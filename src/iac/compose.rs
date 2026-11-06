@@ -198,6 +198,7 @@ fn environment(value: Option<&Value>) -> BTreeMap<String, super::environment::En
                 .as_ref()
                 .and_then(|v| super::environment::literal(&v.text));
             let entry = super::environment::Entry {
+                contract: None,
                 // Shared service fields are added only after their full expansion fits.
                 container: String::new(),
                 image: None,
@@ -602,6 +603,9 @@ pub(super) fn evaluate(
                 events: Vec::new(),
                 subscription: None,
                 environment,
+                images: Vec::new(),
+                provisioned: None,
+                ingress: Vec::new(),
             });
             let mut targets: BTreeSet<(String, String)> = BTreeSet::new();
             for (list, via) in [(&s.depends_on, "depends_on"), (&s.links, "links")] {

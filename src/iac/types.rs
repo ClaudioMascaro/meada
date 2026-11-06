@@ -55,6 +55,7 @@ pub(crate) struct Workload {
     pub ty: String,
     pub images: Vec<String>,
     pub code: Option<String>,
+    pub name: Option<String>,
 }
 
 static WORKLOADS: LazyLock<Vec<Workload>> =
@@ -74,11 +75,33 @@ pub(crate) fn entry(format: &str, ty: &str) -> Option<&'static Entry> {
     ENTRIES.iter().find(|e| e.format == format && e.ty == ty)
 }
 
+pub(crate) fn entries(format: &str) -> impl Iterator<Item = &'static Entry> + '_ {
+    ENTRIES.iter().filter(move |e| e.format == format)
+}
+
+/// A type-table entry is a provisioner only in the format's resource declaration section.
+pub(crate) fn provision_entry(path: &str, block: &str, ty: &str) -> Option<&'static Entry> {
+    let format = format_of(path)?;
+    let declared = match format {
+        "terraform" => super::is_resource_block(block),
+        "cloudformation" => {
+            block.starts_with("Resources.") || block.starts_with("resources.Resources.")
+        }
+        _ => false,
+    };
+    declared.then(|| entry(format, ty)).flatten()
+}
+
 /// The format of the IaC file at `path` as the table names it: `terraform` for a `.tf` or
 /// `.tofu` file or its JSON equivalent, `None` for a format no entry has yet.
 pub(crate) fn format_of(path: &str) -> Option<&'static str> {
-    (path.ends_with(".tf") || path.ends_with(".tofu") || super::json::is_file(path))
-        .then_some("terraform")
+    if path.ends_with(".tf") || path.ends_with(".tofu") || super::json::is_file(path) {
+        Some("terraform")
+    } else if super::cloudformation::is_source(path) {
+        Some("cloudformation")
+    } else {
+        None
+    }
 }
 
 /// The unique contract named by an AWS structured identifier. Forms stay in the type table.
@@ -109,6 +132,13 @@ pub(crate) fn identified(text: &str) -> Option<String> {
 }
 
 impl Entry {
+    pub(crate) fn defining_key(&self, block: &str) -> String {
+        if self.format == "cloudformation" {
+            format!("{block}.Properties.{}", self.name)
+        } else {
+            format!("{block}.{}", self.name)
+        }
+    }
     /// The contract a node of this type named `name` provisions.
     pub(crate) fn contract(&self, name: &str) -> String {
         let prefix = match self.contract {

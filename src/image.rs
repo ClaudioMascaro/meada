@@ -7,6 +7,7 @@ use crate::resolve::Code;
 use crate::workspace::Repository;
 use serde_json::Value;
 
+mod code;
 mod config;
 pub(crate) mod environment;
 mod jib;
@@ -25,10 +26,16 @@ impl ContractKind for Image {
         config::is_file(path)
     }
     fn config_reads_paths(&self, path: &str) -> bool {
-        crate::iac::compose::is_file(path)
+        crate::iac::is_source(path) || crate::iac::cloudformation::is_source(path)
     }
-    fn config_summary(&self, path: &str, src: &[u8], root: &std::path::Path) -> Value {
-        serde_json::to_value(config::read(path, src, root)).unwrap_or(Value::Null)
+    fn config_summary(
+        &self,
+        path: &str,
+        src: &[u8],
+        root: &std::path::Path,
+        facts: &crate::contract::ConfigFacts<'_>,
+    ) -> Value {
+        serde_json::to_value(config::read(path, src, root, facts)).unwrap_or(Value::Null)
     }
     fn sides(&self) -> Option<(&'static str, &'static str)> {
         Some(("builder", "runner"))
@@ -79,31 +86,23 @@ impl ContractKind for Image {
                 });
             }
         }
-        for (root, address, image) in &export.workload_images {
-            let Some(node) = export
-                .iac
-                .iter()
-                .find(|n| n.root == *root && n.address == *address)
-            else {
-                continue;
-            };
-            if crate::iac::types::workload("kubernetes", &node.ty)
-                .is_none_or(|w| w.images.is_empty())
-            {
-                continue;
-            }
-            let Some(name) = evaluated(image) else {
-                continue;
-            };
-            export.consumers.push(runner(
-                &repo.identity,
-                &node.path,
-                &node.address,
-                &name,
-                &node.root,
-                None,
-            ));
-        }
+        let runners = images(export)
+            .into_iter()
+            .filter_map(|(node, image, via)| {
+                let Some(name) = evaluated(image) else {
+                    return None;
+                };
+                Some(runner(
+                    &repo.identity,
+                    &node.path,
+                    &node.address,
+                    &name,
+                    &node.root,
+                    via,
+                ))
+            })
+            .collect::<Vec<_>>();
+        export.consumers.extend(runners);
         for node in &export.iac {
             if node.ty != "service" || crate::iac::types::workload("compose", &node.ty).is_none() {
                 continue;
@@ -118,20 +117,12 @@ impl ContractKind for Image {
             let evidence = image
                 .overridable
                 .then(|| format!("image: {at} (Compose default)"));
-            export.consumers.push(runner(
-                &repo.identity,
-                &node.path,
-                &node.address,
-                &name,
-                &node.root,
-                evidence,
-            ));
             if node.build_image {
                 export.providers.push(Provider {
                     contract: format!("image::{name}"),
                     site: repo.identity.clone(),
                     at: Some(at.clone()),
-                    evidence: image.overridable.then_some(at),
+                    evidence: evidence.map(|_| at),
                     ..Provider::default()
                 });
             }
@@ -145,6 +136,18 @@ impl ContractKind for Image {
                     path: path.into(),
                     level: Level::Exact,
                     reason: format!("Compose build {}#{}.build", n.path, n.block),
+                });
+            }
+        }
+        for (path, summary) in summaries(export) {
+            for code in summary.code {
+                export.executions.push(meada_core::export::Execution {
+                    workload: format!("{}::{path}::{}", repo.identity, code.address),
+                    root: code.root,
+                    repository: repo.identity.clone(),
+                    path: code.path,
+                    level: Level::Exact,
+                    reason: code.reason,
                 });
             }
         }
@@ -424,15 +427,25 @@ impl ContractKind for Image {
                             entry.container,
                             entry.name,
                             entry.target,
-                            entry.value.as_deref().unwrap_or("unresolved")
+                            entry
+                                .value
+                                .as_deref()
+                                .or(entry.contract.as_deref())
+                                .unwrap_or("unresolved")
                         ));
                     }
                 }
-                if identity == symbol
-                    && root.is_none_or(|r| r == n.root)
-                    && let Some(path) = direct(e, n)
-                {
-                    lines.push(format!("code: {} {path} [exact]", e.repository));
+                if identity == symbol && root.is_none_or(|r| r == n.root) {
+                    for execution in e
+                        .executions
+                        .iter()
+                        .filter(|x| x.workload == identity && x.root == n.root)
+                    {
+                        lines.push(format!(
+                            "code: {} {} [exact]",
+                            execution.repository, execution.path
+                        ));
+                    }
                 }
             }
         }
@@ -441,13 +454,6 @@ impl ContractKind for Image {
 }
 
 fn runs(export: &Export, node: &crate::iac::Node, contract: &str) -> bool {
-    if node.ty == "service" {
-        return node
-            .image
-            .as_ref()
-            .and_then(|i| evaluated(&i.text))
-            .is_some_and(|i| format!("image::{i}") == contract);
-    }
     if node.ty == "HelmValues" {
         return summaries(export)
             .iter()
@@ -455,11 +461,62 @@ fn runs(export: &Export, node: &crate::iac::Node, contract: &str) -> bool {
             .flat_map(|(_, s)| &s.runners)
             .any(|r| format!("image::{}", r.image) == contract);
     }
-    export
-        .workload_images
-        .iter()
-        .filter(|(root, address, _)| *root == node.root && *address == node.address)
-        .any(|(_, _, i)| evaluated(i).is_some_and(|i| format!("image::{i}") == contract))
+    images(export)
+        .into_iter()
+        .filter(|(n, _, _)| n.root == node.root && n.address == node.address)
+        .any(|(_, image, _)| evaluated(image).is_some_and(|i| format!("image::{i}") == contract))
+}
+
+/// The one projection of stored format facts into image runners.
+fn images(export: &Export) -> Vec<(&crate::iac::Node, &str, Option<String>)> {
+    let mut out = Vec::new();
+    let mut nodes = std::collections::BTreeMap::new();
+    for node in &export.iac {
+        nodes.insert((node.root.as_str(), node.address.as_str()), node);
+        if node.ty == "service"
+            && crate::iac::types::workload("compose", &node.ty).is_some()
+            && let Some(image) = &node.image
+        {
+            out.push((
+                node,
+                image.text.as_str(),
+                image.overridable.then(|| {
+                    format!(
+                        "image: {}#{}.image (Compose default)",
+                        node.path, node.block
+                    )
+                }),
+            ));
+        }
+        for image in &node.images {
+            let via = (!image.through.is_empty())
+                .then(|| {
+                    let values = image
+                        .through
+                        .iter()
+                        .map(|o| format!("{} {}:{}", o.variable, o.path, o.line))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    format!("image: {}#{} ({values})", node.path, node.block)
+                })
+                .or_else(|| {
+                    image
+                        .image
+                        .overridable
+                        .then(|| format!("image: {}#{} (default)", node.path, node.block))
+                });
+            out.push((node, image.image.text.as_str(), via));
+        }
+    }
+    for (root, address, image) in &export.workload_images {
+        if let Some(node) = nodes.get(&(root.as_str(), address.as_str()))
+            && crate::iac::types::workload("kubernetes", &node.ty)
+                .is_some_and(|w| !w.images.is_empty())
+        {
+            out.push((*node, image.as_str(), None));
+        }
+    }
+    out
 }
 
 fn roles(exports: &[Export]) -> (bool, bool) {

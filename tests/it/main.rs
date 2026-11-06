@@ -7,6 +7,7 @@ mod alerts;
 mod asyncapi;
 mod aws;
 mod aws_sdk;
+mod aws_workloads;
 mod benchmark;
 mod cargo;
 mod channel_queries;

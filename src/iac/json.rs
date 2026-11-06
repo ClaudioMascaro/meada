@@ -136,7 +136,11 @@ impl Read<'_> {
                     _ => Kind::Module,
                 };
                 let ty = if kind == Kind::Module { "" } else { names[0] };
-                let all_args = kind == Kind::Module || subscription::reads(ty);
+                let workload = super::types::workload("terraform", ty).is_some();
+                let all_args = kind == Kind::Module
+                    || subscription::reads(ty)
+                    || workload
+                    || ty == "archive_file";
                 let named_arg = name_argument(kind, ty);
                 let mut attrs = BTreeMap::new();
                 let mut refs = Vec::new();
@@ -178,6 +182,11 @@ impl Read<'_> {
                 } else {
                     BTreeMap::new()
                 };
+                let nested = if workload {
+                    self.nested(body).unwrap_or_default()
+                } else {
+                    Vec::new()
+                };
                 self.module.blocks.push(Block {
                     kind,
                     ty: ty.into(),
@@ -200,9 +209,56 @@ impl Read<'_> {
                         })
                         .flatten(),
                     args,
+                    nested,
                 });
             }
         }
+    }
+    /// JSON uses object bodies (or lists of them) where native syntax uses nested blocks.
+    /// Keep the same expression adapter and charge both body containers and ASTs before copies.
+    fn nested(
+        &mut self,
+        body: &serde_json::Map<String, Value>,
+    ) -> Option<Vec<hcl_edit::structure::Block>> {
+        let mut blocks = Vec::new();
+        for (name, value) in body {
+            let objects: &[Value] = match value {
+                Value::Object(_) => std::slice::from_ref(value),
+                Value::Array(items) => items,
+                _ => continue,
+            };
+            for object in objects.iter().filter_map(Value::as_object) {
+                if !self.store(name.len() + std::mem::size_of::<hcl_edit::structure::Block>()) {
+                    return None;
+                }
+                let Ok(ident) = hcl_edit::Ident::try_new(name) else {
+                    continue;
+                };
+                let mut attrs = Vec::new();
+                for (key, value) in object {
+                    if !self
+                        .store(key.len() + std::mem::size_of::<hcl_edit::structure::Attribute>())
+                    {
+                        return None;
+                    }
+                    let Ok(key_ident) = hcl_edit::Ident::try_new(key) else {
+                        continue;
+                    };
+                    attrs.push(hcl_edit::structure::Attribute::new(
+                        key_ident,
+                        self.expressions.read(value, false),
+                    ));
+                }
+                let nested = self.nested(object)?;
+                blocks.push(
+                    hcl_edit::structure::Block::builder(ident)
+                        .attributes(attrs)
+                        .blocks(nested)
+                        .build(),
+                );
+            }
+        }
+        Some(blocks)
     }
 }
 

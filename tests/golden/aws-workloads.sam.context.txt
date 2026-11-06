@@ -1,0 +1,20 @@
+example.com/acme/sam template.yaml:18-26 Worker
+type: AWS::Serverless::Function
+name: none
+root: template.yaml
+build: "worker"
+handler: "send.dispatch"
+overridable: none
+references:
+example.com/acme/sam template.yaml:14 Orders via Ref
+referenced by: none
+values:
+example.com/acme/sam template.yaml:19 Resources.Worker.Type = "AWS::Serverless::Function"
+example.com/acme/sam template.yaml:21 Resources.Worker.Properties.CodeUri = "worker/"
+example.com/acme/sam template.yaml:22 Resources.Worker.Properties.Handler = "send.dispatch"
+example.com/acme/sam template.yaml:25 Resources.Worker.Properties.Environment.Variables.QUEUE_NAME = "Orders"
+example.com/acme/sam template.yaml:26 Resources.Worker.Properties.Environment.Variables.SECRET_QUEUE = "Hidden"
+env Worker INHERITED -> SAM literal: inherited
+env Worker QUEUE_NAME -> Ref Orders: channel::sqs::orders
+env Worker SECRET_QUEUE -> SAM Environment (unresolved): unresolved
+code: example.com/acme/sam worker [exact]

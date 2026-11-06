@@ -98,7 +98,7 @@ impl<'a> Environments<'a> {
                 // Resolve one container image once, independently of how many variables it sets.
                 let mut images = BTreeMap::new();
                 for entry in &node.environment {
-                    if entry.value.is_none() {
+                    if entry.value.is_none() && entry.contract.is_none() {
                         continue;
                     }
                     let repositories = images.entry(entry.image.as_deref()).or_insert_with(|| {
@@ -148,6 +148,22 @@ impl<'a> Environments<'a> {
         site: &str,
         variable: &str,
     ) -> Vec<(&str, String)> {
+        self.entries(repository, site, variable)
+            .into_iter()
+            .filter(|s| s.entry.contract.is_none())
+            .filter_map(|s| Some((s.entry.value.as_deref()?, s.reason(variable))))
+            .collect()
+    }
+
+    /// Typed known resource references share exactly the same code/container/root scope.
+    fn targets(&self, repository: &str, site: &str, variable: &str) -> Vec<(&str, String)> {
+        self.entries(repository, site, variable)
+            .into_iter()
+            .filter_map(|s| Some((s.entry.contract.as_deref()?, s.reason(variable))))
+            .collect()
+    }
+
+    fn entries(&self, repository: &str, site: &str, variable: &str) -> Vec<&Scope<'a>> {
         let Some(path) = site
             .strip_prefix(repository)
             .and_then(|s| s.strip_prefix("::"))
@@ -169,13 +185,16 @@ impl<'a> Environments<'a> {
             .chain(ancestors)
             .filter_map(|path| paths.get(path))
             .flatten()
-            .filter_map(|s| {
-                Some((
-                    s.entry.value.as_deref()?,
-                    format!("workload:{} (root {}), env:{variable}", s.workload, s.root),
-                ))
-            })
             .collect()
+    }
+}
+
+impl Scope<'_> {
+    fn reason(&self, variable: &str) -> String {
+        format!(
+            "workload:{} (root {}), env:{variable}",
+            self.workload, self.root
+        )
     }
 }
 
@@ -202,6 +221,14 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
                 for (value, reason) in environments.values(&export.repository, site, variable) {
                     if let Some(name) = named(contract, value) {
                         values.entry(name).or_default().insert(reason);
+                    }
+                }
+                for (target, reason) in environments.targets(&export.repository, site, variable) {
+                    if target
+                        .rsplit_once("::")
+                        .is_some_and(|(prefix, _)| prefix == contract)
+                    {
+                        values.entry(target.into()).or_default().insert(reason);
                     }
                 }
                 let values = values

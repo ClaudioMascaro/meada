@@ -200,6 +200,7 @@ pub(super) fn resolve(object: &Obj, configs: &Configs<'_>) -> Vec<Entry> {
     let mut room = ENVIRONMENT_BYTES_MAX;
     for input in &object.facts.environment {
         let entry = |name: String, target: String, value: Option<String>| Entry {
+            contract: None,
             container: input.container.to_string(),
             image: images.get(input.container.as_ref()).map(|i| (*i).into()),
             name,

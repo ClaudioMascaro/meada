@@ -15,6 +15,8 @@ pub(super) struct Summary {
     pub builders: Vec<Builder>,
     pub runners: Vec<Runner>,
     pub paths: Vec<String>,
+    #[serde(default)]
+    pub code: Vec<super::code::Code>,
     #[serde(skip)]
     bytes: usize,
 }
@@ -34,6 +36,10 @@ pub(super) struct Runner {
 }
 
 pub(super) fn is_file(path: &str) -> bool {
+    legacy_file(path) || crate::iac::is_source(path) || crate::iac::cloudformation::is_source(path)
+}
+
+fn legacy_file(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
     (path.starts_with(".github/workflows/") && (path.ends_with(".yml") || path.ends_with(".yaml")))
         || crate::iac::compose::is_file(path)
@@ -78,9 +84,23 @@ fn safe(root: &Path, path: &str) -> bool {
     at.is_dir()
 }
 
-pub(super) fn read(path: &str, src: &[u8], root: &Path) -> Summary {
+pub(super) fn read(
+    path: &str,
+    src: &[u8],
+    root: &Path,
+    facts: &crate::contract::ConfigFacts<'_>,
+) -> Summary {
     let mut out = Summary::default();
     if src.len() > crate::lang::MAX_BYTES {
+        return out;
+    }
+    for node in facts.nodes {
+        if let Some(code) = super::code::checked(root, node, IMAGE_STORED_MAX - out.bytes) {
+            out.bytes += code.address.len() + code.root.len() + code.path.len() + code.reason.len();
+            out.code.push(code);
+        }
+    }
+    if !legacy_file(path) {
         return out;
     }
     if path.ends_with("pom.xml") {
@@ -371,6 +391,7 @@ mod tests {
             ".github/workflows/build.yaml",
             source.as_bytes(),
             Path::new("."),
+            &Default::default(),
         );
         assert!(!summary.builders.is_empty());
         assert!(summary.builders.len() < 10_000);

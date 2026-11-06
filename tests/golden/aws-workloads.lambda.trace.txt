@@ -1,0 +1,9 @@
+example.com/acme/deploy main.tf:4 aws_lambda_function.worker
+  runs code example.com/acme/app . [exact: image::ghcr.io/acme/aws-worker]
+    example.com/acme/app send.ts:3 dispatch
+chain: exact · 1 hops · 2 repos · 57 tokens
+
+example.com/acme/app send.ts:3 dispatch
+  runs code [exact: image::ghcr.io/acme/aws-worker] example.com/acme/deploy main.tf:4 aws_lambda_function.worker (root .)
+  provisions channel::sqs::orders [inferred: channel::sqs::orders; workload:example.com/acme/deploy::main.tf::aws_lambda_function.worker (root .), env:QUEUE_NAME] example.com/acme/deploy main.tf:1 aws_sqs_queue.orders (root .)
+chain: inferred · 2 hops · 2 repos · 110 tokens

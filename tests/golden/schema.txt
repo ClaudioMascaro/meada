@@ -64,7 +64,8 @@ CREATE TABLE iac_nodes (
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
-    subscription TEXT, environment TEXT NOT NULL
+    subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
+    ingress TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3415,6 +3416,9 @@ Output {
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
         Node {
             address: "Deployment.apps/shop/dev-web",
@@ -3447,6 +3451,7 @@ Output {
                     value: Some(
                         "https://sqs.us-east-1.amazonaws.com/123456789012/orders",
                     ),
+                    contract: None,
                 },
                 Entry {
                     container: "main",
@@ -3456,8 +3461,12 @@ Output {
                     name: "TOKEN",
                     target: "Secret/credentials key token (redacted)",
                     value: None,
+                    contract: None,
                 },
             ],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
         Node {
             address: "Service/shop/dev-web",
@@ -3480,6 +3489,9 @@ Output {
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
         Node {
             address: "ServiceAccount/shop/dev-runner",
@@ -3502,6 +3514,9 @@ Output {
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
     ],
     references: [
@@ -3574,6 +3589,9 @@ Output {
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
         Node {
             address: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
@@ -3598,6 +3616,9 @@ Output {
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws",
@@ -3622,6 +3643,9 @@ Output {
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
         Node {
             address: "Queue.acme.io/shop/orders",
@@ -3646,6 +3670,9 @@ Output {
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/queue",
@@ -3670,6 +3697,9 @@ Output {
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/topic",
@@ -3694,6 +3724,9 @@ Output {
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
     ],
     references: [
@@ -3765,6 +3798,9 @@ sample.cloudformation.yaml
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
         Node {
             address: "Worker",
@@ -3793,7 +3829,19 @@ sample.cloudformation.yaml
             handler: None,
             events: [],
             subscription: None,
-            environment: [],
+            environment: [
+                Entry {
+                    container: "Worker",
+                    image: None,
+                    name: "QUEUE",
+                    target: "SAM Environment (unresolved)",
+                    value: None,
+                    contract: None,
+                },
+            ],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
     ],
     [
@@ -3902,6 +3950,9 @@ sample.serverless.yml
             ],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
         Node {
             address: "Queue",
@@ -3931,6 +3982,9 @@ sample.serverless.yml
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
     ],
     [
@@ -3969,6 +4023,9 @@ sample.provision.tf
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
         Node {
             address: "aws_sqs_queue.orders",
@@ -3991,6 +4048,9 @@ sample.provision.tf
             events: [],
             subscription: None,
             environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
         },
     ],
     [],
@@ -4042,5 +4102,11 @@ sample.alert.yaml
       }
     ],
     "truncated": false
+  },
+  "image": {
+    "builders": [],
+    "code": [],
+    "paths": [],
+    "runners": []
   }
 }

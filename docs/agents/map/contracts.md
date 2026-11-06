@@ -23,6 +23,7 @@ topic leaves within 24 KiB; the code wins over these entries.
 <a id="image-contracts-662"></a>
 
 - [Image contracts (#662)](contracts/image-contracts-662.md)
+- [AWS workloads and shared cloud facts (#664)](contracts/aws-workloads-664.md)
 
 <a id="workload-environment-resolution-663"></a>
 

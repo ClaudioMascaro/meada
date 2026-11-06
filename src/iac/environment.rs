@@ -13,6 +13,9 @@ pub(crate) struct Entry {
     pub name: String,
     pub target: String,
     pub value: Option<String>,
+    /// A known resource target, without pretending to know its deployment-time URL or ARN.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contract: Option<String>,
 }
 
 impl Entry {
@@ -22,6 +25,7 @@ impl Entry {
             + self.name.len()
             + self.target.len()
             + self.value.as_ref().map_or(0, String::len)
+            + self.contract.as_ref().map_or(0, String::len)
     }
 }
 

@@ -294,7 +294,12 @@ fn probes() -> Vec<Probe> {
                 "x".repeat(MAX_BYTES / 4)
             );
             crate::alert::Alert
-                .config_summary("rules.yaml", &file(text), std::path::Path::new("."))
+                .config_summary(
+                    "rules.yaml",
+                    &file(text),
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
                 .to_string()
                 .len()
         }),
@@ -306,7 +311,12 @@ fn probes() -> Vec<Probe> {
                 "]".repeat(NESTING)
             );
             crate::alert::Alert
-                .config_summary("alertmanager.yaml", &file(text), std::path::Path::new("."))
+                .config_summary(
+                    "alertmanager.yaml",
+                    &file(text),
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
                 .to_string()
                 .len()
         }),
@@ -319,7 +329,12 @@ fn probes() -> Vec<Probe> {
             });
             let text = format!("resource \"grafana_rule_group\" \"ops\" {{\n{rules}}}\n");
             crate::alert::Alert
-                .config_summary("grafana.tf", &file(text), std::path::Path::new("."))
+                .config_summary(
+                    "grafana.tf",
+                    &file(text),
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
                 .to_string()
                 .len()
         }),
@@ -335,6 +350,7 @@ fn probes() -> Vec<Probe> {
                     ".github/workflows/build.yml",
                     &text,
                     std::path::Path::new("."),
+                    &Default::default(),
                 )
                 .to_string()
                 .len()
@@ -347,6 +363,7 @@ fn probes() -> Vec<Probe> {
                     "skaffold.yaml",
                     &file(format!("build:\n  artifacts:\n{items}")),
                     std::path::Path::new("."),
+                    &Default::default(),
                 )
                 .to_string()
                 .len()
@@ -359,7 +376,12 @@ fn probes() -> Vec<Probe> {
                 "</plugin>".repeat(NESTING / 2)
             ));
             crate::image::Image
-                .config_summary("pom.xml", &text, std::path::Path::new("."))
+                .config_summary(
+                    "pom.xml",
+                    &text,
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
                 .to_string()
                 .len()
         }),
@@ -371,7 +393,12 @@ fn probes() -> Vec<Probe> {
                 "}".repeat(NESTING)
             ));
             crate::image::Image
-                .config_summary("build.gradle.kts", &text, std::path::Path::new("."))
+                .config_summary(
+                    "build.gradle.kts",
+                    &text,
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
                 .to_string()
                 .len()
         }),

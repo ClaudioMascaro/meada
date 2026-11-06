@@ -84,7 +84,8 @@
 
 - `IMAGE_STORED_MAX` (`image/config.rs`): 4 times `lang::MAX_BYTES` per configuration file,
   bounding the image facts when a long job key is repeated for many tags. Past it further
-  builder facts are left out. The reader shares the event/XML/Gradle depth and file ceilings;
+  builder and direct-code facts are left out. Direct-code summaries charge node identity, root,
+  path and reason before copying them. The reader shares the event/XML/Gradle depth and file ceilings;
   unresolved image patterns share `PATTERN_LITERAL_MIN`, `PATTERN_SEGMENTS` and `PATTERN_TEXT_MAX`.
 
 - `ENVIRONMENT_BYTES_MAX` (`iac/environment.rs`, #663): one `lang::MAX_BYTES` (1 MiB) of
@@ -94,4 +95,6 @@
   entries, since a partial list could miss an override. Values beyond `VALUE_MAX` stay
   unresolved; Secret values stay absent. Compose charges repeated service names and images
   before copying them into entries; Kubernetes shares a container name while reading inputs.
-  Unit/repository IaC budgets also charge these entries.
+  Unit/repository IaC budgets also charge these entries and multi-container images, typed
+  targets, projected provisioned names and routing evidence. Lambda/SAM also charge repeated
+  container/image strings before copying environment entries, including overridden entries.

@@ -55,6 +55,13 @@ const NAMED: &[(&str, &str, bool)] = &[
     ("AWS::Lambda::Function", "FunctionName", true),
     ("AWS::Logs::LogGroup", "LogGroupName", true),
     ("AWS::RDS::DBInstance", "DBInstanceIdentifier", true),
+    ("AWS::RDS::DBCluster", "DBClusterIdentifier", true),
+    ("AWS::ElastiCache::CacheCluster", "ClusterName", true),
+    (
+        "AWS::ElastiCache::ReplicationGroup",
+        "ReplicationGroupId",
+        true,
+    ),
     ("AWS::S3::Bucket", "BucketName", true),
     ("AWS::SecretsManager::Secret", "Name", false),
     ("AWS::Serverless::Function", "FunctionName", true),
@@ -384,6 +391,132 @@ impl Eval<'_> {
         }
         Part::join(parts, "")
     }
+
+    /// A known target is not the URL/ARN CloudFormation would return at deployment time.
+    fn environment_target(&mut self, value: &Value) -> Option<(String, String)> {
+        let map = value.as_object()?;
+        let (id, attribute) = if let Some(id) = map.get("Ref").and_then(Value::as_str) {
+            (id, None)
+        } else {
+            let (id, attribute) = get_att(map.get("Fn::GetAtt")?)?;
+            (id, Some(attribute?))
+        };
+        let resource = self.resources.get(id)?;
+        let entry = super::types::entry("cloudformation", &resource.ty)?;
+        if attribute
+            .as_deref()
+            .is_some_and(|a| a != "Arn" && a != entry.name)
+        {
+            return None;
+        }
+        let part = self.name_of(id, 0)?;
+        if part.pattern || part.text.is_empty() {
+            return None;
+        }
+        Some((
+            format!(
+                "{} {id}",
+                if attribute.is_some() { "GetAtt" } else { "Ref" }
+            ),
+            entry.contract(&part.text),
+        ))
+    }
+
+    fn function(&mut self, id: &str, doc: &Value) -> Node {
+        let mut node = Node::default();
+        if self.resources[id].ty != "AWS::Serverless::Function" {
+            return node;
+        }
+        let props = &doc["Resources"][id]["Properties"];
+        if let Some(value) = props
+            .get("CodeUri")
+            .filter(|v| v.is_string() || v.is_object())
+        {
+            let part = self.eval(value, 0);
+            if !part.pattern
+                && let Some(text) =
+                    super::workload::local_path(config_values::parent(self.path), &part.text)
+            {
+                node.build = Some(super::Resolved {
+                    text,
+                    overridable: !part.through.is_empty(),
+                });
+            }
+        }
+        if let Some(value) = props.get("Handler") {
+            let part = self.eval(value, 0);
+            node.handler = Some(super::Resolved {
+                text: part.text,
+                overridable: !part.through.is_empty(),
+            });
+        }
+        if let Some(value) = props.get("ImageUri") {
+            let part = self.eval(value, 0);
+            node.images.push(super::WorkloadImage {
+                container: id.into(),
+                image: super::Resolved {
+                    text: part.text,
+                    overridable: !part.through.is_empty(),
+                },
+                through: part.through.into_iter().collect(),
+            });
+        }
+        let mut entries = BTreeMap::new();
+        let mut room = super::environment::ENVIRONMENT_BYTES_MAX;
+        for variables in [
+            doc.pointer("/Globals/Function/Environment/Variables"),
+            props.pointer("/Environment/Variables"),
+        ]
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_object)
+        {
+            for (name, raw) in variables {
+                let (target, value, contract) =
+                    if let Some((target, contract)) = self.environment_target(raw) {
+                        (target, None, Some(contract))
+                    } else {
+                        let part = self.eval(raw, 0);
+                        let target = if part.pattern {
+                            "SAM Environment (unresolved)"
+                        } else if !part.through.is_empty() {
+                            "SAM parameter default"
+                        } else {
+                            "SAM literal"
+                        };
+                        let value = (!part.pattern && !part.text.contains("{{resolve:"))
+                            .then(|| super::environment::literal(&part.text))
+                            .flatten();
+                        (target.into(), value, None)
+                    };
+                let image = node.images.first().map(|i| i.image.text.as_str());
+                let bytes = id.len()
+                    + name.len()
+                    + target.len()
+                    + value.as_ref().map_or(0, String::len)
+                    + contract.as_ref().map_or(0, String::len)
+                    + image.map_or(0, str::len);
+                let Some(left) = room.checked_sub(bytes) else {
+                    node.environment.clear();
+                    return node;
+                };
+                room = left;
+                entries.insert(
+                    name.clone(),
+                    super::environment::Entry {
+                        container: id.into(),
+                        image: image.map(str::to_string),
+                        name: name.clone(),
+                        target,
+                        value,
+                        contract,
+                    },
+                );
+            }
+        }
+        node.environment = entries.into_values().collect();
+        node
+    }
 }
 
 /// The resources `body`'s intrinsic functions reference, with the `via` of each: `Ref`,
@@ -590,8 +723,9 @@ pub(super) fn nodes(unit: &Unit) -> (Vec<Node>, Vec<Reference>) {
     };
     for id in ids {
         let name = eval.name_of(&id, 0);
+        let function = eval.function(&id, doc);
         let r = &eval.resources[&id];
-        let size = id.len() + name.as_ref().map_or(0, |n| n.text.len());
+        let size = id.len() + name.as_ref().map_or(0, |n| n.text.len()) + function.workload_size();
         if !take(size) {
             break;
         }
@@ -610,14 +744,7 @@ pub(super) fn nodes(unit: &Unit) -> (Vec<Node>, Vec<Reference>) {
             block: config_values::key_path(
                 &[unit.block.clone(), vec![Step::Key(id.clone())]].concat(),
             ),
-            image: None,
-            build: None,
-            build_image: false,
-            role: None,
-            handler: None,
-            events: Vec::new(),
-            subscription: None,
-            environment: Vec::new(),
+            ..function
         });
         let targets = referenced(&id, &r.body, |t| eval.resources.contains_key(t));
         for (target, via) in targets.into_iter().take(REFERENCES_MAX) {

@@ -31,7 +31,13 @@ impl ContractKind for Alert {
     fn config_file(&self, path: &str) -> bool {
         config::is_file(path)
     }
-    fn config_summary(&self, path: &str, src: &[u8], _: &std::path::Path) -> Value {
+    fn config_summary(
+        &self,
+        path: &str,
+        src: &[u8],
+        _: &std::path::Path,
+        _: &crate::contract::ConfigFacts<'_>,
+    ) -> Value {
         serde_json::to_value(config::read(path, src)).unwrap_or(Value::Null)
     }
     fn place(&self, repository: &str, site: &str) -> Option<String> {

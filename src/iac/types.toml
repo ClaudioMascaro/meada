@@ -52,6 +52,13 @@ forms = [
 
 # Workloads (#662): image paths are read by their format reader; [] names every list item.
 [[workload]]
+format = "terraform"
+type = "aws_lambda_function"
+images = ["image_uri"]
+code = "filename"
+name = "function_name"
+
+[[workload]]
 format = "kubernetes"
 type = "Deployment"
 images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
@@ -171,3 +178,123 @@ contract = "resource"
 kind = "secretsmanager"
 name = "name"
 forms = ["arn:*:secretsmanager:*:*:secret:{path}-??????"]
+
+# CloudFormation/SAM aliases of the curated AWS provisioner inventory (#664).
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::SQS::Queue"
+contract = "channel"
+kind = "sqs"
+name = "QueueName"
+forms = ["arn:*:sqs:*:*:{name}", "https://sqs.*.amazonaws.com/*/{name}", "https://*.queue.amazonaws.com/*/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::S3::Bucket"
+contract = "resource"
+kind = "s3"
+name = "BucketName"
+forms = ["arn:*:s3:::{name}", "s3://{name}", "https://{name}.s3.amazonaws.com", "https://{name}.s3.*.amazonaws.com", "https://s3.*.amazonaws.com/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::SNS::Topic"
+contract = "channel"
+kind = "sns"
+name = "TopicName"
+forms = ["arn:*:sns:*:*:{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::Events::EventBus"
+contract = "channel"
+kind = "eventbridge"
+name = "Name"
+forms = ["arn:*:events:*:*:event-bus/{path}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::Kinesis::Stream"
+contract = "channel"
+kind = "kinesis"
+name = "Name"
+forms = ["arn:*:kinesis:*:*:stream/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::DynamoDB::Table"
+contract = "resource"
+kind = "dynamodb"
+name = "TableName"
+forms = ["arn:*:dynamodb:*:*:table/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::DynamoDB::GlobalTable"
+contract = "resource"
+kind = "dynamodb"
+name = "TableName"
+forms = ["arn:*:dynamodb:*:*:table/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::Serverless::SimpleTable"
+contract = "resource"
+kind = "dynamodb"
+name = "TableName"
+forms = ["arn:*:dynamodb:*:*:table/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::RDS::DBInstance"
+contract = "resource"
+kind = "rds"
+name = "DBInstanceIdentifier"
+forms = ["arn:*:rds:*:*:db:{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::RDS::DBCluster"
+contract = "resource"
+kind = "rds"
+name = "DBClusterIdentifier"
+forms = ["arn:*:rds:*:*:cluster:{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::ElastiCache::CacheCluster"
+contract = "resource"
+kind = "elasticache"
+name = "ClusterName"
+forms = ["arn:*:elasticache:*:*:cluster:{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::ElastiCache::ReplicationGroup"
+contract = "resource"
+kind = "elasticache"
+name = "ReplicationGroupId"
+forms = ["arn:*:elasticache:*:*:replicationgroup:{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::SSM::Parameter"
+contract = "resource"
+kind = "ssm"
+name = "Name"
+forms = ["arn:*:ssm:*:*:parameter{path}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::SecretsManager::Secret"
+contract = "resource"
+kind = "secretsmanager"
+name = "Name"
+forms = ["arn:*:secretsmanager:*:*:secret:{path}-??????"]
+
+[[workload]]
+format = "cloudformation"
+type = "AWS::Serverless::Function"
+images = ["Properties.ImageUri"]
+code = "Properties.CodeUri"

@@ -36,9 +36,9 @@ pub(crate) fn read(db: &Connection, identity: &str) -> Result<Vec<Subscription>>
 }
 
 #[derive(Clone)]
-struct Endpoint {
-    name: String,
-    through: BTreeSet<Overridable>,
+pub(super) struct Endpoint {
+    pub(super) name: String,
+    pub(super) through: BTreeSet<Overridable>,
 }
 
 #[derive(Clone)]
@@ -98,7 +98,7 @@ impl<'m> Eval<'m> {
     /// Resolve literals with the ordinary evaluator, and a traversal to a known resource's
     /// name/ARN/id with its node. Other attributes, unknown expressions and ambiguous instances
     /// remain absent. Following aliases shares the evaluator's depth and work budgets.
-    fn endpoint(
+    pub(super) fn endpoint(
         &mut self,
         at: usize,
         each: Option<&Each>,

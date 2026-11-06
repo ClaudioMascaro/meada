@@ -191,6 +191,12 @@ pub struct Related<'e> {
 
 pub use meada_core::search::Hit;
 
+/// Evaluated configuration facts, grouped once by file during indexing.
+#[derive(Default)]
+pub struct ConfigFacts<'a> {
+    pub(crate) nodes: &'a [&'a crate::iac::Node],
+}
+
 /// A contract kind: the whole interface of one, so that the engine, the open items, the
 /// decisions, the trace and the entry points ask a kind instead of naming it. Every question
 /// but `prefix`, `extract` and `link` has a default body; a kind overrides only what it
@@ -235,6 +241,7 @@ pub trait ContractKind {
         _path: &str,
         _src: &[u8],
         _root: &std::path::Path,
+        _facts: &ConfigFacts<'_>,
     ) -> serde_json::Value {
         serde_json::Value::Null
     }
@@ -564,10 +571,18 @@ pub(crate) fn config_reads_paths(path: &str) -> bool {
     KINDS.iter().any(|k| k.config_reads_paths(path))
 }
 
-pub(crate) fn config_summary(path: &str, src: &[u8], root: &std::path::Path) -> serde_json::Value {
+pub(crate) fn config_summary(
+    path: &str,
+    src: &[u8],
+    root: &std::path::Path,
+    nodes: &[&crate::iac::Node],
+) -> serde_json::Value {
     let mut summaries = serde_json::Map::new();
     for kind in KINDS.iter().filter(|k| k.config_file(path)) {
-        summaries.insert(kind.prefix().into(), kind.config_summary(path, src, root));
+        summaries.insert(
+            kind.prefix().into(),
+            kind.config_summary(path, src, root, &ConfigFacts { nodes }),
+        );
     }
     summaries.into()
 }

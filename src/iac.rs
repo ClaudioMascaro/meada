@@ -64,6 +64,7 @@ pub(crate) mod provision;
 pub(crate) mod serverless;
 pub(crate) mod subscription;
 pub(crate) mod types;
+pub(crate) mod workload;
 
 /// The instances one `count` or `for_each` gives; past it the block is one node with no key.
 // ponytail: a fleet of a few hundred instances is real; past a thousand the keys come from data.
@@ -135,6 +136,53 @@ pub(crate) struct Resolved {
     pub overridable: bool,
 }
 
+/// An evaluated container image and the values a deployer can override that it used.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct WorkloadImage {
+    pub container: String,
+    pub image: Resolved,
+    pub through: Vec<Overridable>,
+}
+
+impl WorkloadImage {
+    pub(crate) fn size(&self) -> usize {
+        self.container.len()
+            + self.image.text.len()
+            + self
+                .through
+                .iter()
+                .map(|o| o.path.len() + o.variable.len() + 16)
+                .sum::<usize>()
+    }
+}
+
+/// A composite provisioned name. An explicit absent name forbids a physical-name fallback.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub(crate) struct Projection {
+    pub name: Option<String>,
+    pub pattern: bool,
+    pub through: Vec<Overridable>,
+}
+
+/// Literal routing evidence after a Kubernetes overlay has renamed its Service.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Ingress {
+    pub host: String,
+    pub prefix: String,
+    pub service: String,
+}
+
+impl Projection {
+    pub(crate) fn size(&self) -> usize {
+        self.name.as_ref().map_or(0, String::len)
+            + self
+                .through
+                .iter()
+                .map(|o| o.path.len() + o.variable.len() + 16)
+                .sum::<usize>()
+    }
+}
+
 /// Whether the file at `path` is a var file Terraform loads by itself into its directory's root
 /// module: `terraform.tfvars`, `terraform.tfvars.json`, `*.auto.tfvars` or `*.auto.tfvars.json`.
 fn is_var_file(path: &str) -> bool {
@@ -203,9 +251,28 @@ pub(crate) struct Node {
     pub events: Vec<Resolved>,
     pub subscription: Option<subscription::Subscription>,
     pub environment: Vec<environment::Entry>,
+    pub images: Vec<WorkloadImage>,
+    pub provisioned: Option<Projection>,
+    pub ingress: Vec<Ingress>,
 }
 
 impl Node {
+    pub(crate) fn workload_size(&self) -> usize {
+        self.images.iter().map(WorkloadImage::size).sum::<usize>()
+            + self
+                .environment
+                .iter()
+                .map(environment::Entry::size)
+                .sum::<usize>()
+            + self.build.as_ref().map_or(0, |p| p.text.len())
+            + self.handler.as_ref().map_or(0, |p| p.text.len())
+            + self.provisioned.as_ref().map_or(0, Projection::size)
+            + self
+                .ingress
+                .iter()
+                .map(|i| i.host.len() + i.prefix.len() + i.service.len())
+                .sum::<usize>()
+    }
     pub(crate) fn identity(&self, repository: &str) -> String {
         format!("{repository}::{}::{}", self.path, self.address)
     }
@@ -327,6 +394,8 @@ struct Block {
     /// A module call's `source`, and each of its arguments.
     source: Option<String>,
     args: BTreeMap<String, Named>,
+    /// Nested syntax of workload types, evaluated only by the format's workload reader.
+    nested: Vec<hcl_edit::structure::Block>,
 }
 
 /// An expression a name holds (a local, an output, a module call's argument), with the
@@ -611,7 +680,8 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
         let mut refs = Refs::default();
         refs.visit_body(&b.body);
         let mut args = BTreeMap::new();
-        if kind == Kind::Module || subscription::reads(ty) {
+        let workload = types::workload("terraform", ty).is_some();
+        if kind == Kind::Module || subscription::reads(ty) || workload || ty == "archive_file" {
             for a in b.body.attributes() {
                 args.insert(a.key.as_str().to_string(), Named::new(&a.value));
             }
@@ -638,6 +708,11 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
             refs: refs.0,
             source,
             args,
+            nested: if workload {
+                b.body.blocks().cloned().collect()
+            } else {
+                Vec::new()
+            },
         });
     }
 }
@@ -646,7 +721,10 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
 /// table names for a resource it lists (`bucket` for `aws_s3_bucket`), else `name`.
 fn name_argument(kind: Kind, ty: &str) -> &'static str {
     match kind {
-        Kind::Resource => types::entry("terraform", ty).map_or("name", |e| e.name.as_str()),
+        Kind::Resource => types::entry("terraform", ty)
+            .map(|e| e.name.as_str())
+            .or_else(|| types::workload("terraform", ty).and_then(|w| w.name.as_deref()))
+            .unwrap_or("name"),
         _ => "name",
     }
 }
@@ -1039,6 +1117,9 @@ impl<'m> Eval<'m> {
         }
         self.prepare_subscriptions(&pending);
         for &(node, instance, block, ref each) in &pending {
+            self.workload(node, instance, each.as_ref(), block);
+        }
+        for &(node, instance, block, ref each) in &pending {
             let Some(subscription) = self.subscription(node, instance, each.as_ref(), block) else {
                 continue;
             };
@@ -1140,6 +1221,9 @@ impl<'m> Eval<'m> {
                     events: Vec::new(),
                     subscription: None,
                     environment: Vec::new(),
+                    images: Vec::new(),
+                    provisioned: None,
+                    ingress: Vec::new(),
                 });
                 let local = (block.source.as_deref())
                     .and_then(|s| local_source(dir, s))
@@ -1721,7 +1805,9 @@ pub(crate) fn refresh(
         Ok(n.unwrap_or(0) as usize)
     };
     let kept = bytes(&format!(
-        "SELECT sum(length(CAST(address AS BLOB)) + coalesce(length(CAST(name AS BLOB)), 0)) \
+        "SELECT sum(length(CAST(address AS BLOB)) + coalesce(length(CAST(name AS BLOB)), 0) \
+         + length(CAST(environment AS BLOB)) + length(CAST(images AS BLOB)) \
+         + coalesce(length(CAST(provisioned AS BLOB)), 0) + length(CAST(ingress AS BLOB))) \
          FROM iac_nodes WHERE {}",
         terraform_path("path")
     ))? + bytes(&format!(
@@ -1849,7 +1935,7 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
@@ -1880,6 +1966,12 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
                 .map(serde_json::to_string)
                 .transpose()?,
             serde_json::to_string(&n.environment)?,
+            serde_json::to_string(&n.images)?,
+            n.provisioned
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()?,
+            serde_json::to_string(&n.ingress)?,
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -1892,7 +1984,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
                        block, image, image_overridable, build, build_overridable, role, \
-                       handler, handler_overridable, events, build_image, subscription, environment";
+                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -1924,6 +2016,11 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         handler: resolved(r, 15)?,
         events: serde_json::from_str(&r.get::<_, String>(17)?).unwrap_or_default(),
         environment: serde_json::from_str(&r.get::<_, String>(20)?).unwrap_or_default(),
+        images: serde_json::from_str(&r.get::<_, String>(21)?).unwrap_or_default(),
+        provisioned: r
+            .get::<_, Option<String>>(22)?
+            .and_then(|s| serde_json::from_str(&s).ok()),
+        ingress: serde_json::from_str(&r.get::<_, String>(23)?).unwrap_or_default(),
         subscription: r
             .get::<_, Option<String>>(19)?
             .and_then(|s| serde_json::from_str(&s).ok()),

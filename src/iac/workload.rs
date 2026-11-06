@@ -1,0 +1,241 @@
+//! Terraform workload inputs evaluated in their root/module/instance context.
+
+use super::environment::{self, Entry};
+use super::{Block, Each, Eval, Evaluated, Kind, Resolved, Val, WorkloadImage};
+use hcl::Value;
+use hcl_edit::expr::{Expression, ObjectKey, TraversalOperator};
+use std::collections::BTreeMap;
+
+/// New workload code paths reject parent steps before normalization, even if still in-root.
+pub(crate) fn local_path(base: &str, written: &str) -> Option<String> {
+    if written.starts_with(['/', '~'])
+        || written.contains(['\\', ':', '$', '*'])
+        || written.split('/').any(|s| s == "..")
+    {
+        return None;
+    }
+    let path = super::joined(base, written)?;
+    Some(if path.is_empty() { ".".into() } else { path })
+}
+
+pub(super) fn literal(value: Value) -> Option<String> {
+    let text = match value {
+        Value::String(v) => v,
+        Value::Bool(v) => v.to_string(),
+        Value::Number(v) => v.to_string(),
+        _ => return None,
+    };
+    environment::literal(&text)
+}
+
+impl<'m> Eval<'m> {
+    /// A known resource's identity is not the ARN, URL or secret contents a provider returns.
+    pub(super) fn tf_environment(
+        &mut self,
+        instance: usize,
+        each: Option<&Each>,
+        expr: &'m Expression,
+    ) -> (String, Option<String>, Option<String>) {
+        let found = self.value(instance, each, expr, 0);
+        if let Val::Known(value) = found.val {
+            let target = if found.through.is_empty() {
+                "Terraform environment".into()
+            } else {
+                format!(
+                    "Terraform default {}",
+                    found
+                        .through
+                        .iter()
+                        .map(|o| o.variable.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            };
+            return (target, literal(value), None);
+        }
+        for entry in super::types::entries("terraform") {
+            if let Some(target) = self.endpoint(instance, each, expr, &entry.ty, 0)
+                && target.name.len() <= crate::config_values::VALUE_MAX
+            {
+                return (
+                    format!("Terraform {} {}", entry.ty, target.name),
+                    None,
+                    Some(entry.contract(&target.name)),
+                );
+            }
+        }
+        ("Terraform environment (unresolved)".into(), None, None)
+    }
+
+    fn lambda_code(
+        &mut self,
+        instance: usize,
+        each: Option<&Each>,
+        block: &'m Block,
+    ) -> Option<Resolved> {
+        let filename = &block.args.get("filename")?.expr;
+        let mut found = self.value(instance, each, filename, 0);
+        if !matches!(found.val, Val::Known(Value::String(_))) {
+            // Follow only this exact archive output reference to an explicit local input.
+            // The output itself, arbitrary data sources and ZIP members are never evaluated.
+            let Expression::Traversal(t) = filename else {
+                return None;
+            };
+            if !matches!(&t.expr, Expression::Variable(v) if v.as_str() == "data") {
+                return None;
+            }
+            let ops = t.operators.iter().map(|o| o.value()).collect::<Vec<_>>();
+            let [
+                TraversalOperator::GetAttr(ty),
+                TraversalOperator::GetAttr(name),
+                TraversalOperator::GetAttr(output),
+            ] = ops.as_slice()
+            else {
+                return None;
+            };
+            if ty.as_str() != "archive_file" || output.as_str() != "output_path" {
+                return None;
+            }
+            let modules = self.modules;
+            let mut declarations =
+                modules[self.instances[instance].dir]
+                    .blocks
+                    .iter()
+                    .filter(|b| {
+                        b.kind == Kind::Data && b.ty == "archive_file" && b.name == name.as_str()
+                    });
+            let archive = declarations.next()?;
+            if declarations.next().is_some()
+                || archive.count.is_some()
+                || archive.for_each.is_some()
+            {
+                return None;
+            }
+            let input = archive
+                .args
+                .get("source_dir")
+                .or_else(|| archive.args.get("source_file"))?;
+            found = self.value(instance, None, &input.expr, 0);
+        }
+        let Val::Known(Value::String(written)) = found.val else {
+            return None;
+        };
+        let base = if self.root == "." {
+            ""
+        } else {
+            self.root.as_str()
+        };
+        Some(Resolved {
+            text: local_path(base, &written)?,
+            overridable: !found.through.is_empty(),
+        })
+    }
+
+    pub(super) fn workload(
+        &mut self,
+        node: usize,
+        instance: usize,
+        each: Option<&Each>,
+        block: &'m Block,
+    ) {
+        if block.kind != Kind::Resource || block.ty != "aws_lambda_function" {
+            return;
+        }
+        let mut candidate = super::Node::default();
+        if let Some(arg) = block.args.get("image_uri") {
+            let found = self.value(instance, each, &arg.expr, 0);
+            let (text, _) = found.text();
+            if text != "*" {
+                candidate.images.push(WorkloadImage {
+                    container: block.name.clone(),
+                    image: Resolved {
+                        text,
+                        overridable: !found.through.is_empty(),
+                    },
+                    through: found.through.into_iter().collect(),
+                });
+            }
+        }
+        candidate.build = self.lambda_code(instance, each, block);
+        if let Some(arg) = block.args.get("handler") {
+            let found = self.value(instance, each, &arg.expr, 0);
+            candidate.handler = Some(Resolved {
+                text: found.text().0,
+                overridable: !found.through.is_empty(),
+            });
+        }
+        let image = candidate.images.first().map(|i| i.image.text.as_str());
+        let mut entries = BTreeMap::new();
+        let mut room = environment::ENVIRONMENT_BYTES_MAX;
+        let mut put =
+            |name: &str, (target, value, contract): (String, Option<String>, Option<String>)| {
+                let bytes = block.name.len()
+                    + image.map_or(0, str::len)
+                    + name.len()
+                    + target.len()
+                    + value.as_ref().map_or(0, String::len)
+                    + contract.as_ref().map_or(0, String::len);
+                let Some(left) = room.checked_sub(bytes) else {
+                    entries.clear();
+                    return false;
+                };
+                room = left;
+                entries.insert(
+                    name.to_string(),
+                    Entry {
+                        container: block.name.clone(),
+                        image: image.map(str::to_string),
+                        name: name.into(),
+                        target,
+                        value,
+                        contract,
+                    },
+                );
+                true
+            };
+        'environment: for body in block
+            .nested
+            .iter()
+            .filter(|b| b.ident.as_str() == "environment")
+        {
+            let Some(arg) = body.body.get_attribute("variables") else {
+                continue;
+            };
+            if let Expression::Object(values) = &arg.value {
+                for (key, value) in values {
+                    let name = match key {
+                        ObjectKey::Ident(id) => id.as_str(),
+                        ObjectKey::Expression(Expression::String(s)) => s.value().as_str(),
+                        _ => continue,
+                    };
+                    if !put(name, self.tf_environment(instance, each, value.expr())) {
+                        break 'environment;
+                    }
+                }
+            } else {
+                let Evaluated {
+                    val: Val::Known(Value::Object(values)),
+                    ..
+                } = self.value(instance, each, &arg.value, 0)
+                else {
+                    continue;
+                };
+                for (name, value) in values {
+                    if !put(
+                        &name,
+                        ("Terraform environment".into(), literal(value), None),
+                    ) {
+                        break 'environment;
+                    }
+                }
+            }
+        }
+        candidate.environment = entries.into_values().collect();
+        if self.charge(candidate.workload_size()) {
+            self.nodes[node].images = candidate.images;
+            self.nodes[node].environment = candidate.environment;
+            self.nodes[node].build = candidate.build;
+            self.nodes[node].handler = candidate.handler;
+        }
+    }
+}

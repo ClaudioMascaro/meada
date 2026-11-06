@@ -941,6 +941,9 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
                 events,
                 subscription: None,
                 environment: Vec::new(),
+                images: Vec::new(),
+                provisioned: None,
+                ingress: Vec::new(),
             });
             let targets = cloudformation::referenced(&address, body, |t| known.contains(t));
             for (target, via) in targets.into_iter().take(REFERENCES_MAX) {

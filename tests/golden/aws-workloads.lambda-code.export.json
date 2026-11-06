@@ -1,0 +1,147 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/lambda",
+  "commit": "8efca0379404855352c178a0710d4087e8b61d59",
+  "dirty": true,
+  "files": [
+    {
+      "path": "worker/send.ts",
+      "hash": "fad572b1c61ec654650bd12685ba1c81627fb256bd2cf2f1fc64e6e93c3a0d60"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/lambda::worker/send.ts::dispatch",
+      "span": {
+        "path": "worker/send.ts",
+        "start": 110,
+        "end": 237
+      },
+      "hash": "db873b81c164ea9605fac2b0b0fab8a30012e7b9059b3aa1dbaa65b155c73722"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/lambda::worker/send.ts::SQSClient#0",
+      "caller": "example.com/acme/lambda::worker/send.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker/send.ts",
+        "start": 84,
+        "end": 101
+      }
+    },
+    {
+      "id": "example.com/acme/lambda::worker/send.ts::dispatch::SendMessageCommand#0",
+      "caller": "example.com/acme/lambda::worker/send.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker/send.ts",
+        "start": 153,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/lambda::worker/send.ts::dispatch::client.send#0",
+      "caller": "example.com/acme/lambda::worker/send.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker/send.ts",
+        "start": 141,
+        "end": 234
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::sqs::jobs",
+      "site": "example.com/acme/lambda::worker/send.ts::dispatch::SendMessageCommand#0",
+      "via": "workload:example.com/acme/lambda::main.tf::aws_lambda_function.local (root .), env:QUEUE_NAME"
+    }
+  ],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/lambda::main.tf::aws_lambda_function.local",
+      "address": "aws_lambda_function.local",
+      "type": "aws_lambda_function",
+      "root": ".",
+      "path": "main.tf",
+      "line": 9,
+      "end_line": 16
+    },
+    {
+      "identity": "example.com/acme/lambda::main.tf::aws_lambda_function.zip",
+      "address": "aws_lambda_function.zip",
+      "type": "aws_lambda_function",
+      "root": ".",
+      "path": "main.tf",
+      "line": 17,
+      "end_line": 20
+    },
+    {
+      "identity": "example.com/acme/lambda::main.tf::aws_sqs_queue.jobs",
+      "address": "aws_sqs_queue.jobs",
+      "type": "aws_sqs_queue",
+      "root": ".",
+      "path": "main.tf",
+      "line": 1,
+      "end_line": 3
+    }
+  ],
+  "executions": [
+    {
+      "workload": "example.com/acme/lambda::main.tf::aws_lambda_function.local",
+      "root": ".",
+      "repository": "example.com/acme/lambda",
+      "path": "worker",
+      "level": "exact",
+      "reason": "Terraform Lambda code main.tf#resource.aws_lambda_function.local"
+    },
+    {
+      "workload": "example.com/acme/lambda::main.tf::aws_lambda_function.zip",
+      "root": ".",
+      "repository": "example.com/acme/lambda",
+      "path": "worker.zip",
+      "level": "exact",
+      "reason": "Terraform Lambda code main.tf#resource.aws_lambda_function.zip"
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::sqs::jobs",
+      "node": "example.com/acme/lambda::main.tf::aws_sqs_queue.jobs",
+      "root": "."
+    }
+  ],
+  "links": [],
+  "provisions": [
+    {
+      "side": "example.com/acme/lambda::worker/send.ts::dispatch::SendMessageCommand#0",
+      "provisioner": "example.com/acme/lambda::main.tf::aws_sqs_queue.jobs",
+      "root": ".",
+      "contract": "channel::sqs::jobs",
+      "level": "inferred",
+      "reason": "channel::sqs::jobs; workload:example.com/acme/lambda::main.tf::aws_lambda_function.local (root .), env:QUEUE_NAME"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/lambda::worker/send.ts::dispatch",
+      "kind": "export",
+      "label": "dispatch",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/lambda",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/lambda::worker/send.ts::dispatch"
+        }
+      ]
+    }
+  ]
+}

@@ -69,15 +69,9 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     let mut sides = Vec::new();
     for node in statement.query_map([], super::row)? {
         let node = node?;
-        let Some(format) = types::format_of(&node.path) else {
+        let Some(entry) = types::provision_entry(&node.path, &node.block, &node.ty) else {
             continue;
         };
-        let Some(entry) = types::entry(format, &node.ty) else {
-            continue;
-        };
-        if !super::is_resource_block(&node.block) {
-            continue;
-        }
         let Some(name) = node.name.as_deref().filter(|n| !n.is_empty()) else {
             continue;
         };
@@ -430,7 +424,11 @@ pub(crate) fn decision_context(links: &[Provision], identity: &str, root: &str) 
         .filter(|l| l.provisioner == identity && l.root == root && l.level == Level::Decided)
         .map(|l| format!("{} [decided: {}]", l.contract, l.reason))
         .collect::<std::collections::BTreeSet<_>>();
-    crate::render::section("resolved names", choices.into_iter().collect())
+    if choices.is_empty() {
+        Vec::new()
+    } else {
+        crate::render::section("resolved names", choices.into_iter().collect())
+    }
 }
 
 /// Build source and literal-candidate indexes once, shared by every decision in this pass.

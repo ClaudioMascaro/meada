@@ -374,6 +374,7 @@ words:
 | `<iac-section>` | `referenced by` | The nodes that reference it. |
 | `<iac-section>` | `images` | The images of a Kubernetes workload's containers. |
 | `<iac-section>` | `values` | The config values of its block. |
+| `<iac-section>` | `resolved names` | The physical-name choices a person or model decided for this provisioner. |
 | `<none>` | ` none` | The section has no line. |
 | `<variable>` | `var.<word>` | A root module's variable. |
 | `<overridable-from>` | `default` | Its value is its default, at the variable's block (a CloudFormation `Parameters.<name>`, at its `Default`; a Serverless `opt:name, 'default'`, at the line that writes it). |

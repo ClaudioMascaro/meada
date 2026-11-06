@@ -193,7 +193,8 @@ CREATE TABLE iac_nodes (
     line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
-    subscription TEXT, environment TEXT NOT NULL
+    subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
+    ingress TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -746,26 +747,6 @@ fn refresh_keeping(
     // so those are stored first) and is read again when they change.
     let hidden = hidden_ci(root);
     let configs = configs_found(&all, &hidden);
-    let contract_configs = config_values::unshadowed(
-        all.iter()
-            .chain(&hidden)
-            .filter(|(p, _)| contract::config_file(p))
-            .cloned()
-            .collect(),
-    );
-    refresh_stamped(
-        &tx,
-        "contract_configs",
-        &contract_configs,
-        now,
-        |path| Ok(contract::config_reads_paths(path)),
-        |abs| read_up_to(abs, lang::MAX_BYTES),
-        |path, src| {
-            Ok(serde_json::to_string(&contract::config_summary(
-                path, src, root,
-            ))?)
-        },
-    )?;
     let sensitive = config_values::Sensitive::new(&tx, &configs);
     // The Terraform files and var files read again: the units holding them are evaluated again.
     let terraform = std::cell::RefCell::new(BTreeSet::new());
@@ -841,6 +822,38 @@ fn refresh_keeping(
         }
         kube::refresh(&tx, &kube::evaluate(&files))?;
     }
+    // Kinds receive evaluated IaC facts once per file; path dependencies can change alone.
+    let configuration_nodes = iac::nodes(&tx)?;
+    let mut nodes_by_path = BTreeMap::<&str, Vec<&iac::Node>>::new();
+    for node in &configuration_nodes {
+        nodes_by_path.entry(&node.path).or_default().push(node);
+    }
+    let contract_configs = config_values::unshadowed(
+        all.iter()
+            .chain(&hidden)
+            .filter(|(p, _)| contract::config_file(p))
+            .cloned()
+            .collect(),
+    );
+    refresh_stamped(
+        &tx,
+        "contract_configs",
+        &contract_configs,
+        now,
+        |path| Ok(contract::config_reads_paths(path)),
+        |abs| read_up_to(abs, lang::MAX_BYTES),
+        |path, src| {
+            Ok(serde_json::to_string(&contract::config_summary(
+                path,
+                src,
+                root,
+                nodes_by_path
+                    .get(path)
+                    .map(Vec::as_slice)
+                    .unwrap_or_default(),
+            ))?)
+        },
+    )?;
     // The packages decide which files keep the shapes of what they export (issue #175).
     let manifest_rows = manifest_rows(&tx)?;
     let Packs {
@@ -3972,6 +3985,7 @@ mod tests {
             "sample.alert.yaml",
             &src,
             &tests.join("fixtures/schema"),
+            &[],
         ))
         .unwrap();
         actual += "\n";

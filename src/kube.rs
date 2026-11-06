@@ -750,6 +750,9 @@ impl<'m> Eval<'m> {
                 events: Vec::new(),
                 subscription: None,
                 environment,
+                images: Vec::new(),
+                provisioned: None,
+                ingress: Vec::new(),
             });
         }
         let (objs, addresses, roles) = (&objs[..kept], &addresses[..kept], &roles[..kept]);
@@ -784,6 +787,9 @@ impl<'m> Eval<'m> {
                     events: Vec::new(),
                     subscription: None,
                     environment: Vec::new(),
+                    images: Vec::new(),
+                    provisioned: None,
+                    ingress: Vec::new(),
                 });
                 held.entry(i).or_default().push(composed.len());
                 composed.push((i, address, b));

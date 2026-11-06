@@ -185,3 +185,10 @@ The `alert` entry of `contract_configs` (#672) stores rule names, explicit label
 route conditions and receivers, key paths and line spans. It stores neither PromQL/LogQL
 expressions nor notification credentials. Rule and route nodes and their contract sides are
 derived at query time. A stored-format sample participates in the schema fingerprint.
+
+`iac_nodes.images` stores container names, evaluated images and override provenance.
+`iac_nodes.provisioned` optionally projects a composite target while retaining the physical
+name and an explicit unresolved state; `iac_nodes.ingress` holds literal transformed routing
+facts. `environment` may also retain a typed known contract target without a literal value.
+These facts stay under the existing IaC budgets and are described in the
+[AWS workload topic](../contracts/aws-workloads-664.md).

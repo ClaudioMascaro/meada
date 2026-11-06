@@ -45,12 +45,8 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
             ))
         })?
         .filter_map(|row| match row {
-            Ok((path, block, ty)) => {
-                let entry = types::format_of(&path).and_then(|f| types::entry(f, &ty));
-                entry
-                    .filter(|_| super::is_resource_block(&block))
-                    .map(|entry| Ok((path, format!("{block}.{}", entry.name))))
-            }
+            Ok((path, block, ty)) => types::provision_entry(&path, &block, &ty)
+                .map(|entry| Ok((path, entry.defining_key(&block)))),
             Err(error) => Some(Err(error)),
         })
         .collect::<rusqlite::Result<std::collections::HashSet<_>>>()?;
