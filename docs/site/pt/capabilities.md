@@ -724,7 +724,7 @@ ocultas e sem valor resolvido. Os contratos e workloads participam de `context`,
 
 ### SDKs Azure nos cinco grupos de linguagens
 
-Construtores conhecidos dos SDKs Azure em JavaScript/TypeScript, Python, Java, Go e C# criam produtores/consumidores de Service Bus e Event Hubs, escritores/leitores de contêineres Blob e leitores de segredos Key Vault. O [guia do usuário](../../user-guide.md#uso-dos-sdks-azure-nos-cinco-grupos-de-linguagens) lista os construtores e as operações. Receptores de assinatura mantêm tópico e assinatura na mesma carga, raiz e contêiner; nomes do ambiente sem essa evidência continuam não resolvidos. As formas C# existentes de Service Bus mantêm a identidade do tópico.
+Construtores conhecidos dos SDKs Azure em JavaScript/TypeScript, Python, Java, Go e C# criam produtores/consumidores de Service Bus e Event Hubs, escritores/leitores de contêineres Blob e leitores de segredos Key Vault. O [guia do usuário](https://github.com/ClaudioMascaro/meada/blob/main/docs/user-guide.md#uso-dos-sdks-azure-nos-cinco-grupos-de-linguagens) lista os construtores e as operações. Receptores de assinatura mantêm tópico e assinatura na mesma carga, raiz e contêiner; nomes do ambiente sem essa evidência continuam não resolvidos. As formas C# existentes de Service Bus mantêm a identidade do tópico.
 
 ## Recursos personalizados e módulos de infraestrutura
 

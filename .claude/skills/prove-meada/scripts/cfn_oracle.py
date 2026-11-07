@@ -9,7 +9,7 @@ references/config-iac.md ("CloudFormation oracle conventions").
 
 import re
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import yaml  # PyYAML: see SKILL.md's Gotchas
 
@@ -329,7 +329,33 @@ def evaluate(repo):
             first, last = spans[rid]
             nodes.append({"address": rid, "root": rel, "type": body["Type"], "name": name, "pattern": pattern,
                           "through": tuple(sorted(through)), "unchecked": False, "path": rel,
-                          "line": first, "end": last})
+                          "line": first, "end": last,
+                          **sam_code_fields(rel, doc, body)})
             for target, via in sorted(references_of(rid, body, resources))[:64]:
                 references.add((rel, rid, target, via))
     return nodes, sorted(references), unreadable
+
+
+def sam_code_fields(rel, doc, resource):
+    """Literal SAM CodeUri and Handler, with function properties overriding Globals (#664).
+
+    These are source metadata, not a claim that the code exists or executes. A computed
+    function property masks its global default rather than inheriting a guessed value.
+    """
+    if resource.get("Type") != "AWS::Serverless::Function":
+        return {}
+    globals_ = doc.get("Globals") or {}
+    defaults = (globals_.get("Function") or {}) if isinstance(globals_, dict) else {}
+    properties = resource.get("Properties") or {}
+    fields = {**(defaults if isinstance(defaults, dict) else {}),
+              **(properties if isinstance(properties, dict) else {})}
+    result = {}
+    code = fields.get("CodeUri")
+    if isinstance(code, str) and code and len(code.encode()) <= NAME_MAX \
+            and not code.startswith("/") and "\\" not in code and ":" not in code \
+            and ".." not in code.split("/") and "${" not in code:
+        result["build"] = str(PurePosixPath(rel).parent / code)
+    handler = fields.get("Handler")
+    if isinstance(handler, str) and handler and len(handler.encode()) <= NAME_MAX and "${" not in handler:
+        result["handler"] = handler
+    return result

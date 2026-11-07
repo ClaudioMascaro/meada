@@ -829,6 +829,32 @@ def cmd_selftest(_):
         assert check_value_answer(identity, rows, 'team-b', bad, budget_cut=True, budget=50), bad
     tiny = '… cut after 0 of 5 lines (budget 1 tokens); raise budget for more\n'
     assert not check_value_answer(identity, rows, 'team-b', tiny, budget_cut=True, budget=1)
+    # The public SAM template supplies CodeUri on the function and Handler in Globals.
+    # Validate those fields without shifting the references or swallowing the value tail.
+    import cfn_oracle as cfn
+    source = yaml.load('''Transform: AWS::Serverless-2016-10-31
+Globals:
+  Function: {Handler: bootstrap}
+Resources:
+  Worker:
+    Type: AWS::Serverless::Function
+    Properties: {CodeUri: target/lambda/worker/}
+''', Loader=cfn.Loader)
+    worker = source['Resources']['Worker']
+    metadata = cfn.sam_code_fields('template.yaml', source, worker)
+    assert metadata == {'build': 'target/lambda/worker', 'handler': 'bootstrap'}, metadata
+    header = [f'{identity} template.yaml:5-7 Worker', 'type: AWS::Serverless::Function',
+              'name: none', 'root: template.yaml', 'build: "target/lambda/worker"',
+              'handler: "bootstrap"', 'overridable: none', 'references: none', 'referenced by: none']
+    complete = '\n'.join(header + ['values:', f'{identity} template.yaml:7 Resources.Worker.Type = "AWS::Serverless::Function"']) + '\n'
+    assert not check_iac_context(identity, 'template.yaml', header, complete, complete)
+    for changed in (complete.replace('build: "target/lambda/worker"\n', ''),
+                    complete.replace('handler: "bootstrap"', 'handler: "other"'),
+                    complete.replace('references: none\n', ''),
+                    complete.replace('values:\n', '')):
+        assert check_iac_context(identity, 'template.yaml', header, changed, complete), changed
+    worker['Properties']['Handler'] = {'Ref': 'RuntimeHandler'}
+    assert cfn.sam_code_fields('template.yaml', source, worker) == {'build': 'target/lambda/worker'}
     print("selftest passed")
 
 

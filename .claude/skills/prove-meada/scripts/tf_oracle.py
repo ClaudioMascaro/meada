@@ -406,6 +406,9 @@ def context_lines(identity, nodes, references, node):
     name += " (pattern)" if node["pattern"] else ""
     lines = [f"{identity} {node['path']}:{node['line']}-{node['end']} {node['address']}",
              f"type: {node['type']}", f"name: {name}", f"root: {node['root']}"]
+    # #664: source-derived SAM code metadata precedes the existing reference/value sections.
+    lines += [f"{field}: " + json.dumps(node[field], ensure_ascii=False)
+              for field in ("build", "handler") if field in node]
     # #650: the root variables the name went through, in path and line order.
     lines.append("overridable:" if node["through"] else "overridable: none")
     lines += [f"{identity} {path}:{line} {var} ({'tfvars' if tfvars else 'default'})"

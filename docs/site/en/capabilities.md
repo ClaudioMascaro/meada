@@ -719,7 +719,7 @@ provisioning and export.
 
 ### Azure SDKs in five language groups
 
-Known Azure SDK constructors in JavaScript/TypeScript, Python, Java, Go and C# create Service Bus and Event Hubs producers/consumers, Blob container writers/readers and Key Vault secret readers. The [user guide](../../user-guide.en.md#azure-sdk-use-in-five-language-groups) lists the constructors and operations. Subscription receivers retain topic and subscription within the same workload, root and container; environment names without that evidence stay unresolved. Existing C# Service Bus forms retain topic identity.
+Known Azure SDK constructors in JavaScript/TypeScript, Python, Java, Go and C# create Service Bus and Event Hubs producers/consumers, Blob container writers/readers and Key Vault secret readers. The [user guide](https://github.com/ClaudioMascaro/meada/blob/main/docs/user-guide.en.md#azure-sdk-use-in-five-language-groups) lists the constructors and operations. Subscription receivers retain topic and subscription within the same workload, root and container; environment names without that evidence stay unresolved. Existing C# Service Bus forms retain topic identity.
 
 ## Custom resources and infrastructure modules
 
