@@ -425,6 +425,7 @@ fn methods(list: Value) -> Vec<String> {
 /// A provider of `contract` at `site`.
 fn provider(site: Site, contract: String) -> Found {
     Found {
+        identity: None,
         role: Role::Provider,
         site,
         contract: Some(contract),
@@ -449,6 +450,7 @@ fn consumer(path: &str, index: usize, read: Read, shape: Option<Shape>) -> Found
 /// client, which has no call of its own).
 fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
     Found {
+        identity: None,
         role: Role::Consumer,
         site,
         contract: read.contract,
@@ -1152,6 +1154,7 @@ mod tests {
     #[test]
     fn a_route_is_a_candidate_for_a_dynamic_url_through_its_gateway_path() {
         let consumer = Consumer {
+            identity: None,
             contract: None,
             site: "r::a.ts::f::g#0".into(),
             via: None,

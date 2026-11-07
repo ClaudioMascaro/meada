@@ -190,7 +190,14 @@ impl ContractKind for Image {
         crate::index::sort_providers(&mut export.providers);
         crate::index::sort_consumers(&mut export.consumers);
         export.consumers.dedup_by(|a, b| {
-            a.site == b.site && a.contract == b.contract && a.via == b.via && a.root == b.root
+            a.site == b.site
+                && a.contract == b.contract
+                && a.via == b.via
+                && a.root == b.root
+                && (a.identity == b.identity
+                    || a.contract
+                        .as_deref()
+                        .is_some_and(|c| !crate::contract::unresolved(c)))
         });
     }
     fn workspace_step(&self, exports: &mut [Export], repositories: &[Repository]) {
@@ -601,6 +608,7 @@ fn runner(
     via: Option<String>,
 ) -> Consumer {
     Consumer {
+        identity: None,
         contract: Some(format!("image::{name}")),
         site: format!("{repository}::{path}::{address}"),
         via,

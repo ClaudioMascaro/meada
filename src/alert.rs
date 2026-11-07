@@ -112,6 +112,7 @@ impl ContractKind for Alert {
                 );
                 for matcher in conditions(&summary.routes, i) {
                     export.consumers.push(Consumer {
+                        identity: None,
                         contract: Some(matcher.contract()),
                         site: node.identity(&repo.identity),
                         via: Some(matcher.via()),
@@ -130,7 +131,14 @@ impl ContractKind for Alert {
         crate::index::sort_providers(&mut export.providers);
         crate::index::sort_consumers(&mut export.consumers);
         export.consumers.dedup_by(|a, b| {
-            a.site == b.site && a.contract == b.contract && a.via == b.via && a.root == b.root
+            a.site == b.site
+                && a.contract == b.contract
+                && a.via == b.via
+                && a.root == b.root
+                && (a.identity == b.identity
+                    || a.contract
+                        .as_deref()
+                        .is_some_and(|c| !crate::contract::unresolved(c)))
         });
     }
     fn link(

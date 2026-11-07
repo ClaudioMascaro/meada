@@ -1288,6 +1288,7 @@ fn import(exports: &mut [Export], providers: &Providers) {
                 }
                 if !hops.is_empty() {
                     consumers.push(Consumer {
+                        identity: None,
                         contract: Some(contract(ecosystem, &entry.name)),
                         site: call.site.clone(),
                         via: entry.via.clone(),
@@ -1524,6 +1525,7 @@ fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
             }
             for (want, shape) in kept {
                 found.push(Found {
+                    identity: None,
                     role: Role::Shape,
                     site: Site::File(path.to_string()),
                     contract: None,
@@ -1564,6 +1566,7 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                         continue;
                     }
                     consumers.push(Consumer {
+                        identity: None,
                         contract: Some(contract(ecosystem, &e.name)),
                         site: format!(
                             "{}::{}::{}::{}",
@@ -1786,6 +1789,7 @@ impl ContractKind for Packages {
                         continue;
                     }
                     found.push(Found {
+                        identity: None,
                         role: Role::Import,
                         site: Site::Call {
                             path: path.to_string(),
@@ -2064,6 +2068,7 @@ mod tests {
         let export = Export {
             repository: "r".into(),
             consumers: vec![Consumer {
+                identity: None,
                 contract: Some(contract.into()),
                 site: call.into(),
                 via: None,
@@ -2648,6 +2653,7 @@ mod tests {
             "package::unknown::x 1 (local 2)"
         );
         let consumer = Consumer {
+            identity: None,
             contract: Some(contract.into()),
             site: "r::pom.xml".into(),
             via: None,

@@ -288,6 +288,7 @@ pub(crate) fn extract(code: &Code, channels: bool) -> Vec<Found> {
                 None => format!("{prefix}::{kind}"),
             });
             found.push(Found {
+                identity: None,
                 role,
                 site: if role == Role::Consumer && channels {
                     Site::Def {

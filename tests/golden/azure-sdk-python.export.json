@@ -1,0 +1,465 @@
+{
+  "format": 1,
+  "repository": "local/azure-sdk-python",
+  "files": [
+    {
+      "path": "worker.py",
+      "hash": "051e2a052799039951763000455d6febe60bd1cb3d3964c0c3e7a45ab4ea6b45"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/azure-sdk-python::worker.py::handler",
+      "span": {
+        "path": "worker.py",
+        "start": 1787,
+        "end": 1817
+      },
+      "hash": "f0e35ca9c73a93bb14d2188e8d3e53814091227e0f1a18c52f4adc5cb47342c1"
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::hidden",
+      "span": {
+        "path": "worker.py",
+        "start": 1432,
+        "end": 1786
+      },
+      "hash": "10aedf4ce3679305a415a518835eb4b855c093ae8d7bbb4b1135ff0020eedfb5"
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::read",
+      "span": {
+        "path": "worker.py",
+        "start": 1342,
+        "end": 1378
+      },
+      "hash": "a85fe8973f4bcab39b4535a30b8d42d4e059384344647e25ceba3c3661be0049"
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::receive",
+      "span": {
+        "path": "worker.py",
+        "start": 1053,
+        "end": 1118
+      },
+      "hash": "9db4d02ccd3bfdb16d30637c6b1bb7157e3a65220fb91a6f2b65d9f3435bc13f"
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::receive_events",
+      "span": {
+        "path": "worker.py",
+        "start": 1241,
+        "end": 1301
+      },
+      "hash": "8639e0cff231ad404033443bd3a1cebf5871b7be0b3c05a6541c25983a661b16"
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::secret",
+      "span": {
+        "path": "worker.py",
+        "start": 1379,
+        "end": 1431
+      },
+      "hash": "8936113ac9162b750acd087951f341049c2a6c31a506ad5b2ca86a7d72f254e7"
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::send",
+      "span": {
+        "path": "worker.py",
+        "start": 1007,
+        "end": 1052
+      },
+      "hash": "5b4c9463eb9ab216a98d0f095305dbbc41e632d5e853f089d9c54261675d6a8b"
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::send_events",
+      "span": {
+        "path": "worker.py",
+        "start": 1191,
+        "end": 1240
+      },
+      "hash": "1a909101e0e0381330a1026907e5284a8da98a3d99d764eb7da14fba093f772f"
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::subscribe",
+      "span": {
+        "path": "worker.py",
+        "start": 1119,
+        "end": 1190
+      },
+      "hash": "2d079846f7708c3893127c2905607adebd8afc0e5ffeb9da803af9ae2525956a"
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::write",
+      "span": {
+        "path": "worker.py",
+        "start": 1302,
+        "end": 1341
+      },
+      "hash": "bd6c2b3fb4fae1eba77d90f46b6a0b22521d0d02d20ca6dd0a46995dd0a2468a"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/azure-sdk-python::worker.py::Bus#0",
+      "caller": "local/azure-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 276,
+        "end": 339
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::Consumer#0",
+      "caller": "local/azure-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 682,
+        "end": 805
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::Producer#0",
+      "caller": "local/azure-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 571,
+        "end": 670
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::Secrets#0",
+      "caller": "local/azure-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 959,
+        "end": 1006
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::Storage#0",
+      "caller": "local/azure-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 816,
+        "end": 868
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::bus.get_queue_receiver#0",
+      "caller": "local/azure-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 409,
+        "end": 459
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::bus.get_queue_sender#0",
+      "caller": "local/azure-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 349,
+        "end": 397
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::bus.get_subscription_receiver#0",
+      "caller": "local/azure-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 475,
+        "end": 559
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::hidden::(call).get_blob_client#0",
+      "caller": "local/azure-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1634,
+        "end": 1709
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::hidden::(call).get_queue_sender#0",
+      "caller": "local/azure-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1481,
+        "end": 1538
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::hidden::(call).get_secret#0",
+      "caller": "local/azure-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1732,
+        "end": 1786
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::hidden::(call).send_batch#0",
+      "caller": "local/azure-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1566,
+        "end": 1629
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::hidden::(call).send_messages#0",
+      "caller": "local/azure-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1481,
+        "end": 1561
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::hidden::(call).upload_blob#0",
+      "caller": "local/azure-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1634,
+        "end": 1727
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::hidden::Bus#0",
+      "caller": "local/azure-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1481,
+        "end": 1507
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::hidden::Producer#0",
+      "caller": "local/azure-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1566,
+        "end": 1611
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::hidden::Secrets#0",
+      "caller": "local/azure-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1732,
+        "end": 1758
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::hidden::Storage#0",
+      "caller": "local/azure-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1634,
+        "end": 1663
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::read::blob.download_blob#0",
+      "caller": "local/azure-sdk-python::worker.py::read",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1358,
+        "end": 1378
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::receive::receiver.receive_messages#0",
+      "caller": "local/azure-sdk-python::worker.py::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1072,
+        "end": 1118
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::receive_events::consumer.receive#0",
+      "caller": "local/azure-sdk-python::worker.py::receive_events",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1267,
+        "end": 1301
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::secret::secrets.get_secret#0",
+      "caller": "local/azure-sdk-python::worker.py::secret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1397,
+        "end": 1431
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::send::sender.send_messages#0",
+      "caller": "local/azure-sdk-python::worker.py::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1023,
+        "end": 1052
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::send_events::producer.send_batch#0",
+      "caller": "local/azure-sdk-python::worker.py::send_events",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1214,
+        "end": 1240
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::storage.get_blob_client#0",
+      "caller": "local/azure-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 876,
+        "end": 948
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::subscribe::subscription.receive_messages#0",
+      "caller": "local/azure-sdk-python::worker.py::subscribe",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1140,
+        "end": 1190
+      }
+    },
+    {
+      "id": "local/azure-sdk-python::worker.py::write::blob.upload_blob#0",
+      "caller": "local/azure-sdk-python::worker.py::write",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1319,
+        "end": 1341
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::eventhubs::events-python",
+      "site": "local/azure-sdk-python::worker.py::send_events::producer.send_batch#0"
+    },
+    {
+      "contract": "channel::servicebus::orders-python",
+      "site": "local/azure-sdk-python::worker.py::send::sender.send_messages#0"
+    },
+    {
+      "contract": "resource::azureblob::uploads-python",
+      "site": "local/azure-sdk-python::worker.py::write::blob.upload_blob#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::azureblob::uploads-python",
+      "site": "local/azure-sdk-python::worker.py::read::blob.download_blob#0",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::orders-python",
+      "site": "local/azure-sdk-python::worker.py::receive",
+      "via": null
+    },
+    {
+      "contract": "channel::eventhubs::events-python",
+      "site": "local/azure-sdk-python::worker.py::receive_events",
+      "via": null
+    },
+    {
+      "contract": "resource::keyvault::token-python",
+      "site": "local/azure-sdk-python::worker.py::secret::secrets.get_secret#0",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::subscription:orders-python/audit",
+      "site": "local/azure-sdk-python::worker.py::subscribe",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/azure-sdk-python::worker.py::read::blob.download_blob#0",
+      "provider": "local/azure-sdk-python::worker.py::write::blob.upload_blob#0",
+      "contract": "resource::azureblob::uploads-python",
+      "level": "exact",
+      "reason": "resource::azureblob::uploads-python"
+    },
+    {
+      "consumer": "local/azure-sdk-python::worker.py::receive",
+      "provider": "local/azure-sdk-python::worker.py::send::sender.send_messages#0",
+      "contract": "channel::servicebus::orders-python",
+      "level": "exact",
+      "reason": "channel::servicebus::orders-python"
+    },
+    {
+      "consumer": "local/azure-sdk-python::worker.py::receive_events",
+      "provider": "local/azure-sdk-python::worker.py::send_events::producer.send_batch#0",
+      "contract": "channel::eventhubs::events-python",
+      "level": "exact",
+      "reason": "channel::eventhubs::events-python"
+    }
+  ]
+}

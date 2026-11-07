@@ -1335,7 +1335,7 @@ brokers son dos canales:
 | Redis streams | `redis` | |
 | BullMQ | `bullmq` | solo en TypeScript y JavaScript |
 | JMS | `jms` | solo en Java y Kotlin (Spring JMS) |
-| Azure Service Bus | `servicebus` | solo en C# |
+| Azure Service Bus | `servicebus` | JS/TS, Python, Java, Go y C# |
 
 Los clientes de cada lenguaje están en la sección 9. Swift no tiene lectura de canales en 1.0.
 
@@ -2361,6 +2361,25 @@ lecturas solo en el código ejecutado por la imagen o ruta correspondiente, con 
 [capacidades](site/es/capabilities.md#contratos-azure-y-functions) para los tipos y límites;
 `context`, `trace`, export y huérfanos siguen las mismas reglas de aprovisionamiento.
 
+### Uso de los SDK de Azure en cinco grupos de lenguajes
+
+Los constructores conocidos de los SDK de Azure crean los lados de las operaciones siguientes. JavaScript y TypeScript forman un grupo, con comprobaciones separadas. Java usa los builders `com.azure` indicados; JavaScript usa los constructores de `@azure/service-bus`, `@azure/event-hubs`, `@azure/storage-blob` y `@azure/keyvault-secrets`. Python usa `azure.servicebus`, `azure.eventhub`, `azure.storage.blob` y `azure.keyvault.secrets`, incluidas sus variantes `aio` y las fábricas `from_connection_string` de los tres primeros servicios. Go usa los paquetes correspondientes de `github.com/Azure/azure-sdk-for-go/sdk`: Service Bus y Event Hubs también admiten fábricas `FromConnectionString`; Blob admite `NewClient`, `NewClientWithNoCredential`, `NewClientWithSharedKeyCredential` y `NewClientFromConnectionString`. .NET usa `Azure.Messaging.ServiceBus`, `Azure.Messaging.EventHubs.Producer` / `.Consumer`, `Azure.Storage.Blobs` y `Azure.Security.KeyVault.Secrets`. Blob en JS también admite `BlobServiceClient.fromConnectionString`.
+
+| Grupo | Service Bus productor / consumidor | Event Hubs productor / consumidor | Blob escritor / lector | Key Vault lector |
+| --- | --- | --- | --- | --- |
+| JavaScript + TypeScript | `createSender(name).sendMessages` / `createReceiver(queue)` or `(topic, subscription)`, then `receiveMessages` or `subscribe` | `EventHubProducerClient(..., hub).sendBatch` / `EventHubConsumerClient(group, ..., hub).subscribe` | service → `getContainerClient(container)` → `getBlockBlobClient(object)`: `upload`, `uploadData`, `uploadFile`, `uploadStream`; blob `download`, `downloadToBuffer`, `downloadToFile` | `SecretClient.getSecret(name)` |
+| Python | `get_queue_sender` / `get_topic_sender` → `send_messages`; `get_queue_receiver` / `get_subscription_receiver` → `receive_messages` | `eventhub_name` explícito: producer `send_batch` / consumer `receive` | service `get_blob_client(container, blob)` or `get_container_client(container).get_blob_client(blob)`: `upload_blob` / `download_blob` | `SecretClient.get_secret(name)` |
+| Java | `ServiceBusClientBuilder.sender().queueName` or `topicName` → `buildClient`: `sendMessage`, `sendMessages`; receiver `queueName` or `topicName` + `subscriptionName` → `buildClient().receiveMessages` | builder `connectionString(cs, hub)` or `credential(namespace, hub, credential)`: `buildProducerClient().send` / `consumerGroup(...).buildConsumerClient().receiveFromPartition` | `BlobServiceClientBuilder...buildClient().getBlobContainerClient(container).getBlobClient(object)`: `upload`, `uploadFromFile` / `downloadContent`, `downloadStream`, `downloadToFile` | `SecretClientBuilder...buildClient().getSecret(name)` |
+| Go | `NewSender` → `SendMessage`, `SendMessageBatch`; `NewReceiverForQueue` / `NewReceiverForSubscription` → `ReceiveMessages` | `NewProducerClient` → `SendEventDataBatch`; `NewConsumerClient` → `NewPartitionClient` → `ReceiveEvents` | `UploadBuffer`, `UploadFile`, `UploadStream` / `DownloadBuffer`, `DownloadFile`, `DownloadStream`, contenedor después de `ctx` | `GetSecret(ctx, name, version, ...)` |
+| C# | envíos, programaciones y procesadores existentes conservados; nuevos `CreateReceiver(queue)` / `(topic, subscription)` → `ReceiveMessageAsync`, `ReceiveMessagesAsync` | hub explícito: producer `SendAsync` / consumer `ReadEventsAsync` | service → `GetBlobContainerClient(container)` → `GetBlobClient(object)`: `Upload`, `UploadAsync` / `DownloadTo`, `DownloadToAsync`; container `UploadBlob`, `UploadBlobAsync` | `SecretClient.GetSecret`, `GetSecretAsync` |
+
+Los nombres identifican colas/temas, hubs, contenedores de blobs y secretos. Grupo, partición, objeto y versión del secreto no cambian el contrato. Los IDs ARM y las URL de Blob/Key Vault admitidos siguen la misma normalización que infraestructura y configuración. Una suscripción nueva es `channel::servicebus::subscription:<topic>/<subscription>`; una cola con `/subscriptions/` conserva su identidad distinta. Los procesadores C# existentes conservan la identidad del tema.
+
+Un nombre del entorno queda sin resolver, con `env:NAME`, sin una carga almacenada que ejecute ese código. Tema y suscripción solo se combinan dentro de la misma carga, raíz y contenedor; los valores desconocidos o destinos tipados incompatibles siguen sin resolverse. Los enlaces resueltos por el entorno son `inferred`. Las llamadas exactas a fábricas conservan los nombres de sus receptores. Los constructores ocultos, clientes solo tipados, saltos por coincidencia de nombre, receptores reasignados y retornos opacos no crean nuevos lados SDK.
+
+El inventario es limitado. No se analizan cadenas de conexión ni credenciales para obtener nombres; Event Hubs necesita un argumento explícito de hub. Los constructores directos con URL de Blob/Container, procesadores de sesión, otras familias de polling/streaming, operaciones de listado/borrado/metadatos y otros SDK quedan fuera. Crear un cliente o handle no aporta dirección.
+
+Las formas de cola `createReceiver(queue, options)` en JS/TS y `CreateReceiver(queue, options)` en C# conservan la identidad de la cola cuando se prueban las opciones: un objeto JS/TS o una construcción conocida de `ServiceBusReceiverOptions`. JS/TS también admite `undefined` explícito sin ocultación local; C# admite `options: null`. Las reasignaciones y los segundos argumentos opacos siguen sin resolverse. Un segundo argumento string sigue nombrando una suscripción, con opciones opcionales en el tercer argumento.
 
 ### Recursos personalizados y módulos de infraestructura
 

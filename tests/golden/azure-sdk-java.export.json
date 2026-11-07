@@ -1,0 +1,665 @@
+{
+  "format": 1,
+  "repository": "local/azure-sdk-java",
+  "files": [
+    {
+      "path": "Worker.java",
+      "hash": "054808b1d45a42d0cf59d533e1d89a694ea6285abf0e4148bee450d7fd933f66"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker",
+      "span": {
+        "path": "Worker.java",
+        "start": 243,
+        "end": 1504
+      },
+      "hash": "fa0ccae6e8ee2fa155dc00d1ae1b3ece8edd7bab86bf553a896b6b0eb330646c"
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.read()",
+      "span": {
+        "path": "Worker.java",
+        "start": 1220,
+        "end": 1379
+      },
+      "hash": "515e2b8bc3b6edde8ce3ac11f1c9ae2342fd98b9b03a6da9d0d1fd98494193f1"
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receive()",
+      "span": {
+        "path": "Worker.java",
+        "start": 405,
+        "end": 552
+      },
+      "hash": "86cbcaa10072c97af51268879f072f01dc774693370d1b051625253f7fd69bfe"
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()",
+      "span": {
+        "path": "Worker.java",
+        "start": 860,
+        "end": 1038
+      },
+      "hash": "344fc0a0ce97d4bcc4afbb164acfb86219024e19de3880c735b6245a5a9baee2"
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.secret()",
+      "span": {
+        "path": "Worker.java",
+        "start": 1381,
+        "end": 1502
+      },
+      "hash": "d70103a0f2f687abd38257ccdafc3284ec043a7657f323534aa5627f6382cf39"
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.send()",
+      "span": {
+        "path": "Worker.java",
+        "start": 259,
+        "end": 403
+      },
+      "hash": "b358ddc905ad674b9988f0a91f9f9b3b3a377969a562abfa335de160147cb6c8"
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.sendEvents()",
+      "span": {
+        "path": "Worker.java",
+        "start": 731,
+        "end": 858
+      },
+      "hash": "2ffd20fc08af509f7ba78d25dc70fd4c1dc85ccb9493ca4d5d45ca791aa96dbd"
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.subscribe()",
+      "span": {
+        "path": "Worker.java",
+        "start": 554,
+        "end": 729
+      },
+      "hash": "51a7b7f20b83a26596fcfb52749f5d61b91a92dfd9346e389696f021d9020971"
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.write()",
+      "span": {
+        "path": "Worker.java",
+        "start": 1040,
+        "end": 1218
+      },
+      "hash": "b0a7a510d12fb6f86820eea23cf19336f569375147ab914f2ccc9aa6d2073ed9"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.read()::(expression).endpoint#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1234,
+        "end": 1283
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.read()::(method_invocation).buildClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1234,
+        "end": 1297
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.read()::(method_invocation).downloadContent#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1234,
+        "end": 1376
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.read()::(method_invocation).getBlobClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1234,
+        "end": 1358
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.read()::(method_invocation).getBlobContainerClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1234,
+        "end": 1336
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.read()::BlobServiceClientBuilder#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1234,
+        "end": 1264
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receive()::(expression).connectionString#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 422,
+        "end": 480
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receive()::(method_invocation).buildClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 422,
+        "end": 530
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receive()::(method_invocation).queueName#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 422,
+        "end": 516
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receive()::(method_invocation).receiveMessages#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 422,
+        "end": 549
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receive()::(method_invocation).receiver#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 422,
+        "end": 491
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receive()::ServiceBusClientBuilder#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 422,
+        "end": 451
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()::(expression).connectionString#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 883,
+        "end": 953
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()::(method_invocation).buildConsumerClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 883,
+        "end": 998
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()::(method_invocation).consumerGroup#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 883,
+        "end": 976
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()::(method_invocation).receiveFromPartition#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 883,
+        "end": 1035
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()::EventHubClientBuilder#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 883,
+        "end": 910
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.secret()::(expression).vaultUrl#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.secret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1397,
+        "end": 1438
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.secret()::(method_invocation).buildClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.secret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1397,
+        "end": 1475
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.secret()::(method_invocation).credential#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.secret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1397,
+        "end": 1461
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.secret()::(method_invocation).getSecret#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.secret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1397,
+        "end": 1499
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.secret()::SecretClientBuilder#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.secret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1397,
+        "end": 1422
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.send()::(expression).connectionString#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 273,
+        "end": 331
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.send()::(method_invocation).buildClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 273,
+        "end": 379
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.send()::(method_invocation).queueName#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 273,
+        "end": 365
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.send()::(method_invocation).sendMessage#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 273,
+        "end": 400
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.send()::(method_invocation).sender#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 273,
+        "end": 340
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.send()::ServiceBusClientBuilder#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 273,
+        "end": 302
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.sendEvents()::(expression).connectionString#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.sendEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 751,
+        "end": 821
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.sendEvents()::(method_invocation).buildProducerClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.sendEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 751,
+        "end": 843
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.sendEvents()::(method_invocation).send#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.sendEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 751,
+        "end": 855
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.sendEvents()::EventHubClientBuilder#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.sendEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 751,
+        "end": 778
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.subscribe()::(expression).connectionString#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.subscribe()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 573,
+        "end": 631
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.subscribe()::(method_invocation).buildClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.subscribe()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 573,
+        "end": 707
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.subscribe()::(method_invocation).receiveMessages#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.subscribe()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 573,
+        "end": 726
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.subscribe()::(method_invocation).receiver#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.subscribe()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 573,
+        "end": 642
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.subscribe()::(method_invocation).subscriptionName#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.subscribe()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 573,
+        "end": 693
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.subscribe()::(method_invocation).topicName#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.subscribe()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 573,
+        "end": 667
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.subscribe()::ServiceBusClientBuilder#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.subscribe()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 573,
+        "end": 602
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.write()::(expression).endpoint#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.write()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1055,
+        "end": 1104
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.write()::(method_invocation).buildClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.write()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1055,
+        "end": 1141
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.write()::(method_invocation).credential#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.write()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1055,
+        "end": 1127
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.write()::(method_invocation).getBlobClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.write()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1055,
+        "end": 1202
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.write()::(method_invocation).getBlobContainerClient#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.write()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1055,
+        "end": 1180
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.write()::(method_invocation).upload#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.write()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1055,
+        "end": 1215
+      }
+    },
+    {
+      "id": "local/azure-sdk-java::Worker.java::Worker.write()::BlobServiceClientBuilder#0",
+      "caller": "local/azure-sdk-java::Worker.java::Worker.write()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1055,
+        "end": 1085
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::eventhubs::events-java",
+      "site": "local/azure-sdk-java::Worker.java::Worker.sendEvents()::(method_invocation).send#0"
+    },
+    {
+      "contract": "channel::servicebus::orders-java",
+      "site": "local/azure-sdk-java::Worker.java::Worker.send()::(method_invocation).sendMessage#0"
+    },
+    {
+      "contract": "resource::azureblob::uploads-java",
+      "site": "local/azure-sdk-java::Worker.java::Worker.write()::(method_invocation).upload#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::azureblob::uploads-java",
+      "site": "local/azure-sdk-java::Worker.java::Worker.read()::(method_invocation).downloadContent#0",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::orders-java",
+      "site": "local/azure-sdk-java::Worker.java::Worker.receive()",
+      "via": null
+    },
+    {
+      "contract": "channel::eventhubs::events-java",
+      "site": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()",
+      "via": null
+    },
+    {
+      "contract": "resource::keyvault::token-java",
+      "site": "local/azure-sdk-java::Worker.java::Worker.secret()::(method_invocation).getSecret#0",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::subscription:orders-java/audit",
+      "site": "local/azure-sdk-java::Worker.java::Worker.subscribe()",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/azure-sdk-java::Worker.java::Worker.read()::(method_invocation).downloadContent#0",
+      "provider": "local/azure-sdk-java::Worker.java::Worker.write()::(method_invocation).upload#0",
+      "contract": "resource::azureblob::uploads-java",
+      "level": "exact",
+      "reason": "resource::azureblob::uploads-java"
+    },
+    {
+      "consumer": "local/azure-sdk-java::Worker.java::Worker.receive()",
+      "provider": "local/azure-sdk-java::Worker.java::Worker.send()::(method_invocation).sendMessage#0",
+      "contract": "channel::servicebus::orders-java",
+      "level": "exact",
+      "reason": "channel::servicebus::orders-java"
+    },
+    {
+      "consumer": "local/azure-sdk-java::Worker.java::Worker.receiveEvents()",
+      "provider": "local/azure-sdk-java::Worker.java::Worker.sendEvents()::(method_invocation).send#0",
+      "contract": "channel::eventhubs::events-java",
+      "level": "exact",
+      "reason": "channel::eventhubs::events-java"
+    }
+  ]
+}

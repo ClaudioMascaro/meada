@@ -219,6 +219,7 @@ pub(crate) fn extract<'a>(
                             None => format!("{prefix}::{}", service.kind),
                         };
                         found.push(Found {
+                            identity: None,
                             role: operation.role,
                             site: if operation.role == Role::Consumer {
                                 Site::Def {

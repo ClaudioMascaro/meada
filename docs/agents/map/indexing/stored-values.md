@@ -215,3 +215,14 @@ flags. `index::exports_of` hydrates only those handler modules' exact stored exp
 `ContractKind::read_declarations`, before `symbols_read` names their symbols in partial reads.
 `exports_path` indexes that lookup. Queries use the stored summaries/exports/symbols, with no
 filesystem validation or IaC evaluation. See [the HTTP map](../contracts/iac-http-routes-666.md).
+
+`contracts.identity` (#670) is optional private JSON for a kind's receiver subtype and folded
+literal/env/unknown name components. It participates in the row key and internal side summaries,
+never public export; no request or credential object is stored there. Legacy None preserves
+existing behavior. The schema-golden hash causes the ordinary deterministic rebuild for older
+source indexes; read-only queries consume the rebuilt summary without source or process reads.
+
+Internal side sorting retains the optional identity; declaration deduplication preserves it
+while a contract is unresolved. A queue and
+subscription may share a handler, unresolved prefix and environment variable; dropping either
+before workload resolution would erase a real qualified side. Legacy None retains prior keys.

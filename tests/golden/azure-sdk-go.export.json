@@ -1,0 +1,274 @@
+{
+  "format": 1,
+  "repository": "local/azure-sdk-go",
+  "files": [
+    {
+      "path": "worker.go",
+      "hash": "1f4c6fa3114d72b7fe3cfef85514296903e3b7ef1cc3ba7e5f82902fa7853777"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/azure-sdk-go::worker.go::run",
+      "span": {
+        "path": "worker.go",
+        "start": 299,
+        "end": 1284
+      },
+      "hash": "aaba376d6415faca553b1e912ead335c6fa4fcdbe14a2acbcdbc90a6c0cbf6d1"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/azure-sdk-go::worker.go::run::blob.NewClient#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1017,
+        "end": 1058
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::bus.NewClient#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 328,
+        "end": 369
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::client.NewReceiverForQueue#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 439,
+        "end": 483
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::client.NewReceiverForSubscription#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 506,
+        "end": 566
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::client.NewSender#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 386,
+        "end": 420
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::consumer.NewPartitionClient#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 878,
+        "end": 915
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::hub.NewConsumerClient#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 787,
+        "end": 858
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::hub.NewProducerClient#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 706,
+        "end": 768
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::partition.ReceiveEvents#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 963,
+        "end": 999
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::producer.SendEventDataBatch#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 917,
+        "end": 961
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::receiver.ReceiveMessages#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 607,
+        "end": 644
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::secret.GetSecret#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1240,
+        "end": 1282
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::secrets.NewClient#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1197,
+        "end": 1238
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::sender.SendMessage#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 568,
+        "end": 605
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::storage.DownloadBuffer#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1120,
+        "end": 1180
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::storage.UploadBuffer#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1060,
+        "end": 1118
+      }
+    },
+    {
+      "id": "local/azure-sdk-go::worker.go::run::subscription.ReceiveMessages#0",
+      "caller": "local/azure-sdk-go::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 646,
+        "end": 687
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::eventhubs::events-go",
+      "site": "local/azure-sdk-go::worker.go::run::producer.SendEventDataBatch#0"
+    },
+    {
+      "contract": "channel::servicebus::orders-go",
+      "site": "local/azure-sdk-go::worker.go::run::sender.SendMessage#0"
+    },
+    {
+      "contract": "resource::azureblob::uploads-go",
+      "site": "local/azure-sdk-go::worker.go::run::storage.UploadBuffer#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "channel::eventhubs::events-go",
+      "site": "local/azure-sdk-go::worker.go::run",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::orders-go",
+      "site": "local/azure-sdk-go::worker.go::run",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::subscription:orders-go/audit",
+      "site": "local/azure-sdk-go::worker.go::run",
+      "via": null
+    },
+    {
+      "contract": "resource::keyvault::token-go",
+      "site": "local/azure-sdk-go::worker.go::run::secret.GetSecret#0",
+      "via": null
+    },
+    {
+      "contract": "resource::azureblob::uploads-go",
+      "site": "local/azure-sdk-go::worker.go::run::storage.DownloadBuffer#0",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/azure-sdk-go::worker.go::run",
+      "provider": "local/azure-sdk-go::worker.go::run::producer.SendEventDataBatch#0",
+      "contract": "channel::eventhubs::events-go",
+      "level": "exact",
+      "reason": "channel::eventhubs::events-go"
+    },
+    {
+      "consumer": "local/azure-sdk-go::worker.go::run",
+      "provider": "local/azure-sdk-go::worker.go::run::sender.SendMessage#0",
+      "contract": "channel::servicebus::orders-go",
+      "level": "exact",
+      "reason": "channel::servicebus::orders-go"
+    },
+    {
+      "consumer": "local/azure-sdk-go::worker.go::run::storage.DownloadBuffer#0",
+      "provider": "local/azure-sdk-go::worker.go::run::storage.UploadBuffer#0",
+      "contract": "resource::azureblob::uploads-go",
+      "level": "exact",
+      "reason": "resource::azureblob::uploads-go"
+    }
+  ]
+}

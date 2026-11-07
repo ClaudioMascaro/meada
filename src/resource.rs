@@ -132,6 +132,8 @@ impl ContractKind for Resource {
         _operation: Option<&str>,
     ) -> Option<String> {
         let name = match contract {
+            "resource::azureblob" => crate::contract::azure::container(value),
+            "resource::keyvault" => crate::contract::azure::secret(value),
             "resource::gcs" => crate::contract::gcp::bucket(value),
             "resource::gcpsecretmanager" => crate::contract::gcp::secret(value),
             _ => return crate::contract::environment_name(contract, value),
@@ -156,6 +158,7 @@ impl ContractKind for Resource {
             .chain(python::sides(code))
             .chain(aws::extract(code, indexed))
             .chain(crate::contract::gcp::sdk::extract(code, false))
+            .chain(crate::contract::azure::sdk::extract(code, false))
             .collect()
     }
 
@@ -232,6 +235,7 @@ impl ContractKind for Resource {
                 }
                 if resource.role.reads() {
                     export.consumers.push(Consumer {
+                        identity: None,
                         contract: Some(contract.clone()),
                         site,
                         via: None,
@@ -246,19 +250,21 @@ impl ContractKind for Resource {
         }
         // The index's orders; several entries may name the same side.
         let providers = &mut export.providers;
-        providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
-        providers.dedup_by(|a, b| (&a.contract, &a.site) == (&b.contract, &b.site));
+        crate::index::sort_providers(providers);
+        providers.dedup_by(|a, b| {
+            (&a.contract, &a.site) == (&b.contract, &b.site)
+                && (a.identity == b.identity || !crate::contract::unresolved(&a.contract))
+        });
         let consumers = &mut export.consumers;
-        let key = |c: &Consumer| {
-            (
-                c.site.clone(),
-                c.contract.clone(),
-                c.via.clone(),
-                c.root.clone(),
-            )
-        };
-        consumers.sort_by_key(key);
-        consumers.dedup_by(|a, b| key(a) == key(b));
+        crate::index::sort_consumers(consumers);
+        consumers.dedup_by(|a, b| {
+            (&a.site, &a.contract, &a.via) == (&b.site, &b.contract, &b.via)
+                && a.root == b.root
+                && (a.identity == b.identity
+                    || a.contract
+                        .as_deref()
+                        .is_some_and(|c| !crate::contract::unresolved(c)))
+        });
     }
 
     fn context_at(

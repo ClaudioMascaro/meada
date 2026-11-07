@@ -399,6 +399,7 @@ pub(in crate::http) fn unfollowed(code: &Code, config: &Config) -> Vec<Found> {
     }
     (config.unfollowed().iter())
         .map(|u| Found {
+            identity: None,
             role: Role::Unfollowed,
             site: Site::File(first.to_string()),
             contract: None,
