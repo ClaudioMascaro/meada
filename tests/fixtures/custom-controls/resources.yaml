@@ -1,9 +1,9 @@
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata: { name: fallback-topic }
 spec: {}
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata: { name: unknown-override }
 spec: { topicName: '${MISSING}' }

@@ -2289,3 +2289,8 @@ reads only in code run by the corresponding image or path, at `inferred`. Secret
 and unknown values stay unresolved. See [capabilities](site/en/capabilities.md#azure-contracts-and-functions)
 for the types and limits; `context`, `trace`, export and orphans follow the existing
 provisioning rules.
+
+
+### Custom resources and infrastructure modules
+
+Infrastructure defined by Strimzi, Config Connector, ACK or the listed Crossplane families can provision the same contract code uses. For example, a `KafkaTopic` with `metadata.name: topic-object` and `spec.topicName: shipments` appears in `search` with `kind = "iac"` by its object and by `shipments`; `context` shows `channel::kafka::shipments`. `trace` goes down from the node to its uses and up from a use to infrastructure. For a private module, add `[[iac.module]]` to `meada.toml`; for your own CRD, use `[[iac.custom_resource]]`. See the exact inventory and limits in [capabilities](site/en/capabilities.md#custom-resources-and-infrastructure-modules) and [configuration](site/en/configuration.md#private-iac-mappings). Incomplete names remain searchable without an invented provisioner.

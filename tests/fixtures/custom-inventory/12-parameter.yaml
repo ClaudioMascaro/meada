@@ -1,4 +1,4 @@
-apiVersion: ssm.services.k8s.aws/v1beta1
+apiVersion: ssm.services.k8s.aws/v1alpha1
 kind: Parameter
 metadata:
   name: operator-12

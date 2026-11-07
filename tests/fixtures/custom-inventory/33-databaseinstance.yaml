@@ -1,4 +1,4 @@
-apiVersion: sql.gcp.upbound.io/v1beta1
+apiVersion: sql.gcp.upbound.io/v1beta2
 kind: DatabaseInstance
 metadata:
   name: operator-33

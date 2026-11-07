@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Curated operators and private IaC mappings (#671): 43 explicit Strimzi, RabbitMQ Queue,
+  ACK, Config Connector and Crossplane AWS/GCP/Azure types provision existing contracts.
+  RabbitMQ Exchange/Binding topology routes real publishes to queues without inventing an
+  exchange channel. Six terraform-aws-modules sources read declared resource and Lambda/ECS
+  workload inputs; `meada.toml` maps exact/private source prefixes and custom group/kind key
+  paths to curated entries. Unknown identities and creation controls remain conservative.
+  This joins the existing 1.4.0 minor development release.
 - The console graph has image builder-to-runner and alert emitter-to-matcher views, including
   links within a repository, alongside provisioner sides and provisioning links with roots,
   levels and reasons. A bilingual legend explains each role and keyboard navigation. The

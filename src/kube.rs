@@ -760,6 +760,7 @@ impl<'m> Eval<'m> {
         let configs = environment::configs(&objs);
         let customs = custom::Targets::new(&objs);
         let start = self.out.nodes.len();
+        let references_start = self.out.references.len();
         let mut kept = 0;
         for (o, address) in objs.iter().zip(&addresses) {
             let environment = environment::resolve(o, &configs);
@@ -1115,12 +1116,13 @@ impl<'m> Eval<'m> {
                     }),
             )
             .collect::<Vec<_>>();
+        if views.is_empty() {
+            return;
+        }
         let topology = topology::Targets::new(&views);
         let mut references = HashMap::<&str, usize>::new();
-        for reference in &self.out.references {
-            if reference.root == self.root {
-                *references.entry(&reference.source).or_default() += 1;
-            }
+        for reference in &self.out.references[references_start..] {
+            *references.entry(&reference.source).or_default() += 1;
         }
         // Counts own their keys before the stored references grow.
         let mut references = references

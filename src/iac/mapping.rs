@@ -80,11 +80,23 @@ fn known(entry: &str, workload: bool) -> Result<(), String> {
     if !text(entry) {
         return Err("an IaC type table entry must be a bounded literal string".into());
     }
-    if types::named(entry).is_some() || workload && types::named_workload(entry).is_some() {
-        Ok(())
-    } else {
-        Err(format!("unknown IaC type table entry `{entry}`"))
+    if types::named(entry).is_some() {
+        return Ok(());
     }
+    if workload && let Some(row) = types::named_workload(entry) {
+        return if row.format == "terraform"
+            && matches!(
+                row.ty.as_str(),
+                "aws_lambda_function" | "aws_ecs_task_definition"
+            ) {
+            Ok(())
+        } else {
+            Err(format!(
+                "IaC workload entry `{entry}` is not supported for a module mapping"
+            ))
+        };
+    }
+    Err(format!("unknown IaC type table entry `{entry}`"))
 }
 
 impl TryFrom<Raw> for Config {

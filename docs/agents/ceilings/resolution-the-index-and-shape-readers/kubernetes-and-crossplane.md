@@ -1,5 +1,11 @@
 # Kubernetes and Crossplane
 
+- Custom identities/topology (#671) share `OBJECTS_MAX`, `OBJECT_REFERENCES_MAX`, unit/repository
+  storage budgets and `COMPOSED_MAX`. Literal input text is bounded by `VALUE_MAX`; projection
+  keys/names, scopes, references and binding copies charge before allocation. Hash lookups
+  resolve unique endpoints; no endpoint Cartesian product is expanded. Crossplane patch sets
+  are indexed once, and missing/duplicate/nested sets stay unread. The full-file custom binding
+  fan-out probe runs independently through `custom_topology_reader_stays_bounded_on_a_full_file`.
 Ingress HTTP summaries (#665) share `OBJECT_REFERENCES_MAX` (64 literal host/prefix rules)
 and `UNIT_STORED_MAX` (4 MiB of borrowed route text before copying, then charged to the unit
 again with its other facts). Passing either leaves only unread host mounts, preventing a

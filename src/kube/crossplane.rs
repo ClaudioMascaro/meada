@@ -228,16 +228,16 @@ fn bases(
                 false => external(base).or_else(|| name_at(base, &["metadata", "name"])),
             };
             let mut custom = super::custom::read(base, kind, group_of(api), mappings);
-            if let Some(custom) = &mut custom {
-                if patches_affect(&r["patches"], &named_sets, |path| custom.affected(path)) {
-                    custom.invalidate();
-                }
+            if let Some(custom) = &mut custom
+                && patches_affect(&r["patches"], &named_sets, |path| custom.affected(path))
+            {
+                custom.invalidate();
             }
             let mut topology = super::topology::read(base, kind, group_of(api));
-            if let Some(topology) = &mut topology {
-                if patches_affect(&r["patches"], &named_sets, |path| topology.affected(path)) {
-                    topology.invalidate();
-                }
+            if let Some(topology) = &mut topology
+                && patches_affect(&r["patches"], &named_sets, |path| topology.affected(path))
+            {
+                topology.invalidate();
             }
             let (line, end_line) = span(step, i).unwrap_or((1, 1));
             out.push(Base {

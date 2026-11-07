@@ -1,4 +1,4 @@
-apiVersion: kinesis.services.k8s.aws/v1beta1
+apiVersion: kinesis.services.k8s.aws/v1alpha1
 kind: Stream
 metadata:
   name: operator-06

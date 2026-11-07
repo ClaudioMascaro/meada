@@ -1,4 +1,4 @@
-apiVersion: pubsub.gcp.upbound.io/v1beta1
+apiVersion: pubsub.gcp.upbound.io/v1beta2
 kind: Subscription
 metadata:
   name: operator-31

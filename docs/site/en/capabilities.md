@@ -706,3 +706,79 @@ stays inside the repository with no `..` or symlink; ZIP archives are never open
 package identifies no local code. Key Vault app-setting references stay redacted and
 unresolved. Contracts and workloads participate in `context`, `trace`, orphans,
 provisioning and export.
+
+
+## Custom resources and infrastructure modules
+
+This is a closed inventory of 43 custom resource types, plus the RabbitMQ operator Exchange and Binding roles. Types and groups must match exactly. Other CRDs remain available through `search` with `kind = "iac"`, `context` and `trace`, without an assumed contract. Meada reads repository files without querying operators or downloading modules.
+
+| Type and group | Identity field | Contract |
+| --- | --- | --- |
+| `KafkaTopic.kafka.strimzi.io` | `spec.topicName` | `channel::kafka` |
+| `Queue.rabbitmq.com` | `spec.name` | `channel::amqp` |
+| `Queue.sqs.services.k8s.aws` | `spec.queueName` | `channel::sqs` |
+| `Bucket.s3.services.k8s.aws` | `spec.name` | `resource::s3` |
+| `Topic.sns.services.k8s.aws` | `spec.name` | `channel::sns` |
+| `EventBus.eventbridge.services.k8s.aws` | `spec.name` | `channel::eventbridge` |
+| `Stream.kinesis.services.k8s.aws` | `spec.name` | `channel::kinesis` |
+| `Table.dynamodb.services.k8s.aws` | `spec.tableName` | `resource::dynamodb` |
+| `DBInstance.rds.services.k8s.aws` | `spec.dbInstanceIdentifier` | `resource::rds` |
+| `DBCluster.rds.services.k8s.aws` | `spec.dbClusterIdentifier` | `resource::rds` |
+| `CacheCluster.elasticache.services.k8s.aws` | `spec.cacheClusterID` | `resource::elasticache` |
+| `ReplicationGroup.elasticache.services.k8s.aws` | `spec.replicationGroupID` | `resource::elasticache` |
+| `Parameter.ssm.services.k8s.aws` | `spec.name` | `resource::ssm` |
+| `Secret.secretsmanager.services.k8s.aws` | `spec.name` | `resource::secretsmanager` |
+| `PubSubTopic.pubsub.cnrm.cloud.google.com` | `spec.resourceID` | `channel::pubsub` |
+| `PubSubSubscription.pubsub.cnrm.cloud.google.com` | `spec.resourceID` | `channel::pubsub` |
+| `StorageBucket.storage.cnrm.cloud.google.com` | `spec.resourceID` | `resource::gcs` |
+| `SQLInstance.sql.cnrm.cloud.google.com` | `spec.resourceID` | `resource::cloudsql` |
+| `SQLDatabase.sql.cnrm.cloud.google.com` | `spec.resourceID` | `resource::cloudsql` |
+| `SecretManagerSecret.secretmanager.cnrm.cloud.google.com` | `spec.resourceID` | `resource::gcpsecretmanager` |
+| `Queue.sqs.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::sqs` |
+| `Bucket.s3.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::s3` |
+| `Topic.sns.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::sns` |
+| `Bus.cloudwatchevents.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::eventbridge` |
+| `Stream.kinesis.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::kinesis` |
+| `Table.dynamodb.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::dynamodb` |
+| `Instance.rds.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::rds` |
+| `Cluster.elasticache.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::elasticache` |
+| `Parameter.ssm.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::ssm` |
+| `Secret.secretsmanager.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::secretsmanager` |
+| `Topic.pubsub.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::pubsub` |
+| `Subscription.pubsub.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::pubsub` |
+| `Bucket.storage.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::gcs` |
+| `DatabaseInstance.sql.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::cloudsql` |
+| `Database.sql.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::cloudsql` |
+| `Secret.secretmanager.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::gcpsecretmanager` |
+| `Queue.servicebus.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::servicebus` |
+| `Topic.servicebus.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::servicebus` |
+| `Subscription.servicebus.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::servicebus` |
+| `EventHub.eventhub.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::eventhubs` |
+| `Account.storage.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::azurestorage` |
+| `Container.storage.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::azureblob` |
+| `Secret.keyvault.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::keyvault` |
+
+Strimzi uses `metadata.name` only when `spec.topicName` is absent. Config Connector uses `metadata.name` only when `spec.resourceID` is absent. A present but unknown or invalid field does not enable that default. The listed Crossplane families require an explicit `crossplane.io/external-name` annotation. The physical name shown on a node stays separate from its normalized contract identifier.
+
+Cloud SQL uses the composite identity `<instance>/<database>`: `SQLDatabase` reads `spec.instanceRef`, and `Database.sql.gcp.upbound.io` reads `spec.forProvider.instance` or `instanceRef`. Local references must resolve to one object of the correct group, type and namespace. Pub/Sub subscriptions have a separate `channel::pubsub::subscriptions/<name>` contract and read their source from `spec.topicRef` or `spec.forProvider.topic`/`topicRef`. Service Bus subscriptions require a full name or ARM ID identifying both topic and subscription, producing `channel::servicebus::subscription:<topic>/<subscription>`. An unqualified short name is insufficient.
+
+Literal Composition bases use the same inventory. Patches that can change identity, qualification or routing suppress projection; unknown patches, absent or duplicate patch sets and nested sets also establish no contract. Functions and patches are never executed.
+
+### RabbitMQ topology
+
+`Queue.rabbitmq.com` provisions `channel::amqp::<spec.name>`. `Exchange.rabbitmq.com` supplies its name and type without becoming a channel. `Binding.rabbitmq.com` references `spec.source` and `spec.destination` in the same evaluation unit, cluster, namespace and vhost; a `connectionSecret` reference stays distinct from a cluster-name reference. Only `queue` destinations with unique, known endpoints produce a binding. `topic` uses `*` and `#`; `direct` accepts keys without wildcards; `fanout` reaches all keys. `headers`, unknown types and `exchange` destinations produce no queue route. The latter still have navigable references. An absent Exchange type defaults to `direct`. AMQP names and keys are limited to 255 bytes. Provisioning from a publish retains its real site and route level, `exact` for a literal key and `inferred` for a wildcard.
+
+### Registry modules
+
+Only these six sources are recognized; the optional `registry.terraform.io/` prefix is accepted. The table lists the inputs read and creation controls.
+
+| Source | Inputs; controls |
+| --- | --- |
+| `terraform-aws-modules/sqs/aws` | `name`, `fifo_queue`, `use_name_prefix`; `create` |
+| `terraform-aws-modules/sns/aws` | `name`, `fifo_topic`, `use_name_prefix`; `create` |
+| `terraform-aws-modules/s3-bucket/aws` | `bucket`; `create`, `create_bucket` |
+| `terraform-aws-modules/dynamodb-table/aws` | `name`; `create`, `create_table` |
+| `terraform-aws-modules/lambda/aws` | `function_name`, `package_type`, `image_uri`, `environment_variables`, `source_path`, `local_existing_package`, `handler`; `create`, `create_function`, `create_package`, `create_layer`, `putin_khuylo` |
+| `terraform-aws-modules/ecs/aws//modules/service` | `name`, `container_definitions` (`name`, `create`, `image`, `environment`, `secrets`); `create`, `create_service`, `create_task_definition` |
+
+`create = false`, `count = 0` or an unknown creation control produces no side. Unknown names remain safe patterns without an invented physical name. SQS and SNS append `.fifo` when requested; names generated by `use_name_prefix` establish no literal provisioner. Lambda and ECS supply images and environments through the same reader as native workloads, retaining container scopes. Lambda accepts a known scalar `source_path` with `create_package = true`, inside the repository and through no `..` or symlink; list/object forms and S3 packaging have no local target. `local_existing_package` must be an existing file and stays opaque: no ZIP extraction or packager execution. `create_layer = true` suppresses the function. The module directory is never presumed to be the function code.

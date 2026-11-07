@@ -8,6 +8,11 @@ The extension steps of the package ecosystems, the readers the JVM and .NET shar
 entries per library of the HTTP and channel kinds. The other extension steps are in
 [Seams and what extends them](overview/seams-and-what-extends-them.md).
 
+Curated operators and registry/private IaC types extend the existing embedded type table,
+Eval, Kubernetes reader, configuration stamp and kind-owned projection hooks. The field and
+phase contracts are in [custom IaC (#671)](contracts/custom-iac-671.md); new cloud policy belongs
+to its contract kind, including batch routed provision uses, never an engine switch.
+
 - `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
   JVM: `dotnet/msbuild.rs` reads an SDK-style project file (`msbuild::read`: whether it is a
   project and, if so, its `Using`s (the SDK's implicit usings among them), its `PackageId`,

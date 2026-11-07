@@ -270,9 +270,15 @@ impl Entry {
             return crate::contract::azure::subscription(text);
         }
         let target = self.project(text)?;
-        (!target.starts_with("arn:")
+        let structured = ["arn:", "projects/", "/subscriptions/", "//"]
+            .iter()
+            .any(|prefix| {
+                target
+                    .get(..prefix.len())
+                    .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+            });
+        (!structured
             && !target.contains("://")
-            && !target.starts_with("projects/")
             && !target.contains(['$', '{', '}', '?', '#'])
             && !target.chars().any(char::is_whitespace))
         .then_some(target)
@@ -455,6 +461,21 @@ mod tests {
         let table: Table = toml::from_str(TABLE).unwrap();
         assert!(!table.entry.is_empty());
         assert_eq!(table.entry.len(), ENTRIES.len());
+    }
+
+    #[test]
+    fn stored_projection_defaults_preserve_the_explicit_unknown_state() {
+        let old: crate::iac::Projection =
+            serde_json::from_str(r#"{"name":null,"pattern":false,"through":[]}"#).unwrap();
+        assert!(old.name.is_none() && old.entry.is_none() && old.binding.is_none());
+        assert!(old.defining.is_empty() && old.code.is_none());
+        let known: crate::iac::Projection =
+            serde_json::from_str(r#"{"name":"literal","pattern":false,"through":[]}"#).unwrap();
+        assert_eq!(known.name.as_deref(), Some("literal"));
+        assert_eq!(
+            serde_json::to_value(known).unwrap(),
+            serde_json::json!({"name":"literal","pattern":false,"through":[]})
+        );
     }
 
     /// Every format's entry has an evaluated, named resource in the provisioning fixtures.

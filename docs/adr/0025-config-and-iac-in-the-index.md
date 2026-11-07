@@ -500,6 +500,15 @@ re-evaluates the whole unit. Links across repositories resolve at link time, as 
   0005).
 - A block whose type the table does not know is still an IaC node, with its references and config
   values; it holds no contract side.
+- #671 implements a bounded inventory of 43 custom resource types plus RabbitMQ topology
+  roles, documented in capabilities, and six named terraform-aws-modules sources. Crossplane
+  provider identities require explicit external-name annotations; literal composition bases
+  qualify, while patches that could alter identity or routing suppress the projection.
+  `[[iac.module]]` selects `source` or a component-bounded `source_prefix`, `entry` and `input`;
+  `[[iac.custom_resource]]` selects `group`, `kind`, `entry` and `key_path`. Exact sources win,
+  then the longest prefix. Mappings reuse the existing readers and evaluator; they never
+  download modules. Their digest and the embedded table digest invalidate affected indexes.
+  Physical node names remain separate from canonical contracts and explicit absent projections.
 
 ### Search
 

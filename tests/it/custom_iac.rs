@@ -222,6 +222,7 @@ fn private_mapping_inventory_and_key_paths_are_bounded_and_validated() {
         (oversized, "256 entries"),
         ("[[iac.module]]\nsource = \"a\"\nsource_prefix = \"a\"\nentry = \"terraform:aws_sqs_queue\"\ninput = \"name\"\n".into(), "one of source or source_prefix"),
         ("[[iac.custom_resource]]\ngroup = \"a\"\nkind = \"Queue\"\nentry = \"terraform:aws_sqs_queue\"\nkey_path = \"spec.[broken\"\n".into(), "key path"),
+        ("[[iac.module]]\nsource = \"a\"\nentry = \"terraform:google_cloud_run_service\"\ninput = \"name\"\n".into(), "not supported for a module mapping"),
     ] {
         std::fs::write(root.join("meada.toml"), text).unwrap();
         let error = match Engine::open(&root) { Err(error) => error.to_string(), Ok(_) => panic!("invalid mapping was accepted") };
@@ -283,6 +284,49 @@ fn registry_modules_create_the_named_resources_and_workloads_and_honor_disabled_
             "{context}"
         );
     }
+}
+
+#[test]
+fn private_module_workloads_use_the_supported_lambda_and_ecs_input_seams() {
+    let root = fixture_repo(
+        "custom_private_workloads",
+        "custom-private",
+        Some("https://example.com/custom-671-private-workloads/infra.git"),
+    );
+    std::fs::write(root.join("meada.toml"), "[[iac.module]]\nsource = \"private/function\"\nentry = \"terraform:aws_lambda_function\"\ninput = \"workload_name\"\n[[iac.module]]\nsource = \"private/service\"\nentry = \"terraform:aws_ecs_task_definition\"\ninput = \"settings.name\"\n").unwrap();
+    std::fs::write(
+        root.join("main.tf"),
+        r#"module "function" {
+ source = "private/function"
+ workload_name = "processor"
+ package_type = "Image"
+ image_uri = "registry.example.com/private/function:1"
+}
+module "service" {
+ source = "private/service"
+ settings = { name = "processor-service" }
+ container_definitions = { worker = { image = "registry.example.com/private/service:1" } }
+}
+module "off" {
+ source = "private/function"
+ workload_name = "off"
+ package_type = "Image"
+ image_uri = "registry.example.com/private/off:1"
+ create = false
+}
+"#,
+    )
+    .unwrap();
+    let value: Value =
+        serde_json::from_str(&Engine::open(&root).unwrap().export().unwrap()).unwrap();
+    assert_eq!(
+        value["consumers"],
+        serde_json::json!([
+            {"contract":"image::registry.example.com/private/function","site":"example.com/custom-671-private-workloads/infra::main.tf::module.function","via":null,"root":"."},
+            {"contract":"image::registry.example.com/private/service","site":"example.com/custom-671-private-workloads/infra::main.tf::module.service","via":null,"root":"."}
+        ])
+    );
+    assert!(provisions(&value).is_empty(), "{value}");
 }
 
 #[test]

@@ -1,4 +1,4 @@
-apiVersion: eventbridge.services.k8s.aws/v1beta1
+apiVersion: eventbridge.services.k8s.aws/v1alpha1
 kind: EventBus
 metadata:
   name: operator-05
