@@ -5,6 +5,7 @@ No product readers or feature fixtures are imported. Every generated input, raw 
 MCP result and complete export is retained. Run after independently building exact base/head.
 """
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -20,6 +21,62 @@ from console import http, query_equal
 from prove import Http, Stdio, answer, free_port, git, fetch, infra
 
 PREFIX = 'example.com/image-proof/'
+
+
+def boutique_non_image_key(source, base):
+    """Source-authorized A7 additions after the pinned pre-image binary.
+
+    Keep every old consumer and process field. #668 adds two unresolved Secret
+    Manager reads; #667 adds one literal GCS provisioner; #661/ADR 0026 retain
+    the AWS meaning of the generic final key `bucket`, even in a GCS backend.
+    """
+    repository = 'github.com/googlecloudplatform/microservices-demo'
+    calls = [
+        ('src/cartservice/src/cartstore/AlloyDBCartStore.cs',
+         'cartservice.cartstore.AlloyDBCartStore.AlloyDBCartStore(IConfiguration)',
+         ['using Google.Cloud.SecretManager.V1;',
+          'SecretManagerServiceClient client = SecretManagerServiceClient.Create();',
+          'new SecretVersionName(projectId, secretId, "latest")',
+          'client.AccessSecretVersion(secretVersionName)']),
+        ('src/productcatalogservice/catalog_loader.go', 'getSecretPayload',
+         ['secretmanager "cloud.google.com/go/secretmanager/apiv1"',
+          'client, err := secretmanager.NewClient(ctx)',
+          'Name: fmt.Sprintf("projects/%s/secrets/%s/versions/%s", project, secret, version)',
+          'client.AccessSecretVersion(ctx, req)']),
+    ]
+    consumers = []
+    for file, symbol, witnesses in calls:
+        text = (source/file).read_text()
+        if not all(text.count(witness) == 1 for witness in witnesses):
+            raise ValueError('pinned Boutique SDK source changed: '+file)
+        consumers.append({'contract': 'resource::gcpsecretmanager',
+                          'site': f'{repository}::{file}::{symbol}::client.AccessSecretVersion#0',
+                          'via': None})
+    processes = copy.deepcopy(base['processes'])
+    by_parent = {row['site'].rsplit('::', 1)[0]: row for row in consumers}
+    for process in processes:
+        steps = []
+        for step in process['steps']:
+            steps.append(step)
+            if step['node'] in by_parent:
+                side = by_parent[step['node']]
+                steps.append({'depth': step['depth']+1, 'repository': repository,
+                              'level': None, 'via': 'call', 'node': side['site'],
+                              'mark': 'consumes', 'contract': side['contract']})
+        process['steps'] = steps
+    terraform = (source/'.github/terraform/main.tf').read_text()
+    if not re.search(r'backend\s+"gcs"\s*\{\s*bucket\s*=\s*"cicd-terraform-state"', terraform) \
+            or not re.search(r'resource\s+"google_storage_bucket"\s+"terraform_state_storage_bucket"\s*\{\s*name\s*=\s*"cicd-terraform-state"', terraform):
+        raise ValueError('pinned Boutique Terraform source changed')
+    return {
+        'consumers': sorted(base['consumers']+consumers, key=lambda row: row['site']),
+        'processes': processes,
+        'provisioners': [{'contract': 'resource::gcs::cicd-terraform-state',
+                          'node': repository+'::.github/terraform/main.tf::google_storage_bucket.terraform_state_storage_bucket',
+                          'root': '.github/terraform'}],
+        'uses': [{'contract': 'resource::s3::cicd-terraform-state', 'site': repository,
+                  'at': '.github/terraform/main.tf#terraform.backend.gcs.bucket'}],
+    }
 
 
 def write(root, path, text):
@@ -531,16 +588,23 @@ class Probe:
         self.check('boutique busybox init image retained as runner',any(c.get('contract')=='image::docker.io/library/busybox' for c in head['consumers']))
         # Full original exports remain attached; inspect every top-level delta, including
         # unknown fields, rather than letting the generic comparator silently omit fields.
-        allowed={'providers','consumers','links','iac_nodes','executions'}
+        allowed={'providers','consumers','links','iac_nodes','executions','processes','provisioners','uses'}
         changes={k:{'base':base.get(k),'head':head.get(k)} for k in sorted(set(base)|set(head)) if base.get(k)!=head.get(k)}
         write(self.run,'boutique/full-field-deltas.json',json.dumps(changes,indent=2))
         raw_base=(self.run/'boutique/base/export.out').read_text()
         raw_head=(self.run/'boutique/head/export.out').read_text()
         write(self.run,'boutique/export.diff',''.join(difflib.unified_diff(raw_base.splitlines(True),raw_head.splitlines(True),fromfile='base',tofile='head')))
         self.check('boutique unchanged whole fields outside new image model',not(set(changes)-allowed),repr(sorted(changes)))
-        for key in ['providers','consumers','links']:
+        for key in ['providers','links']:
             old=[r for r in head[key] if not str(r.get('contract','')).startswith('image::')]
             self.check('boutique all existing '+key+' rows unchanged',old==base[key])
+        non_image = boutique_non_image_key(source, base)
+        write(self.run,'boutique/non-image-source-key.json',json.dumps(non_image,indent=2))
+        for key, expected_rows in non_image.items():
+            actual = head.get(key)
+            if key == 'consumers':
+                actual = [r for r in actual if not str(r.get('contract','')).startswith('image::')]
+            self.check('boutique complete '+key+' equals base plus source-authorized A7 additions',actual==expected_rows)
         frontend=head['repository']+'::kubernetes-manifests/frontend.yaml::Deployment.apps/frontend'
         qs=[{'tool':'context','arguments':{'symbol':frontend,'budget':200000}},
             {'tool':'trace','arguments':{'from':frontend,'direction':'down','budget':200000}},

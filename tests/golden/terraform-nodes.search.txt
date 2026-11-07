@@ -20,7 +20,7 @@ example.com/acme/infra envs/prod/main.tf:1 data.aws_caller_identity.current (aws
 example.com/acme/infra envs/prod/main.tf:10 module.orders (module, root envs/prod)
 example.com/acme/infra envs/prod/main.tf:16 module.payments (module, root envs/prod)
 example.com/acme/infra envs/prod/main.tf:22 module.worker (module, root envs/prod)
-example.com/acme/infra envs/prod/main.tf:44 module.audit (module, root envs/prod)
+example.com/acme/infra envs/prod/main.tf:44 module.audit (module, name "audit", root envs/prod) (no use in the workspace)
 example.com/acme/infra envs/stage/main.tf:1 module.orders (module, root envs/stage)
 example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, name "orders", root envs/prod) (no use in the workspace)
 example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, name "orders-stage", root envs/stage) (no use in the workspace)

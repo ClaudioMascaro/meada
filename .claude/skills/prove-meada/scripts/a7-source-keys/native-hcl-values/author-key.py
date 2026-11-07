@@ -129,7 +129,7 @@ def status(entries):
         "config_line": f"config files: 11 read, 2 skipped (lockfiles: 0, unreadable: 2); values: {len(entries)}, redacted: {redacted}",
         "iac_nodes": 1,
         "shadowed_files_counted": 0,
-        "declared_resource_unlinked_ids": ["resource::native_fixture::botanical", "resource::native_fixture::edge", "resource::native_fixture::masked"],
+        "declared_resource_unlinked_ids": ["resource::native-fixture::botanical", "resource::native-fixture::edge", "resource::native-fixture::masked"],
         "stale_via_count": 0,
         "iac_orphan_lines": 0,
         "unknown_or_unaccounted_config_status_rows_allowed": False,
@@ -417,19 +417,19 @@ locals {
 
     source("meada.toml", '''# Declared targets make direct key context part of the #641 public contract.
 [[resource]]
-kind = "native_fixture"
+kind = "native-fixture"
 id = "botanical"
 role = "write"
 via = ["botany.tf#locals.proof.ranked_exact"]
 
 [[resource]]
-kind = "native_fixture"
+kind = "native-fixture"
 id = "masked"
 role = "write"
 via = ["sensory/variables.tf#variable.proof.default.plain"]
 
 [[resource]]
-kind = "native_fixture"
+kind = "native-fixture"
 id = "edge"
 role = "write"
 via = ["boundary.tf#locals.proof.before_scalar"]
@@ -507,9 +507,9 @@ via = ["boundary.tf#locals.proof.before_scalar"]
 
     context("facets.tf::neutral_widget.proof", "one unknown-type IaC block exposes all of its independently authored value rows", rows=("facets.tf", "resource.neutral_widget.proof."))
     for file, key, contract in [
-        ("botany.tf", "locals.proof.ranked_exact", "resource::native_fixture::botanical"),
-        ("sensory/variables.tf", "variable.proof.default.plain", "resource::native_fixture::masked"),
-        ("boundary.tf", "locals.proof.before_scalar", "resource::native_fixture::edge"),
+        ("botany.tf", "locals.proof.ranked_exact", "resource::native-fixture::botanical"),
+        ("sensory/variables.tf", "variable.proof.default.plain", "resource::native-fixture::masked"),
+        ("boundary.tf", "locals.proof.before_scalar", "resource::native-fixture::edge"),
     ]:
         context(file + "#" + key, "direct declared configuration-key context, full target metadata and payload privacy", target={"file": file, "key": key, "line": next(r["line"] for r in baseline if r["id"] == file + "#" + key), "contract": contract, "role": "write", "level": "declared"})
         context(contract, "declared resource context reaches exactly its source key without repeating scalar contents", target={"file": file, "key": key, "contract": contract, "role": "write", "level": "declared"})
@@ -531,7 +531,7 @@ via = ["boundary.tf#locals.proof.before_scalar"]
             "replace_exactly_once": {"before": before, "after": after},
             "bytes_before": len(original), "bytes_after": len(replacement),
             "sha256_before": hashlib.sha256(original).hexdigest(), "sha256_after": hashlib.sha256(replacement).hexdigest(),
-            "preserve_original_mtime_ns_for_warm_refresh": True,
+            "preserve_original_mtime_ns_for_warm_refresh": False,
             "query_file": "queries.jsonl",
             "warm_and_cold_must_equal_complete_phase_expectations": True,
             "restore_exact_original_bytes_and_mtime_after_phase": True,
@@ -591,7 +591,7 @@ via = ["boundary.tf#locals.proof.before_scalar"]
         },
         "export_expectations": {
             "config_value_rows": 0,
-            "declared_contracts": ["resource::native_fixture::botanical", "resource::native_fixture::edge", "resource::native_fixture::masked"],
+            "declared_contracts": ["resource::native-fixture::botanical", "resource::native-fixture::edge", "resource::native-fixture::masked"],
             "declared_role": "write", "links": [], "provisioners": [],
             "automatic_contracts_from_neutral_source": [],
             "preserve_complete_export_and_judge_unexpected_fields_or_rows": True,
@@ -609,7 +609,7 @@ via = ["boundary.tf#locals.proof.before_scalar"]
             "search": "Require the entire high-budget row multiset and exact listed order, every file/key/line/value/cut/redacted field, and no unexpected row. Full result counts must equal the independent key. Do not filter surprises into success.",
             "kind_visibility": "Expected native kinds are complete. Search's public rendering lacks an explicit kind column; retain the complete direct-key metadata and record any kind that cannot be observed as UNPROVEN rather than claiming storage introspection.",
             "transports": "For each phase and each query use identical source, index, repository scope and query arguments; HTTP must copy the full stdio answer. Preserve both records, tool schemas, diagnostics and cleanup.",
-            "freshness": "Each same-size edit starts from baseline. Compare warm refresh with original size and mtime to a cold index of exactly the changed bytes, then restore all source hashes and query/status/export equivalence. Never change the answer key from a runtime result.",
+            "freshness": "Each same-size edit starts from baseline. Compare warm refresh after a visible mtime change (ADR 0004), with unchanged size, to a cold index of exactly the changed bytes, then restore all source hashes and query/status/export equivalence. Never change the answer key from a runtime result.",
             "unknown_payload_fields": "Preserve complete record/status/export/context/decision payloads. A new/unexpected field is review evidence, not discarded data. Independent runtime judgment is separate and may be BROKEN, BLOCKED or UNPROVEN.",
         },
         "not_claimed": ["generic Terraform evaluator correctness", "Terraform node-name or provisioner acceptance", "SSM SecureString matrix (reuse its dedicated source receipt)", "complete generic IaC field key", "a runtime verdict"],

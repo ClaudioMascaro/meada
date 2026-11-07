@@ -68,7 +68,9 @@ source copies are fetched at the unchanged existing pins. The independent keys s
 
 `a7-source-capture.py` uses the existing transports for the eleven frozen source edits:
 ten same-size edits and one explicit Compose override clear. The persistent MCP reader
-queries before CLI export/status. Each phase retains warm/cold and restored warm/cold
+queries before CLI export/status. Edits change mtime even when size stays fixed, following
+ADR 0004's stat-based freshness contract; simultaneous preservation of size and mtime is
+outside that guarantee. Each phase retains warm/cold and restored warm/cold
 answers, full responses/status/export, same-scope HTTP replies and exact copy/cmp/hash/mtime
 restoration. Only JSON-RPC IDs are excluded from whole response comparisons; raw replies
 remain intact. Explicit HCL privacy constraints inspect responses and diagnostics, excluding

@@ -335,6 +335,7 @@ fn only_iac_nodes_holding_contract_sides_enter_the_export() {
             ("aws_sns_topic.orders", "aws_sns_topic", "envs/prod"),
             ("aws_sqs_queue.dlq[0]", "aws_sqs_queue", "envs/prod"),
             ("aws_sqs_queue.dlq[1]", "aws_sqs_queue", "envs/prod"),
+            ("module.audit", "module", "envs/prod"),
             (
                 "module.orders.aws_sqs_queue.this",
                 "aws_sqs_queue",
@@ -348,6 +349,60 @@ fn only_iac_nodes_holding_contract_sides_enter_the_export() {
             (
                 "module.payments.aws_sqs_queue.this",
                 "aws_sqs_queue",
+                "envs/prod"
+            ),
+        ]
+    );
+    // The checked-in registry module also creates its literal SQS queue (#642 story 37).
+    // Check the whole provisioner inventory, including every root and repeated queue.
+    let provisioners: Vec<_> = json["provisioners"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| {
+            (
+                p["contract"].as_str().unwrap(),
+                p["node"].as_str().unwrap(),
+                p["root"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        provisioners,
+        [
+            (
+                "channel::sns::orders-events",
+                "example.com/acme/infra::envs/prod/main.tf::aws_sns_topic.orders",
+                "envs/prod"
+            ),
+            (
+                "channel::sqs::audit",
+                "example.com/acme/infra::envs/prod/main.tf::module.audit",
+                "envs/prod"
+            ),
+            (
+                "channel::sqs::dead-letters",
+                "example.com/acme/infra::envs/prod/main.tf::aws_sqs_queue.dlq[0]",
+                "envs/prod"
+            ),
+            (
+                "channel::sqs::dead-letters",
+                "example.com/acme/infra::envs/prod/main.tf::aws_sqs_queue.dlq[1]",
+                "envs/prod"
+            ),
+            (
+                "channel::sqs::orders",
+                "example.com/acme/infra::modules/queue/main.tf::module.orders.aws_sqs_queue.this",
+                "envs/prod"
+            ),
+            (
+                "channel::sqs::orders-stage",
+                "example.com/acme/infra::modules/queue/main.tf::module.orders.aws_sqs_queue.this",
+                "envs/stage"
+            ),
+            (
+                "channel::sqs::payments",
+                "example.com/acme/infra::modules/queue/main.tf::module.payments.aws_sqs_queue.this",
                 "envs/prod"
             ),
         ]

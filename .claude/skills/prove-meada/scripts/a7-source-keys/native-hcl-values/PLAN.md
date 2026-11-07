@@ -68,14 +68,14 @@ replace it with a newly invented harness.
    answers, and copies over HTTP under exactly the same repository/scope/arguments.
 2. In that already indexed working copy, replace `refresh = "maples"` with
    `refresh = "willow"` exactly once in `botany.tf`. The byte size stays fixed;
-   preserve and reset its original `mtime_ns` before the warm query/refresh. Save
+   change its `mtime_ns` before the warm query/refresh, following ADR 0004. Save
    the whole warm status/export/38-query set. A separate cold copy with exactly
    these changed bytes must have identical answers/status/export after excluding
    only predeclared transport envelopes, never semantic fields.
 3. Restore exact baseline bytes and mtime; verify the complete fixture hashes and
    baseline query/status/export equivalence before the next edit.
 4. Starting from baseline, replace `sensitive = true ` with `sensitive = false`
-   exactly once in `sensory/variables.tf`, again preserving size and original
+   exactly once in `sensory/variables.tf`, again preserving size and changing
    mtime. Warm and cold captures must each equal `sensitivity_public`: 72 rows,
    3 redacted. Unchanged `visible/*.tfvars` must refresh to public rows, while all
    3 rows under `opaque/child` remain redacted. The ignored `shadow/fern.tf`
@@ -103,3 +103,15 @@ separate IaC var-file counting convention and unobservable explicit kind fields
 remain unadjudicated as described in `ASSUMPTIONS.md`; they cannot become a pass
 by copying candidate output. The dedicated SSM receipt retains its own matrix.
 Final runtime judgment waits fresh exact-source/key-bound CI artifacts.
+
+## Contract corrections after the first capture
+
+The first public capture was blocked by the fixture kind `native_fixture`.
+The accepted manifest identifier grammar requires lowercase ASCII letters, digits
+and hyphens, so the three declarations and query IDs now use `native-fixture`.
+All 72 row expectations and both edits retain their original source-derived content.
+ADR 0004 requires a changed mtime or size for automatic freshness. The phase recipe
+now changes mtime explicitly; an edit preserving both stat fields is outside that
+guarantee. Exact original bytes and mtime still restore after every phase.
+Old failing artifacts and the prior key remain in Git history and retained receipts.
+These corrections do not constitute a new independent or blind judgment.

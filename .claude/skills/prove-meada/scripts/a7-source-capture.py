@@ -214,6 +214,8 @@ def main():
         for edit in phase_key.get("source_edits", []):
             if edit.get("starts_from") != "baseline":
                 raise RuntimeError("each source edit must start from baseline")
+            if edit.get("preserve_original_mtime_ns_for_warm_refresh"):
+                raise RuntimeError("warm edits must change a stat field, as required by ADR 0004")
             target = repo / edit["file"]
             original, stamp = target.read_bytes(), target.stat()
             replacement = edit["replace_exactly_once"]
@@ -229,21 +231,26 @@ def main():
                 if hashlib.sha256(changed).hexdigest() != edit["sha256_after"]:
                     raise RuntimeError("source edit changed beyond the frozen key")
                 target.write_bytes(changed)
-                os.utime(target, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+                # ADR 0004 hashes files whose mtime or size changed. Keep the
+                # same-size controls, with an explicit stat-visible timestamp.
+                # One second also works on filesystems with coarse timestamps.
+                changed_mtime = max(time.time_ns(), stamp.st_mtime_ns + 1_000_000_000)
+                os.utime(target, ns=(stamp.st_atime_ns, changed_mtime))
                 actual = target.stat()
                 save(run / "phases" / edit["phase"] / "source-edit.json", {
                     "file": edit["file"], "bytes_before": len(original), "bytes_after": actual.st_size,
                     "sha256_before": source_hash(backup), "sha256_after": source_hash(target),
                     "mtime_before_ns": stamp.st_mtime_ns, "mtime_after_ns": actual.st_mtime_ns,
+                    "freshness_contract": "ADR 0004: mtime or size changes before warm refresh",
                     "first_reader": "existing persistent MCP session, before CLI export/status"})
-                if actual.st_mtime_ns != stamp.st_mtime_ns or source_hash(target) != edit["sha256_after"]:
+                if actual.st_mtime_ns == stamp.st_mtime_ns or source_hash(target) != edit["sha256_after"]:
                     raise RuntimeError("source bytes/mtime differ before the warm query")
                 warm = capture(repo, run / "phases" / edit["phase"] / "warm", edit["phase"], client=client)
                 cold_repo = run / "work/cold" / edit["phase"] / name
                 cold_repo.parent.mkdir(parents=True)
                 shutil.copytree(src, cold_repo, symlinks=True)
                 (cold_repo / edit["file"]).write_bytes(changed)
-                os.utime(cold_repo / edit["file"], ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+                os.utime(cold_repo / edit["file"], ns=(stamp.st_atime_ns, actual.st_mtime_ns))
                 if any(source_hash(repo / path) != source_hash(cold_repo / path) for path in expected):
                     raise RuntimeError("warm/cold source inputs differ")
                 cold = capture(cold_repo, run / "phases" / edit["phase"] / "cold", edit["phase"], cold=True)
