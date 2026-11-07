@@ -6,6 +6,7 @@ Only transport/refresh equality, exact restoration and explicit privacy constrai
 are automated. CAPTURED is not semantic acceptance or PROVED. Run in public CI.
 """
 import argparse
+import copy
 import hashlib
 import importlib.util
 import json
@@ -25,6 +26,24 @@ def save(path, data):
 def source_hash(path):
     data = os.readlink(path).encode() if path.is_symlink() else path.read_bytes()
     return hashlib.sha256(data).hexdigest()
+
+
+def privacy_response(query, response):
+    """Keep response metadata, excluding only an exact empty-search query echo.
+
+    Raw transcripts are saved separately. A no-match answer repeats caller input,
+    so it cannot establish that a secret was read from the indexed source.
+    """
+    result = response.get("result", {})
+    content = result.get("content", [])
+    term = query.get("arguments", {}).get("query")
+    if (query.get("tool") == "search" and isinstance(term, str)
+            and result.get("isError") is False and len(content) == 1
+            and content[0].get("type") == "text"
+            and content[0].get("text") == f"no matches for `{term}`\n"):
+        response = copy.deepcopy(response)
+        response["result"]["content"][0]["text"] = ""
+    return response
 
 
 def main():
@@ -156,12 +175,15 @@ def main():
         save(out / "record.json", record)
         cli("status", ["status"])
         cli("export1", ["export"])
-        http_responses = []
+        http_responses, http_privacy_responses = [], []
         original_http = prove.Http
         class RecordedHttp(original_http):
             def call(self, method, params):
                 response = super().call(method, params)
                 http_responses.append({"method": method, "response": response})
+                query = {"tool": params.get("name"), "arguments": params.get("arguments", {})}
+                http_privacy_responses.append({"method": method, "response":
+                    privacy_response(query, response) if method == "tools/call" else response})
                 return response
         prove.Http = RecordedHttp
         try:
@@ -173,7 +195,9 @@ def main():
         forbidden = privacy.get("sensitivity_public_forbidden_substrings", []) if phase == "sensitivity_public" else \
             privacy.get("restored_forbidden_substrings", []) if phase == "restored" else \
             privacy.get("baseline_and_literal_changed_forbidden_substrings", [])
-        payloads = json.dumps([client.info, responses, tools_response, http_responses], ensure_ascii=False)
+        privacy_responses = [privacy_response(query, response)
+                             for query, response in zip(queries, responses, strict=True)]
+        payloads = json.dumps([client.info, privacy_responses, tools_response, http_privacy_responses], ensure_ascii=False)
         diagnostics = "\n".join(path.read_text(errors="replace") for path in out.iterdir()
                                 if path.suffix in (".out", ".err") or path.name == "export1.json")
         diagnostics += "\n" + "\n".join(path.read_text(errors="replace") for path in (folder / "http" / name).iterdir()
