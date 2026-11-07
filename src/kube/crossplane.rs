@@ -231,7 +231,10 @@ fn bases(
             if let Some(custom) = &mut custom
                 && patches_affect(&r["patches"], &named_sets, |path| custom.affected(path))
             {
-                custom.invalidate();
+                let retain_name = !patches_affect(&r["patches"], &named_sets, |path| {
+                    custom.fields_affected(path)
+                });
+                custom.invalidate(retain_name);
             }
             let mut topology = super::topology::read(base, kind, group_of(api));
             if let Some(topology) = &mut topology

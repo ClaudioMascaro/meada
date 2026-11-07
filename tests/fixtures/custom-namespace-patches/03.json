@@ -1,0 +1,11 @@
+{
+  "apiVersion": "pubsub.cnrm.cloud.google.com/v1beta1",
+  "kind": "PubSubTopic",
+  "metadata": {
+    "name": "topic",
+    "namespace": "newscope"
+  },
+  "spec": {
+    "resourceID": "replacement-topic"
+  }
+}

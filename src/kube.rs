@@ -725,7 +725,7 @@ impl<'m> Eval<'m> {
         for object in &mut objs {
             if duplicates.contains(&object.address()) {
                 if let Some(custom) = &mut object.facts.custom {
-                    custom.invalidate();
+                    custom.invalidate(false);
                 }
                 if let Some(topology) = &mut object.facts.topology {
                     topology.invalidate();

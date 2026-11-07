@@ -257,7 +257,6 @@ impl Entry {
             if self.ty.starts_with("azurerm_") {
                 return crate::contract::azure::pattern(&self.ty, text);
             }
-            return super::pattern::supported(text).then(|| text.into());
         }
         if text.is_empty() || text.len() > crate::config_values::VALUE_MAX {
             return None;
@@ -280,7 +279,8 @@ impl Entry {
         (!structured
             && !target.contains("://")
             && !target.contains(['$', '{', '}', '?', '#'])
-            && !target.chars().any(char::is_whitespace))
+            && !target.chars().any(char::is_whitespace)
+            && (!pattern || super::pattern::supported(&target)))
         .then_some(target)
     }
 

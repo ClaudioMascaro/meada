@@ -75,6 +75,7 @@ pub(super) struct Name {
     source: Option<(String, Input)>,
     filter: Option<String>,
     filtered: bool,
+    unread: bool,
 }
 
 fn at<'a>(mut value: &'a Value, path: &str) -> Option<&'a Value> {
@@ -177,6 +178,7 @@ pub(super) fn read(
                 .as_deref()
                 .and_then(|key| at(value, key))
                 .is_some_and(|v| v.as_str() != Some("")),
+        unread: false,
     })
 }
 
@@ -279,21 +281,36 @@ impl Name {
         namespace: Option<&str>,
         targets: &Targets<'_>,
     ) -> Projection {
-        let name = self.physical(object_name).and_then(|name| {
-            let entry = types::named(&self.entry)?;
-            if let Some((_, qualifier)) = &self.qualifier {
-                let qualifier = targets.value(qualifier, namespace)?;
-                if entry.canonical()?.ty == "google_sql_database" {
-                    return crate::contract::gcp::database(&qualifier, name);
+        let name = self
+            .physical(object_name)
+            .filter(|_| !self.unread)
+            .and_then(|name| {
+                let entry = types::named(&self.entry)?;
+                if let Some((_, qualifier)) = &self.qualifier {
+                    let qualifier = targets.value(qualifier, namespace)?;
+                    if entry.canonical()?.ty == "google_sql_database" {
+                        return crate::contract::gcp::database(&qualifier, name);
+                    }
                 }
-            }
-            entry.mapped(name, false)
-        });
-        let dot = if block.is_empty() { "" } else { "." };
+                entry.mapped(name, false)
+            });
+        let defining = (|| {
+            let mut path = if block.is_empty() {
+                Vec::new()
+            } else {
+                crate::config_values::sites::parts_without_selectors(block)?
+            };
+            path.extend(crate::config_values::sites::parts_without_selectors(
+                &self.key,
+            )?);
+            Some(crate::config_values::key_path(&path))
+        })()
+        .into_iter()
+        .collect();
         Projection {
             name,
             entry: Some(self.entry.clone()),
-            defining: vec![format!("{block}{dot}{}", self.key)],
+            defining,
             ..Default::default()
         }
     }
@@ -340,6 +357,31 @@ impl Name {
 
     /// Crossplane field-path patches that can change any retained identity or route are unread.
     pub(super) fn affected(&self, path: &str) -> bool {
+        self.fields_affected(path) || self.namespace_affected(path)
+    }
+
+    /// A default namespace matters only when a retained endpoint reference uses it.
+    fn namespace_affected(&self, path: &str) -> bool {
+        let implicit = self.qualifier.iter().chain(&self.source).any(|(_, input)| {
+            matches!(
+                input,
+                Input::Reference {
+                    namespace: None,
+                    ..
+                }
+            )
+        });
+        if !implicit {
+            return false;
+        }
+        let Some(written) = crate::config_values::sites::parts_without_selectors(path) else {
+            return true;
+        };
+        let namespace = [Step::Key("metadata".into()), Step::Key("namespace".into())];
+        namespace.starts_with(&written) || written.starts_with(&namespace)
+    }
+
+    pub(super) fn fields_affected(&self, path: &str) -> bool {
         let Some(written) = crate::config_values::sites::parts_without_selectors(path) else {
             return true;
         };
@@ -372,8 +414,11 @@ impl Name {
             })
     }
 
-    pub(super) fn invalidate(&mut self) {
-        self.value = None;
+    pub(super) fn invalidate(&mut self, retain_name: bool) {
+        self.unread = true;
+        if !retain_name {
+            self.value = None;
+        }
         self.qualifier = None;
         self.source = None;
     }

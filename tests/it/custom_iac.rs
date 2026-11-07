@@ -231,6 +231,216 @@ fn private_mapping_inventory_and_key_paths_are_bounded_and_validated() {
 }
 
 #[test]
+fn composition_namespace_patches_invalidate_only_implicit_reference_scopes() {
+    let root = fixture_repo(
+        "custom_namespace_patches",
+        "custom-namespace-patches",
+        Some("https://example.com/custom-671-namespace/infra.git"),
+    );
+    let engine = Engine::open(&root).unwrap();
+    let value: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let mut actual = provisions(&value)
+        .into_iter()
+        .map(|(contract, node, root)| {
+            assert_eq!(root, ".");
+            (contract, node.rsplit_once("::").unwrap().1.to_string())
+        })
+        .collect::<Vec<_>>();
+    actual.sort();
+    assert_eq!(
+        actual,
+        [
+            (
+                "channel::pubsub::original-topic".into(),
+                "PubSubTopic.pubsub.cnrm.cloud.google.com/oldscope/topic".into()
+            ),
+            (
+                "channel::pubsub::replacement-topic".into(),
+                "PubSubTopic.pubsub.cnrm.cloud.google.com/newscope/topic".into()
+            ),
+            (
+                "channel::pubsub::subscriptions/audit-explicit".into(),
+                "Composition.apiextensions.crossplane.io/scope/subscription-explicit".into()
+            ),
+            (
+                "channel::pubsub::subscriptions/audit-literal".into(),
+                "Composition.apiextensions.crossplane.io/scope/subscription-literal".into()
+            ),
+            (
+                "channel::pubsub::subscriptions/audit-unchanged".into(),
+                "Composition.apiextensions.crossplane.io/scope/subscription-unchanged".into()
+            ),
+            (
+                "resource::cloudsql::original-instance".into(),
+                "SQLInstance.sql.cnrm.cloud.google.com/oldscope/instance".into()
+            ),
+            (
+                "resource::cloudsql::original-instance/orders-explicit".into(),
+                "Composition.apiextensions.crossplane.io/scope/database-explicit".into()
+            ),
+            (
+                "resource::cloudsql::original-instance/orders-literal".into(),
+                "Composition.apiextensions.crossplane.io/scope/database-literal".into()
+            ),
+            (
+                "resource::cloudsql::original-instance/orders-unchanged".into(),
+                "Composition.apiextensions.crossplane.io/scope/database-unchanged".into()
+            ),
+            (
+                "resource::cloudsql::replacement-instance".into(),
+                "SQLInstance.sql.cnrm.cloud.google.com/newscope/instance".into()
+            ),
+        ],
+        "{value}"
+    );
+    let mut subscriptions = value["subscriptions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| (s["source"].as_str().unwrap(), s["target"].as_str().unwrap()))
+        .collect::<Vec<_>>();
+    subscriptions.sort();
+    assert_eq!(
+        subscriptions,
+        [
+            (
+                "channel::pubsub::original-topic",
+                "channel::pubsub::subscriptions/audit-explicit"
+            ),
+            (
+                "channel::pubsub::original-topic",
+                "channel::pubsub::subscriptions/audit-literal"
+            ),
+            (
+                "channel::pubsub::original-topic",
+                "channel::pubsub::subscriptions/audit-unchanged"
+            ),
+        ]
+    );
+    let context = engine
+        .context(
+            "Composition.apiextensions.crossplane.io/scope/database-implicit",
+            Some(12000),
+        )
+        .unwrap();
+    assert!(context.contains("name: \"orders\""), "{context}");
+    assert!(
+        !context.contains("resource::cloudsql::original-instance/orders"),
+        "{context}"
+    );
+    let explicit = engine
+        .context(
+            "Composition.apiextensions.crossplane.io/scope/database-explicit",
+            Some(12000),
+        )
+        .unwrap();
+    assert!(
+        explicit.contains("resource::cloudsql::original-instance/orders-explicit"),
+        "{explicit}"
+    );
+}
+
+#[test]
+fn equivalent_mapping_key_paths_never_create_directionless_self_uses() {
+    let root = fixture_repo(
+        "custom_quoted_definition",
+        "custom-quoted-definition",
+        Some("https://example.com/custom-671-quoted/infra.git"),
+    );
+    // Keep repository provenance equal while changing only the mapping spelling.
+    let path = root.join("main.tf.json");
+    let source = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(path, format!("{source}\n")).unwrap();
+    let engine = Engine::open(&root).unwrap();
+    let ask = || serde_json::from_str::<Value>(&engine.export().unwrap()).unwrap();
+    let check = |value: &Value| {
+        assert_eq!(
+            provisions(value),
+            [
+                (
+                    "resource::s3::custom-assets".into(),
+                    "example.com/custom-671-quoted/infra::store.json::Store.review.invalid/store"
+                        .into(),
+                    ".".into()
+                ),
+                (
+                    "resource::s3::module-assets".into(),
+                    "example.com/custom-671-quoted/infra::main.tf.json::module.store".into(),
+                    ".".into()
+                ),
+            ]
+        );
+        for field in ["uses", "provisions", "providers", "consumers", "links"] {
+            assert!(
+                value
+                    .get(field)
+                    .and_then(Value::as_array)
+                    .is_none_or(Vec::is_empty),
+                "unexpected {field}: {value}"
+            );
+        }
+    };
+    let quoted = ask();
+    check(&quoted);
+    let config = include_str!("../fixtures/custom-quoted-definition/meada.toml");
+    std::fs::write(
+        root.join("meada.toml"),
+        config
+            .replace("settings[\"bucket\"]", "settings.bucket")
+            .replace("spec[\"bucket\"]", "spec.bucket"),
+    )
+    .unwrap();
+    assert_eq!(ask(), quoted);
+    std::fs::write(root.join("main.tf.json"), r#"{"module":{"store":{"source":"private/storage","settings":{"items":[{"bucket":"module-assets"}]}}}}"#).unwrap();
+    std::fs::write(root.join("store.json"), r#"{"apiVersion":"review.invalid/v1","kind":"Store","metadata":{"name":"store"},"spec":{"items":[{"bucket":"custom-assets"}]}}"#).unwrap();
+    let array = config
+        .replace(
+            "settings[\"bucket\"]",
+            "settings[\"items\"][00][\"bucket\"]",
+        )
+        .replace("spec[\"bucket\"]", "spec[\"items\"][00][\"bucket\"]");
+    std::fs::write(root.join("meada.toml"), &array).unwrap();
+    let quoted_array = ask();
+    check(&quoted_array);
+    std::fs::write(
+        root.join("meada.toml"),
+        array
+            .replace(
+                "settings[\"items\"][00][\"bucket\"]",
+                "settings.items[0].bucket",
+            )
+            .replace("spec[\"items\"][00][\"bucket\"]", "spec.items[0].bucket"),
+    )
+    .unwrap();
+    assert_eq!(ask(), quoted_array);
+    std::fs::write(root.join("main.tf.json"), r#"{"variable":{"unknown":{}},"module":{"store":{"source":"private/storage","settings":{"bucket":"module-assets","unread":"${var.unknown}"}}}}"#).unwrap();
+    std::fs::write(
+        root.join("store.json"),
+        include_str!("../fixtures/custom-quoted-definition/store.json"),
+    )
+    .unwrap();
+    std::fs::write(root.join("meada.toml"), config).unwrap();
+    let unread = ask();
+    assert_eq!(
+        provisions(&unread),
+        [(
+            "resource::s3::custom-assets".into(),
+            "example.com/custom-671-quoted/infra::store.json::Store.review.invalid/store".into(),
+            ".".into()
+        )]
+    );
+    for field in ["uses", "provisions", "providers", "consumers", "links"] {
+        assert!(
+            unread
+                .get(field)
+                .and_then(Value::as_array)
+                .is_none_or(Vec::is_empty),
+            "unexpected {field}: {unread}"
+        );
+    }
+}
+
+#[test]
 fn registry_modules_create_the_named_resources_and_workloads_and_honor_disabled_inputs() {
     let root = fixture_repo(
         "custom_registry",
@@ -302,6 +512,8 @@ fn private_module_workloads_use_the_supported_lambda_and_ecs_input_seams() {
  package_type = "Image"
  image_uri = "registry.example.com/private/function:1"
 }
+
+
 module "service" {
  source = "private/service"
  settings = { name = "processor-service" }
@@ -327,6 +539,58 @@ module "off" {
         ])
     );
     assert!(provisions(&value).is_empty(), "{value}");
+}
+
+#[test]
+fn structured_patterns_cannot_fall_back_to_the_wrong_mapped_kind() {
+    let root = fixture_repo(
+        "custom_structured_patterns",
+        "custom-structured-patterns",
+        Some("https://example.com/custom-671-patterns/infra.git"),
+    );
+    let engine = Engine::open(&root).unwrap();
+    let value: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    assert_eq!(
+        provisions(&value),
+        [
+            (
+                "channel::servicebus::batch-*".into(),
+                "example.com/custom-671-patterns/infra::main.tf.json::module.azure".into(),
+                ".".into()
+            ),
+            (
+                "channel::sqs::batch-*".into(),
+                "example.com/custom-671-patterns/infra::main.tf.json::module.known_arn".into(),
+                ".".into()
+            ),
+            (
+                "channel::sqs::batch-*".into(),
+                "example.com/custom-671-patterns/infra::main.tf.json::module.plain".into(),
+                ".".into()
+            ),
+            (
+                "resource::gcs::batch-*".into(),
+                "example.com/custom-671-patterns/infra::main.tf.json::module.gcp".into(),
+                ".".into()
+            ),
+        ],
+        "{value}"
+    );
+    for field in ["uses", "provisions", "providers", "consumers", "links"] {
+        assert!(
+            value
+                .get(field)
+                .and_then(Value::as_array)
+                .is_none_or(Vec::is_empty),
+            "unexpected {field}: {value}"
+        );
+    }
+    let context = engine.context("module.arm", Some(12000)).unwrap();
+    assert!(context.contains("/subscriptions/"), "{context}");
+    assert!(
+        !context.contains("channel::sqs::/subscriptions/"),
+        "{context}"
+    );
 }
 
 #[test]

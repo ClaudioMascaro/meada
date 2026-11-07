@@ -99,13 +99,31 @@ impl<'m> Eval<'m> {
         let Some(spec) = self.module_spec(block) else {
             return;
         };
-        self.nodes[node].provisioned = Some(Projection {
-            entry: Some(spec.entry.clone()),
-            ..Default::default()
-        });
+        self.nodes[node].provisioned = Some(Projection::default());
         let Some(steps) = crate::config_values::sites::parts_without_selectors(&spec.input) else {
             return;
         };
+        let mut defining = match &block.json_path {
+            Some(key) => {
+                let Some(path) = crate::config_values::sites::parts_without_selectors(key) else {
+                    return;
+                };
+                path
+            }
+            None => vec![Step::Key("module".into()), Step::Key(block.name.clone())],
+        };
+        defining.extend(steps.iter().cloned());
+        let defining = crate::config_values::key_path(&defining);
+        let initial = Projection {
+            entry: Some(spec.entry.clone()),
+            defining: vec![defining.clone()],
+            ..Default::default()
+        };
+        let initial_size = initial.size();
+        if !self.charge(initial_size) {
+            return;
+        }
+        self.nodes[node].provisioned = Some(initial);
         let Some((Step::Key(head), tail)) = steps.split_first() else {
             return;
         };
@@ -180,20 +198,15 @@ impl<'m> Eval<'m> {
         let target = (created && !generated)
             .then(|| types::named(&spec.entry)?.mapped(&name, pattern))
             .flatten();
-        let block_key = block
-            .json_path
-            .clone()
-            .unwrap_or_else(|| format!("module.{}", block.name));
-        let dot = if spec.input.starts_with('[') { "" } else { "." };
         let projection = Projection {
             name: target,
             pattern,
             through: found.through.into_iter().collect(),
             entry: Some(spec.entry),
-            defining: vec![format!("{block_key}{dot}{}", spec.input)],
+            defining: vec![defining],
             ..Default::default()
         };
-        if self.charge(projection.size()) {
+        if self.charge(projection.size().saturating_sub(initial_size)) {
             self.nodes[node].provisioned = Some(projection);
         }
     }

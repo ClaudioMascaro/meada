@@ -26,6 +26,15 @@ physical even when projection is absent. Cloud SQL is instance/database; Pub/Sub
 and Service Bus subscriptions preserve their native distinct identities. Crossplane requires an
 explicit external-name annotation, including literal composition bases.
 
+Composition namespace patches also invalidate qualifier/source references that inherit the
+base namespace, while retaining an unaffected physical name. Explicit reference namespaces and
+literal endpoints do not depend on that default. Defining locators use the config key renderer
+over parsed steps, so quoted simple keys and alternate numeric index spellings exclude the same
+identity field from config uses. Generic mapped patterns pass through entry normalization and
+structured-identifier refusal before pattern matching; GCP/Azure retain their kind-owned rules.
+Declared defining locators are retained, within the storage budget, before evaluating a module
+input, so an unread aggregate cannot turn its known identity field into a directionless use.
+
 `kube/topology.rs` owns Queue/Exchange/Binding roles and root-local endpoint lookup by physical
 name, cluster reference kind/name, namespace and vhost. Duplicate addresses/endpoints and unread
 patches establish no binding. A real unique queue/exchange pair plus a supported Exchange type

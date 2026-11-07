@@ -1,0 +1,39 @@
+{
+  "variable": {
+    "unknown": {}
+  },
+  "module": {
+    "arm": {
+      "source": "private/queue",
+      "identity": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ServiceBus/namespaces/ns/queues/jobs-${var.unknown}"
+    },
+    "projects": {
+      "source": "private/queue",
+      "identity": "projects/p/topics/jobs-${var.unknown}"
+    },
+    "upper_arn": {
+      "source": "private/queue",
+      "identity": "ARN:aws:sns:r:a:jobs-${var.unknown}"
+    },
+    "protocol_relative": {
+      "source": "private/queue",
+      "identity": "//example.invalid/queue/jobs-${var.unknown}"
+    },
+    "plain": {
+      "source": "private/queue",
+      "identity": "batch-${var.unknown}"
+    },
+    "known_arn": {
+      "source": "private/queue",
+      "identity": "arn:aws:sqs:us-east-1:123456789012:batch-${var.unknown}"
+    },
+    "gcp": {
+      "source": "private/gcp",
+      "identity": "batch-${var.unknown}"
+    },
+    "azure": {
+      "source": "private/azure",
+      "identity": "batch-${var.unknown}"
+    }
+  }
+}
