@@ -200,6 +200,9 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
                         depth,
                     );
                 }
+                if let Some((at, index)) = self.code.first_result(path, scope, name) {
+                    return self.called(at, index, None, awaited, depth);
+                }
                 let (function, n) = self.code.param_of(path, scope, name)?;
                 if let Some(frame) = self.contexts.last() {
                     return (frame.function == function)

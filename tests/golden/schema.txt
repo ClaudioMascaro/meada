@@ -3639,7 +3639,23 @@ Output {
             subscription: None,
             environment: [],
             images: [],
-            provisioned: None,
+            provisioned: Some(
+                Projection {
+                    name: Some(
+                        "acme-assets",
+                    ),
+                    pattern: false,
+                    through: [],
+                    entry: Some(
+                        "kubernetes:Bucket.s3.aws.upbound.io",
+                    ),
+                    defining: [
+                        "[3].metadata.annotations[\"crossplane.io/external-name\"]",
+                    ],
+                    code: None,
+                    binding: None,
+                },
+            ),
             ingress: [],
         },
         Node {
@@ -3751,7 +3767,21 @@ Output {
             subscription: None,
             environment: [],
             images: [],
-            provisioned: None,
+            provisioned: Some(
+                Projection {
+                    name: None,
+                    pattern: false,
+                    through: [],
+                    entry: Some(
+                        "kubernetes:Queue.sqs.aws.upbound.io",
+                    ),
+                    defining: [
+                        "[1].spec.resources[0].base.metadata.annotations[\"crossplane.io/external-name\"]",
+                    ],
+                    code: None,
+                    binding: None,
+                },
+            ),
             ingress: [],
         },
         Node {
@@ -3779,7 +3809,23 @@ Output {
             subscription: None,
             environment: [],
             images: [],
-            provisioned: None,
+            provisioned: Some(
+                Projection {
+                    name: Some(
+                        "orders-topic",
+                    ),
+                    pattern: false,
+                    through: [],
+                    entry: Some(
+                        "kubernetes:Topic.sns.aws.upbound.io",
+                    ),
+                    defining: [
+                        "[1].spec.resources[1].base.metadata.annotations[\"crossplane.io/external-name\"]",
+                    ],
+                    code: None,
+                    binding: None,
+                },
+            ),
             ingress: [],
         },
     ],

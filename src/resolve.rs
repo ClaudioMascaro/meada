@@ -12,9 +12,9 @@ use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Annotated, Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, Import, Imported,
-    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker,
-    Through, Ty, Value,
+    Annotated, Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, FirstResult, Import,
+    Imported, Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step,
+    Taker, Through, Ty, Value,
 };
 
 mod mutations;
@@ -4888,6 +4888,7 @@ struct ByName<'a> {
     consts: HashMap<&'a str, Vec<&'a Const>>,
     /// The values the locals were given (`Facts::bound`), by scope and name.
     bound: HashMap<(&'a str, &'a str), Vec<&'a Bound>>,
+    first_results: HashMap<(&'a str, &'a str), Vec<&'a FirstResult>>,
 }
 
 impl<'a> ByName<'a> {
@@ -4903,6 +4904,10 @@ impl<'a> ByName<'a> {
         for bound in &facts.bound {
             let key = (bound.scope.as_str(), bound.name.as_str());
             by_name.bound.entry(key).or_default().push(bound);
+        }
+        for first in &facts.first_results {
+            let key = (first.scope.as_str(), first.name.as_str());
+            by_name.first_results.entry(key).or_default().push(first);
         }
         by_name
     }
@@ -5372,6 +5377,30 @@ impl<'a> Code<'a> {
             }
         }
         None
+    }
+
+    /// The exact call whose first result the nearest stable local holds. Ordinary value
+    /// folding leaves this projection unknown; SDK readers still prove the call's origin.
+    pub(crate) fn first_result(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<(&'a str, usize)> {
+        let Binding::Local(at, within, local) =
+            self.resolver.lexical(path, scope, name, &mut Seen::new())
+        else {
+            return None;
+        };
+        let [first] = self
+            .by_name(at)?
+            .first_results
+            .get(&(within, local))?
+            .as_slice()
+        else {
+            return None;
+        };
+        Some((at, self.call_index(at, &first.call)?))
     }
 
     /// Every name `path` binds to a value (`Facts::bound`), in source order: the kinds that need

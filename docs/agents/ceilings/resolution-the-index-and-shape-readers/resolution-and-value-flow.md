@@ -4,7 +4,9 @@
 frames and a kind-supplied typed-construction predicate. It uses the existing evaluation
 limits and does not change ordinary `Code::value`. Shared SDK evidence memoizes normalized
 frame argument names and client evidence; unknown alternatives invalidate the result. Go
-records only the first binding of a multiple-result call, leaving error/other results unknown.
+records only guarded first-result call ranges for the shared SDK evidence walk; ordinary
+scalar folding and error/other result bindings remain unknown. These facts follow the full
+value cache, not the lean index, and reuse the nearest lexical binding query.
 Scoped selector effects (`resolve/mutations.rs`) follow exact aliases and argument frames,
 compare actual read/write call order, and share selection/memo normalization. Retained write
 facts charge their names and scopes to `MAX_BYTES` (1 MiB); overflow removes complete write
