@@ -26,7 +26,11 @@
   which stands for the package (`Modules::dir`: a `replace` of the importing file's module,
   none when it is by a module from outside, else the longest module path of the repository, a
   directory its module owns), and `shared` with the files of each directory and
-  `Facts::package`.
+  `Facts::package`. A stable first binding of a multiple-result call is not a scalar
+  constant. `Facts::first_results` retains its scope/name and exact call range only in full
+  facts/value caches, after the same single-binding and assignment guards. The shared SDK
+  walk asks `Code::first_result`, which checks the nearest lexical binding before following
+  that exact call; ordinary value folding does not use this evidence.
 - `resolve.rs`, `resolve/mutations.rs`: shared resolution and scoped selector effects behind the adapter. `Resolver` connects calls to definitions
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
   bound by several imports (the latest in source order decides, whatever it resolves to), a

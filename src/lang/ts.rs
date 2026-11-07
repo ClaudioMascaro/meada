@@ -1425,17 +1425,23 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                         .then(|| f.child_by_field_name("object"))
                         .flatten()
                         .map(|object| Box::new(deeper(object)));
-                    Value::Call(Invocation {
+                    let awaited = awaited_artifact(node);
+                    let call = Value::Call(Invocation {
                         callee: callee(f, src),
                         receiver,
                         args: args.map_or(Vec::new(), |a| named(a).map(deeper).collect()),
                         kwargs: Vec::new(),
                         // The span of the call in `Facts::calls`.
-                        range: match awaited_artifact(node) {
+                        range: match awaited {
                             true => f.start_byte()..node.end_byte(),
                             false => node.byte_range(),
                         },
-                    })
+                    });
+                    if awaited {
+                        Value::Await(Box::new(call))
+                    } else {
+                        call
+                    }
                 })
             }
             None if kind == "new_expression" => callee_node(node).map_or(Value::Unknown, |f| {
@@ -2652,13 +2658,20 @@ mod tests {
 
     #[test]
     fn an_awaited_typed_call_is_a_call_value() {
-        let facts = parse("async function f() { g(await get<Row>(\"/x\"), await get(\"/y\")); }");
+        let source = "async function f() { g(await get<Row>(\"/x\"), await get(\"/y\")); }";
+        let facts = parse(source);
         let call = facts.calls.iter().find(|c| c.callee == "g").unwrap();
         assert_eq!(call.args.len(), 2);
-        assert!(
-            call.args
-                .iter()
-                .all(|a| matches!(a, Value::Call(call) if call.callee == "get"))
-        );
+        for (value, written) in call.args.iter().zip(["get<Row>(\"/x\")", "get(\"/y\")"]) {
+            let Value::Await(value) = value else {
+                panic!("await syntax is retained");
+            };
+            let Value::Call(call) = value.as_ref() else {
+                panic!("awaited get call");
+            };
+            assert_eq!(call.callee, "get");
+            assert_eq!(call.args.len(), 1);
+            assert_eq!(&source[call.range.clone()], written);
+        }
     }
 }

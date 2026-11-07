@@ -575,6 +575,11 @@ pub struct Facts {
     /// the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub bound: Vec<Bound>,
+    /// A stable first binding of a multiple-result call (Go). This is a result projection,
+    /// not a scalar constant: only a reader proving that call's result may follow it.
+    /// Not kept in the lean index, like the bound values above.
+    #[serde(default, skip_serializing_if = "lean")]
+    pub first_results: Vec<FirstResult>,
     /// Scoped selector assignments/deletions, with their source order. None means this
     /// parse does not establish complete write knowledge; no literal values are retained.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -663,6 +668,13 @@ pub struct Bound {
     pub within: String,
     pub name: String,
     pub value: Value,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FirstResult {
+    pub scope: String,
+    pub name: String,
+    pub call: Range<usize>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

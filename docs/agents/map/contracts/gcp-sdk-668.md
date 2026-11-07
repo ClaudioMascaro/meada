@@ -28,7 +28,9 @@ mapping-call effects, with no SDK names in packs or resolution. Both syntax evid
 and query work use existing ceilings. Ordinary `Code::value` folding stays unchanged. TS/JS retain complex receiver expressions so
 inline `new` keeps construction evidence while a plain class call does not. `Code::value_bound` guards static factories
 against a value hiding the class name. Go records the first result of a multiple-result call
-as syntax-only value evidence; other result bindings remain unknown. Await syntax and
+as guarded scope/name and call-range evidence, separate from scalar constants. Only
+`Code::first_result` and the shared SDK walk follow it; other result bindings and ordinary
+value folding remain unknown. Await syntax and
 asynchronous definitions remain neutral facts; the kind and shared evidence walk require a
 C# async factory result to be awaited once. Resource readers use operation call sites;
 channel receives retain handler definition sites. SDK policy remains here.
