@@ -472,6 +472,7 @@ fn client<'a>(
         return None;
     }
     match value {
+        Value::Await(value) => client(code, path, scope, value, depth + 1),
         Value::New(ty, _) => type_of(code, path, scope, ty),
         Value::Ref(written) => {
             let written = written.strip_prefix("this.").unwrap_or(written);

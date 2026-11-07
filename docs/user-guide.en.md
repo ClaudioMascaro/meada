@@ -588,6 +588,22 @@ unresolved targets, without reading secret contents. Search, `context`, `trace` 
 directions, scoped orphans and export include the new contracts and runners; environment
 entries and configuration values stay outside the export.
 
+### GCP SDK use in five language groups
+
+Constructor-backed GCP clients create Pub/Sub producers and subscription consumers, Cloud Storage writers/readers and Secret Manager readers. JavaScript and TypeScript share one group, with both source languages checked independently. The operation inventory is explicit; other overloads are outside this list.
+
+| Group | Pub/Sub producer / consumer | Cloud Storage writer / reader | Secret Manager reader |
+| --- | --- | --- | --- |
+| JavaScript + TypeScript | `new PubSub().topic(name).publishMessage(...)` / `.subscription(name).on("message", handler)` | `new Storage().bucket(name).file(object).save(...)` / `.download(...)` | `new SecretManagerServiceClient().accessSecretVersion({name})` |
+| Python | `PublisherClient().publish(topic, ...)` / `SubscriberClient().subscribe(subscription, callback=...)` | `storage.Client().bucket(name).blob(object).upload_from_string(...)` / `.download_as_bytes()` | `SecretManagerServiceClient().access_secret_version(request={"name": name})` |
+| Java | `Publisher.newBuilder(topic).build().publish(...)` / `Subscriber.newBuilder(subscription, handler).build().startAsync()` | `StorageOptions.newBuilder().build().getService().create(BlobInfo.newBuilder(BlobId.of(bucket, object)).build(), ...)` / `.readAllBytes(bucket, object)` | `SecretManagerServiceClient.create().accessSecretVersion(name)` |
+| Go | Pub/Sub v2 `NewClient`: `Publisher(topic).Publish(...)` / `Subscriber(subscription).Receive(ctx, handler)`; v1 `Topic` / `Subscription` | `storage.NewClient`: `Bucket(bucket).Object(object).NewWriter(ctx)` / `.NewReader(ctx)` | `secretmanager.NewClient`: `AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{Name: name})` |
+| C# | `client = await PublisherClient.CreateAsync(topic); client.PublishAsync(...)` / `client = await SubscriberClient.CreateAsync(subscription); client.StartAsync(handler)` | `StorageClient.Create()`: `UploadObject`, `UploadObjectAsync` / `DownloadObject`, `DownloadObjectAsync`, bucket as first argument | `SecretManagerServiceClient.Create()`: `AccessSecretVersion`, `AccessSecretVersionAsync` |
+
+Literal topic, subscription, bucket and secret identities use the same normalization as Terraform and config. A subscription is `channel::pubsub::subscriptions/<id>` and never a guessed topic. Names read from the environment remain unresolved without a workload that actually runs the code; scoped values resolve at `inferred`, preserving the operation subtype. Hidden constructors, injected types without construction, name-matched factories, reassigned clients and opaque return alternatives supply no SDK side.
+
+Request fields changed before use leave the name unresolved; reads before the change and independent objects preserve their identity. Typed helpers must match the resource being used. In C#, await `CreateAsync` first, then invoke the operation on the returned client.
+
 ### AWS channels, data, secrets and subscriptions
 
 The Terraform/OpenTofu table also recognizes the types below. ARNs reduce to physical names,
@@ -1157,6 +1173,22 @@ A route links whoever **serves** it (the provider, the code that handles it) to 
 it (the consumer, an HTTP client call). In every language, Meada normalizes the path:
 `/users/:id`, `/users/{id}` and `/users/<int:id>` become the same `/users/{}`, and the method is
 uppercased. Path case and API versions are kept.
+
+Infrastructure can declare routes: API Gateway HTTP and REST in Terraform/OpenTofu, SAM
+`Api` and `HttpApi` events, and Serverless `http` and `httpApi` events. For example, a SAM
+event with `Method: GET` and `Path: /orders/{id}` provides `http::GET::/orders/{}`. Declare the
+public host in `[serve] hosts`, as for a code route. The target is the handler symbol in the
+same repository when it resolves with certainty, including an aliased export; otherwise it
+is the whole repository. Missing or ambiguous files, ZIP archives, remote or absolute paths,
+parent steps and symlinks never fabricate a handler.
+
+A REST API's public method comes from `http_method`, not the POST used to invoke Lambda.
+The integration must identify one Lambda in the same evaluation unit and instance;
+incidental references, mismatched APIs and unknown targets provide no route. Quick create
+requires an explicit method/path `route_key`. `ANY` (or Serverless `method: '*'`) serves any
+method at that path; `$default` or a catch-all without a finite path provides none. Overridable
+values retain `inferred` evidence. Evaluation and path validation happen during indexing,
+without network access; queries use stored facts.
 
 How the link is chosen, depending on what the URL shows:
 

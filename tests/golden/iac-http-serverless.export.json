@@ -1,0 +1,104 @@
+{
+  "format": 1,
+  "repository": "example.com/route-oracle/serverless",
+  "commit": "e4d364a47f2440a5b8281950db6c17f97c29f15d",
+  "dirty": true,
+  "files": [
+    {
+      "path": "runtime.ts",
+      "hash": "74163a5e89c7a304d220283953e57c8c7d4482333432ca9724811cc0f0e74989"
+    },
+    {
+      "path": "unrelated.ts",
+      "hash": "5fdb9f277f5c633e125ec0d91bf4458290145b85708265354a004b79614e6dcb"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/route-oracle/serverless::runtime.ts::inventory",
+      "span": {
+        "path": "runtime.ts",
+        "start": 7,
+        "end": 78
+      },
+      "hash": "fcd0a15fc3fb63b4c0926d201c75ba08edc99792468e97b633a98c23a5d0d7ea"
+    },
+    {
+      "id": "example.com/route-oracle/serverless::unrelated.ts::inventory",
+      "span": {
+        "path": "unrelated.ts",
+        "start": 7,
+        "end": 74
+      },
+      "hash": "cf9c8b4d08b4626fcc2426fdddc94577150fcc61983e09b3a6c4eacf0773bb2a"
+    }
+  ],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "http::PATCH::/inventory/{}",
+      "site": "example.com/route-oracle/serverless::runtime.ts::inventory"
+    }
+  ],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/route-oracle/serverless::serverless.yml::functions.inventory",
+      "address": "functions.inventory",
+      "type": "Serverless::Function",
+      "root": "serverless.yml",
+      "path": "serverless.yml",
+      "line": 6,
+      "end_line": 11
+    }
+  ],
+  "executions": [
+    {
+      "workload": "example.com/route-oracle/serverless::serverless.yml::functions.inventory",
+      "root": "serverless.yml",
+      "repository": "example.com/route-oracle/serverless",
+      "path": "runtime.ts",
+      "level": "exact",
+      "reason": "Serverless handler serverless.yml#functions.inventory.handler"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/route-oracle/consumer::client.ts::patchInventory::fetch#0",
+      "provider": "example.com/route-oracle/serverless::runtime.ts::inventory",
+      "contract": "http::PATCH::/inventory/{}",
+      "level": "exact",
+      "reason": "host inventory.example.test is served by example.com/route-oracle/serverless"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/route-oracle/serverless::runtime.ts::inventory",
+      "kind": "export",
+      "label": "inventory",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/serverless",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/serverless::runtime.ts::inventory"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/route-oracle/serverless::unrelated.ts::inventory",
+      "kind": "export",
+      "label": "inventory",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/serverless",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/serverless::unrelated.ts::inventory"
+        }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,7 @@ this file, and a change to these modules updates it.
 
 - [Test crates, harness and fixtures](tests/test-crates-harness-and-fixtures.md)
 - [Test modules by subject](tests/test-modules-by-subject.md)
+- [GCP SDK operations, origin controls and workload names](contracts/gcp-sdk-668.md)
 - [Package, channel and gateway fixtures](tests/package-channel-and-gateway-fixtures.md)
 - [Workspace editor and shared validation (#310)](tests/workspace-editor-and-shared-validation-310.md)
 - [Java declarative clients (#90)](tests/java-declarative-clients-90.md)

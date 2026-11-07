@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  OrchardFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs20.x
+      Handler: app.orchard
+      CodeUri: runtime/
+      Events:
+        ReadOrchard:
+          Type: Api
+          Properties:
+            Path: /orchards/{treeId}
+            Method: get
+        CreateOrchard:
+          Type: HttpApi
+          Properties:
+            Path: /orchards
+            Method: POST
+            ApiId: !Ref Socket
+
+
+  Socket:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      ProtocolType: WEBSOCKET

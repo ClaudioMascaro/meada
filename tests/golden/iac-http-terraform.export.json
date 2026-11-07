@@ -1,0 +1,104 @@
+{
+  "format": 1,
+  "repository": "example.com/route-oracle/terraform",
+  "commit": "1c171629589f7d0322b84485ca06c964afb9f36b",
+  "dirty": true,
+  "files": [
+    {
+      "path": "runtime/index.ts",
+      "hash": "f75793e5181904622a390a8caffd74739e94c2d682a37a2f788d1bcd2da9b498"
+    },
+    {
+      "path": "unrelated.ts",
+      "hash": "0ae0f31d9ca2ff9fcbbb08219ba1256fd90147661946849f62aaaf2c4726adc4"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits",
+      "span": {
+        "path": "runtime/index.ts",
+        "start": 7,
+        "end": 78
+      },
+      "hash": "d8861941ab408b7568ea5ae60d97d8872a1405080e953761457277fcc35bdf63"
+    },
+    {
+      "id": "example.com/route-oracle/terraform::unrelated.ts::handleOrbits",
+      "span": {
+        "path": "unrelated.ts",
+        "start": 7,
+        "end": 77
+      },
+      "hash": "6c114bb73a6d28fe39fa4853576df053c855cb249a1fe3fa9c2870e847a67969"
+    }
+  ],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "http::GET::/orbits/{}",
+      "site": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits"
+    }
+  ],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/route-oracle/terraform::main.tf::aws_lambda_function.orbits",
+      "address": "aws_lambda_function.orbits",
+      "type": "aws_lambda_function",
+      "root": ".",
+      "path": "main.tf",
+      "line": 6,
+      "end_line": 12
+    }
+  ],
+  "executions": [
+    {
+      "workload": "example.com/route-oracle/terraform::main.tf::aws_lambda_function.orbits",
+      "root": ".",
+      "repository": "example.com/route-oracle/terraform",
+      "path": "runtime",
+      "level": "exact",
+      "reason": "Terraform Lambda code main.tf#resource.aws_lambda_function.orbits"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/route-oracle/consumer::client.ts::readOrbit::fetch#0",
+      "provider": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits",
+      "contract": "http::GET::/orbits/{}",
+      "level": "exact",
+      "reason": "host orbits.example.test is served by example.com/route-oracle/terraform"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits",
+      "kind": "export",
+      "label": "handleOrbits",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/terraform",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/route-oracle/terraform::unrelated.ts::handleOrbits",
+      "kind": "export",
+      "label": "handleOrbits",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/terraform",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/terraform::unrelated.ts::handleOrbits"
+        }
+      ]
+    }
+  ]
+}

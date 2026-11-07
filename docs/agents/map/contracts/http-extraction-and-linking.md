@@ -1,5 +1,7 @@
 # HTTP extraction and linking
 
+IaC declarations and handler placement: [API Gateway, SAM and Serverless](iac-http-routes-666.md).
+
 Infrastructure routing and its shared inference explanation:
 [Services, Compose and Ingress](http-infrastructure-665.md).
 

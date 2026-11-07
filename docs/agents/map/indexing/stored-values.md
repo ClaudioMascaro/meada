@@ -199,3 +199,12 @@ name and an explicit unresolved state; `iac_nodes.ingress` holds literal transfo
 facts. `environment` may also retain a typed known contract target without a literal value.
 These facts stay under the existing IaC budgets and are described in the
 [AWS workload topic](../contracts/aws-workloads-664.md).
+
+
+IaC HTTP providers (#666) retain `iac::Node::routes` in the `iac_nodes.routes` JSON column:
+resolved method/path values and their declaration location. HTTP's contract-config summary
+stores normalized contracts, an indexing-time validated handler module/member and inferred
+flags. `index::exports_of` hydrates only those handler modules' exact stored exports, through
+`ContractKind::read_declarations`, before `symbols_read` names their symbols in partial reads.
+`exports_path` indexes that lookup. Queries use the stored summaries/exports/symbols, with no
+filesystem validation or IaC evaluation. See [the HTTP map](../contracts/iac-http-routes-666.md).

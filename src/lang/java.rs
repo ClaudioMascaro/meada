@@ -228,7 +228,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // The locals declared with an initializer, and every name the file assigns: a local the
     // file assigns holds no one value, so its bound is dropped (`Facts::bound`).
     let mut initialized: Vec<Bound> = Vec::new();
-    let mut reassigned: BTreeSet<String> = BTreeSet::new();
+    let mut reassigned: Vec<(String, String)> = Vec::new();
     let mut seen = Declared::new(tree.root_node());
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
@@ -663,7 +663,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     _ => named(node).next(),
                 };
                 if let Some(n) = left.filter(|n| n.kind() == "identifier") {
-                    reassigned.insert(text(n, src).to_string());
+                    reassigned.push((scope.as_ref().clone(), text(n, src).to_string()));
                 }
                 let write = match left {
                     Some(n) if n.kind() == "identifier" => {
@@ -798,18 +798,43 @@ fn parse(src: &[u8]) -> Result<Facts> {
         facts.calls[outer].on = call_at(&inner);
     }
     // A local is bound to its initializer when it is the one binding of its name in its
-    // definition, no field of an enclosing class shares the name and the file never assigns it.
+    // definition, no field of an enclosing class shares the name and its binding is never assigned.
     let mut declared: BTreeMap<(&str, &str), usize> = BTreeMap::new();
     for local in &locals {
         *declared.entry((&local.scope, &local.name)).or_default() += 1;
     }
+    let bindings: BTreeSet<(&str, &str)> = declared
+        .keys()
+        .copied()
+        .chain(
+            facts
+                .defs
+                .iter()
+                .flat_map(|d| d.params.iter().map(|p| (d.name.as_str(), p.name.as_str()))),
+        )
+        .collect();
+    let reassigned: BTreeSet<(String, String)> = reassigned
+        .into_iter()
+        .filter_map(|(scope, name)| {
+            let mut at = scope.as_str();
+            loop {
+                if bindings.contains(&(at, name.as_str())) {
+                    return Some((at.to_string(), name));
+                }
+                if at.is_empty() {
+                    return None;
+                }
+                at = crate::parent(at);
+            }
+        })
+        .collect();
     let field_hides = |name: &str, scope: &str| {
         (fields.get(name)).is_some_and(|at| at.iter().any(|at| encloses(at, scope)))
     };
     facts.bound = (initialized.into_iter())
         .filter(|b| {
             declared.get(&(b.scope.as_str(), b.name.as_str())) == Some(&1)
-                && !reassigned.contains(&b.name)
+                && !reassigned.contains(&(b.scope.clone(), b.name.clone()))
                 && !field_hides(&b.name, &b.scope)
         })
         .collect();

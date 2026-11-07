@@ -762,6 +762,62 @@ fn event_text(vars: &mut Vars, event: &Value, at: &mut Vec<Step>) -> Option<Reso
     Some(out)
 }
 
+/// HTTP fields keep known string expansions and reject unresolved segments.
+fn http_string(vars: &mut Vars, text: &str, at: &[Step]) -> Option<Resolved> {
+    let segments = vars.string(text, at);
+    (!segments.iter().any(|seg| matches!(seg, Seg::Unknown(_)))).then(|| text_of(&segments))
+}
+
+/// Keep method and path distinct. Generic Ref labels and unknown `*` sentinels are not fields.
+fn http_route(
+    vars: &mut Vars,
+    event: &Value,
+    at: &mut Vec<Step>,
+    file: &str,
+) -> Option<super::Route> {
+    let map = event.as_object()?;
+    let [(kind, body)] = map.iter().collect::<Vec<_>>()[..] else {
+        return None;
+    };
+    if !matches!(kind.as_str(), "http" | "httpApi") {
+        return None;
+    }
+    at.push(Step::Key(kind.clone()));
+    let parts = match body {
+        Value::String(text) => {
+            let parts = text.split_whitespace().collect::<Vec<_>>();
+            match parts.as_slice() {
+                [method, path] => http_string(vars, method, at).zip(http_string(vars, path, at)),
+                _ => None,
+            }
+        }
+        Value::Object(map) => {
+            let mut part = |key: &str| {
+                at.push(Step::Key(key.into()));
+                let value = map
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .and_then(|text| http_string(vars, text, at));
+                at.pop();
+                value
+            };
+            part("method").zip(part("path"))
+        }
+        _ => None,
+    };
+    let location = format!("{file}#{}", config_values::key_path(at));
+    at.pop();
+    let (mut method, path) = parts?;
+    if method.text == "*" {
+        method.text = "ANY".into();
+    }
+    Some(super::Route {
+        method: http_part("method", method),
+        path: http_part("path", path),
+        at: location,
+    })
+}
+
 /// Provider entries precede function entries; even an unread override replaces the default.
 /// Resource references wait for the same CloudFormation evaluation used for resource nodes.
 fn environment<'a>(
@@ -1019,11 +1075,13 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
                 _ => None,
             };
             let mut events = Vec::new();
+            let mut routes = Vec::new();
             if let Some(Value::Array(list)) = body.get("events") {
                 at.push(Step::Key("events".into()));
                 for (i, e) in list.iter().take(EVENTS_MAX).enumerate() {
                     at.push(Step::Index(i));
                     events.extend(event_text(&mut vars, e, &mut at));
+                    routes.extend(http_route(&mut vars, e, &mut at, path));
                     at.pop();
                 }
                 at.pop();
@@ -1033,6 +1091,7 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
                 + name.as_ref().map_or(0, String::len)
                 + handler.as_ref().map_or(0, |h| h.text.len())
                 + events.iter().map(|e| e.text.len()).sum::<usize>()
+                + routes.iter().map(super::Route::size).sum::<usize>()
                 + environment
                     .iter()
                     .map(super::environment::Entry::size)
@@ -1060,6 +1119,7 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
                 role: None,
                 handler,
                 events,
+                routes,
                 subscription: None,
                 environment,
                 images: Vec::new(),
