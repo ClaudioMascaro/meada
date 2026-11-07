@@ -1,0 +1,23 @@
+service: unread-fields
+provider: {name: aws}
+custom:
+  method: {Fn::If: [IsGet, GET, POST]}
+functions:
+  inventory:
+    handler: runtime.inventory
+    events:
+      - httpApi:
+          method: {Fn::If: [IsGet, GET, POST]}
+          path: /unknown-method
+      - httpApi:
+          method: {Ref: GET}
+          path: /reference-method
+      - http:
+          method: GET
+          path: {Ref: invented-path}
+      - httpApi:
+          method: GET
+          path: 42
+      - httpApi:
+          method: '${self:custom.method}'
+          path: /unknown-self-method

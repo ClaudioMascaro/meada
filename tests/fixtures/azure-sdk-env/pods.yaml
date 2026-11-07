@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata: {name: sdk-workers}
+spec:
+  containers:
+    - name: first
+      image: ghcr.io/probe/azure-sdk-worker:v1
+      env:
+        - {name: TOPIC, value: orders}
+        - {name: SUB, value: audit}
+        - name: UNREAD
+          valueFrom: {secretKeyRef: {name: private, key: sub}}
+        - {name: QUEUE, value: orders/subscriptions/audit}
+    - name: second
+      image: ghcr.io/probe/azure-sdk-worker:v1
+      env:
+        - {name: TOPIC, value: shipping}
+        - {name: SUB, value: ops}
+        - name: UNREAD
+          valueFrom: {secretKeyRef: {name: private, key: sub}}
+        - {name: QUEUE, value: shipping/subscriptions/ops}
+    - name: unread-subscription
+      image: ghcr.io/probe/azure-sdk-worker:v1
+      env:
+        - {name: TOPIC, value: blocked}
+        - name: SUB
+          valueFrom: {secretKeyRef: {name: private, key: sub}}
+        - {name: QUEUE, value: blocked/subscriptions/secret}
+---
+apiVersion: v1
+kind: Secret
+metadata: {name: private}
+stringData: {sub: secret-subscription-canary-670}

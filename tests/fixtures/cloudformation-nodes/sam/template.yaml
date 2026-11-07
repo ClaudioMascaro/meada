@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Orders service
+
+Parameters:
+  AppName:
+    Type: String
+    Default: shop
+  Stage:
+    Type: String
+    Default: dev
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 10
+
+Resources:
+  OrdersApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+  OrdersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-orders-${Stage}"
+      CodeUri: src/orders/
+      Handler: app.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref OrdersTable
+          QUEUE_URL: !Ref OrdersQueue
+      Events:
+        Create:
+          Type: Api
+          Properties:
+            Path: /orders
+            Method: post
+            RestApiId: !Ref OrdersApi
+        Work:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt OrdersQueue.Arn
+  OrdersQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${AppName}-orders-${Stage}"
+  OrdersTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: !Join ["-", [!Ref AppName, orders]]
+      PrimaryKey:
+        Name: id
+        Type: String

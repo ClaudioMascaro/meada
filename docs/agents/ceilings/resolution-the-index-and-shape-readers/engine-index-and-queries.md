@@ -14,12 +14,35 @@
   file of it changed and nothing every group reads moved (config files and manifests, Meada's
   version, the file list, the exports of every group): a file added or deleted anywhere, or an
   edit that changes what a file exports, extracts and resolves every group again. A group holding
-  a changed file is extracted and resolved whole, and every file of it whose values the last
-  extraction read (`valued`) is parsed again: on this repository, a one-line edit of a Rust file
-  parses the 220 Rust files of the crate's module trees again (2.0 s of a 3.3 s refresh), since
-  the actix-web and Rocket reader reads every call's values (`Web::read`, under one `ITEM_WORK`
-  budget spent in walk order) and every file's mentions (`Web::mentioned`). Narrowing a group per
-  file needs each kind to say what its contracts read (#391). A dev build that changes a kind
+  a changed file is extracted and resolved whole, over the values of every file of it the last
+  extraction read (`valued`): the HTTP client reader (`http/python/clients.rs`, which reads
+  reqwest and ureq too) walks the value flow of the receiver of every call named like an HTTP
+  method (`map.get(k)` included), about 120 of the 222 Rust files here, and the actix-web and
+  Rocket reader reads every call's arguments (`Web::read`, under one `ITEM_WORK` budget spent in
+  walk order) and every file's mentions (`Web::mentioned`). The values cache (ADR 0027) gives
+  those back for every unchanged file. On this repository a one-line edit of a Rust file
+  refreshes in 1.02 s, a median of eleven (1.52 s before #610 on the same machine, 3.4 s
+  without the cache). What is left, in the order of its cost: building the Rust group's resolver, which
+  resolves every call (about 170 ms), reading the cached values back as JSON (about 150 ms),
+  reading every kept file's stored facts, which the entry points read (about 110 ms), the http
+  kind over the Rust group (axum's routers and the actix reader's argument scan, about 120 ms),
+  the package kind's import of every call (about 80 ms) and writing the contract rows (about
+  60 ms). Narrowing a group per file needs each kind to say what its contracts read, and the
+  client reader's walk depends on resolver answers over the whole group (exact callers,
+  definitions) that no read set per file captures (#391, #610).
+
+- `index/values.rs`: the values cache holds one entry per file of `valued` (pruned on every
+  extraction), each the file's parse as JSON, values included: on this repository 18.7 MB beside a
+  60.8 MB index, 616 entries, the largest 1.6 MB. An entry is keyed by the file's bytes, setting
+  and pack and by Meada's build (version, stored format, the executable's path, size and mtime),
+  so a rebuilt or moved binary misses every entry once. An entry is at most `ENTRY_BYTES`
+  (8 MiB) of JSON, so the cache is at most that per `valued` file: a file whose parse serializes
+  past it (a C# read's shared scope is written once per read) is parsed on every refresh. An entry nested past `serde_json`'s depth
+  (128) does not deserialize and is parsed again on every refresh, as is anything else wrong with
+  the cache (unreadable, locked past the busy timeout, a write that failed): a miss costs a parse,
+  never a different index. A changed file is parsed twice per refresh, once for its stored facts
+  and once for its values, since the first parse is under the setting `settle` may still change.
+  A refresh that changes nothing or keeps every group leaves the cache as it is. A dev build that changes a kind
   without changing the version keeps the rows an older build gave the groups it does not touch.
   An entry point that asks the name of an inline definition of a kept file makes the refresh
   roll back and run again keeping no group, a second full pass.

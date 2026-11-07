@@ -66,7 +66,9 @@ struct Framework {
     shortcuts: bool,
 }
 
-const FRAMEWORKS: &[Framework] = &[
+// Mount matching compares framework identities across lookups. A static owns one
+// table; a const may be promoted to different allocations by optimized code.
+static FRAMEWORKS: &[Framework] = &[
     Framework {
         apps: &["fastapi.FastAPI"],
         routers: &["fastapi.APIRouter"],

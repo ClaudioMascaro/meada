@@ -12,8 +12,9 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   in `lang/mod.rs` (`CODING_STANDARDS.md`). Three questions are
   required: `prefix`, `extract` (receives `Code`, never the syntax tree, and `Indexed`, what the
   index read of the repository besides: the manifests and tsconfigs, the exported rows, the
-  files of every pack and the bytes of the config files the packs list (`Indexed::configs`,
-  never stored: Java's Spring `application.properties` and `application.yml`), which a kind
+  files of every pack and the bytes of the config files the packs list and of the inputs they
+  name (`Indexed::configs`, never stored: Java's Spring `application.properties` and
+  `application.yml`, Backstage's `$include` partials, #689, with `Indexed::symlinks`), which a kind
   reads when its contracts depend on what the manifests or a configuration say;
   it returns `Found` with a `Site`: `Def`, `Inline`, `File`, `Call`) and
   `link` (receives the whole workspace's providers and exports). The others have a default
@@ -21,23 +22,31 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
 
   | Question | The kind says |
   |---|---|
+  | `use_level` | the strength of a directed side before an evaluated provisioner name weakens it (resources distinguish SDK and declared sides) |
   | `entry` | which entry point kind a side of a contract makes (a pure function of the contract: entry points are stored) |
+  | `read_declarations` | indexed locations needed by a declaration, loaded immediately before its `declare`, without opening source files |
   | `declare` | the sides `meada.toml` declares, run at query time (a config edit needs no reindex) |
-  | `symbols_read` | the symbols `declare`, `workspace_step`, `link` and `status` look up, which a partial export reads before declaring (resources: their `via` symbols; packages: every symbol of a repository with a named manifest) |
+  | `symbols_read` | the symbols `declare`, `workspace_step`, `workspace_ready`, `link` and `status` look up, which a partial export reads before declaring (resources: their `via` symbols; packages: every symbol of a repository with a named manifest) |
   | `workspace_step` | a step over every repository after every `declare` (the package provider index, dependency entries, imports, shapes) |
+  | `workspace_ready` | a prepared view after all workspace steps finish (HTTP routing through image-scoped workloads) |
+  | `workspace_links` | optional whole-workspace links instead of the kind's per-consumer hook, with `None` preserving its original order |
   | `after_links` | a pass over the links after the decisions replay (HTTP: drift) |
   | `unresolved`, `label`, `parts` | whether an identifier is an unresolved side, how it is labelled, the parts `search` ranks |
-  | `place` | where a site sits when it is neither a symbol nor a call (packages: manifest and field) |
+  | `place` | where this kind's site sits when it is neither a symbol nor a call (packages: manifest and field); dispatch uses only the contract's kind |
   | `search_word`, `own_search` | the word of `search`'s `kind` and, for an own renderer, its hits |
   | `sides`, `view`, `related_sides` | the role words and the carried word of `context` on a contract, and the sides that reach it by another name; a contract listed by its providers alone is followed by the linked consumers that read fields, with their drift (the engine's rule: `View::follows_drift`) |
+  | `workspace_related_sides` | optional workspace grouping using prepared links, replacing per-repository `related_sides` without repeating routing |
   | `at_call`, `context_sections` | the lines a call adds to a symbol's `contracts:`, and the sections `context` adds after the callees (packages: `consumers:`) |
+  | `explain_inferred` | whether a symbol's `context` explains a call consumer's inferred link, given its repository, link and prepared exports (HTTP: a declared `base_url_env` peer or resolved infrastructure/workload); false by default |
   | `context_reads` | the call sites `context_sections` looks up, which `context` reads first (packages: the consumers of the links into the symbol) |
   | `starts` | the providers a `trace` start text names |
   | `calls_from_definition` | whether a consumer at a symbol (a Feign or Retrofit interface method) calls on its provider, so `trace` follows from the method to it (HTTP; a channel handler is where a link ends) |
-  | `status` | the lines `meada status` prints |
-  | `decidable`, `serves`, `candidate` | whether an ambiguous link is an open item, whether a provider serves a contract (aliases included), whether a provider is a candidate for a consumer with no contract |
+  | `flows_to_consumer` | whether data travels provider to consumer (resource writes to reads, channel producers to handlers), including consumers at call sites |
+  | `status`, `scope_status` | the lines `meada status` prints per repository, optionally considering the visible workspace |
+  | `workspace_status` | optional per-query status rows in repository order, with `None` preserving the ordinary status hooks and call order |
+  | `decidable`, `consumer_item`, `link_candidate`, `serves`, `candidate` | whether a consumer ambiguity remains an open item, whether a provider remains a current link candidate, alias matching and candidates for a consumer with no contract |
 
-  The engine fixes the phase order: every `declare`, then every `workspace_step`, then `link`,
+  The engine fixes the phase order: each kind's `read_declarations` then `declare`, followed by every `workspace_step`, every `workspace_ready`, then `link`,
   then the decisions replay, then every `after_links`, each in `KINDS` order (decisions are
   kind-free and a pass over the links must see decided links). A side is unresolved when its
   contract is absent (skipped by `link`, an open item whose candidates come from each provider's
@@ -93,6 +102,11 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   new host one more entry in `Provider::hosts`. A payload schema becomes a shape through
   `schema::read`; a new kind of shape source is a `shape::Source` variant, never a new shape
   type.
+- **Configuration and IaC source locations** use `document::events::read_located` (JSON alone:
+  `json_spanned`) when a scalar's location is insufficient. The shared reader lends completed
+  collections beside their key/end lines before a repeated property replaces one. Format
+  interpretation stays with the caller (`iac/json.rs`); retained location or marker metadata
+  carries paths and lines, with its budget charged before copying, never values.
 - New **shape source** (spec #23): a provider's is a `shape::Source` variant, never a new shape
   type, with an arm in `Source::at` and `Source::declared`, in the order `http::ts::provider_shape`
   and `Http::declare` apply (a document, then a zod schema, `zod.rs`, then the returned
@@ -106,7 +120,7 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   charges its per-file limit to a `shape::Budget`, and an extraction holds one reader of each
   source (`Literals` holds its `Types`, which hold their `Zod`), so each limit is spent once per
   file. What a pack reads from code
-  for it is a shape fact: an optional part of the pack's output, `serde(skip)` like
+  for it is a shape fact: an optional part of the pack's output, kept out of the index like
   `Call::args` and read through `Code` (`Code::uses`), so a pack without it is unchanged. The
   TS/JS pack's are in `lang/ts/uses.rs` (`Call::uses`, the `Step`s the enclosing function
   applies to a call's result). The kind turns them into a `Found::shape`, stored as
@@ -120,9 +134,9 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   of its own and reads no kind: it reads `Link::drift`, the exports' consumer shapes (which
   consumers read fields), their calls (where each consumer is) and the seam's `parts` (the part
   of a contract `search` ranks against).
-- New **match rule** (a path rewrite, a new provider source): the kind's `link`, its `serves`
-  and its `candidate` (the questions `items.rs` and `decisions.rs` ask) and each candidate's
-  contract must agree.
+- New **match rule** (a path rewrite, a new provider source): the kind's `link`, `link_candidate`,
+  `serves` and `candidate` and each candidate's contract must agree. Item listing and ordinary
+  replay share `consumer_item` eligibility and the query-aware `link_candidate` rule.
   `meada decide` writes the candidate's contract as the decision's target and
   `decisions::evaluate` checks it against the link's candidates, so a candidate carrying the
   consumer's contract instead of the provider's own makes every decision on it stale.

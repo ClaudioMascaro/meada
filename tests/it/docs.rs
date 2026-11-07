@@ -1,5 +1,6 @@
 //! The repository map keeps up with the code: every limit marked `ponytail:` is named in
-//! `docs/agents/ceilings.md` or a part of `docs/agents/ceilings/` (CODING_STANDARDS.md, hostile input), every
+//! `docs/agents/ceilings.md` or a part of `docs/agents/ceilings/` (CODING_STANDARDS.md, hostile input),
+//! source comments use `ponytail:` rather than `shortcut:`, every
 //! entry point kind and process step mark is in the list the map gives of them, every module has
 //! its line in `docs/agents/architecture.md`, and every Markdown file under `docs/agents` stays
 //! within its size budget (the map and the files split by `examples/split_agents.rs`).
@@ -583,4 +584,32 @@ fn schema_version_matches_the_migrations() {
         crate::common::SCHEMA_VERSION,
         "SCHEMA_VERSION in tests/it/common/mod.rs must equal the entries of MIGRATIONS"
     );
+}
+
+#[test]
+fn source_comments_use_ponytail_instead_of_shortcut() {
+    let mut parser = tree_sitter::Parser::new();
+    parser
+        .set_language(&tree_sitter_rust::LANGUAGE.into())
+        .unwrap();
+    let mut problems = Vec::new();
+    for (path, text) in limit_sources() {
+        let tree = parser.parse(&text, None).unwrap();
+        let mut pending = vec![tree.root_node()];
+        while let Some(node) = pending.pop() {
+            if matches!(node.kind(), "line_comment" | "block_comment") {
+                for (offset, line) in text[node.byte_range()].lines().enumerate() {
+                    if line.contains("shortcut:") {
+                        let line = node.start_position().row + offset + 1;
+                        problems.push(format!(
+                            "{path}:{line}: use `ponytail:` instead of `shortcut:` (CODING_STANDARDS.md)"
+                        ));
+                    }
+                }
+            } else {
+                pending.extend(node.children(&mut node.walk()));
+            }
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
 }

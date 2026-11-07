@@ -24,13 +24,16 @@
   unreadable one, is rebuilt beside it and renamed over it, and `status` says so. One whose stored facts do not
   parse is rebuilt by the first refresh that reads them (when a file changed), which `status`
   cannot tell.
-- The index holds no source text and no values, apart from the BLAKE3 of each symbol's span
+- The index holds no source text and no values of code, apart from the BLAKE3 of each symbol's span
   (`symbols.hash`, `Def::hash`) and the facts listed under "Stored values" in
   [map/indexing/stored-values.md](../indexing/stored-values.md): argument counts and labels, names a file
   declares or imports, summaries of manifests, build files and provider documents, the field
-  paths of shapes, entry points and communities. A value the index now stores joins that list. A
+  paths of shapes, entry points and communities, and the config values of YAML and JSON files
+  (ADR 0004 amended, ADR 0025). A value the index now stores joins that list. A
   contract kind that reads a value from a new place relies on the loop of misses (`Code::read`,
-  `valued`) that `refresh` runs until none is left.
+  `valued`) that `refresh` runs until none is left. The values cache beside the index
+  (`values.db`, ADR 0027) gives back what a pack parsed of a file, values included, by the file's
+  bytes, setting, pack and Meada's build: no query reads it, and a hit is what a parse gives.
 - Links are never stored. They derive from the stored provider and consumer contracts, then the
   decisions replay, when a query runs, so a change on either side, or to a decisions file, needs
   no relinking. `Level` order: `exact` < `declared` < `inferred` < `decided` < `ambiguous`.

@@ -36,3 +36,9 @@ interface Row {
 type Rows = Row[];
 
 export default Router();
+
+import {SNSClient, PublishCommand} from '@aws-sdk/client-sns';
+const sdk = new SNSClient({});
+function publishAws() {
+  sdk.send(new PublishCommand({TopicArn: process.env.TOPIC}));
+}

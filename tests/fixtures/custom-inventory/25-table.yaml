@@ -1,0 +1,10 @@
+apiVersion: dynamodb.aws.upbound.io/v1beta1
+kind: Table
+metadata:
+  name: operator-25
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: xp-ledger
+spec:
+  forProvider:
+    region: us-east-1

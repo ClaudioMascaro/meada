@@ -1,0 +1,2 @@
+v: 2
+next: { $include: c3.yaml }

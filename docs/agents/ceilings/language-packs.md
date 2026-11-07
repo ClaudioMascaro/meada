@@ -251,9 +251,33 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   written in place there is `Value::Unknown`. `VALUE_DEPTH` (64): a value nested deeper in
   arguments, objects, arrays and the receivers of method chains is `Unknown` from there.
   `FOLD_DEPTH` (256): a `+` chain or a chain of string method calls folds only that deep (the
-  rest is a hole), and a member chain in a callee is cut to the node kind. The parent of every node is read once (`Parents`, which
+  rest is a hole), and a member chain in a callee is cut to the node kind. Finding the lexical
+  scope of a runtime `String` binding uses the same bound; if it is not reached, the file's
+  runtime conversion stays opaque. Strict-mode ancestry uses that bound too, falling back
+  conservatively to the non-strict enclosing binding. The parent of every node is read once (`Parents`, which
   `lang/ts/uses.rs` and `lang/ts/types.rs` climb too), as `Node::parent` is linear in the
   tree's depth.
+- `lang/ts.rs` (`url_form`, `Parents::written`, #685): `new URL(x)` of one argument is `x`, and
+  `u.toString()` with no argument, `u.href` and `String(u)` pass the value of `u` through, where
+  `u` is a name or a `new URL(..)`, also inside a template string (`${u}` folds through the name).
+  They follow the WHATWG URL Standard (the constructor parses its argument, `toString()` is
+  `href`), so a URL that `searchParams`, `search` or `hash` changes keeps its path. `new URL`
+  stays a call when the file binds or reassigns `URL`, except for the named `URL` export of
+  `url` or `node:url` through an import or a destructured, unshadowed `require`. Unknown packages,
+  repository aliases, default and namespace imports and other exports stay opaque. The guard
+  applies across the whole file, so a local binding can suppress unrelated global uses too.
+  Member writes (`u.p = ..`, `u.p += ..`, `u["p"] = ..` for any `p` but `search` and
+  `hash`) are tracked per name across the whole file, whichever function writes them: a `const`
+  built by `new URL` whose name is written holds an unknown value, and the pass-through forms of
+  that name are not read, so two functions that use the same name for different URLs lose both.
+  A mutation inside a function the URL is passed to is not seen, so a wrapper called with the
+  URL folds to the string it was built from. A parameter, a `catch` binding or a variable named
+  `URL` also stops the fold. A shadowed or reassigned `require` stops folding its destructured
+  `URL` across the whole file. `new URL(x, base)`
+  of the global is a `Value::New` named `GLOBAL_URL` (#686, joined by the HTTP kind, below), so
+  `.href`, `toString()` and `String(u)` on a two-argument `new URL` are not read. A `toString` or
+  `href` that a repository class defines on a name is read as a pass-through of that name, not
+  followed to the method.
 - `lang/ts.rs` (`Facts::locals`): a local binding hides the name in its whole enclosing
   definition, whatever block holds it, the definition's own definitions, constants and
   parameters of that name included, and a function that is no definition (a method or arrow of an
@@ -261,9 +285,27 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   parameters and locals to the definition around it; at the top level that is the whole file.
   A call to the hidden name elsewhere in that scope loses its exact link or its value, never
   gains a wrong one (no marker).
+- `lang/ts.rs` (`sealed_field`, `member_writes`, `this_member`, #688): an instance field of a
+  `.ts` or `.tsx` class that is `readonly`, `private` or `#x` (not `static` or `abstract`) holds
+  a value only when it has exactly one write, its initializer or a plain `this.f = v` that is a
+  statement of its class's `constructor` body; that value, written in the constructor, is what
+  `this.f` (also inside a template or a `+`) reads in a method. A public or `protected` mutable
+  field, a second write of a member of that name anywhere inside the class (`x.f = ..`, `op=`,
+  `++`, `this['f']`, a pattern, a computed `this[k]`), a write under a condition, in a nested
+  function or outside the constructor, a parameter property, a constructor parameter
+  (`this.f = param`: no fold through the callers of `new`) and a JavaScript file stay unknown.
+  `this` is the instance only in an instance method or field initializer, through arrow
+  functions: in a `function`, a method of an object literal, a `static` member or a static block
+  it reads nothing. `THIS_CLIMB` (256, `ponytail:`): a `this` nested deeper than that many nodes
+  inside its member reads nothing. Not seen (`ponytail:`): a write through an alias of `this`
+  (`const self = this; self.f = v`), `Object.assign(this, ..)`, a write from outside the class
+  that casts the type away (`(c as any).f = v`), and a subclass that redeclares a non-private
+  `readonly` field (its own initializer then overrides the value the base class's methods read):
+  the resolver keeps no list of a class's subclasses.
 - `lang/python.rs`: `VALUE_DEPTH` (64): a list, tuple, dict literal, parenthesized expression or
   `await` nested deeper in a value is `Value::Unknown`, so a hostile file cannot overflow the
-  stack. `FOLD_DEPTH` (256): a `+` or `or` chain, a chain of string methods or `getenv`
+  stack. The syntax-only terminal-exit check stops at the same depth and records possible
+  fallthrough as unknown. `FOLD_DEPTH` (256): a `+` or `or` chain, a chain of string methods or `getenv`
   defaults and nested f-strings fold only that deep (the rest is a hole), and an attribute
   chain in a callee is cut to the node kind; each call's arguments are folded again, so a file
   of nested calls costs up to `FOLD_DEPTH` steps per call. `DEFINITION_DEPTH` (128): a

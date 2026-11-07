@@ -1,0 +1,9 @@
+apiVersion: storage.azure.upbound.io/v1beta1
+kind: Account
+metadata:
+  name: operator-40
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: /subscriptions/proof/resourceGroups/r/providers/Microsoft.Storage/storageAccounts/xpassetsstore
+spec:
+  forProvider: {}

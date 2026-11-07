@@ -20,6 +20,8 @@ pub(super) use backstage::{name, unread};
 pub(super) use clients::consumers;
 #[cfg(test)]
 pub(crate) use config::probe as app_config_probe;
+pub(in crate::http) use config::{Config, unfollowed, unfollowed_of};
+pub(crate) use config::{DEPTH as INCLUDE_DEPTH, INCLUDES, Reason as IncludeReason, config_inputs};
 
 use super::{
     CallAt, HTTP_METHODS, METHODS, Mounts, contract, join, normalize_path, prefixes, provider,
@@ -63,6 +65,7 @@ pub(super) fn providers(
                 (Site::File(path.into()), None)
             };
             found.push(Found {
+                identity: None,
                 shape,
                 ..provider(site, contract(exported, &route))
             });
@@ -247,6 +250,7 @@ fn express(code: &Code, literals: &mut Literals) -> (Vec<Found>, Vec<(String, St
         let Some(id) = id else {
             let (path, index) = plugin;
             unmounted.push(Found {
+                identity: None,
                 role: Role::Unmounted,
                 contract: None,
                 ..provider(
@@ -310,6 +314,7 @@ fn express(code: &Code, literals: &mut Literals) -> (Vec<Found>, Vec<(String, St
                 _ => Site::File(path.into()),
             };
             found.push(Found {
+                identity: None,
                 shape: shape.clone(),
                 ..provider(site, contract(&method, &full))
             });

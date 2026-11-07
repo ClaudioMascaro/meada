@@ -10,8 +10,8 @@ use std::rc::Rc;
 use tree_sitter::{Node, Parser};
 
 use super::{
-    Binds, Call, Class, Const, Def, Export, Facts, Import, Imported, Kind, LanguagePack, Layout,
-    Modules, Param, Receiver, Value, children, named, text,
+    Binds, Call, Class, Const, Def, Export, Facts, FirstResult, Import, Imported, Kind,
+    LanguagePack, Layout, Modules, Param, Receiver, Value, children, named, text,
 };
 use crate::resolve::Code;
 use crate::{Result, parent, qualify};
@@ -118,6 +118,7 @@ fn dir(path: &str) -> &str {
 struct Walk<'s> {
     src: &'s [u8],
     facts: Facts,
+    write_bytes: usize,
     /// The locals recorded so far, so each is listed once.
     locals: BTreeSet<String>,
     /// Every binding of a name in a scope, with the class the source writes for it (`None` when
@@ -131,6 +132,8 @@ struct Walk<'s> {
     /// The plain names a statement of a function's own block binds to one value (`r :=
     /// gin.Default()`), by scope: constants when nothing else binds or assigns the name.
     held: Vec<(String, String, Value)>,
+    /// First-result projections, kept apart from ordinary scalar constants.
+    first_results: Vec<FirstResult>,
     /// The names assigned again, with the scope the assignment is written in and what it does
     /// to a name bound to an environment read (`keeps_env`).
     assigned: Vec<(String, String, Keep)>,
@@ -234,7 +237,7 @@ impl Walk<'_> {
 
     /// Records the writes to `targets`: a name assigned again in `scope`, and the field name of
     /// a selector, which any package may write (`config.Base = ..`).
-    fn write(&mut self, scope: &str, targets: &[Node], keeps: Keep) {
+    fn write(&mut self, scope: &str, targets: &[Node], keeps: Keep, range: Range<usize>) {
         for target in targets {
             let name = match target.kind() {
                 "identifier" => text(*target, self.src),
@@ -243,6 +246,19 @@ impl Walk<'_> {
                         continue;
                     };
                     self.selected.insert(text(field, self.src).to_string());
+                    if self.facts.member_writes.is_some()
+                        && let Some(object) = target.child_by_field_name("operand")
+                    {
+                        self.facts.member_write(
+                            super::MemberWrite {
+                                scope: scope.into(),
+                                object: callee(object, self.src),
+                                field: Some(text(field, self.src).into()),
+                                range: range.clone(),
+                            },
+                            &mut self.write_bytes,
+                        );
+                    }
                     continue;
                 }
                 _ => continue,
@@ -381,6 +397,17 @@ impl Walk<'_> {
                 });
             }
         }
+        for first in std::mem::take(&mut self.first_results) {
+            if self
+                .bound
+                .get(&(first.scope.clone(), first.name.clone()))
+                .map(Vec::len)
+                == Some(1)
+                && !assigned.contains(&qualify(&first.scope, &first.name))
+            {
+                self.facts.first_results.push(first);
+            }
+        }
         // A fallback leaves the name its read only when the default is plain, which the
         // constants of the file now tell.
         if !defaults.is_empty() {
@@ -497,13 +524,13 @@ impl Walk<'_> {
                             _ => Keep::No,
                         };
                         self.dereference(scope, &targets);
-                        self.write(scope, &targets, keeps);
+                        self.write(scope, &targets, keeps, node.byte_range());
                     }
                 }
                 "inc_statement" | "dec_statement" => {
                     let targets: Vec<Node> = named(node).collect();
                     self.dereference(scope, &targets);
-                    self.write(scope, &targets, Keep::No);
+                    self.write(scope, &targets, Keep::No, node.byte_range());
                 }
                 "var_spec" | "const_spec" => {
                     let ty = node.child_by_field_name("type");
@@ -541,7 +568,7 @@ impl Walk<'_> {
                             true => Keep::Pointer,
                             false => Keep::No,
                         };
-                        self.write(scope, &[operand], keeps);
+                        self.write(scope, &[operand], keeps, node.byte_range());
                     }
                 }
                 "type_switch_statement" => {
@@ -771,6 +798,20 @@ impl Walk<'_> {
             ([name], [value]) => Some((name, values::value(*value, src, &self.std, scope, depth))),
             _ => None,
         };
+        if lookup.is_none()
+            && let ([name, _, ..], [call]) = (&left[..], &right[..])
+            && call.kind() == "call_expression"
+            && name.kind() == "identifier"
+            && text(*name, src) != "_"
+        {
+            let name = text(*name, src).to_string();
+            self.std.note(scope, &name, &Value::Unknown);
+            self.first_results.push(FirstResult {
+                scope: scope.into(),
+                name,
+                call: call.byte_range(),
+            });
+        }
         if let Some((name, value)) = lookup.or(one)
             && name.kind() == "identifier"
             && text(*name, src) != "_"
@@ -1138,11 +1179,16 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         .ok_or("tree-sitter returned no tree")?;
     let mut walk = Walk {
         src,
-        facts: Facts::default(),
+        facts: Facts {
+            member_writes: Some(Vec::new()),
+            ..Facts::default()
+        },
+        write_bytes: 0,
         locals: BTreeSet::new(),
         bound: BTreeMap::new(),
         type_scoped: BTreeSet::new(),
         held: Vec::new(),
+        first_results: Vec::new(),
         assigned: Vec::new(),
         returns: HashMap::new(),
         std: values::Std::default(),
@@ -1479,6 +1525,49 @@ mod tests {
         };
         assert_eq!(receivers(PATH_DEPTH - 1), ["f a = S"]);
         assert!(receivers(PATH_DEPTH).is_empty());
+    }
+
+    #[test]
+    fn a_first_result_is_origin_evidence_not_a_scalar_constant() {
+        let source = "package x\nfunc f() { client, err := makeClient(); client.Use(); _ = err }";
+        let parsed = facts(source);
+        assert!(parsed.consts.is_empty());
+        let [first] = parsed.first_results.as_slice() else {
+            panic!("only the first result has origin evidence");
+        };
+        assert_eq!((&*first.scope, &*first.name), ("f", "client"));
+        assert_eq!(&source[first.call.clone()], "makeClient()");
+        let lean = serde_json::to_value(&parsed).unwrap();
+        assert!(lean.get("first_results").is_none());
+        let full = super::super::with_values(|| serde_json::to_value(&parsed)).unwrap();
+        let restored: Facts = serde_json::from_value(full.clone()).unwrap();
+        assert_eq!(
+            super::super::with_values(|| serde_json::to_value(&restored)).unwrap(),
+            full
+        );
+        assert_eq!(full["first_results"].as_array().unwrap().len(), 1);
+
+        for bad in [
+            "client, err := makeClient(); client = other(); _ = err",
+            "client, err := makeClient(); func() { client = other() }(); _ = err",
+            "client, err := makeClient(); { client := other(); client.Use() }; _ = err",
+            "client, err := makeClient(); keep(&client); _ = err",
+            "if client, err := makeClient(); err == nil { client.Use() }",
+            "{ client, err := makeClient(); client.Use(); _ = err }",
+            "_, client := makeClient(); client.Use()",
+        ] {
+            let source = format!(
+                "package x\nfunc valid() {{ client, err := makeClient(); client.Use(); _ = err }}\n\
+                 func bad() {{ {bad} }}"
+            );
+            let parsed = facts(&source);
+            let names: Vec<_> = parsed
+                .first_results
+                .iter()
+                .map(|r| qualify(&r.scope, &r.name))
+                .collect();
+            assert_eq!(names, ["valid.client"], "{bad}");
+        }
     }
 
     #[test]

@@ -1,0 +1,7 @@
+alert::support::team-(b|c)
+  example.com/acme/monitoring emitter grafana.tf:5 resource.grafana_rule_group.infra.rule [inferred: alert::support::team-(b|c); matchers "support"=~"team-(b|c)"; receiver: regex]
+  example.com/acme/monitoring emitter loki.yaml:4 groups[0].rules[0] [inferred: alert::support::team-(b|c); matchers "support"=~"team-(b|c)"; receiver: regex]
+  example.com/acme/monitoring emitter rules.yaml:22 [1].spec.groups[0].rules[0] [inferred: alert::support::team-(b|c); matchers "support"=~"team-(b|c)"; receiver: regex]
+  example.com/acme/monitoring emitter rules.yaml:31 [2].groups[0].rules[0] [inferred: alert::support::team-(b|c); matchers "support"=~"team-(b|c)"; receiver: regex]
+  example.com/acme/monitoring emitter rules.yaml:5 [0].groups[0].rules[0] [inferred: alert::support::team-(b|c); matchers "support"=~"team-(b|c)"; receiver: regex]
+  example.com/acme/monitoring matcher alertmanager.yaml:7 [0].route.routes[1]

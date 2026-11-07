@@ -1,0 +1,3 @@
+services:
+  refusedSecondOverride:
+    image: proof/override:one

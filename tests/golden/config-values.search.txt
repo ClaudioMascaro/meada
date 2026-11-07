@@ -1,0 +1,30 @@
+example.com/acme/app chart/values-prd.yaml:6 alerts.loki[0].labels.support = "team-b"
+example.com/acme/app chart/values-prd.yaml:7 alerts.loki[0].labels.owner = "team-b"
+
+example.com/acme/app chart/values-prd.yaml:6 alerts.loki[0].labels.support = "team-b"
+
+example.com/acme/app chart/values-prd.yaml:9 image.repository = "ghcr.io/acme/app"
+example.com/acme/app .github/workflows/ci.yml:12 jobs.image.steps[0].with.tags = "ghcr.io/acme/app:latest"
+example.com/acme/app config/settings.json:14 edge = "ghcr.io/acme/app􏿿"
+example.com/acme/app deploy/app.yaml:14 [0].spec.template.spec.containers[0].image = "ghcr.io/acme/app:1.4.2"
+example.com/acme/app config/settings.json:13 mirror = "a copy of ghcr.io/acme/app"
+
+example.com/acme/app deploy/app.yaml:26 [1].data.password = redacted
+
+example.com/acme/app deploy/app.yaml:7 [0].metadata.labels["app.kubernetes.io/name"] = "app"
+example.com/acme/app deploy/app.yaml:38 [2].spec.selector["app.kubernetes.io/name"] = "app"
+
+example.com/acme/app config/settings.json:7 description = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" (cut)
+
+example.com/acme/app .github/workflows/ci.yml:12 jobs.image.steps[0].with.tags = "ghcr.io/acme/app:latest"
+
+no matches for `7357`
+
+no matches for `kept-out-by-meadaignore`
+
+no matches for `lockfileversion`
+
+example.com/acme/app deploy/app.yaml:9 [0].spec.replicas = 2
+
+example.com/acme/app config/settings.json:3 ["feature-flags"].beta = true
+example.com/acme/app config/settings.json:4 ["feature-flags"].ratio = 0.25

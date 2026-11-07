@@ -7,7 +7,9 @@ example.com/chain/gateway (.) indexado, 8 arquivos
   orders.openapi.json: openapi 3.0.3, rotas: 1
   GET /api/shipments/{} em orders.openapi.json também está em openapi.yaml: uma rota só
   docs/missing.yaml: listado em `serve.documents`, não encontrado
+  arquivos de configuração: 4 lidos, 1 ignorados (lockfiles: 0, ilegíveis: 1); valores: 34, ocultados: 0
 example.com/chain/catalog (../chain-catalog) indexado, 4 arquivos
 example.com/chain/web (../chain-web) indexado, 6 arquivos
+  arquivos de configuração: 1 lidos, 0 ignorados (lockfiles: 0, ilegíveis: 0); valores: 4, ocultados: 0
   conclusão errada? relate: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
 example.com/chain/worker (../chain-worker) indexado, 3 arquivos

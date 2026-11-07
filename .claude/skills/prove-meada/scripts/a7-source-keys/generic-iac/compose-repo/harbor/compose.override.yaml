@@ -1,0 +1,3 @@
+services:
+  refusedWrongFamilyOverride:
+    image: proof/wrong:one

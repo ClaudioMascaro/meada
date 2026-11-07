@@ -99,7 +99,28 @@ pub struct Export {
     /// The repository's communities (spec #31), by name, each with its sorted members.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub communities: Vec<Community>,
+    /// The IaC nodes of the repository that hold a contract side (ADR 0026, #656), by
+    /// identity, then root.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub iac_nodes: Vec<IacNode>,
+    /// Workloads that run code from a path in their own repository, without an image link.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub executions: Vec<Execution>,
+    /// The provisioner sides of the repository (ADR 0026, #656), by contract, node, root.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub provisioners: Vec<Provisioner>,
+    /// Directionless config uses (#661), by contract and key site. No config value text.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub uses: Vec<Use>,
     pub links: Vec<Link>,
+    /// The provisioning links that touch the repository (ADR 0026, #656): from every other
+    /// side of a contract to each of its provisioners, by side, provisioner, root, contract.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub provisions: Vec<Provision>,
+    /// IaC subscriptions (ADR 0026), by source, target, node and root. Their consumer links
+    /// remain in `links`, as a binding's do.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subscriptions: Vec<Subscription>,
     /// The process of each entry point (spec #31), in entry point order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub processes: Vec<Process>,
@@ -127,7 +148,13 @@ impl Default for Export {
             dependencies: Vec::new(),
             imports: Vec::new(),
             communities: Vec::new(),
+            iac_nodes: Vec::new(),
+            executions: Vec::new(),
+            provisioners: Vec::new(),
+            uses: Vec::new(),
             links: Vec::new(),
+            provisions: Vec::new(),
+            subscriptions: Vec::new(),
             processes: Vec::new(),
             stale_decisions: Vec::new(),
         }
@@ -193,6 +220,12 @@ pub struct CallSite {
 pub struct Provider {
     pub contract: String,
     pub site: String,
+    /// SDK origin (`sdk:aws`) or an unresolved environment read (`env:NAME`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<String>,
+    /// Configuration location of a repository-level side, `<file>#<key path>`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
     /// The path a gateway serves the route at, when `[serve]` rewrites it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gateway: Option<String>,
@@ -215,6 +248,9 @@ pub struct Consumer {
     /// reads from the parsed response (spec #23).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape: Option<Shape>,
+    /// The evaluation root of a workload side. Earlier kinds have no root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<String>,
 }
 
 /// A queue bound to an exchange by a pattern: the call `site` (a call site) that binds the
@@ -400,6 +436,105 @@ pub struct Community {
     pub members: Vec<String>,
 }
 
+/// An IaC node that holds a contract side (ADR 0025, ADR 0026): its identity
+/// (`<repository>::<path>::<address>`), its address, its type, the label of the root module that
+/// roots its evaluation and its span, by line (`line` to `end_line`, 1-based, in `path`). A
+/// local module two roots instantiate gives one node per root, of the same identity.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
+pub struct IacNode {
+    pub identity: String,
+    pub address: String,
+    #[serde(rename = "type")]
+    pub ty: String,
+    pub root: String,
+    pub path: String,
+    pub line: usize,
+    pub end_line: usize,
+}
+
+/// A workload runs code in a repository. Image links derive this at query time; only direct
+/// same-repository paths are written in `executions`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Execution {
+    pub workload: String,
+    pub root: String,
+    pub repository: String,
+    pub path: String,
+    pub level: Level,
+    pub reason: String,
+}
+
+/// A provisioner side (ADR 0026): the IaC node `node` (an [`IacNode`]'s identity) of the root
+/// `root` creates what the contract `contract` names.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[non_exhaustive]
+pub struct Provisioner {
+    pub contract: String,
+    pub node: String,
+    pub root: String,
+}
+
+/// A subscription read from IaC: source and target channel contracts and the declaring node.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[non_exhaustive]
+pub struct Subscription {
+    pub source: String,
+    pub target: String,
+    pub node: String,
+    pub root: String,
+}
+
+/// A provisioning link (ADR 0026): the side `side` of the contract `contract` (a producer,
+/// consumer, writer or reader: a call site, a symbol or a repository) to its provisioner
+/// `provisioner` of the root `root`, with a level and a reason like any link. Never a consumer
+/// to provider link, so it has an array of its own.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub struct Provision {
+    pub side: String,
+    pub provisioner: String,
+    pub root: String,
+    pub contract: String,
+    pub level: Level,
+    pub reason: String,
+    /// The key locator of a directionless config use; absent for directed sides.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
+}
+
+impl Provision {
+    /// Every current field, in declaration order. A field added later is optional: it starts
+    /// empty and is set after `new`.
+    pub fn new(
+        side: String,
+        provisioner: String,
+        root: String,
+        contract: String,
+        level: Level,
+        reason: String,
+    ) -> Self {
+        Self {
+            at: None,
+            side,
+            provisioner,
+            root,
+            contract,
+            level,
+            reason,
+        }
+    }
+}
+
+/// A config use has no direction. Its repository-level site is located by `at` (ADR 0026).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[non_exhaustive]
+pub struct Use {
+    pub contract: String,
+    pub site: String,
+    pub at: String,
+}
+
 /// A consumer linked to a provider through a contract. Each side is a call site, a symbol, a
 /// file or a whole repository, as its kind places it: an HTTP consumer is a call and its
 /// provider a symbol; a channel consumer is its handler and its producer a call.
@@ -420,9 +555,23 @@ pub struct Link {
     /// The shape drift of an HTTP link with a shape on both sides (spec #23, ADR 0009).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drift: Option<Drift>,
+    /// The workload side's evaluation root, retained when a decision is replayed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<String>,
+}
+
+/// A workload's independent image sides share its location, but have separate decisions.
+pub fn side_id<'a>(site: &'a str, contract: &str, root: Option<&str>) -> std::borrow::Cow<'a, str> {
+    match root {
+        Some(root) => format!("{site}::{contract} (root {root})").into(),
+        None => site.into(),
+    }
 }
 
 impl Link {
+    pub fn item_site(&self) -> std::borrow::Cow<'_, str> {
+        side_id(&self.consumer, &self.contract, self.root.as_deref())
+    }
     /// Every current field, in declaration order. A field added later is optional: it starts
     /// empty and is set after `new`.
     #[expect(clippy::too_many_arguments)]
@@ -445,6 +594,7 @@ impl Link {
             by,
             p,
             drift,
+            root: None,
         }
     }
 }

@@ -1,0 +1,10 @@
+asyncapi: 2.6.0
+info: {title: AWS producers, version: '1'}
+servers:
+  sns: {url: aws, protocol: sns}
+  eventbridge: {url: aws, protocol: eventbridge}
+  kinesis: {url: aws, protocol: kinesis}
+channels:
+  alerts: {servers: [sns], subscribe: {message: {payload: {type: object}}}}
+  events: {servers: [eventbridge], subscribe: {message: {payload: {type: object}}}}
+  records: {servers: [kinesis], subscribe: {message: {payload: {type: object}}}}

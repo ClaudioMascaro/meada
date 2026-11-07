@@ -1,0 +1,3 @@
+alert::support::team-b
+  example.com/acme/monitors emitter main.tf:1 datadog_monitor.app
+  example.com/acme/routing matcher teams/platform/routing-rules.tf:1 opsgenie_team_routing_rule.app [inferred: alert::service::app; matchers "tags"=~"service:app"; receiver: opsgenie_team.platform; forwarding: Datadog monitor tags -> OpsGenie tags]

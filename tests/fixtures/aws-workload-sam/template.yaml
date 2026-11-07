@@ -1,0 +1,26 @@
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  Hidden:
+    Type: String
+    NoEcho: true
+    Default: must-stay-redacted
+Globals:
+  Function:
+    Environment:
+      Variables:
+        QUEUE_NAME: wrong-global
+        INHERITED: inherited
+Resources:
+  Orders:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: orders
+  Worker:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: worker/
+      Handler: send.dispatch
+      Environment:
+        Variables:
+          QUEUE_NAME: !Ref Orders
+          SECRET_QUEUE: !Ref Hidden

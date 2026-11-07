@@ -16,10 +16,13 @@ use serde::Serialize;
 use crate::Result;
 use crate::community::{self, Community};
 use crate::config::Serve;
+use crate::config_values;
 use crate::contract::{self, Found, Level, Link, Names, Role, Site};
 use crate::decisions::Stale;
 use crate::document::{self, Summary};
 use crate::entry::{self, EntryKind, EntryPoint};
+use crate::iac;
+use crate::kube;
 use crate::lang::{self, Facts};
 use crate::msg::{Fix, Msg};
 use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
@@ -27,6 +30,8 @@ use crate::resolve::{Ancestry, Code, Exported, Flexible, Resolution, Resolver, T
 use crate::shape::{Shape, Want};
 pub(crate) use meada_core::export as written;
 pub(crate) use meada_core::export::{Binding, CallSite, File, Process, Publish, Span, Symbol};
+
+mod values;
 
 /// The stored format's version, derived from its golden (`tests/golden/schema.txt`, kept by the
 /// unit test `the_stored_format_matches_its_golden`): re-blessing it after a change to `SCHEMA`,
@@ -72,8 +77,11 @@ pub(crate) fn schema_version() -> i32 {
 /// row (issue #175) is the shape of the module-level constant or type `method` a file exports,
 /// read for the view `via` (`shape::Want`), kept only in a repository with a named manifest.
 /// An `unmounted` row (#615) is a Backstage plugin whose `pluginId` cannot be read, at its
-/// `createBackendPlugin` call, no `contract`: `meada status` reports it. `exports` holds what each file exports (`resolve::Exported`): a `name` with the `file` and
-/// `target` definition, constant or type it names (`target`
+/// `createBackendPlugin` call, no `contract`: `meada status` reports it. An `unfollowed` row
+/// (#689) is a Backstage `$include` not followed, at the first file of the TS and JavaScript
+/// group, no `contract`: the including file in `via`, the reason in `method` and the include as
+/// written in `fragments`; `meada status` reports it. `exports` holds what each file exports
+/// (`resolve::Exported`): a `name` with the `file` and `target` definition, constant or type it names (`target`
 /// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
 /// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
 /// time to resolve imports of a package into another repository (spec #22). `communities`
@@ -91,8 +99,34 @@ pub(crate) fn schema_version() -> i32 {
 /// (`route`, `export`, `channel` or `program`), the `label` that names its process and the `site` the process starts
 /// from; rewritten with the contracts. `valued` lists the files whose values (`Facts` as parsed,
 /// which the index does not keep) the last contract extraction read (`resolve::Code::read`): a
-/// refresh parses them again before it extracts, so one pass usually reads all it needs.
-const SCHEMA: &str = "
+/// refresh reads them back from the values cache beside the index (ADR 0027), or parses them
+/// again, before it extracts, so one pass usually reads all it needs.
+/// `config_files` holds each config file (#639, ADR 0025: a YAML or JSON file the walk visits,
+/// or one under the hidden CI paths) stamped like `documents`, its `summary` being
+/// `config_values::Outcome` as JSON (read, with its count of values and of those redacted; a
+/// lockfile; or unreadable, with the line and the reason); `config_values` holds each of its
+/// scalars but nulls: the `key` path, the `value` (cut at `config_values::VALUE_MAX`, `cut` 1,
+/// or NULL when a format marks it secret), its `type` (`string`, `number`, `boolean`), its
+/// `line`, and the key path and value lowercased (`folded_key`, `folded_value`, each with a
+/// B-tree for exact and prefix search), rewritten with the file. `config_search` is an FTS5
+/// trigram index over both folded columns (#647, no text of its own: it reads `config_values` by
+/// `id`), which serves substring search for a query of three characters or more. None of the
+/// three reaches the export. `iac_nodes` holds each IaC node (#649, `iac::Node`: its address, the
+/// label of its root module, its type, physical name as static evaluation resolves it (#650),
+/// whether that is a `pattern`, the `overridable` values it went through as JSON, file, first and
+/// last line, the key path of its block and, for a Compose service (#652), its image and build
+/// context with a flag each for a default that gave it, and for a Kubernetes object what it is
+/// to Crossplane, its `role` (#655)) and `iac_references` each reference
+/// between two nodes of one root (`iac::Reference`). The Terraform ones are rewritten root by
+/// root (`iac::refresh`) for the roots whose evaluation unit holds a Terraform file, var file or
+/// Compose file that changed, the Kubernetes ones (#651, `kube::Node` rows of YAML and JSON
+/// files, told apart by their path) whole when a Kubernetes file changed (`kube::refresh`).
+/// `iac_images` holds the images of a Kubernetes workload once its overlay changed them
+/// (`kube::Image`) and `iac_unresolved` the Kustomize entries not followed (`kube::Unresolved`),
+/// rewritten with them. The CloudFormation and SAM nodes (#653), a resource each with its type
+/// `AWS::...` and its template as root, are rewritten per template whose file changed or left
+/// (`iac::refresh_template`). None is exported.
+pub(crate) const SCHEMA: &str = "
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
@@ -116,7 +150,7 @@ CREATE INDEX candidates_call ON candidates (call);
 CREATE INDEX candidates_target ON candidates (target);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
-    method TEXT, fragments TEXT, shape TEXT
+    method TEXT, fragments TEXT, shape TEXT, identity TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (
@@ -128,12 +162,55 @@ CREATE TABLE manifests (
     summary TEXT NOT NULL
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+CREATE INDEX exports_path ON exports (path);
 CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 CREATE INDEX communities_member ON communities (member);
 CREATE TABLE valued (path TEXT PRIMARY KEY);
+CREATE TABLE config_files (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
+CREATE TABLE contract_configs (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
+CREATE TABLE config_values (
+    id INTEGER PRIMARY KEY, path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
+    cut INTEGER NOT NULL, folded_key TEXT NOT NULL, folded_value TEXT
+);
+CREATE INDEX config_values_path ON config_values (path);
+CREATE INDEX config_values_folded_key ON config_values (folded_key);
+CREATE INDEX config_values_folded_value ON config_values (folded_value);
+CREATE VIRTUAL TABLE config_search USING fts5(
+    folded_key, folded_value, content='config_values', content_rowid='id',
+    tokenize='trigram case_sensitive 1'
+);
+CREATE TABLE iac_nodes (
+    address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT,
+    pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
+    line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
+    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
+    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
+    subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
+    ingress TEXT NOT NULL, routes TEXT NOT NULL
+);
+CREATE INDEX iac_nodes_address ON iac_nodes (address);
+CREATE INDEX iac_nodes_path ON iac_nodes (path);
+CREATE TABLE iac_references (
+    root TEXT NOT NULL, source TEXT NOT NULL, target TEXT NOT NULL, via TEXT
+);
+CREATE INDEX iac_references_source ON iac_references (root, source);
+CREATE INDEX iac_references_target ON iac_references (root, target);
+CREATE TABLE iac_images (
+    root TEXT NOT NULL, address TEXT NOT NULL, container TEXT NOT NULL, image TEXT NOT NULL
+);
+CREATE INDEX iac_images_address ON iac_images (root, address);
+CREATE TABLE iac_unresolved (
+    root TEXT NOT NULL, path TEXT NOT NULL, entry TEXT NOT NULL, reason TEXT NOT NULL
+);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -188,6 +265,8 @@ fn provenance_fingerprint(db: &Connection) -> Result<String> {
         "SELECT path, hash FROM files ORDER BY path",
         "SELECT path, hash FROM documents ORDER BY path",
         "SELECT path, hash FROM manifests ORDER BY path",
+        "SELECT path, hash FROM config_files ORDER BY path",
+        "SELECT path, hash FROM contract_configs ORDER BY path",
     ] {
         hash.update(query.as_bytes());
         let mut statement = db.prepare(query)?;
@@ -571,9 +650,12 @@ pub struct Indexed<'a> {
     pub exported: &'a [Exported],
     /// The files of every pack, as kept.
     pub files: &'a [&'a str],
-    /// The config files every pack lists (`LanguagePack::config_files`), as read on this
-    /// refresh: path and bytes, which no kind keeps.
+    /// The config files every pack lists (`LanguagePack::config_files`) and the inputs they name
+    /// (`LanguagePack::config_inputs`), as read on this refresh: path and bytes, each path once,
+    /// which no kind keeps.
     pub configs: &'a [(&'a str, &'a [u8])],
+    /// The config inputs a pack named that are symbolic links, which the index does not read.
+    pub symlinks: &'a [&'a str],
 }
 
 /// Brings the index up to date with the files a language pack handles under `root`: tracked
@@ -585,7 +667,8 @@ pub struct Indexed<'a> {
 /// file's exports, re-export chains, name inference, config changes and inline route
 /// handlers renamed by a mount elsewhere alike. Contracts are extracted again for the whole of
 /// such a group, since constants and client wrappers reach across its files, over the values of
-/// the files the last extraction read (`valued`), parsed again up front. Deleted files leave
+/// the files the last extraction read (`valued`), read up front from the values cache, which
+/// gives back what a parse of an unchanged file would, or parsed again. Deleted files leave
 /// the index. The result equals a refresh of an empty index over the same files. Stored facts
 /// that do not parse (a change whose golden was not re-blessed) rebuild the index.
 ///
@@ -628,11 +711,20 @@ fn refresh_keeping(
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
                  DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities; \
-                 DELETE FROM valued;",
+                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM contract_configs; DELETE FROM config_values; \
+                 INSERT INTO config_search (config_search) VALUES ('delete-all'); \
+                 DELETE FROM iac_nodes; DELETE FROM iac_references; DELETE FROM iac_images; \
+                 DELETE FROM iac_unresolved;",
             )?;
             None
         }
     };
+    let mappings = crate::config::load(root)?.iac;
+    let mapping_stamp = mappings.stamp()?;
+    let mappings_changed = known_configs
+        .as_deref()
+        .and_then(|stamp| stamp.rsplit_once(':'))
+        .is_none_or(|(_, stamp)| stamp != mapping_stamp);
     let stored = stored_files(&tx)?;
 
     let all = walk(root);
@@ -641,6 +733,7 @@ fn refresh_keeping(
         "documents",
         &documents_found(root, &all, serve),
         now,
+        |_| Ok(false),
         |abs| read_up_to(abs, document::DOCUMENT_BYTES_MAX),
         |path, src| Ok(serde_json::to_string(&document::read(path, src))?),
     )?;
@@ -649,10 +742,131 @@ fn refresh_keeping(
         "manifests",
         &manifests_found(&all),
         now,
+        |_| Ok(false),
         |abs| read_up_to(abs, lang::MAX_BYTES),
         |path, src| match package::is_tsconfig(path) {
             true => Ok(serde_json::to_string(&package::read_tsconfig(src))?),
             false => Ok(serde_json::to_string(&package::read_manifest(path, src))?),
+        },
+    )?;
+    // Config values hold no code either: an edited config file changes its rows alone.
+    // A `.tfvars` file is redacted for the sensitive variables of other files (they sort last,
+    // so those are stored first) and is read again when they change.
+    let hidden = hidden_ci(root);
+    let configs = configs_found(&all, &hidden);
+    let sensitive = config_values::Sensitive::new(&tx, &configs);
+    // The Terraform files and var files read again: the units holding them are evaluated again.
+    let terraform = std::cell::RefCell::new(BTreeSet::new());
+    // Whether a Kubernetes file changed, appeared or left: its objects are evaluated again.
+    let kubernetes = std::cell::Cell::new(false);
+    let gone = refresh_stamped(
+        &tx,
+        "config_files",
+        &configs,
+        now,
+        |path| sensitive.stale(path),
+        |abs| read_up_to(abs, lang::MAX_BYTES),
+        |path, src| {
+            if iac::is_input(path) {
+                terraform
+                    .borrow_mut()
+                    .insert(config_values::parent(path).to_string());
+            }
+            if kube::changed(&tx, path, Some(src))? {
+                kubernetes.set(true);
+            }
+            // A template is its own unit: only its own rows are rewritten.
+            if iac::template_changed(&tx, path, Some(src))? {
+                iac::refresh_template(&tx, path, Some(src))?;
+            }
+            let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?);
+            config_values::store(&tx, path, &rows)?;
+            Ok(serde_json::to_string(&outcome)?)
+        },
+    )?;
+    let mut kube_left = false;
+    for path in &gone {
+        kube_left = kube_left || kube::changed(&tx, path, None)?;
+        if iac::template_changed(&tx, path, None)? {
+            iac::refresh_template(&tx, path, None)?;
+        }
+        config_values::forget(&tx, path)?;
+    }
+    let mut dirs = terraform.into_inner();
+    if mappings_changed {
+        dirs.extend(
+            configs
+                .iter()
+                .filter(|(p, _)| iac::is_input(p))
+                .map(|(p, _)| config_values::parent(p).to_string()),
+        );
+    }
+    let left = gone.iter().filter(|p| iac::is_input(p));
+    dirs.extend(left.map(|p| config_values::parent(p).to_string()));
+    // ponytail: a changed Terraform file reads every Terraform file of the repository again to
+    // find the roots and their units, though only the units holding it are evaluated again.
+    if !dirs.is_empty() {
+        let mut files = Vec::new();
+        for (path, abs) in configs.iter().filter(|(p, _)| iac::is_input(p)) {
+            if let Ok(src) = read_up_to(abs, lang::MAX_BYTES)
+                && src.len() <= lang::MAX_BYTES
+            {
+                files.push((path.clone(), src));
+            }
+        }
+        iac::refresh(&tx, &iac::Repository::read_with(&files, &mappings), &dirs)?;
+    }
+    // ponytail: one changed Kubernetes file evaluates every overlay and directory of manifests of
+    // the repository again, not only the units it belongs to; a repository of many overlays
+    // would make that slow.
+    if kubernetes.get() || kube_left || mappings_changed {
+        let mut files = Vec::new();
+        for (path, abs) in configs.iter().filter(|(p, _)| kube::is_source(p)) {
+            let Ok(src) = read_up_to(abs, lang::MAX_BYTES) else {
+                continue;
+            };
+            // A file that cannot hold an object (or is past the size ceiling, which config
+            // values count) still exists for a kustomization naming it.
+            let big = src.len() > lang::MAX_BYTES;
+            let src = if big || !kube::wanted(path, &src) {
+                Vec::new()
+            } else {
+                src
+            };
+            files.push((path.clone(), src));
+        }
+        kube::refresh(&tx, &kube::evaluate_with(&files, &mappings))?;
+    }
+    // Kinds receive evaluated IaC facts once per file; path dependencies can change alone.
+    let configuration_nodes = iac::nodes(&tx)?;
+    let mut nodes_by_path = BTreeMap::<&str, Vec<&iac::Node>>::new();
+    for node in &configuration_nodes {
+        nodes_by_path.entry(&node.path).or_default().push(node);
+    }
+    let contract_configs = config_values::unshadowed(
+        all.iter()
+            .chain(&hidden)
+            .filter(|(p, _)| contract::config_file(p))
+            .cloned()
+            .collect(),
+    );
+    refresh_stamped(
+        &tx,
+        "contract_configs",
+        &contract_configs,
+        now,
+        |path| Ok(contract::config_reads_paths(path)),
+        |abs| read_up_to(abs, lang::MAX_BYTES),
+        |path, src| {
+            Ok(serde_json::to_string(&contract::config_summary(
+                path,
+                src,
+                root,
+                nodes_by_path
+                    .get(path)
+                    .map(Vec::as_slice)
+                    .unwrap_or_default(),
+            ))?)
         },
     )?;
     // The packages decide which files keep the shapes of what they export (issue #175).
@@ -661,6 +875,7 @@ fn refresh_keeping(
         walked,
         packs,
         configs,
+        symlinks,
         digest,
         settings,
     } = packs_of(root, &all);
@@ -707,7 +922,7 @@ fn refresh_keeping(
     // so it extracts again. Folding them in also forces that on an index of this version written
     // before the `shape` rows and constant `exports` targets existed (issue #175), which the
     // schema golden does not cover.
-    let digest = configs_digest(digest, &manifest_rows);
+    let digest = configs_digest(digest, &manifest_rows, &mapping_stamp);
     if changed.is_empty() && deleted.is_empty() && known_configs.as_deref() == Some(&digest) {
         tx.commit()?;
         return Ok(());
@@ -764,7 +979,7 @@ fn refresh_keeping(
         .collect();
     let found_configs = |pack: usize| -> Vec<(&str, &[u8])> {
         (configs.get(&pack).into_iter().flatten())
-            .map(|(n, c)| (*n, c.as_slice()))
+            .map(|(n, c)| (n.as_str(), c.as_slice()))
             .collect()
     };
     // What each pack's files give one another (`LanguagePack::join`), from the facts as parsed:
@@ -840,12 +1055,14 @@ fn refresh_keeping(
         layouts.insert(pack, layout);
     }
     let all: BTreeMap<&str, &Facts> = groups.values().flatten().map(|(p, f)| (*p, *f)).collect();
+    let mut graph_moved = false;
     // A file its pack leaves out keeps its facts, for when a change brings it in, but no rows:
     // an empty `resolved` both marks it and makes the rows be written again then.
     for path in parsed.keys().filter(|p| !all.contains_key(*p)) {
         if stored.get(*path).is_some_and(|s| s.resolved.is_empty()) {
             continue;
         }
+        graph_moved = true;
         forget_calls(&tx, path)?;
         tx.execute("DELETE FROM symbols WHERE path = ?1", params![path])?;
         tx.execute(
@@ -854,71 +1071,113 @@ fn refresh_keeping(
         )?;
     }
     let mut roots: Vec<(String, String)> = Vec::new();
-    let mut resolvers: BTreeMap<usize, Resolver> = BTreeMap::new();
-    for (&pack, files) in &groups {
-        let layout = layouts.remove(&pack).expect("a layout per pack");
-        roots.extend(layout.programs);
-        let resolver =
-            Resolver::with_shared(files, layout.modules, layout.shared, lang::pack(pack));
-        let resolver = resolver.publishing(layout.published);
-        resolvers.insert(pack, resolver.reaching(layout.reaches));
+    for layout in layouts.values_mut() {
+        roots.append(&mut layout.programs);
     }
+    let group_of = |path: &str| {
+        let pack = packs.get(path).copied().or_else(|| lang::pack_for(path));
+        pack.map(lang::resolver_of)
+    };
+    // The groups that may keep their rows; their resolvers are built only if none is kept.
+    let candidates = match keep && known_configs.as_deref() == Some(&digest) {
+        true => candidate_groups(
+            &stored,
+            &groups,
+            group_of,
+            (changed_paths.iter().map(String::as_str))
+                .chain(deleted.iter().map(|p| p.as_str()))
+                .chain(restamped.iter().map(String::as_str)),
+        ),
+        false => BTreeSet::new(),
+    };
+    let mut resolvers: BTreeMap<usize, Resolver> = BTreeMap::new();
+    for &pack in groups.keys().filter(|g| !candidates.contains(g)) {
+        resolvers.insert(pack, resolver(pack, &groups, &mut layouts));
+    }
+    // A group nothing of which changed exports what it did (`Resolver::exported` reads its own
+    // files and its pack's configs alone): its stored rows stand for its resolver's.
+    let stored_exports = match candidates.is_empty() {
+        true => Vec::new(),
+        false => stored_exports(&tx)?,
+    };
+    let exports_of = |pack: usize, resolvers: &BTreeMap<usize, Resolver>| match resolvers.get(&pack)
+    {
+        Some(resolver) => resolver.exported(),
+        None => (stored_exports.iter())
+            .filter(|e| group_of(&e.path) == Some(pack))
+            .cloned()
+            .collect(),
+    };
+    let mut exported: Vec<Exported> = (groups.keys())
+        .flat_map(|&pack| exports_of(pack, &resolvers))
+        .collect();
+    // A group of packs that resolve together keeps its rows when nothing it reads moved: none
+    // of its files changed, and every group exports what it did.
+    let kept_groups = match !candidates.is_empty() && stored_exports == exported {
+        true => candidates,
+        false => {
+            for &pack in &candidates {
+                resolvers.insert(pack, resolver(pack, &groups, &mut layouts));
+            }
+            exported = resolvers.values().flat_map(Resolver::exported).collect();
+            BTreeSet::new()
+        }
+    };
+    // The files of the kept groups: their rows stay as they are.
+    let kept_files: HashSet<&str> = (kept_groups.iter())
+        .flat_map(|g| groups[g].keys().copied())
+        .collect();
     let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
     let files: Vec<&str> = all.keys().copied().collect();
-    tx.execute("DELETE FROM flexible", [])?;
+    forget_rows_outside(&tx, "flexible", &kept_files)?;
     for f in resolvers.values().flat_map(Resolver::flexible) {
         tx.execute(
             "INSERT INTO flexible VALUES (?1, ?2, ?3, ?4)",
             params![f.path, f.name, f.least as i64, f.most.map(|m| m as i64)],
         )?;
     }
-    let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
-    let kept_groups = match keep && known_configs.as_deref() == Some(&digest) {
-        true => unchanged_groups(
-            &tx,
-            &stored,
-            &groups,
-            &exported,
-            |path| {
-                let pack = packs.get(path).copied().or_else(|| lang::pack_for(path));
-                pack.map(lang::resolver_of)
-            },
-            changed_paths
-                .iter()
-                .map(String::as_str)
-                .chain(deleted.iter().map(|p| p.as_str()))
-                .chain(restamped.iter().map(String::as_str)),
-        )?,
-        false => BTreeSet::new(),
-    };
-    // The files of the kept groups: their rows stay as they are.
-    let kept_files: HashSet<&str> = (kept_groups.iter())
-        .flat_map(|g| groups[g].keys().copied())
-        .collect();
+    // A pack's config input may be another pack's config file: each path once.
+    let mut seen = HashSet::new();
     let pack_configs: Vec<(&str, &[u8])> = (configs.values().flatten())
-        .map(|(path, src)| (*path, src.as_slice()))
+        .filter(|(path, _)| seen.insert(path.as_str()))
+        .map(|(path, src)| (path.as_str(), src.as_slice()))
         .collect();
+    let symlinks: Vec<&str> = symlinks.iter().map(String::as_str).collect();
     let indexed = Indexed {
         manifests: &manifests,
         tsconfigs: &tsconfigs,
         exported: &exported,
         files: &files,
         configs: &pack_configs,
+        symlinks: &symlinks,
     };
 
     // Contracts, from every file of the groups not kept. Values are not kept in the index, so
-    // the files whose values a kind reads are parsed again: up front those the last extraction
-    // read (`valued`), then those a kind misses, until no kind misses one. A kind only looks
+    // the files whose values a kind reads are read from the values cache or parsed again: up
+    // front those the last extraction read (`valued`), then those a kind misses, until no kind
+    // misses one. A kind only looks
     // files up, so a file parsed for nothing changes no contract.
     // ponytail: a group holding a changed file is extracted whole, since a kind reads the whole
     // pack at once (mounts across files, budgets spent in walk order); narrowing it per file
     // needs each kind to say what its contracts read (#391).
+    let cache = values::Values::beside(db);
     let reparse = |path: &str| -> Result<Facts> {
         let src = fs::read(root.join(path))?;
         let pack = packs[path];
         let setting = parsed_under.get(path).cloned();
         let setting = setting.unwrap_or_else(|| settings[&pack](path));
-        let mut facts = lang::pack(pack).parse_with(path, &src, &setting)?;
+        let key = values::key(pack, &setting, &src);
+        // ponytail: a changed file is parsed here a second time, its first parse being under a
+        // setting `settle` may still change; only the changed files of a refresh pay it.
+        let mut facts = match cache.get(path, &key) {
+            Some(facts) => facts,
+            None => {
+                VALUE_PARSES.set(VALUE_PARSES.get() + 1);
+                let facts = lang::pack(pack).parse_with(path, &src, &setting)?;
+                cache.put(path, key, &facts);
+                facts
+            }
+        };
         if let Some(join) = joins.get(&pack) {
             join(path, &mut facts);
         }
@@ -994,6 +1253,7 @@ fn refresh_keeping(
             tx.execute("INSERT INTO valued VALUES (?1)", params![path])?;
         }
     }
+    cache.keep(&read);
     // The values are not needed past the extraction.
     drop(reparsed);
     let unknown = kept_files.iter().map(|p| p.to_string()).collect();
@@ -1004,6 +1264,9 @@ fn refresh_keeping(
     // change, under names its own contracts give, which did not either.
     // ponytail: a group holding a changed file resolves whole; a reverse-import graph can narrow
     // it if resolution shows up in profiles.
+    // Whether the graph communities are read from moved: a deleted file, one its pack leaves
+    // out, or another version or config, else a file whose symbols or call edges differ.
+    graph_moved = graph_moved || !deleted.is_empty() || known_configs.as_deref() != Some(&digest);
     // The symbols and the targets of every call, for the entry points; a kept file's, as stored.
     let (mut symbols, mut called) = stored_reach(&tx, &kept_files)?;
     let mut order: Vec<(&&str, &&Facts)> = (all.iter())
@@ -1030,6 +1293,7 @@ fn refresh_keeping(
         if before == Some(resolved.as_str()) {
             continue;
         }
+        graph_moved = graph_moved || stored_graph(&tx, path)? != graph(&rows);
         forget_calls(&tx, path)?;
         tx.execute("DELETE FROM symbols WHERE path = ?1", params![path])?;
         for (id, start, end, hash) in &rows.symbols {
@@ -1137,6 +1401,7 @@ fn refresh_keeping(
             });
         }
         let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
+        let identity = f.identity.as_ref().map(serde_json::to_string).transpose()?;
         let key = (
             role,
             site,
@@ -1145,6 +1410,7 @@ fn refresh_keeping(
             path,
             &f.method,
             fragments.transpose()?,
+            identity,
         );
         let shape = rows.entry(key).or_default();
         match (shape.as_mut(), &f.shape) {
@@ -1153,21 +1419,23 @@ fn refresh_keeping(
             (_, None) => {}
         }
     }
-    for ((role, site, contract, via, path, method, fragments), shape) in rows {
+    for ((role, site, contract, via, path, method, fragments, identity), shape) in rows {
         let shape = shape.as_ref().map(serde_json::to_string).transpose()?;
         tx.execute(
-            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![role, contract, site, via, path, method, fragments, shape],
+            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                role, contract, site, via, path, method, fragments, shape, identity
+            ],
         )?;
     }
     tx.execute("DELETE FROM exports", [])?;
-    for e in resolvers.values().flat_map(Resolver::exported) {
+    for e in &exported {
         tx.execute(
             "INSERT INTO exports VALUES (?1, ?2, ?3, ?4)",
             params![e.path, e.name, e.file, e.target],
         )?;
     }
-    tx.execute("DELETE FROM families", [])?;
+    forget_rows_outside(&tx, "families", &kept_files)?;
     for a in resolvers.values().flat_map(Resolver::ancestries) {
         let ancestors = a
             .ancestors
@@ -1179,7 +1447,6 @@ fn refresh_keeping(
             params![a.path, a.class, ancestors],
         )?;
     }
-    let exported: Vec<Exported> = resolvers.values().flat_map(Resolver::exported).collect();
     // The programs the packs declare per file, and the console scripts of the manifests.
     let scripts = package::programs(&manifests, &files);
     let programs: Vec<entry::Program> = (all.iter())
@@ -1215,7 +1482,10 @@ fn refresh_keeping(
             params![e.identity, e.kind.name(), e.label, e.site],
         )?;
     }
-    write_communities(&tx)?;
+    // Communities are read off the symbols and their `exact` and `inferred` calls alone.
+    if graph_moved {
+        write_communities(&tx)?;
+    }
     tx.execute("DELETE FROM meta", [])?;
     tx.execute(
         "INSERT INTO meta VALUES (?1, ?2)",
@@ -1260,8 +1530,10 @@ struct Packs<'a> {
     walked: Vec<(&'a String, &'a PathBuf, usize)>,
     /// The pack of each of them, by path.
     packs: BTreeMap<&'a str, usize>,
-    /// The config files read, per pack: path and content.
-    configs: BTreeMap<usize, Vec<(&'a str, Vec<u8>)>>,
+    /// The config files read, per pack: path and content, the inputs they name after them.
+    configs: BTreeMap<usize, Vec<(String, Vec<u8>)>>,
+    /// The config inputs the packs named that are symbolic links, sorted.
+    symlinks: BTreeSet<String>,
     /// The BLAKE3 of the config files read, before `configs_digest` folds the manifests in.
     digest: blake3::Hasher,
     /// What the configs make of each file's facts (`LanguagePack::settings`), per pack: a file
@@ -1273,16 +1545,20 @@ struct Packs<'a> {
 type Setting = Box<dyn Fn(&str) -> String>;
 
 /// The packs of the files `walk` found under `root`, their config files read (`read_config`)
-/// on every call: they are few and small. A `**/` name takes every file of that name (or, for
-/// `**/*.ext`, of that ending) the walk found, in path order.
+/// on every call: they are few and small, though Backstage's roots are parsed and grafted to find
+/// their inputs. A `**/` name takes every file of that name (or, for
+/// `**/*.ext`, of that ending) the walk found, in path order. The inputs those name
+/// (`LanguagePack::config_inputs`) follow them, read the same way when the walk sees them.
 fn packs_of<'a>(root: &Path, all: &'a [(String, PathBuf)]) -> Packs<'a> {
     let walked: Vec<(&String, &PathBuf, usize)> = (all.iter())
         .filter_map(|(path, abs)| Some((path, abs, lang::pack_for(path)?)))
         .collect();
     let packs: BTreeMap<&str, usize> = walked.iter().map(|(p, _, k)| (p.as_str(), *k)).collect();
-    let mut configs: BTreeMap<usize, Vec<(&str, Vec<u8>)>> =
+    let mut configs: BTreeMap<usize, Vec<(String, Vec<u8>)>> =
         packs.values().map(|&pack| (pack, Vec::new())).collect();
     let mut digest = blake3::Hasher::new();
+    let seen: HashSet<&str> = all.iter().map(|(path, _)| path.as_str()).collect();
+    let mut symlinks = BTreeSet::new();
     for (&pack, found) in &mut configs {
         for &name in lang::pack(pack).config_files() {
             let paths: BTreeSet<&str> = match name.strip_prefix("**/") {
@@ -1298,14 +1574,32 @@ fn packs_of<'a>(root: &Path, all: &'a [(String, PathBuf)]) -> Packs<'a> {
                 if let Some(src) = read_config(root, path) {
                     digest.update(format!("{pack}\0{path}\0{}\0", src.len()).as_bytes());
                     digest.update(&src);
-                    found.push((path, src));
+                    found.push((path.to_string(), src));
                 }
+            }
+        }
+        let inputs = config_inputs(root, pack, found, &seen);
+        for (path, input) in inputs {
+            match input {
+                lang::ConfigInput::Read(src) => {
+                    digest.update(format!("{pack}\0{path}\0{}\0", src.len()).as_bytes());
+                    digest.update(&src);
+                    found.push((path, src.into_owned()));
+                }
+                lang::ConfigInput::Symlink => {
+                    digest.update(format!("{pack}\0{path}\0symlink\0").as_bytes());
+                    symlinks.insert(path);
+                }
+                lang::ConfigInput::Missing => {}
             }
         }
     }
     let settings = (configs.iter())
         .map(|(&pack, found)| {
-            let found: Vec<(&str, &[u8])> = found.iter().map(|(n, c)| (*n, c.as_slice())).collect();
+            let found: Vec<(&str, &[u8])> = found
+                .iter()
+                .map(|(n, c)| (n.as_str(), c.as_slice()))
+                .collect();
             (pack, lang::pack(pack).settings(&found))
         })
         .collect();
@@ -1313,38 +1607,110 @@ fn packs_of<'a>(root: &Path, all: &'a [(String, PathBuf)]) -> Packs<'a> {
         walked,
         packs,
         configs,
+        symlinks,
         digest,
         settings,
     }
 }
 
+/// What each input the config files `found` of `pack` name holds
+/// (`LanguagePack::config_inputs`), by path, those already among `found` left out: read as a
+/// config file is when the walk sees it (`seen`), else a symbolic link or missing. Like the walk,
+/// the read goes through no symbolic link.
+fn config_inputs(
+    root: &Path,
+    pack: usize,
+    found: &[(String, Vec<u8>)],
+    seen: &HashSet<&str>,
+) -> BTreeMap<String, lang::ConfigInput<'static>> {
+    let configs: Vec<(&str, &[u8])> = found
+        .iter()
+        .map(|(p, s)| (p.as_str(), s.as_slice()))
+        .collect();
+    let inputs = std::cell::RefCell::new(BTreeMap::new());
+    let read = |path: &str| {
+        let input = match seen
+            .contains(path)
+            .then(|| read_config(root, path))
+            .flatten()
+        {
+            Some(src) => lang::ConfigInput::Read(src.into()),
+            None if plain_file(root, path).is_none() && through_link(root, path) => {
+                lang::ConfigInput::Symlink
+            }
+            None => lang::ConfigInput::Missing,
+        };
+        inputs.borrow_mut().insert(path.to_string(), input.clone());
+        input
+    };
+    lang::pack(pack).config_inputs(&configs, &read);
+    let mut inputs = inputs.into_inner();
+    inputs.retain(|path, _| !configs.iter().any(|(p, _)| p == path));
+    inputs
+}
+
+/// Whether a symbolic link lies on the way from `root` to `path`.
+fn through_link(root: &Path, path: &str) -> bool {
+    let mut abs = root.to_path_buf();
+    for segment in path.split('/') {
+        abs.push(segment);
+        match fs::symlink_metadata(&abs) {
+            Ok(meta) if meta.file_type().is_symlink() => return true,
+            Ok(_) => {}
+            Err(_) => return false,
+        }
+    }
+    false
+}
+
 /// `meta.configs`: the config files' digest with the stored manifests folded in, and the
 /// version of Meada, whose kinds a refresh trusts to keep a group's rows (`refresh`).
-fn configs_digest(mut digest: blake3::Hasher, manifest_rows: &[(String, String)]) -> String {
+fn configs_digest(
+    mut digest: blake3::Hasher,
+    manifest_rows: &[(String, String)],
+    mappings: &str,
+) -> String {
     for (path, summary) in manifest_rows {
         digest.update(format!("{path}\0{summary}\0").as_bytes());
     }
     digest.update(env!("CARGO_PKG_VERSION").as_bytes());
-    digest.finalize().to_hex().to_string()
+    format!("{}:{mappings}", digest.finalize().to_hex())
 }
 
-/// The groups (`lang::resolver_of`) whose rows a refresh keeps: none when the files of the
-/// groups or what they export moved since the last refresh (each group's extraction reads
-/// them), else every group no `touched` path (changed, deleted, or stamped by a join) is of.
-fn unchanged_groups<'p>(
-    db: &Connection,
+/// The groups of packs that resolve together that may keep their rows: the files of every group
+/// are those the index holds rows of, and none of the group's files was changed, deleted or
+/// stamped by a join (`touched`). They keep them when every group also exports what it did.
+fn candidate_groups<'p>(
     stored: &HashMap<String, Stored>,
     groups: &BTreeMap<usize, BTreeMap<&str, &Facts>>,
-    exported: &[Exported],
     group_of: impl Fn(&str) -> Option<usize>,
     touched: impl Iterator<Item = &'p str>,
-) -> Result<BTreeSet<usize>> {
+) -> BTreeSet<usize> {
     let before = (stored.iter()).filter(|(_, s)| !s.resolved.is_empty());
     let before: BTreeSet<&str> = before.map(|(path, _)| path.as_str()).collect();
     let now: BTreeSet<&str> = groups.values().flat_map(|f| f.keys().copied()).collect();
     if before != now {
-        return Ok(BTreeSet::new());
+        return BTreeSet::new();
     }
+    let touched: BTreeSet<usize> = touched.filter_map(group_of).collect();
+    (groups.keys().copied())
+        .filter(|g| !touched.contains(g))
+        .collect()
+}
+
+/// The resolver of the group of `pack`, over its files and what its pack made of them, which
+/// it takes from `layouts`.
+fn resolver<'a>(
+    pack: usize,
+    groups: &'a BTreeMap<usize, BTreeMap<&'a str, &'a Facts>>,
+    layouts: &mut BTreeMap<usize, lang::Layout>,
+) -> Resolver<'a> {
+    let layout = layouts.remove(&pack).expect("a layout per pack");
+    Resolver::with_layout(&groups[&pack], layout, lang::pack(pack))
+}
+
+/// The `exports` rows, in the order they were written.
+fn stored_exports(db: &Connection) -> Result<Vec<Exported>> {
     let mut statement =
         db.prepare("SELECT path, name, file, target FROM exports ORDER BY rowid")?;
     let rows = statement.query_map([], |r| {
@@ -1355,16 +1721,46 @@ fn unchanged_groups<'p>(
             target: r.get(3)?,
         })
     })?;
-    let stored_exports = rows.collect::<rusqlite::Result<Vec<_>>>()?;
-    if stored_exports != exported {
-        return Ok(BTreeSet::new());
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// Stored exact exports of the requested modules, including repositories with no package.
+pub(crate) fn exports_of(db: &Connection, paths: &[String]) -> Result<Vec<Exported>> {
+    if paths.is_empty() {
+        return Ok(Vec::new());
     }
-    let touched: BTreeSet<usize> = touched.filter_map(group_of).collect();
-    Ok(groups
-        .keys()
-        .copied()
-        .filter(|g| !touched.contains(g))
-        .collect())
+    Ok(db
+        .prepare(
+            "SELECT path, name, file, target FROM exports WHERE path IN \
+         (SELECT value FROM json_each(?1)) ORDER BY path, name, file, target",
+        )?
+        .query_map(params![serde_json::to_string(paths)?], |r| {
+            Ok(Exported {
+                path: r.get(0)?,
+                name: r.get(1)?,
+                file: r.get(2)?,
+                target: r.get(3)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
+/// Deletes the rows of `table` (`flexible`, `families`) of every file but the kept ones.
+fn forget_rows_outside(tx: &Transaction, table: &str, kept: &HashSet<&str>) -> Result<()> {
+    if kept.is_empty() {
+        tx.execute(&format!("DELETE FROM {table}"), [])?;
+        return Ok(());
+    }
+    let paths: Vec<String> = (tx.prepare(&format!("SELECT DISTINCT path FROM {table}"))?)
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    for path in paths.iter().filter(|p| !kept.contains(p.as_str())) {
+        tx.execute(
+            &format!("DELETE FROM {table} WHERE path = ?1"),
+            params![path],
+        )?;
+    }
+    Ok(())
 }
 
 /// The symbols of the files `kept`, and what their calls reach but the caller itself (a self-call
@@ -1441,6 +1837,11 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
             document::DOCUMENT_BYTES_MAX,
         ),
         ("manifests", manifests_found(&all), lang::MAX_BYTES),
+        (
+            "config_files",
+            configs_found(&all, &hidden_ci(root)),
+            lang::MAX_BYTES,
+        ),
     ];
     for (table, found, max) in tables {
         let read = |abs: &Path| read_up_to(abs, max);
@@ -1487,7 +1888,40 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
     if stored.keys().any(|p| !packs.contains_key(p.as_str())) {
         return Ok(false);
     }
-    Ok(configs_digest(digest, &manifest_rows(db)?) == configs)
+    let mappings = crate::config::load(root)?.iac.stamp()?;
+    Ok(configs_digest(digest, &manifest_rows(db)?, &mappings) == configs)
+}
+
+/// What communities read of a file's rows (`write_communities`): its symbols, and the caller and
+/// target of each of its `exact` and `inferred` calls, sorted.
+type Graph = (Vec<String>, Vec<(String, String)>);
+
+/// The graph a file's stored rows give.
+fn stored_graph(tx: &Transaction, path: &str) -> Result<Graph> {
+    let mut symbols: Vec<String> = (tx.prepare_cached("SELECT id FROM symbols WHERE path = ?1")?)
+        .query_map(params![path], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    let mut calls: Vec<(String, String)> = (tx.prepare_cached(
+        "SELECT caller, target FROM calls WHERE path = ?1 AND level IN ('exact', 'inferred') \
+         AND target IS NOT NULL",
+    )?)
+    .query_map(params![path], |r| Ok((r.get(0)?, r.get(1)?)))?
+    .collect::<rusqlite::Result<_>>()?;
+    symbols.sort();
+    calls.sort();
+    Ok((symbols, calls))
+}
+
+/// The graph a file's rows give, as `stored_graph` reads them once written.
+fn graph(rows: &Rows) -> Graph {
+    let mut symbols: Vec<String> = rows.symbols.iter().map(|(id, ..)| id.clone()).collect();
+    let mut calls: Vec<(String, String)> = (rows.calls.iter())
+        .filter(|c| matches!(c.level, Some(Level::Exact | Level::Inferred)))
+        .filter_map(|c| Some((c.caller.clone(), c.target.clone()?)))
+        .collect();
+    symbols.sort();
+    calls.sort();
+    (symbols, calls)
 }
 
 /// Rewrites the `communities` rows from the stored calls at `exact` or `inferred` between two
@@ -1622,18 +2056,60 @@ fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
         .collect()
 }
 
-/// Brings `table` (`documents` or `manifests`, both stamped like `files`) up to date with
-/// `found`, the files on disk (path and absolute path), as `refresh` does `files`: stat, then
-/// `read` and hash, then `summarize` only what changed. A stored row not found, or whose file
-/// cannot be statted or read, leaves the table.
+/// The config files of a repository (path and absolute path): the YAML and JSON files `walk`
+/// found and those under the hidden CI paths (`hidden`, from `hidden_ci`), in path order.
+fn configs_found(
+    walked: &[(String, PathBuf)],
+    hidden: &[(String, PathBuf)],
+) -> Vec<(String, PathBuf)> {
+    let mut found: Vec<_> = (walked.iter().chain(hidden))
+        .filter(|(path, _)| config_values::is_config(path))
+        .cloned()
+        .collect();
+    // The `.tfvars` files last, for the sensitive variables of the others, and no `.tf` file
+    // a `.tofu` one shadows.
+    found.sort_by(|(a, _), (b, _)| {
+        (config_values::is_tfvars(a), a).cmp(&(config_values::is_tfvars(b), b))
+    });
+    config_values::unshadowed(found)
+}
+
+/// Every file under the hidden entries of `root` that config values read although hidden
+/// (`config_values::HIDDEN_CI`: `.github/**`, `.gitlab-ci.yml` and the rest), but what
+/// `.gitignore`, `.ignore` and `.meadaignore` exclude, sorted. No other hidden path is walked.
+fn hidden_ci(root: &Path) -> Vec<(String, PathBuf)> {
+    let mut files: Vec<(String, PathBuf)> = WalkBuilder::new(root)
+        .require_git(false)
+        .parents(false)
+        .hidden(false)
+        .add_custom_ignore_filename(".meadaignore")
+        .filter_entry(|e| match e.depth() {
+            1 => (e.file_name().to_str()).is_some_and(config_values::is_hidden_ci),
+            _ => !is_build_output(e.path()) && !is_default_skip(e.path()),
+        })
+        .build()
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_type().is_some_and(|t| t.is_file()))
+        .filter_map(|entry| Some((relative(root, entry.path())?, entry.into_path())))
+        .collect();
+    files.sort();
+    files
+}
+
+/// Brings `table` (`documents`, `manifests` or `config_files`, stamped like `files`) up to date
+/// with `found`, the files on disk (path and absolute path), as `refresh` does `files`: stat,
+/// then `read` and hash, then `summarize` only what changed, or what `forced` says depends on
+/// another file that did. A stored row not found, or whose
+/// file cannot be statted or read, leaves the table; their paths are returned.
 fn refresh_stamped(
     tx: &Transaction,
     table: &str,
     found: &[(String, PathBuf)],
     now: SystemTime,
+    forced: impl Fn(&str) -> Result<bool>,
     read: impl Fn(&Path) -> std::io::Result<Vec<u8>>,
     summarize: impl Fn(&str, &[u8]) -> Result<String>,
-) -> Result<()> {
+) -> Result<Vec<String>> {
     let stored: HashMap<String, Stamp> = tx
         .prepare(&format!("SELECT path, hash, mtime, size FROM {table}"))?
         .query_map([], |r| {
@@ -1650,7 +2126,9 @@ fn refresh_stamped(
         };
         seen.insert(path.as_str());
         let known = stored.get(path);
-        if known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size) {
+        let forced = forced(path)?;
+        if !forced && known.is_some_and(|k| k.mtime.is_some() && k.mtime == mtime && k.size == size)
+        {
             continue;
         }
         let mtime = mtime.filter(|_| trusted);
@@ -1659,7 +2137,7 @@ fn refresh_stamped(
             continue;
         };
         let hash = blake3::hash(&src).to_hex().to_string();
-        if known.is_some_and(|k| k.hash == hash) {
+        if !forced && known.is_some_and(|k| k.hash == hash) {
             tx.execute(
                 &format!("UPDATE {table} SET mtime = ?2, size = ?3 WHERE path = ?1"),
                 params![path, mtime, size],
@@ -1672,13 +2150,16 @@ fn refresh_stamped(
             params![path, hash, mtime, size, summary],
         )?;
     }
-    for path in stored.keys().filter(|p| !seen.contains(p.as_str())) {
+    let gone: Vec<String> = (stored.into_keys())
+        .filter(|p| !seen.contains(p.as_str()))
+        .collect();
+    for path in &gone {
         tx.execute(
             &format!("DELETE FROM {table} WHERE path = ?1"),
             params![path],
         )?;
     }
-    Ok(())
+    Ok(gone)
 }
 
 /// The size and mtime (nanoseconds) of the file at `abs`, and whether that mtime is old
@@ -1695,6 +2176,15 @@ fn stat(abs: &Path, now: SystemTime) -> Result<(i64, Option<i64>, bool)> {
 
 thread_local! {
     static REVERSED_WALK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The files this thread's refreshes parsed for their values, past the values cache.
+    static VALUE_PARSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// How many files this thread's refreshes have parsed for their values (`valued`), past the
+/// values cache (ADR 0027). Test-only: no command, option or setting reads it.
+#[doc(hidden)]
+pub fn value_parses() -> usize {
+    VALUE_PARSES.get()
 }
 
 /// Runs `f` with this thread's indexing in reverse order (determinism test, spec #31): the
@@ -1908,8 +2398,9 @@ fn resolve_file<'a>(
         .calls
         .iter()
         .zip(call_ids(identity, path, facts, names))
-        .map(|(call, (caller, call_id))| {
-            let resolution = resolver.call(path, call);
+        .enumerate()
+        .map(|(index, (call, (caller, call_id)))| {
+            let resolution = resolver.resolved_at(path, index);
             let narrowed = matches!(resolution, Resolution::Narrowed(_));
             let (target, level, candidates) = match resolution {
                 Resolution::Exact(t) => (Some(id(&t)), Some(Level::Exact), Vec::new()),
@@ -1969,6 +2460,9 @@ pub(crate) struct Export {
     pub(crate) repository: String,
     /// Where the repository stands in the workspace; set by the engine, never stored or shown.
     pub(crate) root: PathBuf,
+    /// Query-time decisions, supplied by the workspace, never stored in the index.
+    pub(crate) decisions: crate::decisions::Decisions,
+    pub(crate) name_candidates: std::collections::BTreeMap<String, crate::items::NameCandidates>,
     pub(crate) files: Vec<File>,
     /// The files a pack dropped for passing a limit (`Facts::budget`, `Facts::usings`) or because
     /// the grammar misread them (`Facts::misparsed`), each with the limit or the reason, in path
@@ -1980,6 +2474,8 @@ pub(crate) struct Export {
     pub(crate) consumers: Vec<Consumer>,
     /// The RabbitMQ bindings the repository declares (spec #20), neither side of a channel.
     pub(crate) bindings: Vec<Binding>,
+    /// Kind-prepared infrastructure uses; never stored or written as raw directed sides.
+    pub(crate) provision_uses: Vec<crate::contract::ProvisionUse>,
     /// The provider documents (spec #21), in path order; those read are exported, with
     /// their contracts.
     pub(crate) documents: Vec<Document>,
@@ -2017,6 +2513,19 @@ pub(crate) struct Export {
     /// The repository's communities (spec #31), by name, each with its sorted members.
     pub(crate) communities: Vec<Community>,
     pub(crate) links: Vec<Link>,
+    pub(crate) provisioners: Vec<iac::provision::Side>,
+    pub(crate) config_uses: Vec<iac::config_uses::Side>,
+    /// Declared key locations read at query time, without the config values themselves.
+    pub(crate) config_sites: Vec<config_values::sites::Site>,
+    pub(crate) configurations: Vec<(String, serde_json::Value)>,
+    pub(crate) iac: Vec<iac::Node>,
+    pub(crate) iac_references: Vec<iac::Reference>,
+    /// HTTP's prepared workspace routing, never stored or written to the graph export.
+    pub(crate) http: Option<crate::http::Prepared>,
+    pub(crate) workload_images: Vec<(String, String, String)>,
+    pub(crate) executions: Vec<written::Execution>,
+    pub(crate) subscriptions: Vec<iac::subscription::Subscription>,
+    pub(crate) provisions: Vec<written::Provision>,
     /// The repository's entry points (spec #31), sorted by identity. Not exported as such:
     /// `processes` is what the export shows.
     pub(crate) entry_points: Vec<EntryPoint>,
@@ -2027,18 +2536,31 @@ pub(crate) struct Export {
     /// The sites of the Backstage plugins whose `pluginId` cannot be read (`unmounted` rows,
     /// #615), sorted. Shown by `meada status` only.
     pub(crate) unmounted: Vec<String>,
+    /// The Backstage `$include`s not followed (`unfollowed` rows, #689), as stored: `via`,
+    /// `fragments` and `method`, sorted. Shown by `meada status` only, which the HTTP kind reads.
+    pub(crate) unfollowed: Vec<(String, Option<String>, Option<String>)>,
 }
 
 /// Puts `providers` back in the order `export` reads them in, after a kind's `declare` added
 /// some.
 pub(crate) fn sort_providers(providers: &mut [Provider]) {
-    providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
+    providers.sort_by(|a, b| {
+        (&a.contract, &a.site, &a.identity).cmp(&(&b.contract, &b.site, &b.identity))
+    });
 }
 
 /// Puts `consumers` back in the order `export` reads them in, after a kind's `declare` added
 /// some.
 pub(crate) fn sort_consumers(consumers: &mut [Consumer]) {
-    consumers.sort_by(|a, b| (&a.site, &a.contract, &a.via).cmp(&(&b.site, &b.contract, &b.via)));
+    consumers.sort_by(|a, b| {
+        (&a.site, &a.contract, &a.via, &a.root, &a.identity).cmp(&(
+            &b.site,
+            &b.contract,
+            &b.via,
+            &b.root,
+            &b.identity,
+        ))
+    });
 }
 
 impl Export {
@@ -2055,6 +2577,8 @@ impl Export {
                 let mut provider = written::Provider::default();
                 provider.contract = p.contract;
                 provider.site = p.site;
+                provider.via = p.via;
+                provider.at = p.at;
                 provider.gateway = p.gateway;
                 provider.shape = p.shape;
                 provider
@@ -2067,6 +2591,7 @@ impl Export {
                 consumer.site = c.site;
                 consumer.via = c.via;
                 consumer.shape = c.shape;
+                consumer.root = c.root;
                 consumer
             })
             .collect();
@@ -2087,6 +2612,71 @@ impl Export {
         out.imports = self.imports;
         out.communities = self.communities;
         out.links = self.links;
+        for side in self.provisioners {
+            let (node, provisioner) = side.written();
+            out.iac_nodes.push(node);
+            out.provisioners.push(provisioner);
+        }
+        for node in &self.iac {
+            let identity = node.identity(&out.repository);
+            if out
+                .consumers
+                .iter()
+                .any(|c| c.site == identity && c.root.as_deref().is_none_or(|r| r == node.root))
+                || out.providers.iter().any(|p| p.site == identity)
+                || out.bindings.iter().any(|b| b.site == identity)
+                || self.executions.iter().any(|x| x.workload == identity)
+            {
+                let mut written = written::IacNode::default();
+                written.identity = identity;
+                written.address = node.address.clone();
+                written.ty = node.ty.clone();
+                written.root = node.root.clone();
+                written.path = node.path.clone();
+                written.line = node.line;
+                written.end_line = node.end_line;
+                out.iac_nodes.push(written);
+            }
+        }
+        out.iac_nodes
+            .sort_by(|a, b| (&a.identity, &a.root).cmp(&(&b.identity, &b.root)));
+        out.iac_nodes.dedup();
+        out.provisions = self
+            .provisions
+            .into_iter()
+            .map(|mut link| {
+                // Internal key identities let trace start at one key. The wire format uses
+                // the repository as the side, with the locator kept separately (ADR 0026).
+                if link.at.is_some()
+                    && let Some((repository, _)) = link.side.split_once("::")
+                {
+                    link.side = repository.to_string();
+                }
+                link
+            })
+            .collect();
+        out.provisions.sort();
+        out.provisions.dedup();
+        out.uses = self
+            .config_uses
+            .iter()
+            .map(|u| u.written(&out.repository))
+            .collect();
+        out.executions = self.executions;
+        out.subscriptions = self
+            .subscriptions
+            .into_iter()
+            .map(|s| {
+                let mut summary = written::Subscription::default();
+                summary.source = s.source;
+                summary.target = s.target;
+                summary.node = s.node;
+                summary.root = s.root;
+                summary
+            })
+            .collect();
+        out.subscriptions.sort();
+        out.subscriptions.dedup();
         out.processes = self.processes;
         out.stale_decisions = self.stale_decisions;
         out
@@ -2116,10 +2706,20 @@ pub(crate) struct Document {
 /// The provider side of a contract: a symbol that serves it, a file, a repository, the call
 /// that produces to a channel, or a route or channel side only a document lists
 /// (`<repository>::<document>::<METHOD> <path>`, or `... <broker> send <name>`).
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) struct Provider {
     pub(crate) contract: String,
     pub(crate) site: String,
+    /// The provenance of an SDK use (`contracts.via`), including an environment read.
+    pub(crate) via: Option<String>,
+    /// The written SDK operation, when this side was extracted from code (`contracts.method`).
+    pub(crate) method: Option<String>,
+    /// Private kind-owned receiver identity; never part of the public export schema.
+    pub(crate) identity: Option<crate::contract::ReceiverIdentity>,
+    /// Configuration location for a repository-level builder.
+    pub(crate) at: Option<String>,
+    /// Evidence that this side's evaluated name is overridable.
+    pub(crate) evidence: Option<String>,
     /// The path a gateway serves the route at, when `[serve]` rewrites it (`meada export`).
     pub(crate) gateway: Option<String>,
     /// What the route's response or the channel's messages carry: from the first document by
@@ -2149,6 +2749,7 @@ pub(crate) struct Gateway {
 /// how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`.
 /// An unresolved one also keeps what could be read of its URL (see `Found`); the export leaves
 /// that out.
+#[derive(Clone)]
 pub(crate) struct Consumer {
     pub(crate) contract: Option<String>,
     pub(crate) site: String,
@@ -2158,15 +2759,31 @@ pub(crate) struct Consumer {
     /// the parsed response (`contracts.shape`, spec #23).
     pub(crate) shape: Option<Shape>,
     pub(crate) method: Option<String>,
+    pub(crate) identity: Option<crate::contract::ReceiverIdentity>,
     pub(crate) fragments: Vec<String>,
     /// For a call through a package import, where it resolves in each provider of the package
     /// (`package::import`); `Packages::link` turns them into links.
     pub(crate) hops: Vec<Hop>,
+    pub(crate) root: Option<String>,
+}
+
+impl Consumer {
+    pub(crate) fn item_site(&self) -> std::borrow::Cow<'_, str> {
+        written::side_id(
+            &self.site,
+            self.contract.as_deref().unwrap_or_default(),
+            self.root.as_deref(),
+        )
+    }
 }
 
 /// A `contracts.shape` value; one that does not parse reads as no shape.
 fn stored_shape(json: Option<String>) -> Option<Shape> {
     // ponytail: written by `refresh` only, so a bad value is an index to rebuild.
+    serde_json::from_str(&json?).ok()
+}
+
+fn stored_identity(json: Option<String>) -> Option<crate::contract::ReceiverIdentity> {
     serde_json::from_str(&json?).ok()
 }
 
@@ -2234,7 +2851,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         .collect();
     let providers = db
         .prepare(
-            "SELECT contract, site, shape FROM contracts WHERE role = 'provider' \
+            "SELECT contract, site, shape, via, method, identity FROM contracts WHERE role = 'provider' \
              ORDER BY contract, site",
         )?
         .query_map([], |r| {
@@ -2242,18 +2859,22 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                 contract: r.get(0)?,
                 site: r.get(1)?,
                 shape: stored_shape(r.get(2)?),
+                via: r.get(3)?,
+                method: r.get(4)?,
+                identity: stored_identity(r.get(5)?),
                 ..Provider::default()
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
     let consumers = db
         .prepare(
-            "SELECT contract, site, via, method, fragments, shape FROM contracts \
+            "SELECT contract, site, via, method, fragments, shape, identity FROM contracts \
              WHERE role = 'consumer' ORDER BY site, contract, via",
         )?
         .query_map([], |r| {
             let fragments: Option<String> = r.get(4)?;
             Ok(Consumer {
+                identity: stored_identity(r.get(6)?),
                 contract: r.get(0)?,
                 site: r.get(1)?,
                 via: r.get(2)?,
@@ -2264,6 +2885,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                     .and_then(|f| serde_json::from_str(&f).ok())
                     .unwrap_or_default(),
                 hops: Vec::new(),
+                root: None,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -2296,6 +2918,13 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
     let unmounted = db
         .prepare("SELECT site FROM contracts WHERE role = 'unmounted' ORDER BY site")?
         .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    let unfollowed = db
+        .prepare(
+            "SELECT via, fragments, method FROM contracts WHERE role = 'unfollowed' \
+             ORDER BY via, fragments, method",
+        )?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
         .collect::<rusqlite::Result<_>>()?;
     let publishes = db
         .prepare(
@@ -2436,6 +3065,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         providers,
         consumers,
         bindings,
+        provision_uses: Vec::new(),
         publishes,
         manifests,
         tsconfigs,
@@ -2449,11 +3079,37 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         imports: Vec::new(),
         communities: Vec::new(),
         links: Vec::new(),
+        provisioners: iac::provision::read(db, identity)?,
+        config_uses: iac::config_uses::read(db, identity)?,
+        config_sites: Vec::new(),
+        configurations: db
+            .prepare("SELECT path, summary FROM contract_configs ORDER BY path")?
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+            .map(|r| {
+                let (p, s) = r?;
+                Ok((p, serde_json::from_str(&s)?))
+            })
+            .collect::<Result<_>>()?,
+        iac: iac::nodes(db)?,
+        iac_references: iac::all_references(db)?,
+        http: None,
+        workload_images: db
+            .prepare(
+                "SELECT root, address, image FROM iac_images ORDER BY root, address, container",
+            )?
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<rusqlite::Result<_>>()?,
+        executions: Vec::new(),
+        subscriptions: iac::subscription::read(db, identity)?,
+        provisions: Vec::new(),
+        decisions: crate::decisions::Decisions::default(),
+        name_candidates: std::collections::BTreeMap::new(),
         entry_points,
         processes: Vec::new(),
         documents,
         stale_decisions: Vec::new(),
         unmounted,
+        unfollowed,
     })
 }
 
@@ -2712,8 +3368,9 @@ mod tests {
         with_busy_timeout,
     };
     use crate::config::Serve;
+    use crate::kube;
     use crate::msg::Fix;
-    use crate::{document, lang, package};
+    use crate::{config_values, document, lang, package};
 
     const REPO: &str = "example.com/acme/web";
     const MANIFEST: &str = "ops/meada.workspace.toml";
@@ -3256,6 +3913,7 @@ mod tests {
             "manifests",
             &found,
             std::time::SystemTime::now(),
+            |_| Ok(false),
             |abs| fs::read(abs),
             |_, _| Ok("{}".into()),
         )
@@ -3285,13 +3943,32 @@ mod tests {
     }
 
     /// What an index stores: `SCHEMA`, then the facts each pack stores for its sample in
-    /// `tests/fixtures/schema/`, then the summary of each provider document and manifest sample.
+    /// `tests/fixtures/schema/`, then the summary of each provider document and manifest sample,
+    /// then the outcome and rows of the config values sample, then the IaC nodes of the
+    /// kustomization sample.
     /// Its golden is the schema version's source (`schema_version`), so a change fails until
     /// `MEADA_BLESS=1` rewrites the golden, which changes the version.
     #[test]
     fn the_stored_format_matches_its_golden() {
         let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
         let mut actual = SCHEMA.trim_start().to_string();
+        let identity = [
+            crate::contract::ReceiverIdentity {
+                kind: "subscription".into(),
+                parts: vec![
+                    crate::names::Argument::Literal("orders".into()),
+                    crate::names::Argument::Environment("SUBSCRIPTION".into()),
+                ],
+            },
+            crate::contract::ReceiverIdentity {
+                kind: "entity".into(),
+                parts: vec![crate::names::Argument::Unresolved],
+            },
+        ];
+        actual += &format!(
+            "\nreceiver_identity\n{}\n",
+            serde_json::to_string_pretty(&identity).unwrap()
+        );
         for pack in lang::packs() {
             let name = format!("sample.{}", pack.extensions()[0]);
             let src = fs::read(tests.join("fixtures/schema").join(&name)).unwrap_or_else(|_| {
@@ -3332,6 +4009,88 @@ mod tests {
         let src = fs::read(tests.join("fixtures/schema/sample.tsconfig.json")).unwrap();
         let summary = serde_json::to_string_pretty(&package::read_tsconfig(&src)).unwrap();
         actual += &format!("\nsample.tsconfig.json\n{summary}\n");
+        let src = fs::read(tests.join("fixtures/schema/sample.values.yaml")).unwrap();
+        let (outcome, rows) = config_values::read("sample.values.yaml", &src);
+        let outcome = serde_json::to_string_pretty(&outcome).unwrap();
+        actual += &format!("\nsample.values.yaml\n{outcome}\n");
+        actual.extend(rows.iter().map(|row| format!("{row:?}\n")));
+
+        // The IaC nodes, references, images and unresolved entries of a kustomization (#651).
+        let files: Vec<(String, Vec<u8>)> = [
+            ("sample.kustomization.yaml", "overlay/kustomization.yaml"),
+            ("sample.kubernetes.yaml", "overlay/sample.kubernetes.yaml"),
+        ]
+        .iter()
+        .map(|(name, path)| {
+            (
+                path.to_string(),
+                fs::read(tests.join("fixtures/schema").join(name)).unwrap(),
+            )
+        })
+        .collect();
+        actual += "\nsample.kustomization.yaml\n";
+        actual += &format!("{:#?}\n", kube::evaluate(&files));
+
+        // The Crossplane roles, composed resources and references of a unit (#655).
+        let src = fs::read(tests.join("fixtures/schema/sample.crossplane.yaml")).unwrap();
+        let files = [("xp/sample.crossplane.yaml".to_string(), src)];
+        actual += "\nsample.crossplane.yaml\n";
+        actual += &format!("{:#?}\n", kube::evaluate(&files));
+        // The IaC nodes and references of a CloudFormation template (#653), and its config values
+        // with a `NoEcho` default redacted.
+        let src = fs::read(tests.join("fixtures/schema/sample.cloudformation.yaml")).unwrap();
+        actual += "\nsample.cloudformation.yaml\n";
+        let files = [("stack/template.yaml".to_string(), src.clone())];
+        actual += &format!("{:#?}\n", crate::iac::evaluate(&files));
+        let (_, rows) = config_values::read("stack/template.yaml", &src);
+        actual.extend(rows.iter().map(|row| format!("{row:?}\n")));
+        // The roles a `contracts` row stores, and the reasons an `unfollowed` row (#689) does.
+        actual += "\ncontracts.role\n";
+        actual.extend(
+            crate::contract::Role::ALL
+                .iter()
+                .map(|role| format!("{}\n", role.name())),
+        );
+        actual += "\nunfollowed.method\n";
+        actual.extend(
+            (crate::http::IncludeReason::ALL.iter()).map(|reason| format!("{}\n", reason.name())),
+        );
+
+        // The IaC nodes and references of a Serverless service (#654): a function with its handler
+        // and events, and a resource beside it.
+        let src = fs::read(tests.join("fixtures/schema/sample.serverless.yml")).unwrap();
+        actual += "\nsample.serverless.yml\n";
+        let files = [("api/serverless.yml".to_string(), src)];
+        actual += &format!("{:#?}\n", crate::iac::evaluate(&files));
+
+        // Type-specific physical names (#656) change stored IaC name values.
+        let src = fs::read(tests.join("fixtures/schema/sample.provision.tf")).unwrap();
+        actual += "\nsample.provision.tf\n";
+        actual += &format!("{:#?}\n", crate::iac::evaluate(&[("main.tf".into(), src)]));
+
+        // Alert rule and route summaries (#672) invalidate indexes from earlier extractors.
+        let src = fs::read(tests.join("fixtures/schema/sample.alert.yaml")).unwrap();
+        actual += "\nsample.alert.yaml\n";
+        actual += &serde_json::to_string_pretty(&crate::contract::config_summary(
+            "sample.alert.yaml",
+            &src,
+            &tests.join("fixtures/schema"),
+            &[],
+        ))
+        .unwrap();
+        actual += "\n";
+
+        // Native incident payloads and condition programs (#673) also live in summaries.
+        let src = fs::read(tests.join("fixtures/schema/sample.incident.tf")).unwrap();
+        actual += "\nsample.incident.tf\n";
+        actual += &serde_json::to_string_pretty(&crate::contract::config_summary(
+            "sample.incident.tf",
+            &src,
+            &tests.join("fixtures/schema"),
+            &[],
+        ))
+        .unwrap();
+        actual += "\n";
 
         let golden = tests.join("golden/schema.txt");
         if std::env::var_os("MEADA_BLESS").is_some_and(|v| v == "1") {

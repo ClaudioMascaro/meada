@@ -60,3 +60,18 @@ test.each(['en', 'pt-BR'] as const)('playground controls have names and keyboard
   expect(getByRole(host, 'spinbutton', { name: t.budget }).tabIndex).toBe(0);
   expect(getByRole(host, 'button', { name: t.run }).tabIndex).toBe(0);
 });
+
+test.each(['value', 'iac', 'alert'])('the playground exposes and sends the %s search kind', async kind => {
+  const fetch = vi.fn().mockResolvedValue(Response.json({ text: `${kind} answer`, generation: null }));
+  vi.stubGlobal('fetch', fetch);
+  await act(() => root.render(<PlaygroundPage api={new Api(new Auth(config))} locale="en" />));
+  expect(getByRole(host, 'option', { name: kind })).toBeDefined();
+  await act(() => {
+    fireEvent.change(getByRole(host, 'textbox', { name: 'Repository' }), { target: { value: 'example.com/acme/monitoring' } });
+    fireEvent.change(getByRole(host, 'textbox', { name: 'Query' }), { target: { value: 'support' } });
+    fireEvent.change(getByRole(host, 'combobox', { name: 'Kind' }), { target: { value: kind } });
+    fireEvent.submit(getByRole(host, 'form', { name: 'Query playground' }));
+  });
+  await waitFor(() => expect(getByRole(host, 'region', { name: 'Answer' }).textContent).toBe(`${kind} answer`));
+  expect(JSON.parse(fetch.mock.calls[0]![1].body).arguments).toEqual({ query: 'support', kind });
+});

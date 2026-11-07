@@ -1,0 +1,8 @@
+groups:
+  - name: zzprove-rules
+    rules:
+      - alert: ZzproveHighErrorRate
+        expr: rate(errors_total[5m]) > 1
+        labels:
+          support: team-b
+          severity: page

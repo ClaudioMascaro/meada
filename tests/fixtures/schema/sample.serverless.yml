@@ -1,0 +1,19 @@
+service: sample
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+functions:
+  hello:
+    handler: src/hello.handler
+    events:
+      - http:
+          path: hello
+          method: get
+      - sqs:
+          arn: !GetAtt Queue.Arn
+resources:
+  Resources:
+    Queue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${opt:stage, 'dev'}-jobs

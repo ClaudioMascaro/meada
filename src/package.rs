@@ -589,6 +589,7 @@ pub struct ExportedShape {
 pub use meada_core::export::How;
 
 /// Where a call through a package import resolves in one provider of the package.
+#[derive(Clone)]
 pub struct Hop {
     /// The provider's site: its manifest.
     pub manifest: String,
@@ -1287,6 +1288,7 @@ fn import(exports: &mut [Export], providers: &Providers) {
                 }
                 if !hops.is_empty() {
                     consumers.push(Consumer {
+                        identity: None,
                         contract: Some(contract(ecosystem, &entry.name)),
                         site: call.site.clone(),
                         via: entry.via.clone(),
@@ -1294,6 +1296,7 @@ fn import(exports: &mut [Export], providers: &Providers) {
                         method: entry.range.clone(),
                         fragments: Vec::new(),
                         hops,
+                        root: None,
                     });
                 }
             }
@@ -1522,6 +1525,7 @@ fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
             }
             for (want, shape) in kept {
                 found.push(Found {
+                    identity: None,
                     role: Role::Shape,
                     site: Site::File(path.to_string()),
                     contract: None,
@@ -1562,6 +1566,7 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                         continue;
                     }
                     consumers.push(Consumer {
+                        identity: None,
                         contract: Some(contract(ecosystem, &e.name)),
                         site: format!(
                             "{}::{}::{}::{}",
@@ -1575,6 +1580,7 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                         method: e.range.clone(),
                         fragments: Vec::new(),
                         hops: Vec::new(),
+                        root: None,
                     });
                     let mut dependency = Dependency::default();
                     dependency.manifest = manifest.path.clone();
@@ -1783,6 +1789,7 @@ impl ContractKind for Packages {
                         continue;
                     }
                     found.push(Found {
+                        identity: None,
                         role: Role::Import,
                         site: Site::Call {
                             path: path.to_string(),
@@ -1842,7 +1849,7 @@ impl ContractKind for Packages {
     /// reaches through a package import of their own repository (a monorepo: no door, at any
     /// level; an entry point of another kind stays one), and the shapes imported from a
     /// package (issue #175).
-    fn workspace_step(&self, exports: &mut [Export]) {
+    fn workspace_step(&self, exports: &mut [Export], _: &[Repository]) {
         ECOSYSTEMS.iter().for_each(|e| e.settle(exports));
         let providers = Providers::new(exports);
         consume(exports, &providers);
@@ -2061,6 +2068,7 @@ mod tests {
         let export = Export {
             repository: "r".into(),
             consumers: vec![Consumer {
+                identity: None,
                 contract: Some(contract.into()),
                 site: call.into(),
                 via: None,
@@ -2068,6 +2076,7 @@ mod tests {
                 method: Some("^1.0.0".into()),
                 fragments: Vec::new(),
                 hops: Vec::new(),
+                root: None,
             }],
             calls: vec![call_site],
             ..Export::default()
@@ -2285,6 +2294,7 @@ mod tests {
                 exported: &exported,
                 files: &names,
                 configs: &[],
+                symlinks: &[],
             };
             let found = Packages.extract(&code, &indexed);
             let mut rows: Vec<_> = (found.iter())
@@ -2643,6 +2653,7 @@ mod tests {
             "package::unknown::x 1 (local 2)"
         );
         let consumer = Consumer {
+            identity: None,
             contract: Some(contract.into()),
             site: "r::pom.xml".into(),
             via: None,
@@ -2650,6 +2661,7 @@ mod tests {
             method: Some("1".into()),
             fragments: Vec::new(),
             hops: Vec::new(),
+            root: None,
         };
         let repo = Repository {
             root: "/nonexistent".into(),
@@ -2844,6 +2856,14 @@ mod tests {
             shape
         };
         Export {
+            configurations: Vec::new(),
+            decisions: crate::decisions::Decisions::default(),
+            name_candidates: std::collections::BTreeMap::new(),
+            iac: Vec::new(),
+            iac_references: Vec::new(),
+            http: None,
+            workload_images: Vec::new(),
+            executions: Vec::new(),
             repository: name.into(),
             root: PathBuf::new(),
             files: (files.iter())
@@ -2859,6 +2879,7 @@ mod tests {
             providers: Vec::new(),
             consumers: Vec::new(),
             bindings: Vec::new(),
+            provision_uses: Vec::new(),
             documents: Vec::new(),
             publishes: Vec::new(),
             entry_points: Vec::new(),
@@ -2892,8 +2913,14 @@ mod tests {
                 .collect(),
             imports: Vec::new(),
             links: Vec::new(),
+            provisioners: Vec::new(),
+            config_uses: Vec::new(),
+            config_sites: Vec::new(),
+            subscriptions: Vec::new(),
+            provisions: Vec::new(),
             stale_decisions: Vec::new(),
             unmounted: Vec::new(),
+            unfollowed: Vec::new(),
         }
     }
 

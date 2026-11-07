@@ -1,0 +1,6 @@
+spring:
+  messaging:
+    destination: arn:aws:sns:eu-west-1:123456789012:events
+    endpoint: https://sqs.eu-west-1.amazonaws.com/123456789012/orders
+  storage:
+    location: s3://archive/reports/latest.json

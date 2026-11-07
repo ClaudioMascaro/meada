@@ -1,0 +1,1958 @@
+{
+  "schema": 1,
+  "status": "SOURCE_KEY_READY_NOT_RUNTIME_PROOF",
+  "approved_source_commit": "fe0faf5dfd7408571bf982bc395ef10d1e456a0b",
+  "rule_sources": [
+    "#642 stories18-31,39",
+    "ADR0025 Kubernetes/Kustomize, Compose, Crossplane, node identity, references, paths",
+    "docs/agents/ceilings/resolution-the-index-and-shape-readers/kubernetes-and-crossplane.md",
+    "docs/agents/ceilings/resolution-the-index-and-shape-readers/compose-cloudformation-serverless-and-images.md"
+  ],
+  "derivation": "Only retained immutable source trees/files, YAML source scalar locations, manually selected finite unit table, and approved format rules. No product output, evaluator, fixture implementation, mutation or auditor material.",
+  "inventory_complete": true,
+  "comparison_contract": {
+    "nodes": "Compare the entire multiset keyed by repository,file,address,root, including unknown/uncontracted kinds. Public export cannot prove node completeness.",
+    "references": "Compare whole endpoint/via-source-field groups and both reverse directions. Source native field names are the key; equivalent rendered via wording is acceptable only when it names the same source site.",
+    "traces": "For every source-selected reference-bearing node, save full up/down traces, verify complete local reference reachability, and preserve same-scope stdio/HTTP byte equality. Contract traversal is judged separately by its accepted source keys.",
+    "privacy": "Generic node keys expose only names/locations; secret config values follow ADR0025 and remain absent from export."
+  },
+  "runtime_verdict": "UNPROVEN",
+  "sources": {
+    "crossplane-aws": {
+      "origin": "https://github.com/upbound/platform-ref-aws.git",
+      "commit": "57fa3b0127c8ce263327f2d43b4e46d07fb90896",
+      "files_sha256": {
+        ".github/workflows/ci.yaml": "8f11913de34b34c0f5aaab42f7c0f576344f7f03b18a0d21e42a27c0a002ae70",
+        ".github/workflows/composition-tests.yaml": "1c718a15087044f96446f3ea63324f3a99962a386b07592a58abcbfe60b52fc5",
+        ".github/workflows/e2e.yaml": "152cdf532a6b99906a8d2d5ab697809469ea44c8fbe37068fe4b0ff8d695b97d",
+        ".github/workflows/tag.yaml": "72e2db9dac6b79505bb57078f3d967cc4acb4a0d84d7a7d64b5327e76792e7ab",
+        ".github/workflows/tag.yml": "72e2db9dac6b79505bb57078f3d967cc4acb4a0d84d7a7d64b5327e76792e7ab",
+        ".github/workflows/yamllint.yaml": "a1d74709b027013a6ba741822dfd91747999b5468314ffce5558545d1106c5dd",
+        "apis/clusters/composition.yaml": "05de21293dc81677b75e75d5544230dae2c456e0b420a2f0d1af0ac0abedec21",
+        "apis/clusters/definition.yaml": "0a322bdd7042fecb124a56feefa887dabe9863998bf8fbe3cba8e12cfcff417f",
+        "examples/app-xr.yaml": "22192ae207413cf8ccd74e60c59da229acf3d21d908258fae9f8c9fdf7e3adf3",
+        "examples/aws-default-provider.yaml": "22ffed8ad83be62937342303f0ead302a52aa78f0ab519795de17f63419f223b",
+        "examples/cluster-xr.yaml": "a558a61e7c3c6cb3e7eaa01441cb903bc55f88e714619ee4fc54f596eb31194c",
+        "examples/configuration.yaml": "07dbaa1de2f45e99e1d34d667dce58147defbc7d3021997e311714903bcfb808",
+        "examples/mariadb-xr.yaml": "b94f42541ab91b2274d72ac6896dc7110ea2781829b77ff1ea34e5318bb2f9e7",
+        "examples/postgres-xr.yaml": "afca5a7134638dfefe07575e55883bf00282d1b01c309654732c778b6c0168e8",
+        "upbound.yaml": "bf33ff76cd5d57ec98e3875f2fd162ea639ee901ac64efa1c24ef5a9df60ef8f"
+      },
+      "tree_truncated": false,
+      "tree_entries": 47,
+      "skipped_before_parse": []
+    },
+    "a7-generic-kube-source-key": {
+      "origin": "https://github.com/zz-prove/a7-generic-kube-source-key.git",
+      "repository": "github.com/zz-prove/a7-generic-kube-source-key",
+      "commit": "d2e4d2f3ec01da8b7e0866000fe68cd6a9380f41",
+      "commit_message": "a7 independent source key",
+      "fixed_git": {
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_AUTHOR_NAME": "prove-meada",
+        "GIT_AUTHOR_EMAIL": "prove@example.com",
+        "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
+        "GIT_COMMITTER_NAME": "prove-meada",
+        "GIT_COMMITTER_EMAIL": "prove@example.com",
+        "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z"
+      },
+      "files": {
+        "base/bundle.yaml": {
+          "mode": "file",
+          "bytes": 1391,
+          "sha256": "39ee9d18b1cb1e41d5a2a7e6fee6f6cacea0f007cf52b77d0fceb0b80bb57645"
+        },
+        "cycle-a/kustomization.yaml": {
+          "mode": "file",
+          "bytes": 24,
+          "sha256": "1e38ad5bf792f4a696ebee21de92137bf7dc05f067fe21ac817b97ca263b848c"
+        },
+        "cycle-b/kustomization.yaml": {
+          "mode": "file",
+          "bytes": 24,
+          "sha256": "8c04ff4c7869c833f82807ead2c6a88853a38820a1375b9ddc0ec47b35039254"
+        },
+        "helm/templated.yaml": {
+          "mode": "file",
+          "bytes": 101,
+          "sha256": "7b17b842a588b80560a769797755453d08429e98bc3b9e23a662582868ea49e7"
+        },
+        "linked-base": {
+          "mode": "symlink",
+          "target": "base",
+          "target_sha256": "cae662172fd450bb0cd710a769079c05bfc5d8e35efa6576edc7d0377afdd4a2"
+        },
+        "middle/kustomization.yaml": {
+          "mode": "file",
+          "bytes": 238,
+          "sha256": "e2ef34b569fdf770dd317350d1a1dbfbfc52fb9afe7ec5b0e6085f8789f8d1e4"
+        },
+        "overlays/cedar/kustomization.yaml": {
+          "mode": "file",
+          "bytes": 623,
+          "sha256": "2822b20573f8908fe2f7725a248b42993e311ceaebbaf9d035f2d921f7979d7d"
+        },
+        "overlays/harbor/kustomization.yaml": {
+          "mode": "file",
+          "bytes": 253,
+          "sha256": "90a87730690dc02d23a5deb93182fd069292ed5c0aee1c3aa772ea5897f116e3"
+        },
+        "patch.yaml": {
+          "mode": "file",
+          "bytes": 93,
+          "sha256": "27d531432efc1eb0ffecca5cf06a7b3e9910b432b20895a5113c89a905d8034a"
+        },
+        "plain-a/bundle.yaml": {
+          "mode": "file",
+          "bytes": 611,
+          "sha256": "4f8b8c7b372e5062aab5dde183bc72c79ec353f6a3e9f14a8294414ae20a0090"
+        },
+        "plain-b/config.json": {
+          "mode": "file",
+          "bytes": 117,
+          "sha256": "3e7b4812cfbda8792c726bcdc8b67cddb56a32b754d9a24447a3bb4a1af63ba0"
+        },
+        "plain-b/object.json": {
+          "mode": "file",
+          "bytes": 264,
+          "sha256": "aec9ecbe9a6bd986c75a654cbcc3ae990001145bd385cd9c416b7e2e70cbf675"
+        },
+        "xp-one/bundle.yaml": {
+          "mode": "file",
+          "bytes": 3419,
+          "sha256": "9a5a3626053e83955c33a56b09b95588b0777bf112bbc244eec4bbca3d0d72be"
+        },
+        "xp-two/bundle.yaml": {
+          "mode": "file",
+          "bytes": 262,
+          "sha256": "163e3eba3d2fde0d66bbfc29784041bb6ac5673dcddd924732ac0aba0cf3012a"
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "source": "crossplane-aws",
+      "file": "apis/clusters/composition.yaml",
+      "document": 0,
+      "block": "",
+      "type": "Composition.apiextensions.crossplane.io",
+      "span": {
+        "first": 1,
+        "last": 17
+      },
+      "original_name": "clusters.aws.platformref.upbound.io",
+      "original_namespace": null,
+      "root": "apis/clusters",
+      "address": "Composition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io",
+      "name": "clusters.aws.platformref.upbound.io",
+      "pattern": false,
+      "overridable": [],
+      "role": "composition",
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "CompositeResourceDefinition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io",
+          "to_file": "apis/clusters/definition.yaml",
+          "via": "compositeTypeRef Cluster.aws.platformref.upbound.io",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "apis/clusters/composition.yaml",
+              "path": "spec.compositeTypeRef.apiVersion",
+              "line": 8
+            },
+            {
+              "file": "apis/clusters/composition.yaml",
+              "path": "spec.compositeTypeRef.kind",
+              "line": 9
+            }
+          ]
+        }
+      ],
+      "referenced_by": [],
+      "identity": "github.com/upbound/platform-ref-aws::apis/clusters/composition.yaml::Composition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io",
+      "key": "crossplane-aws|apis/clusters|apis/clusters/composition.yaml|Composition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io"
+    },
+    {
+      "source": "crossplane-aws",
+      "file": "apis/clusters/definition.yaml",
+      "document": 0,
+      "block": "",
+      "type": "CompositeResourceDefinition.apiextensions.crossplane.io",
+      "span": {
+        "first": 1,
+        "last": 192
+      },
+      "original_name": "clusters.aws.platformref.upbound.io",
+      "original_namespace": null,
+      "root": "apis/clusters",
+      "address": "CompositeResourceDefinition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io",
+      "name": "clusters.aws.platformref.upbound.io",
+      "pattern": false,
+      "overridable": [],
+      "role": "xrd",
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [
+        {
+          "from": "Composition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io",
+          "from_file": "apis/clusters/composition.yaml",
+          "via": "compositeTypeRef Cluster.aws.platformref.upbound.io",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "apis/clusters/composition.yaml",
+              "path": "spec.compositeTypeRef.apiVersion",
+              "line": 8
+            },
+            {
+              "file": "apis/clusters/composition.yaml",
+              "path": "spec.compositeTypeRef.kind",
+              "line": 9
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/upbound/platform-ref-aws::apis/clusters/definition.yaml::CompositeResourceDefinition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io",
+      "key": "crossplane-aws|apis/clusters|apis/clusters/definition.yaml|CompositeResourceDefinition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io"
+    },
+    {
+      "source": "crossplane-aws",
+      "file": "examples/app-xr.yaml",
+      "document": 0,
+      "block": "",
+      "type": "App.platform.upbound.io",
+      "span": {
+        "first": 1,
+        "last": 28
+      },
+      "original_name": "platform-ref-aws-ghost",
+      "original_namespace": "default",
+      "root": "examples",
+      "address": "App.platform.upbound.io/default/platform-ref-aws-ghost",
+      "name": "platform-ref-aws-ghost",
+      "pattern": false,
+      "overridable": [],
+      "role": null,
+      "namespace": "default",
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [],
+      "identity": "github.com/upbound/platform-ref-aws::examples/app-xr.yaml::App.platform.upbound.io/default/platform-ref-aws-ghost",
+      "key": "crossplane-aws|examples|examples/app-xr.yaml|App.platform.upbound.io/default/platform-ref-aws-ghost"
+    },
+    {
+      "source": "crossplane-aws",
+      "file": "examples/aws-default-provider.yaml",
+      "document": 0,
+      "block": "",
+      "type": "ProviderConfig.aws.m.upbound.io",
+      "span": {
+        "first": 1,
+        "last": 11
+      },
+      "original_name": "default",
+      "original_namespace": null,
+      "root": "examples",
+      "address": "ProviderConfig.aws.m.upbound.io/default",
+      "name": "default",
+      "pattern": false,
+      "overridable": [],
+      "role": null,
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [],
+      "identity": "github.com/upbound/platform-ref-aws::examples/aws-default-provider.yaml::ProviderConfig.aws.m.upbound.io/default",
+      "key": "crossplane-aws|examples|examples/aws-default-provider.yaml|ProviderConfig.aws.m.upbound.io/default"
+    },
+    {
+      "source": "crossplane-aws",
+      "file": "examples/cluster-xr.yaml",
+      "document": 0,
+      "block": "",
+      "type": "Cluster.aws.platformref.upbound.io",
+      "span": {
+        "first": 1,
+        "last": 31
+      },
+      "original_name": "platform-ref-aws",
+      "original_namespace": "default",
+      "root": "examples",
+      "address": "Cluster.aws.platformref.upbound.io/default/platform-ref-aws",
+      "name": "platform-ref-aws",
+      "pattern": false,
+      "overridable": [],
+      "role": "composite",
+      "namespace": "default",
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [],
+      "identity": "github.com/upbound/platform-ref-aws::examples/cluster-xr.yaml::Cluster.aws.platformref.upbound.io/default/platform-ref-aws",
+      "key": "crossplane-aws|examples|examples/cluster-xr.yaml|Cluster.aws.platformref.upbound.io/default/platform-ref-aws"
+    },
+    {
+      "source": "crossplane-aws",
+      "file": "examples/configuration.yaml",
+      "document": 0,
+      "block": "",
+      "type": "Configuration.pkg.crossplane.io",
+      "span": {
+        "first": 1,
+        "last": 6
+      },
+      "original_name": "platform-ref-aws",
+      "original_namespace": null,
+      "root": "examples",
+      "address": "Configuration.pkg.crossplane.io/platform-ref-aws",
+      "name": "platform-ref-aws",
+      "pattern": false,
+      "overridable": [],
+      "role": null,
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [],
+      "identity": "github.com/upbound/platform-ref-aws::examples/configuration.yaml::Configuration.pkg.crossplane.io/platform-ref-aws",
+      "key": "crossplane-aws|examples|examples/configuration.yaml|Configuration.pkg.crossplane.io/platform-ref-aws"
+    },
+    {
+      "source": "crossplane-aws",
+      "file": "examples/mariadb-xr.yaml",
+      "document": 0,
+      "block": "",
+      "type": "SQLInstance.aws.platform.upbound.io",
+      "span": {
+        "first": 1,
+        "last": 17
+      },
+      "original_name": "platform-ref-aws-db-mariadb",
+      "original_namespace": "default",
+      "root": "examples",
+      "address": "SQLInstance.aws.platform.upbound.io/default/platform-ref-aws-db-mariadb",
+      "name": "platform-ref-aws-db-mariadb",
+      "pattern": false,
+      "overridable": [],
+      "role": null,
+      "namespace": "default",
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [],
+      "identity": "github.com/upbound/platform-ref-aws::examples/mariadb-xr.yaml::SQLInstance.aws.platform.upbound.io/default/platform-ref-aws-db-mariadb",
+      "key": "crossplane-aws|examples|examples/mariadb-xr.yaml|SQLInstance.aws.platform.upbound.io/default/platform-ref-aws-db-mariadb"
+    },
+    {
+      "source": "crossplane-aws",
+      "file": "examples/postgres-xr.yaml",
+      "document": 0,
+      "block": "[0]",
+      "type": "SQLInstance.aws.platform.upbound.io",
+      "span": {
+        "first": 1,
+        "last": 19
+      },
+      "original_name": "platform-ref-aws-db-postgres",
+      "original_namespace": "default",
+      "root": "examples",
+      "address": "SQLInstance.aws.platform.upbound.io/default/platform-ref-aws-db-postgres",
+      "name": "platform-ref-aws-db-postgres",
+      "pattern": false,
+      "overridable": [],
+      "role": null,
+      "namespace": "default",
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [],
+      "identity": "github.com/upbound/platform-ref-aws::examples/postgres-xr.yaml::SQLInstance.aws.platform.upbound.io/default/platform-ref-aws-db-postgres",
+      "key": "crossplane-aws|examples|examples/postgres-xr.yaml|SQLInstance.aws.platform.upbound.io/default/platform-ref-aws-db-postgres"
+    },
+    {
+      "source": "crossplane-aws",
+      "file": "examples/postgres-xr.yaml",
+      "document": 1,
+      "block": "[1]",
+      "type": "Secret",
+      "span": {
+        "first": 21,
+        "last": 28
+      },
+      "original_name": "psqlsecret",
+      "original_namespace": "default",
+      "root": "examples",
+      "address": "Secret/default/psqlsecret",
+      "name": "psqlsecret",
+      "pattern": false,
+      "overridable": [],
+      "role": null,
+      "namespace": "default",
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [],
+      "identity": "github.com/upbound/platform-ref-aws::examples/postgres-xr.yaml::Secret/default/psqlsecret",
+      "key": "crossplane-aws|examples|examples/postgres-xr.yaml|Secret/default/psqlsecret"
+    },
+    {
+      "source": "crossplane-aws",
+      "file": "upbound.yaml",
+      "document": 0,
+      "block": "",
+      "type": "Project.meta.dev.upbound.io",
+      "span": {
+        "first": 1,
+        "last": 63
+      },
+      "original_name": "platform-ref-aws",
+      "original_namespace": null,
+      "root": ".",
+      "address": "Project.meta.dev.upbound.io/platform-ref-aws",
+      "name": "platform-ref-aws",
+      "pattern": false,
+      "overridable": [],
+      "role": null,
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [],
+      "identity": "github.com/upbound/platform-ref-aws::upbound.yaml::Project.meta.dev.upbound.io/platform-ref-aws",
+      "key": "crossplane-aws|.|upbound.yaml|Project.meta.dev.upbound.io/platform-ref-aws"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 0,
+      "block": "[0]",
+      "type": "CompositeResourceDefinition.apiextensions.crossplane.io",
+      "span": {
+        "first": 1,
+        "last": 17
+      },
+      "original_name": "xrelays.proof.example.org",
+      "original_namespace": null,
+      "root": "xp-one",
+      "address": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+      "name": "xrelays.proof.example.org",
+      "pattern": false,
+      "overridable": [],
+      "role": "xrd",
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "Composition.apiextensions.crossplane.io/proof-route",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "defaultCompositionRef",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[0].spec.defaultCompositionRef.name",
+              "line": 15
+            }
+          ]
+        },
+        {
+          "to": "Composition.apiextensions.crossplane.io/proof-route",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "enforcedCompositionRef",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[0].spec.enforcedCompositionRef.name",
+              "line": 17
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-route",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "compositeTypeRef XRelay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.compositeTypeRef.apiVersion",
+              "line": 26
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.compositeTypeRef.kind",
+              "line": 27
+            }
+          ]
+        },
+        {
+          "from": "Relay.proof.example.org/amber/request",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "composite XRelay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[3].apiVersion",
+              "line": 80
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[3].kind",
+              "line": 81
+            }
+          ]
+        },
+        {
+          "from": "XRelay.proof.example.org/amber/reality",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "kind XRelay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[4].apiVersion",
+              "line": 89
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[4].kind",
+              "line": 90
+            }
+          ]
+        },
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-route/nested",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "kind XRelay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[3].base.apiVersion",
+              "line": 64
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[3].base.kind",
+              "line": 65
+            }
+          ]
+        },
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-pipeline",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "compositeTypeRef XRelay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[6].spec.compositeTypeRef.apiVersion",
+              "line": 114
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[6].spec.compositeTypeRef.kind",
+              "line": 115
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 1,
+      "block": "[1]",
+      "type": "Composition.apiextensions.crossplane.io",
+      "span": {
+        "first": 19,
+        "last": 67
+      },
+      "original_name": "proof-route",
+      "original_namespace": null,
+      "root": "xp-one",
+      "address": "Composition.apiextensions.crossplane.io/proof-route",
+      "name": "proof-route",
+      "pattern": false,
+      "overridable": [],
+      "role": "composition",
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "compositeTypeRef XRelay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.compositeTypeRef.apiVersion",
+              "line": 26
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.compositeTypeRef.kind",
+              "line": 27
+            }
+          ]
+        },
+        {
+          "to": "Composition.apiextensions.crossplane.io/proof-route/literal",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "resources",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[0].name",
+              "line": 29
+            }
+          ]
+        },
+        {
+          "to": "Composition.apiextensions.crossplane.io/proof-route/patched",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "resources",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[1].name",
+              "line": 39
+            }
+          ]
+        },
+        {
+          "to": "Composition.apiextensions.crossplane.io/proof-route/unnamed",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "resources",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[2].name",
+              "line": 56
+            }
+          ]
+        },
+        {
+          "to": "Composition.apiextensions.crossplane.io/proof-route/nested",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "resources",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[3].name",
+              "line": 62
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "defaultCompositionRef",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[0].spec.defaultCompositionRef.name",
+              "line": 15
+            }
+          ]
+        },
+        {
+          "from": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "enforcedCompositionRef",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[0].spec.enforcedCompositionRef.name",
+              "line": 17
+            }
+          ]
+        },
+        {
+          "from": "Relay.proof.example.org/amber/request",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "compositionRef",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[3].spec.compositionRef.name",
+              "line": 87
+            }
+          ]
+        },
+        {
+          "from": "XRelay.proof.example.org/amber/reality",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "compositionRef",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[4].spec.compositionRef.name",
+              "line": 96
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|Composition.apiextensions.crossplane.io/proof-route"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 2,
+      "block": "[2]",
+      "type": "CustomResourceDefinition.apiextensions.k8s.io",
+      "span": {
+        "first": 69,
+        "last": 78
+      },
+      "original_name": "deliveries.relay.proof.example.org",
+      "original_namespace": null,
+      "root": "xp-one",
+      "address": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+      "name": "deliveries.relay.proof.example.org",
+      "pattern": false,
+      "overridable": [],
+      "role": null,
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [
+        {
+          "from": "Delivery.relay.proof.example.org/amber/standalone",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "kind Delivery.relay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[5].apiVersion",
+              "line": 98
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[5].kind",
+              "line": 99
+            }
+          ]
+        },
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-route/literal",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "kind Delivery.relay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[0].base.apiVersion",
+              "line": 31
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[0].base.kind",
+              "line": 32
+            }
+          ]
+        },
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-route/patched",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "kind Delivery.relay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[1].base.apiVersion",
+              "line": 41
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[1].base.kind",
+              "line": 42
+            }
+          ]
+        },
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-route/unnamed",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "kind Delivery.relay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[2].base.apiVersion",
+              "line": 58
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[2].base.kind",
+              "line": 59
+            }
+          ]
+        },
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-pipeline/pipe",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "kind Delivery.relay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[6].spec.pipeline[0].input.resources[0].base.apiVersion",
+              "line": 127
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[6].spec.pipeline[0].input.resources[0].base.kind",
+              "line": 128
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 3,
+      "block": "[3]",
+      "type": "Relay.proof.example.org",
+      "span": {
+        "first": 80,
+        "last": 87
+      },
+      "original_name": "request",
+      "original_namespace": "amber",
+      "root": "xp-one",
+      "address": "Relay.proof.example.org/amber/request",
+      "name": "request",
+      "pattern": false,
+      "overridable": [],
+      "role": "claim",
+      "namespace": "amber",
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "composite XRelay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[3].apiVersion",
+              "line": 80
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[3].kind",
+              "line": 81
+            }
+          ]
+        },
+        {
+          "to": "Composition.apiextensions.crossplane.io/proof-route",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "compositionRef",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[3].spec.compositionRef.name",
+              "line": 87
+            }
+          ]
+        }
+      ],
+      "referenced_by": [],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::Relay.proof.example.org/amber/request",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|Relay.proof.example.org/amber/request"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 4,
+      "block": "[4]",
+      "type": "XRelay.proof.example.org",
+      "span": {
+        "first": 89,
+        "last": 96
+      },
+      "original_name": "reality",
+      "original_namespace": "amber",
+      "root": "xp-one",
+      "address": "XRelay.proof.example.org/amber/reality",
+      "name": "reality",
+      "pattern": false,
+      "overridable": [],
+      "role": "composite",
+      "namespace": "amber",
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "kind XRelay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[4].apiVersion",
+              "line": 89
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[4].kind",
+              "line": 90
+            }
+          ]
+        },
+        {
+          "to": "Composition.apiextensions.crossplane.io/proof-route",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "compositionRef",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[4].spec.compositionRef.name",
+              "line": 96
+            }
+          ]
+        }
+      ],
+      "referenced_by": [],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::XRelay.proof.example.org/amber/reality",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|XRelay.proof.example.org/amber/reality"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 5,
+      "block": "[5]",
+      "type": "Delivery.relay.proof.example.org",
+      "span": {
+        "first": 98,
+        "last": 104
+      },
+      "original_name": "standalone",
+      "original_namespace": "amber",
+      "root": "xp-one",
+      "address": "Delivery.relay.proof.example.org/amber/standalone",
+      "name": "external-route",
+      "pattern": false,
+      "overridable": [],
+      "role": "managed",
+      "namespace": "amber",
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "kind Delivery.relay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[5].apiVersion",
+              "line": 98
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[5].kind",
+              "line": 99
+            }
+          ]
+        }
+      ],
+      "referenced_by": [],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::Delivery.relay.proof.example.org/amber/standalone",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|Delivery.relay.proof.example.org/amber/standalone"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 6,
+      "block": "[6]",
+      "type": "Composition.apiextensions.crossplane.io",
+      "span": {
+        "first": 108,
+        "last": 147
+      },
+      "original_name": "proof-pipeline",
+      "original_namespace": null,
+      "root": "xp-one",
+      "address": "Composition.apiextensions.crossplane.io/proof-pipeline",
+      "name": "proof-pipeline",
+      "pattern": false,
+      "overridable": [],
+      "role": "composition",
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "compositeTypeRef XRelay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[6].spec.compositeTypeRef.apiVersion",
+              "line": 114
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[6].spec.compositeTypeRef.kind",
+              "line": 115
+            }
+          ]
+        },
+        {
+          "to": "Composition.apiextensions.crossplane.io/proof-pipeline/pipe",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "pipeline literal-input",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[6].spec.pipeline[0].step",
+              "line": 118
+            }
+          ]
+        }
+      ],
+      "referenced_by": [],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-pipeline",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|Composition.apiextensions.crossplane.io/proof-pipeline"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-two/bundle.yaml",
+      "document": 0,
+      "block": "[0]",
+      "type": "Relay.proof.example.org",
+      "span": {
+        "first": 1,
+        "last": 8
+      },
+      "original_name": "request",
+      "original_namespace": "amber",
+      "root": "xp-two",
+      "address": "Relay.proof.example.org/amber/request",
+      "name": "request",
+      "pattern": false,
+      "overridable": [],
+      "role": "claim",
+      "namespace": "amber",
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-two/bundle.yaml::Relay.proof.example.org/amber/request",
+      "key": "a7-generic-kube-source-key|xp-two|xp-two/bundle.yaml|Relay.proof.example.org/amber/request"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-two/bundle.yaml",
+      "document": 1,
+      "block": "[1]",
+      "type": "Delivery.relay.proof.example.org",
+      "span": {
+        "first": 10,
+        "last": 14
+      },
+      "original_name": "remote",
+      "original_namespace": "amber",
+      "root": "xp-two",
+      "address": "Delivery.relay.proof.example.org/amber/remote",
+      "name": "remote",
+      "pattern": false,
+      "overridable": [],
+      "role": "managed",
+      "namespace": "amber",
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-two/bundle.yaml::Delivery.relay.proof.example.org/amber/remote",
+      "key": "a7-generic-kube-source-key|xp-two|xp-two/bundle.yaml|Delivery.relay.proof.example.org/amber/remote"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 1,
+      "block": "[1].spec.resources[0]",
+      "type": "Delivery.relay.proof.example.org",
+      "span": {
+        "first": 29,
+        "last": 36
+      },
+      "original_name": "local-route",
+      "original_namespace": null,
+      "root": "xp-one",
+      "address": "Composition.apiextensions.crossplane.io/proof-route/literal",
+      "name": "public-route",
+      "pattern": false,
+      "overridable": [],
+      "role": "composed",
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "kind Delivery.relay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[0].base.apiVersion",
+              "line": 31
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[0].base.kind",
+              "line": 32
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-route",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "resources",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[0].name",
+              "line": 29
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/literal",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|Composition.apiextensions.crossplane.io/proof-route/literal"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 1,
+      "block": "[1].spec.resources[1]",
+      "type": "Delivery.relay.proof.example.org",
+      "span": {
+        "first": 39,
+        "last": 55
+      },
+      "original_name": "stable-written",
+      "original_namespace": null,
+      "root": "xp-one",
+      "address": "Composition.apiextensions.crossplane.io/proof-route/patched",
+      "name": "*",
+      "pattern": true,
+      "overridable": [],
+      "role": "composed",
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "kind Delivery.relay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[1].base.apiVersion",
+              "line": 41
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[1].base.kind",
+              "line": 42
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-route",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "resources",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[1].name",
+              "line": 39
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/patched",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|Composition.apiextensions.crossplane.io/proof-route/patched"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 1,
+      "block": "[1].spec.resources[2]",
+      "type": "Delivery.relay.proof.example.org",
+      "span": {
+        "first": 56,
+        "last": 59
+      },
+      "original_name": null,
+      "original_namespace": null,
+      "root": "xp-one",
+      "address": "Composition.apiextensions.crossplane.io/proof-route/unnamed",
+      "name": "*",
+      "pattern": true,
+      "overridable": [],
+      "role": "composed",
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "kind Delivery.relay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[2].base.apiVersion",
+              "line": 58
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[2].base.kind",
+              "line": 59
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-route",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "resources",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[2].name",
+              "line": 56
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/unnamed",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|Composition.apiextensions.crossplane.io/proof-route/unnamed"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 1,
+      "block": "[1].spec.resources[3]",
+      "type": "XRelay.proof.example.org",
+      "span": {
+        "first": 62,
+        "last": 67
+      },
+      "original_name": "nested",
+      "original_namespace": null,
+      "root": "xp-one",
+      "address": "Composition.apiextensions.crossplane.io/proof-route/nested",
+      "name": "nested",
+      "pattern": false,
+      "overridable": [],
+      "role": "composed",
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "kind XRelay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[3].base.apiVersion",
+              "line": 64
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[3].base.kind",
+              "line": 65
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-route",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "resources",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[1].spec.resources[3].name",
+              "line": 62
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/nested",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|Composition.apiextensions.crossplane.io/proof-route/nested"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "document": 6,
+      "block": "[6].spec.pipeline[0].input.resources[0]",
+      "type": "Delivery.relay.proof.example.org",
+      "span": {
+        "first": 125,
+        "last": 132
+      },
+      "original_name": "pipe-fixed",
+      "original_namespace": null,
+      "root": "xp-one",
+      "address": "Composition.apiextensions.crossplane.io/proof-pipeline/pipe",
+      "name": "pipe-external",
+      "pattern": false,
+      "overridable": [],
+      "role": "composed",
+      "namespace": null,
+      "images": [],
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+          "to_file": "xp-one/bundle.yaml",
+          "via": "kind Delivery.relay.proof.example.org",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[6].spec.pipeline[0].input.resources[0].base.apiVersion",
+              "line": 127
+            },
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[6].spec.pipeline[0].input.resources[0].base.kind",
+              "line": 128
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "Composition.apiextensions.crossplane.io/proof-pipeline",
+          "from_file": "xp-one/bundle.yaml",
+          "via": "pipeline literal-input",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "xp-one/bundle.yaml",
+              "path": "[6].spec.pipeline[0].step",
+              "line": 118
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-kube-source-key::xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-pipeline/pipe",
+      "key": "a7-generic-kube-source-key|xp-one|xp-one/bundle.yaml|Composition.apiextensions.crossplane.io/proof-pipeline/pipe"
+    }
+  ],
+  "references": [
+    {
+      "source": "crossplane-aws",
+      "root": "apis/clusters",
+      "from": "Composition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io",
+      "to": "CompositeResourceDefinition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io",
+      "from_file": "apis/clusters/composition.yaml",
+      "to_file": "apis/clusters/definition.yaml",
+      "via": "compositeTypeRef Cluster.aws.platformref.upbound.io",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "apis/clusters/composition.yaml",
+          "path": "spec.compositeTypeRef.apiVersion",
+          "line": 8
+        },
+        {
+          "file": "apis/clusters/composition.yaml",
+          "path": "spec.compositeTypeRef.kind",
+          "line": 9
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+      "to": "Composition.apiextensions.crossplane.io/proof-route",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "defaultCompositionRef",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[0].spec.defaultCompositionRef.name",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+      "to": "Composition.apiextensions.crossplane.io/proof-route",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "enforcedCompositionRef",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[0].spec.enforcedCompositionRef.name",
+          "line": 17
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-route",
+      "to": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "compositeTypeRef XRelay.proof.example.org",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.compositeTypeRef.apiVersion",
+          "line": 26
+        },
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.compositeTypeRef.kind",
+          "line": 27
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-route",
+      "to": "Composition.apiextensions.crossplane.io/proof-route/literal",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "resources",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[0].name",
+          "line": 29
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-route",
+      "to": "Composition.apiextensions.crossplane.io/proof-route/patched",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "resources",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[1].name",
+          "line": 39
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-route",
+      "to": "Composition.apiextensions.crossplane.io/proof-route/unnamed",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "resources",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[2].name",
+          "line": 56
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-route",
+      "to": "Composition.apiextensions.crossplane.io/proof-route/nested",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "resources",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[3].name",
+          "line": 62
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Relay.proof.example.org/amber/request",
+      "to": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "composite XRelay.proof.example.org",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[3].apiVersion",
+          "line": 80
+        },
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[3].kind",
+          "line": 81
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Relay.proof.example.org/amber/request",
+      "to": "Composition.apiextensions.crossplane.io/proof-route",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "compositionRef",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[3].spec.compositionRef.name",
+          "line": 87
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "XRelay.proof.example.org/amber/reality",
+      "to": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "kind XRelay.proof.example.org",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[4].apiVersion",
+          "line": 89
+        },
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[4].kind",
+          "line": 90
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "XRelay.proof.example.org/amber/reality",
+      "to": "Composition.apiextensions.crossplane.io/proof-route",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "compositionRef",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[4].spec.compositionRef.name",
+          "line": 96
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Delivery.relay.proof.example.org/amber/standalone",
+      "to": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "kind Delivery.relay.proof.example.org",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[5].apiVersion",
+          "line": 98
+        },
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[5].kind",
+          "line": 99
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-route/literal",
+      "to": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "kind Delivery.relay.proof.example.org",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[0].base.apiVersion",
+          "line": 31
+        },
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[0].base.kind",
+          "line": 32
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-route/patched",
+      "to": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "kind Delivery.relay.proof.example.org",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[1].base.apiVersion",
+          "line": 41
+        },
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[1].base.kind",
+          "line": 42
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-route/unnamed",
+      "to": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "kind Delivery.relay.proof.example.org",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[2].base.apiVersion",
+          "line": 58
+        },
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[2].base.kind",
+          "line": 59
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-pipeline/pipe",
+      "to": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "kind Delivery.relay.proof.example.org",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[6].spec.pipeline[0].input.resources[0].base.apiVersion",
+          "line": 127
+        },
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[6].spec.pipeline[0].input.resources[0].base.kind",
+          "line": 128
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-route/nested",
+      "to": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "kind XRelay.proof.example.org",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[3].base.apiVersion",
+          "line": 64
+        },
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[1].spec.resources[3].base.kind",
+          "line": 65
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-pipeline",
+      "to": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "compositeTypeRef XRelay.proof.example.org",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[6].spec.compositeTypeRef.apiVersion",
+          "line": 114
+        },
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[6].spec.compositeTypeRef.kind",
+          "line": 115
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-one",
+      "from": "Composition.apiextensions.crossplane.io/proof-pipeline",
+      "to": "Composition.apiextensions.crossplane.io/proof-pipeline/pipe",
+      "from_file": "xp-one/bundle.yaml",
+      "to_file": "xp-one/bundle.yaml",
+      "via": "pipeline literal-input",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "xp-one/bundle.yaml",
+          "path": "[6].spec.pipeline[0].step",
+          "line": 118
+        }
+      ]
+    }
+  ],
+  "dropped_reference_sites": [],
+  "counts": {
+    "nodes": 24,
+    "references": 20,
+    "by_source": {
+      "crossplane-aws": 10,
+      "a7-generic-kube-source-key": 14
+    },
+    "by_source_and_root": {
+      "crossplane-aws|apis/clusters": 2,
+      "crossplane-aws|examples": 7,
+      "crossplane-aws|.": 1,
+      "a7-generic-kube-source-key|xp-one": 12,
+      "a7-generic-kube-source-key|xp-two": 2
+    },
+    "queries_by_source": {
+      "crossplane-aws": 41,
+      "a7-generic-kube-source-key": 70
+    }
+  },
+  "limitations": [
+    "The actual pinned composition runs two unsupported custom functions and contains no literal composed base. Its composed-node set is empty; the neutral literal pipeline/resources controls supply that scope.",
+    "The public Cluster composite is recognized via its repository XRD but lies in examples/, so its reference set is empty across the apis/clusters evaluation-unit boundary.",
+    "Composition patches, transforms and arbitrary functions stay unread; no generated resource is guessed."
+  ],
+  "negative_nodes": [
+    {
+      "source": "a7-generic-kube-source-key",
+      "file": "xp-one/bundle.yaml",
+      "address": "Composition.apiextensions.crossplane.io/proof-pipeline/refused-function-resource",
+      "reason": "unsupported gotemplating input group does not create literal composed resources"
+    },
+    {
+      "source": "crossplane-aws",
+      "file": "apis/clusters/composition.yaml",
+      "address": "Composition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io/*",
+      "reason": "both actual pipeline steps have custom functionRef and no literal pt.fn.crossplane.io resource input, so no composed node is guessed"
+    }
+  ],
+  "wrong_unit_controls": [
+    {
+      "source": "crossplane-aws",
+      "root": "examples",
+      "node": "Cluster.aws.platformref.upbound.io/default/platform-ref-aws",
+      "expected_references": [],
+      "reason": "XRD and composition exist only under apis/clusters unit"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-two",
+      "node": "Relay.proof.example.org/amber/request",
+      "role": "claim",
+      "expected_references": [],
+      "reason": "repository XRD identifies its role, but no XRD or composition is in xp-two unit"
+    },
+    {
+      "source": "a7-generic-kube-source-key",
+      "root": "xp-two",
+      "node": "Delivery.relay.proof.example.org/amber/remote",
+      "role": "managed",
+      "expected_references": [],
+      "reason": "provider CRD exists only in xp-one unit"
+    }
+  ],
+  "source_edits": [
+    {
+      "phase": "crossplane-name-patch-remove",
+      "starts_from": "baseline",
+      "file": "xp-one/bundle.yaml",
+      "replace_exactly_once": {
+        "before": "toFieldPath: metadata.name",
+        "after": "toFieldPath: spec.disabled"
+      },
+      "sha256_before": "9a5a3626053e83955c33a56b09b95588b0777bf112bbc244eec4bbca3d0d72be",
+      "sha256_after": "be4a797ee2fa7661d38b1c602e7002993df85c469d41dd4d3c31be520c1ef292",
+      "same_utf8_byte_count": true,
+      "expected": {
+        "node_count_in_neutral_repository": 34,
+        "reference_count_in_neutral_repository": 31,
+        "changed_node": {
+          "root": "xp-one",
+          "address": "Composition.apiextensions.crossplane.io/proof-route/patched",
+          "name": "stable-written",
+          "pattern": false
+        },
+        "other_nodes_and_references_unchanged": true
+      },
+      "restoration": "Restore baseline exact bytes, then require original SHA256, complete node/reference/image/event sets, and matching warm/cold captures in both stdio/HTTP."
+    },
+    {
+      "phase": "crossplane-default-chain-remove",
+      "starts_from": "baseline",
+      "file": "xp-one/bundle.yaml",
+      "replace_exactly_once": {
+        "before": "  defaultCompositionRef:\n    name: proof-route\n",
+        "after": "  defaultCompositionRef:\n    name: proof-other\n"
+      },
+      "sha256_before": "9a5a3626053e83955c33a56b09b95588b0777bf112bbc244eec4bbca3d0d72be",
+      "sha256_after": "a92eabcbb41881e2053b07f342a0889734482852e16cfcc45490b17756635d29",
+      "same_utf8_byte_count": true,
+      "expected": {
+        "node_count_in_neutral_repository": 34,
+        "reference_count_in_neutral_repository": 30,
+        "removed_reference": {
+          "root": "xp-one",
+          "from": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org",
+          "to": "Composition.apiextensions.crossplane.io/proof-route",
+          "via": "defaultCompositionRef",
+          "level": "exact"
+        },
+        "enforcedCompositionRef_and_other_fields_unchanged": true
+      },
+      "restoration": "Restore baseline exact bytes, then require original SHA256, complete node/reference/image/event sets, and matching warm/cold captures in both stdio/HTTP."
+    }
+  ],
+  "capture_query_files": {
+    "crossplane-aws": {
+      "file": "crossplane-aws.queries.jsonl",
+      "queries": 41
+    },
+    "a7-generic-kube-source-key": {
+      "file": "a7-generic-kube-source-key.queries.jsonl",
+      "queries": 180,
+      "note": "combined neutral Kubernetes plus Crossplane"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+apiVersion: rds.services.k8s.aws/v1alpha1
+kind: DBCluster
+metadata:
+  name: operator-09
+  namespace: platform
+spec:
+  dbClusterIdentifier: ack-cluster

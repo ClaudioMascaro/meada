@@ -327,6 +327,23 @@ fn composite(node: Node, files: (&[u8], &Std), scope: &str, depth: usize, level:
                 _ => Value::Unknown,
             }
         }
+        "map_type" => Value::Object(
+            named(body)
+                .map(|entry| {
+                    let key = entry
+                        .child_by_field_name("key")
+                        .map_or(Value::Unknown, |key| {
+                            element(key, files, scope, depth, level)
+                        });
+                    let value = entry
+                        .child_by_field_name("value")
+                        .map_or(Value::Unknown, |value| {
+                            element(value, files, scope, depth, level)
+                        });
+                    ("[]".to_string(), Value::List(vec![key, value]))
+                })
+                .collect(),
+        ),
         _ => Value::Unknown,
     }
 }

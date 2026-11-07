@@ -61,10 +61,28 @@ def capture(run, scope, base, head, repos):
                                           os.environ.get('CARGO_TARGET_DIR', str(Path.cwd() / 'target'))], required=True)
             command('build-console', [SCRIPTS / 'build.sh', 'head-ui', '.', run,
                                      'ui,accounts' if scope['accounts'] else 'ui'], required=True)
+            entries = sorted((run / 'head').glob('*/export1.json'))
+            if not entries:
+                raise RuntimeError('console parity requires captured corpus entries')
+            for export in entries:
+                name = export.parent.name
+                api_run = run / 'console-api' / name
+                api_run.mkdir(parents=True)
+                for data in ('head', 'work'):
+                    (api_run / data).symlink_to(run / data, target_is_directory=True)
+                try:
+                    command(f'console-{name}-start', [python, SCRIPTS / 'console.py', 'start',
+                            '--bin', run / 'bin/meada-head-ui', '--run', api_run, '--ui-dir', 'ui/dist',
+                            '--repos', name, *(['--accounts'] if scope['accounts'] else [])], required=True)
+                    command(f'console-{name}-api', [python, SCRIPTS / 'console.py', 'api', '--run', api_run])
+                finally:
+                    try:
+                        command(f'console-{name}-stop', [python, SCRIPTS / 'console.py', 'stop', '--run', api_run])
+                    finally:
+                        (api_run / 'console/private.pem').unlink(missing_ok=True)
             command('console-start', [python, SCRIPTS / 'console.py', 'start', '--bin', run / 'bin/meada-head-ui',
                                       '--run', run, '--ui-dir', 'ui/dist',
                                       *(['--accounts'] if scope['accounts'] else [])], required=True)
-            command('console-api', [python, SCRIPTS / 'console.py', 'api', '--run', run])
             command('console-pages', ['node', SCRIPTS / 'console-pages.mjs', run])
         if scope['goldens']:
             command('goldens', [python, SCRIPTS / 'prove.py', 'rebless', '--base', base, '--run', run])
@@ -132,14 +150,31 @@ def selftest():
             run = Path(temp) / 'proof'
             assert capture(run, scope, 'a' * 40, 'b' * 40, 'meada') == 2
         assert json.loads((run / 'receipt.json').read_text())['capture'] == 'BLOCKED'
-    with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
-        scope['console'] = True
-        with patch('subprocess.run', return_value=subprocess.CompletedProcess([], 0)):
+    scope['console'] = scope['accounts'] = True
+    for api_exit in (0, 1):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
             run = Path(temp) / 'proof'
-            assert capture(run, scope, 'a' * 40, 'b' * 40, 'meada') == 0
-        names = [step['name'] for step in json.loads((run / 'receipt.json').read_text())['steps']]
-        assert names.index('build-base') < names.index('clean-console-core') < names.index('build-console')
-        assert names[-2:] == ['console-stop', 'clean']
+            def fake_console(args, **kwargs):
+                if 'run' in args:
+                    for entry in ('meada', 'click'):
+                        directory = run / 'head' / entry
+                        directory.mkdir(parents=True)
+                        (directory / 'export1.json').write_text('{}')
+                if 'start' in args:
+                    assert '--accounts' in args
+                    if '--repos' in args:
+                        assert Path(args[args.index('--run') + 1]).name == args[args.index('--repos') + 1]
+                return subprocess.CompletedProcess(args, api_exit if 'api' in args else 0)
+            with patch('subprocess.run', side_effect=fake_console):
+                assert capture(run, scope, 'a' * 40, 'b' * 40, 'all') == api_exit
+            receipt = json.loads((run / 'receipt.json').read_text())
+            names = [step['name'] for step in receipt['steps']]
+            assert names.index('build-base') < names.index('clean-console-core') < names.index('build-console')
+            for entry in ('meada', 'click'):
+                assert names.index(f'console-{entry}-start') < names.index(f'console-{entry}-api') < names.index(f'console-{entry}-stop')
+                assert (run / 'console-api' / entry / 'head').resolve() == run / 'head'
+            assert names.index('console-click-stop') < names.index('console-start')
+            assert names[-2:] == ['console-stop', 'clean'] and receipt['verdict'] == 'UNPROVEN'
     print('prove-ci selftest: local guard, capture status, failure retention and cleanup passed')
 
 

@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
-use crate::contract::{self, Level, Link, kind_of};
+use crate::contract::{self, Link, kind_of};
 use crate::index::{Consumer, Export, Provider};
 use crate::render::{Files, callee};
 use crate::workspace::Repository;
@@ -34,7 +34,7 @@ impl ItemKind {
 }
 
 /// A provider a decision may pick for an open item.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Candidate {
     /// The identity of the repository that holds the provider.
     pub repository: String,
@@ -42,6 +42,15 @@ pub struct Candidate {
     pub contract: String,
     /// The provider's site, such as `example.com/web::app/api/health/route.ts::GET`.
     pub site: String,
+}
+
+/// Query-local candidate names prepared by a kind before linking its sides.
+#[derive(Default)]
+pub(crate) struct NameCandidates {
+    pub candidates: Vec<Candidate>,
+    pub distinct: usize,
+    /// The chosen literal name and its decision's position in the repository input.
+    pub selected: Option<(String, usize)>,
 }
 
 impl Candidate {
@@ -74,10 +83,10 @@ pub struct OpenItem {
     pub repository: String,
     /// Repository-relative path of the call's file.
     pub path: String,
-    /// 1-based line of the call, from the file as it is now; `None` when it cannot be read.
+    /// 1-based line from the source or indexed declaration; `None` when unknown.
     pub line: Option<usize>,
-    /// The call (or the definition) as written, on one line; the callee when the file cannot be
-    /// read.
+    /// The call or definition on one line; repository-level and configuration-key items use
+    /// contract/location metadata instead of scalar values.
     pub expression: String,
     /// `None` for a call at the top level of its file.
     pub enclosing: Option<Enclosing>,
@@ -95,20 +104,16 @@ impl OpenItem {
     }
 }
 
-/// Whether `link` is an ambiguous link a person can decide, as its kind says.
-fn decidable(link: &Link) -> bool {
-    link.level == Level::Ambiguous && kind_of(&link.contract).is_none_or(|k| k.decidable())
-}
-
 /// The sites `list` places, each with the position of its repository: the unresolved
 /// consumers and those an ambiguous link of `links` leaves from (a call, or a definition).
 pub(crate) fn sites(exports: &[Export], links: &[Link]) -> Vec<(usize, String)> {
-    let ambiguous: HashSet<&str> = (links.iter())
-        .filter(|l| decidable(l))
-        .map(|l| l.consumer.as_str())
+    let ambiguous: HashSet<String> = (links.iter())
+        .filter(|l| contract::consumer_item(l, exports))
+        .map(|l| l.item_site().into_owned())
         .collect();
     let items = exports.iter().enumerate().flat_map(|(n, e)| {
-        let open = |c: &&Consumer| c.contract.is_none() || ambiguous.contains(c.site.as_str());
+        let open =
+            |c: &&Consumer| c.contract.is_none() || ambiguous.contains(c.item_site().as_ref());
         (e.consumers.iter().filter(open)).map(move |c| (n, c.site.clone()))
     });
     items.collect()
@@ -120,9 +125,12 @@ pub(crate) fn sites(exports: &[Export], links: &[Link]) -> Vec<(usize, String)> 
 /// an unresolved consumer are the providers of the workspace that its kind's `candidate` leaves
 /// (HTTP: by method and literal URL fragments).
 pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> Vec<OpenItem> {
-    let mut ambiguous: HashMap<&str, Vec<&Link>> = HashMap::new();
-    for link in links.iter().filter(|l| decidable(l)) {
-        ambiguous.entry(&link.consumer).or_default().push(link);
+    let mut ambiguous: HashMap<String, Vec<&Link>> = HashMap::new();
+    for link in links.iter().filter(|l| contract::consumer_item(l, exports)) {
+        ambiguous
+            .entry(link.item_site().into_owned())
+            .or_default()
+            .push(link);
     }
     let providers: Vec<(&str, &Provider)> = exports
         .iter()
@@ -141,36 +149,50 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
             .collect();
         let mut files = Files::new(&repo.root);
         for consumer in &export.consumers {
-            let (kind, candidates) =
-                match (&consumer.contract, ambiguous.get(consumer.site.as_str())) {
-                    (None, _) => {
-                        let fitting = providers.iter().filter(|(_, p)| {
-                            kind_of(&p.contract).is_some_and(|k| k.candidate(consumer, p))
-                        });
-                        (
-                            ItemKind::Unresolved,
-                            fitting.map(candidate).collect::<Vec<_>>(),
-                        )
-                    }
-                    (Some(_), Some(links)) => {
-                        let listed = links.iter().filter_map(|l| {
-                            (providers.iter())
-                                .find(|(_, p)| {
-                                    p.site == l.provider && contract::serves(p, &l.contract)
-                                })
-                                .map(candidate)
-                        });
-                        (ItemKind::Ambiguous, listed.collect())
-                    }
-                    _ => continue,
-                };
+            let (kind, candidates) = match (
+                &consumer.contract,
+                ambiguous.get(consumer.item_site().as_ref()),
+            ) {
+                (None, _) => {
+                    let fitting = providers.iter().filter(|(_, p)| {
+                        kind_of(&p.contract).is_some_and(|k| k.candidate(consumer, p))
+                    });
+                    (
+                        ItemKind::Unresolved,
+                        fitting.map(candidate).collect::<Vec<_>>(),
+                    )
+                }
+                (Some(_), Some(links)) => {
+                    let listed = providers
+                        .iter()
+                        .filter(|(_, p)| {
+                            links
+                                .iter()
+                                .any(|l| contract::link_candidate(p, l, exports))
+                        })
+                        .map(candidate);
+                    (ItemKind::Ambiguous, listed.collect())
+                }
+                _ => continue,
+            };
             // A consumer at a definition (a method of a declarative client, which has no call
             // of its own) is the definition: its lines are the excerpt (ADR 0006).
+            let infrastructure;
             let (span, caller) = match calls.get(consumer.site.as_str()) {
                 Some(call) => (&call.span, symbols.get(call.caller.as_str())),
                 None => match symbols.get(consumer.site.as_str()) {
                     Some(def) => (&def.span, Some(def)),
-                    None => continue,
+                    None => {
+                        let Some(node) = export
+                            .iac
+                            .iter()
+                            .find(|n| n.identity(&export.repository) == consumer.site)
+                        else {
+                            continue;
+                        };
+                        infrastructure = node.span(files.get(&node.path));
+                        (&infrastructure, None)
+                    }
                 },
             };
             let range = |start: i64, end: i64| start as usize..end as usize;
@@ -194,8 +216,11 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
             // The label of a route orders as its method then path: the space sorts before
             // every method letter and before the slash.
             candidates.sort_by_cached_key(|c| (c.repository.clone(), c.label(), c.site.clone()));
+            candidates.dedup_by(|a, b| {
+                a.repository == b.repository && a.contract == b.contract && a.site == b.site
+            });
             items.push(OpenItem {
-                id: consumer.site.clone(),
+                id: consumer.item_site().into_owned(),
                 kind,
                 repository: export.repository.clone(),
                 line: files
@@ -218,6 +243,7 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contract::Level;
 
     fn ambiguous(contract: &str) -> Link {
         Link::new(
@@ -234,9 +260,12 @@ mod tests {
 
     #[test]
     fn only_an_ambiguous_link_of_a_decidable_kind_is_an_item() {
-        assert!(decidable(&ambiguous("http::GET::/users")));
+        assert!(contract::consumer_item(
+            &ambiguous("http::GET::/users"),
+            &[]
+        ));
         let mut exact = ambiguous("http::GET::/users");
         exact.level = Level::Exact;
-        assert!(!decidable(&exact));
+        assert!(!contract::consumer_item(&exact, &[]));
     }
 }

@@ -183,7 +183,7 @@ impl Decision {
     }
 
     /// `decided by <by> (p=<p>)`, or `decided by human`.
-    fn reason(&self) -> String {
+    pub(crate) fn reason(&self) -> String {
         match self.p {
             Some(p) => format!("decided by {} (p={p:.2})", self.by),
             None => format!("decided by {}", self.by),
@@ -267,9 +267,9 @@ fn evaluate(
     core: &[Link],
     missing: &[Missing],
 ) -> Fate {
-    let at = |l: &&Link| l.consumer == d.call && l.level == Level::Ambiguous;
+    let at = |l: &&Link| l.item_site() == d.call && contract::consumer_item(l, exports);
     if !(export.calls.iter().any(|c| c.id == d.call)
-        || export.consumers.iter().any(|c| c.site == d.call))
+        || export.consumers.iter().any(|c| c.item_site() == d.call))
     {
         return Fate::Stale(Cause::CallGone);
     }
@@ -283,7 +283,7 @@ fn evaluate(
     let open = match d.kind {
         Kind::AmbiguousLink => core.iter().any(|l| at(&l)),
         Kind::DynamicUrl => {
-            (export.consumers.iter()).any(|c| c.site == d.call && c.contract.is_none())
+            (export.consumers.iter()).any(|c| c.item_site() == d.call && c.contract.is_none())
         }
     };
     if !open {
@@ -310,9 +310,7 @@ fn evaluate(
         Kind::AmbiguousLink => core
             .iter()
             .filter(at)
-            .find(|l| {
-                (served.iter()).any(|p| p.site == l.provider && contract::serves(p, &l.contract))
-            })
+            .find(|l| (served.iter()).any(|p| contract::link_candidate(p, l, exports)))
             .map_or(Fate::Stale(Cause::NotCandidate), |l| {
                 Fate::Applies(l.provider.clone(), l.contract.clone())
             }),
@@ -325,20 +323,39 @@ fn evaluate(
 /// sorted, and for each repository the decisions that did not apply. A stale decision or one
 /// that waits on a missing peer changes no link: the core's stands.
 pub(crate) fn replay(
-    mut links: Vec<Link>,
+    links: Vec<Link>,
     workspace: &Workspace,
     exports: &[Export],
+    include: impl Fn(&Decision) -> bool,
+) -> (Vec<Link>, Vec<Evaluation>) {
+    replay_repositories(
+        links,
+        &workspace.repos,
+        &workspace.missing,
+        exports,
+        include,
+    )
+}
+
+/// The same evaluation for a kind's execution projection. Raw links remain the input to
+/// open-item validation; derived environment and routing facts consume only this result.
+pub(crate) fn replay_repositories(
+    mut links: Vec<Link>,
+    repositories: &[crate::workspace::Repository],
+    missing: &[Missing],
+    exports: &[Export],
+    include: impl Fn(&Decision) -> bool,
 ) -> (Vec<Link>, Vec<Evaluation>) {
     let mut evaluations = Vec::new();
     let mut applied = Vec::new();
-    for (repo, export) in workspace.repos.iter().zip(exports) {
+    for (repo, export) in repositories.iter().zip(exports) {
         let mut evaluation = Evaluation {
             repository: repo.identity.clone(),
             stale: Vec::new(),
             waiting: Vec::new(),
         };
-        for d in &repo.decisions.items {
-            let fate = evaluate(d, export, exports, &links, &workspace.missing);
+        for d in repo.decisions.items.iter().filter(|d| include(d)) {
+            let fate = evaluate(d, export, exports, &links, missing);
             let (call, target) = (d.call.clone(), d.target.clone());
             match fate {
                 Fate::Applies(provider, contract) => applied.push((d, provider, contract)),
@@ -349,8 +366,17 @@ pub(crate) fn replay(
         evaluations.push(evaluation);
     }
     for (d, provider, contract) in applied {
-        links.retain(|l| !(l.consumer == d.call && l.level == Level::Ambiguous));
-        links.push(d.link(&provider, &contract));
+        let source = links
+            .iter()
+            .find(|l| l.item_site() == d.call)
+            .map(|l| (l.consumer.clone(), l.root.clone()));
+        links.retain(|l| !(l.item_site() == d.call && l.level == Level::Ambiguous));
+        let mut decided = d.link(&provider, &contract);
+        if let Some((consumer, root)) = source {
+            decided.consumer = consumer;
+            decided.root = root;
+        }
+        links.push(decided);
     }
     links.sort_by(|a, b| (&a.consumer, &a.provider).cmp(&(&b.consumer, &b.provider)));
     (links, evaluations)

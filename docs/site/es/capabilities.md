@@ -1,8 +1,14 @@
 # Capacidades y límites
 
-Meada 1.0 indexa TypeScript, JavaScript, Python, Rust, Go, Java, Kotlin, C# y Swift. Encuentra llamadas en el código y conecta repositorios mediante HTTP, paquetes y canales de mensajes. Cada vínculo indica su nivel de certeza.
+Meada 1.4 indexa TypeScript, JavaScript, Python, Rust, Go, Java, Kotlin, C# y Swift. Encuentra llamadas en el código y conecta repositorios mediante HTTP, paquetes y canales de mensajes. Cada vínculo indica su nivel de certeza.
 
 El modo servidor incluye [consola](console.md), [snapshots](snapshots.md), [retención](generations.md) y [workspace gestionado](workspaces.md) mediante módulos opcionales. La consola tiene editor, diff, playground y grafo, y un workspace puede delegar sus entradas a [equipos](console.md#equipos). Con `accounts`, la consola autentica [cuentas locales](console.md#cuentas-locales) sin proveedor de identidad: la cuenta predeterminada `admin` cambia su contraseña en el primer inicio de sesión, las contraseñas comunes se rechazan, diez fallos seguidos bloquean una cuenta, `meada ui reset-admin` recupera la cuenta predeterminada y el operador global crea cuentas, cambia su rol, las suspende, las reactiva y restablece su contraseña, sin dejar nunca la consola sin un operador activo, y les da grupos que `[accounts.groups]` asocia a repositorios, limitando lo que lee cada cuenta y haciendo operadores de equipo a los dueños de entradas; junto a un proveedor de identidad, `break_glass = true` mantiene solo la cuenta predeterminada como [break glass](console.md#break-glass). Una cuenta con sesión iniciada genera [tokens de agente](console.md#tokens-de-agente) para los nodos y, con `proposals`, para el servidor de propuestas, válidos de 1 a 168 horas y mostrados una sola vez, que `meada mcp --listen` y `meada workspaces mcp` con `[accounts]` admiten y responde bajo la concesión de la cuenta, sin bearer compartido. Con `[accounts.github]`, la persona [verifica su login de GitHub](console.md#login-de-github-verificado) una vez, pegando un token de acceso personal que la consola usa solo para leer el login, y sus roles en GitHub pasan a concederle repositorios en la consola y en los nodos. El [catálogo de repositorios](console.md#catalogo-de-repositorios) lista, antes de que exista un manifiesto, solo lo que la persona puede seleccionar. [Compose](https://github.com/ClaudioMascaro/meada/blob/main/deploy/compose/) y [Helm](https://github.com/ClaudioMascaro/meada/blob/main/deploy/helm/meada/) ofrecen ejemplos de despliegue. Los [workspaces con nombre](named-workspaces.md) de `workspaces` pueden mantenerse como versiones (guardar, aplicar, revertir, renombrar, borrar, delegar) por sus operadores, mediante la consola y `meada workspaces`, con cada cambio comprobado contra la base que leyó. Cada workspace puede declarar sus propios peers, referencias a variables de entorno, recursos y hosts de serve para un repositorio compartido, y la consola muestra la [configuración efectiva](named-workspaces.md#configuracion-efectiva) (lo que el `meada.toml` del propio repositorio sustituye, lo que aún no rige) antes de guardar el texto. Los operadores arman ese manifiesto con [controles guiados](named-workspaces.md#autoria-guiada) (repositorios del catálogo, peers, ajustes de serve, recursos, nombres de variables de entorno) que siguen siendo un solo documento con el texto, mostrando el diff y congelando el contenido revisado hasta que confirmen. Con `proposals`, un [servidor de propuestas](named-workspaces.md#autoria-asistida-por-mcp) (`meada workspaces mcp`) permite que un agente de CLI, con su propio MCP de lectura de GitHub, liste lo que el operador puede seleccionar y valide un manifiesto como la consola lo guardaría, sin escribir nada, para que una persona lo revise y lo aplique en la consola. Los workspaces nombrados y el servidor de propuestas también funcionan con cuentas locales, con `[accounts.github]` en lugar de `[oidc.github]`.
+
+El [grafo de la consola](console.md#infraestructura-en-el-grafo) muestra aprovisionadores y sus
+raíces, enlaces de aprovisionamiento, constructor → ejecutor de imágenes y emisor → matcher de
+alertas. La leyenda explica los roles; las tablas con nombres accesibles permiten navegar por
+teclado, conservan nivel y motivo de los enlaces y muestran lados sin contraparte. El playground
+ofrece búsquedas `value`, `iac`, `image` y `alert`.
 
 ## Lenguajes y resolución
 
@@ -35,6 +41,8 @@ El análisis usa la configuración por defecto de cada crate para x86_64 Linux. 
 
 ### Go
 
+Los clientes del AWS SDK for Go v2 cuentan cuando proceden de `New` o `NewFromConfig`, incluidos alias y fábricas seguidas mediante llamadas exactas. SQS, SNS, EventBridge, Kinesis, S3, DynamoDB, SSM y Secrets Manager usan las formas de SDK AWS de abajo. Un tipo declarado por sí solo no demuestra el origen del cliente.
+
 La ruta `module` de cada `go.mod` resuelve imports a carpetas de paquetes, incluido `replace` a una carpeta del repositorio. Un módulo anidado controla su subárbol. Archivos de una carpeta con el mismo `package` comparten ámbito, incluidos los `_test.go`. Meada no ejecuta el toolchain Go.
 
 El análisis usa linux/amd64. Archivos `_windows.go`, con `//go:build` falso o con cgo (`import "C"`) quedan fuera. Meada lee funciones, tipos, interfaces y métodos (`Tipo.Metodo`). Resuelve llamadas dentro del paquete y mediante imports (`pkg.F()`, alias o punto); la biblioteca estándar y los módulos externos permanecen externos.
@@ -42,6 +50,8 @@ El análisis usa linux/amd64. Archivos `_windows.go`, con `//go:build` falso o c
 Una llamada `recv.M()` es `exact` cuando el código indica el tipo en un parámetro, campo, `var`, literal compuesto o resultado de función. Sin ello, la resolución por nombre es `inferred` o `ambiguous`. Una llamada por interfaz termina en el método de la interfaz.
 
 ### Java
+
+El AWS SDK for Java 2.x reconoce clientes síncronos y asíncronos creados por `create()` o `builder().build()`, con solicitudes construidas mediante builders. SQS, SNS, EventBridge, Kinesis, S3, DynamoDB, SSM y Secrets Manager usan las formas de SDK AWS de abajo. Un tipo inyectado por sí solo no demuestra su origen; las fábricas deben resolver mediante llamadas exactas.
 
 Meada lee clases, interfaces, enums, records, métodos y constructores, incluidos los tipos anidados. Los nombres incluyen el paquete y, en los métodos, los tipos escritos de los parámetros: `example.Orders.place(String,int)`. Las llamadas en lambdas y clases anónimas pertenecen al símbolo que las contiene.
 
@@ -63,6 +73,8 @@ Las declaraciones que no son `private` ni `internal` forman la superficie export
 
 ### C#
 
+Los clientes concretos del AWS SDK para .NET cuentan mediante `new`, incluidos alias y fábricas exactas. Solicitudes con inicializadores, argumentos nombrados, listas y diccionarios nombran los lados de SQS, SNS, EventBridge, Kinesis, S3, DynamoDB, SSM y Secrets Manager. El tipo de una interfaz inyectada por sí solo no demuestra el origen del cliente.
+
 Cada `.csproj` de estilo SDK (con `Sdk`) es un proyecto y contiene los `.cs` de su carpeta, dentro de un `.sln` o no; los `.sln` no cambian nada, y un `.csproj` antiguo, sin `Sdk`, no es un proyecto. Meada lee clases, records, structs e interfaces, también anidados (`Externa.Interna`) y `partial` (cada parte en su archivo, con los miembros de todas), métodos y constructores con los tipos escritos de sus parámetros (`Acme.Orders.OrderService.Place(string,int)`) y funciones locales (`Metodo.Local`). Los namespaces de bloque y de archivo dan los nombres completos. Un tipo que dos proyectos del repositorio declaran con el mismo nombre completo es, en un archivo de uno de ellos, el del propio proyecto, como lo elige el compilador; en un archivo de otro proyecto, es el del proyecto que el suyo referencia (`ProjectReference`, directa o indirectamente), y el nombre queda `ambiguous` cuando los dos o ninguno están referenciados. Un tipo `internal` (también sin modificador de acceso) existe solo para los archivos de su proyecto: en un archivo de otro proyecto el nombre se vincula al tipo que ese archivo ve, como si el `internal` no existiera, y una llamada a él no tiene vínculo; lo mismo vale para un constructor o método `internal`, `private` o `private protected` de un tipo público (`InternalsVisibleTo` no se lee). Las carpetas `obj/` y `bin/` junto a un `.csproj` son salida de compilación y quedan fuera del índice, aun sin `.gitignore`. Las llamadas de una lambda pertenecen al símbolo que la contiene, y un atributo es una llamada sobre lo que decora.
 
 `using`, `using static`, los alias (`using X = A.B`) y `global using` se resuelven por los namespaces de todos los proyectos; un `global using`, los `<Using>` del `.csproj` y los implicit usings activados (`ImplicitUsings`) valen en todos los archivos del proyecto, y solo en él. Los tipos de cada namespace que envuelve al del archivo son visibles sin `using`, del más interno al más externo (en `Acme.Query.Internal`, los de `Acme.Query.Internal`, `Acme.Query` y `Acme`) y antes que los de un `using`, en namespaces de archivo y de bloque anidados. Las llamadas sin receptor, con `this`, `base`, estáticas (`Tipo.Metodo()`) y por `using static` (que alcanzan solo los miembros y tipos anidados que declara el tipo nombrado, no los de sus bases) son `exact` cuando la cantidad de argumentos deja un solo método, contando `params` y los parámetros con valor por defecto; las sobrecargas con la misma cantidad quedan `ambiguous`. Los tipos de fuera del repositorio siguen siendo externos. Las llamadas sobre un receptor de tipo escrito todavía no se resuelven por ese tipo. Una base de fuera del repositorio deja las llamadas a los miembros de la clase sin `exact`, salvo `IDisposable`, `IAsyncDisposable`, `IEquatable` e `IComparable`, de miembros conocidos, que ocultan solo los nombres que declaran. Los elementos (`<Using>`, `PackageReference`, `ProjectReference`) y las propiedades de un `Directory.Build.props` valen en los proyectos que tiene debajo como si estuvieran en el `.csproj`, evaluados antes que los de este (el `props` más cercano oculta los de arriba, salvo que importe a su padre con `GetPathOfFileAbove`); un `ProjectReference` ahí es relativo a cada proyecto, y uno construido sobre `$(MSBuildThisFileDirectory)` cuenta como calculado. Un `props` con más de 256 `<Using>` y referencias no se lee. `nameof(x)` vale el texto del último identificador de `x` (`nameof(Pedidos.Topico)` es `"Topico"`), así que un nombre de canal o una parte de URL escritos con él son conocidos.
@@ -77,11 +89,28 @@ Los nombres se resuelven primero en el módulo del archivo y después en los mó
 
 ## HTTP y documentos de contrato
 
+Las declaraciones IaC también ofrecen rutas HTTP: API Gateway HTTP y REST en Terraform/OpenTofu (HCL y JSON), eventos SAM `Api`/`HttpApi` y Serverless `http`/`httpApi`. Los métodos y rutas literales usan la misma normalización de parámetros que las rutas en código. El provider apunta al símbolo del handler local cuando se resuelve con certeza, o al repositorio completo. Los consumidores de otros repositorios usan las reglas comunes de host y peers. Las referencias, métodos o rutas desconocidos no inventan rutas; las integraciones que no sean Lambda y las rutas catch-all sin una ruta finita quedan fuera del mapa (#666).
+
+Las URLs base de la configuración o del entorno de un workload pueden nombrar un Service
+Kubernetes (`orders`, `orders.shop`, `orders.shop.svc` o
+`orders.shop.svc.cluster.local`, con o sin puerto) o un servicio Compose. Meada sigue
+el selector del Service y la imagen o la ruta local del workload hasta el repositorio que
+atiende la ruta. Estos enlaces son `inferred`, con el Service en el motivo. Los nombres
+cortos usan el namespace y la raíz de evaluación del workload conocido; los candidatos
+distintos quedan `ambiguous`. El entorno procede solo de las entradas indexadas del workload
+que ejecuta ese código.
+
+Un Ingress une su host y prefijo literal con la ruta del Service, como un prefijo de gateway.
+Prevalece el prefijo más específico. Las reglas con anotación de rewrite, backend desconocido
+o `pathType` distinto de `Prefix` quedan sin enlace (se aceptan las formas antiguas sin
+`pathType`). No se interpretan rutas específicas del controller, expresiones regulares ni
+hosts con comodines. No se consulta ningún cluster.
+
 Meada conecta consumidores y proveedores entre lenguajes, incluso detrás de gateways. Una ruta cuyo handler está en un archivo de prueba (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`, un directorio `tests` o `src/test`) no es proveedora, salvo que `meada.toml` tenga `test_routes = true` (véase [Configuración](configuration.md)):
 
 | Lenguaje | Consumidores HTTP | Proveedores HTTP |
 | --- | --- | --- |
-| TypeScript / JavaScript | `fetch`, `discovery.getBaseUrl` y `proxy.endpoints` de Backstage | Next.js app router, Express, plugins de backend de Backstage |
+| TypeScript / JavaScript | `fetch`, `discovery.getBaseUrl` y `proxy.endpoints` de Backstage (también la forma antigua, las claves de `proxy` que empiezan por `/` cuando ningún archivo tiene `endpoints` ni un `$include` ahí, en `proxy` o en la raíz que Meada no sigue, y el endpoint escrito como texto, `'/ep': https://...`) | Next.js app router, Express, plugins de backend de Backstage |
 | Python | `requests`, `httpx`, `aiohttp` | FastAPI, Flask, Django |
 | Rust | `reqwest`, `ureq` | axum, actix-web, Rocket |
 | Go | `net/http`, resty | `net/http`, gin, echo, chi, gorilla/mux |
@@ -91,6 +120,10 @@ Meada conecta consumidores y proveedores entre lenguajes, incluso detrás de gat
 | Swift | `URLSession`, Alamofire, AsyncHTTPClient | Vapor, Hummingbird |
 
 En TypeScript y JavaScript, un `fetch` cuya URL la arma una función del repositorio es un consumidor cuando la función solo devuelve una cadena: una arrow function con cuerpo de expresión, o un cuerpo de un único `return`. La llamada (`fetch(url("api/vets"))`), o una constante que la guarda (`const u = url("api/owners"); fetch(u)`), se pliega a la cadena con los parámetros de la función reemplazados por los argumentos de la llamada, también cuando la función viene de otro módulo. Solo se pliega una llamada que resuelve exactamente. Una función de más de una instrucción, una `async`, una que devuelve algo que no es una cadena, y una cadena con una parte que no se pliega (una base leída de `process.env`, un condicional sobre una global de build) dejan el consumidor sin resolver.
+
+En TypeScript y JavaScript, `new URL(x)` con un argumento se lee como `x`, como lo define la especificación WHATWG URL, solo para el `URL` global sin reasignación o el export nombrado `URL` de `url` o `node:url` por `import` o `require` no ocultado. Un constructor de paquete desconocido, alias de repositorio u otro export queda opaco. `u.toString()`, `u.href` y `String(u)` pasan la URL, igual que `${u}` en una template string, esté la URL en una constante o armada en el lugar (`fetch(new URL(BASE + "/api/vets").toString())`), y un wrapper de cliente llamado con una de ellas se pliega en sus puntos de llamada. Una base leída del entorno muestra su `via`. Los cambios por `u.searchParams`, `u.search` y `u.hash` conservan la ruta; una escritura en cualquier otro miembro de una constante creada con `new URL` (`u.pathname = ..`, `u.host += ..`), en cualquier punto del archivo, deja el consumidor sin resolver, igual que una mutación dentro de una función que recibe la URL, que Meada no ve. `new URL(ref, base)` con dos argumentos es la unión de ambos, como lo define la especificación WHATWG URL (RFC 3986 sección 5.2 para estas referencias): un `ref` absoluto es él mismo, `//host/x` toma el host de `ref`, `/orders` reemplaza la ruta de la base y `orders` se une al directorio de la base (`https://h/api/` da `/api/orders`, `https://h/api` da `/orders`). Sobre una base leída del entorno o un hueco, `/orders` conserva la base como cabeza (`http::GET::/orders`, con `via env:API_URL` para `process.env.API_URL`); un `ref` relativo, uno que empieza con una lectura, y una query o un fragmento solos dejan el consumidor sin resolver, y un parámetro en cualquier lado se resuelve en los puntos de llamada, como en un wrapper de cliente. `.href`, `toString()` y `String(u)` de un `new URL` de dos argumentos no se leen.
+
+`String(u)` respeta las declaraciones locales de `String` y pasa la URL solo cuando la llamada usa la conversión global. Las asignaciones e incrementos que pueden reemplazar esa conversión dejan la URL sin resolver. Una declaración local conserva la conversión global fuera de su ámbito. Las funciones declaradas en bloques de JavaScript sin modo estricto también ocultan la conversión en la función contenedora; los módulos, las clases y `use strict` conservan el ámbito del bloque.
 
 En Java, un método de una clase `@RestController` o `@Controller` con `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping` o `@RequestMapping(method = RequestMethod.X)` pasa a ser proveedor, bajo el prefijo del `@RequestMapping` de la clase. La ruta pliega constantes `static final` (también de otras clases) y `+`; cada ruta de un array es un proveedor. Un `@RequestMapping` sin `method` atiende todos los métodos (`http::ANY::<ruta>`) y se vincula a consumidores de cualquier método, con "any method" en la razón. `server.servlet.context-path` no se aplica. Las anotaciones y `RequestMethod` valen por un import de Spring, simple, estático o `import ...bind.annotation.*`; una clase del repositorio con el mismo nombre, o un import que también podría traer el nombre, las oculta. Las anotaciones también pueden escribirse completas, sin import (`@org.springframework.web.bind.annotation.GetMapping`), salvo que el repositorio declare una clase con ese nombre. En `method` o en un array de rutas, un elemento ilegible se ignora y los demás valen.
 
@@ -102,13 +135,17 @@ En Swift, una ruta Vapor (`get`, `post`, `put`, `patch`, `delete` y `on(.METHOD,
 
 En Python, `base_url_env` vincula también la URL base de `os.environ`, `os.getenv` y de un campo de una subclase de `BaseSettings` (pydantic-settings) del mismo archivo: la variable es `<env_prefix><CAMPO>` en mayúsculas (el `env_prefix` literal de `model_config = SettingsConfigDict(...)` o de `class Config`), o el `alias` / `validation_alias` del campo, sin prefijo. Meada nunca lee el valor de una variable.
 
+En TypeScript, `base_url_env` vincula la URL base de `process.env.X`, `process.env["X"]` e `import.meta.env.X`, también a través de fallbacks `||` y `??` y métodos de cadena como `trim` o `replace`, y la de `config.getString('a.b')` o `getOptionalString('a.b')` de Backstage cuya clave guarda exactamente `${VAR}` en un `app-config*.yaml` del repositorio (`app-config.yaml` primero, gana el primer archivo que tiene la clave), también cuando el valor viene de un archivo parcial por `$include` (con o sin una ruta de clave después de `#`, desde la carpeta del archivo que incluye, un parcial incluyendo otro) o es un `$env: VAR`. Un `$include` con ruta absoluta, que sale del repositorio, por enlace simbólico, con `${`, de otra extensión que `.json`, `.yaml` y `.yml`, a un archivo o ruta de clave que no existe, con otra clave al lado, en ciclo, más allá de 8 inclusiones de profundidad, de 64 inclusiones o de 1 MiB injertado desde un `app-config` no se sigue: las claves bajo él quedan sin leer y `meada status` lo nombra con su motivo. `$file` no se lee. Un `app-config` que es un único `$include` es el archivo que nombra, y uno de más de un documento YAML no se lee, porque Backstage lo rechaza. La lectura puede estar en una constante, en la propia URL o en un campo de clase `readonly`, `private` o `#x` escrito una sola vez, por su inicializador o por un `this.campo = valor` simple en el cuerpo del constructor: `this.campo` en un método es esa lectura. Un campo público mutable, uno escrito dos veces (una escritura condicional cuenta como dos) o fuera del constructor, una propiedad de parámetro, un `this.campo = parametro` y un campo de un archivo JavaScript siguen sin valor. Meada nunca lee el valor de una variable.
+
+El `context` de una función o método muestra el nivel, el motivo y el proveedor de los vínculos `inferred` de llamadas HTTP cuando la variable de entorno de la URL base selecciona un par mediante `base_url_env`, como `base URL from API_URL` y el par elegido. Esto incluye la base leída por un campo o un parcial de Backstage; editar solo el parcial actualiza el motivo y el par en la siguiente consulta. `trace` muestra el mismo motivo.
+
 En Swift, una ruta Hummingbird (`get`, `post`, `put`, `patch`, `delete` y `on(ruta, method: .get)`) llamada en un `Router()` o en un `group(prefijo)` suyo es proveedor bajo el prefijo de cada `group` que la rodea, a cualquier profundidad, también cuando el router pasa por argumentos y retornos de funciones. El closure de la ruta es el handler, y `use:` acepta una función. Los nombres solo valen con el import `Hummingbird`; el `addRoutes` de un controlador no se lee.
 
 En C#, una minimal API es un proveedor: `MapGet`, `MapPost`, `MapPut`, `MapPatch`, `MapDelete` y `MapMethods(patrón, métodos, handler)` sobre la aplicación (`WebApplication.Create` o el `Build()` de `WebApplication.CreateBuilder`) o sobre un grupo `MapGroup(prefijo)`, con grupos anidados a cualquier profundidad. El prefijo sigue al grupo por variables locales, argumentos de método, valores de retorno y métodos de extensión llamados sobre el grupo (`group.MapOrders()`, con el namespace de la clase estática importado), así que un método de extensión llamado en dos grupos atiende bajo los dos prefijos. `RequireAuthorization()`, `WithTags(..)` y las otras convenciones comunes mantienen el grupo. Un handler lambda es un handler inline con el nombre de su ruta; un method group (`Handlers.List`) es el método que nombra. Un grupo que Meada no lee (un parámetro de lambda, como en `UseEndpoints(e => e.MapGet(..))`, un campo, una variable reasignada) no da ruta, ni siquiera en la raíz.
 
 En C#, un método de una clase controller (con `[ApiController]` o derivada de `ControllerBase` o `Controller`) con `[HttpGet]`, `[HttpPost]`, `[HttpPut]`, `[HttpPatch]`, `[HttpDelete]`, `[HttpHead]` o `[HttpOptions]` es un proveedor, bajo el `[Route]` de la clase. `[controller]` pasa a ser el nombre de la clase sin el sufijo `Controller`, `[action]` el nombre del método, y `{id}`, `{id:int}` y `{id?}` pasan a ser un parámetro. Una plantilla que empieza con `/` o `~/` reemplaza el prefijo de la clase. Un `[Route]` en el método, sin atributo de método, atiende todos los métodos (`http::ANY::<ruta>`) y se vincula a consumidores de cualquier método, con "any method" en la razón. Los atributos y las bases valen por `using Microsoft.AspNetCore.Mvc` o por su nombre completo (`HttpGet` y `HttpGetAttribute` son el mismo nombre); una clase del repositorio con el mismo nombre los esconde. La plantilla debe ser un literal de cadena, y un corchete literal se escribe `[[` o `]]`; cualquier otro `[token]` no genera ruta. `[action]` pierde el sufijo `Async` (como en ASP.NET Core por defecto) o vale el `[ActionName("x")]` literal. Sin `[Route]` en la clase y sin plantilla en el método, la ruta es convencional (`MapControllerRoute`), que no se lee; `[Route("")]` es la raíz. Solo cuentan los métodos públicos sin `[NonAction]`. Un `[Route]` que no es de MVC deja la clase o el método sin ruta. No generan ruta: un controller que hereda de otra clase del repositorio, una clase que es base de otra, y una clase declarada en partes (`partial`) en varios archivos.
 
-En C#, una llamada a `GetAsync`, `PostAsync`, `PutAsync`, `PatchAsync`, `DeleteAsync`, `GetStringAsync`, `GetStreamAsync`, `GetByteArrayAsync`, `GetFromJsonAsync`, `PostAsJsonAsync`, `PutAsJsonAsync` o `SendAsync(new HttpRequestMessage(HttpMethod.X, url))` en un `HttpClient` es un consumer. El receptor solo cuenta cuando es un `HttpClient` por su tipo declarado (campo, parámetro o local tipado) o por construcción, resuelto por los usings, nunca solo por el nombre. La URL pliega literales, interpolación (`$"{base}/users/{id}"`), strings verbatim y raw, `+`, y campos `const` y `static readonly`, también de otras clases; una parte que no se puede evaluar pasa a ser parámetro. Un local ligado una vez (`var url = $"..."`) se sigue; un nombre asignado de nuevo en cualquier parte del archivo no tiene un solo valor. `BaseAddress = new Uri(base)` en el cliente, en su inicializador o por asignación (una sola), es el host de sus URLs relativas, unidas como `Uri` (`https://c/v1` y `orders` dan `/orders`), y un método que recibe la ruta (o el método, o el cliente) se lee en cada uno de sus llamadores. Una URL que no se puede evaluar es un consumer no resuelto. Los clientes de `IHttpClientFactory.CreateClient(name)` no se leen.
+En C#, una llamada a `GetAsync`, `PostAsync`, `PutAsync`, `PatchAsync`, `DeleteAsync`, `GetStringAsync`, `GetStreamAsync`, `GetByteArrayAsync`, `GetFromJsonAsync`, `PostAsJsonAsync`, `PutAsJsonAsync` o `SendAsync(new HttpRequestMessage(HttpMethod.X, url))` en un `HttpClient` es un consumer. El receptor solo cuenta cuando es un `HttpClient` por su tipo declarado (campo, parámetro o local tipado) o por construcción, resuelto por los usings, nunca solo por el nombre. La URL pliega literales, interpolación (`$"{base}/users/{id}"`), strings verbatim y raw, `+`, y campos `const` y `static readonly`, también de otras clases; una parte que no se puede evaluar pasa a ser parámetro. Un local ligado una vez (`var url = $"..."`) se sigue; un enlace asignado de nuevo no tiene un solo valor en su propio ámbito; el mismo nombre en otro método sigue siendo independiente. `BaseAddress = new Uri(base)` en el cliente, en su inicializador o por asignación (una sola), es el host de sus URLs relativas, unidas como `Uri` (`https://c/v1` y `orders` dan `/orders`), y un método que recibe la ruta (o el método, o el cliente) se lee en cada uno de sus llamadores. Una URL que no se puede evaluar es un consumer no resuelto. Los clientes de `IHttpClientFactory.CreateClient(name)` no se leen.
 
 En C#, un typed client registrado con `AddHttpClient<T>(c => c.BaseAddress = new Uri(base))` (también `AddHttpClient<I, T>`) da esa base al `HttpClient` que el contenedor pasa al constructor de `T` y a toda llamada sobre él dentro de `T`, también a través de un campo `readonly` que el constructor asigna. La base se evalúa como una URL y puede venir de una lectura del entorno o de la configuración; un `BaseAddress` que el constructor fija en su parámetro prevalece. Dos registros con bases distintas, una base que no se evalúa, un registro que Meada no lee (un method group, una lambda que pasa el cliente a otra llamada, un `ConfigureHttpClient` encadenado), un `BaseAddress` que el constructor fija de forma condicional o distinta del registro, o un constructor que el propio código llama (`new T(..)`, un `T t = new(..)` tipado) dejan la base desconocida. El parámetro de un constructor primario (`class T(HttpClient http)`) no recibe inyección. Cada método de una interfaz Refit con `[Get("/x")]`, `[Post]`, `[Put]`, `[Patch]`, `[Delete]` o `[Head]` (mediante `using Refit`) es un consumidor, con la base de cada `RestService.For<T>(url)` cuyo `T` es la interfaz o una interfaz que la extiende, la ruta añadida a la ruta de la propia base; quien lo llama lo alcanza por un receptor de tipo declarado (un campo, un parámetro, una variable local tipada), así que `trace` va de quien llama, por el método de la interfaz, hasta el proveedor; `var api = RestService.For<T>(..)` no da tipo a `api`. Una interfaz que ningún `RestService.For` crea, como una registrada con `AddRefitClient`, tiene base desconocida.
 
@@ -122,7 +159,7 @@ Los consumidores Java son los métodos de `RestTemplate` (`getForObject`, `getFo
 
 En Java, una interfaz `@FeignClient(name = "x", url = "...")` (`org.springframework.cloud.openfeign`) con métodos anotados como en Spring MVC (`@GetMapping`, `@RequestMapping(method = ...)` y los demás) tiene cada método como consumidor, en el propio método de la interfaz: quien lo llama llega al proveedor, y `trace` y `context` pasan por él. La base viene de `url` y el prefijo de `path`, ambos con placeholders `${clave}` resueltos por la configuración de Spring, como en `@Value`. Una `url` sin esquema recibe `http://`, como en Spring Cloud. Un `@RequestMapping` sin `method` vale `GET`, como lo envía Feign. Sin `url` el host queda sin resolver, y la razón del vínculo lleva el `name` (`host unresolved (Feign client x)`); vale el proveedor que atiende la ruta y el método. `@RequestLine`, otros contratos de Feign y un `@RequestMapping` en la interfaz no se leen. En Retrofit, una interfaz cuyos métodos llevan `@GET("x")`, `@POST` y los demás de `retrofit2.http` tiene cada método como consumidor; la base viene del `Retrofit.Builder().baseUrl(base)` que crea la interfaz (`retrofit.create(Api.class)`), también por una constante o un wrapper, un consumidor por creación, y sin creación la base queda desconocida. Una ruta que empieza con `/` reemplaza la ruta de la base (también cuando está concatenada), y una relativa la sigue; una ruta vacía es el `@Url` dinámico de Retrofit y da un consumidor sin contrato. Una anotación de Retrofit tiene la ruta solo en `value`, y una ruta con una `{` que no cierra dentro de su segmento no se lee. `@HTTP` no se lee. Las anotaciones valen por import, con las mismas reglas de ocultamiento que Spring. Un método Feign o Retrofit ambiguo (por ejemplo, sin `url` y con dos repositorios que sirven la ruta) o no resuelto es un ítem abierto en el propio método: `search` con `kind=ambiguous` o `kind=unresolved` lo lista, y `meada decide` lo resuelve con el método como fragmento.
 
-En Rust, `base_url_env` puede vincular una URL base leída con `std::env::var`, `env!` o `dotenvy::var`. En Go, cubre `os.Getenv` y `os.LookupEnv`, incluidos valores por defecto con `if v == ""`, `len(v) == 0`, `!ok` o `!ok || v == ""` cuando `ok` viene del mismo `os.LookupEnv`. También sigue `strings.TrimSuffix`, `TrimRight` y `TrimSpace`, y un campo de struct del mismo archivo con la etiqueta `env:"X"` o `envconfig:"X"` (cleanenv, caarlos0/env, envconfig).
+En Rust, `base_url_env` puede vincular una URL base leída con `std::env::var`, `env!` o `dotenvy::var`. En Go, cubre `os.Getenv` y `os.LookupEnv`, incluidos valores por defecto con `if v == ""`, `len(v) == 0`, `!ok` o `!ok || v == ""` cuando `ok` viene del mismo `os.LookupEnv`. También sigue `strings.TrimSuffix`, `TrimRight` y `TrimSpace`, y un campo de struct del mismo archivo con la etiqueta `env:"X"` o `envconfig:"X"` (cleanenv, caarlos0/env, envconfig). Un campo de struct que guarda la URL base (`c.base`) es la lectura que le da todo composite literal del repositorio que lo llena, directamente (`&Client{base: os.Getenv("X")}`) o por el parámetro de un constructor (`New(base string)`) cuyos llamadores en el repositorio pasan todos la misma lectura; vale en un método que lee el campo directamente o por un wrapper de petición. El campo queda desconocido cuando dos literales o dos llamadores dan lecturas distintas, cuando un literal lo llena por posición o con un tipo que el código no dice (un alias), cuando ningún literal lo llena, cuando algún archivo lo escribe por un selector (`c.base = x`), cuando el constructor no tiene llamador en el repositorio y cuando un valor es una cadena literal en lugar de una lectura.
 
 En Java, `base_url_env` vincula la URL base de `System.getenv("X")`, también cuando se sigue una variable local que guarda la lectura (una que el archivo nunca vuelve a asignar), y la de un campo o parámetro de constructor con `@Value("${clave}")` de Spring. La clave viene del `application.properties`, del `application.yml` o del `application.yaml` en `src/main/resources` del módulo del archivo (el de la raíz de código principal que el build Maven o Gradle declara para él, un `srcDirs` de Gradle incluido, o si no el del `src/main/` en que está); con más de uno, vale el `.properties`, después el `.yml`. En un `.properties`, lo que sigue a `#---` no se lee. Una URL literal vincula por host a los `[serve] hosts` de los pares. Un placeholder `${VAR}` que ninguna clave llena es la variable `VAR`, mapeada por `base_url_env`. Con valor por defecto (`${VAR:https://web.example.com/api}`), el valor por defecto vincula por host cuando algún par sirve ese host; si no, vale `VAR`, como sin valor por defecto. Meada nunca lee el valor de una variable. Un campo `static`, un campo que algún archivo asigna, o uno que un parámetro o una variable local ocultan, no recibe valor. Un parámetro de constructor solo recibe el valor de Spring cuando ninguna llamada en el código crea la clase, `this(..)`, `super(..)` y un `new` dentro de una clase anónima incluidos; con llamadas, prevalece el valor del llamador. Los perfiles (`application-<perfil>`), el binding relajado de variables y SpEL (`#{...}`) no se leen.
 
@@ -143,18 +180,21 @@ Cada productor se vincula con los handlers de sus consumidores, incluso dentro d
 | Kafka | `kafkajs` | `confluent-kafka`, `kafka-python` | `rdkafka` | `segmentio/kafka-go`, `confluent-kafka-go`, `sarama` | Spring Kafka | Spring Kafka | `Confluent.Kafka` |
 | RabbitMQ | `amqplib` | `pika` | `lapin` | `amqp091-go` | Spring AMQP | Spring AMQP | `RabbitMQ.Client` |
 | Amazon SQS | AWS SDK v3, `sqs-consumer` | `boto3` | `aws-sdk-sqs` | `aws-sdk-go-v2` | AWS SDK v2 | AWS SDK v2 | `AWSSDK.SQS` |
+| Amazon SNS | AWS SDK v3 `PublishCommand`, `PublishBatchCommand` | `boto3` `publish`, `publish_batch` | | AWS SDK v2 | AWS SDK 2.x | | AWS SDK .NET |
+| Amazon EventBridge | AWS SDK v3 `PutEventsCommand` | `boto3` `put_events` | | AWS SDK v2 | AWS SDK 2.x | | AWS SDK .NET |
+| Amazon Kinesis | AWS SDK v3 `PutRecordCommand`, `PutRecordsCommand` | `boto3` `put_record`, `put_records` | | AWS SDK v2 | AWS SDK 2.x | | AWS SDK .NET |
 | NATS | `nats` | `nats-py` | `async-nats` | `nats.go` | jnats | jnats | `NATS.Client` |
 | Redis streams | `ioredis`, `node-redis` | `redis-py` | crate `redis` | `go-redis` | Jedis, Lettuce | Jedis, Lettuce | `StackExchange.Redis` |
 | JMS | | | | | Spring JMS | Spring JMS | |
-| Azure Service Bus | | | | | | | `Azure.Messaging.ServiceBus` |
+| Azure Service Bus | Azure SDK | Azure SDK | | Azure SDK | Azure SDK | | `Azure.Messaging.ServiceBus` |
 
 Los brokers son los ids de los contratos (`channel::<broker>::<nombre>`): `kafka`, `amqp` (RabbitMQ), `jms`, `sqs`, `nats`, `redis`, `bullmq` y `servicebus` (Azure Service Bus). También se soportan jobs BullMQ. En RabbitMQ, un `publish` a una exchange alcanza las colas mediante sus bindings. NATS considera los comodines `*` y `>`. No se modelan clusters de broker: tópicos con el mismo nombre en clusters distintos pueden vincularse como si pertenecieran a uno solo.
 
-En Java, un cliente cuenta por el tipo que el código escribe para él (`KafkaTemplate`, `RabbitTemplate`, `JmsTemplate`, `SqsClient` o `SqsAsyncClient`, `Connection` o `Dispatcher` de jnats, `Jedis`, `JedisPooled`, `UnifiedJedis`, `JedisCluster` y los `RedisCommands`, `RedisAsyncCommands` y `RedisReactiveCommands` de Lettuce), y una anotación de listener por su import de Spring; un tipo del repositorio con el mismo nombre (una clase, una interfaz o una anotación `@interface`) la oculta. Producen `KafkaTemplate.send(tópico, ...)`, `RabbitTemplate.convertAndSend(exchange, routingKey, ...)` (con dos argumentos, o con un `MessagePostProcessor`, publica en la exchange por defecto y llega a la cola que nombra su clave, o en la `spring.rabbitmq.template.exchange` de la configuración), `JmsTemplate.send` y `convertAndSend` con el destino, `sendMessage` con el `queueUrl` de la petición (la cola es el último segmento de la URL), `publish(asunto, ...)` y `xadd(clave, ...)`. Consumen `@KafkaListener(topics = ...)`, también por `topicPartitions`, `@RabbitListener(queues = ...)`, `queuesToDeclare` y `bindings = @QueueBinding(...)`, cuyas claves se vuelven bindings (en una `@Exchange` `direct`, la predeterminada, o `fanout`, solo las claves sin comodín; en una `headers`, ninguna), `@JmsListener(destination = ...)`, `receiveMessage`, `subscribe(asunto)` y los streams de `xreadGroup` (Jedis, de un `Map.of`) y `xreadgroup` (Lettuce, de `StreamOffset`). `BindingBuilder.bind(new Queue(..)).to(new TopicExchange(..)).with(clave)` también vincula una cola. El handler de una anotación es el método anotado; el de un cliente que hace polling es el método con la llamada que nombra el tópico o la cola, aunque el bucle de recepción esté en otro. Los nombres se evalúan como las URLs: constantes, campos `final`, los argumentos de un wrapper, un campo con `@Value("${clave}")` y los placeholders `${clave}` de las anotaciones, leídos de la configuración Spring del módulo. Un nombre que no se evalúa (una variable de entorno, SpEL, una sobrecarga que los argumentos no distinguen) es un lado no resuelto.
+En Java, fuera de las formas AWS, un cliente cuenta por el tipo que el código escribe para él (`KafkaTemplate`, `RabbitTemplate`, `JmsTemplate`, `Connection` o `Dispatcher` de jnats, `Jedis`, `JedisPooled`, `UnifiedJedis`, `JedisCluster` y los `RedisCommands`, `RedisAsyncCommands` y `RedisReactiveCommands` de Lettuce), y una anotación de listener por su import de Spring; un tipo del repositorio con el mismo nombre (una clase, una interfaz o una anotación `@interface`) la oculta. Producen `KafkaTemplate.send(tópico, ...)`, `RabbitTemplate.convertAndSend(exchange, routingKey, ...)` (con dos argumentos, o con un `MessagePostProcessor`, publica en la exchange por defecto y llega a la cola que nombra su clave, o en la `spring.rabbitmq.template.exchange` de la configuración), `JmsTemplate.send` y `convertAndSend` con el destino, `sendMessage` con el `queueUrl` de la petición (la cola es el último segmento de la URL), `publish(asunto, ...)` y `xadd(clave, ...)`. Consumen `@KafkaListener(topics = ...)`, también por `topicPartitions`, `@RabbitListener(queues = ...)`, `queuesToDeclare` y `bindings = @QueueBinding(...)`, cuyas claves se vuelven bindings (en una `@Exchange` `direct`, la predeterminada, o `fanout`, solo las claves sin comodín; en una `headers`, ninguna), `@JmsListener(destination = ...)`, `receiveMessage`, `subscribe(asunto)` y los streams de `xreadGroup` (Jedis, de un `Map.of`) y `xreadgroup` (Lettuce, de `StreamOffset`). `BindingBuilder.bind(new Queue(..)).to(new TopicExchange(..)).with(clave)` también vincula una cola. El handler de una anotación es el método anotado; el de un cliente que hace polling es el método con la llamada que nombra el tópico o la cola, aunque el bucle de recepción esté en otro. Los nombres se evalúan como las URLs: constantes, campos `final`, los argumentos de un wrapper, un campo con `@Value("${clave}")` y los placeholders `${clave}` de las anotaciones, leídos de la configuración Spring del módulo. Un nombre que no se evalúa (una variable de entorno, SpEL, una sobrecarga que los argumentos no distinguen) es un lado no resuelto.
 
 En Kotlin, los mismos clientes, anotaciones y bindings valen escritos a la manera de Kotlin, con las reglas de Java para handlers y nombres: argumentos con nombre y arrays (`@KafkaListener(topics = ["a", "b"])`, `arrayOf(..)`), anotaciones anidadas sin `@` (`QueueBinding(value = Queue("q"), exchange = Exchange(value = "x"), key = ["k"])`), `Queue("q")` sin `new` en `BindingBuilder`, `const val` de nivel superior o de un `companion object`, plantillas (`"orders-$env"` es un lado sin resolver mientras `env` no se evalúa), un cliente recibido por el constructor (`private val kafka: KafkaTemplate<String, String>`), `@Value("\${clave}")` y `mapOf(clave to id)` en los streams de Jedis y Lettuce. Una llamada sobre un receptor implícito (función de extensión del cliente, bloques `apply` y `with`) no se lee.
 
-En C#, un cliente cuenta por el tipo que el código escribe para él (un campo, una propiedad, un parámetro o un local tipado) o por la construcción que lo creó (`new ProducerBuilder<..>(..).Build()`, `factory.CreateConnection()`, `connection.CreateModel()`, `multiplexer.GetDatabase()`, `client.CreateSender(..)`), resuelto por los usings, nunca solo por el nombre: un tipo del repositorio con el mismo nombre lo oculta, y `ConnectionFactory` o `IConnection` con `RabbitMQ.Client` y `NATS.Client` importados a la vez no es ninguno de los dos. Producen `Produce` y `ProduceAsync(tópico, ...)` de Confluent.Kafka, `BasicPublish` y `BasicPublishAsync(exchange, routingKey, ...)` (la exchange vacía, `string.Empty`, `String.Empty` con `using System;` o `""`, llega a la cola que nombra su clave), `SendMessageAsync` de AWSSDK.SQS con la URL de la cola o con `new SendMessageRequest { QueueUrl = .. }` (la cola es el último segmento de la URL), `Publish(asunto, ...)` de NATS.Client, `StreamAdd` y `StreamAddAsync(clave, ...)` de StackExchange.Redis y los métodos de envío de un `ServiceBusSender` (`SendMessageAsync`, `SendMessagesAsync`, `ScheduleMessageAsync`, `ScheduleMessagesAsync`), cuya cola o tópico es el argumento del `CreateSender` que lo creó. Consumen `Subscribe(tópico)` y `Subscribe(tópicos)`, `BasicConsume(cola, ...)`, `ReceiveMessageAsync`, `SubscribeAsync(asunto, handler)`, `StreamReadGroup` y `StreamReadGroupAsync(clave, ...)` y `CreateProcessor(cola)` o `CreateProcessor(tópico, suscripción)`. `QueueBind(cola, exchange, clave)` vincula una cola con las reglas de enrutamiento de RabbitMQ, y un vínculo con comodín de NATS es `inferred`. Azure Service Bus no tiene comodín, y un procesador sobre un tópico consume todo mensaje enviado al tópico, sea cual sea la suscripción. El handler de un callback es el propio callback (una lambda o un método del repositorio pasado a `SubscribeAsync`) o cada handler asignado con `+=` al evento `Received`, `ReceivedAsync`, `MessageHandler` o `ProcessMessageAsync` del consumidor o del procesador que guarda el resultado de la llamada (en un local, en el mismo método; en un campo, en cualquier método de la clase), un consumidor por handler; el de un cliente que hace polling es el método con la llamada que nombra el tópico o la cola. `.ConfigureAwait(..)` en la cadena que crea el cliente no la interrumpe. Los nombres se evalúan como las URLs (constantes, campos `static readonly`, locales ligados una vez, interpolación y los argumentos de un wrapper en cada llamador, también el del método que crea un `ServiceBusSender` con `CreateSender(cola)`). Un `ServiceBusSender` escrito más de una vez (un campo asignado en dos constructores o en un setter, o un local rehecho) no tiene un nombre único y queda sin resolver. Un nombre que no se evalúa, incluida una lectura de variable de entorno o de `IConfiguration` (aquí no se lee `appsettings.json`), es un lado sin resolver. MassTransit, `BasicGet`, `SubscribeSync` y `QueueSubscribe`, `CreateReceiver` y NATS.Net v2 no se leen.
+En C#, fuera de las formas AWS, un cliente cuenta por el tipo que el código escribe para él (un campo, una propiedad, un parámetro o un local tipado) o por la construcción que lo creó (`new ProducerBuilder<..>(..).Build()`, `factory.CreateConnection()`, `connection.CreateModel()`, `multiplexer.GetDatabase()`, `client.CreateSender(..)`), resuelto por los usings, nunca solo por el nombre: un tipo del repositorio con el mismo nombre lo oculta, y `ConnectionFactory` o `IConnection` con `RabbitMQ.Client` y `NATS.Client` importados a la vez no es ninguno de los dos. Producen `Produce` y `ProduceAsync(tópico, ...)` de Confluent.Kafka, `BasicPublish` y `BasicPublishAsync(exchange, routingKey, ...)` (la exchange vacía, `string.Empty`, `String.Empty` con `using System;` o `""`, llega a la cola que nombra su clave), `SendMessageAsync` de AWSSDK.SQS con la URL de la cola o con `new SendMessageRequest { QueueUrl = .. }` (la cola es el último segmento de la URL), `Publish(asunto, ...)` de NATS.Client, `StreamAdd` y `StreamAddAsync(clave, ...)` de StackExchange.Redis y los métodos de envío de un `ServiceBusSender` (`SendMessageAsync`, `SendMessagesAsync`, `ScheduleMessageAsync`, `ScheduleMessagesAsync`), cuya cola o tópico es el argumento del `CreateSender` que lo creó. Consumen `Subscribe(tópico)` y `Subscribe(tópicos)`, `BasicConsume(cola, ...)`, `ReceiveMessageAsync`, `SubscribeAsync(asunto, handler)`, `StreamReadGroup` y `StreamReadGroupAsync(clave, ...)` y `CreateProcessor(cola)` o `CreateProcessor(tópico, suscripción)`. `QueueBind(cola, exchange, clave)` vincula una cola con las reglas de enrutamiento de RabbitMQ, y un vínculo con comodín de NATS es `inferred`. Azure Service Bus no tiene comodín, y un procesador sobre un tópico consume todo mensaje enviado al tópico, sea cual sea la suscripción. El handler de un callback es el propio callback (una lambda o un método del repositorio pasado a `SubscribeAsync`) o cada handler asignado con `+=` al evento `Received`, `ReceivedAsync`, `MessageHandler` o `ProcessMessageAsync` del consumidor o del procesador que guarda el resultado de la llamada (en un local, en el mismo método; en un campo, en cualquier método de la clase), un consumidor por handler; el de un cliente que hace polling es el método con la llamada que nombra el tópico o la cola. `.ConfigureAwait(..)` en la cadena que crea el cliente no la interrumpe. Los nombres se evalúan como las URLs (constantes, campos `static readonly`, locales ligados una vez, interpolación y los argumentos de un wrapper en cada llamador, también el del método que crea un `ServiceBusSender` con `CreateSender(cola)`). Un `ServiceBusSender` escrito más de una vez (un campo asignado en dos constructores o en un setter, o un local rehecho) no tiene un nombre único y queda sin resolver. Un nombre que no se evalúa, incluida una lectura de variable de entorno o de `IConfiguration` (aquí no se lee `appsettings.json`), es un lado sin resolver. MassTransit, `BasicGet`, `SubscribeSync` y `QueueSubscribe`, NATS.Net v2 no se leen.
 
 ## Paquetes npm
 
@@ -223,6 +263,232 @@ Drift es un campo que un consumidor `fetch` lee de una respuesta pero que la rut
 | `search` con tipo `drift` | Lista el drift encontrado |
 | `meada status` | Cuenta lecturas ausentes en el repositorio consumidor; el proveedor no recibe esa cuenta |
 
+## Valores de configuración
+
+Cada escalar de cada archivo `*.yaml`, `*.yml` y `*.json` que Meada lee, y de los archivos YAML y JSON de la configuración de CI en la raíz (`.github/`, `.gitlab-ci.yml`, `.gitlab/`, `.circleci/`, `.buildkite/`, `.drone.yml`), es un valor de configuración: archivo, ruta de la clave (al estilo de jq, `alerts.loki[0].labels.support`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` en un archivo de varios documentos), valor, tipo (texto, número o booleano) y línea. Las demás rutas ocultas quedan fuera, y no hay nada que activar.
+
+Los archivos Terraform y OpenTofu también son valores de configuración (`*.tf`, `*.tofu`, `*.tf.json`, `*.tofu.json`, `*.tfvars`, `*.auto.tfvars`, `*.tfvars.json`). La ruta de la clave pasa por el tipo y las etiquetas del bloque y por el nombre del atributo (`resource.aws_sqs_queue.orders.name`, `resource.opsgenie_team_routing_rule.critical.criteria.conditions[1].expected_value`), y un bloque repetido con el mismo tipo y las mismas etiquetas se indexa `[n]` (`ingress[0]`). Un literal conserva su tipo; una expresión (`var.environment`, `format(..)`) o una plantilla (`"${var.environment}-orders"`, un heredoc con interpolación) se guarda tal como está escrita, con el tipo `expression` o `template`, hasta que la evaluación estática la resuelva. Un archivo `.tofu` oculta el archivo `.tf` del mismo nombre en su carpeta (el `.tofu.json`, el `.tf.json`), como hace OpenTofu, y el archivo oculto no se lee.
+
+| Consulta | Resultado |
+| --- | --- |
+| `search` con kind `value` | Valores cuyo valor o ruta de la clave es igual a la consulta, empieza con ella o la contiene, como `<repositorio> <ruta>:<línea> <ruta de la clave> = <valor>` |
+| `search` sin kind | Valores solo cuando ningún símbolo y ningún contrato coincide |
+| `meada status` | Archivos de configuración leídos y omitidos (lockfiles, archivos que no se leen) y los valores ocultados |
+
+Un valor de más de 1 KiB se guarda cortado, marcado `(cut)`. Los `data` y `stringData` de un `Secret` de Kubernetes se guardan como `redacted`, con ruta de la clave, tipo y línea, igual que el `default` de una `variable` de Terraform con `sensitive = true` y todo valor que un archivo `.tfvars` da a una variable de ese nombre (todos, cuando un archivo Terraform en la misma carpeta o por encima no se lee) y el `value` de un recurso `aws_ssm_parameter` con `type = "SecureString"` literal, en HCL o Terraform JSON; nada más se filtra, así que los archivos que no deben entrar en el índice van en `.meadaignore`. Los lockfiles (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`), las plantillas Helm (que no son YAML hasta renderizarse), los archivos de más de 1 MiB y los archivos de más de 1.000 documentos quedan fuera. El texto de los valores nunca entra en `meada export`.
+
+Un ARN AWS reconocido por la tabla de tipos, una URL SQS o `s3://archive/ruta` en configuración se convierte en un lado de uso `exact`, ubicado por `<archivo>#<ruta de la clave>`. Un nombre simple bajo la última clave `queue`, `topic`, `bucket` o `table` se convierte en un uso SQS, SNS, S3 o DynamoDB `inferred`, respectivamente. Por ejemplo, `queue: orders` en valores Helm usa `channel::sqs::orders`; `other: orders` no enlaza nada. El uso no tiene dirección: solo enlaza a los provisionadores y cuenta para huérfanos, sin convertirse en productor, consumidor, escritor o lector. `context` y la búsqueda de contratos muestran estos usos, y `trace` sigue los enlaces de aprovisionamiento hasta la clave y de vuelta. Los valores ocultados, cortados o sin resolver quedan fuera; el atributo que define el nombre de un provisionador no usa su propio recurso. El export incluye los lados en `uses`, sin el texto de los valores, y la consola los muestra separados de los lados con dirección.
+
+## Nodos IaC
+
+Cada `resource`, bloque `data` y llamada `module` de los archivos `*.tf`, `*.tf.json`, `*.tofu` y `*.tofu.json` es un nodo IaC, con dirección (`<tipo>.<nombre>`, `data.<tipo>.<nombre>`, `module.<nombre>`), tipo, archivo, líneas y el módulo raíz que empieza su evaluación: una carpeta que ninguna otra llama como módulo local, etiquetada por su ruta (`.` en la raíz). Cada llamada de un módulo local (un `source` `./` o `../` que queda dentro del repositorio) instancia sus bloques con la dirección de la llamada delante (`module.orders.aws_sqs_queue.this`), y un `count` o un `for_each` sobre valores que se resuelven en literales da un nodo por instancia, con `[clave]` al final (`aws_sqs_queue.dlq[0]`). Una expresión que nombra un resource, un bloque data o un módulo es una referencia, guardada como una llamada; una que pasa por `var.<nombre>`, `local.<nombre>` o la salida de un módulo se sigue hasta lo que nombra, y guarda el nombre por el que pasó.
+
+El JSON Terraform usa las mismas reglas de evaluación y referencia. Las cadenas comunes son plantillas; una interpolación sola conserva el tipo del resultado, por lo que `${var.items}` puede proporcionar una colección. Los defaults de variables y las fuentes de módulos son literales. Las cadenas estáticas de `depends_on` nombran referencias. Los arrays de bloques conservan sus índices en las rutas de configuración. Las dos extensiones JSON admiten direcciones de nodos en las ubicaciones `via` de recursos declarados.
+
+| Consulta | Resultado |
+| --- | --- |
+| `search` con kind `iac` | Nodos cuya dirección, tipo o nombre físico (el argumento `name` como la evaluación estática lo resuelve) es igual a la consulta, empieza con ella o la contiene, como `<repositorio> <ruta>:<línea> <dirección> (<tipo>, name "<nombre>", root <módulo raíz>)`, `pattern` en lugar de `name` cuando una parte no se resuelve |
+| `search` sin kind | Ningún nodo IaC: solo los valores de configuración que guardan su nombre, cuando nada más coincide |
+| `context` en una dirección | Tipo, nombre físico (`(pattern)` cuando una parte no se resuelve), módulo raíz, las variables de la raíz por las que pasó el nombre (`overridable:`, `(default)` o `(tfvars)`), las referencias en los dos sentidos (`references:`, `referenced by:`, cada una con su `via`) y los valores de configuración del bloque |
+| `trace` desde una dirección | Las referencias, `down` (lo que el nodo alcanza) o `up` (lo que lo alcanza), dentro del módulo raíz y por los módulos locales |
+
+Toda referencia es `exact`: un nombre tal como está escrito, seguido sin evaluar valores. La
+evaluación estática resuelve el nombre físico de cada nodo y cada `count` y `for_each`, sin ejecutar
+Terraform ni acceder a la red, a partir de los valores del propio repositorio: los defaults de las
+variables, el `terraform.tfvars`, el `terraform.tfvars.json`, los `*.auto.tfvars` y los
+`*.auto.tfvars.json` de la raíz (en ese orden, ganando el archivo siguiente), los locals, las
+entradas y salidas de un módulo local por llamada, `each`, `count.index`, plantillas y las funciones
+puras de texto, colección y conversión del ADR 0025 con `jsonencode`. Data sources, atributos de
+resources, módulos del registro, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`, variables
+sensibles y cualquier otra función nunca se evalúan: esa parte es un `*` y el nombre un patrón
+(`orders-*`), que enlaza nombres literales según las reglas de patrones de abajo. Un nombre que pasó por una variable del módulo raíz, por
+su default o por un archivo de variables, la registra, ya que quien despliega puede cambiarla. Un
+valor de más de 64 KiB, una expresión cuya evaluación podría pasar de 1 MiB y lo que una raíz evalúa
+más allá de 64 MiB quedan sin resolver. Un archivo Terraform o de variables cambiado evalúa de nuevo
+solo los módulos raíz cuya unidad (la raíz y los módulos locales que llama) lo contiene. Un `count`
+o un `for_each` que no se resuelve da un solo nodo, sin clave; un módulo del registro o remoto es
+solo el nodo de la llamada. Solo los
+nodos con un lado de contrato entran en `meada export`.
+
+### Contratos huérfanos
+
+`search` sin filtro, y con `kind = "contract"`, `channel` o `resource`, también encuentra los lados provisionadores por contrato.
+
+`meada status` lista contratos huérfanos por tipo y broker (o tipo de recurso): provisionadores
+sin uso y usos sin provisionador. Solo hay líneas de huérfanos cuando el repositorio o workspace
+consultado contiene al menos un provisionador y un uso de ese grupo. Un repositorio solo de
+código o solo de IaC no genera esas líneas; `search` y `context` marcan el propio lado con
+`no provisioner in the workspace` o `no use in the workspace`. Los vínculos de aprovisionamiento,
+incluidos patrones y módulos raíz independientes, determinan si hay contraparte. Los avisos
+existentes de recursos declarados sin escritores y lectores siguen separados.
+
+### Provisionadores Terraform
+
+Un resource `aws_sqs_queue` provisiona `channel::sqs::<nombre>` por el argumento `name`;
+un `aws_s3_bucket` provisiona `resource::s3::<nombre>` por `bucket`. La tabla de tipos en
+`src/iac/types.toml`, integrada en el binario, también lee nombres en ARN y URL. Un
+`[[resource]]` declarado con `kind = "s3"` y el mismo `id` participa en ese contrato,
+conservando `declared`.
+
+CloudFormation y SAM usan los mismos contratos para SQS, SNS, EventBridge, Kinesis, S3,
+DynamoDB (Table, GlobalTable y SimpleTable), RDS (instancia o clúster), ElastiCache
+(clúster o grupo), SSM y Secrets Manager cuando se conoce el nombre físico. La propiedad
+que define ese nombre no usa su propio recurso; los secretos solo aportan su identidad.
+
+Cada productor, consumidor, escritor y lector se enlaza con cada provisionador, identificado
+por dirección y módulo raíz. Raíces como `envs/dev` y `envs/prod` no son ambiguas entre sí.
+Nombres escritos dan `exact`; nombres que pasan por valores reemplazables dan `inferred`, con
+las variables y sus orígenes en el motivo. `context` en el bloque lista los lados del contrato;
+en un productor lista sus provisionadores. `trace` sigue del bloque al código con `down` y del
+código a la infraestructura con `up`. El export conserva `format: 1` y añade `iac_nodes`,
+`provisioners` y `provisions`, omitidos cuando están vacíos. Tipos no listados y bloques data no
+provisionan contratos. Un patrón con al menos tres caracteres literales y comodines en los límites
+de segmentos (`-`, `_`, `.`, `/`) se enlaza a un nombre literal en `inferred`, o `ambiguous` cuando
+coinciden varios nombres. Los patrones nunca se enlazan entre sí. El grafo de la consola muestra
+los provisionadores y sus enlaces propios.
+
+### SDK AWS en Java, Go y C#
+
+Las operaciones siguientes crean lados de contratos sin declaración en `meada.toml`. El cliente debe proceder de un constructor del SDK, con cada salto usado para demostrar ese origen resuelto mediante una llamada exacta. Parámetros, locales y nombres de tipos que ocultan el cliente o su constructor no heredan su origen. Un nombre literal se une al nombre físico aprovisionado; una lectura del entorno sin una entrada correspondiente en el workload queda sin resolver y conserva `env:NOMBRE` en el export, incluidos los productores. Meada nunca lee el entorno del proceso.
+
+Las lecturas del entorno mediante alias de importación en Go y C# conservan el nombre de la variable. Una solicitud guardada por nombre queda sin resolver cuando se escribe el campo que nombra el recurso, incluso mediante un alias.
+
+| Servicio | Operaciones y dirección |
+| --- | --- |
+| SQS | `SendMessage`, `SendMessageBatch` producen; `ReceiveMessage` consume, mediante `QueueUrl` |
+| SNS | `Publish`, `PublishBatch` producen, mediante `TopicArn` |
+| EventBridge | `PutEvents` produce en cada `Entries[].EventBusName` |
+| Kinesis | `PutRecord`, `PutRecords` producen, mediante `StreamName` |
+| S3 | `PutObject`, `DeleteObject` escriben; `GetObject`, `HeadObject`, `ListObjects`, `ListObjectsV2` leen, mediante el bucket |
+| DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem` escriben; `GetItem`, `Query`, `Scan`, `BatchGetItem` leen, mediante `TableName` o todas las claves de `RequestItems` |
+| SSM | `GetParameter`, `GetParameters` leen; `PutParameter`, `DeleteParameter`, `DeleteParameters` escriben, mediante `Name` o cada entrada de `Names` |
+| Secrets Manager | `GetSecretValue`, `BatchGetSecretValue` leen; `PutSecretValue`, `UpdateSecret`, `CreateSecret`, `DeleteSecret` escriben, mediante `SecretId`, cada entrada de `SecretIdList` o `Name` |
+
+Los nombres de operaciones usan la grafía Go; Java empieza en minúscula y .NET acepta formas síncronas y `Async`. S3 en .NET usa `BucketName` y `GetObjectMetadata` para `HeadObject`. Los ARN se reducen al nombre físico de la infraestructura. `GetParametersByPath` queda sin resolver porque `Path` es una jerarquía, no un parámetro. Las operaciones de control de RDS y ElastiCache no demuestran lecturas o escrituras de datos. Un recurso sin nombre nunca enlaza; una declaración de `meada.toml` conserva el nivel `declared`.
+
+### GCP y Cloud Run
+
+Terraform/OpenTofu reconoce `google_pubsub_topic` y `google_pubsub_subscription` como canales
+`pubsub`, `google_storage_bucket` como `gcs`, `google_sql_database_instance` y
+`google_sql_database` como `cloudsql`, y `google_secret_manager_secret` como
+`gcpsecretmanager`. El nombre viene de `name`, excepto los secretos, que usan `secret_id`.
+Las instancias Cloud SQL usan `<instancia>`; las bases usan `<instancia>/<base>`, con una
+instancia literal o una referencia resuelta a una instancia conocida. Una base no aprovisiona
+su instancia. Los proyectos quedan fuera de la identidad.
+
+Un tópico usa `channel::pubsub::<id>`; una suscripción usa
+`channel::pubsub::subscriptions/<id>`, incluso cuando ambos comparten el mismo id. La
+suscripción enlaza a sus consumidores con los productores del tópico indicado por `topic`:
+`exact` sin filtro, `inferred` con filtro o nombres sobrescribibles. Una fuente sin resolver
+no crea un enlace ni inventa un tópico a partir del nombre de la suscripción.
+
+`gs://<bucket>/objeto`, `projects/<proyecto>/topics/<id>`,
+`projects/<proyecto>/subscriptions/<id>` y `projects/<proyecto>/secrets/<id>` (también con
+`/versions/<versión>`) son usos de configuración `exact`. Los nombres simples bajo las claves
+finales `pubsub_topic`, `pubsub_subscription`, `gcs_bucket`, `cloudsql_instance`,
+`cloudsql_database` y `gcpsecretmanager_secret` son `inferred`; `cloudsql_database` exige
+`<instancia>/<base>`. Las claves genéricas `topic` y `bucket` conservan sus significados SNS y
+S3. Los identificadores malformados, valores ocultados o cortados y la mera igualdad de texto
+no crean usos.
+
+`google_cloud_run_service`, `google_cloud_run_v2_service` y `google_cloud_run_v2_job` son
+workloads: cada contenedor conserva su imagen y su entorno. Las imágenes enlazan al
+repositorio que las publica; la evidencia sobrescribible debilita el enlace. Las lecturas de
+entorno solo reciben valores del contenedor que ejecuta su código y quedan `inferred`. Las
+referencias Secret Manager siguen como destinos sin resolver, sin leer el contenido del
+secreto. Búsqueda, `context`, `trace` en ambos sentidos, huérfanos por ámbito y export incluyen
+los nuevos contratos y runners; las entradas de entorno y valores de configuración quedan
+fuera del export.
+
+### Clientes de los SDK de GCP
+
+Los cinco grupos de SDK de GCP (JavaScript/TypeScript, Python, Java, Go y C#) reconocen las formas documentadas de publicación y recepción por suscripción Pub/Sub, lectura/escritura de Cloud Storage y acceso a Secret Manager. La [guía de usuario](https://github.com/ClaudioMascaro/meada/blob/main/docs/user-guide.es.md#uso-de-los-sdk-de-gcp-en-cinco-grupos-de-lenguajes) enumera las operaciones y los constructores exactos. Los temas y las suscripciones conservan identidades distintas, incluso al resolver el entorno de la carga; una lectura del entorno sola sigue sin resolver.
+
+### Canales, datos, secretos y suscripciones AWS
+
+La tabla Terraform/OpenTofu también reconoce los tipos siguientes. Los ARN se reducen al
+nombre físico, incluidas las rutas de parámetros y secretos; se elimina el sufijo de seis
+caracteres del ARN de Secrets Manager. Las mismas reglas de aprovisionamiento, `context`,
+`trace` y export se aplican a todos estos contratos.
+
+| Tipo Terraform | Nombre físico | Contrato |
+| --- | --- | --- |
+| `aws_sns_topic` | `name` | `channel::sns` |
+| `aws_cloudwatch_event_bus` | `name` | `channel::eventbridge` |
+| `aws_kinesis_stream` | `name` | `channel::kinesis` |
+| `aws_dynamodb_table` | `name` | `resource::dynamodb` |
+| `aws_db_instance` | `identifier` | `resource::rds` |
+| `aws_rds_cluster` | `cluster_identifier` | `resource::rds` |
+| `aws_elasticache_cluster` | `cluster_id` | `resource::elasticache` |
+| `aws_elasticache_replication_group` | `replication_group_id` | `resource::elasticache` |
+| `aws_ssm_parameter` | `name`, conservando `/` inicial | `resource::ssm` |
+| `aws_secretsmanager_secret` | `name` | `resource::secretsmanager` |
+
+Un parámetro SSM `SecureString` guarda `value` como `redacted` en HCL y JSON de Terraform/OpenTofu. Si `type` es una expresión que
+el lector de valores no resuelve, su valor también se oculta por precaución.
+
+`aws_sns_topic_subscription` con `protocol = "sqs"` enlaza consumidores de la cola con
+productores del tópico. `aws_cloudwatch_event_rule` junto con `aws_cloudwatch_event_target`
+hace lo mismo del bus a la cola; sin `event_bus_name` se usa `default`. Sin filtro el nivel es
+`exact`; con `filter_policy` o `event_pattern` es `inferred`. Los nombres reemplazables también
+dan `inferred`, con sus variables en el motivo. El motivo identifica la suscripción o el target
+y su regla. Endpoints sin resolver, otros protocolos y targets sin una regla única en el mismo
+bus no crean enlaces. Las reglas solo con programación no enrutan eventos publicados en el bus.
+
+`context` muestra productores y consumidores a través de la suscripción. `trace` sube del
+consumidor al productor y baja del aprovisionador a los consumidores; un canal de origen `sns`,
+`eventbridge` o `kinesis` también puede iniciar el trace. Los resúmenes entran en el array opcional `subscriptions`, con origen, destino, nodo y raíz.
+Los enlaces entran en `links`,
+conservando aparte los de aprovisionamiento en `provisions`. `meada status` muestra contratos
+aprovisionados sin uso y usos sin aprovisionador, por kind y broker, solo cuando el workspace
+contiene al menos un aprovisionador y un uso del grupo. Los otros formatos IaC siguen como
+nodos y referencias; esta tabla de contratos cubre archivos `.tf`, `.tf.json`, `.tofu` y `.tofu.json`.
+
+## Kubernetes y Kustomize
+
+Todo documento YAML o JSON con `apiVersion`, `kind` y `metadata.name` es un nodo IaC, con dirección `<Kind>[.<grupo>]/<namespace>/<nombre>` (`Deployment.apps/shop/api`, `Service/shop/api`; el grupo core no escribe grupo). Un kind de alcance de clúster no tiene namespace en la dirección (`ClusterRole.rbac.authorization.k8s.io/reader`), ni un objeto que no define ninguno y al que ningún overlay da uno. Una plantilla Helm (un nombre con `{{`) y un archivo de Kustomize no son objetos.
+
+Una carpeta con `kustomization.yaml` que ningún otro kustomization nombra como base es un overlay y una unidad de evaluación. Sus `resources`, `bases` y `components` que nombran un archivo u otro kustomization dentro del repositorio se instancian bajo ella, cada nodo etiquetado por el overlay (`root overlays/dev`), con el `namePrefix`, el `nameSuffix`, el `namespace` y las `images` de cada kustomization en el camino aplicados, los de la base primero y los del overlay al final: una base usada por dos overlays es un nodo en cada uno, con su nombre y su namespace. Un `..` que queda dentro del repositorio se sigue (`../../base`). Una entrada remota (una URL, `github.com/org/repo//ruta?ref=v1`), por encima de la raíz del repositorio, absoluta, ausente, alcanzada por un symlink, en ciclo o anidada más allá de 16 niveles no se sigue, nunca se descarga, y `meada status` la cuenta (`entradas de kustomize no seguidas: N`). Los manifiestos que ningún kustomization lista, ni usa como patch, son simples: los manifiestos de una carpeta son una unidad de evaluación, etiquetada por la carpeta.
+
+| Referencia | Guardada como |
+| --- | --- |
+| Un Service a los dueños de pod template (Deployment, StatefulSet, DaemonSet, Job, CronJob, Pod) cuyas etiquetas del pod contienen su selector | `via selector app=api` |
+| Una carga de trabajo a los ConfigMaps y Secrets de `env`, `envFrom` y volúmenes | `via env DATABASE_URL`, `via envFrom`, `via volume settings` |
+| Una carga de trabajo a su `serviceAccountName` | `via serviceAccountName` |
+| Un Ingress a los Services de sus reglas y del backend por defecto | `via backend shop.example.com/api`, `via defaultBackend` |
+
+Una referencia queda en un namespace y una unidad, y nombra el objeto como se escribió, antes del prefijo y del sufijo del overlay, que el overlay aplica después a los dos lados. Toda referencia es `exact`. `search` con kind `iac` y `context` responden por estos nodos como por los de Terraform, y `context` en una carga de trabajo añade `images:`, lo que cada contenedor ejecuta tras las `images` del overlay (`web: registry.example.com/shop/api:1.4.0`). Los patches, los generadores, `commonLabels`, las plantillas Helm y `kind: List` no se aplican ni se leen, y los objetos quedan fuera de `meada export`.
+
+### Crossplane
+
+Los objetos Crossplane son objetos Kubernetes, y `context` dice qué es cada uno para Crossplane en una línea `role:`: una definición de recurso compuesto (XRD), una composition (las dos sin namespace), un claim o un recurso compuesto (un objeto del kind de claim o compuesto que un XRD del repositorio define), un recurso gestionado (un objeto con `spec.forProvider`) o un recurso que crea una composition. Cada recurso que una composition crea a partir de una `base` literal, en `spec.resources` o en el `input.resources` de un paso de pipeline que ejecuta la función patch-and-transform, es un nodo `<composition>/<recurso>` del kind de la base, con el nombre de su anotación `crossplane.io/external-name` o de su `metadata.name`; el nombre de un recurso gestionado también es su external name.
+
+| Referencia | Guardada como |
+| --- | --- |
+| Un claim al XRD de su kind compuesto | `via composite XPostgreSQLInstance.database.acme.io` |
+| Un recurso compuesto a su XRD | `via kind XNetwork.network.acme.io` |
+| Un claim o recurso compuesto a la composition que nombra su `compositionRef` | `via compositionRef` |
+| Un XRD a su composition por defecto y a la impuesta | `via defaultCompositionRef`, `via enforcedCompositionRef` |
+| Una composition al XRD de su `compositeTypeRef` | `via compositeTypeRef XPostgreSQLInstance.database.acme.io` |
+| Una composition a cada recurso que crea | `via resources`, `via pipeline <paso>` |
+| Un recurso creado o gestionado a la definición de su kind (un XRD o un `CustomResourceDefinition`) | `via kind Bucket.s3.aws.upbound.io` |
+
+Toda referencia es `exact` y queda en una unidad, como las de Kubernetes: un claim en otra carpeta que su XRD conserva su papel y no referencia nada. `trace` desde un claim baja hasta su XRD, la composition y los recursos que crea. Los patches y las funciones no se evalúan: un nombre que un patch (o un patch set) define, o una base sin nombre, es el patrón `*`, y un paso que ejecuta cualquier otra función (Go templating, KCL) no crea nodo.
+
+### Compose
+
+Un archivo Compose (`compose.yaml`, `compose.yml`, `docker-compose.yaml` o `docker-compose.yml`) con su archivo de override en la misma carpeta es una unidad de evaluación, con raíz en la carpeta. Cada servicio es un nodo IaC `services.<nombre>` de tipo `service`. `depends_on`, `links` y las redes compartidas (`networks:`; un servicio sin ninguna está en `default`) son referencias, con `via depends_on`, `via links` o `via networks.<nombre>`. `${VAR:-valor}` se resuelve a su valor por defecto y `context` lo marca `(overridable)`; `${VAR}` queda en el texto como parte sin resolver, marcada `(unresolved)`. `context` muestra `image:` y `build:` del servicio, guardados para el contrato de imagen; un contexto de build solo se guarda como ruta dentro del repositorio (una ruta absoluta, una URL, una que sale de la raíz o una con una parte sin resolver no).
+
+### CloudFormation y SAM
+
+Una plantilla válida llamada `compose.yaml` conserva sus nodos y referencias en el índice inicial y las actualizaciones; el nombre del archivo no la convierte en Compose.
+
+Una plantilla YAML (las etiquetas cortas `!Ref`, `!Sub`, `!GetAtt`, `!Join` y las demás se leen) o JSON con un mapa `Resources` que lleve `AWSTemplateFormatVersion` o la transformación SAM (`AWS::Serverless-2016-10-31`) es una unidad de evaluación, con raíz en su ruta. Cada recurso es un nodo IaC direccionado por su id lógico dentro de la plantilla, y su tipo (`AWS::SQS::Queue`, `AWS::Serverless::Function`: los tipos SAM son nodos como cualquier otro) es el tipo del nodo. `Ref`, `Fn::GetAtt` (con el atributo en el `via`: `via Fn::GetAtt.Arn`), las variables de `Fn::Sub` y `DependsOn` son referencias, todas `exact`. El nombre físico de cola, tema, bucket, tabla, función, stream, secreto y algunos tipos más se evalúa dentro de la plantilla: el valor por defecto de un parámetro (`context` lo lista en `overridable:`), `Ref`, `Fn::Sub`, `Fn::GetAtt` y `Fn::Join`. Un pseudo parámetro (`AWS::Region`), un import (`Fn::ImportValue`), cualquier otra función y un parámetro sin valor por defecto quedan como partes sin resolver: el nombre pasa a ser un patrón, con un `*` por cada una. Un parámetro con `NoEcho` tiene su valor por defecto guardado como `redacted` entre los valores de configuración y ningún nombre pasa por él. Una plantilla modificada se evalúa de nuevo sola. Los stacks anidados, las macros y las condiciones no se siguen.
+
+### Serverless Framework
+
+Un `serverless.yml`, `serverless.yaml` o `serverless.json` con un `service` es una unidad de evaluación, con raíz en su ruta. Cada función es un nodo IaC `functions.<nombre>` de tipo `Serverless::Function`, con el nombre de su `name` o `<service>-<stage>-<función>` (la etapa sustituible por `--stage`, `opt:stage`), y su handler y sus eventos se guardan y los muestra `context` (`handler:`, `event:`: `http GET /orders`, `sqs Queue.Arn`, `schedule rate(5 minutes)`). Una función referencia, `exact`, los recursos que su cuerpo nombra con `Ref`, `Fn::GetAtt` o `Fn::Sub`. La sección `resources` se lee como CloudFormation: cada recurso es un nodo en su id lógico, con los nombres y referencias descritos arriba. `${self:...}` se resuelve al valor en esa ruta del archivo, y el valor por defecto de `${opt:...}` se resuelve y se marca `(overridable)`, porque quien despliega lo pasa por la línea de comandos; `${env:...}`, `${ssm:...}`, `${sls:...}`, `${file(...)}` y las demás fuentes quedan como partes no resueltas: un `*` en el nombre, `${...}` en un texto guardado. Un valor que se nombra a sí mismo, directo o en ciclo, queda sin resolver, y `${self:provider.stage}` sin etapa en el archivo es `dev`, como en el nombre de una función. Un servicio modificado se evalúa de nuevo solo. `serverless.ts`, los plugins y los valores de otros archivos no se leen.
+
 ## Comunidades y procesos
 
 Una comunidad agrupa símbolos que se llaman más entre sí que al resto. `meada export` calcula los grupos con Leiden, sin aleatoriedad y con aritmética entera. El nombre viene de la carpeta de la mayoría de sus miembros (`src`, `src#2`), igual en cada máquina.
@@ -241,3 +507,303 @@ Un proceso es el árbol de llamadas desde un punto de entrada, entre repositorio
 ## Límites y próximos pasos
 
 Los lenguajes y clientes HTTP o de mensajes fuera de estas listas aún no tienen soporte. El [ADR 0003](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr/0003-v1-scope-and-roadmap.md) define el alcance y el orden. Consulta el [roadmap](roadmap.md), las [decisiones](https://github.com/ClaudioMascaro/meada/blob/main/docs/adr) y el [CHANGELOG](https://github.com/ClaudioMascaro/meada/blob/main/CHANGELOG.md).
+
+## Llamadas del AWS SDK en código
+
+Las lecturas de recursos conservan cada llamada SDK como lado distinto en JS, TS y Python. `trace` hacia arriba llega a sus escritores; desde un escritor, hacia abajo llega a la función lectora y continúa por sus llamadas, con la ubicación real de cada operación.
+
+TypeScript y JavaScript reconocen comandos v3 enviados con `cliente.send(new Comando(...))`,
+con cliente y comando importados del paquete AWS correspondiente. Python reconoce métodos de
+clientes creados por `boto3.client(...)` o una `Session`. Los nombres pueden venir de constantes
+y argumentos de wrappers resueltos exactamente. Un cliente alcanzado solo por coincidencia
+de nombre, u oculto por un parámetro, `catch`, desestructuración u otro binding, no aporta lado.
+
+| Servicio | Produce o escribe | Lee | Argumento del nombre |
+| --- | --- | --- | --- |
+| SNS | `Publish`, `PublishBatch` | | `TopicArn` |
+| EventBridge | `PutEvents` | | `Entries[].EventBusName`, `default` si se omite |
+| Kinesis | `PutRecord`, `PutRecords` | | `StreamARN` o `StreamName` |
+| S3 | `PutObject` | `GetObject` | `Bucket` |
+| DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `TransactWriteItems` | `GetItem`, `Query`, `Scan`, `BatchGetItem`, `TransactGetItems` | `TableName`, claves de `RequestItems`, o tablas de `TransactItems` |
+| SSM | | `GetParameter`, `GetParameters`, `GetParametersByPath` | `Name`, `Names`, `Path` |
+| Secrets Manager | | `GetSecretValue`, `BatchGetSecretValue` | `SecretId`, `SecretIdList` |
+
+En JavaScript cada operación tiene el sufijo `Command`; boto3 usa snake case
+(`put_object`, `get_secret_value`). SNS, EventBridge y Kinesis son productores; S3 y DynamoDB
+usan los lados escritor y lector de recursos. Los nombres literales y ARN compatibles se unen
+a la infraestructura por nombre físico, sin cuenta ni región. Los lados SDK literales se unen
+en `exact`, incluso a otros lados SDK del mismo repositorio; un lado declarado en `meada.toml`
+conserva `declared`. Los valores de infraestructura sustituibles siguen dando `inferred`.
+
+Sin una entrada correspondiente en el entorno del workload, una lectura como `process.env.BUCKET` u `os.getenv("BUCKET")` queda sin resolver, con
+`via: "env:BUCKET"` en el export y la variable nombrada en el contexto de su función. Un
+productor o escritor SDK también tiene `via`, opcional en el formato 1; un literal usa `sdk:aws`.
+Meada no lee el entorno del proceso. La construcción aislada de un comando, los publishes SNS
+para teléfonos o endpoints, los clientes de alto nivel `boto3.resource` y `DynamoDBDocumentClient`
+y las operaciones fuera de la tabla no se reconocen por estas formas.
+
+`GetParametersByPath` consulta una jerarquía, por lo que su lado queda sin resolver; la ruta no se trata como nombre de parámetro. Un `ConditionCheck` de `TransactWriteItems` es lector, aunque la transacción también escriba otras tablas. Las claves calculadas de `RequestItems` conservan el literal o el nombre de la variable de entorno.
+
+## Imágenes y código de las cargas de trabajo
+
+El contrato `image::<registry>/<repository>` conecta una carga de trabajo con el repositorio
+cuya configuración construye su imagen (#662). `nginx:1.27` pasa a ser
+`image::docker.io/library/nginx`; `acme/api`, `image::docker.io/acme/api`. Los nombres quedan en
+minúsculas, sin etiqueta ni digest.
+
+Los constructores proceden de `docker/build-push-action` (`tags`), `docker/metadata-action`
+(`images`), Compose con `build` e `image`, artefactos Skaffold (incluso varios documentos YAML),
+destinos Jib literales de Maven/Gradle y comandos ko `build --bare` o `publish --bare` con
+`KO_DOCKER_REPO` definido en el workflow. Las imágenes base no son destinos. Otros modos de
+nombres de ko y expresiones Gradle no leídas no crean un constructor supuesto.
+
+Los ejecutores son containers e init containers de cargas Kubernetes, después de aplicar los
+overrides de imagen de Kustomize, servicios Compose e `image.repository` de valores Helm.
+No se renderizan templates Helm. `context` muestra la imagen y los repositorios constructores;
+`trace` recorre la relación en ambos sentidos hasta las entradas del código. Los overlays que
+usan la misma carga e imagen conservan un ejecutor y su enlace por raíz de evaluación. Las
+evidencias repetidas de esa imagen en una carga y raíz forman un solo lado. Un contexto
+Compose local ejecuta directamente código del mismo repositorio en `exact`, incluso sin
+`image`, dentro de la raíz y sin atravesar enlaces simbólicos.
+
+Los literales enlazan en `exact`; los defaults Compose y valores Helm, en `inferred`, con su
+origen en el motivo. Las partes no resueltas permanecen patrones y solo corresponden a nombres
+literales en límites de segmentos; varios candidatos quedan `ambiguous` y admiten una decisión.
+`status` solo enumera imágenes huérfanas cuando el ámbito visible tiene constructores y
+ejecutores. En caso contrario, `search` y `context` marcan el lado sin contraparte. La
+exportación mantiene el formato 1, con ubicaciones `at` y `executions` para rutas directas;
+el grafo del console muestra contratos de imagen, enlaces y código de cargas de trabajo.
+
+### Nombres parcialmente resueltos
+
+Un canal, recurso o imagen con partes desconocidas conserva un patrón como `*-orders`.
+`${terraform.workspace}-orders` coincide con `prod-orders` en `inferred`: se requieren
+al menos tres caracteres literales y cada `*` debe ocupar segmentos completos delimitados
+por `-`, `_`, `.` o `/`. Un patrón nunca coincide con otro patrón. Varios nombres literales
+compatibles quedan `ambiguous`, todos enumerados, y se convierten en elementos abiertos.
+`meada decide` guarda la elección en `meada.decisions.toml`; el vínculo elegido queda
+`decided`. Las decisiones de aprovisionamiento pertenecen al lado que contiene el patrón
+y conservan su raíz de evaluación.
+
+Los elementos de claves de configuración usan metadatos del archivo, la línea, la clave y el contrato, también cuando el valor está marcado `redacted` o recortado.
+
+Un patrón de builder de imagen con varios nombres literales de runners también mantiene su propio elemento abierto en el repositorio que construye la imagen.
+
+## Ubicaciones de recursos declarados
+
+El `via` de `[[resource]]` acepta símbolos (`src/orders.ts::cancelOrder`), direcciones IaC y
+`<archivo>#<ruta de clave>`. El lado pertenece al bloque o la clave, accesible por `context` y
+`trace`, y sus enlaces siguen siendo `declared`. Las direcciones incluyen Terraform/OpenTofu
+(`aws_sqs_queue.orders`), Kubernetes/Crossplane (`Deployment.apps/shop/api`), Compose
+(`services.api`), CloudFormation/SAM (`template.yaml::Orders`) y Serverless
+(`serverless.yml::functions.api`). Use `<archivo>::<dirección>` para distinguir archivos. La ubicación identifica el bloque de
+origen; el calificador ` (root ...)` de consultas IaC no es una forma de `via`.
+Una dirección que coincide con varios bloques de origen necesita el calificador de archivo;
+sin él, el `via` está obsoleto.
+
+Las rutas usan puntos, índices (`groups[0].name`) y claves entre comillas JSON
+(`metadata.labels["app.kubernetes.io/name"]`). En listas, `[clave=valor]` selecciona elementos
+por igualdad del valor completo, por ejemplo
+`values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support`.
+La ubicación procede de valores indexados y sus rutas padre.
+Los valores nulos y contenedores vacíos no tienen valor indexado; su `via` está obsoleto.
+Un selector puede encontrar varios elementos; cada clave encontrada recibe un lado. Los
+valores marcados como `redacted` o recortados no sirven para seleccionar elementos. Las expresiones
+y plantillas HCL no satisfacen la igualdad de un selector. Los archivos siguen
+las reglas del índice, incluido `.meadaignore`; un `via` no abre archivos por su cuenta.
+
+Un `via` sin coincidencia está obsoleto y aparece en las líneas existentes de `meada status`.
+Sin ningún `via` válido, el lado vuelve al repositorio completo. Esto conecta etiquetas en
+valores Helm con reglas de enrutamiento mediante declaraciones sin renderizar plantillas.
+
+```toml
+[[resource]]
+kind = "routing"
+id = "team-b"
+role = "write"
+via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
+```
+
+## Funciones y tareas AWS
+
+Lambda en Terraform/OpenTofu ejecuta `image_uri`; SAM ejecuta `ImageUri`, y las tareas ECS
+ejecutan la imagen de cada contenedor de `container_definitions`, incluso mediante `jsonencode`.
+Estos ejecutores participan en contratos de imagen, contexto, trazas y huérfanos. El entorno
+conserva su contenedor y raíz de evaluación, sin alcanzar código de otra imagen.
+
+Un `filename` local de Lambda o `CodeUri` de SAM conecta directamente el código del mismo
+repositorio. Una referencia exacta a `data.archive_file.<nombre>.output_path` puede seguir
+solo su entrada local explícita `source_dir` o `source_file`. Los archivos ZIP son ubicaciones
+opacas; su contenido no se extrae. Un handler Serverless como `worker/send.dispatch` selecciona
+un único archivo local existente (`.ts`, `.js`, `.mjs`, `.cjs` o `.py`); las extensiones ambiguas
+quedan sin resolver. Las rutas nuevas deben ser relativas, sin componentes `..` y sin
+atravesar enlaces simbólicos. S3, URL y código remoto no se convierten en rutas locales.
+
+SAM combina `Globals.Function.Environment.Variables` con el entorno de la función; Serverless
+combina `provider.environment` con `functions.<nombre>.environment`. La función prevalece,
+aunque su valor de reemplazo no pueda leerse. Terraform Lambda y ECS también aportan sus
+entornos. Las referencias conocidas a recursos pueden conservar la identidad del contrato
+sin inventar un ARN o URL del despliegue. Secretos, referencias dinámicas y valores externos
+siguen sin contenido. La lectura en código resuelve en `inferred`, con workload y variable
+en el motivo; `context` y `trace` muestran la ejecución por imagen y las rutas directas.
+
+Referencias como `aws_sqs_queue.orders.url` y `aws_s3_bucket.assets.bucket` identifican
+el contrato sin proporcionar una URL del despliegue; atributos de contenido como `value` siguen sin resolver.
+
+## Entornos de los workloads
+
+Una lectura de entorno que nombra una cola, tópico o recurso, como `process.env.QUEUE_URL`,
+se resuelve solo con las entradas del workload que ejecuta ese código. La evidencia de
+ejecución viene de la imagen publicada por el repositorio o de un contexto de build local
+de Compose. Los contenedores conservan sus propios entornos. La resolución es `inferred`,
+con el workload y la variable en el motivo.
+
+Kubernetes aporta literales, referencias a claves de ConfigMap o Secret y `envFrom`; Compose
+aporta entradas en mapa o lista y valores predeterminados como `${QUEUE_URL:-orders}`.
+`context` del workload muestra los nombres, destinos y valores disponibles. Un Secret sigue
+`redacted`, y una referencia ausente o un valor no resuelto no crea vínculos. Los nombres solo
+coinciden dentro del ámbito del workload: los valores vienen del IaC y la configuración de
+los repositorios, nunca del entorno de un proceso.
+
+## Alertas y rutas de Alertmanager
+
+El contrato `alert::<clave>::<valor>` une las etiquetas de reglas Prometheus y Loki
+(incluido `PrometheusRule`) y Grafana con los matchers de rutas de Alertmanager, en
+archivos de configuración y objetos `AlertmanagerConfig`. La igualdad crea un enlace
+`exact`; una expresión regular crea `inferred`. Las condiciones de una ruta se comprueban juntas.
+
+`search` con kind `alert` encuentra el contrato; `context` en la ruta muestra su receiver,
+y `trace` recorre de la regla a la ruta y de vuelta. `meada export` incluye emisores,
+matchers y enlaces. `meada status` solo lista huérfanos cuando el ámbito visible contiene
+ambos lados; de lo contrario, `search` y `context` indican el lado ausente. Los valores Helm
+que dependen de templates no son emisores: Meada no renderiza templates.
+
+Las reglas Grafana también se leen de exports JSON y bloques `rule` de recursos `grafana_rule_group` en Terraform/OpenTofu, con etiquetas literales.
+
+Una ruta raíz sin matchers no crea un lado de alerta: no hay clave y valor para el contrato. El grafo describe los matchers escritos, sin predecir notificaciones finales, inhibiciones ni horarios.
+
+Prometheus y Loki también emiten el `alertname` literal del nombre de la regla, sobrescribiendo una etiqueta con ese nombre. Las etiquetas que puedan venir de la expresión permanecen desconocidas, no vacías. Los archivos bajo `templates/` no se renderizan ni se tratan como emisores de alertas.
+
+### OpsGenie y PagerDuty en Terraform
+
+Las tags literales `clave:valor` de `datadog_monitor` son emisores. Las condiciones de
+tags en `opsgenie_team_routing_rule` y las condiciones
+PCL de orquestaciones PagerDuty, son matchers. La igualdad es `exact`; regex, prefijo y
+contención son `inferred`. Las condiciones y el orden de las reglas se evalúan juntos;
+valores desconocidos u operaciones no leídas no eligen un destino por conjetura.
+
+Las tags de Datadog llegan a OpsGenie. Las etiquetas de reglas llegan a tags sólo mediante
+un receiver OpsGenie seleccionado en Alertmanager que configure `tags` explícitamente.
+Los templates simples de `.CommonLabels.<clave>` o `.GroupLabels.<clave>` usan etiquetas
+fijadas por el `group_by` efectivo. Un receiver PagerDuty v2 puede reenviarlas por
+`details`, que se convierte en `event.custom_details.<clave>`; no hay reenvío implícito
+de tags a PagerDuty. Templates no leídos y reenvíos ausentes no generan links.
+
+`context` muestra el ámbito escrito de la regla, y `trace` conserva el camino hasta el
+bloque de enrutamiento. Un matcher compatible no demuestra entrega ni una notificación
+final a un equipo. En el ejemplo público #638 la regla prueba `service:app`: el mismo
+monitor también emite `support:team-b`, pero no hay allí un matcher para `support`.
+El YAML de monitor no estándar y los valores Helm originales siguen siendo configuración.
+
+## Contratos Azure y Functions
+
+La tabla Terraform/OpenTofu lee `azurerm_servicebus_queue`, `azurerm_servicebus_topic` y
+`azurerm_servicebus_subscription` como canales `servicebus`; `azurerm_eventhub` como
+`eventhubs`; `azurerm_storage_account` como recurso `azurestorage`,
+`azurerm_storage_container` como `azureblob` y `azurerm_key_vault_secret` como `keyvault`.
+Una cuenta y un contenedor con igual nombre mantienen contratos distintos.
+
+Una suscripción tiene identidad `channel::servicebus::subscription:<tema>/<suscripción>`.
+Une sus consumidores con los productores del tema, con `exact` sin regla de filtro e
+`inferred` cuando se declara una regla. Las colas y temas conservan `/` en sus nombres.
+Los processors C# existentes conservan la identidad del tema, incluso al recibir una
+suscripción. Los IDs ARM completos y las URL de blob/secreto admitidas dan usos `exact`;
+las claves finales `servicebus_queue`, `servicebus_topic`, `servicebus_subscription`
+(valor `tema/suscripción`), `eventhubs_hub`, `azurestorage_account`, `azureblob_container`
+y `keyvault_secret` dan `inferred`. La igualdad sin esta evidencia no crea vínculos.
+
+`azurerm_linux_function_app` lee el bloque Docker de `site_config.application_stack`;
+ambos tipos Linux y Windows leen `zip_deploy_file` local y `app_settings`. El archivo local
+queda dentro del repositorio, sin `..` ni symlinks; los ZIP no se abren. Un paquete remoto
+no identifica código local. Las referencias Key Vault en app settings siguen ocultas
+y sin resolver. Los contratos y workloads participan en `context`, `trace`, huérfanos,
+aprovisionamiento y export.
+
+### SDK de Azure en cinco grupos de lenguajes
+
+Los constructores conocidos de los SDK de Azure en JavaScript/TypeScript, Python, Java, Go y C# crean productores/consumidores de Service Bus y Event Hubs, escritores/lectores de contenedores Blob y lectores de secretos Key Vault. La [guía de usuario](https://github.com/ClaudioMascaro/meada/blob/main/docs/user-guide.es.md#uso-de-los-sdk-de-azure-en-cinco-grupos-de-lenguajes) enumera constructores y operaciones. Los receptores de suscripción conservan tema y suscripción dentro de la misma carga, raíz y contenedor; los nombres del entorno sin esa evidencia siguen sin resolverse. Las formas C# existentes de Service Bus conservan la identidad del tema.
+
+## Recursos personalizados y módulos de infraestructura
+
+Este es un inventario cerrado de 43 tipos de recursos personalizados, más los roles de Exchange y Binding del operador RabbitMQ. Los tipos y grupos deben coincidir exactamente. Otros CRD siguen disponibles en `search` con `kind = "iac"`, `context` y `trace`, sin recibir un contrato supuesto. Meada lee los archivos del repositorio sin consultar operadores ni descargar módulos.
+
+| Tipo y grupo | Campo de identidad | Contrato |
+| --- | --- | --- |
+| `KafkaTopic.kafka.strimzi.io` | `spec.topicName` | `channel::kafka` |
+| `Queue.rabbitmq.com` | `spec.name` | `channel::amqp` |
+| `Queue.sqs.services.k8s.aws` | `spec.queueName` | `channel::sqs` |
+| `Bucket.s3.services.k8s.aws` | `spec.name` | `resource::s3` |
+| `Topic.sns.services.k8s.aws` | `spec.name` | `channel::sns` |
+| `EventBus.eventbridge.services.k8s.aws` | `spec.name` | `channel::eventbridge` |
+| `Stream.kinesis.services.k8s.aws` | `spec.name` | `channel::kinesis` |
+| `Table.dynamodb.services.k8s.aws` | `spec.tableName` | `resource::dynamodb` |
+| `DBInstance.rds.services.k8s.aws` | `spec.dbInstanceIdentifier` | `resource::rds` |
+| `DBCluster.rds.services.k8s.aws` | `spec.dbClusterIdentifier` | `resource::rds` |
+| `CacheCluster.elasticache.services.k8s.aws` | `spec.cacheClusterID` | `resource::elasticache` |
+| `ReplicationGroup.elasticache.services.k8s.aws` | `spec.replicationGroupID` | `resource::elasticache` |
+| `Parameter.ssm.services.k8s.aws` | `spec.name` | `resource::ssm` |
+| `Secret.secretsmanager.services.k8s.aws` | `spec.name` | `resource::secretsmanager` |
+| `PubSubTopic.pubsub.cnrm.cloud.google.com` | `spec.resourceID` | `channel::pubsub` |
+| `PubSubSubscription.pubsub.cnrm.cloud.google.com` | `spec.resourceID` | `channel::pubsub` |
+| `StorageBucket.storage.cnrm.cloud.google.com` | `spec.resourceID` | `resource::gcs` |
+| `SQLInstance.sql.cnrm.cloud.google.com` | `spec.resourceID` | `resource::cloudsql` |
+| `SQLDatabase.sql.cnrm.cloud.google.com` | `spec.resourceID` | `resource::cloudsql` |
+| `SecretManagerSecret.secretmanager.cnrm.cloud.google.com` | `spec.resourceID` | `resource::gcpsecretmanager` |
+| `Queue.sqs.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::sqs` |
+| `Bucket.s3.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::s3` |
+| `Topic.sns.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::sns` |
+| `Bus.cloudwatchevents.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::eventbridge` |
+| `Stream.kinesis.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::kinesis` |
+| `Table.dynamodb.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::dynamodb` |
+| `Instance.rds.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::rds` |
+| `Cluster.elasticache.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::elasticache` |
+| `Parameter.ssm.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::ssm` |
+| `Secret.secretsmanager.aws.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::secretsmanager` |
+| `Topic.pubsub.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::pubsub` |
+| `Subscription.pubsub.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::pubsub` |
+| `Bucket.storage.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::gcs` |
+| `DatabaseInstance.sql.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::cloudsql` |
+| `Database.sql.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::cloudsql` |
+| `Secret.secretmanager.gcp.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::gcpsecretmanager` |
+| `Queue.servicebus.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::servicebus` |
+| `Topic.servicebus.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::servicebus` |
+| `Subscription.servicebus.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::servicebus` |
+| `EventHub.eventhub.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `channel::eventhubs` |
+| `Account.storage.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::azurestorage` |
+| `Container.storage.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::azureblob` |
+| `Secret.keyvault.azure.upbound.io` | `metadata.annotations["crossplane.io/external-name"]` | `resource::keyvault` |
+
+Strimzi usa `metadata.name` solo cuando falta `spec.topicName`. Config Connector usa `metadata.name` solo cuando falta `spec.resourceID`. Un campo presente pero desconocido o inválido no activa ese valor por defecto. Las familias Crossplane enumeradas requieren la anotación explícita `crossplane.io/external-name`. El nombre físico mostrado en el nodo sigue separado de su identificador de contrato normalizado.
+
+Cloud SQL usa la identidad compuesta `<instancia>/<base>`: `SQLDatabase` lee `spec.instanceRef`, y `Database.sql.gcp.upbound.io` lee `spec.forProvider.instance` o `instanceRef`. Las referencias locales deben resolver a un solo objeto del grupo, tipo y namespace correctos. Las suscripciones Pub/Sub tienen contrato propio `channel::pubsub::subscriptions/<nombre>` y leen el origen de `spec.topicRef` o `spec.forProvider.topic`/`topicRef`. Las suscripciones Service Bus requieren el nombre completo o ARM ID que identifica tópico y suscripción, produciendo `channel::servicebus::subscription:<tópico>/<suscripción>`. Un nombre corto sin calificación no basta.
+
+Las bases literales de Composition usan el mismo inventario. Los patches que pueden cambiar identidad, calificación o ruta suprimen la proyección; patches desconocidos, conjuntos ausentes o duplicados y conjuntos anidados tampoco establecen un contrato. Las funciones y los patches nunca se ejecutan.
+
+### Topología RabbitMQ
+
+`Queue.rabbitmq.com` provisiona `channel::amqp::<spec.name>`. `Exchange.rabbitmq.com` aporta nombre y tipo sin convertirse en canal. `Binding.rabbitmq.com` referencia `spec.source` y `spec.destination` en la misma unidad de evaluación, cluster, namespace y vhost; una referencia por `connectionSecret` sigue separada de una referencia por nombre de cluster. Solo destinos de tipo `queue` con endpoints únicos y conocidos generan binding. `topic` usa `*` y `#`; `direct` acepta claves sin comodines; `fanout` alcanza todas las claves. `headers`, tipos desconocidos y destinos de tipo `exchange` no generan ruta de cola. Estos últimos conservan referencias navegables. El tipo ausente de Exchange es `direct`. Los nombres y claves AMQP tienen un límite de 255 bytes. El provisionamiento de un publish conserva su lugar real y nivel de ruta, `exact` para clave literal e `inferred` para comodín.
+
+### Módulos de registro
+
+Solo se reconocen estas seis fuentes; se acepta el prefijo opcional `registry.terraform.io/`. La tabla enumera entradas leídas y controles de creación.
+
+| Fuente | Entradas; controles |
+| --- | --- |
+| `terraform-aws-modules/sqs/aws` | `name`, `fifo_queue`, `use_name_prefix`; `create` |
+| `terraform-aws-modules/sns/aws` | `name`, `fifo_topic`, `use_name_prefix`; `create` |
+| `terraform-aws-modules/s3-bucket/aws` | `bucket`; `create`, `create_bucket` |
+| `terraform-aws-modules/dynamodb-table/aws` | `name`; `create`, `create_table` |
+| `terraform-aws-modules/lambda/aws` | `function_name`, `package_type`, `image_uri`, `environment_variables`, `source_path`, `local_existing_package`, `handler`; `create`, `create_function`, `create_package`, `create_layer`, `putin_khuylo` |
+| `terraform-aws-modules/ecs/aws//modules/service` | `name`, `container_definitions` (`name`, `create`, `image`, `environment`, `secrets`); `create`, `create_service`, `create_task_definition` |
+
+`create = false`, `count = 0` o un control de creación desconocido no produce lado. Los nombres desconocidos siguen como patrones seguros, sin inventar un nombre físico. SQS y SNS añaden `.fifo` cuando se solicita; los nombres generados por `use_name_prefix` no establecen provisionador literal. Lambda y ECS aportan imágenes y ambientes con el mismo lector de los workloads nativos, conservando ámbitos por contenedor. Lambda acepta `source_path` escalar conocido con `create_package = true`, dentro del repositorio y sin `..` ni symlink; las formas de lista/objeto y el empaquetado S3 no tienen destino local. `local_existing_package` debe ser un archivo existente y queda opaco: no se extraen ZIP ni se ejecuta empaquetador. `create_layer = true` suprime la función. El directorio del módulo no se supone como código de la función.

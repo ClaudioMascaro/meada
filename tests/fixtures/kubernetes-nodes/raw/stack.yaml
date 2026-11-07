@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tools
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: runner
+  namespace: tools
+  labels:
+    app: runner
+spec:
+  containers:
+    - name: main
+      image: busybox:1.36
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: runner
+  namespace: tools
+spec:
+  selector:
+    app: runner

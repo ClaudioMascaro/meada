@@ -1,0 +1,7 @@
+example.com/resource-via/infra (.) indexed, 0 files
+  resource::routing::team-b: `via` stack.yaml::Gone matches no symbol, ignored
+  resource::routing::team-b: `via` custom_rule.open (root .) matches no symbol, ignored
+  resource::routing::team-b: `via` Routing matches no symbol, ignored
+  config files: 9 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 24, redacted: 0
+example.com/resource-via/app (../resource-via-app) indexed, 1 files
+  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 6, redacted: 0

@@ -397,6 +397,39 @@ fn edit(repo: &Path) {
     fs::write(repo.join("tsconfig.json"), "{}\n").unwrap();
 }
 
+/// Edits a Backstage config partial (#689), and nothing else: its root `app-config.yaml` includes
+/// it, so the refreshed export reads the new variable, as a cold export of the same files does.
+#[test]
+fn a_refresh_after_editing_only_a_backstage_partial_equals_a_cold_export() {
+    const PARTIAL: &str = "config/partials/acme.yaml";
+    let edit = |repo: &Path| replace(repo, PARTIAL, "${API_URL}", "${PARTIAL_URL}");
+    let repo = fixture_repo("fresh_partial", "ts-backstage-web", WEB);
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    edit(&repo);
+    let refreshed = engine.export().unwrap();
+    assert_ne!(before, refreshed);
+    assert_eq!(
+        refreshed,
+        cold_export("fresh_partial_cold", "ts-backstage-web", WEB, edit)
+    );
+    let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
+    let via = |function: &str| {
+        (json["consumers"].as_array().unwrap().iter())
+            .find(|c| {
+                c["site"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("::{function}::"))
+            })
+            .map(|c| c["via"].clone())
+    };
+    assert_eq!(via("viaIncludedKey"), Some("env:PARTIAL_URL".into()));
+    assert_eq!(via("viaIncludedBlock"), Some("env:PARTIAL_URL".into()));
+    assert_eq!(via("viaGetString"), Some("env:API_URL".into()));
+}
+
 /// Edits, adds and deletes `.swift` files of the SwiftPM fixture, then edits its `Package.swift`
 /// alone: each refreshed export equals a cold export of the same files (spec #29, #117).
 #[test]
@@ -734,6 +767,58 @@ fn rust_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() 
         refreshed,
         cold_export("fresh_rust_cold", "conformance-rust", ORIGIN, edit_rust)
     );
+}
+
+/// A refresh after a one-line edit reads the values of every unchanged file from the values
+/// cache (ADR 0027), parsing only the edited one, and leaves the index a cold one; deleting the
+/// cache costs only the parses.
+#[test]
+fn a_refresh_over_the_values_cache_parses_only_the_edited_file_and_equals_a_cold_export() {
+    let edit = |repo: &Path| {
+        replace(
+            repo,
+            "crates/worker/src/clients.rs",
+            "verbs/head",
+            "verbs/heads",
+        )
+    };
+    let again = |repo: &Path| {
+        edit(repo);
+        replace(
+            repo,
+            "crates/worker/src/urls.rs",
+            "/fmt/inline",
+            "/fmt/inlined",
+        );
+    };
+    let repo = fixture_repo("fresh_values", "conformance-rust", ORIGIN);
+    age(&repo);
+    let started = meada::value_parses();
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    let cold = meada::value_parses() - started;
+    let cache = repo.join(".meada/values.db");
+    assert!(cold > 1 && cache.exists(), "{cold} parsed for values");
+
+    edit(&repo);
+    let started = meada::value_parses();
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+    assert_eq!(meada::value_parses() - started, 1);
+    assert_ne!(refreshed, before);
+    let expected = cold_export("fresh_values_cold", "conformance-rust", ORIGIN, edit);
+    assert_eq!(refreshed, expected);
+
+    fs::remove_file(&cache).unwrap();
+    replace(
+        &repo,
+        "crates/worker/src/urls.rs",
+        "/fmt/inline",
+        "/fmt/inlined",
+    );
+    let started = meada::value_parses();
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+    assert_eq!(meada::value_parses() - started, cold);
+    let expected = cold_export("fresh_values_again", "conformance-rust", ORIGIN, again);
+    assert_eq!(refreshed, expected);
 }
 
 /// Renames a function of a multi-file package that the package's other files call, adds a file
@@ -2460,6 +2545,74 @@ fn a_refresh_keeps_untouched_groups_and_follows_edits_across_files_like_a_cold_i
     }
 }
 
+/// A config file edited alone (#639) rewrites its values and nothing else: the Python job's
+/// file, rewritten under its old stamp, still gives its old consumer, so no group of code was
+/// extracted again, and the export does not move, while `search` finds the edited value and not
+/// the old one; a removed config file takes its values along.
+#[test]
+fn an_edited_config_file_alone_refreshes_its_values_and_nothing_else() {
+    let repo = catalog("fresh_config_alone");
+    fs::write(repo.join("settings.yaml"), "billing:\n  region: eu-west\n").unwrap();
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let before = engine.export().unwrap();
+    let values = |q: &str| engine.search(q, Some("value"), None).unwrap();
+    assert!(
+        values("eu-west").contains("settings.yaml:2"),
+        "{}",
+        values("eu-west")
+    );
+    replace(&repo, "jobs/report.py", "billing", "bulling");
+    fs::write(
+        repo.join("settings.yaml"),
+        "billing:\n  region: us-east-2\n",
+    )
+    .unwrap();
+    age(&repo);
+
+    let refreshed = engine.export().unwrap();
+
+    assert_eq!(refreshed, before);
+    let edited = values("us-east-2");
+    let line = "settings.yaml:2 billing.region = \"us-east-2\"";
+    assert!(edited.contains(line), "{edited}");
+    assert_eq!(values("eu-west"), "no matches for `eu-west`\n");
+    fs::remove_file(repo.join("settings.yaml")).unwrap();
+    assert_eq!(values("us-east-2"), "no matches for `us-east-2`\n");
+}
+
+/// A changed value is found by its new text and not its old one through the trigram index too
+/// (#647): a substring of three characters or more takes that path, so the rows of the old text
+/// must leave it with the file, and a removed file takes its rows along.
+#[test]
+fn an_edited_config_value_is_found_by_a_substring_of_its_new_text_only() {
+    let repo = catalog("fresh_config_trigram");
+    fs::write(repo.join("settings.yaml"), "billing:\n  region: eu-west\n").unwrap();
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let values = |q: &str| engine.search(q, Some("value"), None).unwrap();
+    assert!(
+        values("u-wes").contains("settings.yaml:2"),
+        "{}",
+        values("u-wes")
+    );
+    fs::write(
+        repo.join("settings.yaml"),
+        "billing:\n  region: us-east-2\n",
+    )
+    .unwrap();
+    age(&repo);
+
+    let found = values("s-eas");
+    assert!(
+        found.contains("settings.yaml:2 billing.region = \"us-east-2\""),
+        "{found}"
+    );
+    assert_eq!(values("u-wes"), "no matches for `u-wes`\n");
+    fs::remove_file(repo.join("settings.yaml")).unwrap();
+    assert_eq!(values("s-eas"), "no matches for `s-eas`\n");
+}
+
 /// A refresh does not read a kept group's files again (#391): the Python job's file, rewritten
 /// under its old stamp with a host of the same length, still gives its old consumer after an
 /// edit of the TypeScript group, since its values are not parsed again.
@@ -2477,4 +2630,28 @@ fn a_refresh_does_not_parse_a_kept_group_again() {
 
     assert!(refreshed.contains("billing.example.com"), "{refreshed}");
     assert!(!refreshed.contains("bulling"), "{refreshed}");
+}
+
+/// An edit that changes what a file exports keeps no group, though the other groups' exports
+/// are read from their stored rows (#610): the Python job's file, rewritten under its old stamp,
+/// is parsed again and gives its new host.
+#[test]
+fn an_edit_of_what_a_file_exports_keeps_no_group() {
+    let repo = catalog("fresh_kept_exports");
+    age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    engine.export().unwrap();
+    replace(&repo, "jobs/report.py", "billing", "bulling");
+    age(&repo);
+    let export = "export async function titles()";
+    replace(
+        &repo,
+        "web/comments.ts",
+        export,
+        &format!("export const n = 1;\n{export}"),
+    );
+
+    let refreshed = engine.export().unwrap();
+
+    assert!(refreshed.contains("bulling.example.com"), "{refreshed}");
 }

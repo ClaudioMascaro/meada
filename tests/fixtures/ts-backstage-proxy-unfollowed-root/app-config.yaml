@@ -1,0 +1,3 @@
+# A whole `app-config.yaml` that is one `$include` Meada does not follow (an absolute path) may
+# hold `proxy.endpoints`, so the legacy keys of the other file are no endpoints.
+$include: /etc/backstage/app-config.yaml

@@ -1,0 +1,38 @@
+example.com/azure/infra main.tf:3-20 azurerm_linux_function_app.image
+type: azurerm_linux_function_app
+name: "image-worker"
+root: .
+overridable: none
+references:
+example.com/azure/infra main.tf:2 aws_sqs_queue.tasks
+referenced by: none
+values:
+example.com/azure/infra main.tf:4 resource.azurerm_linux_function_app.image.name = "image-worker"
+example.com/azure/infra main.tf:6 resource.azurerm_linux_function_app.image.app_settings.TASK_QUEUE = aws_sqs_queue.tasks.id
+example.com/azure/infra main.tf:7 resource.azurerm_linux_function_app.image.app_settings.LITERAL_QUEUE = "https://sqs.us-east-1.amazonaws.com/123456789012/tasks"
+example.com/azure/infra main.tf:8 resource.azurerm_linux_function_app.image.app_settings.UNKNOWN_QUEUE = var.no_default
+example.com/azure/infra main.tf:9 resource.azurerm_linux_function_app.image.app_settings.SECRET_QUEUE = "@Microsoft.KeyVault(SecretUri=https://keys.vault.azure.net/secrets/api-key/version)"
+example.com/azure/infra main.tf:14 resource.azurerm_linux_function_app.image.site_config.application_stack.docker.registry_url = "https://ghcr.io"
+example.com/azure/infra main.tf:15 resource.azurerm_linux_function_app.image.site_config.application_stack.docker.image_name = "azure/functions"
+example.com/azure/infra main.tf:16 resource.azurerm_linux_function_app.image.site_config.application_stack.docker.image_tag = var.tag
+image: image::ghcr.io/azure/functions
+  builder: example.com/azure/app [inferred: image::ghcr.io/azure/functions; image: main.tf#resource.azurerm_linux_function_app.image (var.tag main.tf:1)]
+env image LITERAL_QUEUE -> Terraform environment: https://sqs.us-east-1.amazonaws.com/123456789012/tasks
+env image SECRET_QUEUE -> Key Vault secret api-key (redacted): unresolved
+env image TASK_QUEUE -> Terraform aws_sqs_queue tasks: channel::sqs::tasks
+env image UNKNOWN_QUEUE -> Terraform environment (unresolved): unresolved
+
+example.com/azure/infra main.tf:21-25 azurerm_windows_function_app.archive
+type: azurerm_windows_function_app
+name: "archive-worker"
+root: .
+build: "worker.zip"
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/azure/infra main.tf:22 resource.azurerm_windows_function_app.archive.name = "archive-worker"
+example.com/azure/infra main.tf:23 resource.azurerm_windows_function_app.archive.zip_deploy_file = "worker.zip"
+example.com/azure/infra main.tf:24 resource.azurerm_windows_function_app.archive.app_settings.LOCAL_QUEUE = "tasks"
+env archive LOCAL_QUEUE -> Terraform environment: tasks
+code: example.com/azure/infra worker.zip [exact]

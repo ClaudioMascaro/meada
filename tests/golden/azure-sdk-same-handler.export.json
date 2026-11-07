@@ -1,0 +1,146 @@
+{
+  "format": 1,
+  "repository": "local/azure-sdk-same-handler",
+  "files": [
+    {
+      "path": "worker.go",
+      "hash": "880f3d6814b46764cd9b8365e37852f6fa24fed0def2ca4d7db9e5192bbc2f51"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/azure-sdk-same-handler::worker.go::run",
+      "span": {
+        "path": "worker.go",
+        "start": 101,
+        "end": 390
+      },
+      "hash": "0618a9a51932b7a0dfd9dcf39f088a791c5c5ed066c88d5b1b1f742ba77e0759"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/azure-sdk-same-handler::worker.go::run::bus.NewClient#0",
+      "caller": "local/azure-sdk-same-handler::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 128,
+        "end": 167
+      }
+    },
+    {
+      "id": "local/azure-sdk-same-handler::worker.go::run::client.NewReceiverForQueue#0",
+      "caller": "local/azure-sdk-same-handler::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 181,
+        "end": 229
+      }
+    },
+    {
+      "id": "local/azure-sdk-same-handler::worker.go::run::client.NewReceiverForSubscription#0",
+      "caller": "local/azure-sdk-same-handler::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 250,
+        "end": 313
+      }
+    },
+    {
+      "id": "local/azure-sdk-same-handler::worker.go::run::os.Getenv#0",
+      "caller": "local/azure-sdk-same-handler::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 208,
+        "end": 224
+      }
+    },
+    {
+      "id": "local/azure-sdk-same-handler::worker.go::run::os.Getenv#1",
+      "caller": "local/azure-sdk-same-handler::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 284,
+        "end": 300
+      }
+    },
+    {
+      "id": "local/azure-sdk-same-handler::worker.go::run::queue.ReceiveMessages#0",
+      "caller": "local/azure-sdk-same-handler::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 315,
+        "end": 347
+      }
+    },
+    {
+      "id": "local/azure-sdk-same-handler::worker.go::run::subscription.ReceiveMessages#0",
+      "caller": "local/azure-sdk-same-handler::worker.go::run",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 349,
+        "end": 388
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "image::ghcr.io/probe/azure-sdk-worker",
+      "site": "local/azure-sdk-same-handler",
+      "at": ".github/workflows/build.yml#jobs.publish.steps[0].with.tags"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "image::ghcr.io/probe/azure-sdk-worker",
+      "site": "local/azure-sdk-same-handler::pods.yaml::Pod/same-handler",
+      "via": null,
+      "root": "."
+    },
+    {
+      "contract": "channel::servicebus::orders",
+      "site": "local/azure-sdk-same-handler::worker.go::run",
+      "via": "workload:local/azure-sdk-same-handler::pods.yaml::Pod/same-handler (root .), env:BUS"
+    },
+    {
+      "contract": "channel::servicebus::subscription:orders/audit",
+      "site": "local/azure-sdk-same-handler::worker.go::run",
+      "via": "workload:local/azure-sdk-same-handler::pods.yaml::Pod/same-handler (root .), env:BUS"
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "local/azure-sdk-same-handler::pods.yaml::Pod/same-handler",
+      "address": "Pod/same-handler",
+      "type": "Pod",
+      "root": ".",
+      "path": "pods.yaml",
+      "line": 1,
+      "end_line": 8
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/azure-sdk-same-handler::pods.yaml::Pod/same-handler",
+      "provider": "local/azure-sdk-same-handler",
+      "contract": "image::ghcr.io/probe/azure-sdk-worker",
+      "level": "exact",
+      "reason": "image::ghcr.io/probe/azure-sdk-worker",
+      "root": "."
+    }
+  ]
+}

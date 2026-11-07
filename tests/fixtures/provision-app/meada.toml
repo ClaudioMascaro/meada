@@ -1,0 +1,18 @@
+[[peer]]
+repo = "example.com/provision/infra"
+
+[[resource]]
+kind = "s3"
+id = "archive"
+role = "write"
+via = ["src/producer.ts::enqueueOrder"]
+
+[[resource]]
+kind = "s3"
+id = "archive"
+role = "read"
+
+[[resource]]
+kind = "postgres"
+id = "archive"
+role = "read"

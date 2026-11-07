@@ -1,0 +1,9 @@
+route:
+  receiver: fallback
+  routes:
+    - receiver: team-b
+      matchers:
+        - support="team-b"
+receivers:
+  - name: fallback
+  - name: team-b

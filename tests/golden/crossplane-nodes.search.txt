@@ -1,0 +1,29 @@
+example.com/acme/platform platform/composition.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws (Composition, name "xpostgresqlinstances.aws", root platform)
+example.com/acme/platform platform/pipeline.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline (Composition, name "xpostgresqlinstances.aws-pipeline", root platform)
+example.com/acme/platform platform/composition.yaml:17 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/subnets (SubnetGroup, name "orders-db-subnets", root platform)
+example.com/acme/platform platform/composition.yaml:27 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/instance (Instance, pattern "*", root platform)
+example.com/acme/platform platform/composition.yaml:40 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/backups (Bucket, name "orders-db-backups", root platform)
+example.com/acme/platform platform/composition.yaml:53 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/network (XNetwork, pattern "*", root platform)
+example.com/acme/platform platform/pipeline.yaml:18 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline/events (Queue, name "orders-events", root platform) (no use in the workspace)
+
+example.com/acme/platform examples/claim.yaml:1 PostgreSQLInstance.database.acme.io/team-b/reports-db (PostgreSQLInstance, name "reports-db", root examples)
+example.com/acme/platform platform/claim.yaml:1 PostgreSQLInstance.database.acme.io/team-a/orders-db (PostgreSQLInstance, name "orders-db", root platform)
+example.com/acme/platform platform/composition.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws (Composition, name "xpostgresqlinstances.aws", root platform)
+example.com/acme/platform platform/composition.yaml:17 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/subnets (SubnetGroup, name "orders-db-subnets", root platform)
+example.com/acme/platform platform/composition.yaml:27 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/instance (Instance, pattern "*", root platform)
+example.com/acme/platform platform/composition.yaml:40 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/backups (Bucket, name "orders-db-backups", root platform)
+example.com/acme/platform platform/composition.yaml:53 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/network (XNetwork, pattern "*", root platform)
+example.com/acme/platform platform/definition.yaml:1 CompositeResourceDefinition.apiextensions.crossplane.io/xpostgresqlinstances.database.acme.io (CompositeResourceDefinition, name "xpostgresqlinstances.database.acme.io", root platform)
+example.com/acme/platform platform/pipeline.yaml:1 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline (Composition, name "xpostgresqlinstances.aws-pipeline", root platform)
+example.com/acme/platform platform/pipeline.yaml:18 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline/events (Queue, name "orders-events", root platform) (no use in the workspace)
+
+example.com/acme/platform platform/claim.yaml:1 PostgreSQLInstance.database.acme.io/team-a/orders-db (PostgreSQLInstance, name "orders-db", root platform)
+example.com/acme/platform platform/composition.yaml:17 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/subnets (SubnetGroup, name "orders-db-subnets", root platform)
+example.com/acme/platform platform/composition.yaml:40 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/backups (Bucket, name "orders-db-backups", root platform)
+example.com/acme/platform platform/pipeline.yaml:18 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws-pipeline/events (Queue, name "orders-events", root platform) (no use in the workspace)
+
+example.com/acme/platform platform/bucket.yaml:1 Bucket.s3.aws.upbound.io/shared-assets (Bucket, name "acme-shared-assets", root platform) (no use in the workspace)
+example.com/acme/platform platform/composition.yaml:40 Composition.apiextensions.crossplane.io/xpostgresqlinstances.aws/backups (Bucket, name "orders-db-backups", root platform)
+example.com/acme/platform platform/bucket.yaml:13 CustomResourceDefinition.apiextensions.k8s.io/buckets.s3.aws.upbound.io (CustomResourceDefinition, name "buckets.s3.aws.upbound.io", root platform)
+
+no matches for `logs`

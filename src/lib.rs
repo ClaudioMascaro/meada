@@ -3,6 +3,7 @@
 
 #[cfg(feature = "accounts")]
 mod accounts;
+mod alert;
 #[cfg(any(feature = "ui", feature = "generation-pointer"))]
 pub mod audit;
 #[cfg(feature = "workspaces")]
@@ -10,6 +11,7 @@ mod catalog;
 mod channel;
 mod community;
 mod config;
+mod config_values;
 mod contract;
 pub mod decide;
 mod decider;
@@ -27,11 +29,14 @@ pub mod github_app;
 #[cfg(feature = "oidc")]
 mod grant;
 mod http;
+mod iac;
+mod image;
 mod index;
 #[doc(hidden)]
-pub use index::{with_busy_timeout, with_reversed_walk};
+pub use index::{value_parses, with_busy_timeout, with_reversed_walk};
 mod items;
 mod jvm;
+mod kube;
 mod lang;
 mod literals;
 pub mod mcp;

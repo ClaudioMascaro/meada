@@ -1,0 +1,7 @@
+# A `proxy.endpoints` include whose key path's last key is absent gives Backstage `undefined`, a
+# key its loader leaves out, so the legacy keys beside it are the endpoints.
+proxy:
+  endpoints:
+    $include: ./partials/proxy.yaml#nope
+  '/inventory':
+    target: ${INVENTORY_URL}

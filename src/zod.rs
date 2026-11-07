@@ -335,29 +335,49 @@ impl<'a> Reader<'_, 'a> {
         if depth >= ZOD_DEPTH {
             return Some(None);
         }
-        let of = |call: &'a Invocation, methods: [&str; 2]| {
-            let on = (call.receiver.as_deref()).filter(|_| methods.contains(&method(call)));
-            on.map(|receiver| (call, receiver))
-        };
         match value {
             Value::Schema(name) => self.named(path, scope, name, depth),
-            Value::Call(call) => match of(call, ["parse", "parseAsync"]) {
-                Some((_, receiver)) => self.schema(path, scope, receiver, depth + 1),
-                None => Some(None),
-            },
+            Value::Call(_) | Value::Await(_) => {
+                self.parsed(path, scope, value, ["parse", "parseAsync"], depth)
+            }
             Value::Member(name, field) if field == "data" => {
-                let Some((at, within, Value::Call(call))) = self.constant(path, scope, name) else {
+                let Some((at, within, held)) = self.constant(path, scope, name) else {
                     return Some(None);
                 };
-                match of(call, ["safeParse", "safeParseAsync"]) {
-                    Some((_, receiver)) => self.schema(at, within, receiver, depth + 1),
-                    None => Some(None),
-                }
+                self.parsed(at, within, held, ["safeParse", "safeParseAsync"], depth)
             }
             Value::Ref(name) => match self.constant(path, scope, name) {
                 Some((at, within, held)) => self.body(at, within, held, depth + 1),
                 None => Some(None),
             },
+            _ => Some(None),
+        }
+    }
+
+    /// A parse result, optionally awaited. Safe parse supplies the schema only when `body`
+    /// selects its `data`; awaiting the result alone does not make that selection.
+    fn parsed(
+        &mut self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        methods: [&str; 2],
+        depth: usize,
+    ) -> Read {
+        if depth >= ZOD_DEPTH {
+            return Some(None);
+        }
+        match value {
+            Value::Await(value) => {
+                self.spent.charge()?;
+                self.parsed(path, scope, value, methods, depth + 1)
+            }
+            Value::Call(call) if methods.contains(&method(call)) => {
+                match call.receiver.as_deref() {
+                    Some(receiver) => self.schema(path, scope, receiver, depth + 1),
+                    None => Some(None),
+                }
+            }
             _ => Some(None),
         }
     }
@@ -819,6 +839,8 @@ mod tests {
         for body in [
             "function h(req, res) { res.json(S.parse(req.body)); res.json({ other: 1 }); }",
             "function h(req, res) { res.json(S.safeParse(req.body)); }",
+            "async function h(req, res) { res.json(await S.safeParseAsync(req.body)); }",
+            "async function h(req, res) { const r = await other(req.body); res.json(r.data); }",
             "function h(req, res) { res.json(S.parse(req.body).tags); }",
             "function h(req, res) { res.end(); }",
         ] {

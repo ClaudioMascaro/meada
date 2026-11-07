@@ -1,0 +1,33 @@
+example.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[0] (aws_sqs_queue, name "dead-letters", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[1] (aws_sqs_queue, name "dead-letters", root envs/prod) (no use in the workspace)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, name "orders", root envs/prod) (no use in the workspace)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, name "orders-stage", root envs/stage) (no use in the workspace)
+example.com/acme/infra modules/queue/main.tf:9 module.payments.aws_sqs_queue.this (aws_sqs_queue, name "payments", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/prod/main.tf:40 aws_sqs_queue_redrive_allow_policy.dlq (aws_sqs_queue_redrive_allow_policy, root envs/prod)
+
+example.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[0] (aws_sqs_queue, name "dead-letters", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/prod/main.tf:35 aws_sqs_queue.dlq[1] (aws_sqs_queue, name "dead-letters", root envs/prod) (no use in the workspace)
+
+example.com/acme/infra envs/prod/main.tf:10 module.orders (module, root envs/prod)
+example.com/acme/infra envs/stage/main.tf:1 module.orders (module, root envs/stage)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, name "orders", root envs/prod) (no use in the workspace)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, name "orders-stage", root envs/stage) (no use in the workspace)
+example.com/acme/infra modules/queue/main.tf:13 module.orders.aws_sns_topic_subscription.this (aws_sns_topic_subscription, root envs/prod)
+example.com/acme/infra modules/queue/main.tf:13 module.orders.aws_sns_topic_subscription.this (aws_sns_topic_subscription, root envs/stage)
+
+example.com/acme/infra envs/prod/main.tf:1 data.aws_caller_identity.current (aws_caller_identity, root envs/prod)
+
+example.com/acme/infra envs/prod/main.tf:10 module.orders (module, root envs/prod)
+example.com/acme/infra envs/prod/main.tf:16 module.payments (module, root envs/prod)
+example.com/acme/infra envs/prod/main.tf:22 module.worker (module, root envs/prod)
+example.com/acme/infra envs/prod/main.tf:44 module.audit (module, name "audit", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/stage/main.tf:1 module.orders (module, root envs/stage)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, name "orders", root envs/prod) (no use in the workspace)
+example.com/acme/infra modules/queue/main.tf:9 module.orders.aws_sqs_queue.this (aws_sqs_queue, name "orders-stage", root envs/stage) (no use in the workspace)
+example.com/acme/infra modules/queue/main.tf:9 module.payments.aws_sqs_queue.this (aws_sqs_queue, name "payments", root envs/prod) (no use in the workspace)
+example.com/acme/infra modules/queue/main.tf:13 module.orders.aws_sns_topic_subscription.this (aws_sns_topic_subscription, root envs/prod)
+example.com/acme/infra modules/queue/main.tf:13 module.orders.aws_sns_topic_subscription.this (aws_sns_topic_subscription, root envs/stage)
+example.com/acme/infra modules/queue/main.tf:13 module.payments.aws_sns_topic_subscription.this (aws_sns_topic_subscription, root envs/prod)
+example.com/acme/infra modules/worker/main.tf:5 module.worker.aws_lambda_event_source_mapping.this (aws_lambda_event_source_mapping, root envs/prod)
+
+no matches for `nothing-here`

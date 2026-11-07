@@ -1,14 +1,29 @@
 # Contract kind interface
 
+`contract::workspace_steps` shares phase order between full and answer-sized queries: every
+`workspace_step`, then every `workspace_ready`. The latter prepares views that depend on other
+kinds' completed steps (HTTP routing depends on the image kind's pattern decisions).
+Then each kind's default-empty `provision_uses` hook can prepare additional infrastructure uses
+in one batch. Rows retain their real site, contract, level and reason in a transient Export
+field; Channel uses one Routes view for operator queue bindings (#671), without replacing raw
+producer sides or teaching the engine broker policies.
+`explain_inferred` also receives the link and visible exports so a kind can reuse its prepared
+evidence for presentation.
+
 - `contract.rs`: `ContractKind` trait, the whole interface of a kind: `prefix`, `extract` and
   `link` are required, every other question (see [New contract kind](../overview/seams-and-what-extends-them.md))
   has a default body. The engine fixes the phase order (every `declare`, every `workspace_step`,
-  `link`, the decisions replay, every `after_links`) and asks the kinds in `KINDS` order; a new
+  every `workspace_ready`, `link`, the decisions replay, every `after_links`) and asks the kinds in `KINDS` order; a new
   kind appends to the list. A side is unresolved when its contract is absent (an unresolved
   consumer) or when `unresolved` says so of the identifier (an unresolved side). The seam's free
   functions (`kind_of`, `unresolved`, `shown`, `typed`, `label`, `parts`, `place`, `serves`,
-  `entry`, `searched`) are what the rest of the crate calls. A kind's helpers are private to its
-  file; the few that stay `pub` are named under their kind (`http::contract`,
+  `consumer_item`, `link_candidate`, `entry`, `searched`, `explain_inferred`) are what the rest
+  of the crate calls. The
+  `explain_inferred` display policy defaults to false and receives the consumer, repository,
+  link and visible exports. HTTP enables it when the recorded `env:` base selects a peer
+  declared by `base_url_env`, or its prepared routing supplies structured infrastructure or
+  workload evidence. Proxy suffixes preserve the peer lookup. It changes no links. A kind's
+  helpers are private to its file; the few that stay `pub` are named under their kind (`http::contract`,
   `normalize_path` and `PARAM` for the config and the documents, both `meada_core::http`'s,
   re-exported; `channel::contract` for
   the documents; the `package` readers the index writer calls). `KINDS`, `Level`, `Link`, `Names`, `Role`. A `Found` carries its `role` (`Provider`,
@@ -16,3 +31,9 @@
   stored in `contracts.role`; the site does not imply it (a channel producer is a `Site::Call`, a channel
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
   in the index: unnamed inline segments drop, and an empty result is the file's top level.
+
+`environment_identity` (#670) optionally resolves a private `ReceiverIdentity` from certain
+stored `EnvironmentValue` entries. Scope includes workload, IaC root and selected container;
+only the kind interprets subtype and companion components. A claimed empty result prevents
+scalar fallback. Legacy None retains `environment_name` / `environment_target`. Identity stays
+out of public exports, while `method` and `via` retain actual written operation/provenance.

@@ -1,0 +1,157 @@
+{
+  "format": 1,
+  "repository": "local/gcp-sdk-resource-sites",
+  "files": [
+    {
+      "path": "reads.ts",
+      "hash": "0a6c204da7d0e4a3a9570542b8be751ff671ed0b716ae4d153f949bc78351f9e"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::readTwice",
+      "span": {
+        "path": "reads.ts",
+        "start": 204,
+        "end": 536
+      },
+      "hash": "3669474d6fbfa9d7e5989375bdd3d0600a090d1766abadfe8bd8915fdf683417"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-resource-sites::reads.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "reads.ts",
+        "start": 163,
+        "end": 195
+      }
+    },
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::Storage#0",
+      "caller": "local/gcp-sdk-resource-sites::reads.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "reads.ts",
+        "start": 134,
+        "end": 147
+      }
+    },
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::readTwice::(call_expression).download#0",
+      "caller": "local/gcp-sdk-resource-sites::reads.ts::readTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "reads.ts",
+        "start": 229,
+        "end": 285
+      }
+    },
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::readTwice::(call_expression).download#1",
+      "caller": "local/gcp-sdk-resource-sites::reads.ts::readTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "reads.ts",
+        "start": 289,
+        "end": 345
+      }
+    },
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::readTwice::(call_expression).file#0",
+      "caller": "local/gcp-sdk-resource-sites::reads.ts::readTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "reads.ts",
+        "start": 229,
+        "end": 274
+      }
+    },
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::readTwice::(call_expression).file#1",
+      "caller": "local/gcp-sdk-resource-sites::reads.ts::readTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "reads.ts",
+        "start": 289,
+        "end": 334
+      }
+    },
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::readTwice::secrets.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-resource-sites::reads.ts::readTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "reads.ts",
+        "start": 349,
+        "end": 439
+      }
+    },
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::readTwice::secrets.accessSecretVersion#1",
+      "caller": "local/gcp-sdk-resource-sites::reads.ts::readTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "reads.ts",
+        "start": 443,
+        "end": 533
+      }
+    },
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::readTwice::storage.bucket#0",
+      "caller": "local/gcp-sdk-resource-sites::reads.ts::readTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "reads.ts",
+        "start": 229,
+        "end": 259
+      }
+    },
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::readTwice::storage.bucket#1",
+      "caller": "local/gcp-sdk-resource-sites::reads.ts::readTwice",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "reads.ts",
+        "start": 289,
+        "end": 319
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "resource::gcs::double-reads",
+      "site": "local/gcp-sdk-resource-sites::reads.ts::readTwice::(call_expression).download#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcs::double-reads",
+      "site": "local/gcp-sdk-resource-sites::reads.ts::readTwice::(call_expression).download#1",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::double-token",
+      "site": "local/gcp-sdk-resource-sites::reads.ts::readTwice::secrets.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::double-token",
+      "site": "local/gcp-sdk-resource-sites::reads.ts::readTwice::secrets.accessSecretVersion#1",
+      "via": null
+    }
+  ],
+  "links": []
+}

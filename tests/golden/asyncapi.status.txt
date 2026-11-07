@@ -11,3 +11,4 @@ example.com/asyncapi/events (../asyncapi-events) indexed, 1 files
   sensors.asyncapi.yml: server protocol `mqtt` has no broker kind, its channels are ignored
   serverless.asyncapi.yaml: asyncapi 3.0.0, channels: 0
   serverless.asyncapi.yaml: no root `servers`, so no channel has a broker kind: its channels are ignored
+  config files: 6 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 68, redacted: 0

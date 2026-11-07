@@ -1,0 +1,54 @@
+{
+  "format": 1,
+  "repository": "example.com/resource-via/app",
+  "files": [
+    {
+      "path": "app.py",
+      "hash": "a4c08a8c055b41677653c451b394ae02056eabfa13ee44eeafc2fb397c7dc2ee"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/resource-via/app::app.py::emit",
+      "span": {
+        "path": "app.py",
+        "start": 0,
+        "end": 20
+      },
+      "hash": "6eaab20f9b2b6df4ac46635ca3ecd146dbb9114fb2af8b6474248d9012a42729"
+    }
+  ],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "resource::routing::team-b",
+      "site": "example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support"
+    }
+  ],
+  "consumers": [],
+  "links": [
+    {
+      "consumer": "example.com/resource-via/infra::main.tf::opsgenie_team_routing_rule.team_b",
+      "provider": "example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support",
+      "contract": "resource::routing::team-b",
+      "level": "declared",
+      "reason": "resource::routing::team-b"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/resource-via/app::app.py::emit",
+      "kind": "export",
+      "label": "emit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/resource-via/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/resource-via/app::app.py::emit"
+        }
+      ]
+    }
+  ]
+}

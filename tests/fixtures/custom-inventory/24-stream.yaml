@@ -1,0 +1,10 @@
+apiVersion: kinesis.aws.upbound.io/v1beta1
+kind: Stream
+metadata:
+  name: operator-24
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: xp-stream
+spec:
+  forProvider:
+    region: us-east-1

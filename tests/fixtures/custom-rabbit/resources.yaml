@@ -1,0 +1,256 @@
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: inbox-object
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  name: inbox
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: broadcast-object
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  name: broadcast
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: direct-object
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  name: direct-inbox
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: lookalike-object
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  name: events
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Exchange
+metadata:
+  name: event-object
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  name: events
+  type: topic
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Exchange
+metadata:
+  name: fanout-exchange
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  name: fan
+  type: fanout
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Exchange
+metadata:
+  name: direct-exchange
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  name: direct
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Exchange
+metadata:
+  name: headers-exchange
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  name: headers
+  type: headers
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: topic-bind
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  source: events
+  destination: inbox
+  destinationType: queue
+  routingKey: order.*
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: fanout-bind
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  source: fan
+  destination: broadcast
+  destinationType: queue
+  routingKey: ignored
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: direct-bind
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  source: direct
+  destination: direct-inbox
+  destinationType: queue
+  routingKey: order.created
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: literal-wildcard
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  source: direct
+  destination: events
+  destinationType: queue
+  routingKey: order.*
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: headers-bind
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  source: headers
+  destination: inbox
+  destinationType: queue
+  routingKey: order.created
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: exchange-bind
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  source: events
+  destination: direct
+  destinationType: exchange
+  routingKey: order.created
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: unknown-source
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /
+  source: missing
+  destination: inbox
+  destinationType: queue
+  routingKey: order.created
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: wrong-cluster
+spec:
+  rabbitmqClusterReference:
+    name: other
+  vhost: /
+  source: events
+  destination: inbox
+  destinationType: queue
+  routingKey: order.created
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: wrong-vhost
+spec:
+  rabbitmqClusterReference:
+    name: broker
+  vhost: other
+  source: events
+  destination: inbox
+  destinationType: queue
+  routingKey: order.created
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: rabbit-stack
+spec:
+  compositeTypeRef:
+    apiVersion: platform.example.com/v1
+    kind: Messaging
+  resources:
+  - name: queue
+    base:
+      apiVersion: rabbitmq.com/v1beta1
+      kind: Queue
+      spec:
+        rabbitmqClusterReference:
+          name: broker
+        vhost: /
+        name: composed-inbox
+  - name: exchange
+    base:
+      apiVersion: rabbitmq.com/v1beta1
+      kind: Exchange
+      spec:
+        rabbitmqClusterReference:
+          name: broker
+        vhost: /
+        name: composed-exchange
+        type: topic
+  - name: binding
+    base:
+      apiVersion: rabbitmq.com/v1beta1
+      kind: Binding
+      spec:
+        rabbitmqClusterReference:
+          name: broker
+        vhost: /
+        source: composed-exchange
+        destination: composed-inbox
+        destinationType: queue
+        routingKey: order.created
+  - name: patched-binding
+    base:
+      apiVersion: rabbitmq.com/v1beta1
+      kind: Binding
+      spec:
+        rabbitmqClusterReference:
+          name: broker
+        vhost: /
+        source: composed-exchange
+        destination: composed-inbox
+        destinationType: queue
+        routingKey: order.created
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.source
+      toFieldPath: spec.source

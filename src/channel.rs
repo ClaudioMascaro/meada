@@ -17,6 +17,7 @@ use crate::resolve::Code;
 use crate::shape::Shape;
 use crate::workspace::Repository;
 
+mod aws;
 mod csharp;
 mod go;
 mod java;
@@ -33,6 +34,26 @@ const SIDES: (&str, &str) = ("producer", "consumer");
 
 /// The start of every channel contract identifier.
 const PREFIX: &str = "channel::";
+
+// ponytail: AMQP 0-9-1 exchange/queue names and routing keys are short strings, at most 255 bytes.
+const AMQP_ROUTING_MAX: usize = 255;
+
+pub(crate) fn amqp_name(name: &str) -> bool {
+    !name.is_empty() && name.len() <= AMQP_ROUTING_MAX && !name.chars().any(char::is_control)
+}
+
+/// Operator types are explicit: direct wildcards stay literal and cannot use topic matching.
+pub(crate) fn topology_pattern<'a>(exchange: &str, key: &'a str) -> Option<&'a str> {
+    if key.len() > AMQP_ROUTING_MAX {
+        return None;
+    }
+    match exchange {
+        "topic" => Some(key),
+        "direct" if !key.contains(['*', '#']) => Some(key),
+        "fanout" => Some("#"),
+        _ => None,
+    }
+}
 
 /// The contract identifier of the channel `name` of `broker`, kept as evaluated. A side whose
 /// name could not be evaluated is `channel::<broker>`: it names its broker kind, never links
@@ -51,6 +72,7 @@ pub fn contract(broker: &str, name: Option<&str>) -> String {
 struct Routes<'a> {
     pub bindings: Vec<&'a Binding>,
     pub publishes: Vec<&'a Publish>,
+    pub subscriptions: Vec<&'a crate::iac::subscription::Subscription>,
 }
 
 impl<'a> Routes<'a> {
@@ -58,6 +80,7 @@ impl<'a> Routes<'a> {
         Self {
             bindings: exports.iter().flat_map(|e| &e.bindings).collect(),
             publishes: exports.iter().flat_map(|e| &e.publishes).collect(),
+            subscriptions: exports.iter().flat_map(|e| &e.subscriptions).collect(),
         }
     }
 
@@ -76,19 +99,30 @@ impl<'a> Routes<'a> {
 
 /// Whether the topic-exchange `pattern` matches the routing `key`: words split at `.`, `*` is
 /// exactly one word and `#` zero or more.
-// ponytail: an exchange's type (`assertExchange`) is not read, so every pattern follows
-// topic-exchange rules, a direct or fanout exchange included.
+// Code-declared bindings retain topic rules; operator bindings first select a supported
+// pattern with topology_pattern. Dynamic programming keeps repeated `#` linear per key word.
 fn pattern_matches(pattern: &str, key: &str) -> bool {
-    fn go(pattern: &[&str], key: &[&str]) -> bool {
-        match pattern.split_first() {
-            None => key.is_empty(),
-            Some((&"#", rest)) => (0..=key.len()).any(|n| go(rest, &key[n..])),
-            Some((&"*", rest)) => !key.is_empty() && go(rest, &key[1..]),
-            Some((word, rest)) => key.first() == Some(word) && go(rest, &key[1..]),
-        }
+    if pattern.len() > AMQP_ROUTING_MAX || key.len() > AMQP_ROUTING_MAX {
+        return false;
     }
-    let words = |text| Vec::from_iter(str::split(text, '.'));
-    go(&words(pattern), &words(key))
+    let key = key.split('.').collect::<Vec<_>>();
+    let mut previous = vec![false; key.len() + 1];
+    previous[0] = true;
+    for word in pattern.split('.') {
+        let mut next = vec![false; key.len() + 1];
+        if word == "#" {
+            next[0] = previous[0];
+            for i in 1..=key.len() {
+                next[i] = previous[i] || next[i - 1];
+            }
+        } else {
+            for i in 1..=key.len() {
+                next[i] = previous[i - 1] && (word == "*" || word == key[i - 1]);
+            }
+        }
+        previous = next;
+    }
+    previous[key.len()]
 }
 
 /// The call a message was made at.
@@ -109,8 +143,53 @@ fn parse(contract: &str) -> Option<(&str, Option<&str>)> {
 }
 
 impl ContractKind for Channel {
+    fn environment_name(
+        &self,
+        contract: &str,
+        value: &str,
+        operation: Option<&str>,
+    ) -> Option<String> {
+        if matches!(contract, "channel::servicebus" | "channel::eventhubs") {
+            return crate::contract::azure::sdk::environment_name(contract, value);
+        }
+        if contract == "channel::pubsub" {
+            let name = crate::contract::gcp::sdk::environment_name(value, operation)?;
+            return Some(format!("channel::pubsub::{name}"));
+        }
+        crate::contract::environment_name(contract, value)
+    }
+
+    fn environment_identity(
+        &self,
+        contract: &str,
+        identity: &crate::contract::ReceiverIdentity,
+        values: &dyn Fn(&str) -> Vec<crate::contract::EnvironmentValue>,
+    ) -> Option<Vec<(String, String)>> {
+        crate::contract::azure::sdk::environment_identity(contract, identity, values)
+    }
+
+    fn environment_target(&self, contract: &str, target: &str, operation: Option<&str>) -> bool {
+        if contract == "channel::servicebus" {
+            return target
+                .strip_prefix("channel::servicebus::")
+                .is_some_and(|name| crate::contract::azure::servicebus(name).is_some());
+        }
+        if contract == "channel::pubsub" {
+            let Some(name) = target.strip_prefix("channel::pubsub::") else {
+                return false;
+            };
+            return crate::contract::gcp::sdk::environment_target(name, operation);
+        }
+        target
+            .rsplit_once("::")
+            .is_some_and(|(prefix, _)| prefix == contract)
+    }
     fn prefix(&self) -> &'static str {
         "channel"
+    }
+
+    fn flows_to_consumer(&self) -> bool {
+        true
     }
 
     fn sides(&self) -> Option<(&'static str, &'static str)> {
@@ -166,7 +245,27 @@ impl ContractKind for Channel {
                 matched: None,
                 shape: None,
             });
+        let subscribed_producers = export.providers.iter().filter_map(|p| {
+            Some(Related {
+                site: &p.site,
+                role: Role::Provider,
+                words: format!("{producer} {}", crate::render::label(&p.site)),
+                matched: Some(subscribed(&p.contract, contract, &routes)?),
+                shape: p.shape.as_ref(),
+            })
+        });
+        let subscribed_consumers = export.consumers.iter().filter_map(|c| {
+            Some(Related {
+                site: &c.site,
+                role: Role::Consumer,
+                words: consumer.into(),
+                matched: Some(subscribed(contract, c.contract.as_deref()?, &routes)?),
+                shape: c.shape.as_ref(),
+            })
+        });
         provided
+            .chain(subscribed_producers)
+            .chain(subscribed_consumers)
             .chain(published)
             .chain(consumed)
             .chain(bound)
@@ -179,6 +278,11 @@ impl ContractKind for Channel {
 
     fn parts<'c>(&self, contract: &'c str) -> (Option<&'c str>, Option<&'c str>) {
         parse(contract).map_or((None, None), |(broker, name)| (Some(broker), name))
+    }
+
+    fn provisioned_group<'c>(&self, contract: &'c str) -> Option<&'c str> {
+        let (broker, name) = parse(contract)?;
+        name.filter(|n| !n.is_empty()).map(|_| broker)
     }
 
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
@@ -205,11 +309,16 @@ impl ContractKind for Channel {
                 }
             }
         }
-        messages
+        let mut found: Vec<_> = messages
             .iter()
             .map(|m| {
                 let mut contract = Some(contract(m.broker, m.name.as_deref()));
-                let (mut via, mut method) = (None, None);
+                let (mut via, mut method) = (
+                    m.environment
+                        .as_deref()
+                        .map(crate::image::environment::pending),
+                    None,
+                );
                 let (role, site) = match &m.role {
                     Side::Producer => (Role::Provider, call(m)),
                     // A publish whose routing key could not be evaluated is an unresolved
@@ -242,6 +351,7 @@ impl ContractKind for Channel {
                     }
                 };
                 Found {
+                    identity: None,
                     role,
                     site,
                     contract,
@@ -251,7 +361,13 @@ impl ContractKind for Channel {
                     shape: None,
                 }
             })
-            .collect()
+            .chain(ts::aws(code))
+            .chain(python::aws(code))
+            .collect();
+        found.extend(aws::extract(code, Some(indexed)));
+        found.extend(crate::contract::gcp::sdk::extract(code, true));
+        found.extend(crate::contract::azure::sdk::extract(code, true));
+        found
     }
 
     /// Adds the channel sides of the repository's AsyncAPI documents (spec #21). A document side
@@ -290,6 +406,7 @@ impl ContractKind for Channel {
                         ..Provider::default()
                     }),
                     document::Role::Consumer => export.consumers.push(Consumer {
+                        identity: None,
                         contract: Some(contract),
                         site,
                         via: None,
@@ -297,22 +414,75 @@ impl ContractKind for Channel {
                         method: None,
                         fragments: Vec::new(),
                         hops: Vec::new(),
+                        root: None,
                     }),
                 }
+            }
+        }
+        for node in &export.iac {
+            let Some(binding) = node.provisioned.as_ref().and_then(|p| p.binding.as_ref()) else {
+                continue;
+            };
+            let mut side = Binding::default();
+            side.contract = binding.contract.clone();
+            side.exchange = binding.exchange.clone();
+            side.pattern = binding.pattern.clone();
+            side.site = node.identity(&export.repository);
+            if !export.bindings.contains(&side) {
+                export.bindings.push(side);
             }
         }
         index::sort_providers(&mut export.providers);
         index::sort_consumers(&mut export.consumers);
     }
 
-    /// The publish at `call` and each queue the bindings of the workspace route it to.
-    fn at_call(&self, exports: &[Export], export: &Export, call: &str) -> Vec<String> {
-        let publishes: Vec<_> = export.publishes.iter().filter(|q| q.site == call).collect();
-        if publishes.is_empty() {
+    fn provision_uses(&self, exports: &[Export]) -> Vec<(usize, crate::contract::ProvisionUse)> {
+        // Earlier code-only workspaces retain their bytes. Infrastructure makes this an
+        // indexed group; each real binding can then project its publish's queue use.
+        if !exports
+            .iter()
+            .flat_map(|e| &e.provisioners)
+            .any(|p| p.contract.starts_with("channel::amqp::"))
+        {
             return Vec::new();
         }
         let routes = Routes::new(exports);
-        let mut lines = Vec::new();
+        let mut uses = Vec::new();
+        for (n, export) in exports.iter().enumerate() {
+            for publish in &export.publishes {
+                for (contract, (level, reason)) in routes.reached(publish) {
+                    uses.push((
+                        n,
+                        crate::contract::ProvisionUse {
+                            site: publish.site.clone(),
+                            contract: contract.into(),
+                            level,
+                            reason,
+                        },
+                    ));
+                }
+            }
+        }
+        uses
+    }
+
+    /// The publish at `call` and each queue the bindings of the workspace route it to.
+    fn at_call(&self, exports: &[Export], export: &Export, call: &str) -> Vec<String> {
+        let mut lines: Vec<_> = export
+            .providers
+            .iter()
+            .filter(|p| p.site == call && p.contract.starts_with(PREFIX))
+            .filter_map(|p| p.via.as_deref())
+            .filter_map(|via| {
+                via.strip_prefix("env:")
+                    .map(|name| format!("unresolved environment {name}"))
+            })
+            .collect();
+        let publishes: Vec<_> = export.publishes.iter().filter(|q| q.site == call).collect();
+        if publishes.is_empty() {
+            return lines;
+        }
+        let routes = Routes::new(exports);
         for publish in publishes {
             lines.push(format!("publishes {} {}", publish.exchange, publish.key));
             for (queue, (level, reason)) in routes.reached(publish) {
@@ -337,7 +507,7 @@ impl ContractKind for Channel {
         let providers = providers.iter().map(|&(_, p)| p);
         (reaching(contract, providers, &Routes::new(exports)).into_iter())
             .map(|(provider, (level, reason))| {
-                Link::new(
+                let mut link = Link::new(
                     consumer.site.clone(),
                     provider.to_string(),
                     contract.clone(),
@@ -346,8 +516,26 @@ impl ContractKind for Channel {
                     None,
                     None,
                     None,
-                )
+                );
+                crate::contract::environment_link(&mut link, consumer.via.as_deref());
+                link
             })
+            .collect()
+    }
+
+    /// New AWS source channels can start a trace at each producer, so a subscription's
+    /// source can be followed without selecting one producer first.
+    fn starts<'a>(&self, from: &str, providers: &[(&'a str, &'a str)]) -> Vec<&'a str> {
+        if !matches!(
+            parse(from),
+            Some(("sns" | "eventbridge" | "kinesis", Some(_)))
+        ) {
+            return Vec::new();
+        }
+        providers
+            .iter()
+            .filter(|(contract, _)| *contract == from)
+            .map(|(_, site)| *site)
             .collect()
     }
 
@@ -417,7 +605,18 @@ fn reaching<'p>(
 ) -> BTreeMap<&'p str, (Level, String)> {
     let mut found = BTreeMap::new();
     for p in providers {
-        if let Some(matched) = fits(&p.contract, contract) {
+        if let Some(mut matched) = fits(&p.contract, contract) {
+            if let Some(reason) = crate::contract::environment_reason(p.via.as_deref()) {
+                matched.0 = matched.0.max(Level::Inferred);
+                matched.1 += &format!("; {reason}");
+            }
+            strongest(&mut found, &p.site, matched);
+        }
+        if let Some(mut matched) = subscribed(&p.contract, contract, routes) {
+            if let Some(reason) = crate::contract::environment_reason(p.via.as_deref()) {
+                matched.0 = matched.0.max(Level::Inferred);
+                matched.1 += &format!("; {reason}");
+            }
             strongest(&mut found, &p.site, matched);
         }
     }
@@ -429,6 +628,26 @@ fn reaching<'p>(
         }
     }
     found
+}
+
+/// A subscription carries the source channel to the target; a filter is evidence of a
+/// possible delivery, never an exact one. Several routes to one producer keep the strongest.
+fn subscribed(source: &str, target: &str, routes: &Routes<'_>) -> Option<(Level, String)> {
+    routes
+        .subscriptions
+        .iter()
+        .filter(|s| s.source == source && s.target == target)
+        .map(|s| {
+            (
+                if s.inferred {
+                    Level::Inferred
+                } else {
+                    Level::Exact
+                },
+                s.reason.clone(),
+            )
+        })
+        .min()
 }
 
 /// Keeps the strongest of the matches to `key`.
@@ -489,6 +708,7 @@ mod tests {
 
     fn consumer(contract: &str, site: &str) -> Consumer {
         Consumer {
+            identity: None,
             contract: Some(contract.into()),
             site: site.into(),
             via: None,
@@ -496,6 +716,7 @@ mod tests {
             method: None,
             fragments: Vec::new(),
             hops: Vec::new(),
+            root: None,
         }
     }
 
@@ -628,6 +849,24 @@ mod tests {
         }
     }
 
+    #[test]
+    fn amqp_repeated_hashes_do_not_expand_and_oversized_keys_are_refused() {
+        let pattern = format!("{}.missing", vec!["#"; 100].join("."));
+        let key = vec!["a"; 100].join(".");
+        let start = std::time::Instant::now();
+        for _ in 0..100 {
+            assert!(!pattern_matches(&pattern, &key));
+        }
+        assert!(start.elapsed() < std::time::Duration::from_secs(2));
+        let oversized = "a".repeat(super::AMQP_ROUTING_MAX + 1);
+        assert!(!pattern_matches("#", &oversized));
+        assert!(!pattern_matches(&oversized, "a"));
+        assert!(super::topology_pattern("topic", &oversized).is_none());
+        assert!(super::topology_pattern("direct", "order.*").is_none());
+        assert_eq!(super::topology_pattern("fanout", "ignored"), Some("#"));
+        assert!(super::topology_pattern("headers", "order.created").is_none());
+    }
+
     /// A publish at a call adds its own line and one per queue its bindings route it to; a
     /// call with no publish adds nothing.
     #[test]
@@ -706,6 +945,7 @@ export async function listen() {
             exported: &[],
             files: &["a.ts"],
             configs: &[],
+            symlinks: &[],
         };
         let sites: Vec<_> = Channel
             .extract(&code, &indexed)

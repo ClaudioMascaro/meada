@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: client, namespace: shop}
+spec:
+  template:
+    metadata: {labels: {app: client}}
+    spec:
+      containers:
+        - name: client
+          image: ghcr.io/http-iac/client:v1
+          env:
+            - {name: ORDERS_URL, value: 'http://orders:8080'}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: orders, namespace: shop}
+spec:
+  selector: {app: orders}
+  ports: [{port: 8080, targetPort: 3000}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: orders, namespace: shop}
+spec:
+  template:
+    metadata: {labels: {app: orders}}
+    spec:
+      containers:
+        - name: orders
+          image: ghcr.io/http-iac/server:v1
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: {name: orders, namespace: shop}
+spec:
+  rules:
+    - host: shop.example.com
+      http:
+        paths:
+          - path: /store
+            pathType: Prefix
+            backend:
+              service: {name: orders, port: {number: 8080}}

@@ -36,7 +36,7 @@
   write, looked up by a map, never searched) are as many as the file's writes. Left out:
   MassTransit; `SubscribeSync`, `QueueSubscribe` and `Request` of NATS.Client, and NATS.Net v2 as
   a whole; `BasicGet` and a consumer class that overrides `HandleBasicDeliver` (the handler is
-  the method holding `BasicConsume`); `CreateReceiver` and `CreateSessionProcessor`; a Service
+  the method holding `BasicConsume`); `CreateSessionProcessor` (new constructor-backed polling receivers are covered by #670); a Service
   Bus sender made in another file than the one that sends; a stream read by an array of
   `StreamPosition` (unresolved); a `TopicPartition` as the Kafka target; a topic list built as
   `new List<string> { .. }` (unresolved); `request.QueueUrl = ..` set after the construction; a
@@ -53,7 +53,7 @@
   node-redis client made as `await createClient().connect()` is not traced (the `connect` chain
   has no binding); a BullMQ processor given as a file path is not followed (the function that
   makes the `Worker` handles).
-- `channel/python.rs`: a client is traced to its constructor by `Code::origins` (a name its
+- `channel/python.rs`: a client needs complete constructor evidence in `names/python/arguments.rs` (a name its
   scope binds once, an attribute assigned a call once, a parameter every exact caller passes, a
   value a function returns, or a call written in place: `boto3.client("sqs").send_message(...)`,
   `pika.BlockingConnection(p).channel().basic_publish(...)`), with one level of `channel()` or
@@ -78,6 +78,39 @@
   `CHAIN` (64): a builder chain (`FutureRecord::to(t).payload(p)`, an SQS `send_message()...`,
   redis `StreamReadOptions`) is read to that many calls below the form (`Code::chain`, itself
   bounded by `FLUENT_CHAIN`); a longer one is not a producer or a consumer.
-- `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
-  across the workspace), and an exchange's type is not read: every binding pattern follows
-  topic-exchange rules.
+- `channel.rs`: broker clusters are not part of contract identity (one name of one broker kind
+  is one channel across the workspace). Code-declared bindings retain topic rules. Operator
+  bindings (#671) first require matching cluster/vhost/namespace endpoints and a supported
+  Exchange type; headers, unknown types and direct wildcard keys establish no queue route.
+  `AMQP_ROUTING_MAX` is 255 bytes, AMQP 0-9-1's short-string maximum, for routing names/keys.
+  `pattern_matches` uses bounded dynamic programming over words, with repeated `#` tested
+  against a failing tail instead of recursively expanding combinations. Oversized input stays
+  unmatched. Other brokers retain their existing matching rules.
+
+- AWS SDKs in Java 2.x, Go v2 and .NET (#660): operation tables live in `channel/aws.rs` and
+  `resource/aws.rs`; the mechanical readers and complete constructor evidence live in
+  `contract/sdk/`. A type-only injected client, a name-matched factory, an opaque return branch,
+  a reassigned local and a hidden constructor yield no side. Existing `EVAL_DEPTH` and
+  `EVAL_BUDGET` bound the memoized walk; the SDK lattice test drives a full 1 MiB source file
+  in each language. Java builder requests, Go input literals, .NET request initializers,
+  lists, table-keyed maps and supported named/string overloads name sides. A named request
+  whose name field is written is opaque, with C# writes followed through receiver aliases. Operations not in
+  the documented table do not. A hierarchy query (`GetParametersByPath`) has no physical
+  parameter name and stays unresolved. RDS and ElastiCache control-plane clients establish
+  no data uses. Kotlin keeps the earlier typed SQS reader.
+
+- Python complete factory evidence (#659/#660): `EVAL_DEPTH` (256) and `EVAL_BUDGET` (65,536)
+  bound each receiver question, including argument inventories. The memo keys constructor
+  evidence rather than full call routes; a 1 MiB parameter-return lattice with 128 operations
+  retains its whole side set. Opaque keyword/positional expansions supply no parameter evidence;
+  a second await applied to already-awaited evidence remains unknown.
+
+- GCP SDKs (#668) share the complete, memoized constructor walk in `contract/sdk/origins.rs`.
+  `EVAL_DEPTH` (256) and `EVAL_BUDGET` (65,536) bound each file's walk and exact-frame argument
+  inventory; equivalent normalized frames share memo entries. Only ADR 0026's five-group
+  constructor/operation inventory is recognized. Injected types, unknown factories, opaque
+  return branches, reassigned clients and hidden constructors supply no side. Unsupported
+  overloads and builders are not implied by a supported operation name. A subscription never
+  guesses its topic; its canonical target is `subscriptions/<id>`. Creating a client or handle
+  supplies no direction. Unknown names retain unresolved sides; environment names resolve only
+  within a real scoped workload, through kind-owned normalization and typed target checks.

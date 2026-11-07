@@ -7,7 +7,7 @@ use std::rc::Rc;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Binds, Call, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind,
+    Binds, Call, ConfigInput, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind,
     LanguagePack, Modules, Param, Part, Ty, Value, children, named, text,
 };
 use crate::{Result, package, qualify};
@@ -55,18 +55,51 @@ impl LanguagePack for TsJs {
         let tree = parser
             .parse(src, None)
             .ok_or("tree-sitter returned no tree")?;
-        let parents = Parents::new(tree.root_node(), src);
-        let mut facts = Facts::default();
+        let module = path.ends_with(".mjs");
+        let parents = Parents::new(tree.root_node(), src, module);
+        // The grammar gives `undefined` a dedicated token and recovers its bare arrow
+        // parameter as `undefined = > body`. Reparse only that adjacent `=>` form with an
+        // equal-length identifier token. All facts still read the original bytes and spans.
+        let repaired = if parents.arrow_parameters.is_empty() {
+            None
+        } else {
+            let mut syntax = src.to_vec();
+            for &at in &parents.arrow_parameters {
+                syntax[at] = b'_';
+            }
+            Some(
+                parser
+                    .parse(&syntax, None)
+                    .ok_or("tree-sitter returned no tree")?,
+            )
+        };
+        let root = repaired.as_ref().unwrap_or(&tree).root_node();
+        let parents = if repaired.is_some() {
+            Parents::new(root, src, module)
+        } else {
+            parents
+        };
+        let mut facts = Facts {
+            member_writes: Some(Vec::new()),
+            ..Facts::default()
+        };
+        let mut write_bytes = 0;
         let mut uses = uses::Uses::new(src, &parents);
+        // The instance fields only their declaration or constructor may assign, or only their
+        // class reach (`sealed_field`), by class and name, with their initializer; and every
+        // member write, by name (`None`: any member of `this`) and scope (`member_writes`).
+        let typescript = path.ends_with(".ts") || path.ends_with(".tsx");
+        let mut sealed: Vec<(String, String, Option<Value>)> = Vec::new();
+        let mut writes: BTreeMap<(Option<String>, String), Vec<Option<Value>>> = BTreeMap::new();
         // Each function definition by its node: the `return`s written in its body.
         let mut functions: HashMap<usize, usize> = HashMap::new();
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
-            node: tree.root_node(),
+            node: root,
             scope: String::new(),
             depth: 0,
-            body: tree.root_node(),
+            body: root,
             binding: None,
         }];
         while let Some(Visit {
@@ -91,6 +124,7 @@ impl LanguagePack for TsJs {
                 inner = qualify(&scope, &name);
                 functions.insert(node.id(), facts.defs.len());
                 facts.defs.push(Def {
+                    asynchronous: children(node).any(|n| n.kind() == "async"),
                     params: params(node, src, &inner, &parents),
                     returns: (node.child_by_field_name("return_type"))
                         .and_then(|t| types::returned(t, src, &parents)),
@@ -141,7 +175,19 @@ impl LanguagePack for TsJs {
                             on: None,
                             unwraps: false,
                             awaits: false,
-                            receiver: None,
+                            receiver: (function.kind() == "member_expression")
+                                .then(|| function.child_by_field_name("object"))
+                                .flatten()
+                                .filter(|object| {
+                                    matches!(
+                                        object.kind(),
+                                        "call_expression"
+                                            | "new_expression"
+                                            | "await_expression"
+                                            | "parenthesized_expression"
+                                    )
+                                })
+                                .map(|object| value(object, src, &scope, &parents)),
                             arg_types: arguments
                                 .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())
                                 .unwrap_or_default(),
@@ -159,6 +205,23 @@ impl LanguagePack for TsJs {
                         });
                     }
                 }
+                "public_field_definition" if typescript => {
+                    if let Some(name) = sealed_field(node, src) {
+                        let initial = node.child_by_field_name("value");
+                        let initial = initial.map(|v| value(v, src, &scope, &parents));
+                        sealed.push((scope.clone(), name, initial));
+                    }
+                }
+                "assignment_expression"
+                | "augmented_assignment_expression"
+                | "update_expression"
+                    if typescript =>
+                {
+                    for (name, plain) in member_writes(node, src, &scope, &parents) {
+                        let at = writes.entry((name, scope.clone())).or_default();
+                        at.push(plain);
+                    }
+                }
                 "import_statement" => imports(node, src, &mut facts.imports),
                 "export_statement" => exports(node, src, &mut facts.exports),
                 // A `return` of a function that is no definition (one returned in place, or
@@ -174,6 +237,7 @@ impl LanguagePack for TsJs {
                 _ => {}
             }
             let named = binds(node, src, &parents);
+            selector_writes(node, src, &scope, &mut facts, &mut write_bytes);
             if node.kind() == "assignment_expression"
                 && named.is_some()
                 && let Some(Assigned {
@@ -224,9 +288,13 @@ impl LanguagePack for TsJs {
                     &scope,
                     &parents,
                 );
+                // A `new URL` whose path or host the file writes through its name is no longer
+                // the string it was built from.
+                let rewritten = is_url_new(*value_node, src, &parents)
+                    && parents.written.contains(name.as_str());
                 facts.consts.push(Const {
                     name: qualify(&scope, name),
-                    value,
+                    value: if rewritten { Value::Unknown } else { value },
                     ty,
                     scope: None,
                 });
@@ -249,6 +317,44 @@ impl LanguagePack for TsJs {
                 }
             }));
         }
+        // A sealed field written once, by its initializer or by the plain `this.f = v` of its
+        // class's constructor body, holds that value: a constant of the class, written in the
+        // constructor, as Java's `final` and C#'s `readonly` fields are (`Const::scope`), which
+        // `this.f` reads. Any other write of a member so named inside the class, or a computed
+        // one of `this`, leaves it none.
+        // ponytail: a write through an alias of `this` (`const self = this; self.f = v`) or
+        // `Object.assign(this, ..)` is not seen, nor a subclass that redeclares a non-private
+        // `readonly` field; see `docs/agents/ceilings/language-packs.md`.
+        for (class, name, initial) in sealed {
+            let inside = |scope: &str| {
+                (scope.strip_prefix(class.as_str()))
+                    .is_some_and(|r| r.is_empty() || r.starts_with('.'))
+            };
+            // The writes of `name` (or of any member) in scopes from `class` up to `class/`, which
+            // holds every `class.*` scope; `inside` drops the others the range holds (`class-x`).
+            let mut given = [Some(name.clone()), None].into_iter().flat_map(|name| {
+                let (from, to) = (class.clone(), format!("{class}/"));
+                (writes.range((name.clone(), from)..(name, to)))
+                    .filter(|((_, scope), _)| inside(scope))
+                    .flat_map(|((_, scope), values)| values.iter().map(move |v| (scope, v)))
+            });
+            let ctor = qualify(&class, "constructor");
+            let held = match (initial, given.next(), given.next()) {
+                (Some(value), None, _) => Some((value, None)),
+                (None, Some((scope, Some(value))), None) if *scope == ctor => {
+                    Some((value.clone(), Some(ctor)))
+                }
+                _ => None,
+            };
+            if let Some((value, scope)) = held {
+                facts.consts.push(Const {
+                    name: qualify(&class, &name),
+                    value,
+                    ty: None,
+                    scope,
+                });
+            }
+        }
         Ok(facts)
     }
 
@@ -259,6 +365,11 @@ impl LanguagePack for TsJs {
             // Backstage's configuration, which `http::ts` reads for `config.getString`.
             "**/app-config*.yaml",
         ]
+    }
+
+    /// The `$include` targets of Backstage's `app-config*.yaml` (#689).
+    fn config_inputs<'b>(&self, configs: &[(&str, &[u8])], read: &dyn Fn(&str) -> ConfigInput<'b>) {
+        crate::http::config_inputs(configs, read);
     }
 
     fn receiver(&self) -> Option<&'static str> {
@@ -587,18 +698,79 @@ fn definition(
 struct Parents<'t> {
     up: HashMap<usize, Node<'t>>,
     assigned: HashSet<String>,
+    /// The names a member is written through (`u.p = ..`, `u.p += ..`, `u["p"] = ..`), except
+    /// `search` and `hash`, which keep the path of a URL (WHATWG URL Standard).
+    // ponytail: per name across the whole file, whichever function writes it; see `docs/agents/ceilings.md`.
+    written: HashSet<String>,
+    /// Whether the file binds a `URL` other than the runtime constructor: `new URL(x)` is then
+    /// no runtime global.
+    url_declared: bool,
+    /// Merged lexical scopes that hide the runtime String conversion.
+    string_shadows: Vec<Range<usize>>,
+    /// Modules, class bodies and functions/programs with a strict directive prologue.
+    strict_scopes: HashSet<usize>,
+    /// Bare `undefined =>` parameters the grammar recovered as a comparison.
+    arrow_parameters: Vec<usize>,
 }
 
 impl<'t> Parents<'t> {
-    fn new(root: Node<'t>, src: &[u8]) -> Self {
+    fn new(root: Node<'t>, src: &[u8], module: bool) -> Self {
         let mut up = HashMap::new();
         let mut assigned = HashSet::new();
+        let mut written = HashSet::new();
+        let mut url_declared = false;
+        let mut url_required = false;
+        let mut require_declared = false;
+        let mut arrow_parameters = Vec::new();
+        let mut string_bindings = Vec::new();
+        let mut string_writes = Vec::new();
+        let mut strict_scopes = HashSet::new();
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
+            let body = if node.kind() == "program" {
+                Some(node)
+            } else if BODIES.contains(&node.kind()) {
+                node.child_by_field_name("body")
+            } else {
+                None
+            };
+            if node.kind() == "class_body"
+                || body.is_some_and(|body| strict_directive(body, src))
+                || node.kind() == "program"
+                    && (module
+                        || named(node)
+                            .any(|n| matches!(n.kind(), "import_statement" | "export_statement")))
+            {
+                strict_scopes.insert(node.id());
+            }
+            if node.kind() == "binary_expression"
+                && let Some(left) = node.child_by_field_name("left")
+                && left.kind() == "undefined"
+                && let Some(operator) = node.child_by_field_name("operator")
+                && operator.kind() == ">"
+                && let Some(at) = operator.start_byte().checked_sub(1)
+                && src.get(at..operator.end_byte()) == Some(b"=>")
+                && children(node).any(|child| {
+                    child.is_error() && child.start_byte() == at && child.end_byte() == at + 1
+                })
+            {
+                arrow_parameters.push(left.start_byte());
+            }
+            url_declared |= shadows_runtime(node, src, "URL");
+            url_required |= runtime_url_require(node, src);
+            require_declared |= shadows_runtime(node, src, "require");
+            if shadows_runtime(node, src, "String")
+                && !(node.kind() == "for_in_statement"
+                    && node.child_by_field_name("kind").is_none())
+            {
+                string_bindings.push(node);
+            }
+            written.extend(member_written(node, src));
             let target = match node.kind() {
                 "assignment_expression" | "augmented_assignment_expression" => {
                     node.child_by_field_name("left")
                 }
+                "update_expression" => node.child_by_field_name("argument"),
                 "for_in_statement" => node
                     .child_by_field_name("kind")
                     .is_none()
@@ -606,17 +778,321 @@ impl<'t> Parents<'t> {
                     .flatten(),
                 _ => None,
             };
-            assigned.extend(target.map(|t| bound(t, src)).unwrap_or_default());
+            let names = target.map(|t| bound(t, src)).unwrap_or_default();
+            if names.iter().any(|name| name == "String") {
+                string_writes.push(node.start_byte());
+            }
+            assigned.extend(names);
             for child in children(node) {
                 up.insert(child.id(), node);
                 stack.push(child);
             }
         }
-        Self { up, assigned }
+        url_declared |= assigned.contains("URL")
+            || (url_required && (require_declared || assigned.contains("require")));
+        let mut parents = Self {
+            up,
+            assigned,
+            written,
+            url_declared,
+            string_shadows: Vec::new(),
+            strict_scopes,
+            arrow_parameters,
+        };
+        let mut scopes: Vec<_> = string_bindings
+            .into_iter()
+            .map(|node| parents.string_scope(node, src, root))
+            .collect();
+        scopes.sort_by_key(|scope| scope.start);
+        for scope in scopes {
+            if let Some(last) = parents.string_shadows.last_mut()
+                && last.end >= scope.start
+            {
+                last.end = last.end.max(scope.end);
+            } else {
+                parents.string_shadows.push(scope);
+            }
+        }
+        // An assignment outside a lexical String binding can replace the global itself.
+        if string_writes
+            .into_iter()
+            .any(|at| !parents.string_hidden(at))
+        {
+            parents.string_shadows = vec![root.byte_range()];
+        }
+        parents
     }
 
     fn of(&self, node: Node) -> Option<Node<'t>> {
         self.up.get(&node.id()).copied()
+    }
+
+    fn string_hidden(&self, at: usize) -> bool {
+        let next = self
+            .string_shadows
+            .partition_point(|scope| scope.start <= at);
+        next > 0 && at < self.string_shadows[next - 1].end
+    }
+
+    /// Parameters and expression names belong to their own function; declarations belong
+    /// to their enclosing lexical scope, or function for var. A bounded lookup that cannot
+    /// establish the scope conservatively hides the runtime throughout the file.
+    fn string_scope(&self, node: Node<'t>, src: &[u8], root: Node<'t>) -> Range<usize> {
+        match node.kind() {
+            "formal_parameters" => {
+                return self.of(node).unwrap_or(root).byte_range();
+            }
+            "catch_clause"
+            | "arrow_function"
+            | "function_expression"
+            | "function"
+            | "generator_function"
+            | "class" => return node.byte_range(),
+            "for_in_statement"
+                if node
+                    .child_by_field_name("kind")
+                    .is_none_or(|kind| text(kind, src) != "var") =>
+            {
+                return node.byte_range();
+            }
+            _ => {}
+        }
+        let function = self
+            .of(node)
+            .is_some_and(|parent| parent.kind() == "variable_declaration")
+            || node.kind() == "for_in_statement"
+            // Annex B also creates an enclosing var binding for ordinary block functions
+            // in non-strict code. Async and generator declarations stay block scoped.
+            || node.kind() == "function_declaration"
+                && !children(node).any(|child| child.kind() == "async")
+                && !self.enclosing_strict(node);
+        let mut at = self.of(node);
+        for _ in 0..FOLD_DEPTH {
+            let Some(parent) = at else { break };
+            if parent.kind() == "program"
+                || (function && BODIES.contains(&parent.kind()))
+                || (!function
+                    && matches!(
+                        parent.kind(),
+                        "statement_block" | "for_statement" | "for_in_statement" | "switch_body"
+                    ))
+            {
+                return parent.byte_range();
+            }
+            at = self.of(parent);
+        }
+        root.byte_range()
+    }
+
+    fn enclosing_strict(&self, node: Node) -> bool {
+        let mut at = self.of(node);
+        for _ in 0..FOLD_DEPTH {
+            let Some(parent) = at else { break };
+            if self.strict_scopes.contains(&parent.id()) {
+                return true;
+            }
+            at = self.of(parent);
+        }
+        false
+    }
+}
+
+/// Only raw string-literal directive statements can enable strict mode. Comments do not
+/// end the prologue, but an ordinary expression does (ECMAScript 14.1.1).
+fn strict_directive(body: Node, src: &[u8]) -> bool {
+    for statement in named(body) {
+        if matches!(statement.kind(), "comment" | "hash_bang_line") {
+            continue;
+        }
+        if statement.kind() != "expression_statement" {
+            return false;
+        }
+        let Some(literal) = named(statement).next().filter(|n| n.kind() == "string") else {
+            return false;
+        };
+        if matches!(text(literal, src), "\"use strict\"" | "'use strict'") {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether `node` binds `name`, hiding the runtime name. Only the named `URL` export of Node's
+/// `url` and `node:url` modules proves that a binding named `URL` is the runtime constructor.
+fn shadows_runtime(node: Node, src: &[u8], name: &str) -> bool {
+    match node.kind() {
+        "class_declaration"
+        | "abstract_class_declaration"
+        | "class"
+        | "function_declaration"
+        | "generator_function_declaration"
+        | "function_expression"
+        | "function"
+        | "generator_function"
+        | "enum_declaration" => node
+            .child_by_field_name("name")
+            .is_some_and(|n| text(n, src) == name),
+        "variable_declarator" => {
+            !(name == "URL" && runtime_url_require(node, src))
+                && (node.child_by_field_name("name"))
+                    .is_some_and(|n| bound(n, src).iter().any(|n| n == name))
+        }
+        // A parameter or a `catch` binding of that name hides the global as well.
+        "formal_parameters" => bound(node, src).iter().any(|n| n == name),
+        "for_in_statement" => node
+            .child_by_field_name("left")
+            .is_some_and(|n| bound(n, src).iter().any(|n| n == name)),
+        "import_alias" | "import_require_clause" => named(node)
+            .next()
+            .is_some_and(|n| n.kind() == "identifier" && text(n, src) == name),
+        "catch_clause" => (node.child_by_field_name("parameter"))
+            .is_some_and(|n| bound(n, src).iter().any(|n| n == name)),
+        "arrow_function" => {
+            (node.child_by_field_name("parameter")).is_some_and(|n| text(n, src) == name)
+        }
+        "import_statement" => {
+            let mut bindings = Vec::new();
+            imports(node, src, &mut bindings);
+            bindings.iter().any(|i| {
+                i.local == name
+                    && !(name == "URL"
+                        && matches!(i.source.as_str(), "url" | "node:url")
+                        && matches!(&i.name, Imported::Name(n) if n == "URL"))
+            })
+        }
+        _ => false,
+    }
+}
+
+/// `const { URL } = require('url')` (or `node:url`), including an explicit `URL: URL` binding.
+/// A module object, another export, a rest or nested pattern does not prove a constructor.
+fn runtime_url_require(node: Node, src: &[u8]) -> bool {
+    if node.kind() != "variable_declarator" {
+        return false;
+    }
+    let Some(pattern) = node
+        .child_by_field_name("name")
+        .filter(|n| n.kind() == "object_pattern")
+    else {
+        return false;
+    };
+    let binds_url = named(pattern).any(|n| match n.kind() {
+        "shorthand_property_identifier_pattern" => text(n, src) == "URL",
+        "pair_pattern" => {
+            n.child_by_field_name("key")
+                .is_some_and(|k| text(k, src) == "URL")
+                && n.child_by_field_name("value")
+                    .is_some_and(|v| v.kind() == "identifier" && text(v, src) == "URL")
+        }
+        _ => false,
+    });
+    binds_url
+        && node.child_by_field_name("value").is_some_and(|v| {
+            v.kind() == "call_expression"
+                && v.child_by_field_name("function")
+                    .is_some_and(|f| f.kind() == "identifier" && text(f, src) == "require")
+                && v.child_by_field_name("arguments").is_some_and(|args| {
+                    let mut args = named(args);
+                    args.next().is_some_and(|a| {
+                        a.kind() == "string"
+                            && matches!(unquote(a, src).as_str(), "url" | "node:url")
+                    }) && args.next().is_none()
+                })
+        })
+}
+
+/// The callee of a `new URL(reference, base)` of the runtime global, as a `Value::New` names it.
+pub const GLOBAL_URL: &str = "globalThis.URL";
+
+/// Whether `node` is `new URL(..)` of the runtime global: no declaration of the file hides it.
+fn is_url_new(node: Node, src: &[u8], up: &Parents) -> bool {
+    node.kind() == "new_expression"
+        && !up.url_declared
+        && (node.child_by_field_name("constructor"))
+            .is_some_and(|c| c.kind() == "identifier" && text(c, src) == "URL")
+}
+
+/// The name `node` writes a member of, when it is `u.p = ..` or `u.p += ..` (or `u["p"]`) and
+/// `p` is neither `search` nor `hash`.
+fn member_written(node: Node, src: &[u8]) -> Option<String> {
+    if !matches!(
+        node.kind(),
+        "assignment_expression" | "augmented_assignment_expression"
+    ) {
+        return None;
+    }
+    let left = node.child_by_field_name("left")?;
+    let object = left.child_by_field_name("object")?;
+    let member = match left.kind() {
+        "member_expression" => text(left.child_by_field_name("property")?, src).to_string(),
+        "subscript_expression" => {
+            let index = left.child_by_field_name("index")?;
+            if index.kind() == "string" {
+                unquote(index, src)
+            } else {
+                String::new()
+            }
+        }
+        _ => return None,
+    };
+    (object.kind() == "identifier" && member != "search" && member != "hash")
+        .then(|| text(object, src).to_string())
+}
+
+fn selector_writes(node: Node, src: &[u8], scope: &str, facts: &mut Facts, spent: &mut usize) {
+    if facts.member_writes.is_none() {
+        return;
+    }
+    let target = match node.kind() {
+        "assignment_expression" | "augmented_assignment_expression" => {
+            node.child_by_field_name("left")
+        }
+        "update_expression" => node
+            .child_by_field_name("argument")
+            .or_else(|| named(node).next()),
+        "unary_expression" if children(node).any(|n| text(n, src) == "delete") => node
+            .child_by_field_name("argument")
+            .or_else(|| named(node).next()),
+        _ => return,
+    };
+    let mut pending: Vec<_> = target.into_iter().collect();
+    while let Some(target) = pending.pop() {
+        if facts.member_writes.is_none() {
+            break;
+        }
+        let field = match target.kind() {
+            "member_expression" => target
+                .child_by_field_name("property")
+                .map(|p| text(p, src).to_string()),
+            "subscript_expression" => target
+                .child_by_field_name("index")
+                .filter(|n| n.kind() == "string")
+                .map(|n| unquote(n, src)),
+            "identifier" => continue,
+            "assignment_pattern" => {
+                pending.extend(target.child_by_field_name("left"));
+                continue;
+            }
+            "pair_pattern" => {
+                pending.extend(target.child_by_field_name("value"));
+                continue;
+            }
+            _ => {
+                pending.extend(named(target));
+                continue;
+            }
+        };
+        if let Some(object) = target.child_by_field_name("object") {
+            facts.member_write(
+                super::MemberWrite {
+                    scope: scope.into(),
+                    object: callee(object, src),
+                    field,
+                    range: node.byte_range(),
+                },
+                spent,
+            );
+        }
     }
 }
 
@@ -679,7 +1155,7 @@ fn bound_nodes(pattern: Node) -> Vec<Node> {
     let mut stack = vec![pattern];
     while let Some(node) = stack.pop() {
         match node.kind() {
-            "identifier" | "shorthand_property_identifier_pattern" => out.push(node),
+            "identifier" | "undefined" | "shorthand_property_identifier_pattern" => out.push(node),
             "pair_pattern" => stack.extend(node.child_by_field_name("value")),
             "assignment_pattern" | "object_assignment_pattern" => {
                 stack.extend(node.child_by_field_name("left"))
@@ -733,7 +1209,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
     else {
         return Vec::new();
     };
-    if list.kind() == "identifier" {
+    if matches!(list.kind(), "identifier" | "undefined") {
         return vec![Param {
             name: text(list, src).to_string(),
             binds: Binds::Any,
@@ -759,7 +1235,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
             };
             Param {
                 name: pattern
-                    .filter(|n| n.kind() == "identifier")
+                    .filter(|n| matches!(n.kind(), "identifier" | "undefined"))
                     .map_or("", |n| text(n, src))
                     .to_string(),
                 binds: Binds::Any,
@@ -1080,11 +1556,16 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
             let properties = named(node).filter_map(|property| match property.kind() {
                 "pair" => {
                     let key = property.child_by_field_name("key")?;
+                    let value = property.child_by_field_name("value")?;
+                    if key.kind() == "computed_property_name" {
+                        let key = named(key).next().map_or(Value::Unknown, deeper);
+                        return Some(("[]".into(), Value::List(vec![key, deeper(value)])));
+                    }
                     let key = match key.kind() {
                         "string" => unquote(key, src),
                         _ => text(key, src).to_string(),
                     };
-                    let value = deeper(property.child_by_field_name("value")?);
+                    let value = deeper(value);
                     Some((key, value))
                 }
                 "shorthand_property_identifier" => {
@@ -1110,15 +1591,18 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
             Value::Object(properties.collect())
         }
         "array" => Value::List(named(node).map(deeper).collect()),
-        "await_expression" => named(node).next().map_or(Value::Unknown, deeper),
+        "await_expression" => named(node)
+            .next()
+            .map_or(Value::Unknown, |n| Value::Await(Box::new(deeper(n)))),
         "number" => Value::Scalar(text(node, src).parse().ok()),
         "true" | "false" => Value::Scalar(None),
-        "identifier" if text(node, src) == "undefined" => Value::Undefined,
-        "identifier" => Value::Ref(text(node, src).to_string()),
+        // `undefined` is a shadowable name, including the grammar's dedicated node.
+        "identifier" | "undefined" => Value::Ref(text(node, src).to_string()),
+        "member_expression" if let Some(name) = this_member(node, src, up) => Value::Ref(name),
         kind if FUNCTIONS.contains(&kind) && written_in_place(node, up) => {
             function(scope, &inline(node))
         }
-        kind => match parts(node, src) {
+        kind => match parts(node, src, up) {
             Some(parts) => Value::Str(parts),
             None if kind == "call_expression" => {
                 let args = node.child_by_field_name("arguments");
@@ -1128,24 +1612,40 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                         .then(|| f.child_by_field_name("object"))
                         .flatten()
                         .map(|object| Box::new(deeper(object)));
-                    Value::Call(Invocation {
+                    let awaited = awaited_artifact(node);
+                    let call = Value::Call(Invocation {
                         callee: callee(f, src),
                         receiver,
                         args: args.map_or(Vec::new(), |a| named(a).map(deeper).collect()),
                         kwargs: Vec::new(),
                         // The span of the call in `Facts::calls`.
-                        range: match awaited_artifact(node) {
+                        range: match awaited {
                             true => f.start_byte()..node.end_byte(),
                             false => node.byte_range(),
                         },
-                    })
+                    });
+                    if awaited {
+                        Value::Await(Box::new(call))
+                    } else {
+                        call
+                    }
                 })
             }
             None if kind == "new_expression" => callee_node(node).map_or(Value::Unknown, |f| {
                 let args = node.child_by_field_name("arguments");
                 let args = args.filter(|a| a.kind() == "arguments");
-                let args = args.map(|a| named(a).map(deeper));
-                Value::New(callee(f, src), args.into_iter().flatten().collect())
+                let args: Vec<Value> = args
+                    .map(|a| named(a).map(deeper))
+                    .into_iter()
+                    .flatten()
+                    .collect();
+                // `new URL(reference, base)` of the runtime global: the name no declaration of
+                // the file can hide, for the HTTP kind to join (`http::join`).
+                let name = match args.len() == 2 && is_url_new(node, src, up) {
+                    true => GLOBAL_URL.to_string(),
+                    false => callee(f, src),
+                };
+                Value::New(name, args)
             }),
             None if kind == "member_expression" => {
                 let object = node.child_by_field_name("object");
@@ -1193,17 +1693,17 @@ fn declared(
 
 /// A string expression folded into literal text, environment reads and holes; `None` when
 /// `node` is not a string expression Meada folds.
-fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
-    parts_at(node, src, 0)
+fn parts(node: Node, src: &[u8], up: &Parents) -> Option<Vec<Part>> {
+    parts_at(node, src, up, 0)
 }
 
 /// `parts` of a node `depth` levels inside the expression it started from; past `FOLD_DEPTH`
 /// the rest is a hole.
-fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
+fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Part>> {
     if depth >= FOLD_DEPTH {
         return Some(vec![Part::Hole]);
     }
-    let parts = |n: Node| parts_at(n, src, depth + 1);
+    let parts = |n: Node| parts_at(n, src, up, depth + 1);
     // Anything inside a string that is not itself foldable is a hole.
     let inside = |n: Node| parts(n).unwrap_or_else(|| vec![Part::Hole]);
     match node.kind() {
@@ -1248,17 +1748,77 @@ fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
         "identifier" if text(node, src) != "undefined" => {
             Some(vec![Part::Ref(text(node, src).to_string())])
         }
+        "member_expression" if let Some(name) = this_member(node, src, up) => {
+            Some(vec![Part::Ref(name)])
+        }
         "parenthesized_expression"
         | "non_null_expression"
         | "as_expression"
         | "satisfies_expression" => parts(named(node).next()?),
-        _ => env_read(node, src, depth).map(|env| vec![env]),
+        _ => url_form(node, src, up, depth)
+            .or_else(|| env_read(node, src, up, depth).map(|env| vec![env])),
+    }
+}
+
+/// The URL forms that pass a string through, as the WHATWG URL Standard reads them: `new URL(x)`
+/// with one argument parses `x` (#dom-url-url), and `u.toString()`, `u.href` and `String(u)` are
+/// the URL's `href` (#dom-url-href). The receiver is a `new URL(..)` or a name no member write
+/// reaches (`Parents::written`): a write to the path or the host changes what it holds.
+fn url_form(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Part>> {
+    let parts = |n: Node| parts_at(n, src, up, depth + 1);
+    let written = |n: Node| n.kind() == "identifier" && up.written.contains(text(n, src));
+    let url = |n: Node| match n.kind() {
+        "identifier" if !written(n) => parts(n),
+        "new_expression" => parts(n),
+        _ => None,
+    };
+    fn one(arguments: Option<Node<'_>>) -> Option<Node<'_>> {
+        let mut args = named(arguments.filter(|a| a.kind() == "arguments")?);
+        let first = args.next()?;
+        args.next().is_none().then_some(first)
+    }
+    match node.kind() {
+        "new_expression" => {
+            let argument = one(node.child_by_field_name("arguments"))?;
+            parts(argument).filter(|_| is_url_new(node, src, up))
+        }
+        "member_expression" => {
+            let property = node.child_by_field_name("property")?;
+            let object = node.child_by_field_name("object")?;
+            if text(property, src) == "href" {
+                url(object)
+            } else {
+                None
+            }
+        }
+        "call_expression" => {
+            let function = callee_node(node)?;
+            let arguments = node.child_by_field_name("arguments");
+            match function.kind() {
+                "member_expression"
+                    if (function.child_by_field_name("property"))
+                        .is_some_and(|p| text(p, src) == "toString")
+                        && arguments.is_some_and(|a| named(a).next().is_none()) =>
+                {
+                    url(function.child_by_field_name("object")?)
+                }
+                "identifier"
+                    if text(function, src) == "String"
+                        && !up.string_hidden(function.start_byte()) =>
+                {
+                    let argument = one(arguments)?;
+                    parts(argument).filter(|_| !written(argument))
+                }
+                _ => None,
+            }
+        }
+        _ => None,
     }
 }
 
 /// `process.env.X`, `process.env["X"]` or `import.meta.env.X`, also through string method
 /// calls such as `.replace(...)` or `.trim()`.
-fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
+fn env_read(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Part> {
     const STRING_METHODS: &[&str] = &[
         "replace",
         "replaceAll",
@@ -1293,6 +1853,7 @@ fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
             single_env(parts_at(
                 function.child_by_field_name("object")?,
                 src,
+                up,
                 depth + 1,
             )?)
         }
@@ -1320,6 +1881,133 @@ fn config_read(call: Node, function: Node, src: &[u8]) -> Option<Part> {
         key: unquote(key, src),
         then: Vec::new(),
     })
+}
+
+/// How many nodes `this_member` climbs to the class member around a `this`; past it the `this`
+/// is read as no instance's.
+// ponytail: real code nests a `this` a few dozen nodes inside its method; the climb must stay
+// cheap whatever the file. See `docs/agents/ceilings/language-packs.md`.
+const THIS_CLIMB: usize = 256;
+
+/// `this.f` or `this.#f` as the name the resolver reads (`LanguagePack::receiver`), when the
+/// `this` is an instance of the class around it: written in an instance method or field
+/// initializer of a class body, through arrow functions only. A `function`, a method of an
+/// object literal, a `static` member and a static block bind another `this`.
+fn this_member(node: Node, src: &[u8], up: &Parents) -> Option<String> {
+    let object = node.child_by_field_name("object")?;
+    let property = node.child_by_field_name("property")?;
+    let named = matches!(
+        property.kind(),
+        "property_identifier" | "private_property_identifier"
+    );
+    if object.kind() != "this" || !named {
+        return None;
+    }
+    let mut at = node;
+    for _ in 0..THIS_CLIMB {
+        let parent = up.of(at)?;
+        match parent.kind() {
+            "class_body" => {
+                let shared = (at.children(&mut at.walk())).any(|c| c.kind() == "static");
+                let instance = !shared && at.kind() != "class_static_block";
+                return instance.then(|| format!("this.{}", text(property, src)));
+            }
+            "method_definition" if up.of(parent).is_none_or(|b| b.kind() != "class_body") => {
+                return None;
+            }
+            kind if kind != "arrow_function" && FUNCTIONS.contains(&kind) => return None,
+            "function_declaration" | "generator_function_declaration" => return None,
+            _ => at = parent,
+        }
+    }
+    None
+}
+
+/// The name of the instance field `node` (a `public_field_definition`) declares, when only its
+/// declaration or a constructor of its class may assign it (`readonly`) or only its class may
+/// reach it (`private`, `#x`): TypeScript's handbook
+/// (https://www.typescriptlang.org/docs/handbook/2/classes.html#readonly) and ECMAScript's
+/// private names (https://tc39.es/ecma262/#sec-private-names). A `static` or `abstract` field
+/// is no instance's.
+fn sealed_field(node: Node, src: &[u8]) -> Option<String> {
+    let name = node.child_by_field_name("name")?;
+    let mut sealed = name.kind() == "private_property_identifier";
+    for child in node.children(&mut node.walk()) {
+        match child.kind() {
+            "readonly" => sealed = true,
+            "accessibility_modifier" if text(child, src) == "private" => sealed = true,
+            "static" | "abstract" => return None,
+            _ => {}
+        }
+    }
+    let plain = matches!(
+        name.kind(),
+        "property_identifier" | "private_property_identifier"
+    );
+    (sealed && plain).then(|| text(name, src).to_string())
+}
+
+/// The members the write `node` (`=`, `op=`, `++`) assigns: each one's name, `None` for a
+/// computed member of `this` (it may be any), with the value of a plain `this.f = v` written
+/// as a statement of a constructor's body, the one write a sealed field may have. A pattern
+/// (`[this.a] = ..`) writes every member it holds.
+fn member_writes(
+    node: Node,
+    src: &[u8],
+    scope: &str,
+    up: &Parents,
+) -> Vec<(Option<String>, Option<Value>)> {
+    let target = match node.kind() {
+        "update_expression" => node.child_by_field_name("argument"),
+        _ => node.child_by_field_name("left"),
+    };
+    let mut pending: Vec<Node> = target.into_iter().collect();
+    let mut out = Vec::new();
+    while let Some(t) = pending.pop() {
+        let object = t.child_by_field_name("object");
+        let on_this = object.is_some_and(|o| o.kind() == "this");
+        let name = match t.kind() {
+            "member_expression" => t.child_by_field_name("property").map(|p| text(p, src)),
+            "subscript_expression" => match t.child_by_field_name("index") {
+                Some(index) if index.kind() == "string" => {
+                    out.push((Some(unquote(index, src)), None));
+                    continue;
+                }
+                _ if on_this => None,
+                _ => continue,
+            },
+            _ => {
+                pending.extend(named(t));
+                continue;
+            }
+        };
+        let plain = (node.kind() == "assignment_expression"
+            && Some(t) == target
+            && on_this
+            && in_constructor_body(node, src, up))
+        .then(|| node.child_by_field_name("right"))
+        .flatten()
+        .filter(|v| !FUNCTIONS.contains(&v.kind()) && v.kind() != "class")
+        .map(|v| value(v, src, scope, up));
+        out.push((name.map(str::to_string), plain));
+    }
+    out
+}
+
+/// Whether the expression `node` is a statement of the body of a class's `constructor`.
+fn in_constructor_body(node: Node, src: &[u8], up: &Parents) -> bool {
+    let statement = up.of(node).filter(|s| s.kind() == "expression_statement");
+    let block = statement
+        .and_then(|s| up.of(s))
+        .filter(|b| b.kind() == "statement_block");
+    let method = block.and_then(|b| up.of(b)).filter(|m| {
+        m.kind() == "method_definition"
+            && m.child_by_field_name("name")
+                .is_some_and(|n| text(n, src) == "constructor")
+    });
+    method
+        .and_then(|m| up.of(m))
+        .is_some_and(|c| c.kind() == "class_body")
 }
 
 /// The environment read that makes up all of `parts`, if that is what they are.
@@ -1571,6 +2259,287 @@ mod tests {
         assert!(matches!(args[1].args.as_slice(), [Value::Str(_)]));
     }
 
+    /// What the first argument of the one `fetch` in `path` folds to, `src` alone in the
+    /// repository.
+    fn fetched_parts(path: &'static str, src: &str) -> Vec<Part> {
+        use crate::resolve::{Code, Resolver};
+        let facts = TsJs.parse(path, src.as_bytes()).unwrap();
+        let files = BTreeMap::from([(path, &facts)]);
+        let modules = TsJs.modules(&[], &BTreeMap::new()).unwrap();
+        let resolver = Resolver::new(&files, modules, &TsJs);
+        let code = Code::new(&resolver, &files, &TsJs);
+        let [call] = &facts
+            .calls
+            .iter()
+            .filter(|c| c.callee == "fetch")
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("one fetch in {src}");
+        };
+        match code.value(path, &call.scope, &call.args[0]) {
+            Value::Str(parts) => parts,
+            _ => panic!("no string in {src}"),
+        }
+    }
+
+    /// A field TypeScript lets only its declaration or its constructor assign (`readonly`), or
+    /// only its class reach (`private`, ECMAScript's `#x`), written once holds that value: a
+    /// constant of the class, written in the constructor, which `this.f` in a method reads.
+    #[test]
+    fn a_readonly_or_private_field_written_once_is_a_constant_of_its_class() {
+        let env = || vec![Part::Env("API".into()), Part::Text("/o".into())];
+        // `F` is the field's name.
+        let class = |members: &str, field: &str| {
+            let method = "list() { return fetch(`${this.F}/o`); }";
+            format!("class C {{\n{members}\n{method}\n}}\n").replace('F', field)
+        };
+        let assigned = "constructor() { this.F = process.env.API; }";
+        for (members, field) in [
+            (format!("private readonly F: string;\n{assigned}"), "base"),
+            (format!("readonly F: string;\n{assigned}"), "base"),
+            (format!("private F: string;\n{assigned}"), "base"),
+            (format!("F: string;\n{assigned}"), "#base"),
+            ("private readonly F = process.env.API;".to_string(), "base"),
+            ("F = process.env.API;".to_string(), "#base"),
+        ] {
+            let src = class(&members, field);
+            assert_eq!(fetched_parts("a.ts", &src), env(), "{src}");
+        }
+        // Through a concatenation, and a Backstage read the HTTP kind decides.
+        let src = "class C {\nprivate readonly base: string;\n\
+                   constructor(config: Config) { this.base = config.getString('a.b'); }\n\
+                   list() { return fetch(this.base + '/o'); }\n}\n";
+        let parts = fetched_parts("a.ts", src);
+        assert!(
+            matches!(&parts[..], [Part::Read { key, .. }, Part::Text(t)] if key == "a.b" && t == "/o"),
+            "{parts:?}"
+        );
+
+        let hole = || vec![Part::Hole, Part::Text("/o".into())];
+        for members in [
+            // Public and mutable.
+            "base = process.env.API;",
+            "public base: string;\nconstructor() { this.base = process.env.API; }",
+            // Written twice: by the initializer and the constructor, twice in the constructor,
+            // or under a condition (written, or not).
+            "private readonly base = process.env.API;\nconstructor() { this.base = process.env.API; }",
+            "private base: string;\nconstructor() { this.base = process.env.API; this.base = process.env.API; }",
+            "private base: string;\nconstructor(x: boolean) { if (x) { this.base = process.env.API; } }",
+            "private base = process.env.API;\nreset() { this.base += '/v2'; }",
+            "private base = process.env.API;\nreset(o: C) { o.base = 'x'; }",
+            "private base = process.env.API;\nreset() { [this.base] = ['x']; }",
+            "private base = process.env.API;\nreset() { this['base'] = 'x'; }",
+            // Written outside the constructor, or in a nested function of it.
+            "private base: string;\ninit() { this.base = process.env.API; }",
+            "private base: string;\nconstructor() { const f = () => { this.base = process.env.API; }; f(); }",
+            // A parameter property, or a constructor's parameter: its callers give the value.
+            "constructor(private readonly base: string) {}",
+            "private readonly base: string;\nconstructor(base: string) { this.base = base; }",
+            // Static: no instance holds it.
+            "static readonly base = process.env.API;",
+        ] {
+            let src = class(members, "base");
+            assert_eq!(fetched_parts("a.ts", &src), hole(), "{src}");
+        }
+        // Only an instance method's `this` is the instance, also through an arrow function: a
+        // `function`, a method of an object literal, a `static` method and a nested class bind
+        // another `this`.
+        let sealed = "private readonly base = process.env.API;";
+        let with = |method: &str| format!("class C {{\n{sealed}\n{method}\n}}\n");
+        let arrow = with("list() { return [1].map(() => fetch(`${this.base}/o`)); }");
+        assert_eq!(fetched_parts("a.ts", &arrow), env(), "{arrow}");
+        for method in [
+            "list() { return [1].map(function () { return fetch(`${this.base}/o`); }); }",
+            "list() { return run({ go() { return fetch(`${this.base}/o`); } }); }",
+            "static list() { return fetch(`${this.base}/o`); }",
+            "list() { class D { go() { return fetch(`${this.base}/o`); } } }",
+        ] {
+            let src = with(method);
+            assert_eq!(fetched_parts("a.ts", &src), hole(), "{src}");
+        }
+        // A JavaScript file declares no `readonly` or `private`, and its `#x` is left as today.
+        let js = class("F = process.env.API;", "#base");
+        assert_eq!(fetched_parts("a.js", &js), hole(), "{js}");
+    }
+
+    /// A `this` nested past `THIS_CLIMB` nodes inside its method is no instance's.
+    #[test]
+    fn a_this_nested_past_the_climb_reads_nothing() {
+        let nested = |n: usize| {
+            let arrows = "() => ".repeat(n);
+            format!(
+                "class C {{\nprivate readonly base = process.env.API;\n\
+                 list() {{ return {arrows}fetch(`${{this.base}}/o`); }}\n}}\n"
+            )
+        };
+        let env = vec![Part::Env("API".into()), Part::Text("/o".into())];
+        assert_eq!(fetched_parts("a.ts", &nested(THIS_CLIMB / 4)), env);
+        let hole = vec![Part::Hole, Part::Text("/o".into())];
+        assert_eq!(fetched_parts("a.ts", &nested(THIS_CLIMB * 2)), hole);
+    }
+
+    #[test]
+    fn sealed_fields_of_many_classes_are_read_in_linear_time() {
+        let source: String = (0..8192)
+            .map(|n| {
+                format!(
+                    "class C{n} {{ private readonly base: string; \
+                     constructor() {{ this.base = process.env.API; }} }}\n"
+                )
+            })
+            .collect();
+        let start = std::time::Instant::now();
+        let facts = TsJs.parse("a.ts", source.as_bytes()).unwrap();
+        let took = start.elapsed();
+        assert_eq!(
+            facts.consts.iter().filter(|c| c.scope.is_some()).count(),
+            8192
+        );
+        // 1.4 s measured in a local debug build; the bound is over twenty times that.
+        assert!(took.as_secs() < 40, "{took:?}");
+    }
+
+    /// The text of the literal parts of a folded value, `<env>` for an environment read, `?`
+    /// for a name and `_` for a hole; `None` when the value is no string.
+    fn folded(value: &Value) -> Option<String> {
+        let Value::Str(parts) = value else {
+            return None;
+        };
+        Some(
+            parts
+                .iter()
+                .map(|p| match p {
+                    Part::Text(t) => t.clone(),
+                    Part::Env(e) => format!("<{e}>"),
+                    Part::Ref(_) => "?".into(),
+                    _ => "_".into(),
+                })
+                .collect(),
+        )
+    }
+
+    fn fetched(src: &str) -> Vec<Option<String>> {
+        let facts = parse(src);
+        let calls = facts.calls.iter().filter(|c| c.callee == "fetch");
+        calls.map(|c| folded(&c.args[0])).collect()
+    }
+
+    /// WHATWG URL Standard: `new URL(x)` parses `x` (#dom-url-url), and `toString()`, `href` and
+    /// `String(u)` give its `href` (#dom-url-href), also inside a template string.
+    #[test]
+    fn a_url_of_one_argument_is_the_string_it_parses() {
+        let got = fetched(
+            "fetch(new URL('https://h.example.com/a'));\n\
+             fetch(new URL(`${process.env.API_URL}/a`).toString());\n\
+             fetch(new URL('https://h.example.com/b').href);\n\
+             fetch(String(new URL('https://h.example.com/c')));\n\
+             fetch(`${new URL('https://h.example.com/d')}/e`);\n\
+             const u = new URL(base); fetch(u.toString()); fetch(u.href); fetch(String(u));\n\
+             fetch(`${u}`);\n",
+        );
+        let host = |p: &str| Some(format!("https://h.example.com/{p}"));
+        assert_eq!(got[0], host("a"));
+        assert_eq!(got[1], Some("<API_URL>/a".into()));
+        assert_eq!(got[2], host("b"));
+        assert_eq!(got[3], host("c"));
+        assert_eq!(got[4], Some("https://h.example.com/d/e".into()));
+        // A name folds through the existing name folding at the shared side.
+        assert!(
+            got[5..].iter().all(|g| g.as_deref() == Some("?")),
+            "{got:?}"
+        );
+    }
+
+    /// Only a call with the shape of the standard's reads: `toString(16)`, `new URL(x, base)` and
+    /// a `href` of anything but a name or a `new URL(..)` stay as they were.
+    #[test]
+    fn other_shapes_of_those_names_stay_calls() {
+        let facts = parse(
+            "fetch(n.toString(16));\n\
+             fetch(new URL('/a', base));\n\
+             fetch(new URL(...parts));\n\
+             fetch(o.p.href);\n\
+             fetch(String());\n\
+             fetch(String(a, b));\n",
+        );
+        let args: Vec<_> = (facts.calls.iter())
+            .filter(|c| c.callee == "fetch")
+            .map(|c| &c.args[0])
+            .collect();
+        assert!(matches!(args[0], Value::Call(i) if i.callee == "n.toString"));
+        assert!(matches!(args[1], Value::New(c, a) if c == GLOBAL_URL && a.len() == 2));
+        assert!(matches!(args[2], Value::New(c, _) if c == "URL"));
+        assert!(matches!(args[3], Value::Unknown));
+        assert!(matches!(args[4], Value::Call(_)));
+        assert!(matches!(args[5], Value::Call(_)));
+    }
+
+    /// WHATWG URL Standard: `searchParams` changes only the query (#dom-url-searchparams), as
+    /// `search` and `hash` do; a write to any other member changes the path or the host.
+    #[test]
+    fn a_member_write_other_than_the_query_leaves_the_url_unknown() {
+        let unknown = |src: &str| {
+            let facts = parse(src);
+            let c = facts.consts.iter().find(|c| c.name == "u").unwrap();
+            matches!(c.value, Value::Unknown)
+        };
+        let url = "const u = new URL('https://h.example.com/a');\n";
+        assert!(!unknown(url));
+        assert!(!unknown(&format!("{url}u.searchParams.set('k', 'v');")));
+        assert!(!unknown(&format!("{url}u.searchParams.append('k', 'v');")));
+        assert!(!unknown(&format!(
+            "{url}u.search = '?k=v'; u.hash += '#h'; u['hash'] = 'x';"
+        )));
+        for write in [
+            "u.pathname = '/b';",
+            "u.pathname += '/b';",
+            "u.host = 'other';",
+            "u.href = 'https://o.example.com/';",
+            "u['pathname'] = '/b';",
+            "u[key] = '/b';",
+        ] {
+            assert!(unknown(&format!("{url}{write}")), "{write}");
+        }
+        // The pass-through forms of a written name stay calls and members, as they were.
+        let facts = parse(&format!(
+            "{url}u.pathname = '/b'; fetch(u.toString()); fetch(u.href);"
+        ));
+        let args: Vec<_> = (facts.calls.iter())
+            .filter(|c| c.callee == "fetch")
+            .map(|c| &c.args[0])
+            .collect();
+        assert!(matches!(args[0], Value::Call(i) if i.callee == "u.toString"));
+        assert!(matches!(args[1], Value::Member(o, p) if o == "u" && p == "href"));
+    }
+
+    /// A file that declares a `URL`, or imports one from a relative path, has no runtime global
+    /// of that name: its `new URL(x)` is the repository's constructor.
+    #[test]
+    fn a_url_the_file_declares_or_imports_from_the_repository_is_no_global() {
+        for head in [
+            "class URL { constructor(p) {} }\n",
+            "function URL(p) {}\n",
+            "const URL = makeUrl();\n",
+            "import { URL } from './url';\n",
+            "import { Other as URL } from '../url';\n",
+            "import URL from './url';\n",
+            "function f(URL) { return URL; }\n",
+            "const f = (URL) => URL;\n",
+            "try { run(); } catch (URL) {}\n",
+        ] {
+            let got = fetched(&format!("{head}fetch(new URL('https://h.example.com/a'));"));
+            assert_eq!(got, [None], "{head}");
+        }
+        // An import from a package, or a `require` of one, is the same global.
+        let got = fetched(
+            "const { URL } = require('node:url');\nfetch(new URL('https://h.example.com/a'));",
+        );
+        assert_eq!(got, [Some("https://h.example.com/a".into())]);
+        let got =
+            fetched("import { URL } from 'node:url';\nfetch(new URL('https://h.example.com/a'));");
+        assert_eq!(got, [Some("https://h.example.com/a".into())]);
+    }
+
     /// How many calls deep the first argument of `value` goes.
     fn nesting(value: &Value) -> usize {
         let mut value = value;
@@ -1616,6 +2585,40 @@ mod tests {
 
     fn parse(src: &str) -> Facts {
         TsJs.parse("a.ts", src.as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn a_bare_undefined_arrow_retains_its_parameter_scope_and_original_spans() {
+        let src = "const bare = undefined => read(undefined);\n\
+                   const commented = undefined /* parameter */ => read(undefined);\n\
+                   const parenthesized = (undefined) => read(undefined);\n\
+                   const asynchronous = async undefined => read(undefined);\n\
+                   const ordinary = value => read(value);\n\
+                   const comparison = undefined > read(undefined);\n\
+                   const malformed = undefined = > read(undefined);\n\
+                   const text = 'undefined => read(undefined)';\n\
+                   // const comment = undefined => read(undefined);\n";
+        for path in ["a.js", "a.ts"] {
+            let facts = TsJs.parse(path, src.as_bytes()).unwrap();
+            let functions = [
+                ("bare", "undefined"),
+                ("commented", "undefined"),
+                ("parenthesized", "undefined"),
+                ("asynchronous", "undefined"),
+                ("ordinary", "value"),
+            ];
+            assert_eq!(facts.defs.len(), functions.len(), "{path}");
+            for (name, parameter) in functions {
+                let def = facts.defs.iter().find(|d| d.name == name).unwrap();
+                assert_eq!(def.params.len(), 1, "{path}: {name}");
+                assert_eq!(def.params[0].name, parameter, "{path}: {name}");
+                let call = facts.calls.iter().find(|c| c.scope == name).unwrap();
+                assert_eq!(&src[call.range.clone()], format!("read({parameter})"));
+                assert!(matches!(&call.args[0], Value::Ref(name) if name == parameter));
+                assert!(src[def.range.clone()].contains(parameter));
+            }
+            assert_eq!(facts.calls.iter().filter(|c| c.scope.is_empty()).count(), 2);
+        }
     }
 
     fn depth(value: &Value) -> usize {
@@ -1879,13 +2882,20 @@ mod tests {
 
     #[test]
     fn an_awaited_typed_call_is_a_call_value() {
-        let facts = parse("async function f() { g(await get<Row>(\"/x\"), await get(\"/y\")); }");
+        let source = "async function f() { g(await get<Row>(\"/x\"), await get(\"/y\")); }";
+        let facts = parse(source);
         let call = facts.calls.iter().find(|c| c.callee == "g").unwrap();
         assert_eq!(call.args.len(), 2);
-        assert!(
-            call.args
-                .iter()
-                .all(|a| matches!(a, Value::Call(call) if call.callee == "get"))
-        );
+        for (value, written) in call.args.iter().zip(["get<Row>(\"/x\")", "get(\"/y\")"]) {
+            let Value::Await(value) = value else {
+                panic!("await syntax is retained");
+            };
+            let Value::Call(call) = value.as_ref() else {
+                panic!("awaited get call");
+            };
+            assert_eq!(call.callee, "get");
+            assert_eq!(call.args.len(), 1);
+            assert_eq!(&source[call.range.clone()], written);
+        }
     }
 }

@@ -1,0 +1,11 @@
+groups:
+  - name: not-a-rendered-group
+    rules:
+      - alert: HelmGhost
+        expr: vector(1)
+        labels:
+          support: helm-value-ghost
+route:
+  receiver: helm-route-ghost
+  match:
+    support: aurora

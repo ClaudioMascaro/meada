@@ -1,0 +1,18 @@
+# A config file as config values store it (#639): a key path per scalar, its value, type and
+# line; the document index first, a Secret's data redacted.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web
+  annotations:
+    app.kubernetes.io/name: web
+data:
+  replicas: 3
+  debug: false
+  missing: null
+  hosts: [a.example.com, b.example.com]
+---
+apiVersion: v1
+kind: Secret
+stringData:
+  password: hunter2

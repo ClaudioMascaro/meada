@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+"""Run the CI Clippy feature matrix, sequentially, without external dependencies."""
+
+import argparse
+from pathlib import Path
+import re
+import shlex
+import subprocess
+import sys
+
+
+ROOT = Path(__file__).resolve().parent.parent
+WORKFLOW = ROOT / ".github/workflows/ci.yml"
+
+
+def child_block(lines, key, indent):
+    heading = " " * indent + key + ":"
+    matches = [i for i, line in enumerate(lines) if line.startswith(heading)]
+    if len(matches) != 1 or lines[matches[0]] != heading:
+        raise ValueError(f"expected one block header {heading!r}")
+    start = matches[0] + 1
+    end = start
+    while end < len(lines):
+        line = lines[end]
+        if line.strip() and not line.lstrip().startswith("#"):
+            if len(line) - len(line.lstrip(" ")) <= indent:
+                break
+        end += 1
+    return lines[start:end]
+
+
+def matrix_features(text):
+    lines = text.splitlines()
+    for depth, key in enumerate(("jobs", "clippy-features", "strategy", "matrix", "features")):
+        lines = child_block(lines, key, depth * 2)
+    features = []
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        match = re.fullmatch(r"          - ([A-Za-z0-9_-]+(?:,[A-Za-z0-9_-]+)*)", line)
+        if match is None:
+            raise ValueError(f"unsupported feature matrix syntax: {line!r}")
+        features.append(match[1])
+    if not features or len(features) != len(set(features)):
+        raise ValueError("feature matrix must be nonempty and contain no duplicates")
+    return features
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--list", action="store_true", help="list CI feature combinations")
+    mode.add_argument("--only", metavar="FEATURE", help="run one listed combination")
+    args = parser.parse_args()
+    try:
+        features = matrix_features(WORKFLOW.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        parser.error(f"cannot read {WORKFLOW}: {error}")
+    if args.only is not None and args.only not in features:
+        parser.error(f"feature combination is not in the CI matrix: {args.only!r}")
+    if args.list:
+        print("\n".join(features))
+        return 0
+    for feature in [args.only] if args.only is not None else features:
+        command = [
+            "cargo", "clippy", "--locked", "--all-targets", "--features", feature,
+            "--", "-D", "warnings",
+        ]
+        print("+ " + shlex.join(command), file=sys.stderr, flush=True)
+        result = subprocess.run(command, cwd=ROOT)
+        if result.returncode:
+            return result.returncode
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

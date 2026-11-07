@@ -1,0 +1,462 @@
+{
+  "format": 1,
+  "repository": "local/azure-sdk-values-env",
+  "files": [
+    {
+      "path": "worker.ts",
+      "hash": "095cb9a430dcc6d338c27830ea0c55769096eaecc10b9813d8307da244330350"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::missingSecret",
+      "span": {
+        "path": "worker.ts",
+        "start": 1142,
+        "end": 1210
+      },
+      "hash": "02b4b971414e794ba84bd300fda0d9ddc1d0031437aed0b359735fce04435c49"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::privateSecret",
+      "span": {
+        "path": "worker.ts",
+        "start": 1218,
+        "end": 1293
+      },
+      "hash": "9757e7d2ac8aa1931f3044240327579c192fa9fb460d9a8aa7a5859806bb9a90"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::read",
+      "span": {
+        "path": "worker.ts",
+        "start": 659,
+        "end": 769
+      },
+      "hash": "6294346b49ec90b8f816e1de1f1bf3c48bd361c3b42c5d8ee68f5791422dbaa0"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::receive",
+      "span": {
+        "path": "worker.ts",
+        "start": 418,
+        "end": 521
+      },
+      "hash": "dde21363a596df222596edbfbb4aa08df4dd84fc22aaa15c6fe36adcf0506b12"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::secret",
+      "span": {
+        "path": "worker.ts",
+        "start": 777,
+        "end": 837
+      },
+      "hash": "19d0f9ff13d77d0ce198022ede5b67db427d97be643e17c629c18d3c79d145c8"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::send",
+      "span": {
+        "path": "worker.ts",
+        "start": 318,
+        "end": 410
+      },
+      "hash": "c7c39b45ceca6a0f71bae50e959f952583c8cc2b06dae69ce0f7e38c99826cc0"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::write",
+      "span": {
+        "path": "worker.ts",
+        "start": 529,
+        "end": 651
+      },
+      "hash": "e73b709eb9a8181ccc853a5e3870ba7b5ead541d6dd30b8dfbdf0b891ef730ab"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::wrongBlob",
+      "span": {
+        "path": "worker.ts",
+        "start": 951,
+        "end": 1062
+      },
+      "hash": "08a66023a768e7c7272beb722688d57e4b8334e50d502b15b6c4ddf47065d90d"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::wrongHub",
+      "span": {
+        "path": "worker.ts",
+        "start": 845,
+        "end": 943
+      },
+      "hash": "132a1239da52c720f2bbdbc564487383da24b3c1af931a81711422c6dd995fca"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::wrongSecret",
+      "span": {
+        "path": "worker.ts",
+        "start": 1070,
+        "end": 1134
+      },
+      "hash": "1f9baa62e122ed74d694162723dfde83128c790fb35e815854b6ff2d4dbbe552"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::BlobServiceClient#0",
+      "caller": "local/azure-sdk-values-env::worker.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 213,
+        "end": 256
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::SecretClient#0",
+      "caller": "local/azure-sdk-values-env::worker.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 274,
+        "end": 309
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::missingSecret::secrets.getSecret#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::missingSecret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1169,
+        "end": 1207
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::privateSecret::secrets.getSecret#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::privateSecret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1245,
+        "end": 1290
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::read::(call_expression).download#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::read",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 677,
+        "end": 766
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::read::(call_expression).getBlobClient#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::read",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 677,
+        "end": 755
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::read::storage.getContainerClient#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::read",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 677,
+        "end": 726
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::receive::(new_expression).subscribe#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 439,
+        "end": 518
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::receive::EventHubConsumerClient#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 439,
+        "end": 499
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::secret::secrets.getSecret#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::secret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 797,
+        "end": 834
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::send::(new_expression).sendBatch#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 336,
+        "end": 407
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::send::EventHubProducerClient#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 336,
+        "end": 390
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::write::(call_expression).getBlockBlobClient#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::write",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 548,
+        "end": 631
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::write::(call_expression).uploadData#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::write",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 548,
+        "end": 648
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::write::storage.getContainerClient#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::write",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 548,
+        "end": 597
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::wrongBlob::(call_expression).download#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::wrongBlob",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 974,
+        "end": 1059
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::wrongBlob::(call_expression).getBlobClient#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::wrongBlob",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 974,
+        "end": 1048
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::wrongBlob::storage.getContainerClient#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::wrongBlob",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 974,
+        "end": 1019
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::wrongHub::(new_expression).sendBatch#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::wrongHub",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 867,
+        "end": 940
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::wrongHub::EventHubProducerClient#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::wrongHub",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 867,
+        "end": 923
+      }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::wrongSecret::secrets.getSecret#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::wrongSecret",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1095,
+        "end": 1131
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::eventhubs",
+      "site": "local/azure-sdk-values-env::worker.ts::wrongHub::(new_expression).sendBatch#0",
+      "via": "env:WRONG"
+    },
+    {
+      "contract": "channel::eventhubs::events-env",
+      "site": "local/azure-sdk-values-env::worker.ts::send::(new_expression).sendBatch#0",
+      "via": "workload:local/azure-sdk-values-env::pods.yaml::Pod/sdk-values (root .), env:HUB"
+    },
+    {
+      "contract": "image::ghcr.io/probe/azure-sdk-worker",
+      "site": "local/azure-sdk-values-env",
+      "at": ".github/workflows/build.yml#jobs.publish.steps[0].with.tags"
+    },
+    {
+      "contract": "resource::azureblob::uploads-env",
+      "site": "local/azure-sdk-values-env::worker.ts::write::(call_expression).uploadData#0",
+      "via": "workload:local/azure-sdk-values-env::pods.yaml::Pod/sdk-values (root .), env:CONTAINER"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "image::ghcr.io/probe/azure-sdk-worker",
+      "site": "local/azure-sdk-values-env::pods.yaml::Pod/sdk-values",
+      "via": null,
+      "root": "."
+    },
+    {
+      "contract": "resource::keyvault",
+      "site": "local/azure-sdk-values-env::worker.ts::missingSecret::secrets.getSecret#0",
+      "via": "env:MISSING"
+    },
+    {
+      "contract": "resource::keyvault",
+      "site": "local/azure-sdk-values-env::worker.ts::privateSecret::secrets.getSecret#0",
+      "via": "env:PRIVATE_SECRET"
+    },
+    {
+      "contract": "resource::azureblob::uploads-env",
+      "site": "local/azure-sdk-values-env::worker.ts::read::(call_expression).download#0",
+      "via": "workload:local/azure-sdk-values-env::pods.yaml::Pod/sdk-values (root .), env:CONTAINER"
+    },
+    {
+      "contract": "channel::eventhubs::events-env",
+      "site": "local/azure-sdk-values-env::worker.ts::receive",
+      "via": "workload:local/azure-sdk-values-env::pods.yaml::Pod/sdk-values (root .), env:HUB"
+    },
+    {
+      "contract": "resource::keyvault::token-env",
+      "site": "local/azure-sdk-values-env::worker.ts::secret::secrets.getSecret#0",
+      "via": "workload:local/azure-sdk-values-env::pods.yaml::Pod/sdk-values (root .), env:SECRET"
+    },
+    {
+      "contract": "resource::azureblob",
+      "site": "local/azure-sdk-values-env::worker.ts::wrongBlob::(call_expression).download#0",
+      "via": "env:WRONG"
+    },
+    {
+      "contract": "resource::keyvault",
+      "site": "local/azure-sdk-values-env::worker.ts::wrongSecret::secrets.getSecret#0",
+      "via": "env:WRONG"
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "local/azure-sdk-values-env::pods.yaml::Pod/sdk-values",
+      "address": "Pod/sdk-values",
+      "type": "Pod",
+      "root": ".",
+      "path": "pods.yaml",
+      "line": 1,
+      "end_line": 23
+    }
+  ],
+  "uses": [
+    {
+      "contract": "channel::eventhubs::events-env",
+      "site": "local/azure-sdk-values-env",
+      "at": "pods.yaml#[0].spec.containers[1].env[0].value"
+    },
+    {
+      "contract": "channel::servicebus::wrong",
+      "site": "local/azure-sdk-values-env",
+      "at": "pods.yaml#[0].spec.containers[0].env[4].value"
+    },
+    {
+      "contract": "channel::servicebus::wrong",
+      "site": "local/azure-sdk-values-env",
+      "at": "pods.yaml#[0].spec.containers[1].env[4].value"
+    },
+    {
+      "contract": "resource::azureblob::uploads-env",
+      "site": "local/azure-sdk-values-env",
+      "at": "pods.yaml#[0].spec.containers[1].env[1].value"
+    },
+    {
+      "contract": "resource::keyvault::token-env",
+      "site": "local/azure-sdk-values-env",
+      "at": "pods.yaml#[0].spec.containers[1].env[3].value"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/azure-sdk-values-env::pods.yaml::Pod/sdk-values",
+      "provider": "local/azure-sdk-values-env",
+      "contract": "image::ghcr.io/probe/azure-sdk-worker",
+      "level": "exact",
+      "reason": "image::ghcr.io/probe/azure-sdk-worker",
+      "root": "."
+    },
+    {
+      "consumer": "local/azure-sdk-values-env::worker.ts::read::(call_expression).download#0",
+      "provider": "local/azure-sdk-values-env::worker.ts::write::(call_expression).uploadData#0",
+      "contract": "resource::azureblob::uploads-env",
+      "level": "inferred",
+      "reason": "resource::azureblob::uploads-env; workload:local/azure-sdk-values-env::pods.yaml::Pod/sdk-values (root .), env:CONTAINER"
+    },
+    {
+      "consumer": "local/azure-sdk-values-env::worker.ts::receive",
+      "provider": "local/azure-sdk-values-env::worker.ts::send::(new_expression).sendBatch#0",
+      "contract": "channel::eventhubs::events-env",
+      "level": "inferred",
+      "reason": "channel::eventhubs::events-env; workload:local/azure-sdk-values-env::pods.yaml::Pod/sdk-values (root .), env:HUB"
+    }
+  ]
+}

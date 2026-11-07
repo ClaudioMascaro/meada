@@ -426,9 +426,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // The types declared so far: a local whose scope is one sits in an initializer.
     let mut classes = BTreeSet::new();
     // What a name written in a definition is bound to (`Facts::bound`), and the names assigned
-    // anywhere in the file (`=`, `+=`, `++`, `out`, `ref`), which hold no one value.
+    // in their binding's scope (`=`, `+=`, `++`, `out`, `ref`), which hold no one value.
     let mut bound: Vec<Bound> = Vec::new();
-    let mut assigned: BTreeSet<String> = BTreeSet::new();
+    let mut assigned: Vec<(String, String, bool)> = Vec::new();
     // The assignments through a name (`c.BaseAddress = v`, `_c = v`): the scope written in, the
     // path without a leading `this.`, whether it began with one, and the value.
     let mut members: Vec<(String, String, bool, Value)> = Vec::new();
@@ -530,6 +530,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 })
                 .collect();
             facts.defs.push(Def {
+                asynchronous: modifiers.contains(&"async"),
                 params,
                 bases: match kind {
                     Kind::Class => bases(node, src, &generics),
@@ -876,7 +877,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         }
                         _ => continue,
                     };
-                    assigned.insert(text(name, src).to_string());
+                    assigned.push((scope.as_ref().clone(), text(name, src).to_string(), this));
                     let at = (scope.as_ref().clone(), this, given.clone());
                     writes
                         .entry(text(name, src).to_string())
@@ -952,7 +953,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 if children(node).any(|c| matches!(c.kind(), "++" | "--")) =>
             {
                 for target in named(node).filter(|t| t.kind() == "identifier") {
-                    assigned.insert(text(target, src).to_string());
+                    assigned.push((scope.as_ref().clone(), text(target, src).to_string(), false));
                     let at = (scope.as_ref().clone(), false, None);
                     writes
                         .entry(text(target, src).to_string())
@@ -977,7 +978,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     _ => None,
                 });
                 for (target, this) in targets {
-                    assigned.insert(text(target, src).to_string());
+                    assigned.push((scope.as_ref().clone(), text(target, src).to_string(), this));
                     let at = (scope.as_ref().clone(), this, None);
                     writes
                         .entry(text(target, src).to_string())
@@ -1294,6 +1295,27 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // local or a parameter, in the scope that declares it.
     let bindings: BTreeSet<(&str, &str)> = (facts.receivers.iter())
         .map(|r| (r.scope.as_str(), r.name.as_str()))
+        .chain(
+            facts
+                .defs
+                .iter()
+                .flat_map(|d| d.params.iter().map(|p| (d.name.as_str(), p.name.as_str()))),
+        )
+        .collect();
+    let assigned: BTreeSet<(String, String)> = assigned
+        .into_iter()
+        .map(|(scope, name, this)| {
+            let mut at = scope.as_str();
+            while !at.is_empty() {
+                if (this && classes.contains(at))
+                    || (!this && bindings.contains(&(at, name.as_str())))
+                {
+                    break;
+                }
+                at = crate::parent(at);
+            }
+            (at.to_string(), name)
+        })
         .collect();
     let mut through: Vec<Bound> = Vec::new();
     let mut member_at: HashMap<(String, String), usize> = HashMap::new();
@@ -1343,10 +1365,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
         }
     }
-    // A name assigned anywhere holds no one value, and its initializer is one more write of it
+    // A binding assigned anywhere holds no one value, and its initializer is one more write of it
     // (`name=`, the first): the kinds that read a name's only write count them.
-    let (kept, initial): (Vec<Bound>, Vec<Bound>) =
-        bound.into_iter().partition(|b| !assigned.contains(&b.name));
+    let (kept, initial): (Vec<Bound>, Vec<Bound>) = bound
+        .into_iter()
+        .partition(|b| !assigned.contains(&(b.scope.clone(), b.name.clone())));
     let bound = kept;
     let mut all: Vec<Bound> = (initial.into_iter())
         .map(|b| Bound {
@@ -2072,20 +2095,46 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 .or_else(|| named(node).find(|n| n.kind() == "argument_list"));
             let mut args = arguments(list, src, depth).0;
             let initializer = named(node).find(|n| n.kind() == "initializer_expression");
-            if let Some(set) = initializer {
-                let set = (named(set).filter(|n| n.kind() == "assignment_expression"))
+            if let Some(set_node) = initializer {
+                let set = (named(set_node).filter(|n| n.kind() == "assignment_expression"))
                     .filter_map(|a| {
                         let left = a.child_by_field_name("left")?;
                         let right = a.child_by_field_name("right")?;
-                        (left.kind() == "identifier")
-                            .then(|| (text(left, src).to_string(), value(right, src, depth + 1)))
+                        match left.kind() {
+                            "identifier" => {
+                                Some((text(left, src).to_string(), value(right, src, depth + 1)))
+                            }
+                            "element_binding_expression" => {
+                                let mut keys = arguments(Some(left), src, depth).0;
+                                (keys.len() == 1).then(|| {
+                                    (
+                                        "[]".to_string(),
+                                        Value::List(vec![
+                                            keys.remove(0),
+                                            value(right, src, depth + 1),
+                                        ]),
+                                    )
+                                })
+                            }
+                            _ => Some(("...".to_string(), Value::Unknown)),
+                        }
                     })
                     .collect();
-                args.push(Value::Object(set));
+                let has_fields = named(set_node).any(|n| n.kind() == "assignment_expression");
+                if has_fields || named(set_node).next().is_none() {
+                    args.push(Value::Object(set));
+                } else {
+                    args.push(Value::List(
+                        named(set_node).map(|n| value(n, src, depth + 1)).collect(),
+                    ));
+                }
             }
             Value::New(ty, args)
         }
         // `new[] { a, b }`, `new T[] { a, b }` and `[a, b]`.
+        "initializer_expression" => {
+            Value::List(named(node).map(|n| value(n, src, depth + 1)).collect())
+        }
         "implicit_array_creation_expression" | "array_creation_expression" => {
             match named(node).find(|n| n.kind() == "initializer_expression") {
                 Some(items) => {
@@ -2110,8 +2159,10 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         "integer_literal" => Value::Scalar(text(node, src).parse().ok()),
         "boolean_literal" => Value::Scalar(None),
         "null_literal" => Value::Undefined,
-        // An awaited value is the value of its operand.
-        "parenthesized_expression" | "await_expression" => named(node)
+        "await_expression" => named(node).next().map_or(Value::Unknown, |n| {
+            Value::Await(Box::new(value(n, src, depth + 1)))
+        }),
+        "parenthesized_expression" => named(node)
             .next()
             .map_or(Value::Unknown, |n| value(n, src, depth + 1)),
         _ => Value::Unknown,
@@ -2496,7 +2547,7 @@ mod tests {
         assert!(scopes[0].len() > 2_000);
     }
 
-    /// What a call awaited is bound to: the call itself, as the same call not awaited is.
+    /// Await syntax survives around a held value, including parenthesized aliases.
     #[test]
     fn a_name_is_bound_to_the_call_it_awaits() {
         let source = "class C { IChannel _ch; IChannel Ch { get; set; }\n\
@@ -2510,7 +2561,10 @@ mod tests {
         let held = |name: &str| -> Vec<String> {
             (facts.bound.iter().filter(|b| b.name == name))
                 .map(|b| match &b.value {
-                    Value::Call(call) => call.callee.clone(),
+                    Value::Await(value) => match value.as_ref() {
+                        Value::Call(call) => call.callee.clone(),
+                        _ => "other".into(),
+                    },
                     _ => "other".into(),
                 })
                 .collect()
@@ -2520,6 +2574,12 @@ mod tests {
         assert_eq!(held("b"), ["Task.Delay"]);
         // A parenthesized await is the value of the expression inside.
         assert_eq!(held("n"), ["c.Count"]);
+        assert!(
+            facts
+                .bound
+                .iter()
+                .all(|b| matches!(b.value, Value::Await(_)))
+        );
     }
 
     /// Every write of a name is a `name=` of its own, a call or a construction by its value and

@@ -1,0 +1,11 @@
+apiVersion: database.acme.io/v1alpha1
+kind: PostgreSQLInstance
+metadata:
+  name: orders-db
+  namespace: team-a
+spec:
+  storageGB: 20
+  compositionRef:
+    name: xpostgresqlinstances.aws-pipeline
+  writeConnectionSecretToRef:
+    name: orders-db-conn

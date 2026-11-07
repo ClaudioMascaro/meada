@@ -1,0 +1,7 @@
+apiVersion: database.acme.io/v1alpha1
+kind: PostgreSQLInstance
+metadata:
+  name: reports-db
+  namespace: team-b
+spec:
+  storageGB: 10

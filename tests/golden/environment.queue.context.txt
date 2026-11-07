@@ -1,0 +1,23 @@
+example.com/acme/deploy deployment.yaml:9-25 Deployment.apps/shop/sender
+type: Deployment
+name: "sender"
+root: .
+overridable: none
+references:
+example.com/acme/deploy deployment.yaml:1 ConfigMap/shop/queues via env QUEUE_URL
+referenced by: none
+images:
+sender: ghcr.io/acme/environment-app:v1
+values:
+example.com/acme/deploy deployment.yaml:9 [1].apiVersion = "apps/v1"
+example.com/acme/deploy deployment.yaml:10 [1].kind = "Deployment"
+example.com/acme/deploy deployment.yaml:12 [1].metadata.name = "sender"
+example.com/acme/deploy deployment.yaml:13 [1].metadata.namespace = "shop"
+example.com/acme/deploy deployment.yaml:18 [1].spec.template.spec.containers[0].name = "sender"
+example.com/acme/deploy deployment.yaml:19 [1].spec.template.spec.containers[0].image = "ghcr.io/acme/environment-app:v1"
+example.com/acme/deploy deployment.yaml:21 [1].spec.template.spec.containers[0].env[0].name = "QUEUE_URL"
+example.com/acme/deploy deployment.yaml:24 [1].spec.template.spec.containers[0].env[0].valueFrom.configMapKeyRef.name = "queues"
+example.com/acme/deploy deployment.yaml:25 [1].spec.template.spec.containers[0].env[0].valueFrom.configMapKeyRef.key = "queue"
+image: image::ghcr.io/acme/environment-app
+  builder: example.com/acme/app [exact: image::ghcr.io/acme/environment-app]
+env sender QUEUE_URL -> ConfigMap/shop/queues key queue: https://sqs.us-east-1.amazonaws.com/123456789012/orders

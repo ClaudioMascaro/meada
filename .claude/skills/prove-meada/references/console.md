@@ -33,16 +33,29 @@ passes) and `"$RUN/bin/meada-head-ui" ui --help` lists `--listen`.
 ## API
 
 ```bash
-python3 $S/console.py start --bin "$RUN/bin/meada-head-ui" --run "$RUN" --ui-dir ui/dist
+ENTRY=meada  # repeat the API check for each corpus entry Scope names
+python3 $S/console.py start --bin "$RUN/bin/meada-head-ui" --run "$RUN" --ui-dir ui/dist --repos "$ENTRY"
 python3 $S/console.py api --run "$RUN"
+python3 $S/console.py stop --run "$RUN"
+mv "$RUN/console" "$RUN/console-$ENTRY"  # retain captures before starting the next entry
 ```
 
-`start` writes `$RUN/console/meada.workspace.toml` (every head entry of the run, `[ui]` on a free
+`start` writes `$RUN/console/meada.workspace.toml` (the selected head entries, all by default, `[ui]` on a free
 loopback port), runs `meada index --workspace`, starts the console detached and waits for
 `GET /api/v1/config`. `api` then sends every stdio query of the run to `POST /api/v1/query`
 (`{"repository", "generation": null, "tool", "arguments"}`, with the `Origin` the console
-requires of a write) and compares `text` byte for byte with the stdio answer, and compares
-`GET /api/v1/repositories/{identity}/export` with the head's `meada export` bytes. Report in
+requires of a write) and compares successful `text` byte for byte with the stdio answer.
+API parity requires one corpus entry per manifest: standalone stdio answers about that entry,
+whereas a manifest of several entries makes one workspace and changes search/context scope.
+For an expected MCP tool error it requires HTTP 422, code `tool_error` and the exact same full
+message, the existing API protocol. A wrong status, code or message fails. Every raw status/body
+is saved under `responses/`; errors are reported separately from successful text-byte parity.
+
+`GET /api/v1/repositories/{identity}/export` is compared byte for byte with the same console
+binary's `export --workspace <that manifest> --repo <that identity>`. Its complete stdout,
+stderr and exit status are saved; no fields are removed. A local checkout export may carry
+`commit`/`dirty` that server mode omits, so comparing across modes is not an export answer key.
+Report in
 `$RUN/console/api.md`.
 
 With sign-in in Scope (`src/accounts*`, `src/postgres.rs`, `src/audit.rs`, `ui/src/Account*`,
@@ -50,7 +63,7 @@ With sign-in in Scope (`src/accounts*`, `src/postgres.rs`, `src/audit.rs`, `ui/s
 
 ```bash
 export MEADA_TEST_POSTGRES_URL=postgres://...   # a Postgres 15+ the run may create a schema in
-python3 $S/console.py start --bin "$RUN/bin/meada-head-ui" --run "$RUN" --ui-dir ui/dist --accounts
+python3 $S/console.py start --bin "$RUN/bin/meada-head-ui" --run "$RUN" --ui-dir ui/dist --repos "$ENTRY" --accounts
 python3 $S/console.py api --run "$RUN"
 ```
 
@@ -61,6 +74,12 @@ a login without `Origin` refused (403), `admin` signed in with a token, `/api/v1
 Without `MEADA_TEST_POSTGRES_URL` the start is BLOCKED: never stub Postgres.
 
 ## Pages
+
+After scoped API checks, start the normal viewer for page checks (without `--repos`):
+
+```bash
+python3 $S/console.py start --bin "$RUN/bin/meada-head-ui" --run "$RUN" --ui-dir ui/dist
+```
 
 ```bash
 CACHE=${PROVE_MEADA_CACHE:-$HOME/.cache/prove-meada}

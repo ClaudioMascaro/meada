@@ -1,0 +1,15 @@
+route:
+  receiver: none
+  group_by: [support, owner]
+  routes:
+    - receiver: incidents
+      match: {support: team-b}
+receivers:
+  - name: none
+  - name: incidents
+    opsgenie_configs:
+      - tags: 'target:{{ .CommonLabels.owner }}'
+    pagerduty_configs:
+      - routing_key: placeholder-not-a-credential
+        details:
+          support: '{{ .GroupLabels.support }}'

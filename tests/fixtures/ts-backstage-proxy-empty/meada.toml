@@ -1,0 +1,5 @@
+# The legacy proxy table of `app-config*.yaml`: `inventory` declares the variable `/inventory`
+# takes its target from; `stock` is reached by the host of `/stock`'s target.
+[[peer]]
+repo = "example.com/backstage/inventory"
+base_url_env = ["INVENTORY_URL"]

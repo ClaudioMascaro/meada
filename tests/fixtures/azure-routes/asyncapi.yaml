@@ -1,0 +1,28 @@
+asyncapi: 2.6.0
+info: {title: Azure routes, version: '1'}
+servers:
+  bus: {url: bus.servicebus.windows.net, protocol: servicebus}
+  hubs: {url: hub.servicebus.windows.net, protocol: eventhubs}
+channels:
+  orders:
+    servers: [bus]
+    subscribe: {}
+  other:
+    servers: [bus]
+    subscribe: {}
+  orders/subscriptions/audit:
+    servers: [bus]
+    subscribe: {}
+  /subscriptions/s/resourceGroups/g/providers/Microsoft.ServiceBus/namespaces/b/topics/orders/subscriptions/orders:
+    servers: [bus]
+    publish: {}
+  /subscriptions/s/resourceGroups/g/providers/Microsoft.ServiceBus/namespaces/b/topics/orders/subscriptions/audit:
+    servers: [bus]
+    publish: {}
+  /subscriptions/s/resourceGroups/g/providers/Microsoft.ServiceBus/namespaces/b/topics/other/subscriptions/audit:
+    servers: [bus]
+    publish: {}
+  events:
+    servers: [hubs]
+    subscribe: {}
+    publish: {}

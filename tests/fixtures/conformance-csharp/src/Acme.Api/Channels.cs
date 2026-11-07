@@ -89,7 +89,7 @@ namespace Acme.Api.Channels
         private const string Url = "https://sqs.us-east-1.amazonaws.com/123456789012/shipments";
         private readonly IAmazonSQS _sqs;
 
-        public SqsShipments(IAmazonSQS sqs) { _sqs = sqs; }
+        public SqsShipments(IAmazonSQS sqs) { _sqs = new AmazonSQSClient(); }
 
         public async Task Ship() { await _sqs.SendMessageAsync(Url, "body"); }
 

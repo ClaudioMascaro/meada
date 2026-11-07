@@ -42,6 +42,7 @@ brokers `amqp`, `jms`, `kafka`, `nats`, `redis`, `servicebus` and `sqs` today; `
 | `eventbridge` | an EventBridge event bus | the bus name |
 | `kinesis` | a Kinesis data stream | the stream name |
 | `pubsub` | a GCP Pub/Sub topic | the topic id |
+| `pubsub` | a GCP Pub/Sub subscription | `subscriptions/<subscription id>` |
 | `servicebus` | an Azure Service Bus queue or topic | the queue or topic name |
 | `eventhubs` | an Azure Event Hub | the event hub name |
 | `kafka` | a Strimzi `KafkaTopic` | `spec.topicName`, else `metadata.name` |
@@ -58,9 +59,11 @@ curated kinds:
 | `s3` | an S3 bucket | the bucket name |
 | `gcs` | a Cloud Storage bucket | the bucket name |
 | `azureblob` | an Azure Storage blob container | the container name |
+| `azurestorage` | an Azure Storage account | the account name, distinct from any container |
 | `dynamodb` | a DynamoDB table | the table name |
 | `rds` | an RDS instance or cluster | the instance or cluster identifier |
 | `cloudsql` | a Cloud SQL instance | the instance name |
+| `cloudsql` | a Cloud SQL database | `<instance>/<database>` |
 | `elasticache` | an ElastiCache cluster or replication group | its id |
 | `ssm` | an SSM Parameter Store parameter | the parameter name, leading `/` kept |
 | `secretsmanager` | an AWS Secrets Manager secret | the secret name |
@@ -91,6 +94,34 @@ amends these tables.
   subscriptions and Service Bus subscriptions are read from IaC and followed like a RabbitMQ
   binding: a consumer of the target links to the producers of the source, `exact` for an
   unfiltered subscription and `inferred` with a filter, the reason naming the subscription.
+
+### GCP identities and workloads (#667, 2026-11-06)
+
+Pub/Sub subscriptions use `channel::pubsub::subscriptions/<id>`. A topic id cannot contain
+`/`, so a topic and subscription with the same short id cannot acquire a direct exact link
+that overrides filtered delivery. The source is only the configured `topic`, resolved from a
+literal or a known topic reference through the bounded evaluator. An unresolved source never
+creates a topic from the subscription id. A missing or empty filter is exact; a nonempty or
+unresolved filter weakens delivery to inferred.
+
+Cloud SQL database identities are `resource::cloudsql::<instance>/<database>`; instances keep
+`resource::cloudsql::<instance>`. Complete literal or evaluated instance evidence is required,
+and both names contribute overridable provenance. A database never provisions its instance.
+
+The shared GCP kind policy validates complete structured identifiers before omitting projects:
+`gs://<bucket>` (object paths are opaque), `projects/<project>/topics/<id>`,
+`projects/<project>/subscriptions/<id>`, and Secret Manager names with an optional
+`/versions/<version>`. These config uses are exact. The final keys `pubsub_topic`,
+`pubsub_subscription`, `gcs_bucket`, `cloudsql_instance`, `cloudsql_database` and
+`gcpsecretmanager_secret` give inferred uses; the database key requires `<instance>/<database>`.
+Generic `topic` and `bucket` retain their AWS meanings. Malformed and wrong-kind identifiers
+cannot fall back to a plain exact name.
+
+Cloud Run v1 services, v2 services and v2 jobs retain each container's image and environment,
+evaluated in the node's root and instance. Image defaults preserve their overridable evidence.
+Secret references retain their readable target with no resolved value; they do not expose
+contents or infer a resource hidden inside those contents. These rows use the existing image,
+execution, context, trace, orphan and export seams and the shared 1.4.0 minor release.
 
 ### Levels
 
@@ -241,6 +272,20 @@ bypasses the workspace filter.
 This ADR amends ADR 0005, which carries the dated amendment (2026-11-04): its contract kinds,
 its rule on environment variables and its `inferred` level change as the sections above say.
 
+### Curated abstraction projection (#671)
+
+The embedded type table maps a bounded documented custom-resource inventory and registry
+module source/input rows onto existing kinds. Private mappings select these same entries.
+Physical names remain on IaC nodes; canonical contract targets and explicit unknown targets
+are separate stored projections. Creation controls that are false or unknown establish no side.
+No operator, module, cloud API, packager or archive is executed while indexing.
+
+RabbitMQ Queue provisions AMQP; Exchange supplies routing metadata and is no channel; Binding
+routes only through real, uniquely resolved endpoints of a supported type. Routed publish uses
+retain the actual code site, exact/inferred route level and binding reason. A neutral batch hook
+on ContractKind exposes these additional uses to provisioning, with an empty default for other
+kinds. The engine does not learn broker policies and raw producers stay unchanged.
+
 ## Considered options
 
 - **Provisioning links in `links`, as consumer to provider.** Rejected: a provisioner neither
@@ -257,3 +302,266 @@ its rule on environment variables and its `inferred` level change as the section
   contract, as channels are, and the provisioner's root label tells environments apart.
 - **A `router` side for alerts.** Rejected: router is HTTP vocabulary; emitter and matcher name
   what each side does.
+
+### AWS SDK forms amendment (2026-11-06, #659)
+
+The operation matrix in the user guide specifies the low-level AWS SDK v3 and boto3 forms.
+Both the client and command origins must be the corresponding SDK's; an unsent JavaScript
+command has no direction. Batch and transaction entries retain each physical name. An omitted
+EventBridge `EventBusName` means `default`; SNS phone and endpoint publishes name no topic.
+
+The existing `contracts.via` stores `sdk:aws` for these directed sides and `env:<variable>`
+for an unresolved environment name. Providers gain optional `via` in export format 1, absent
+on existing rows; consumers already have it. Literal SDK writer-reader and provisioning links
+are `exact`, with evaluated provisioner names weakening them as above. SDK resource readers
+can reach SDK writers in their own repository; declared resource sides preserve their
+cross-repository rule and `declared` level. The environment remains unread until the scoped
+workload mechanism can resolve it; this ticket never reads the process environment.
+
+An SSM hierarchy path is not a physical parameter name, so `GetParametersByPath` remains an
+unresolved reader. A DynamoDB transaction's `ConditionCheck` is a reader of its table, even
+when the same transaction writes another table. Computed batch keys follow the same literal
+and environment rules as other name arguments.
+
+### Image execution representation (#662, 2026-11-06)
+
+The image addition keeps export format 1. Builder locations use the optional provider `at`
+field described above. Workload consumers retain their IaC identity, and their nodes enter
+`iac_nodes`. A direct same-repository code path enters an optional `executions` array with
+`workload`, its `root`, `repository`, repository-relative `path`, `level` and `reason`. These
+rows are not consumer/provider image links. Image links derive the same execution relation
+at query time for context and trace. Readers that do not know the array ignore it.
+
+Several distinct normalized image names matching a pattern are distinct candidates even when
+one repository builds them. Several tags or configuration locations for one repository and
+normalized image are evidence of the same candidate. The kind retains the strongest evidence.
+
+This slice recognizes literal ko destinations in checked-in CI `KO_DOCKER_REPO` with
+`ko build --bare` or `ko publish --bare`. Other ko naming modes add import-path names or hashes;
+unread commands yield no guessed builder. Base-image settings never publish an image.
+The merged release with #660 synchronizes both crates at 1.4.0; image contracts share that
+minor release under Unreleased. ko scripts are read only as single simple commands;
+multiline scripts and unsupported shell syntax yield no guessed builder. A supported command
+has exactly one `--bare`, at most one literal package target and no other flags; a specified
+shell must be `bash` or `sh`. Help, unknown options and other shells stay absent.
+
+Image consumer and link rows optionally carry their evaluation `root`. Their `site` and
+`consumer` still identify the workload. An open item's decision identity additionally names
+the image contract and root, so two container images or overlays do not share a decision.
+Replaying one decision preserves every other image side's ambiguity.
+
+### SDK and image integration (#659 and #662, 2026-11-06)
+
+Combining the SDK and image slices keeps the SDK slice's synchronized 1.4.0 minor release
+for both crates, and export format 1. The earlier image tier's 1.3.0 release note describes
+its starting tier. Optional provider `via` records SDK provenance while optional `at` records
+image build configuration locations; neither replaces the other.
+
+### Declared key locations (#641, 2026-11-06)
+
+An explicit `[[resource]]` key `via` attaches a directed side to the key itself. Its internal
+and exported site is `<repository>::<file>#<canonical key path>`, preserving distinct declared
+keys in ordinary provider/consumer links. This is separate from the automatically recognized,
+directionless config-use rows whose repository site and optional `at` remain as described
+above. The string identity is additive within export format 1; no config scalar text is
+exported. A key declaration may resolve through list selectors, but its site uses the resolved
+indexes so context and trace identify the actual key. Secret/cut values and HCL expressions/templates cannot establish selector equality.
+Selectors require a complete literal string, number or boolean. Only indexed values and their parent key paths
+resolve; null values and empty containers have no row and remain stale (ADR 0025).
+An IaC declaration names a source address, optionally file-qualified; the
+` (root ...)` qualifier accepted by IaC queries is not a declaration form. A bare address
+matching several source identities is stale until qualified with its file.
+
+
+### Anchored provisioning choices (#674)
+
+An ambiguous physical name is an open item at the side holding the pattern. For a provisioner,
+the decision call identity is `provision::<IaC identity>::root=<evaluation root>`; its candidate
+target remains `<repository>::<literal contract>`, using the existing `ambiguous-link` decision
+kind. For a patterned use the call identity is `provision-use::<site>::<pattern contract>`
+and the target is the literal provisioner contract in its repository. The chosen name retains
+all its counterpart sites, while independent roots remain independent.
+The result is a provisioning link at `decided`, with the decision's author in its reason.
+A removed source, closed ambiguity, removed target or changed candidate is stale; a target in
+a missing named peer waits. The export keeps its existing provisioning shape and format 1.
+
+For a use declared at a configuration key, the item keeps the indexed path, key and line.
+Its expression contains contract and location metadata, never the key's scalar value or raw
+source line, preserving ADR 0025 redaction and truncation when shown to a person or decider.
+
+An image builder pattern with several distinct literal runner names is likewise an open item
+in its builder repository, identified as `image-builder::<repository>::<pattern contract>`.
+Its candidates name runner repositories and literal image contracts. Several runners of one
+literal image are one name, and choosing that name retains them all. This is independent of a
+runner's ambiguity among several builders, whose existing decision identity is unchanged.
+
+
+### AWS workload execution (#664)
+
+Lambda image_uri, SAM ImageUri and each ECS container image are image runners, independent
+of whether the container declares environment entries. The format readers keep evaluated
+container images and provenance in the same stored node facts; image contracts project those
+facts alongside Compose and Kubernetes through one runner inventory.
+
+Local Lambda filename inputs, SAM CodeUri and an unambiguous Serverless handler source can
+create direct same-repository executions. An exact archive_file output_path traversal may
+follow only an explicit source_dir/source_file input, with no general data-source evaluation
+and no extraction. New paths are relative, contain no raw parent component and traverse no
+symlink; indexing alone checks existence, with path-sensitive configuration invalidation.
+
+SAM Globals and Serverless provider environment entries are overridden by the function, even
+when its value is unreadable. Environments retain their workload, container image and root.
+A known IaC resource reference can carry an optional typed contract identity without a fake
+URL/ARN; it resolves only a matching unresolved contract kind through the same scope index
+as literals. Secret contents, dynamic references and external values remain unavailable.
+Environment-derived names stay inferred with workload and variable provenance.
+
+### Azure identifiers, subscriptions and Functions (#669)
+
+The AzureRM Terraform/OpenTofu entries are Service Bus queues, topics and subscriptions,
+Event Hubs, Storage accounts and containers, Key Vault secrets, and Linux/Windows Function
+apps. Accounts use `resource::azurestorage::<account>`; containers retain
+`resource::azureblob::<container>`. A subscription target is
+`channel::servicebus::subscription:<topic>/<subscription>`. The colon marker is impossible
+in an Azure queue/topic name, whereas slash is legal. Thus neither a same-name topic nor
+the queue `orders/subscriptions/audit` impersonates a subscription. Physical node names
+remain available beside their separately stored projected target and evaluation evidence;
+an explicitly unresolved projection forbids falling back to an incomplete physical name.
+
+Complete ARM IDs validate subscription/resource-group/provider/type segments before
+discarding deployment selectors. Provider and type labels are case-insensitive; physical
+names retain their case. Blob URLs identify their container, ignoring the object suffix;
+versioned vault URLs identify their secret. Malformed/wrong-service identifiers and
+namespace-only Service Bus URLs identify nothing. Provider-specific final typed keys are
+the bounded inventory `servicebus_queue`, `servicebus_topic`, `servicebus_subscription`
+(topic-qualified value), `eventhubs_hub`, `azurestorage_account`, `azureblob_container`
+and `keyvault_secret`, always inferred. The generic AWS key inventory remains unchanged.
+The kind owns this normalization in `contract/azure.rs`, shared with future SDK readers.
+
+A Service Bus subscription joins its topic like a binding. An observed subscription rule,
+including an unread filter, weakens that route to inferred and names the rule. An absence
+of declared rules gives exact routing, subject to name evaluation evidence. This models
+repository configuration; it makes no claim that a deployment removed the broker's default
+rule. Existing C# `CreateProcessor` forms retain their established topic-based identity and
+origins, independently of these subscription-aware structured identifiers. AsyncAPI's
+`servicebus` and `eventhubs` protocol labels provide the same channel identities; subscription
+addresses use their full ARM ID.
+
+Linux Functions read the single Docker application-stack block's registry/name/tag and
+app settings. Linux and Windows Functions also support local `zip_deploy_file`, validated
+through the image kind's indexing hook with the same path/symlink rules as other workloads.
+Archives are execution locations, never opened and never widened to their parent directory.
+Remote package settings identify no local code. Literal/evaluated app settings and known
+resource attribute targets use the common workload-scoped environment mechanism. Key Vault
+references and secret-content attributes retain no resolved value. This addition shares
+the synchronized 1.4.0 minor release and export format 1.
+
+### GCP SDK forms amendment (2026-11-06, #668)
+
+The adopted operation inventory counts JavaScript and TypeScript as one of five language
+groups, with independent controls for both source languages. A known constructor must establish
+the client through complete exact calls. A declared type, a name-matched factory, a hidden
+constructor, a reassigned client or an opaque return alternative supplies no client evidence.
+Making a topic, subscription, bucket or object handle alone supplies no direction.
+
+| Group | Pub/Sub producer / consumer | Cloud Storage writer / reader | Secret Manager reader |
+| --- | --- | --- | --- |
+| JavaScript + TypeScript | `@google-cloud/pubsub`: `new PubSub().topic(name).publishMessage(...)` / `.subscription(name).on("message", handler)` | `@google-cloud/storage`: `new Storage().bucket(name).file(object).save(...)` / `.download(...)` | `@google-cloud/secret-manager`: `new SecretManagerServiceClient().accessSecretVersion({name})` |
+| Python | `google.cloud.pubsub_v1.PublisherClient().publish(topic, ...)` / `SubscriberClient().subscribe(subscription, callback=...)` | `google.cloud.storage.Client().bucket(name).blob(object).upload_from_string(...)` / `.download_as_bytes()` | `google.cloud.secretmanager.SecretManagerServiceClient().access_secret_version(request={"name": name})` |
+| Java | `com.google.cloud.pubsub.v1.Publisher.newBuilder(topic).build().publish(...)` / `Subscriber.newBuilder(subscription, handler).build().startAsync()` | `com.google.cloud.storage.StorageOptions.newBuilder().build().getService().create(BlobInfo.newBuilder(BlobId.of(bucket, object)).build(), ...)` / `.readAllBytes(bucket, object)` | `com.google.cloud.secretmanager.v1.SecretManagerServiceClient.create().accessSecretVersion(name)` |
+| Go | `cloud.google.com/go/pubsub/v2.NewClient`: `Publisher(topic).Publish(...)` / `Subscriber(subscription).Receive(ctx, handler)`; v1 `cloud.google.com/go/pubsub` uses `Topic` / `Subscription` | `cloud.google.com/go/storage.NewClient`: `Bucket(bucket).Object(object).NewWriter(ctx)` / `.NewReader(ctx)` | `cloud.google.com/go/secretmanager/apiv1.NewClient`: `AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{Name: name})` |
+| C# | `client = await Google.Cloud.PubSub.V1.PublisherClient.CreateAsync(topic); client.PublishAsync(...)` / `client = await SubscriberClient.CreateAsync(subscription); client.StartAsync(handler)` | `Google.Cloud.Storage.V1.StorageClient.Create()`: `UploadObject(bucket, ...)`, `UploadObjectAsync` / `DownloadObject(bucket, ...)`, `DownloadObjectAsync` | `Google.Cloud.SecretManager.V1.SecretManagerServiceClient.Create()`: `AccessSecretVersion(name)`, `AccessSecretVersionAsync(name)` |
+
+Names retained in receivers are evaluated in their constructor/factory call's scope and exact
+return frames. Two calls of a factory retain their own names. A known bucket is not erased by
+an unknown object. Verified Java `TopicName.of`, `SubscriptionName.of`, `SecretVersionName.of`,
+C# typed-name constructors and `FromProjectTopic`/`FromProjectSubscription`, and Python
+`topic_path`/`subscription_path` select the identity component; an identically named local helper
+does not. Helper subtype survives factory memoization: a subscription helper cannot name a
+topic, bucket or secret. Complete structured identities use the shared GCP physical-name policy above.
+Selected request fields and factory identity arguments reject prior writes through exact aliases,
+including mapping update/deletion and exact helper parameters. Later writes, sibling objects
+and unrelated fields preserve valid names. Unknown or exhausted mutation evidence cannot
+prove an unchanged initializer. Async factory results retain await state; a bare C# Task and
+a twice-awaited C# client supply no receiver evidence. Resource reads retain each operation's
+call site, including identical calls within one function.
+
+Pub/Sub receive targets remain `subscriptions/<id>`, including a plain id supplied by a scoped
+workload environment. Receives never derive a topic from a subscription id. Literal SDK
+identities are exact; provisioning and subscription delivery retain their existing scope and
+filter evidence. Workload resolution remains `inferred` with the workload/variable reason.
+Without a matching workload the side remains unresolved with its established `env:NAME` metadata.
+The stored operation retains subtype evidence for this normalization; private intermediary
+provenance is never exported. The operation list is deliberately bounded: other overloads,
+streaming/polling families, delete/list/metadata operations and other SDKs are not promised.
+
+### Azure SDK forms amendment (2026-11-06, #670)
+
+The adopted five-group inventory below closes the Azure operation list left implicit in the
+original ADR. JavaScript and TypeScript share a reader and have independent source controls.
+The new forms require verified SDK construction through complete exact calls. Injected types,
+hidden constructors, reassigned clients, name-matched hops and opaque return alternatives
+supply no new client evidence. Existing C# Service Bus sends, schedules and processors keep
+both their accepted origins and their topic identity. A handle alone supplies no direction.
+
+| Group | Service Bus producer / consumer | Event Hubs producer / consumer | Blob writer / reader | Key Vault reader |
+| --- | --- | --- | --- | --- |
+| JavaScript + TypeScript | `createSender(name).sendMessages` / `createReceiver(queue)` or `(topic, subscription)`, then `receiveMessages` or `subscribe` | `EventHubProducerClient(..., hub).sendBatch` / `EventHubConsumerClient(group, ..., hub).subscribe` | service → `getContainerClient(container)` → `getBlockBlobClient(object)`: `upload`, `uploadData`, `uploadFile`, `uploadStream`; blob `download`, `downloadToBuffer`, `downloadToFile` | `SecretClient.getSecret(name)` |
+| Python | `get_queue_sender` / `get_topic_sender` → `send_messages`; `get_queue_receiver` / `get_subscription_receiver` → `receive_messages` | explicit `eventhub_name`: producer `send_batch` / consumer `receive` | service `get_blob_client(container, blob)` or `get_container_client(container).get_blob_client(blob)`: `upload_blob` / `download_blob` | `SecretClient.get_secret(name)` |
+| Java | `ServiceBusClientBuilder.sender().queueName` or `topicName` → `buildClient`: `sendMessage`, `sendMessages`; receiver `queueName` or `topicName` + `subscriptionName` → `buildClient().receiveMessages` | builder `connectionString(cs, hub)` or `credential(namespace, hub, credential)`: `buildProducerClient().send` / `consumerGroup(...).buildConsumerClient().receiveFromPartition` | `BlobServiceClientBuilder...buildClient().getBlobContainerClient(container).getBlobClient(object)`: `upload`, `uploadFromFile` / `downloadContent`, `downloadStream`, `downloadToFile` | `SecretClientBuilder...buildClient().getSecret(name)` |
+| Go | `NewSender` → `SendMessage`, `SendMessageBatch`; `NewReceiverForQueue` / `NewReceiverForSubscription` → `ReceiveMessages` | `NewProducerClient` → `SendEventDataBatch`; `NewConsumerClient` → `NewPartitionClient` → `ReceiveEvents` | `UploadBuffer`, `UploadFile`, `UploadStream` / `DownloadBuffer`, `DownloadFile`, `DownloadStream`, container after `ctx` | `GetSecret(ctx, name, version, ...)` |
+| C# | existing sends, schedules and processors retained; new `CreateReceiver(queue)` / `(topic, subscription)` → `ReceiveMessageAsync`, `ReceiveMessagesAsync` | explicit hub: producer `SendAsync` / consumer `ReadEventsAsync` | service → `GetBlobContainerClient(container)` → `GetBlobClient(object)`: `Upload`, `UploadAsync` / `DownloadTo`, `DownloadToAsync`; container `UploadBlob`, `UploadBlobAsync` | `SecretClient.GetSecret`, `GetSecretAsync` |
+
+The constructors are JS/TS's imported `@azure/service-bus`, `@azure/event-hubs`,
+`@azure/storage-blob` and `@azure/keyvault-secrets` client classes; Python's corresponding
+`azure.servicebus`, `azure.eventhub`, `azure.storage.blob`, `azure.keyvault.secrets` classes,
+including verified `aio` equivalents; Java's `com.azure` builders; Go's `sdk/messaging/azservicebus`,
+`sdk/messaging/azeventhubs`, `sdk/storage/azblob`, `sdk/security/keyvault/azsecrets` constructors;
+and .NET's `Azure.Messaging.ServiceBus`, `Azure.Messaging.EventHubs.Producer` / `.Consumer`,
+`Azure.Storage.Blobs`, `Azure.Security.KeyVault.Secrets`. JS Blob's `fromConnectionString`,
+Python's first three services' `from_connection_string`, Go messaging's `FromConnectionString`
+and Blob's `NewClientWithNoCredential`, `NewClientWithSharedKeyCredential`,
+`NewClientFromConnectionString` are included. Known Java builder setters are enumerated;
+arbitrary fluent calls do not preserve a client.
+
+Primary inventories: [Service Bus JS](https://learn.microsoft.com/en-us/javascript/api/overview/azure/service-bus-readme?view=azure-node-latest),
+[Event Hubs Python](https://learn.microsoft.com/en-us/python/api/overview/azure/eventhub-readme?view=azure-python),
+[Blob Java](https://learn.microsoft.com/en-us/java/api/overview/azure/storage-blob-readme?view=azure-java-stable),
+[Go messaging](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs),
+[Go storage](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/storage/azblob) and
+[Key Vault .NET](https://learn.microsoft.com/en-us/dotnet/api/overview/azure/security.keyvault.secrets-readme?view=azure-dotnet).
+
+Only explicit entity arguments identify resources: queue/topic, hub, blob container and secret.
+Group, partition, object and version arguments are irrelevant to identity. Pure Azure helpers
+normalize supported complete ARM identifiers and blob/vault URLs, rejecting malformed and
+wrong-service shapes. Connection strings and credentials are not parsed for names. An Event
+Hubs constructor without a separately written hub remains unresolved. Direct Blob/Container URL
+constructors, session processors, other polling/streaming families, list/delete/metadata methods
+and other async families are outside this inventory.
+
+The shared SDK walker carries exact return frames and complete receiver evidence; kind policy
+retains folded name arguments. A new subscription receiver uses
+`subscription:<topic>/<subscription>`, avoiding legal slash queue names and same-name topics.
+Literal names yield exact SDK links; provisioning and filtered delivery retain their existing
+levels and reasons. Workload resolution is inferred, with stored workload and variable evidence.
+Both topic and subscription must come from the same workload, root and selected container;
+unknown, unread, incompatible typed or cross-frame companions cannot be combined.
+
+`Found.method` and `via` remain actual operation/provenance. These fields cannot retain both
+arguments and subtype for `createReceiver` / `CreateReceiver`, which name queues as well as
+subscriptions. A neutral optional `contracts.identity` JSON therefore stores only a kind-owned
+subtype plus normalized literal/environment/unresolved name parts. It contains no constructor,
+request, namespace, connection string or credential object and never enters public export/MCP.
+Absence preserves legacy behavior. Internal Provider/Consumer summaries carry the optional
+value; the contract row key, internal sorting and declaration deduplication include it so unresolved sibling pairs cannot collapse. The
+existing schema-golden hash deterministically rebuilds source indexes from an older layout;
+read-only servers consume the rebuilt stored summaries without rereading source or environment.
+No cloud parsing enters the generic engine, index, environment collector or language packs.
+
+Queue receiver overloads distinguish options from subscription names by proven argument form,
+not positional count: JS/TS object literals or exact folded objects, and C# verified
+`ServiceBusReceiverOptions` constructions. Explicit unshadowed JS/TS `undefined` and named C#
+`options: null` select the queue form. Bare C# positional null remains ambiguous. An opaque or
+reassigned argument supplies no exact entity; strings retain the topic/subscription form.
+The C# options constructor category is retained in private memo keys, preventing a valid first
+factory call from making a later opaque actual look like options. No new walker is involved.

@@ -1,0 +1,6 @@
+channel::sqs::sns-jobs
+  example.com/aws/app producer sns send alerts asyncapi.yaml (documented only) [exact: channel::sqs::sns-jobs subscription aws_sns_topic_subscription.plain (root routes)]
+    example.com/aws/app asyncapi.yaml (document) payload fields:
+    example.com/aws/app asyncapi.yaml (document) payload open: (root)
+  example.com/aws/app consumer app.py:3 sns_receive
+  example.com/aws/infra provisioner routes/main.tf:3 aws_sqs_queue.sns (root routes)

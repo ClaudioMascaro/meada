@@ -1,0 +1,3 @@
+proxy:
+  '/inventory':
+    target: ${INVENTORY_URL}

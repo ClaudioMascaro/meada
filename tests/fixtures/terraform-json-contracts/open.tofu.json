@@ -1,0 +1,1 @@
+{ "resource": [{ "aws_s3_bucket": [{ "archive": [{ "bucket": "json-archive" }] }] }] }

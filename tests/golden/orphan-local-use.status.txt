@@ -1,0 +1,6 @@
+example.com/orphan/app (.) indexed, 1 files
+  resource::postgres::archive is unlinked: no writer and reader in different repositories
+example.com/orphan/infra (../orphan-infra) indexed, 0 files
+  resource::s3::archive is unlinked: no writer and reader in different repositories
+  orphan resource::s3::unused: no use; main.tf:4 aws_s3_bucket.unused (root .)
+  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 4, redacted: 0

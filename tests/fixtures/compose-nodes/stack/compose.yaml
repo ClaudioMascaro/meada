@@ -1,0 +1,28 @@
+services:
+  web:
+    image: ghcr.io/acme/web:${WEB_TAG:-1.4}
+    build: ./web
+    depends_on:
+      - api
+    networks:
+      - front
+  api:
+    image: acme/api:${API_TAG}
+    build:
+      context: ../services/api
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    links:
+      - db:database
+    networks:
+      - front
+      - back
+  db:
+    image: postgres:16
+    networks:
+      - back
+networks:
+  front: {}
+  back: {}

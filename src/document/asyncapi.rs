@@ -65,7 +65,17 @@ pub fn read(path: &str, doc: &Value) -> Summary {
             };
             match broker(protocol) {
                 Some(broker) => {
-                    let key = (broker.to_string(), op.name.clone(), op.role);
+                    let name = match broker {
+                        "servicebus" => crate::contract::azure::subscription(&op.name)
+                            .filter(|_| op.name.starts_with('/'))
+                            .or_else(|| crate::contract::azure::servicebus(&op.name)),
+                        "eventhubs" => crate::contract::azure::eventhub(&op.name),
+                        _ => Some(op.name.clone()),
+                    };
+                    let Some(name) = name else {
+                        continue;
+                    };
+                    let key = (broker.to_string(), name, op.role);
                     let own = payloads.entry(key).or_default();
                     for payload in &op.payloads {
                         if !own.contains(payload) {
@@ -225,6 +235,12 @@ fn broker(protocol: &str) -> Option<&'static str> {
         "nats" => "nats",
         "redis" => "redis",
         "sqs" => "sqs",
+        "sns" => "sns",
+        "eventbridge" => "eventbridge",
+        "kinesis" => "kinesis",
+        "servicebus" => "servicebus",
+        "eventhubs" => "eventhubs",
+        "pubsub" => "pubsub",
         _ => return None,
     })
 }

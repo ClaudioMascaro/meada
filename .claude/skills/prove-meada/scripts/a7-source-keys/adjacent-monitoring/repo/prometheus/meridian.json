@@ -1,0 +1,28 @@
+{
+  "groups": [
+    {
+      "name": "meridian-checks",
+      "labels": {
+        "support": "aurora",
+        "service": "cedar-worker",
+        "severity": "warning"
+      },
+      "rules": [
+        {
+          "alert": "MeridianCritical",
+          "expr": "vector(1)",
+          "labels": {
+            "severity": "critical"
+          }
+        },
+        {
+          "alert": "MeridianOpaque",
+          "expr": "vector(1)",
+          "labels": {
+            "support": "{{ $labels.owner }}"
+          }
+        }
+      ]
+    }
+  ]
+}

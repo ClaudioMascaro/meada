@@ -8,6 +8,9 @@
 .graph-list li + li { margin-top: .5rem; }
 .graph-table code { overflow-wrap: anywhere; }
 .graph-table th { min-width: 7rem; }
+.graph-legend { margin-block: 1.5rem; }
+.graph-legend dt { font-weight: 600; }
+.graph-legend dd { margin: .25rem 0 1rem; }
 @media (max-width: 720px) {
   .graph-form { grid-template-columns: minmax(0, 1fr); }
   .graph-view-picker { align-items: start; flex-direction: column; }

@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../middle
+  - https://example.invalid/forbidden.yaml
+  - ../../../escape.yaml
+  - /tmp/denied.yaml
+  - ../../linked-base
+  - ../../missing.yaml
+  - ../../cycle-a
+namePrefix: cedar-
+nameSuffix: -a
+namespace: cedar
+images:
+  - name: registry.example.invalid/middle
+    newName: registry.example.invalid/cedar
+    newTag: v4
+  - name: registry.example.invalid/middle
+    newName: registry.example.invalid/refused-second-image
+patches:
+  - path: ../../patch.yaml
+configMapGenerator:
+  - name: refused-generated
+    literals: [message=generated]

@@ -12,8 +12,7 @@
 //! polling one, the function that holds the call naming the topic or the queue.
 
 use crate::channel::message::{
-    Handler, Message, bind, channel_name as name, consume, produce, publish, queue_name, topic,
-    topics,
+    Handler, Message, bind, channel_name as name, consume, produce, publish, topic, topics,
 };
 use crate::lang::go::modfile::unversioned;
 use crate::lang::go::package_call;
@@ -29,7 +28,6 @@ enum Client {
     SaramaConsumer,
     SaramaGroup,
     Amqp,
-    Sqs,
     Nats,
     Redis,
 }
@@ -119,12 +117,6 @@ const LIBRARIES: &[Library] = &[
             "DialTLS_ExternalAuth",
         ],
         passes: &["Channel"],
-    },
-    Library {
-        client: Client::Sqs,
-        packages: &["github.com/aws/aws-sdk-go-v2/service/sqs"],
-        makers: &["Client", "NewFromConfig", "New"],
-        passes: &[],
     },
     Library {
         client: Client::Nats,
@@ -291,12 +283,6 @@ fn form<'a>(
             };
             bind(code, path, n, &read)
         }
-        (Client::Sqs, "SendMessage" | "SendMessageBatch") => {
-            produce(code, path, n, "sqs", &|a, _| queue_of(arg(a, 1)))
-        }
-        (Client::Sqs, "ReceiveMessage") => {
-            consume(code, path, n, "sqs", &|a, _| queue_of(arg(a, 1)), None)
-        }
         (Client::Nats, "Publish") => produce(code, path, n, "nats", &one),
         (Client::Nats, "Subscribe" | "QueueSubscribe") => {
             let at = if method == "Subscribe" { 1 } else { 2 };
@@ -416,11 +402,6 @@ fn one_field(
         Some(v) => read(v)?,
         None => None,
     }])
-}
-
-/// The queue the `QueueUrl` of an SQS input names.
-fn queue_of(input: &Value) -> Option<Vec<Option<String>>> {
-    Some(vec![queue_name(field(input, "QueueUrl")?)?])
 }
 
 /// The streams of the `Streams` field of an `XReadGroupArgs`: the stream names are the first

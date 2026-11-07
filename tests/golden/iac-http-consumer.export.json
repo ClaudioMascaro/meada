@@ -1,0 +1,383 @@
+{
+  "format": 1,
+  "repository": "example.com/route-oracle/consumer",
+  "commit": "d7e8b58c8c5aad332c8ac6c19d0a843dbae8710e",
+  "dirty": true,
+  "files": [
+    {
+      "path": "client.ts",
+      "hash": "73df1847a187da180e6dcec3a8636a8ad729d35fe9a43ed1f5db5025db835a1e"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::createOrchard",
+      "span": {
+        "path": "client.ts",
+        "start": 121,
+        "end": 225
+      },
+      "hash": "91ffab789f582975466c12cb74838d67fbfe8fbcc0a04d003bd45dd61082c629"
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::missingHost",
+      "span": {
+        "path": "client.ts",
+        "start": 693,
+        "end": 800
+      },
+      "hash": "d5cc32bd50192ce4ca5ff29cffe638887050f3aab0919561384e0fb45261cfe5"
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::patchInventory",
+      "span": {
+        "path": "client.ts",
+        "start": 233,
+        "end": 359
+      },
+      "hash": "970080f3d986a1969b36f8d0bc5293b657a3414cef99ba3fe801739ccd8f8936"
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::readOrbit",
+      "span": {
+        "path": "client.ts",
+        "start": 367,
+        "end": 469
+      },
+      "hash": "fa1a6870e84a3a8e4eda7fcbd877c4d7ffce9c0d1ac23b2499ce9212b54639bc"
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::readOrchard",
+      "span": {
+        "path": "client.ts",
+        "start": 7,
+        "end": 113
+      },
+      "hash": "46984a20a6d97d9f68394ee37e1a1200c4e05b25f62392fa06de70ea2987b188"
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::wrongMethod",
+      "span": {
+        "path": "client.ts",
+        "start": 477,
+        "end": 601
+      },
+      "hash": "d81739e297510748536e07f5d960087be13a0354f09e152ab5ed2bfd99f930fb"
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::wrongPath",
+      "span": {
+        "path": "client.ts",
+        "start": 609,
+        "end": 685
+      },
+      "hash": "3fa26b1636319b5ba11012c063e2d6b701ebb3038594256337dead5d76d84ba0"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::createOrchard::fetch#0",
+      "caller": "example.com/route-oracle/consumer::client.ts::createOrchard",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client.ts",
+        "start": 155,
+        "end": 222
+      }
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::missingHost::fetch#0",
+      "caller": "example.com/route-oracle/consumer::client.ts::missingHost",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client.ts",
+        "start": 740,
+        "end": 797
+      }
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::patchInventory::fetch#0",
+      "caller": "example.com/route-oracle/consumer::client.ts::patchInventory",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client.ts",
+        "start": 279,
+        "end": 356
+      }
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::readOrbit::fetch#0",
+      "caller": "example.com/route-oracle/consumer::client.ts::readOrbit",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client.ts",
+        "start": 412,
+        "end": 466
+      }
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::readOrchard::fetch#0",
+      "caller": "example.com/route-oracle/consumer::client.ts::readOrchard",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client.ts",
+        "start": 53,
+        "end": 110
+      }
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::wrongMethod::fetch#0",
+      "caller": "example.com/route-oracle/consumer::client.ts::wrongMethod",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client.ts",
+        "start": 524,
+        "end": 598
+      }
+    },
+    {
+      "id": "example.com/route-oracle/consumer::client.ts::wrongPath::fetch#0",
+      "caller": "example.com/route-oracle/consumer::client.ts::wrongPath",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "client.ts",
+        "start": 639,
+        "end": 682
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "http::POST::/orchards",
+      "site": "example.com/route-oracle/consumer::client.ts::createOrchard::fetch#0",
+      "via": "host:orchards.example.test"
+    },
+    {
+      "contract": "http::GET::/orbits/{}",
+      "site": "example.com/route-oracle/consumer::client.ts::missingHost::fetch#0",
+      "via": "host:unrelated.example.test"
+    },
+    {
+      "contract": "http::PATCH::/inventory/{}",
+      "site": "example.com/route-oracle/consumer::client.ts::patchInventory::fetch#0",
+      "via": "host:inventory.example.test"
+    },
+    {
+      "contract": "http::GET::/orbits/{}",
+      "site": "example.com/route-oracle/consumer::client.ts::readOrbit::fetch#0",
+      "via": "host:orbits.example.test"
+    },
+    {
+      "contract": "http::GET::/orchards/{}",
+      "site": "example.com/route-oracle/consumer::client.ts::readOrchard::fetch#0",
+      "via": "host:orchards.example.test"
+    },
+    {
+      "contract": "http::POST::/orbits/{}",
+      "site": "example.com/route-oracle/consumer::client.ts::wrongMethod::fetch#0",
+      "via": "host:orbits.example.test"
+    },
+    {
+      "contract": "http::GET::/orbits",
+      "site": "example.com/route-oracle/consumer::client.ts::wrongPath::fetch#0",
+      "via": "host:orbits.example.test"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/route-oracle/consumer::client.ts::createOrchard::fetch#0",
+      "provider": "example.com/route-oracle/sam::runtime/app.ts::orchard",
+      "contract": "http::POST::/orchards",
+      "level": "exact",
+      "reason": "host orchards.example.test is served by example.com/route-oracle/sam"
+    },
+    {
+      "consumer": "example.com/route-oracle/consumer::client.ts::patchInventory::fetch#0",
+      "provider": "example.com/route-oracle/serverless::runtime.ts::inventory",
+      "contract": "http::PATCH::/inventory/{}",
+      "level": "exact",
+      "reason": "host inventory.example.test is served by example.com/route-oracle/serverless"
+    },
+    {
+      "consumer": "example.com/route-oracle/consumer::client.ts::readOrbit::fetch#0",
+      "provider": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits",
+      "contract": "http::GET::/orbits/{}",
+      "level": "exact",
+      "reason": "host orbits.example.test is served by example.com/route-oracle/terraform"
+    },
+    {
+      "consumer": "example.com/route-oracle/consumer::client.ts::readOrchard::fetch#0",
+      "provider": "example.com/route-oracle/sam::runtime/app.ts::orchard",
+      "contract": "http::GET::/orchards/{}",
+      "level": "exact",
+      "reason": "host orchards.example.test is served by example.com/route-oracle/sam"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/route-oracle/consumer::client.ts::createOrchard",
+      "kind": "export",
+      "label": "createOrchard",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/consumer",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/consumer::client.ts::createOrchard"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/route-oracle/sam",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/route-oracle/sam::runtime/app.ts::orchard",
+          "reason": "host orchards.example.test is served by example.com/route-oracle/sam"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/route-oracle/consumer::client.ts::missingHost",
+      "kind": "export",
+      "label": "missingHost",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/consumer",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/consumer::client.ts::missingHost"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/route-oracle/consumer",
+          "level": null,
+          "via": "call",
+          "node": "example.com/route-oracle/consumer::client.ts::missingHost::fetch#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orbits/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/route-oracle/consumer::client.ts::patchInventory",
+      "kind": "export",
+      "label": "patchInventory",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/consumer",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/consumer::client.ts::patchInventory"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/route-oracle/serverless",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/route-oracle/serverless::runtime.ts::inventory",
+          "reason": "host inventory.example.test is served by example.com/route-oracle/serverless"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/route-oracle/consumer::client.ts::readOrbit",
+      "kind": "export",
+      "label": "readOrbit",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/consumer",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/consumer::client.ts::readOrbit"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/route-oracle/terraform",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits",
+          "reason": "host orbits.example.test is served by example.com/route-oracle/terraform"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/route-oracle/consumer::client.ts::readOrchard",
+      "kind": "export",
+      "label": "readOrchard",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/consumer",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/consumer::client.ts::readOrchard"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/route-oracle/sam",
+          "level": "exact",
+          "via": "link",
+          "node": "example.com/route-oracle/sam::runtime/app.ts::orchard",
+          "reason": "host orchards.example.test is served by example.com/route-oracle/sam"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/route-oracle/consumer::client.ts::wrongMethod",
+      "kind": "export",
+      "label": "wrongMethod",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/consumer",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/consumer::client.ts::wrongMethod"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/route-oracle/consumer",
+          "level": null,
+          "via": "call",
+          "node": "example.com/route-oracle/consumer::client.ts::wrongMethod::fetch#0",
+          "mark": "no-provider",
+          "contract": "http::POST::/orbits/{}"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/route-oracle/consumer::client.ts::wrongPath",
+      "kind": "export",
+      "label": "wrongPath",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/consumer",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/consumer::client.ts::wrongPath"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/route-oracle/consumer",
+          "level": null,
+          "via": "call",
+          "node": "example.com/route-oracle/consumer::client.ts::wrongPath::fetch#0",
+          "mark": "no-provider",
+          "contract": "http::GET::/orbits"
+        }
+      ]
+    }
+  ]
+}

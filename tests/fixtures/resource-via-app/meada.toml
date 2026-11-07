@@ -1,0 +1,8 @@
+[[peer]]
+repo = "example.com/resource-via/infra"
+
+[[resource]]
+kind = "routing"
+id = "team-b"
+role = "write"
+via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]

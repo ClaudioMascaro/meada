@@ -1,0 +1,4 @@
+service: routing
+functions:
+  route:
+    handler: app.emit

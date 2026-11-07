@@ -1,0 +1,7 @@
+{
+  "resource": {
+    "aws_sqs_queue": { "orders": { "name": "json-orders" } },
+    "null_resource": { "unlisted": { "name": "not-a-contract" } }
+  },
+  "data": { "aws_sqs_queue": { "outside": { "name": "outside" } } }
+}

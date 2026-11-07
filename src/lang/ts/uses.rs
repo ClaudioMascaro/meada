@@ -762,12 +762,17 @@ mod tests {
         let json = Step::Call("json".into());
         assert!(fetch.uses.contains(&vec![json, typed]), "{:?}", fetch.uses);
         // The receiver of the awaited call is read, as for the untyped one.
-        let facts = parse("async function f() { g(await api.get<Row>(u)); }");
-        let g = facts.calls.iter().find(|c| c.callee == "g").unwrap();
-        assert!(
-            matches!(&g.args[..], [Value::Call(c)] if c.callee == "api.get"
-                && matches!(c.receiver.as_deref(), Some(Value::Ref(r)) if r == "api"))
-        );
+        for call in ["await api.get<Row>(u)", "await api.get(u)"] {
+            let facts = parse(&format!("async function f() {{ g({call}); }}"));
+            let g = facts.calls.iter().find(|c| c.callee == "g").unwrap();
+            let [Value::Await(value)] = &g.args[..] else {
+                panic!("one await surrounds the typed and untyped call");
+            };
+            assert!(
+                matches!(value.as_ref(), Value::Call(c) if c.callee == "api.get"
+                    && matches!(c.receiver.as_deref(), Some(Value::Ref(r)) if r == "api"))
+            );
+        }
     }
 
     #[test]

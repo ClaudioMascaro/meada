@@ -53,7 +53,9 @@ There are three tools, always in English, and none of them writes:
   with the kind `ambiguous` or `unresolved`, it lists the open items (see
   Decisions);
 - `context` describes one symbol: its code read from disk, its callers, its callees and the
-  contracts it touches; the annotations, attributes and decorators written on a definition (`@Override`,
+  contracts it touches; an `inferred` or `decided` link on a call shows its level, reason and
+  provider, including the base URL variable and selected peer;
+  the annotations, attributes and decorators written on a definition (`@Override`,
   `[Fact]`, `@app.get("/x")`) are calls of the enclosing scope, so `context` lists them apart,
   in an `annotations:` section, each with the definition it decorates (the export's call site
   carries it as `decorates`); on a resource (`resource::postgres::orders`), it lists who writes and

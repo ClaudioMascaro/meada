@@ -8,3 +8,8 @@ Read the topic whose limit this change touches; the other limit families are in
 - [Engine, index and queries](resolution-the-index-and-shape-readers/engine-index-and-queries.md)
 - [Package and build readers](resolution-the-index-and-shape-readers/package-and-build-readers.md)
 - [Shape and document readers](resolution-the-index-and-shape-readers/shape-and-document-readers.md)
+- [Configuration values](resolution-the-index-and-shape-readers/configuration-values.md)
+- [Terraform and provisioning](resolution-the-index-and-shape-readers/terraform-and-provisioning.md)
+- [Kubernetes and Crossplane](resolution-the-index-and-shape-readers/kubernetes-and-crossplane.md)
+- [Compose, CloudFormation, Serverless and images](resolution-the-index-and-shape-readers/compose-cloudformation-serverless-and-images.md)
+- [Alert monitoring readers and routing](resolution-the-index-and-shape-readers/alerts.md)

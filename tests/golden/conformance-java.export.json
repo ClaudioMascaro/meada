@@ -1,7 +1,7 @@
 {
   "format": 1,
   "repository": "example.com/acme/conformance",
-  "commit": "87b9b92cfcd4d0111ef6ae5a587fad65c41beac1",
+  "commit": "142f36873ad1bd2b60a70bc1c5f7dfe6abb5d4e1",
   "dirty": false,
   "files": [
     {
@@ -54,7 +54,7 @@
     },
     {
       "path": "maven/api/src/main/java/example/channels/Delivery.java",
-      "hash": "2e694aa804b3c18fe6bb2ee432dc9dd18785a5926d54fb05278e625b555961bb"
+      "hash": "f0566fe309645982f123a2d12c6afdd8ce127cfc95c8c7f1a2241cf58210dc91"
     },
     {
       "path": "maven/api/src/main/java/example/channels/Sales.java",
@@ -1060,25 +1060,25 @@
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
         "start": 532,
-        "end": 1697
+        "end": 1712
       },
-      "hash": "1e25d090625b0e56f332077310c5539281c54dd9910d186845391f18c8699023"
+      "hash": "b6da089650ecf772007cb193e11231ab4010a3b138a86843258792287ab1c1cf"
     },
     {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.Delivery(JmsTemplate,SqsClient,Connection)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
         "start": 759,
-        "end": 905
+        "end": 920
       },
-      "hash": "df2d8f34f656935ab3dce81d5d6ba8e9a82bb5ac85a6de0885bf1a6ce4b7177c"
+      "hash": "56abc339541b231a6b3b26f0c5017da80bdfba1ae27ddcebd997b5ca9f54939a"
     },
     {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.loop(Object)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1443,
-        "end": 1472
+        "start": 1458,
+        "end": 1487
       },
       "hash": "563c4e34818e1bf325b5254d541af19314bbae74e4d12a3035239d9b0e722da0"
     },
@@ -1086,8 +1086,8 @@
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 911,
-        "end": 1005
+        "start": 926,
+        "end": 1020
       },
       "hash": "164adb7e47052e2d982008c09c5559eac0c270d4881e5dbf9bdab1bdcd5db4bc"
     },
@@ -1095,8 +1095,8 @@
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.onNotification(String)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1011,
-        "end": 1104
+        "start": 1026,
+        "end": 1119
       },
       "hash": "acf51c412887e2cd3e0e7439cd8716f6429dae9065980f4789e8af4b60e2aa06"
     },
@@ -1104,8 +1104,8 @@
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.receive(String)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1246,
-        "end": 1370
+        "start": 1261,
+        "end": 1385
       },
       "hash": "3f6f73fb2467de279f2e61362db3facceae64251c5a4a358de5d7cd315c02297"
     },
@@ -1113,8 +1113,8 @@
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.ship(String)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1110,
-        "end": 1240
+        "start": 1125,
+        "end": 1255
       },
       "hash": "72eb3837c8e0153c5e63af24efc084801170fdc802a15143670f30064825c301"
     },
@@ -1122,8 +1122,8 @@
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.shipments()",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1376,
-        "end": 1437
+        "start": 1391,
+        "end": 1452
       },
       "hash": "e08e1a62f762d8222563b34494be7ae89b20c899200b39a0ce8e6ca7b8566260"
     },
@@ -1131,8 +1131,8 @@
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.track(String)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1478,
-        "end": 1574
+        "start": 1493,
+        "end": 1589
       },
       "hash": "a801be1b4a1aa9c6c81439717ead9e78396cbcad98d0c120c0482779551b0adb"
     },
@@ -1140,8 +1140,8 @@
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.watch(Dispatcher)",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1580,
-        "end": 1695
+        "start": 1595,
+        "end": 1710
       },
       "hash": "29753e76f852b21515952eab62fca91b5bc52a01c7a655bf3498595a8f036a96"
     },
@@ -3255,14 +3255,25 @@
       "decorates": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Billing.java::example.channels.Billing.onRepo(JOrder)"
     },
     {
+      "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.Delivery(JmsTemplate,SqsClient,Connection)::SqsClient.create#0",
+      "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.Delivery(JmsTemplate,SqsClient,Connection)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "maven/api/src/main/java/example/channels/Delivery.java",
+        "start": 869,
+        "end": 887
+      }
+    },
+    {
       "id": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)::jms.convertAndSend#0",
       "caller": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.notifyCustomer(String)",
       "target": null,
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 959,
-        "end": 998
+        "start": 974,
+        "end": 1013
       }
     },
     {
@@ -3272,8 +3283,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1309,
-        "end": 1362
+        "start": 1324,
+        "end": 1377
       }
     },
     {
@@ -3283,8 +3294,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1309,
-        "end": 1354
+        "start": 1324,
+        "end": 1369
       }
     },
     {
@@ -3294,8 +3305,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1309,
-        "end": 1340
+        "start": 1324,
+        "end": 1355
       }
     },
     {
@@ -3305,8 +3316,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1290,
-        "end": 1363
+        "start": 1305,
+        "end": 1378
       }
     },
     {
@@ -3316,8 +3327,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1164,
-        "end": 1232
+        "start": 1179,
+        "end": 1247
       }
     },
     {
@@ -3327,8 +3338,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1164,
-        "end": 1224
+        "start": 1179,
+        "end": 1239
       }
     },
     {
@@ -3338,8 +3349,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1164,
-        "end": 1208
+        "start": 1179,
+        "end": 1223
       }
     },
     {
@@ -3349,8 +3360,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1164,
-        "end": 1192
+        "start": 1179,
+        "end": 1207
       }
     },
     {
@@ -3360,8 +3371,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1148,
-        "end": 1233
+        "start": 1163,
+        "end": 1248
       }
     },
     {
@@ -3371,8 +3382,8 @@
       "level": "exact",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1410,
-        "end": 1430
+        "start": 1425,
+        "end": 1445
       }
     },
     {
@@ -3382,8 +3393,8 @@
       "level": "exact",
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1415,
-        "end": 1429
+        "start": 1430,
+        "end": 1444
       }
     },
     {
@@ -3393,8 +3404,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1553,
-        "end": 1566
+        "start": 1568,
+        "end": 1581
       }
     },
     {
@@ -3404,8 +3415,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1517,
-        "end": 1567
+        "start": 1532,
+        "end": 1582
       }
     },
     {
@@ -3415,8 +3426,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1631,
-        "end": 1688
+        "start": 1646,
+        "end": 1703
       }
     },
     {
@@ -3426,8 +3437,8 @@
       "level": null,
       "span": {
         "path": "maven/api/src/main/java/example/channels/Delivery.java",
-        "start": 1011,
-        "end": 1054
+        "start": 1026,
+        "end": 1069
       },
       "decorates": "example.com/acme/conformance::maven/api/src/main/java/example/channels/Delivery.java::example.channels.Delivery.onNotification(String)"
     },

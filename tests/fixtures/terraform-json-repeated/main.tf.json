@@ -1,0 +1,6 @@
+{
+  "variable": {"secret": {"sensitive": true, "default": "repeated-block-secret-canary"}},
+  "variable": {"public": {"default": "public"}},
+  "resource": {"null_resource": {"first": {"depends_on": ["null_resource.second"]}}},
+  "resource": [{"null_resource": {"second": [{"triggers": {}}], "third": {"triggers": {"literal": "null_resource.second"}}}}]
+}

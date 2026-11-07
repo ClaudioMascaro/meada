@@ -6,13 +6,14 @@
 //! of the response is the field paths `response_reads` reads over the frames climbed. Seams of
 //! the root reused: its `fetch(args)` reader (`locate`, `method`, `fragments`) and `consumer`.
 
+use super::super::join::{depends, opaque_lead, resolve, text_parts};
 use super::super::{consumer, fetch};
 use super::backstage;
 use super::config::Config;
 use crate::contract::Found;
 use crate::declared::{self, Declared, Types};
-use crate::index::Indexed;
-use crate::lang::{Step, Ty};
+use crate::lang::ts::GLOBAL_URL;
+use crate::lang::{Part, Step, Ty, Value};
 use crate::literals::Literals;
 use crate::resolve::{Code, Expand, Expanded, Frame, Target};
 use crate::shape::{self, Import, Shape, Source, under};
@@ -20,11 +21,10 @@ use crate::shape::{self, Import, Shape, Source, under};
 /// `fetch` consumers with the shape each reads of its response (spec #23).
 pub(in crate::http) fn consumers(
     code: &Code,
-    indexed: &Indexed,
+    config: &Config,
     literals: &mut Literals,
 ) -> Vec<Found> {
     let mut found = Vec::new();
-    let config = Config::new(indexed.configs);
     // `fetch` is a consumer only where the language binds it everywhere.
     let global = code.binds_everywhere("fetch");
     for (&path, facts) in code.files() {
@@ -38,7 +38,7 @@ pub(in crate::http) fn consumers(
             // A URL from Backstage's `discovery.getBaseUrl('<id>')` starts at the plugin's mount.
             let plugin = backstage::base(code, path, n);
             let expanded = code.expand(Expand::Call(path, n), &|args, _| {
-                let decided = config.decided(args);
+                let decided = config.decided(&joined(args));
                 let folded =
                     (plugin.as_deref()).and_then(|id| Some((id, backstage::based(&decided, id)?)));
                 let args = folded.as_ref().map_or(&decided, |(_, args)| args);
@@ -66,6 +66,29 @@ pub(in crate::http) fn consumers(
         }
     }
     found
+}
+
+/// `args` with a first argument `new URL(reference, base)` replaced by the join of the two (RFC
+/// 3986 section 5.2, which the WHATWG URL Standard's constructor agrees with for these
+/// references), before the `fetch` is read. Over a base that is an environment read or a hole, an
+/// absolute-path reference keeps the opaque lead; a parameter on either side waits for the call
+/// sites; anything else the join does not read leaves the URL unknown.
+fn joined(args: &[Value]) -> Vec<Value> {
+    let Some(Value::New(callee, urls)) = args.first() else {
+        return args.to_vec();
+    };
+    let ([reference, base], true) = (&urls[..], callee == GLOBAL_URL) else {
+        return args.to_vec();
+    };
+    // A base that does not fold (a member, a call) is a hole: opaque, whatever it holds.
+    let base = text_parts(base).unwrap_or_else(|| vec![Part::Hole]);
+    let url = text_parts(reference).and_then(|r| {
+        let join = resolve(&base, &r).or_else(|| opaque_lead(&base, &r));
+        join.or_else(|| depends(&base, &r))
+    });
+    let mut out = args.to_vec();
+    out[0] = url.map_or(Value::Unknown, Value::Str);
+    out
 }
 
 /// The consumer shape of the `fetch` at `call` (spec #23): the field paths read from the

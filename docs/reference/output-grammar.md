@@ -74,8 +74,16 @@ file whose path holds a space reads as more fields than it has.
 | `<callee>` | `<text>` | What a call names, as written (`fetch`, `requests.get`). |
 | `<identity>` | `<repository>::<path>::<name>` | A symbol's identity. |
 | `<identity>` | `<repository>::<path>` | A file's identity: a route file, or the top level of a file. |
+| `<identity>` | `<repository>::<path>#<key-path>` | A declared config key's canonical identity, with resolved list indexes. |
+| `<identity>` | `<repository>::<path>::<address>` | An IaC node's source identity. |
 | `<n>` | `<number>` | A count. |
 | `<query>` | `<text>` | What the call was given, echoed. |
+| `<orphan-note>` | ` (no provisioner in the workspace)` | The visible scope has uses but no provisioner of this contract kind and broker or resource kind. |
+| `<orphan-note>` | ` (no use in the workspace)` | The visible scope has provisioners but no use of this group. |
+| `<orphan-note>` | ` (no builder in the workspace)` | The visible image scope has runners but no builder. |
+| `<orphan-note>` | ` (no runner in the workspace)` | The visible image scope has builders but no runner. |
+| `<orphan-note>` | ` (no matcher in the workspace)` | The visible alert scope has emitters but no matcher. |
+| `<orphan-note>` | ` (no emitter in the workspace)` | The visible alert scope has matchers but no emitter. |
 
 ## Levels
 
@@ -127,17 +135,21 @@ A contract identifier starts with its contract kind and `::`:
 | `<contract>` | `http::ANY::<route>` | A route a provider serves on every method: it fits a consumer of any method. |
 | `<contract>` | `channel::<broker>::<channel>` | A queue, topic or subject of a broker: `channel::kafka::orders.created`. |
 | `<contract>` | `package::<ecosystem>::<package>` | A package: `package::npm::@example/kit`. |
-| `<contract>` | `resource::<resource-kind>::<resource-id>` | A resource declared in `meada.toml`: `resource::postgres::orders`. |
+| `<contract>` | `image::<word>` | A normalized image name or an unresolved image pattern. |
+| `<contract>` | `alert::<text>::<text>` | A label key and value (or matcher pattern) on an alert rule or Alertmanager route. |
+| `<contract>` | `resource::<resource-kind>::<resource-id>` | A resource declared in `meada.toml` or used through an SDK: `resource::postgres::orders`, `resource::s3::orders-bucket`. |
 | `<method>` | `<word>` | An HTTP method in upper case, such as `GET` or `POST`. |
 | `<route>` | `<word>` | A route path; each parameter is `{}`. |
 | `<broker>` | `<word>` | The broker kind: `kafka`, `amqp`, `nats`, `sqs`, `servicebus` and the others the language packs read. |
 | `<channel>` | `<word>` | The channel's name; a pattern keeps its wildcards (`orders.>`). |
 | `<ecosystem>` | `<word>` | `npm`, `pypi`, `go`, `cargo`, `maven`, `nuget` or `swiftpm`. |
 | `<package>` | `<word>` | The package's name in its ecosystem: `@example/kit`, `example:models`, a Go module path. |
-| `<resource-kind>` | `<word>` | The resource's `kind` in `meada.toml`. |
-| `<resource-id>` | `<text>` | The resource's `id` in `meada.toml`. |
+| `<resource-kind>` | `<word>` | The declared or SDK resource kind. |
+| `<resource-id>` | `<text>` | The declared resource id or SDK physical name. |
 | `<shown-contract>` | `<contract>` | A contract as answers show it. |
+| `<shown-contract>` | `image::<word> (unresolved)` | An image pattern with insufficient literal or segment evidence. |
 | `<shown-contract>` | `channel::<broker> (unresolved)` | A channel side whose name Meada cannot read. |
+| `<shown-contract>` | `resource::<resource-kind> (unresolved)` | An SDK resource side whose physical name Meada cannot read. |
 | `<shown-contract>` | `(unresolved) <callee>` | In `search`: a consumer whose contract Meada cannot read (an open item), with the call it sits at. |
 
 ## `search`
@@ -148,31 +160,38 @@ substrings), and an optional `kind`:
 | `kind` | Lists |
 | --- | --- |
 | `symbol` | Symbols whose name matches. |
-| `contract` | Providers and consumers whose contract identifier matches. |
+| `contract` | Providers, consumers, config uses and provisioners whose contract identifier matches. |
 | `route` | Providers and consumers of `http::` contracts. |
-| `resource` | Writers and readers of `resource::` contracts. |
-| `channel` | Producers and consumers of `channel::` contracts. |
+| `resource` | Writers, readers, config uses and provisioners of `resource::` contracts. |
+| `channel` | Producers, consumers, config uses and provisioners of `channel::` contracts. |
+| `image` | Builders and workload runners of `image::` contracts. |
+| `alert` | Alert rule emitters and Alertmanager route matchers of `alert::` contracts. |
 | `document` | OpenAPI and AsyncAPI documents, by path or title. |
 | `package` | Packages, by name. |
 | `drift` | Fields a consumer reads that its provider lacks, by route or field path. |
 | `community` | Communities, by name. |
 | `process` | Processes, by their entry point's label. |
 | `duplicate` | Groups of symbols with the same span text, by name or path. |
+| `value` | Config values of YAML, JSON and Terraform files, by value or key path. |
+| `iac` | IaC nodes (Terraform resources, data blocks and module calls, Kubernetes objects), by address, type or physical name. |
 | `ambiguous` | Open items: calls with several candidate providers. |
 | `unresolved` | Open items: calls whose target Meada cannot read. |
 
-With no `kind`, `search` lists symbols and contracts. The answer is one line per match, or a
-`no matches` line:
+With no `kind`, `search` lists symbols and contracts, and config values only when neither
+matches; it never lists standalone IaC nodes. Provisioner sides are contracts and appear here too. The answer is one line per match, or a `no matches` line:
 
 | Kind | Line | Meaning |
 | --- | --- | --- |
 | symbol | `<repository> <place> <name>` | A symbol, at its definition. |
-| contract | `<repository> <site> <shown-contract>` | A provider or consumer of a contract, at its site. |
+| contract | `<repository> <site> <shown-contract><orphan-note?>` | A provider or consumer of a contract, at its site. |
+| provisioned contract | `<repository> <place> <address> (root <iac-root>) provisioner <shown-contract><orphan-note?>` | A provisioner side of a contract. |
 | document | `<repository> <path> (<summary>)<title?>` | A provider document. |
 | package | `<repository> <directory> <package><at-version?><in-ecosystem?> (consumers: <n>)` | A package and the number of dependency entries that link to its manifest. |
 | drift | `<repository> <place> <caller> <contract> missing <field-path> (<level>)` | One field path a consumer reads that the provider's shape lacks, with the level of that report. |
 | community | `<repository> <community> (members: <n>)` | A community and its size. |
 | process | `<repository> <label> process::<entry-identity> (<entry-kind>)` | A process: `process::<entry-identity>` is what `trace` starts from. |
+| value | `<repository> <place> <key-path> = <shown-value>` | A config value, at its file and line. |
+| iac node | `<repository> <place> <address> (<iac-type><iac-name?>, root <iac-root>)<orphan-note?>` | An IaC node, at its block's first line, with its type, its physical name and its root module. |
 | copies | `<n> copies` | A group of duplicates; one symbol line per copy follows. |
 | open item | `` <repository> <place> (<item-kind>) candidates: <n>; run `meada decide --item <call-site>` `` | An open item and the command that closes it. |
 | no matches | `` no matches for `<query?>` `` | Nothing matched. |
@@ -184,6 +203,9 @@ With no `kind`, `search` lists symbols and contracts. The answer is one line per
 | `<site>` | `(repository-level)` | A side declared with no `via`: the whole repository. |
 | `<site>` | `<path> (documented only)` | A side only a provider document lists. |
 | `<site>` | `<path> <manifest-field>` | A dependency entry of a manifest, such as `package.json dependencies`. |
+| `<site>` | `use <config-place> [<level>]` | A directionless config use, with its key locator and evidence level. |
+| `<site>` | `<config-place>` | A declared resource side at an indexed config key. |
+| `<config-place>` | `<path>#<key-path> (line <line>)` | A config key's repository-relative locator and 1-based line. |
 | `<manifest-field>` | `<word>` | The manifest's field holding the entry. |
 | `<summary>` | `openapi <version>, routes: <n>` | An OpenAPI document and how many routes it lists. |
 | `<summary>` | `asyncapi <version>, channels: <n>` | An AsyncAPI document and how many channels it lists. |
@@ -203,11 +225,22 @@ With no `kind`, `search` lists symbols and contracts. The answer is one line per
 | `<entry-kind>` | `program` | A program start a language pack declares or a manifest names. |
 | `<item-kind>` | `ambiguous` | An ambiguous link: several providers fit. |
 | `<item-kind>` | `unresolved` | An unresolved consumer, such as a dynamic URL. |
+| `<key-path>` | `<text>` | Where the value sits in its file, jq style: `spec.containers[0].image`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` in a file of several documents. |
+| `<shown-value>` | `<text> (cut)` | A string past 1 KiB, quoted as JSON and cut. |
+| `<address>` | `<word>` | An IaC node's address: `aws_sqs_queue.orders`, `data.aws_iam_policy_document.p`, `module.orders.aws_sqs_queue.this`, `aws_sqs_queue.dlq[0]`, and for a Kubernetes object `<Kind>[.<group>]/<namespace>/<name>`: `Deployment.apps/shop/api`, `Service/shop/api`, `ClusterRole.rbac.authorization.k8s.io/reader`. |
+| `<iac-type>` | `<word>` | The resource or data type of an IaC node, `module` for a module call, or the kind of a Kubernetes object. |
+| `<iac-name>` | `, name <text>` | The node's physical name, its `name` argument as static evaluation resolves it or a Kubernetes object's `metadata.name` once its overlay's prefix and suffix are applied, quoted as JSON. |
+| `<iac-name>` | `, pattern <text>` | The node's physical name when a part of it is unresolved (a data source, `terraform.workspace`, a resource's attribute), each such part a `*`, quoted as JSON. |
+| `<iac-root>` | `<word>` | The root module or overlay its evaluation starts from: its directory, `.` for the repository's root. |
+| `<shown-value>` | `<text>` | A string quoted as JSON (`"team-b"`), a number or a boolean as written, an HCL `expression` or `template` as written, a line break as `\n` (`var.env`, `"${var.env}-orders"`), or `redacted` for a value a format marks secret. |
 
 ## `context`
 
 `context` takes a `symbol`: a name, `<path>::<name>`, an identity, or a contract identifier as
-`search` prints it. Its answer takes one of four forms.
+`search` prints it. A config use also accepts `<file>#<key path>` or
+`<repository>::<file>#<key path>`: its first line locates the key and names its contract and
+level, followed by `provisioners:` when it has provisioning links. Its answer takes the
+following forms.
 
 **A symbol.** Its head line, its community line, its processes line, its span text, then its
 sections:
@@ -232,6 +265,24 @@ symbol, its name as `<path>::<name>` (or its identity when another repository ha
 **A contract.** Its identifier, then one line per side across the workspace, providers first,
 each followed by the shape the side carries and, for a route's consumers, its drift.
 
+**A declared resource key.** Its repository and canonical key locator, then `provides` and
+`consumes` lines for its directed sides. Each side lists linked `reader:` or `writer:`
+identities with the link's level and reason. A key may also retain its directionless config
+use and provisioning lines. A selector query locates its resolved list indexes.
+
+**An IaC node.** Its head (the node and the lines of its block), its `type:`, `name:` and
+`root:` lines (then `role:` for a Crossplane object, #655, and `image:` and `build:` for a Compose service), then `overridable:` (the values a deployer can override that its name went
+through), `references:` (the nodes it references), `referenced by:` (those that reference it),
+`images:` (a Kubernetes workload's images once its overlay's `images` applied; absent for any
+other node) and `values:` (the config values of its block), each followed by its lines or
+printing `none`. An address several nodes have (one per root module that instantiates it) gives
+a `fits` line and one line per node, with what to pass for it. Declared resource sides at the
+node add the same `provides`, `consumes`, `reader:` and `writer:` lines as a declared key.
+Workload context also lists environment names, their targets and available checked-in values.
+Secret targets are marked `redacted`; absent, secret or unresolved values print `unresolved`.
+A decided physical-name pattern adds `resolved names:` with
+`<contract> [decided: <reason>]` for each selected name.
+
 **Nothing.** A `no symbol` or `no contract` line.
 
 In a symbol's answer, the section a line is under says its kind, since a name may hold any
@@ -244,7 +295,8 @@ words:
 | `callees:` | callee, overload set, unresolved call |
 | `annotations:` | callee, overload set, unresolved call |
 | `consumers:` | package consumer |
-| `contracts:` | provides, shape fields, shape open, produces, publishes, consumes, consumes decided, consumes unresolved |
+| `provisioners:` | provisioner |
+| `contracts:` | provides, shape fields, shape open, produces, publishes, consumes, consumes linked, consumes unresolved, environment |
 
 | Kind | Line | Meaning |
 | --- | --- | --- |
@@ -262,25 +314,76 @@ words:
 | overload set | `<repository> <place> <name> (one of <n> overloads)<mark?><on?>` | The overloads of one method a call may reach, at the first one's definition. |
 | unresolved call | `<repository> <place> (unresolved) <callee><on?>` | A call whose target Meada cannot read, at the call. |
 | package consumer | `<repository> <place> <caller><tags?>` | A call in any repository that reaches the symbol through a package import. |
-| provides | `<repository> <place> provides <contract>` | The symbol provides the contract. |
+| provides | `<repository> <place> provides <contract><orphan-note?>` | The symbol provides the contract. |
 | shape fields | `<indent><repository> <shape-source> <carried> fields:<fields?>` | The field paths the shape carries. |
 | shape open | `<indent><repository> <shape-source> <carried> open: <paths>` | The parts of the shape that are open: any field may be under them. |
-| produces | `<repository> <place> produces <shown-contract><mark?>` | A call of the symbol produces to the channel; after a publish, a queue its bindings route it to. |
+| produces | `<repository> <place> produces <shown-contract><mark?><orphan-note?>` | A call of the symbol produces to the channel or writes the resource; after a publish, a queue its bindings route it to. |
 | publishes | `<repository> <place> publishes <exchange> <key>` | A call of the symbol publishes to an exchange with a routing key. |
-| consumes | `<repository> <place> consumes <shown-contract>` | The symbol, or a call of it, consumes the contract. |
-| consumes decided | `<repository> <place> consumes <contract> <arrow> <identity>` | A call of the symbol consumes the contract, linked by a decision to the provider `<identity>`. |
+| consumes | `<repository> <place> consumes <shown-contract><orphan-note?>` | The symbol, or a call of it, consumes the contract. |
+| consumes linked | `<repository> <place> consumes <contract><orphan-note?> <arrow> <identity>` | A call of the symbol consumes the contract through a `decided` link, or an `inferred` HTTP link selected by a declared peer's `base_url_env` mapping. The arrow gives its level, reason and provider `<identity>`. |
 | consumes unresolved | `<repository> <place> consumes (unresolved) <callee>` | A call of the symbol consumes a contract Meada cannot read. |
+| environment | `<repository> <place> unresolved environment <text>` | An SDK argument reads an environment variable without a matching workload value; Meada retains its name and never reads the process environment. |
 | fits | ``` `<query>` fits <n> symbols; pass one of: ``` | The name fits several symbols, listed after it. |
 | no symbol | `` no symbol matches `<query>` `` | No symbol has the name. |
+| config use | `<repository> use <config-place> [<level>] <contract><orphan-note?>` | A directionless config use named by its key locator. |
+| config key | `<repository> <config-place>` | A declared resource key's canonical location. |
+| located provides | `provides <contract>` | The selected key or IaC node writes the declared resource. |
+| located consumes | `consumes <contract>` | The selected key or IaC node reads the declared resource. |
+| linked reader | `  reader: <identity><mark>` | A reader linked to the selected resource writer. |
+| linked writer | `  writer: <identity><mark>` | A writer linked to the selected resource reader. |
 | contract head | `<shown-contract>` | The contract the sides below belong to. |
-| side | `  <repository> <role> <side><mark?>` | A side of the contract; a side linked through another name carries its mark. |
+| side | `  <repository> <role> <side><mark?><orphan-note?>` | A side of the contract; a side linked through another name carries its mark. |
 | drift | `    drift: missing <missing>` | Under a consumer: the field paths it reads that the provider lacks, each with its level. |
 | not checked | `    not checked: <unchecked>` | Under a consumer: the field paths it reads under an open part of the shape. |
 | no contract | `` no <contract-kind> matches `<query>` `` | No side of the contract is in the workspace. |
+| provisioner | `<repository> <place> <address> (root <iac-root>)<mark?>` | A provisioner with its level and reason. |
+| iac type | `type: <iac-type>` | The IaC node's type. |
+| iac name | `name: <physical-name>` | The IaC node's physical name. |
+| iac root | `root: <iac-root>` | The IaC node's root module. |
+| iac role | `role: <text>` | What a Kubernetes object is to Crossplane: `crossplane composite resource definition`, `crossplane composition`, `crossplane claim`, `crossplane composite resource`, `crossplane managed resource` or `crossplane composed resource`. |
+| iac image | `image: <text><iac-mark?>` | A Compose service's image quoted as JSON, or a workload's image contract with its optional missing-builder note. |
+| image builder | `  builder: <repository> [<level>: <reason>]` | A workload's image builder, with its evaluated evidence. |
+| workload code | `code: <repository> <path> [exact]` | A safe same-repository Compose code path. |
+| workload environment | `env <container> <environment-name> -> <environment-target>: <environment-value?>` | One environment entry of the workload, with its checked-in source and available value. |
+| alert emitter | `emitter: <contract><orphan-note?>` | A rule's known label. |
+| alert matcher | `matcher: <contract><orphan-note?>` | A route's effective label condition. |
+| alert receiver | `receiver: <text>` | A route's explicit or inherited receiver. |
+| iac build | `build: <text><iac-mark?>` | A workload's local code input or Compose build context, inside the repository and quoted as JSON. |
+| iac handler | `handler: <text><iac-mark?>` | A Lambda, SAM or Serverless function's handler, quoted as JSON. |
+| iac event | `event: <text><iac-mark?>` | One event of a Serverless function, in file order: its type and what identifies it, quoted as JSON (`"http GET /orders"`, `"sqs Queue.Arn"`). |
+| iac section | `<iac-section>:<none?>` | The lines that follow belong to the section, or ` none` when it has none. |
+| iac reference | `<repository> <place> <address><via?>` | A node the node references, or that references it, at its block. |
+| iac overridable | `<repository> <place> <variable> (<overridable-from>)` | A root module's variable the node's name went through, where its value comes from. |
+| iac image | `<container>: <image-ref>` | A container of a Kubernetes workload and the image it runs. |
+| iac value | `<repository> <place> <key-path> = <shown-value>` | A config value of the node's block. |
+| fits iac | ``` `<query>` fits <n> IaC nodes; pass one of: ``` | The address fits several IaC nodes, listed after it. |
+| fit iac | `<repository> <place> <iac-pass>` | One of the IaC nodes the address fits, and what to pass for it. |
 
 | Field | Form | Meaning |
 | --- | --- | --- |
 | `<last>` | `<number>` | The last line of the span. |
+| `<physical-name>` | `<text>` | The node's `name` argument as static evaluation resolves it, quoted as JSON, or `none`. |
+| `<container>` | `<word>` | The name of a Kubernetes container or Compose service. |
+| `<environment-name>` | `<word>` | The environment entry's name, or a prefix followed by `*` for an unresolved `envFrom`. |
+| `<environment-target>` | `<text>` | A literal, Compose literal/default or unresolved source, or a ConfigMap/Secret address and key, optionally imported by `envFrom`; Secret targets carry `redacted`. |
+| `<environment-value>` | `<text>` | The available checked-in value or typed resource contract, or `unresolved`; an empty literal leaves this field empty. |
+| `<image-ref>` | `<text>` | An image as the overlay leaves it: `ghcr.io/acme/api:1.4.0`. |
+| `<physical-name>` | `<text> (pattern)` | The same name with an unresolved part, each such part a `*`. |
+| `<iac-section>` | `overridable` | The values a deployer can override that its name went through. |
+| `<iac-section>` | `references` | The nodes the node references. |
+| `<iac-section>` | `referenced by` | The nodes that reference it. |
+| `<iac-section>` | `images` | The images of a Kubernetes workload's containers. |
+| `<iac-section>` | `values` | The config values of its block. |
+| `<iac-section>` | `resolved names` | The physical-name choices a person or model decided for this provisioner. |
+| `<none>` | ` none` | The section has no line. |
+| `<variable>` | `var.<word>` | A root module's variable. |
+| `<overridable-from>` | `default` | Its value is its default, at the variable's block (a CloudFormation `Parameters.<name>`, at its `Default`; a Serverless `opt:name, 'default'`, at the line that writes it). |
+| `<overridable-from>` | `tfvars` | Its value comes from a var file (`terraform.tfvars`, `*.auto.tfvars`), at the value's line. |
+| `<via>` | ` via <text>` | What the reference went through: a variable, local or module output (`var.queue_arn`, `local.topic`, `module.orders.queue_arn`), or for a Kubernetes object how it names the other (`selector app=api`, `env DATABASE_URL`, `envFrom`, `volume settings`, `serviceAccountName`, `backend shop.example.com/api`, `defaultBackend`), or for a Crossplane object how it names the other (`composite <Kind>.<group>`, `kind <Kind>.<group>`, `compositionRef`, `defaultCompositionRef`, `enforcedCompositionRef`, `compositeTypeRef <Kind>.<group>`, `resources`, `pipeline <step>`), or for a CloudFormation or SAM resource the intrinsic that names the other (`Ref`, `Fn::GetAtt.Arn`, `Fn::Sub`, `DependsOn`), which a Serverless function's references use too. |
+| `<iac-mark>` | ` (overridable)` | A default (`${VAR:-default}`) gave the text. |
+| `<iac-mark>` | ` (unresolved)` | A variable with no default is still in the text, as `${VAR}`. |
+| `<iac-pass>` | `<address> (root <iac-root>)` | The node in its root module. |
+| `<iac-pass>` | `<repository>::<path>::<address> (root <iac-root>)` | The same, when another repository has it too. |
 | `<counts>` | `<text>` | `<n> <entry-kind>` for each entry kind with processes, joined by `, `. |
 | `<repositories>` | `repository` | One repository holds the entry points. |
 | `<repositories>` | `repositories` | Several repositories do. |
@@ -289,6 +392,7 @@ words:
 | `<section>` | `callees` | What the symbol's calls reach. |
 | `<section>` | `annotations` | The symbol's calls that decorate a definition (attributes, decorators, annotations). |
 | `<section>` | `consumers` | The calls that reach the symbol through a package import. |
+| `<section>` | `provisioners` | The IaC nodes creating the symbol's resources. |
 | `<section>` | `contracts` | The contracts the symbol provides and consumes. |
 | `<empty-section>` | `callers` | No call reaches the symbol. |
 | `<empty-section>` | `callees` | The symbol calls nothing. |
@@ -308,17 +412,28 @@ words:
 | `<paths>` | `<text>` | Field paths joined by `, `. |
 | `<exchange>` | `<word>` | An exchange. |
 | `<key>` | `<word>` | A routing key. |
+| `<role>` | `use` | Names the resource in config, with no direction; links only to provisioners. |
+| `<role>` | `builder` | The repository whose configuration publishes an image. |
+| `<role>` | `runner` | A workload that runs an image. |
+| `<role>` | `emitter` | An alert rule that attaches a known label. |
+| `<role>` | `matcher` | An Alertmanager route that tests a label. |
+| `<role>` | `provisioner` | Creates the resource. |
 | `<role>` | `writer` | Writes the resource. |
 | `<role>` | `reader` | Reads the resource. |
 | `<role>` | `producer` | Produces to the channel: the symbol around the producing call. |
+| `<role>` | `producer <broker> send <channel>` | A documented producer on a subscription's source channel, shown in the target channel's context. |
 | `<role>` | `consumer` | Consumes the channel (its handler), or calls the route. |
 | `<role>` | `provider` | Serves the route: its handler. |
 | `<role>` | `package` | The manifest that declares the package. |
 | `<role>` | `dependent` | A dependency entry on the package, or a call that reaches it through an import. |
 | `<role>` | `binding <exchange> <binding-pattern>` | A binding that routes the exchange's messages to the queue. |
 | `<binding-pattern>` | `<word>` | The binding's routing pattern. |
-| `<side>` | `<place> <caller>` | A side in code: the line and the symbol around it. |
+| `<side>` | `<config-place> [<level>]` | A directionless config use at its key, with its evidence level. |
+| `<side>` | `<config-place>` | A declared resource side at its canonical key. |
+| `<side>` | `<place> <address> (root <iac-root>)` | A provisioner and its root. |
+| `<side>` | `<place> <caller>` | A side in code or IaC: the line and the symbol or source address. |
 | `<side>` | `<path>` | A manifest. |
+| `<side>` | `<path>#<key-path>` | A monitoring rule or route at its configuration key. |
 | `<side>` | `<path> (top level)` | A route file serving with no function of its own. |
 | `<side>` | `(repository-level)` | A side declared with no `via`. |
 | `<side>` | `<path> (documented only)` | A side only a provider document lists. |
@@ -329,8 +444,21 @@ words:
 | `<contract-kind>` | `channel` | A channel. |
 | `<contract-kind>` | `resource` | A resource. |
 | `<contract-kind>` | `package` | A package. |
+| `<contract-kind>` | `image` | An image. |
+| `<contract-kind>` | `alert` | An alert label or route matcher. |
 
 ## `trace`
+
+Resource and channel data flows from provider to consumer downstream and back upstream.
+A declared key or IaC node participates in the same directed links; a declared read-write
+key can continue through its next link. An automatic directionless config use keeps its
+terminal behavior unless the same key also has a declared side.
+A receiving call keeps its identity in links and process steps; its label gives the actual
+call location and owning function. Downstream traversal continues through that owner's body,
+including when the receiving call is the start and has no linked writer. Module-level reads
+retain their file/line and `(top level)` label. Reverse process membership includes the owner
+of a reached receiving operation.
+
 
 `trace` takes a start (`from`, or `changes: uncommitted`) and a `direction`, `down` (what the
 start reaches) or `up` (what reaches it). Its answer is a **chain** or a message.
@@ -355,6 +483,9 @@ carries its level with no reason.
 
 | Kind | Line | Meaning |
 | --- | --- | --- |
+| runs code | `<indent>runs code <repository> <path> [<level>: <reason>]` | A workload reaches the repository's code entry points. |
+| run by workload | `<indent>runs code [<level>: <reason>] <repository> <place> <address> (root <iac-root>)` | Code reaches a workload that runs it. |
+| provision | `<indent>provisions <contract> [<level>: <reason>] <text>` | A provisioning hop, with its root when it reaches IaC. |
 | process | `process <label>` | The process whose steps follow. |
 | node | `<indent><node><call-mark?><repeat?><drift?>` | A node the walk reaches through a call, or a start. |
 | link | `<indent><arrow> <node><repeat?><drift?>` | A node the walk reaches through a link. |
@@ -374,9 +505,14 @@ carries its level with no reason.
 | fits call sites | ``` `<query>` fits <n> call sites; pass one of: ``` | The name fits several call sites, listed after it. |
 | fit call site | `<repository> <place> <call-site>` | One of the call sites the name fits. |
 | no start | `` no symbol, route or call site matches `<query>` `` | Nothing to start from. |
+| iac reference | `<indent><repository> <place> <address><via?><repeat?>` | From an IaC node: a node it references (`down`) or that references it (`up`), at its block, within its root module. |
+| fits iac | ``` `<query>` fits <n> IaC nodes; pass one of: ``` | The address fits several IaC nodes, listed after it. |
+| fit iac | `<repository> <place> <iac-pass>` | One of the IaC nodes the address fits, and what to pass for it. |
 
 | Field | Form | Meaning |
 | --- | --- | --- |
+| `<node>` | `<repository> use <config-place> [<level>]` | A config key; down ends here, up follows only provisioning links. |
+| `<node>` | `<repository> <config-place>` | A declared resource key at its canonical location; directed links can continue through it. |
 | `<node>` | `<repository> <place> <name>` | A symbol at its definition, or a call site and the name it calls. |
 | `<node>` | `<repository> <path> (top level)` | A file: the top level of a file making calls, or a route file serving with no function of its own. |
 | `<node>` | `<repository> (repository-level)` | A side declared with no `via`; the branch ends there. |
@@ -396,9 +532,12 @@ carries its level with no reason.
 | `<sided-kind>` | `resource` | A resource. |
 | `<sided-kind>` | `channel` | A channel. |
 | `<sided-kind>` | `package` | A package. |
+| `<sided-kind>` | `image` | An image. |
 | `<sides>` | `writers and readers` | A resource's sides. |
 | `<sides>` | `producers and consumers` | A channel's sides. |
 | `<sides>` | `packages and dependents` | A package's sides. |
+| `<sides>` | `builders and runners` | An image's sides. |
+| `<sides>` | `emitters and matchers` | An alert contract's sides. |
 | `<call-site>` | `<identity>::<callee>#<n>` | A call site's identity: its caller's (a symbol, or a file for a call at its top level), what it calls, and its ordinal among the caller's calls of that name. |
 
 ## Every tool

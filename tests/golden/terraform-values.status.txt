@@ -1,0 +1,2 @@
+example.com/acme/app (.) indexed, 0 files
+  config files: 9 read, 1 skipped (lockfiles: 0, unreadable: 1); values: 43, redacted: 5

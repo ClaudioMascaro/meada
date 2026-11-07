@@ -1,0 +1,11 @@
+example.com/azure/app use settings.yaml#subscription_id (line 3) [exact]
+  provisions channel::servicebus::subscription:events/audit [exact: channel::servicebus::subscription:events/audit; config settings.yaml#subscription_id] example.com/azure/infra main.tf:4 azurerm_servicebus_subscription.audit (root .)
+chain: exact · 1 hops · 2 repos · 89 tokens
+
+example.com/azure/infra main.tf:4 azurerm_servicebus_subscription.audit
+  provisions channel::servicebus::subscription:events/audit [inferred: channel::servicebus::subscription:events/audit; config settings.yaml#servicebus_subscription] example.com/azure/app use settings.yaml#servicebus_subscription (line 12) [inferred]
+  provisions channel::servicebus::subscription:events/audit [exact: channel::servicebus::subscription:events/audit; config settings.yaml#subscription_id] example.com/azure/app use settings.yaml#subscription_id (line 3) [exact]
+  example.com/azure/infra main.tf:3 azurerm_servicebus_topic.events
+    provisions channel::servicebus::events [inferred: channel::servicebus::events; config settings.yaml#servicebus_topic] example.com/azure/app use settings.yaml#servicebus_topic (line 11) [inferred]
+    provisions channel::servicebus::events [exact: channel::servicebus::events; config settings.yaml#topic_id] example.com/azure/app use settings.yaml#topic_id (line 2) [exact]
+chain: inferred · 4 hops · 2 repos · 262 tokens

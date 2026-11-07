@@ -1,0 +1,15 @@
+example.com/acme/sam template.yaml:18 Worker
+  runs code example.com/acme/sam worker [exact: SAM CodeUri template.yaml#Resources.Worker]
+    example.com/acme/sam worker/send.ts:3 dispatch
+  example.com/acme/sam template.yaml:14 Orders via Ref
+    provisions channel::sqs::orders [inferred: channel::sqs::orders; workload:example.com/acme/sam::template.yaml::Worker (root template.yaml), env:QUEUE_NAME] example.com/acme/sam worker/send.ts:4 dispatch
+chain: inferred · 2 hops · 1 repos · 126 tokens
+
+example.com/acme/sam worker/send.ts:3 dispatch
+  runs code [exact: SAM CodeUri template.yaml#Resources.Worker] example.com/acme/sam template.yaml:18 Worker (root template.yaml)
+  provisions channel::sqs::orders [inferred: channel::sqs::orders; workload:example.com/acme/sam::template.yaml::Worker (root template.yaml), env:QUEUE_NAME] example.com/acme/sam template.yaml:14 Orders (root template.yaml)
+chain: inferred · 2 hops · 1 repos · 113 tokens
+
+example.com/acme/sam template.yaml:14 Orders
+  provisions channel::sqs::orders [inferred: channel::sqs::orders; workload:example.com/acme/sam::template.yaml::Worker (root template.yaml), env:QUEUE_NAME] example.com/acme/sam worker/send.ts:4 dispatch
+chain: inferred · 1 hops · 1 repos · 75 tokens

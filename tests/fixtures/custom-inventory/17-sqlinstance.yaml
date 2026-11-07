@@ -1,0 +1,7 @@
+apiVersion: sql.cnrm.cloud.google.com/v1beta1
+kind: SQLInstance
+metadata:
+  name: operator-17
+  namespace: platform
+spec:
+  resourceID: kcc-primary

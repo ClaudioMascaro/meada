@@ -1,0 +1,15 @@
+example.com/acme/infra api/serverless.yml:14 functions.createOrder
+  example.com/acme/infra api/serverless.yml:39 OrdersQueue via Ref
+chain: exact · 0 hops · 1 repos · 46 tokens
+
+example.com/acme/infra api/serverless.yml:24 functions.processOrder
+  example.com/acme/infra api/serverless.yml:39 OrdersQueue via Fn::GetAtt.Arn
+chain: exact · 0 hops · 1 repos · 49 tokens
+
+example.com/acme/infra api/serverless.yml:39 OrdersQueue
+  example.com/acme/infra api/serverless.yml:14 functions.createOrder via Ref
+  example.com/acme/infra api/serverless.yml:24 functions.processOrder via Fn::GetAtt.Arn
+chain: exact · 0 hops · 1 repos · 68 tokens
+
+example.com/acme/infra api/serverless.yml:43 OrdersTable
+chain: none · 0 hops · 1 repos · 26 tokens

@@ -1,0 +1,5 @@
+name: "[app] health check failing"
+tags: ["service:app", "support:team-b"]
+notifications:
+  opsgenie:
+    teams: [team-platform]

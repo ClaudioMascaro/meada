@@ -1,0 +1,15 @@
+groups:
+  - name: harbor-logs
+    rules:
+      - alert: HarborSlow
+        expr: sum(rate({app="harbor"}[5m])) > 1
+        labels:
+          support: harbor
+          service: harbor-edge
+          severity: warning
+        annotations:
+          support: loki-annotation-ghost
+      - record: harbor:logs:rate5m
+        expr: sum(rate({app="harbor"}[5m]))
+        labels:
+          support: loki-recording-ghost

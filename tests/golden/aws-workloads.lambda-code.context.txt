@@ -1,0 +1,18 @@
+example.com/acme/lambda main.tf:9-16 aws_lambda_function.local
+type: aws_lambda_function
+name: "local"
+root: .
+build: "worker"
+handler: "send.dispatch"
+overridable: none
+references:
+example.com/acme/lambda main.tf:1 aws_sqs_queue.jobs
+example.com/acme/lambda main.tf:4 data.archive_file.bundle
+referenced by: none
+values:
+example.com/acme/lambda main.tf:10 resource.aws_lambda_function.local.function_name = "local"
+example.com/acme/lambda main.tf:11 resource.aws_lambda_function.local.filename = data.archive_file.bundle.output_path
+example.com/acme/lambda main.tf:12 resource.aws_lambda_function.local.handler = "send.dispatch"
+example.com/acme/lambda main.tf:14 resource.aws_lambda_function.local.environment.variables.QUEUE_NAME = aws_sqs_queue.jobs.name
+env local QUEUE_NAME -> Terraform aws_sqs_queue jobs: channel::sqs::jobs
+code: example.com/acme/lambda worker [exact]

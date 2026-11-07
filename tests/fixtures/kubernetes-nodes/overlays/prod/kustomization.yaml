@@ -1,0 +1,9 @@
+resources:
+  - ../../base
+  - github.com/acme/platform//kube/monitoring?ref=v2
+namespace: shop
+nameSuffix: -v2
+images:
+  - name: ghcr.io/acme/api
+    newName: registry.example.com/shop/api
+    newTag: "1.4.0"

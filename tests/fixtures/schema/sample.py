@@ -48,3 +48,14 @@ def main():
 
 
 from .extras import *
+
+
+# Complete factory readers distinguish an opaque return alternative from a constructor.
+def maybe_client(flag):
+    if flag:
+        return Client()
+    return
+
+
+async def async_client():
+    return await helpers.client()

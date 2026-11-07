@@ -1,0 +1,9 @@
+apiVersion: servicebus.azure.upbound.io/v1beta1
+kind: Subscription
+metadata:
+  name: operator-38
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: /subscriptions/proof/resourceGroups/r/providers/Microsoft.ServiceBus/namespaces/bus/topics/xp-notices/subscriptions/xp-audit
+spec:
+  forProvider: {}

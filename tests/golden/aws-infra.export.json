@@ -1,0 +1,456 @@
+{
+  "format": 1,
+  "repository": "example.com/aws/infra",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/aws/infra::arn/main.tf::aws_cloudwatch_event_bus.bus",
+      "address": "aws_cloudwatch_event_bus.bus",
+      "type": "aws_cloudwatch_event_bus",
+      "root": "arn",
+      "path": "arn/main.tf",
+      "line": 2,
+      "end_line": 2
+    },
+    {
+      "identity": "example.com/aws/infra::arn/main.tf::aws_db_instance.database",
+      "address": "aws_db_instance.database",
+      "type": "aws_db_instance",
+      "root": "arn",
+      "path": "arn/main.tf",
+      "line": 5,
+      "end_line": 5
+    },
+    {
+      "identity": "example.com/aws/infra::arn/main.tf::aws_dynamodb_table.table",
+      "address": "aws_dynamodb_table.table",
+      "type": "aws_dynamodb_table",
+      "root": "arn",
+      "path": "arn/main.tf",
+      "line": 4,
+      "end_line": 4
+    },
+    {
+      "identity": "example.com/aws/infra::arn/main.tf::aws_elasticache_cluster.cache",
+      "address": "aws_elasticache_cluster.cache",
+      "type": "aws_elasticache_cluster",
+      "root": "arn",
+      "path": "arn/main.tf",
+      "line": 7,
+      "end_line": 7
+    },
+    {
+      "identity": "example.com/aws/infra::arn/main.tf::aws_elasticache_replication_group.cache_group",
+      "address": "aws_elasticache_replication_group.cache_group",
+      "type": "aws_elasticache_replication_group",
+      "root": "arn",
+      "path": "arn/main.tf",
+      "line": 8,
+      "end_line": 8
+    },
+    {
+      "identity": "example.com/aws/infra::arn/main.tf::aws_kinesis_stream.stream",
+      "address": "aws_kinesis_stream.stream",
+      "type": "aws_kinesis_stream",
+      "root": "arn",
+      "path": "arn/main.tf",
+      "line": 3,
+      "end_line": 3
+    },
+    {
+      "identity": "example.com/aws/infra::arn/main.tf::aws_rds_cluster.database_cluster",
+      "address": "aws_rds_cluster.database_cluster",
+      "type": "aws_rds_cluster",
+      "root": "arn",
+      "path": "arn/main.tf",
+      "line": 6,
+      "end_line": 6
+    },
+    {
+      "identity": "example.com/aws/infra::arn/main.tf::aws_secretsmanager_secret.secret",
+      "address": "aws_secretsmanager_secret.secret",
+      "type": "aws_secretsmanager_secret",
+      "root": "arn",
+      "path": "arn/main.tf",
+      "line": 10,
+      "end_line": 10
+    },
+    {
+      "identity": "example.com/aws/infra::arn/main.tf::aws_sns_topic.topic",
+      "address": "aws_sns_topic.topic",
+      "type": "aws_sns_topic",
+      "root": "arn",
+      "path": "arn/main.tf",
+      "line": 1,
+      "end_line": 1
+    },
+    {
+      "identity": "example.com/aws/infra::arn/main.tf::aws_ssm_parameter.parameter",
+      "address": "aws_ssm_parameter.parameter",
+      "type": "aws_ssm_parameter",
+      "root": "arn",
+      "path": "arn/main.tf",
+      "line": 9,
+      "end_line": 9
+    },
+    {
+      "identity": "example.com/aws/infra::literal/main.tf::aws_cloudwatch_event_bus.bus",
+      "address": "aws_cloudwatch_event_bus.bus",
+      "type": "aws_cloudwatch_event_bus",
+      "root": "literal",
+      "path": "literal/main.tf",
+      "line": 2,
+      "end_line": 2
+    },
+    {
+      "identity": "example.com/aws/infra::literal/main.tf::aws_db_instance.database",
+      "address": "aws_db_instance.database",
+      "type": "aws_db_instance",
+      "root": "literal",
+      "path": "literal/main.tf",
+      "line": 5,
+      "end_line": 5
+    },
+    {
+      "identity": "example.com/aws/infra::literal/main.tf::aws_dynamodb_table.table",
+      "address": "aws_dynamodb_table.table",
+      "type": "aws_dynamodb_table",
+      "root": "literal",
+      "path": "literal/main.tf",
+      "line": 4,
+      "end_line": 4
+    },
+    {
+      "identity": "example.com/aws/infra::literal/main.tf::aws_elasticache_cluster.cache",
+      "address": "aws_elasticache_cluster.cache",
+      "type": "aws_elasticache_cluster",
+      "root": "literal",
+      "path": "literal/main.tf",
+      "line": 7,
+      "end_line": 7
+    },
+    {
+      "identity": "example.com/aws/infra::literal/main.tf::aws_elasticache_replication_group.cache_group",
+      "address": "aws_elasticache_replication_group.cache_group",
+      "type": "aws_elasticache_replication_group",
+      "root": "literal",
+      "path": "literal/main.tf",
+      "line": 8,
+      "end_line": 8
+    },
+    {
+      "identity": "example.com/aws/infra::literal/main.tf::aws_kinesis_stream.stream",
+      "address": "aws_kinesis_stream.stream",
+      "type": "aws_kinesis_stream",
+      "root": "literal",
+      "path": "literal/main.tf",
+      "line": 3,
+      "end_line": 3
+    },
+    {
+      "identity": "example.com/aws/infra::literal/main.tf::aws_rds_cluster.database_cluster",
+      "address": "aws_rds_cluster.database_cluster",
+      "type": "aws_rds_cluster",
+      "root": "literal",
+      "path": "literal/main.tf",
+      "line": 6,
+      "end_line": 6
+    },
+    {
+      "identity": "example.com/aws/infra::literal/main.tf::aws_secretsmanager_secret.secret",
+      "address": "aws_secretsmanager_secret.secret",
+      "type": "aws_secretsmanager_secret",
+      "root": "literal",
+      "path": "literal/main.tf",
+      "line": 10,
+      "end_line": 10
+    },
+    {
+      "identity": "example.com/aws/infra::literal/main.tf::aws_sns_topic.topic",
+      "address": "aws_sns_topic.topic",
+      "type": "aws_sns_topic",
+      "root": "literal",
+      "path": "literal/main.tf",
+      "line": 1,
+      "end_line": 1
+    },
+    {
+      "identity": "example.com/aws/infra::literal/main.tf::aws_ssm_parameter.parameter",
+      "address": "aws_ssm_parameter.parameter",
+      "type": "aws_ssm_parameter",
+      "root": "literal",
+      "path": "literal/main.tf",
+      "line": 9,
+      "end_line": 9
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::eventbridge::events",
+      "node": "example.com/aws/infra::arn/main.tf::aws_cloudwatch_event_bus.bus",
+      "root": "arn"
+    },
+    {
+      "contract": "channel::eventbridge::events",
+      "node": "example.com/aws/infra::literal/main.tf::aws_cloudwatch_event_bus.bus",
+      "root": "literal"
+    },
+    {
+      "contract": "channel::kinesis::records",
+      "node": "example.com/aws/infra::arn/main.tf::aws_kinesis_stream.stream",
+      "root": "arn"
+    },
+    {
+      "contract": "channel::kinesis::records",
+      "node": "example.com/aws/infra::literal/main.tf::aws_kinesis_stream.stream",
+      "root": "literal"
+    },
+    {
+      "contract": "channel::sns::alerts",
+      "node": "example.com/aws/infra::arn/main.tf::aws_sns_topic.topic",
+      "root": "arn"
+    },
+    {
+      "contract": "channel::sns::alerts",
+      "node": "example.com/aws/infra::literal/main.tf::aws_sns_topic.topic",
+      "root": "literal"
+    },
+    {
+      "contract": "resource::dynamodb::orders",
+      "node": "example.com/aws/infra::arn/main.tf::aws_dynamodb_table.table",
+      "root": "arn"
+    },
+    {
+      "contract": "resource::dynamodb::orders",
+      "node": "example.com/aws/infra::literal/main.tf::aws_dynamodb_table.table",
+      "root": "literal"
+    },
+    {
+      "contract": "resource::elasticache::orders-cache",
+      "node": "example.com/aws/infra::arn/main.tf::aws_elasticache_cluster.cache",
+      "root": "arn"
+    },
+    {
+      "contract": "resource::elasticache::orders-cache",
+      "node": "example.com/aws/infra::literal/main.tf::aws_elasticache_cluster.cache",
+      "root": "literal"
+    },
+    {
+      "contract": "resource::elasticache::orders-group",
+      "node": "example.com/aws/infra::arn/main.tf::aws_elasticache_replication_group.cache_group",
+      "root": "arn"
+    },
+    {
+      "contract": "resource::elasticache::orders-group",
+      "node": "example.com/aws/infra::literal/main.tf::aws_elasticache_replication_group.cache_group",
+      "root": "literal"
+    },
+    {
+      "contract": "resource::rds::orders-cluster",
+      "node": "example.com/aws/infra::arn/main.tf::aws_rds_cluster.database_cluster",
+      "root": "arn"
+    },
+    {
+      "contract": "resource::rds::orders-cluster",
+      "node": "example.com/aws/infra::literal/main.tf::aws_rds_cluster.database_cluster",
+      "root": "literal"
+    },
+    {
+      "contract": "resource::rds::orders-db",
+      "node": "example.com/aws/infra::arn/main.tf::aws_db_instance.database",
+      "root": "arn"
+    },
+    {
+      "contract": "resource::rds::orders-db",
+      "node": "example.com/aws/infra::literal/main.tf::aws_db_instance.database",
+      "root": "literal"
+    },
+    {
+      "contract": "resource::secretsmanager::orders/token",
+      "node": "example.com/aws/infra::arn/main.tf::aws_secretsmanager_secret.secret",
+      "root": "arn"
+    },
+    {
+      "contract": "resource::secretsmanager::orders/token",
+      "node": "example.com/aws/infra::literal/main.tf::aws_secretsmanager_secret.secret",
+      "root": "literal"
+    },
+    {
+      "contract": "resource::ssm::/orders/token",
+      "node": "example.com/aws/infra::arn/main.tf::aws_ssm_parameter.parameter",
+      "root": "arn"
+    },
+    {
+      "contract": "resource::ssm::/orders/token",
+      "node": "example.com/aws/infra::literal/main.tf::aws_ssm_parameter.parameter",
+      "root": "literal"
+    }
+  ],
+  "links": [],
+  "provisions": [
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::arn/main.tf::aws_db_instance.database",
+      "root": "arn",
+      "contract": "resource::rds::orders-db",
+      "level": "declared",
+      "reason": "resource::rds::orders-db"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::arn/main.tf::aws_dynamodb_table.table",
+      "root": "arn",
+      "contract": "resource::dynamodb::orders",
+      "level": "declared",
+      "reason": "resource::dynamodb::orders"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::arn/main.tf::aws_elasticache_cluster.cache",
+      "root": "arn",
+      "contract": "resource::elasticache::orders-cache",
+      "level": "declared",
+      "reason": "resource::elasticache::orders-cache"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::arn/main.tf::aws_elasticache_replication_group.cache_group",
+      "root": "arn",
+      "contract": "resource::elasticache::orders-group",
+      "level": "declared",
+      "reason": "resource::elasticache::orders-group"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::arn/main.tf::aws_rds_cluster.database_cluster",
+      "root": "arn",
+      "contract": "resource::rds::orders-cluster",
+      "level": "declared",
+      "reason": "resource::rds::orders-cluster"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::arn/main.tf::aws_secretsmanager_secret.secret",
+      "root": "arn",
+      "contract": "resource::secretsmanager::orders/token",
+      "level": "declared",
+      "reason": "resource::secretsmanager::orders/token"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::arn/main.tf::aws_ssm_parameter.parameter",
+      "root": "arn",
+      "contract": "resource::ssm::/orders/token",
+      "level": "declared",
+      "reason": "resource::ssm::/orders/token"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::literal/main.tf::aws_db_instance.database",
+      "root": "literal",
+      "contract": "resource::rds::orders-db",
+      "level": "declared",
+      "reason": "resource::rds::orders-db"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::literal/main.tf::aws_dynamodb_table.table",
+      "root": "literal",
+      "contract": "resource::dynamodb::orders",
+      "level": "declared",
+      "reason": "resource::dynamodb::orders"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::literal/main.tf::aws_elasticache_cluster.cache",
+      "root": "literal",
+      "contract": "resource::elasticache::orders-cache",
+      "level": "declared",
+      "reason": "resource::elasticache::orders-cache"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::literal/main.tf::aws_elasticache_replication_group.cache_group",
+      "root": "literal",
+      "contract": "resource::elasticache::orders-group",
+      "level": "declared",
+      "reason": "resource::elasticache::orders-group"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::literal/main.tf::aws_rds_cluster.database_cluster",
+      "root": "literal",
+      "contract": "resource::rds::orders-cluster",
+      "level": "declared",
+      "reason": "resource::rds::orders-cluster"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::literal/main.tf::aws_secretsmanager_secret.secret",
+      "root": "literal",
+      "contract": "resource::secretsmanager::orders/token",
+      "level": "declared",
+      "reason": "resource::secretsmanager::orders/token"
+    },
+    {
+      "side": "example.com/aws/app",
+      "provisioner": "example.com/aws/infra::literal/main.tf::aws_ssm_parameter.parameter",
+      "root": "literal",
+      "contract": "resource::ssm::/orders/token",
+      "level": "declared",
+      "reason": "resource::ssm::/orders/token"
+    },
+    {
+      "side": "example.com/aws/app::asyncapi.yaml::eventbridge send events",
+      "provisioner": "example.com/aws/infra::arn/main.tf::aws_cloudwatch_event_bus.bus",
+      "root": "arn",
+      "contract": "channel::eventbridge::events",
+      "level": "exact",
+      "reason": "channel::eventbridge::events"
+    },
+    {
+      "side": "example.com/aws/app::asyncapi.yaml::eventbridge send events",
+      "provisioner": "example.com/aws/infra::literal/main.tf::aws_cloudwatch_event_bus.bus",
+      "root": "literal",
+      "contract": "channel::eventbridge::events",
+      "level": "exact",
+      "reason": "channel::eventbridge::events"
+    },
+    {
+      "side": "example.com/aws/app::asyncapi.yaml::kinesis send records",
+      "provisioner": "example.com/aws/infra::arn/main.tf::aws_kinesis_stream.stream",
+      "root": "arn",
+      "contract": "channel::kinesis::records",
+      "level": "exact",
+      "reason": "channel::kinesis::records"
+    },
+    {
+      "side": "example.com/aws/app::asyncapi.yaml::kinesis send records",
+      "provisioner": "example.com/aws/infra::literal/main.tf::aws_kinesis_stream.stream",
+      "root": "literal",
+      "contract": "channel::kinesis::records",
+      "level": "exact",
+      "reason": "channel::kinesis::records"
+    },
+    {
+      "side": "example.com/aws/app::asyncapi.yaml::sns send alerts",
+      "provisioner": "example.com/aws/infra::arn/main.tf::aws_sns_topic.topic",
+      "root": "arn",
+      "contract": "channel::sns::alerts",
+      "level": "exact",
+      "reason": "channel::sns::alerts"
+    },
+    {
+      "side": "example.com/aws/app::asyncapi.yaml::sns send alerts",
+      "provisioner": "example.com/aws/infra::literal/main.tf::aws_sns_topic.topic",
+      "root": "literal",
+      "contract": "channel::sns::alerts",
+      "level": "exact",
+      "reason": "channel::sns::alerts"
+    }
+  ]
+}

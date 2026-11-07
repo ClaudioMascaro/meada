@@ -16,6 +16,13 @@ What Meada builds for one repository: its symbols, calls and contracts, with no 
 code. Of config and IaC files it keeps the scalars, as config values (ADR 0025).
 _Avoid_: database, cache
 
+**Values cache**:
+The file beside a repository's index (`values.db`) that holds, per file a contract extraction
+reads the values of, what its language pack parsed, values included, keyed by the file's bytes,
+setting and pack and by Meada's build (ADR 0027). A refresh reads it instead of parsing an unchanged file again. No
+query reads it, and deleting it costs only time.
+_Avoid_: index (it is not one), values table
+
 **Partial export**:
 What `search`, `context` and `trace` read of the indexes: every contract row, and of the symbols
 and calls only those of the answer. `meada export` reads the whole index instead; both answer
@@ -42,7 +49,8 @@ _Avoid_: snippet, line range
 
 **Config value**:
 One scalar of a YAML, JSON or IaC file, kept in the index with its file, key path, value, type
-(string, number or boolean) and line (ADR 0025). A value past its ceiling is stored cut, with a
+(string, number or boolean; an HCL expression or template is stored as written, under the type
+`expression` or `template`) and line (ADR 0025). A value past its ceiling is stored cut, with a
 mark; one a format marks secret is stored as `redacted`. `search` finds it with kind `value`; it
 never enters the export.
 _Avoid_: setting, config entry, property
@@ -72,12 +80,29 @@ Kustomize tree per overlay, a CloudFormation or SAM template, a Compose project 
 service file. A change to one of its files re-evaluates all of it.
 _Avoid_: stack, project, workspace
 
+**Overlay**:
+A directory with a Kustomize `kustomization.yaml` that no other kustomization names as a base: the
+root of its evaluation unit, which instantiates its `resources`, `bases` and `components` under it
+with `namePrefix`, `nameSuffix`, `namespace` and `images` applied. Its path labels each node it
+yields, as a root module's does a Terraform node. A manifest no kustomization lists belongs to the
+plain unit of its directory.
+_Avoid_: environment, stage, kustomization (the file)
+
 **Pattern**:
 A name with a part static evaluation could not resolve, kept with a wildcard in its place. It
 links `inferred` to a literal name when its literal part has at least three characters and its
 wildcards fall on segment boundaries; it never links to another pattern. Not a binding's routing
 pattern.
 _Avoid_: glob, wildcard name, template
+
+**Overridable value**:
+A value a deployer can replace without editing the repository that a name went through: a
+Terraform root module's variable, by its default or by the value a `terraform.tfvars` or
+`*.auto.tfvars` file gives it (a CloudFormation or SAM parameter's default, a Compose
+`${VAR:-default}` and the default of a Serverless `${opt:...}` are overridable too; later a Helm
+value). `context` lists those of an IaC node's name under `overridable:`; a name that went
+through one links `inferred`.
+_Avoid_: default (one kind of it), variable, input
 
 **Type table**:
 The data file embedded in Meada that says what each IaC type provisions or runs: its contract

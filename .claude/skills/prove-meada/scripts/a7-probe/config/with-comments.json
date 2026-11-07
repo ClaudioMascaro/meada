@@ -1,0 +1,4 @@
+{
+  // a JSONC file: unreadable as JSON
+  "compilerOptions": {"strict": true}
+}

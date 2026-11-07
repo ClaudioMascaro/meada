@@ -1,0 +1,15 @@
+example.com/acme/deploy main.tf:4-11 aws_lambda_function.worker
+type: aws_lambda_function
+name: "worker"
+root: .
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/deploy main.tf:5 resource.aws_lambda_function.worker.function_name = "worker"
+example.com/acme/deploy main.tf:6 resource.aws_lambda_function.worker.package_type = "Image"
+example.com/acme/deploy main.tf:7 resource.aws_lambda_function.worker.image_uri = "ghcr.io/acme/aws-worker:v1"
+example.com/acme/deploy main.tf:9 resource.aws_lambda_function.worker.environment.variables.QUEUE_NAME = "orders"
+image: image::ghcr.io/acme/aws-worker
+  builder: example.com/acme/app [exact: image::ghcr.io/acme/aws-worker]
+env worker QUEUE_NAME -> Terraform environment: orders

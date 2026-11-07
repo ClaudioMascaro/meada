@@ -1377,3 +1377,24 @@ fn the_audit_refusal_follows_lang() {
         );
     }
 }
+
+#[test]
+fn status_reports_orphans_follow_lang() {
+    let app = fixture_repo(
+        "cli_orphans",
+        "orphan-app",
+        Some("https://example.com/orphan/app.git"),
+    );
+    fixture_repo(
+        "cli_orphans",
+        "orphan-infra",
+        Some("https://example.com/orphan/infra.git"),
+    );
+    meada(&app, "en_US.UTF-8", "index");
+    for (lang, name) in LANGS {
+        assert_golden(
+            &format!("cli.status-orphans.{name}.txt"),
+            &meada(&app, lang, "status"),
+        );
+    }
+}

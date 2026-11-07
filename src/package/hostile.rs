@@ -7,20 +7,22 @@
 //! under the limit proves the reader.
 
 use std::collections::BTreeMap;
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use super::maven::Maven;
 use super::nuget::Nuget;
 use super::{Ecosystem, Export, Manifest, Providers, read_manifest};
+use crate::config_values;
+use crate::document::events::{self, Syntax};
 use crate::dotnet::{appsettings, msbuild};
 use crate::jvm::spring;
 use crate::lang::csharp::CSharp;
 use crate::lang::swift::Swift;
 use crate::lang::{Facts, LanguagePack, MAX_BYTES};
 
-/// The time of the whole table. A row takes about a second in debug; a reader that does work per
-/// pair of nodes, or per link of a chain, misses any bound.
+/// The time of one row, from its start. A row takes a few seconds at most in debug; a reader that
+/// does work per pair of nodes, or per link of a chain, misses any bound.
 const BUDGET: Duration = Duration::from_secs(30);
 
 /// What one reader may return for a file of `MAX_BYTES`: a few times its input, since a key is
@@ -82,6 +84,161 @@ fn project_size(project: Option<msbuild::Project>) -> usize {
     let references = (project.packages.iter().chain(&project.projects))
         .map(|r| r.include.len() + r.version.as_ref().map_or(0, String::len));
     usings.chain(references).sum()
+}
+
+/// How many documents and scalars the event reader gives for `text` read as `syntax`, every
+/// document and every scalar with its position; a stream it cannot read gives the scalars handed
+/// out before it stopped.
+fn stream(syntax: Syntax, text: String) -> usize {
+    let mut handed = 0;
+    let documents = events::read(syntax, &file(text), |_| handed += 1);
+    handed + documents.map_or(0, |d| d.len())
+}
+
+/// The bytes of the key paths and values config values store for `text` at `path`.
+fn stored(path: &str, text: String) -> usize {
+    let (_, rows) = config_values::read(path, &file(text));
+    (rows.iter())
+        .map(|r| r.key.len() + r.value.as_ref().map_or(0, String::len))
+        .sum()
+}
+
+/// The bytes of the addresses and names the IaC nodes and references of `text`, a lone
+/// `main.tf`, store.
+fn nodes(text: String) -> usize {
+    tree(vec![("main.tf".into(), text)])
+}
+
+/// The bytes of the addresses and names the IaC nodes and references of the Terraform files
+/// `files` (path and text) store.
+fn tree(files: Vec<(String, String)>) -> usize {
+    let files: Vec<(String, Vec<u8>)> = (files.into_iter())
+        .map(|(path, text)| (path, file(text)))
+        .collect();
+    let (nodes, references) = crate::iac::evaluate(&files);
+    let nodes = (nodes.iter()).map(|n| {
+        n.address.len()
+            + n.name.as_ref().map_or(0, String::len)
+            + n.workload_size()
+            + n.subscription
+                .as_ref()
+                .map_or(0, |s| serde_json::to_vec(s).unwrap().len())
+    });
+    let references = (references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    nodes.chain(references).sum()
+}
+
+/// The bytes of the addresses the IaC nodes and references of `text`, a lone `compose.yaml`,
+/// store.
+fn compose(text: String) -> usize {
+    let (nodes, references) = crate::iac::evaluate(&[("compose.yaml".into(), file(text))]);
+    let nodes = nodes.iter().map(|n| {
+        n.address.len()
+            + n.environment
+                .iter()
+                .map(crate::iac::environment::Entry::size)
+                .sum::<usize>()
+    });
+    let references = (references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    nodes.chain(references).sum()
+}
+
+/// The bytes of the addresses, names and references the IaC nodes of `text`, a lone
+/// `template.yaml` of CloudFormation (#653), store.
+fn template(text: String) -> usize {
+    let head = "AWSTemplateFormatVersion: x\n";
+    let (nodes, references) =
+        crate::iac::evaluate(&[("template.yaml".into(), file(format!("{head}{text}")))]);
+    let nodes = (nodes.iter()).map(|n| {
+        n.address.len()
+            + n.name.as_ref().map_or(0, String::len)
+            + n.subscription
+                .as_ref()
+                .map_or(0, |s| serde_json::to_vec(s).unwrap().len())
+    });
+    let references = (references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    nodes.chain(references).sum()
+}
+
+/// The bytes of the addresses, names, handlers, events and references the IaC nodes of `text`, a
+/// lone `serverless.yml` (#654), store.
+fn service(text: String) -> usize {
+    let head = "service: s\nprovider:\n  stage: ${opt:stage, 'dev'}\n";
+    let (nodes, references) =
+        crate::iac::evaluate(&[("serverless.yml".into(), file(format!("{head}{text}")))]);
+    let nodes = nodes.iter().map(|n| {
+        let handler = n.handler.as_ref().map_or(0, |h| h.text.len());
+        let events: usize = n.events.iter().map(|e| e.text.len()).sum();
+        n.address.len() + n.name.as_ref().map_or(0, String::len) + handler + events
+    });
+    let references = (references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    nodes.chain(references).sum()
+}
+
+/// The bytes of the addresses, references, images and unresolved entries `kube::evaluate` stores
+/// for the files `files` (path and text) of one repository.
+fn objects(files: Vec<(&str, String)>) -> usize {
+    let files: Vec<(String, Vec<u8>)> = (files.into_iter())
+        .map(|(path, text)| (path.to_string(), file(text)))
+        .collect();
+    let out = crate::kube::evaluate(&files);
+    let nodes = out.nodes.iter().map(|n| {
+        n.address.len()
+            + n.provisioned
+                .as_ref()
+                .map_or(0, crate::iac::Projection::size)
+            + n.environment
+                .iter()
+                .map(crate::iac::environment::Entry::size)
+                .sum::<usize>()
+            + n.ingress
+                .iter()
+                .map(|r| r.host.len() + r.prefix.len() + r.service.len())
+                .sum::<usize>()
+    });
+    let references = (out.references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    let images = out.images.iter().map(|i| i.address.len() + i.image.len());
+    let unresolved = out.unresolved.iter().map(|u| u.entry.len());
+    nodes
+        .chain(references)
+        .chain(images)
+        .chain(unresolved)
+        .sum()
+}
+
+/// A large shared host must not expand once for every path before its budget is checked.
+fn ingress_fanout() -> usize {
+    let paths = fill(2, |i| {
+        format!(
+            "          - {{path: /p{i}, pathType: Prefix, backend: {{service: {{name: api}}}}}}\n"
+        )
+    });
+    let text = format!(
+        "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata: {{name: api}}\nspec:\n  rules:\n    - host: {}\n      http:\n        paths:\n{paths}",
+        "h".repeat(70_000)
+    );
+    objects(vec![("ingress.yaml", text)])
+}
+
+#[test]
+fn ingress_host_path_fanout_stays_bounded() {
+    let start = Instant::now();
+    let size = ingress_fanout();
+    eprintln!("hostile Ingress: {:?}, {size} bytes", start.elapsed());
+    assert!(start.elapsed() < BUDGET);
+    assert!(size <= MAX_OUT);
+}
+
+/// A kustomization file naming `entries`.
+fn kustomization(entries: impl Iterator<Item = String>) -> String {
+    entries
+        .map(|e| format!("  - {e}\n"))
+        .fold("resources:\n".into(), |a, e| a + &e)
 }
 
 /// An SDK-style project file with `body` in it.
@@ -160,6 +317,216 @@ type Probe = (&'static str, fn() -> usize);
 
 fn probes() -> Vec<Probe> {
     vec![
+        (
+            "http iac: a full file repeating wide routes through count",
+            || {
+                use crate::contract::ContractKind;
+                let mut text = format!(
+                    r#"
+resource "aws_lambda_function" "target" {{ function_name = "wide" }}
+resource "aws_apigatewayv2_api" "api" {{ protocol_type = "HTTP" }}
+resource "aws_apigatewayv2_integration" "target" {{
+ api_id = aws_apigatewayv2_api.api.id
+ integration_type = "AWS_PROXY"
+ integration_uri = aws_lambda_function.target.invoke_arn
+}}
+resource "aws_apigatewayv2_route" "wide" {{
+ count = 1000
+ api_id = aws_apigatewayv2_api.api.id
+ route_key = "GET /{}"
+ target = "integrations/${{aws_apigatewayv2_integration.target.id}}"
+}}
+"#,
+                    "x".repeat(32 << 10)
+                );
+                text.extend(std::iter::repeat_n(' ', MAX_BYTES - text.len()));
+                let src = file(text);
+                let (nodes, _) = crate::iac::evaluate(&[("main.tf".into(), src.clone())]);
+                crate::http::Http
+                    .config_summary(
+                        "main.tf",
+                        &src,
+                        std::path::Path::new("/missing-http-iac-source"),
+                        &crate::contract::ConfigFacts {
+                            nodes: &nodes.iter().collect::<Vec<_>>(),
+                        },
+                    )
+                    .to_string()
+                    .len()
+            },
+        ),
+        ("alert: inherited labels across many rules", || {
+            use crate::contract::ContractKind;
+            let rules = fill(2, |i| format!("      - {{alert: A{i}, expr: up}}\n"));
+            let text = format!(
+                "groups:\n  - name: g\n    labels: {{support: \"{}\"}}\n    rules:\n{rules}",
+                "x".repeat(MAX_BYTES / 4)
+            );
+            crate::alert::Alert
+                .config_summary(
+                    "rules.yaml",
+                    &file(text),
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("alert: deeply nested routes", || {
+            use crate::contract::ContractKind;
+            let text = format!(
+                "route: {}0{}\nreceivers: []\n",
+                "[".repeat(NESTING),
+                "]".repeat(NESTING)
+            );
+            crate::alert::Alert
+                .config_summary(
+                    "alertmanager.yaml",
+                    &file(text),
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("alert: many Terraform Grafana rules", || {
+            use crate::contract::ContractKind;
+            let rules = fill(1, |i| {
+                format!(
+                    "  rule {{\n    name = \"a{i}\"\n    labels = {{ support = \"ops\" }}\n  }}\n"
+                )
+            });
+            let text = format!("resource \"grafana_rule_group\" \"ops\" {{\n{rules}}}\n");
+            crate::alert::Alert
+                .config_summary(
+                    "grafana.tf",
+                    &file(text),
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("alert: many Datadog monitor tags", || {
+            use crate::contract::ContractKind;
+            let tags = fill(1, |i| format!("\"key{i}:team-b\",\n"));
+            let text = file(format!(
+                "resource \"datadog_monitor\" \"wide\" {{\n name = \"Wide\"\n tags = [{tags}]\n}}\n"
+            ));
+            crate::alert::Alert
+                .config_summary(
+                    "monitors.tf",
+                    &text,
+                    std::path::Path::new("."),
+                    &crate::contract::ConfigFacts::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("alert: wide OpsGenie criteria", || {
+            use crate::contract::ContractKind;
+            let conditions = fill(1, |i| {
+                format!(
+                    "conditions {{\n field = \"tags\"\n operation = \"equals\"\n expected_value = \"key{i}:team-b\"\n}}\n"
+                )
+            });
+            let text = file(format!(
+                "resource \"opsgenie_team_routing_rule\" \"wide\" {{\n team_id = \"team\"\n criteria {{\n type = \"match-all-conditions\"\n{conditions} }}\n}}\n"
+            ));
+            crate::alert::Alert
+                .config_summary(
+                    "routes.tf",
+                    &text,
+                    std::path::Path::new("."),
+                    &crate::contract::ConfigFacts::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("alert: deeply nested PagerDuty condition", || {
+            use crate::contract::ContractKind;
+            let expression = format!(
+                "{}event.custom_details.support matches 'team-b'{}",
+                "(".repeat(MAX_BYTES / 4),
+                ")".repeat(MAX_BYTES / 4)
+            );
+            let text = file(format!(
+                "resource \"pagerduty_event_orchestration_service\" \"wide\" {{\n service = \"wide\"\n set {{\n id = \"start\"\n rule {{\n condition {{ expression = \"{expression}\" }}\n actions {{}}\n }}\n }}\n}}\n"
+            ));
+            crate::alert::Alert
+                .config_summary(
+                    "pagerduty.tf",
+                    &text,
+                    std::path::Path::new("."),
+                    &crate::contract::ConfigFacts::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("image: repeated workflow keys", || {
+            use crate::contract::ContractKind;
+            let key = "j".repeat(900);
+            let tags = fill(2, |i| format!("            ghcr.io/acme/image-{i}\n"));
+            let text = file(format!(
+                "jobs:\n  {key}:\n    steps:\n      - uses: docker/build-push-action@v6\n        with:\n          tags: |\n{tags}"
+            ));
+            crate::image::Image
+                .config_summary(
+                    ".github/workflows/build.yml",
+                    &text,
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("image: many Skaffold artifacts", || {
+            use crate::contract::ContractKind;
+            let items = fill(1, |i| format!("    - image: ghcr.io/acme/image-{i}\n"));
+            crate::image::Image
+                .config_summary(
+                    "skaffold.yaml",
+                    &file(format!("build:\n  artifacts:\n{items}")),
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("image: deeply nested Maven Jib", || {
+            use crate::contract::ContractKind;
+            let text = file(format!(
+                "{}x{}",
+                "<plugin>".repeat(NESTING / 2),
+                "</plugin>".repeat(NESTING / 2)
+            ));
+            crate::image::Image
+                .config_summary(
+                    "pom.xml",
+                    &text,
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
+                .to_string()
+                .len()
+        }),
+        ("image: deeply nested Gradle Jib", || {
+            use crate::contract::ContractKind;
+            let text = file(format!(
+                "plugins {{ id(\"com.google.cloud.tools.jib\") }} {} image = \"ghcr.io/acme/x\" {}",
+                "jib {".repeat(NESTING),
+                "}".repeat(NESTING)
+            ));
+            crate::image::Image
+                .config_summary(
+                    "build.gradle.kts",
+                    &text,
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
+                .to_string()
+                .len()
+        }),
         // npm: `package.json`
         ("npm: many dependencies", || {
             let deps = fill(1, |i| format!("\"p{i}\":\"^1.0.{i}\","));
@@ -542,8 +909,60 @@ fn probes() -> Vec<Probe> {
                     "    '/e{i}':\n      target: https://h{i}\n      pathRewrite:\n        '^/api/proxy/e{i}': ''\n        '^/r{i}': '/'\n"
                 )
             });
-            crate::http::app_config_probe(file(format!("proxy:\n  endpoints:\n{endpoints}")))
+            let root = file(format!("proxy:\n  endpoints:\n{endpoints}"));
+            crate::http::app_config_probe(&[("app-config.yaml", root)])
         }),
+        // Backstage's `$include` (#689): one partial named from far more keys than
+        // `includes::INCLUDES`, each grafting it, so the count stops it.
+        ("app-config: an include fanned out to many keys", || {
+            let root = fill(8, |i| format!("k{i}: {{ $include: p.yaml }}\n"));
+            let partial = fill(256, |i| format!("p{i}: {{ url: '${{U{i}}}' }}\n"));
+            crate::http::app_config_probe(&[
+                ("app-config.yaml", file(root)),
+                ("p.yaml", file(partial)),
+            ])
+        }),
+        // A chain of partials far past `includes::DEPTH`, each a mapping of many keys.
+        ("app-config: a chain of includes past the depth", || {
+            let mut files = vec![(
+                "app-config.yaml".to_string(),
+                file("k: { $include: c1.yaml }\n".into()),
+            )];
+            for n in 1..=64 {
+                let keys = fill(128, |i| format!("v{i}: x\n"));
+                files.push((
+                    format!("c{n}.yaml"),
+                    file(format!("{keys}k: {{ $include: c{}.yaml }}\n", n + 1)),
+                ));
+            }
+            let files: Vec<(&str, Vec<u8>)> =
+                files.iter().map(|(p, s)| (p.as_str(), s.clone())).collect();
+            crate::http::app_config_probe(&files)
+        }),
+        // Two partials that include each other from many keys each: past `includes::INCLUDES`
+        // grafts (or `MAX_BYTES` grafted, for larger ones) the count stops what the cycle check
+        // does not.
+        ("app-config: a cycle of includes", || {
+            let root = "a: { $include: a.yaml }\nb: { $include: b.yaml }\n".to_string();
+            let a = fill(256, |i| format!("a{i}: {{ $include: b.yaml }}\n"));
+            let b = fill(256, |i| format!("b{i}: {{ $include: a.yaml }}\n"));
+            crate::http::app_config_probe(&[
+                ("app-config.yaml", file(root)),
+                ("a.yaml", file(a)),
+                ("b.yaml", file(b)),
+            ])
+        }),
+        // Many values left unread (an `$env` beside another key) under one key of half the file:
+        // where each sits is compared with the proxy table's key paths (#709), never copied.
+        (
+            "app-config: many values left unread under a long key",
+            || {
+                let key = "k".repeat(MAX_BYTES / 2);
+                let unread = fill(4, |i| format!("  e{i}: {{ $env: A, x: 1 }}\n"));
+                let root = format!("? {key}\n:\n{unread}");
+                crate::http::app_config_probe(&[("app-config.yaml", file(root))])
+            },
+        ),
         // Spring: `application.properties`, `application.yml`
         ("spring: many properties", || {
             configured(
@@ -595,6 +1014,609 @@ fn probes() -> Vec<Probe> {
                 )
             });
             configured("application.yml", first + &levels)
+        }),
+        // YAML and JSON: the event reader (`document::events`), every document and scalar
+        ("events: many documents", || {
+            stream(
+                Syntax::Yaml,
+                fill(1, |i| format!("--- {{k{i}: [a, &a{i} b, *a{i}]}}\n")),
+            )
+        }),
+        ("events: deep and wide", || {
+            // At the nesting limit, every scalar is handed out at the full depth.
+            let wide = fill(1, |_| "1, ".into());
+            stream(Syntax::Yaml, format!("{}[{wide}1]\n", "- ".repeat(127)))
+        }),
+        ("events: aliases fanning out", || {
+            let anchor = format!("a: &a [{}]\n", vec!["x"; 1000].join(", "));
+            stream(Syntax::Yaml, anchor + &fill(1, |i| format!("b{i}: *a\n")))
+        }),
+        ("events: aliases one level deeper each", || {
+            // Each anchor holds the one before: the nesting limit stops it, not the stack.
+            let first = "a0: &a0 [x]\n".to_string();
+            stream(
+                Syntax::Yaml,
+                first + &fill(1, |i| format!("a{}: &a{0} [*a{i}]\n", i + 1)),
+            )
+        }),
+        ("events: deep and wide json", || {
+            let wide = fill(1, |_| "1,".into());
+            let nest = |c: &str| c.repeat(100);
+            stream(Syntax::Json, format!("{}{wide}1{}", nest("["), nest("]")))
+        }),
+        ("events: json nested past serde_json's limit", || {
+            let nest = |c: &str| c.repeat(NESTING);
+            stream(Syntax::Json, format!("{}1{}", nest("["), nest("]")))
+        }),
+        // Config values (#639): the rows a YAML or JSON file stores
+        ("config values: long keys nested deep", || {
+            let key = "k".repeat(1000);
+            let deep = format!("{{\"{key}\": ").repeat(100);
+            let leaves = fill(2, |i| format!("\"v{i}\": 1, "));
+            let text = format!("{deep}{{{leaves}\"z\": 1}}{}", "}".repeat(100));
+            stored("a.json", text)
+        }),
+        ("config values: many scalars", || {
+            stored("a.yaml", fill(1, |i| format!("- {}\n", i % 10)))
+        }),
+        ("config values: secrets in many documents", || {
+            let secret = "---\napiVersion: v1\nkind: Secret\ndata: {a: b, c: d}\n";
+            stored("a.yaml", count(999, |_| secret.to_string()))
+        }),
+        ("hcl: long labels nested deep", || {
+            let label = "k".repeat(4000);
+            let open = format!("b \"{label}\" {{\n").repeat(50);
+            let leaves = fill(2, |i| format!("v{i} = 1\n"));
+            stored("a.tf", format!("{open}{leaves}{}", "}\n".repeat(50)))
+        }),
+        ("hcl: many attributes", || {
+            stored("a.tf", fill(1, |i| format!("a{i} = {}\n", i % 10)))
+        }),
+        ("hcl: many blocks of one type", || {
+            stored("a.tf", fill(1, |i| format!("b {{ a = {} }}\n", i % 10)))
+        }),
+        ("hcl: deep brackets", || {
+            stored("a.tf", format!("x = {}", "[".repeat(NESTING)))
+        }),
+        ("hcl: long heredoc", || {
+            let line = format!("{}\n", "a".repeat(79));
+            stored(
+                "a.tf",
+                format!("x = <<EOT\n{}EOT\n", fill(1, |_| line.clone())),
+            )
+        }),
+        ("hcl: heredoc of interpolations", || {
+            let body = fill(1, |i| format!("${{var.a{i}}}\n"));
+            stored("a.tf", format!("x = <<EOT\n{body}EOT\n"))
+        }),
+        ("hcl: long expression", || {
+            stored(
+                "a.tf",
+                format!("x = f({}0)\n", fill(1, |i| format!("a{i}, "))),
+            )
+        }),
+        ("hcl: many tfvars", || {
+            stored("a.tfvars", fill(1, |i| format!("v{i} = \"x\"\n")))
+        }),
+        // IaC nodes (#649): what the evaluation of one root module stores
+        ("iac json: many repeated blocks with long labels", || {
+            let label = "a".repeat(1000);
+            let blocks = fill(1, |i| {
+                format!("\"resource\":{{\"{label}\":{{\"r{i}\":{{}}}}}},")
+            });
+            tree(vec![(
+                "main.tf.json".into(),
+                format!("{{{blocks}\"//\":\"end\"}}"),
+            )])
+        }),
+        ("iac json: wide expression objects", || {
+            let keys = fill(1, |i| format!("\"k{i}\":true,"));
+            tree(vec![(
+                "main.tofu.json".into(),
+                format!(
+                    "{{\"locals\":{{\"wide\":{{{keys}\"z\":true}}}},\"resource\":{{\"a\":{{\"r\":{{\"name\":\"${{join(\\\"\\\", keys(local.wide))}}\"}}}}}}}}"
+                ),
+            )])
+        }),
+        ("iac json: dependencies of tiny non-traversals", || {
+            let items = "0,".repeat(400_000);
+            tree(vec![(
+                "main.tf.json".into(),
+                format!("{{\"resource\":{{\"a\":{{\"r\":{{\"depends_on\":[{items}0]}}}}}}}}"),
+            )])
+        }),
+        ("iac json: many template interpolations", || {
+            let template = "${a}".repeat(240_000);
+            tree(vec![(
+                "main.tf.json".into(),
+                format!("{{\"resource\":{{\"a\":{{\"r\":{{\"name\":\"{template}\"}}}}}}}}"),
+            )])
+        }),
+        (
+            "iac: AWS subscriptions with repeated references and filters",
+            || {
+                let subscriptions = fill(1, |i| {
+                    format!(
+                        "resource \"aws_sns_topic_subscription\" \"s{i}\" {{\n topic_arn = aws_sns_topic.source.arn\n protocol = \"sqs\"\n endpoint = aws_sqs_queue.target.arn\n filter_policy = jsonencode({{x = [\"a\"]}})\n}}\n"
+                    )
+                });
+                nodes(format!(
+                    "resource \"aws_sns_topic\" \"source\" {{ name = \"source\" }}\nresource \"aws_sqs_queue\" \"target\" {{ name = \"target\" }}\n{subscriptions}"
+                ))
+            },
+        ),
+        (
+            "iac: Azure subscription rules and Function app settings",
+            || {
+                let attributes = fill(2, |i| format!(" K{i} = \"literal-value\"\n"));
+                let subscriptions = fill(3, |i| {
+                    format!(
+                        "resource \"azurerm_servicebus_subscription\" \"s{i}\" {{\n name = \"audit-{i}\"\n topic_id = azurerm_servicebus_topic.source.id\n}}\nresource \"azurerm_servicebus_subscription_rule\" \"r{i}\" {{\n name = \"filter\"\n subscription_id = azurerm_servicebus_subscription.s{i}.id\n filter_type = \"SqlFilter\"\n sql_filter = \"x = 1\"\n}}\n"
+                    )
+                });
+                nodes(format!(
+                    "resource \"azurerm_servicebus_topic\" \"source\" {{ name = \"source\" }}\nresource \"azurerm_linux_function_app\" \"worker\" {{\n name = \"worker\"\n app_settings = {{\n{attributes} }}\n}}\n{subscriptions}"
+                ))
+            },
+        ),
+        ("iac: AWS EventBridge rules and targets", || {
+            let routes = fill(1, |i| {
+                format!(
+                    "resource \"aws_cloudwatch_event_rule\" \"r{i}\" {{\n name = \"r{i}\"\n event_bus_name = \"events\"\n event_pattern = \"{{}}\"\n}}\nresource \"aws_cloudwatch_event_target\" \"t{i}\" {{\n rule = aws_cloudwatch_event_rule.r{i}.name\n event_bus_name = \"events\"\n arn = aws_sqs_queue.target.arn\n}}\n"
+                )
+            });
+            nodes(format!(
+                "{routes}resource \"aws_sqs_queue\" \"target\" {{ name = \"target\" }}\n"
+            ))
+        }),
+        ("iac: a chain of resources", || {
+            nodes(fill(1, |i| {
+                format!("resource \"a\" \"r{}\" {{ x = a.r{i}.id }}\n", i + 1)
+            }))
+        }),
+        ("iac: locals naming each other twice", || {
+            let locals = fill(2, |i| format!("  l{} = [local.l{i}, local.l{i}]\n", i + 1));
+            let users = fill(2, |i| {
+                format!("resource \"b\" \"u{i}\" {{ x = local.l{i} }}\n")
+            });
+            nodes(format!(
+                "resource \"a\" \"t\" {{}}\nlocals {{\n  l0 = a.t.id\n{locals}}}\n{users}"
+            ))
+        }),
+        ("iac: every resource naming a wide local", || {
+            let all = count(5000, |i| format!("a.r{i}, "));
+            let users = fill(2, |i| {
+                format!("resource \"a\" \"r{i}\" {{ x = local.all }}\n")
+            });
+            nodes(format!("locals {{\n  all = [{all}]\n}}\n{users}"))
+        }),
+        ("iac: a module calling itself", || {
+            nodes(fill(1, |i| {
+                format!("module \"m{i}\" {{ source = \"./\" }}\n")
+            }))
+        }),
+        // Static evaluation (#650): what the names and instances one root evaluates store
+        (
+            "iac eval: a list doubled by locals under a for_each",
+            || {
+                let locals = count(40, |i| {
+                    format!("  l{} = concat(local.l{i}, local.l{i})\n", i + 1)
+                });
+                let users = fill(2, |i| {
+                    format!(
+                        "resource \"a\" \"r{i}\" {{\n  for_each = toset(local.l{})\n  name = \"${{each.key}}-${{local.s40}}\"\n}}\n",
+                        i % 41
+                    )
+                });
+                let strings = count(40, |i| {
+                    format!("  s{} = \"${{local.s{i}}}${{local.s{i}}}\"\n", i + 1)
+                });
+                nodes(format!(
+                    "locals {{\n  l0 = [\"a\", \"b\"]\n  s0 = \"ab\"\n{locals}{strings}}}\n{users}"
+                ))
+            },
+        ),
+        ("iac eval: a for in a for in a for over a wide list", || {
+            let items = count(1000, |i| format!("\"k{i}\", "));
+            let users = fill(2, |i| {
+                format!(
+                    "resource \"a\" \"r{i}\" {{ name = length([for a in local.l : [for b in local.l : [for c in local.l : 1]]]) }}\n"
+                )
+            });
+            nodes(format!("locals {{\n  l = [{items}]\n}}\n{users}"))
+        }),
+        ("iac eval: names through cyclic locals", || {
+            let n = 2000;
+            let locals = count(n, |i| {
+                format!("  a{i} = \"${{local.a{}}}-x\"\n", (i + 1) % n)
+            });
+            let users = fill(2, |i| {
+                format!("resource \"a\" \"r{i}\" {{ name = local.a{} }}\n", i % n)
+            });
+            nodes(format!("locals {{\n{locals}}}\n{users}"))
+        }),
+        (
+            "iac eval: modules nested past the ceiling, each passing a name down",
+            || {
+                let depth = 20;
+                let files = (0..depth)
+                .map(|level| {
+                    let calls = count(2, |c| {
+                        format!(
+                            "module \"m{c}\" {{\n  source = \"../l{}\"\n  name = \"${{var.name}}-{c}\"\n}}\n",
+                            level + 1
+                        )
+                    });
+                    let resources = fill(depth, |i| {
+                        format!("resource \"a\" \"r{i}\" {{ name = \"${{var.name}}-{i}\" }}\n")
+                    });
+                    let text = format!("variable \"name\" {{\n  default = \"q\"\n}}\n{calls}{resources}");
+                    (format!("l{level}/main.tf"), text)
+                })
+                .collect();
+                tree(files)
+            },
+        ),
+        ("iac: wide counts", || {
+            nodes(fill(1, |i| {
+                format!("resource \"a\" \"r{i}\" {{ count = 1000 }}\n")
+            }))
+        }),
+        ("compose: many services on one network", || {
+            let services = fill(1, |i| format!("  s{i}:\n    networks: [n]\n"));
+            compose(format!("services:\n{services}"))
+        }),
+        (
+            "compose: long image repeated by environment entries",
+            || {
+                let entries = count(512, |i| format!("      Q{i}: orders\n"));
+                let mut text = format!(
+                    "services:\n  worker:\n    image: {}\n    environment:\n{entries}",
+                    "i".repeat(400 << 10)
+                );
+                text.push_str(&" ".repeat(MAX_BYTES - text.len()));
+                compose(text)
+            },
+        ),
+        (
+            "compose: long service name repeated by environment entries",
+            || {
+                let entries = count(512, |i| format!("      Q{i}: orders\n"));
+                let mut text = format!(
+                    "services:\n  ? {}\n  :\n    image: worker\n    environment:\n{entries}",
+                    "w".repeat(400 << 10)
+                );
+                text.push_str(&" ".repeat(MAX_BYTES - text.len()));
+                compose(text)
+            },
+        ),
+        ("compose: a default naming a default", || {
+            let nest = "${A:-".repeat(5000) + "x" + &"}".repeat(5000);
+            compose(format!("services:\n  a:\n    image: {nest}\n"))
+        }),
+        ("compose: an alias per service", || {
+            let services = fill(1, |i| format!("  s{i}: *base\n"));
+            compose(format!(
+                "x: &base {{image: a, depends_on: [s0]}}\nservices:\n{services}"
+            ))
+        }),
+        // CloudFormation and SAM (#653): what one template's evaluation stores
+        (
+            "cloudformation: tagged intrinsics nested to the limit",
+            || {
+                let nest = "!Join ['', [".repeat(60) + "x" + &"]]".repeat(60);
+                let resources = fill(1, |i| {
+                    format!(
+                        "  R{i}:\n    Type: AWS::SQS::Queue\n    Properties:\n      QueueName: {nest}\n"
+                    )
+                });
+                template(format!("Resources:\n{resources}"))
+            },
+        ),
+        ("cloudformation: every resource depends on many", || {
+            let deps = (0..100)
+                .map(|i| format!("R{i}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let resources = fill(4, |i| {
+                format!("  R{i}:\n    Type: AWS::SQS::Queue\n    DependsOn: [{deps}]\n")
+            });
+            template(format!("Resources:\n{resources}"))
+        }),
+        ("cloudformation: names built from a long default", || {
+            let long = "n".repeat(900);
+            let resources = fill(4, |i| {
+                format!(
+                    "  R{i}:\n    Type: AWS::SQS::Queue\n    Properties:\n      QueueName: !Sub '${{P}}${{P}}${{P}}'\n"
+                )
+            });
+            template(format!(
+                "Parameters:\n  P:\n    Default: {long}\nResources:\n{resources}"
+            ))
+        }),
+        (
+            "cloudformation: a chain of resources naming the last",
+            || {
+                let resources = fill(1, |i| {
+                    format!(
+                        "  R{i:06}:\n    Type: AWS::S3::Bucket\n    Properties:\n      BucketName: !Sub '${{R{:06}}}-x'\n",
+                        i + 1
+                    )
+                });
+                template(format!("Resources:\n{resources}"))
+            },
+        ),
+        ("cloudformation: an alias per resource", || {
+            let resources = fill(4, |i| format!("  R{i}: *base\n"));
+            template(format!(
+                "x: &base {{Type: AWS::SQS::Queue, DependsOn: R0}}\nResources:\n{resources}"
+            ))
+        }),
+        (
+            "cloudformation: an aliased section of many resources",
+            || {
+                let resources = fill(4, |i| {
+                    format!(
+                        "  R{i}:\n    Type: AWS::SQS::Queue\n    Properties:\n      QueueName: q\n"
+                    )
+                });
+                template(format!("x: &r\n{resources}Resources: *r\n"))
+            },
+        ),
+        (
+            "cloudformation: an aliased section of one-line resources",
+            || {
+                let resources = fill(2, |i| format!("  R{i}: {{Type: AWS::SQS::Queue}}\n"));
+                template(format!("x: &r\n{resources}Resources: *r\n"))
+            },
+        ),
+        ("cloudformation: flat JSON of many resources", || {
+            let resources = fill(4, |i| {
+                format!("\"R{i}\": {{\n\"Type\": \"AWS::SQS::Queue\"\n}},\n")
+            });
+            template(format!(
+                "{{\n\"Resources\": {{\n{resources}\"Z\": {{}}\n}}\n}}\n"
+            ))
+        }),
+        ("compose: flat JSON of many services", || {
+            let services = fill(4, |i| format!("\"s{i}\": {{\n\"image\": \"a\"\n}},\n"));
+            compose(format!(
+                "{{\n\"services\": {{\n{services}\"z\": {{}}\n}}\n}}\n"
+            ))
+        }),
+        ("compose: a long blank line above an alias", || {
+            let services = fill(4, |i| format!("  s{i}: {{image: a}}\n"));
+            let blanks = " ".repeat(MAX_BYTES / 2);
+            compose(format!("x: &all\n{services}{blanks}\nservices: *all\n"))
+        }),
+        ("compose: an aliased section of many services", || {
+            let services = fill(4, |i| format!("  s{i}:\n    image: a\n"));
+            compose(format!("x: &all\n{services}services: *all\n"))
+        }),
+        (
+            "cloudformation: tagged aliases that expand past the budget",
+            || {
+                let mut text = String::from("x0: &l0 !Ref [x, x, x, x, x, x, x, x, x, x]\n");
+                for n in 1..=9 {
+                    let p = n - 1;
+                    text += &format!(
+                        "x{n}: &l{n} !Ref [{}]\n",
+                        vec![format!("*l{p}"); 10].join(", ")
+                    );
+                }
+                template(format!("{text}Resources: {{}}\n"))
+            },
+        ),
+        // Serverless (#654): what one service file's evaluation stores
+        ("serverless: functions with many events", || {
+            let events = "      - sqs: arn:aws:sqs:eu:1:queue-name\n".repeat(200);
+            let functions = fill(4, |i| {
+                format!("  f{i}:\n    handler: h.f\n    events:\n{events}")
+            });
+            service(format!("functions:\n{functions}"))
+        }),
+        ("serverless: a diamond of self variables", || {
+            let custom = fill(4, |i| {
+                format!(
+                    "  c{i}: ${{self:custom.c{}}}-${{self:custom.c{}}}\n",
+                    i + 1,
+                    i + 1
+                )
+            });
+            service(format!(
+                "custom:\n{custom}functions:\n  f:\n    name: ${{self:custom.c0}}\n"
+            ))
+        }),
+        (
+            "serverless: a chain past the depth limit with a wide fan-out",
+            || {
+                let fan = vec!["${self:custom.NEXT}"; 40].join("-");
+                let custom: String = (0..16)
+                    .map(|i| format!("  c{i}: {}\n", fan.replace("NEXT", &format!("c{}", i + 1))))
+                    .collect();
+                service(format!(
+                    "custom:\n{custom}  c16: end\nfunctions:\n  f:\n    name: ${{self:custom.c0}}\n"
+                ))
+            },
+        ),
+        (
+            "serverless: a chain past the stack cut with a wide fan-out",
+            || {
+                let fan = vec!["${self:custom.NEXT}"; 40].join("-");
+                let custom: String = (0..200)
+                    .map(|i| format!("  c{i}: {}\n", fan.replace("NEXT", &format!("c{}", i + 1))))
+                    .collect();
+                let functions: String = (0..200)
+                    .map(|i| format!("  f{i}:\n    name: ${{self:custom.c{i}}}\n"))
+                    .collect();
+                service(format!(
+                    "custom:\n{custom}  c200: end\nfunctions:\n{functions}"
+                ))
+            },
+        ),
+        ("serverless: variables in every resource", || {
+            let resources = fill(4, |i| {
+                format!(
+                    "    R{i}:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: ${{self:service}}-${{opt:stage, 'a'}}-${{env:X}}-${{ssm:/p}}\n"
+                )
+            });
+            service(format!("resources:\n  Resources:\n{resources}"))
+        }),
+        ("serverless: a function referencing many resources", || {
+            let env = (0..300)
+                .map(|i| format!("      E{i}: !Ref R{i}\n"))
+                .collect::<String>();
+            let resources = count(300, |i| format!("    R{i}:\n      Type: AWS::SQS::Queue\n"));
+            let functions = fill(4, |i| {
+                format!("  f{i}:\n    handler: h\n    environment:\n{env}")
+            });
+            service(format!(
+                "functions:\n{functions}resources:\n  Resources:\n{resources}"
+            ))
+        }),
+        // Kubernetes and Kustomize (#651): what one repository's evaluation stores
+        ("kustomize: a chain of bases", || {
+            let mut files: Vec<(String, String)> = Vec::new();
+            for i in 0..4000 {
+                let (dir, next) = (format!("d{i}"), format!("../d{}", i + 1));
+                files.push((
+                    format!("{dir}/kustomization.yaml"),
+                    kustomization([next].into_iter()),
+                ));
+            }
+            let files = files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect();
+            objects(files)
+        }),
+        ("kustomize: bases naming each other", || {
+            let mut files: Vec<(String, String)> = Vec::new();
+            for i in 0..4000 {
+                let next = (1..=3).map(|k| format!("../d{}", (i + k) % 4000));
+                files.push((format!("d{i}/kustomization.yaml"), kustomization(next)));
+            }
+            files.push((
+                "root/kustomization.yaml".into(),
+                kustomization(["../d0".to_string()].into_iter()),
+            ));
+            let files = files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect();
+            objects(files)
+        }),
+        ("kustomize: a base named many times", || {
+            let base = count(900, |i| {
+                format!("---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: c{i}\n")
+            });
+            let names = fill(2, |_| "  - ../base\n".to_string());
+            objects(vec![
+                (
+                    "base/kustomization.yaml",
+                    "resources:\n  - all.yaml\n".into(),
+                ),
+                ("base/all.yaml", base),
+                ("o/kustomization.yaml", format!("resources:\n{names}")),
+            ])
+        }),
+        ("kustomize: many overlays over one base", || {
+            let base = count(900, |i| {
+                format!("---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: c{i}\n")
+            });
+            let mut files = vec![
+                (
+                    "base/kustomization.yaml",
+                    "resources:\n  - all.yaml\n".to_string(),
+                ),
+                ("base/all.yaml", base),
+            ];
+            let overlays: Vec<(String, String)> = (0..300)
+                .map(|i| {
+                    (
+                        format!("o{i}/kustomization.yaml"),
+                        "resources:\n  - ../base\n".to_string(),
+                    )
+                })
+                .collect();
+            files.extend(overlays.iter().map(|(p, t)| (p.as_str(), t.clone())));
+            objects(files)
+        }),
+        ("kubernetes: environment reference fan-out", || {
+            let data = fill(2, |i| format!("  Q{i}: {}\n", "x".repeat(512)));
+            let refs = fill(4, |_| "        - configMapRef: {name: values}\n".into());
+            objects(vec![(
+                "env.yaml",
+                format!(
+                    "apiVersion: v1\nkind: ConfigMap\nmetadata: {{name: values}}\ndata:\n{data}---\napiVersion: v1\nkind: Pod\nmetadata: {{name: app}}\nspec:\n  containers:\n    - name: app\n      image: nginx\n      envFrom:\n{refs}"
+                ),
+            )])
+        }),
+        (
+            "kubernetes: long container name repeated by environment entries",
+            || {
+                let entries = count(512, |i| {
+                    format!("        - {{name: Q{i}, value: orders}}\n")
+                });
+                let mut text = format!(
+                    "apiVersion: v1\nkind: Pod\nmetadata: {{name: app}}\nspec:\n  containers:\n    - name: {}\n      image: nginx\n      env:\n{entries}",
+                    "w".repeat(400 << 10)
+                );
+                text.push_str(&" ".repeat(MAX_BYTES - text.len()));
+                objects(vec![("env.yaml", text)])
+            },
+        ),
+        ("kubernetes: ingress host/path fan-out", ingress_fanout),
+        ("kubernetes: custom topology binding fan-out", || {
+            let bindings = count(900, |i| {
+                format!(
+                    "---\napiVersion: rabbitmq.com/v1beta1\nkind: Binding\nmetadata: {{name: b{i}}}\nspec:\n  rabbitmqClusterReference: {{name: broker}}\n  source: events\n  destination: inbox\n  destinationType: queue\n  routingKey: order.*\n"
+                )
+            });
+            let endpoints = "apiVersion: rabbitmq.com/v1beta1\nkind: Queue\nmetadata: {name: q}\nspec:\n  rabbitmqClusterReference: {name: broker}\n  name: inbox\n---\napiVersion: rabbitmq.com/v1beta1\nkind: Exchange\nmetadata: {name: ex}\nspec:\n  rabbitmqClusterReference: {name: broker}\n  name: events\n  type: topic\n";
+            let mut text = format!("{endpoints}{bindings}");
+            text.push_str(&" ".repeat(MAX_BYTES - text.len()));
+            objects(vec![("rabbit.yaml", text)])
+        }),
+        ("kubernetes: services selecting many workloads", || {
+            let pair = |i: usize| {
+                format!(
+                    "---\napiVersion: v1\nkind: Service\nmetadata:\n  name: s{i}\nspec:\n  selector:\n    app: a\n\
+                     ---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: d{i}\nspec:\n  template:\n    \
+                     metadata:\n      labels:\n        app: a\n    spec:\n      containers: []\n"
+                )
+            };
+            let files: Vec<(String, String)> = (0..9)
+                .map(|n| (format!("f{n}.yaml"), count(450, |i| pair(n * 450 + i))))
+                .collect();
+            objects(files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect())
+        }),
+        // Crossplane (#655): compositions, their patch sets, and the kinds XRDs define
+        ("crossplane: resources naming many patch sets", || {
+            let sets = fill(2, |i| {
+                format!(
+                    "    - name: p{i}\n      patches:\n        - fromFieldPath: a\n          \
+                     toFieldPath: metadata.name\n"
+                )
+            });
+            let resources = fill(2, |i| {
+                format!(
+                    "    - name: r{i}\n      base: {{apiVersion: s3.aws.upbound.io/v1, kind: B}}\n      \
+                     patches:\n        - {{type: PatchSet, patchSetName: p{i}}}\n"
+                )
+            });
+            let text = format!(
+                "apiVersion: apiextensions.crossplane.io/v1\nkind: Composition\nmetadata:\n  name: c\n\
+                 spec:\n  patchSets:\n{sets}  resources:\n{resources}"
+            );
+            objects(vec![("c.yaml", text)])
+        }),
+        ("crossplane: claims of a kind many XRDs define", || {
+            let pair = |i: usize| {
+                format!(
+                    "---\napiVersion: apiextensions.crossplane.io/v1\nkind: CompositeResourceDefinition\n\
+                     metadata:\n  name: x{i}\nspec:\n  group: acme.io\n  names: {{kind: X}}\n  \
+                     claimNames: {{kind: C}}\n---\napiVersion: acme.io/v1\nkind: C\nmetadata:\n  name: c{i}\n"
+                )
+            };
+            let files: Vec<(String, String)> = (0..9)
+                .map(|n| (format!("f{n}.yaml"), count(450, |i| pair(n * 450 + i))))
+                .collect();
+            objects(files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect())
         }),
         // .NET: `appsettings.json`
         ("appsettings: many keys", || {
@@ -669,33 +1691,149 @@ fn swift_modules(text: String) -> usize {
         .sum()
 }
 
-/// Every reader, given a file built to explode, returns within `BUDGET` and gives back no more
-/// than `MAX_OUT`. The rows run side by side, each on a thread of its own, and the test names the
-/// ones that missed.
+#[test]
+fn azure_reader_stays_bounded_on_a_full_file() {
+    let (_, probe) = probes()
+        .into_iter()
+        .find(|(name, _)| name.starts_with("iac: Azure"))
+        .unwrap();
+    let start = Instant::now();
+    let size = probe();
+    let elapsed = start.elapsed();
+    eprintln!("Azure IaC hostile probe: {elapsed:?}, {size} stored bytes");
+    assert!(size > 1000 && size <= MAX_OUT, "{size}");
+    assert!(elapsed < BUDGET, "{elapsed:?}");
+}
+
+#[test]
+fn custom_topology_reader_stays_bounded_on_a_full_file() {
+    let (_, probe) = probes()
+        .into_iter()
+        .find(|(name, _)| *name == "kubernetes: custom topology binding fan-out")
+        .unwrap();
+    let start = Instant::now();
+    let size = probe();
+    let elapsed = start.elapsed();
+    eprintln!("Custom topology hostile probe: {elapsed:?}, {size} stored bytes");
+    assert!(size > 1000 && size <= MAX_OUT, "{size}");
+    assert!(elapsed < BUDGET, "{elapsed:?}");
+}
+
+#[test]
+fn http_iac_route_reader_stays_bounded_on_a_full_file() {
+    let (_, probe) = probes()
+        .into_iter()
+        .find(|(name, _)| name.starts_with("http iac:"))
+        .unwrap();
+    let start = Instant::now();
+    let size = probe();
+    let elapsed = start.elapsed();
+    eprintln!("HTTP IaC hostile probe: {elapsed:?}, {size} stored bytes");
+    assert!(size <= MAX_OUT, "{size}");
+    assert!(elapsed < BUDGET, "{elapsed:?}");
+}
+
+/// Every reader, given a file built to explode, returns within `BUDGET` of its start and gives
+/// back no more than `MAX_OUT`. The rows run on a pool of as many threads as the machine has
+/// cores, so a row's time is its reader's, not the wait of a hundred rows started at once beside
+/// the rest of the suite (CI's `cloud` job missed the budget that way); the test names the rows
+/// that missed.
 #[test]
 fn every_reader_stays_bounded_on_a_file_built_to_explode() {
-    let started = Instant::now();
-    let runs: Vec<_> = (probes().into_iter())
-        .map(|(name, probe)| {
-            let (tx, rx) = mpsc::channel();
-            std::thread::spawn(move || {
+    let rows = probes();
+    let names: Vec<&str> = rows.iter().map(|(name, _)| *name).collect();
+    let workers = (std::thread::available_parallelism()).map_or(4, |n| n.get().min(names.len()));
+    let queue = Arc::new(Mutex::new(rows.into_iter().enumerate()));
+    let (tx, rx) = mpsc::channel();
+    for _ in 0..workers {
+        let (queue, tx) = (Arc::clone(&queue), tx.clone());
+        std::thread::spawn(move || {
+            loop {
+                let next = queue.lock().unwrap().next();
+                let Some((i, (_, probe))) = next else {
+                    break;
+                };
                 let start = Instant::now();
-                let _ = tx.send((probe(), start.elapsed()));
-            });
-            (name, rx)
-        })
-        .collect();
-    let mut failed = Vec::new();
-    for (name, rx) in runs {
-        match rx.recv_timeout(BUDGET.saturating_sub(started.elapsed())) {
-            Ok((size, took)) => {
-                eprintln!("hostile {name}: {took:?}, {size} bytes");
-                if size > MAX_OUT {
-                    failed.push(format!("{name}: {size} bytes"));
+                if tx.send(Run::Started(i, start)).is_err() {
+                    break;
+                }
+                let size = std::panic::catch_unwind(probe).ok();
+                let _ = tx.send(Run::Ended(i, size, start.elapsed()));
+            }
+        });
+    }
+    drop(tx);
+    // The start of each running row, the rows that ended or missed, and the threads a row past
+    // the budget still holds.
+    let (mut running, mut ended) = (BTreeMap::new(), vec![false; names.len()]);
+    let (mut late, mut failed) = (Vec::new(), Vec::new());
+    while ended.contains(&false) && late.len() < workers {
+        let wait = (running.values())
+            .map(|start: &Instant| BUDGET.saturating_sub(start.elapsed()))
+            .min()
+            .unwrap_or(BUDGET);
+        match rx.recv_timeout(wait) {
+            Ok(Run::Started(i, start)) => {
+                running.insert(i, start);
+            }
+            Ok(Run::Ended(i, size, took)) => {
+                running.remove(&i);
+                late.retain(|&j| j != i);
+                if ended[i] {
+                    continue;
+                }
+                ended[i] = true;
+                match size {
+                    Some(size) => {
+                        eprintln!("hostile {}: {took:?}, {size} bytes", names[i]);
+                        if took > BUDGET {
+                            failed.push(format!("{}: {took:?}", names[i]));
+                        } else if size > MAX_OUT {
+                            failed.push(format!("{}: {size} bytes", names[i]));
+                        }
+                    }
+                    None => failed.push(format!("{}: a panic", names[i])),
                 }
             }
-            Err(_) => failed.push(format!("{name}: no end within {BUDGET:?}, or a panic")),
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+        for (&i, start) in &running {
+            if !ended[i] && start.elapsed() >= BUDGET {
+                ended[i] = true;
+                late.push(i);
+                failed.push(format!("{}: no end within {BUDGET:?}", names[i]));
+            }
         }
     }
+    for (i, _) in ended.iter().enumerate().filter(|(_, ended)| !**ended) {
+        failed.push(format!(
+            "{}: not run, every thread held by a row past the budget",
+            names[i]
+        ));
+    }
     assert!(failed.is_empty(), "{failed:#?}");
+}
+
+/// What a thread of the pool says about a row: its index and when it started, then its index,
+/// the size it answered (none for a panic) and the time it took.
+enum Run {
+    Started(usize, Instant),
+    Ended(usize, Option<usize>, Duration),
+}
+
+#[test]
+fn incident_readers_stay_bounded_on_their_hostile_inputs() {
+    for (name, probe) in probes().into_iter().filter(|(name, _)| {
+        name.starts_with("alert: many Datadog")
+            || name.starts_with("alert: wide OpsGenie")
+            || name.starts_with("alert: deeply nested PagerDuty")
+    }) {
+        let started = Instant::now();
+        let size = probe();
+        let elapsed = started.elapsed();
+        eprintln!("hostile {name}: {elapsed:?}, {size} bytes");
+        assert!(size <= MAX_OUT, "{name}: {size} bytes");
+        assert!(elapsed <= BUDGET, "{name}: {elapsed:?}");
+    }
 }

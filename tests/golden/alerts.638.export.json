@@ -1,0 +1,40 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/monitors",
+  "commit": "d77bfbe3ab269b309bcf0d753017d928a92cd119",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "alert::service::app",
+      "site": "example.com/acme/monitors::main.tf::datadog_monitor.app"
+    },
+    {
+      "contract": "alert::support::team-b",
+      "site": "example.com/acme/monitors::main.tf::datadog_monitor.app"
+    }
+  ],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/monitors::main.tf::datadog_monitor.app",
+      "address": "datadog_monitor.app",
+      "type": "datadog_monitor",
+      "root": ".",
+      "path": "main.tf",
+      "line": 1,
+      "end_line": 7
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/routing::teams/platform/routing-rules.tf::opsgenie_team_routing_rule.app",
+      "provider": "example.com/acme/monitors::main.tf::datadog_monitor.app",
+      "contract": "alert::service::app",
+      "level": "inferred",
+      "reason": "alert::service::app; matchers \"tags\"=~\"service:app\"; receiver: opsgenie_team.platform; forwarding: Datadog monitor tags -> OpsGenie tags"
+    }
+  ]
+}

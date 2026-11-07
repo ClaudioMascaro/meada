@@ -1,7 +1,7 @@
 {
   "format": 1,
   "repository": "example.com/acme/conformance",
-  "commit": "866c48a6dccf3f175e6fe6d1e994b41b8fca9f93",
+  "commit": "2a9c47ab6003b8106ac3d7cb005d1c5479708df2",
   "dirty": false,
   "files": [
     {
@@ -74,7 +74,7 @@
     },
     {
       "path": "messages/queues.go",
-      "hash": "ceb34657fd4d72faf07be556ff6cc56aee5e601fd27c97a4e9077e1dc3e82988"
+      "hash": "c131b7f85ed354ee9d128033f69fa7fe5c2f9cf6a0dada314ed5f1e30351014e"
     },
     {
       "path": "messages/rabbit.go",
@@ -1067,9 +1067,9 @@
       "span": {
         "path": "messages/queues.go",
         "start": 658,
-        "end": 930
+        "end": 960
       },
-      "hash": "c1f4dee0de7a4e5791bb3ca36bb880b50ec96eb927c2f37858e685f159189d97"
+      "hash": "711f8a4d2242f172c7c5535e0d5d7eaa780ecef49348d450ed68f14d16fb96dc"
     },
     {
       "id": "example.com/acme/conformance::messages/queues.go::SqsProduce",
@@ -5826,8 +5826,8 @@
       "level": null,
       "span": {
         "path": "messages/queues.go",
-        "start": 762,
-        "end": 793
+        "start": 792,
+        "end": 823
       }
     },
     {
@@ -5837,8 +5837,8 @@
       "level": null,
       "span": {
         "path": "messages/queues.go",
-        "start": 893,
-        "end": 926
+        "start": 923,
+        "end": 956
       }
     },
     {
@@ -5848,8 +5848,8 @@
       "level": null,
       "span": {
         "path": "messages/queues.go",
-        "start": 796,
-        "end": 829
+        "start": 826,
+        "end": 859
       }
     },
     {
@@ -5859,8 +5859,19 @@
       "level": null,
       "span": {
         "path": "messages/queues.go",
-        "start": 831,
-        "end": 928
+        "start": 861,
+        "end": 958
+      }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/queues.go::SqsConsume::sqs.NewFromConfig#0",
+      "caller": "example.com/acme/conformance::messages/queues.go::SqsConsume",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "messages/queues.go",
+        "start": 724,
+        "end": 746
       }
     },
     {
@@ -11220,7 +11231,8 @@
     },
     {
       "contract": "channel::sqs",
-      "site": "example.com/acme/conformance::messages/queues.go::SqsProduce::client.SendMessage#1"
+      "site": "example.com/acme/conformance::messages/queues.go::SqsProduce::client.SendMessage#1",
+      "via": "env:QUEUE_URL"
     },
     {
       "contract": "channel::sqs::invoices",

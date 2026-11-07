@@ -1,0 +1,1174 @@
+{
+  "base": "expected.json",
+  "edit": {
+    "after_sha256": "d415da4d9911fcbef92e75023603299dcf2a74025daae4c657f0c4399a4b829a",
+    "after_utf8": "support: borneo",
+    "before_sha256": "3c6358843e8fe807b5d1f11bb6825cb66ab72b89752bfcf00ede9fa322a0320a",
+    "before_utf8": "support: aurora",
+    "byte_length_after": 633,
+    "byte_length_before": 633,
+    "file": "prometheus/aurora.yaml",
+    "occurrences": 1
+  },
+  "edited": "expected-same-size-edit.json",
+  "freshness": "capture warm source edit, independent cold index of identical edited bytes, then warm restoration; do not infer cache correctness from hash changes alone",
+  "http_parity": "run identical frozen queries in the same repository/workspace scope at base, edited and restored phases; compare complete stdio and HTTP answers byte-for-byte",
+  "query_file": "queries.jsonl",
+  "removed_receiving_pairs": [
+    {
+      "receivers_after": [],
+      "receivers_before": [
+        "aurora-pager",
+        "aurora-copy"
+      ],
+      "rule": "prometheus/aurora.yaml::groups[0].rules[0]"
+    },
+    {
+      "receivers_after": [],
+      "receivers_before": [
+        "aurora-regex",
+        "aurora-copy"
+      ],
+      "rule": "prometheus/aurora.yaml::groups[0].rules[1]"
+    }
+  ],
+  "restoration": "restore exact initial file bytes; whole expected.json multiset and complete query answers must return",
+  "scope_phases": {
+    "both_roles_in_scope": {
+      "emitters": [
+        {
+          "contract": "alert::alertname::WrittenGrafanaName",
+          "label_key": "alertname",
+          "name": "BeaconCritical",
+          "role": "emitter",
+          "rule": "grafana/provisioning.yaml::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "grafana/provisioning.yaml",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 8,
+              "last_scalar_line": 25
+            }
+          },
+          "source": {
+            "address": "grafana/provisioning.yaml::groups[0].rules[0].labels.alertname",
+            "document": 0,
+            "file": "grafana/provisioning.yaml",
+            "key": "groups[0].rules[0].labels.alertname",
+            "known": true,
+            "label_key": "alertname",
+            "line": 23,
+            "span": {
+              "first_scalar_line": 23,
+              "last_scalar_line": 23
+            },
+            "value": "WrittenGrafanaName"
+          },
+          "value": "WrittenGrafanaName"
+        },
+        {
+          "contract": "alert::service::cedar-grafana",
+          "label_key": "service",
+          "name": "BeaconCritical",
+          "role": "emitter",
+          "rule": "grafana/provisioning.yaml::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "grafana/provisioning.yaml",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 8,
+              "last_scalar_line": 25
+            }
+          },
+          "source": {
+            "address": "grafana/provisioning.yaml::groups[0].rules[0].labels.service",
+            "document": 0,
+            "file": "grafana/provisioning.yaml",
+            "key": "groups[0].rules[0].labels.service",
+            "known": true,
+            "label_key": "service",
+            "line": 21,
+            "span": {
+              "first_scalar_line": 21,
+              "last_scalar_line": 21
+            },
+            "value": "cedar-grafana"
+          },
+          "value": "cedar-grafana"
+        },
+        {
+          "contract": "alert::severity::critical",
+          "label_key": "severity",
+          "name": "BeaconLedger",
+          "role": "emitter",
+          "rule": "grafana/provisioning.yaml::groups[0].rules[1]",
+          "site": {
+            "document": 0,
+            "file": "grafana/provisioning.yaml",
+            "key": "groups[0].rules[1]",
+            "span": {
+              "first_scalar_line": 26,
+              "last_scalar_line": 41
+            }
+          },
+          "source": {
+            "address": "grafana/provisioning.yaml::groups[0].rules[1].labels.severity",
+            "document": 0,
+            "file": "grafana/provisioning.yaml",
+            "key": "groups[0].rules[1].labels.severity",
+            "known": true,
+            "label_key": "severity",
+            "line": 40,
+            "span": {
+              "first_scalar_line": 40,
+              "last_scalar_line": 40
+            },
+            "value": "critical"
+          },
+          "value": "critical"
+        },
+        {
+          "contract": "alert::support::ledger",
+          "label_key": "support",
+          "name": "BeaconLedger",
+          "role": "emitter",
+          "rule": "grafana/provisioning.yaml::groups[0].rules[1]",
+          "site": {
+            "document": 0,
+            "file": "grafana/provisioning.yaml",
+            "key": "groups[0].rules[1]",
+            "span": {
+              "first_scalar_line": 26,
+              "last_scalar_line": 41
+            }
+          },
+          "source": {
+            "address": "grafana/provisioning.yaml::groups[0].rules[1].labels.support",
+            "document": 0,
+            "file": "grafana/provisioning.yaml",
+            "key": "groups[0].rules[1].labels.support",
+            "known": true,
+            "label_key": "support",
+            "line": 38,
+            "span": {
+              "first_scalar_line": 38,
+              "last_scalar_line": 38
+            },
+            "value": "ledger"
+          },
+          "value": "ledger"
+        },
+        {
+          "contract": "alert::alertname::MeadowCritical",
+          "label_key": "alertname",
+          "name": "MeadowCritical",
+          "role": "emitter",
+          "rule": "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "kubernetes/bundle.yaml",
+            "key": "[0].spec.groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 16,
+              "last_scalar_line": 19
+            }
+          },
+          "source": {
+            "address": "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0].alert",
+            "document": 0,
+            "file": "kubernetes/bundle.yaml",
+            "implicit": true,
+            "key": "[0].spec.groups[0].rules[0].alert",
+            "known": true,
+            "label_key": "alertname",
+            "line": 16,
+            "span": {
+              "first_scalar_line": 16,
+              "last_scalar_line": 16
+            },
+            "value": "MeadowCritical"
+          },
+          "value": "MeadowCritical"
+        },
+        {
+          "contract": "alert::service::cedar-meadow",
+          "label_key": "service",
+          "name": "MeadowCritical",
+          "role": "emitter",
+          "rule": "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "kubernetes/bundle.yaml",
+            "key": "[0].spec.groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 16,
+              "last_scalar_line": 19
+            }
+          },
+          "source": {
+            "address": "kubernetes/bundle.yaml::[0].spec.groups[0].labels.service",
+            "document": 0,
+            "file": "kubernetes/bundle.yaml",
+            "key": "[0].spec.groups[0].labels.service",
+            "known": true,
+            "label_key": "service",
+            "line": 13,
+            "span": {
+              "first_scalar_line": 13,
+              "last_scalar_line": 13
+            },
+            "value": "cedar-meadow"
+          },
+          "value": "cedar-meadow"
+        },
+        {
+          "contract": "alert::alertname::LedgerWarn",
+          "label_key": "alertname",
+          "name": "LedgerWarn",
+          "role": "emitter",
+          "rule": "kubernetes/ledger.json::spec.groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "kubernetes/ledger.json",
+            "key": "spec.groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 22,
+              "last_scalar_line": 28
+            }
+          },
+          "source": {
+            "address": "kubernetes/ledger.json::spec.groups[0].rules[0].alert",
+            "document": 0,
+            "file": "kubernetes/ledger.json",
+            "implicit": true,
+            "key": "spec.groups[0].rules[0].alert",
+            "known": true,
+            "label_key": "alertname",
+            "line": 22,
+            "span": {
+              "first_scalar_line": 22,
+              "last_scalar_line": 22
+            },
+            "value": "LedgerWarn"
+          },
+          "value": "LedgerWarn"
+        },
+        {
+          "contract": "alert::support::ledger",
+          "label_key": "support",
+          "name": "LedgerWarn",
+          "role": "emitter",
+          "rule": "kubernetes/ledger.json::spec.groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "kubernetes/ledger.json",
+            "key": "spec.groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 22,
+              "last_scalar_line": 28
+            }
+          },
+          "source": {
+            "address": "kubernetes/ledger.json::spec.groups[0].labels.support",
+            "document": 0,
+            "file": "kubernetes/ledger.json",
+            "key": "spec.groups[0].labels.support",
+            "known": true,
+            "label_key": "support",
+            "line": 15,
+            "span": {
+              "first_scalar_line": 15,
+              "last_scalar_line": 15
+            },
+            "value": "ledger"
+          },
+          "value": "ledger"
+        },
+        {
+          "contract": "alert::alertname::HarborSlow",
+          "label_key": "alertname",
+          "name": "HarborSlow",
+          "role": "emitter",
+          "rule": "loki/harbor.yaml::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "loki/harbor.yaml",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 4,
+              "last_scalar_line": 11
+            }
+          },
+          "source": {
+            "address": "loki/harbor.yaml::groups[0].rules[0].alert",
+            "document": 0,
+            "file": "loki/harbor.yaml",
+            "implicit": true,
+            "key": "groups[0].rules[0].alert",
+            "known": true,
+            "label_key": "alertname",
+            "line": 4,
+            "span": {
+              "first_scalar_line": 4,
+              "last_scalar_line": 4
+            },
+            "value": "HarborSlow"
+          },
+          "value": "HarborSlow"
+        },
+        {
+          "contract": "alert::severity::warning",
+          "label_key": "severity",
+          "name": "HarborSlow",
+          "role": "emitter",
+          "rule": "loki/harbor.yaml::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "loki/harbor.yaml",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 4,
+              "last_scalar_line": 11
+            }
+          },
+          "source": {
+            "address": "loki/harbor.yaml::groups[0].rules[0].labels.severity",
+            "document": 0,
+            "file": "loki/harbor.yaml",
+            "key": "groups[0].rules[0].labels.severity",
+            "known": true,
+            "label_key": "severity",
+            "line": 9,
+            "span": {
+              "first_scalar_line": 9,
+              "last_scalar_line": 9
+            },
+            "value": "warning"
+          },
+          "value": "warning"
+        },
+        {
+          "contract": "alert::support::harbor",
+          "label_key": "support",
+          "name": "HarborSlow",
+          "role": "emitter",
+          "rule": "loki/harbor.yaml::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "loki/harbor.yaml",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 4,
+              "last_scalar_line": 11
+            }
+          },
+          "source": {
+            "address": "loki/harbor.yaml::groups[0].rules[0].labels.support",
+            "document": 0,
+            "file": "loki/harbor.yaml",
+            "key": "groups[0].rules[0].labels.support",
+            "known": true,
+            "label_key": "support",
+            "line": 7,
+            "span": {
+              "first_scalar_line": 7,
+              "last_scalar_line": 7
+            },
+            "value": "harbor"
+          },
+          "value": "harbor"
+        },
+        {
+          "contract": "alert::alertname::QuartzUnknown",
+          "label_key": "alertname",
+          "name": "QuartzUnknown",
+          "role": "emitter",
+          "rule": "loki/quartz.json::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "loki/quartz.json",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 7,
+              "last_scalar_line": 12
+            }
+          },
+          "source": {
+            "address": "loki/quartz.json::groups[0].rules[0].alert",
+            "document": 0,
+            "file": "loki/quartz.json",
+            "implicit": true,
+            "key": "groups[0].rules[0].alert",
+            "known": true,
+            "label_key": "alertname",
+            "line": 7,
+            "span": {
+              "first_scalar_line": 7,
+              "last_scalar_line": 7
+            },
+            "value": "QuartzUnknown"
+          },
+          "value": "QuartzUnknown"
+        },
+        {
+          "contract": "alert::service::quartz",
+          "label_key": "service",
+          "name": "QuartzUnknown",
+          "role": "emitter",
+          "rule": "loki/quartz.json::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "loki/quartz.json",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 7,
+              "last_scalar_line": 12
+            }
+          },
+          "source": {
+            "address": "loki/quartz.json::groups[0].rules[0].labels.service",
+            "document": 0,
+            "file": "loki/quartz.json",
+            "key": "groups[0].rules[0].labels.service",
+            "known": true,
+            "label_key": "service",
+            "line": 11,
+            "span": {
+              "first_scalar_line": 11,
+              "last_scalar_line": 11
+            },
+            "value": "quartz"
+          },
+          "value": "quartz"
+        },
+        {
+          "contract": "alert::severity::warning",
+          "label_key": "severity",
+          "name": "QuartzUnknown",
+          "role": "emitter",
+          "rule": "loki/quartz.json::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "loki/quartz.json",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 7,
+              "last_scalar_line": 12
+            }
+          },
+          "source": {
+            "address": "loki/quartz.json::groups[0].rules[0].labels.severity",
+            "document": 0,
+            "file": "loki/quartz.json",
+            "key": "groups[0].rules[0].labels.severity",
+            "known": true,
+            "label_key": "severity",
+            "line": 12,
+            "span": {
+              "first_scalar_line": 12,
+              "last_scalar_line": 12
+            },
+            "value": "warning"
+          },
+          "value": "warning"
+        },
+        {
+          "contract": "alert::support::quartz",
+          "label_key": "support",
+          "name": "QuartzUnknown",
+          "role": "emitter",
+          "rule": "loki/quartz.json::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "loki/quartz.json",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 7,
+              "last_scalar_line": 12
+            }
+          },
+          "source": {
+            "address": "loki/quartz.json::groups[0].rules[0].labels.support",
+            "document": 0,
+            "file": "loki/quartz.json",
+            "key": "groups[0].rules[0].labels.support",
+            "known": true,
+            "label_key": "support",
+            "line": 10,
+            "span": {
+              "first_scalar_line": 10,
+              "last_scalar_line": 10
+            },
+            "value": "quartz"
+          },
+          "value": "quartz"
+        },
+        {
+          "contract": "alert::alertname::AuroraCritical",
+          "label_key": "alertname",
+          "name": "AuroraCritical",
+          "role": "emitter",
+          "rule": "prometheus/aurora.yaml::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "prometheus/aurora.yaml",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 9,
+              "last_scalar_line": 16
+            }
+          },
+          "source": {
+            "address": "prometheus/aurora.yaml::groups[0].rules[0].alert",
+            "document": 0,
+            "file": "prometheus/aurora.yaml",
+            "implicit": true,
+            "key": "groups[0].rules[0].alert",
+            "known": true,
+            "label_key": "alertname",
+            "line": 9,
+            "span": {
+              "first_scalar_line": 9,
+              "last_scalar_line": 9
+            },
+            "value": "AuroraCritical"
+          },
+          "value": "AuroraCritical"
+        },
+        {
+          "contract": "alert::service::cedar-api",
+          "label_key": "service",
+          "name": "AuroraCritical",
+          "role": "emitter",
+          "rule": "prometheus/aurora.yaml::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "prometheus/aurora.yaml",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 9,
+              "last_scalar_line": 16
+            }
+          },
+          "source": {
+            "address": "prometheus/aurora.yaml::groups[0].labels.service",
+            "document": 0,
+            "file": "prometheus/aurora.yaml",
+            "key": "groups[0].labels.service",
+            "known": true,
+            "label_key": "service",
+            "line": 5,
+            "span": {
+              "first_scalar_line": 5,
+              "last_scalar_line": 5
+            },
+            "value": "cedar-api"
+          },
+          "value": "cedar-api"
+        },
+        {
+          "contract": "alert::alertname::AuroraPreview",
+          "label_key": "alertname",
+          "name": "AuroraPreview",
+          "role": "emitter",
+          "rule": "prometheus/aurora.yaml::groups[0].rules[1]",
+          "site": {
+            "document": 0,
+            "file": "prometheus/aurora.yaml",
+            "key": "groups[0].rules[1]",
+            "span": {
+              "first_scalar_line": 17,
+              "last_scalar_line": 18
+            }
+          },
+          "source": {
+            "address": "prometheus/aurora.yaml::groups[0].rules[1].alert",
+            "document": 0,
+            "file": "prometheus/aurora.yaml",
+            "implicit": true,
+            "key": "groups[0].rules[1].alert",
+            "known": true,
+            "label_key": "alertname",
+            "line": 17,
+            "span": {
+              "first_scalar_line": 17,
+              "last_scalar_line": 17
+            },
+            "value": "AuroraPreview"
+          },
+          "value": "AuroraPreview"
+        },
+        {
+          "contract": "alert::severity::warning",
+          "label_key": "severity",
+          "name": "AuroraPreview",
+          "role": "emitter",
+          "rule": "prometheus/aurora.yaml::groups[0].rules[1]",
+          "site": {
+            "document": 0,
+            "file": "prometheus/aurora.yaml",
+            "key": "groups[0].rules[1]",
+            "span": {
+              "first_scalar_line": 17,
+              "last_scalar_line": 18
+            }
+          },
+          "source": {
+            "address": "prometheus/aurora.yaml::groups[0].labels.severity",
+            "document": 0,
+            "file": "prometheus/aurora.yaml",
+            "key": "groups[0].labels.severity",
+            "known": true,
+            "label_key": "severity",
+            "line": 6,
+            "span": {
+              "first_scalar_line": 6,
+              "last_scalar_line": 6
+            },
+            "value": "warning"
+          },
+          "value": "warning"
+        },
+        {
+          "contract": "alert::alertname::CedarImplicit",
+          "label_key": "alertname",
+          "name": "CedarImplicit",
+          "role": "emitter",
+          "rule": "prometheus/aurora.yaml::groups[1].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "prometheus/aurora.yaml",
+            "key": "groups[1].rules[0]",
+            "span": {
+              "first_scalar_line": 25,
+              "last_scalar_line": 26
+            }
+          },
+          "source": {
+            "address": "prometheus/aurora.yaml::groups[1].rules[0].alert",
+            "document": 0,
+            "file": "prometheus/aurora.yaml",
+            "implicit": true,
+            "key": "groups[1].rules[0].alert",
+            "known": true,
+            "label_key": "alertname",
+            "line": 25,
+            "span": {
+              "first_scalar_line": 25,
+              "last_scalar_line": 25
+            },
+            "value": "CedarImplicit"
+          },
+          "value": "CedarImplicit"
+        },
+        {
+          "contract": "alert::alertname::MeridianCritical",
+          "label_key": "alertname",
+          "name": "MeridianCritical",
+          "role": "emitter",
+          "rule": "prometheus/meridian.json::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "prometheus/meridian.json",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 12,
+              "last_scalar_line": 15
+            }
+          },
+          "source": {
+            "address": "prometheus/meridian.json::groups[0].rules[0].alert",
+            "document": 0,
+            "file": "prometheus/meridian.json",
+            "implicit": true,
+            "key": "groups[0].rules[0].alert",
+            "known": true,
+            "label_key": "alertname",
+            "line": 12,
+            "span": {
+              "first_scalar_line": 12,
+              "last_scalar_line": 12
+            },
+            "value": "MeridianCritical"
+          },
+          "value": "MeridianCritical"
+        },
+        {
+          "contract": "alert::service::cedar-worker",
+          "label_key": "service",
+          "name": "MeridianCritical",
+          "role": "emitter",
+          "rule": "prometheus/meridian.json::groups[0].rules[0]",
+          "site": {
+            "document": 0,
+            "file": "prometheus/meridian.json",
+            "key": "groups[0].rules[0]",
+            "span": {
+              "first_scalar_line": 12,
+              "last_scalar_line": 15
+            }
+          },
+          "source": {
+            "address": "prometheus/meridian.json::groups[0].labels.service",
+            "document": 0,
+            "file": "prometheus/meridian.json",
+            "key": "groups[0].labels.service",
+            "known": true,
+            "label_key": "service",
+            "line": 7,
+            "span": {
+              "first_scalar_line": 7,
+              "last_scalar_line": 7
+            },
+            "value": "cedar-worker"
+          },
+          "value": "cedar-worker"
+        },
+        {
+          "contract": "alert::alertname::MeridianOpaque",
+          "label_key": "alertname",
+          "name": "MeridianOpaque",
+          "role": "emitter",
+          "rule": "prometheus/meridian.json::groups[0].rules[1]",
+          "site": {
+            "document": 0,
+            "file": "prometheus/meridian.json",
+            "key": "groups[0].rules[1]",
+            "span": {
+              "first_scalar_line": 19,
+              "last_scalar_line": 22
+            }
+          },
+          "source": {
+            "address": "prometheus/meridian.json::groups[0].rules[1].alert",
+            "document": 0,
+            "file": "prometheus/meridian.json",
+            "implicit": true,
+            "key": "groups[0].rules[1].alert",
+            "known": true,
+            "label_key": "alertname",
+            "line": 19,
+            "span": {
+              "first_scalar_line": 19,
+              "last_scalar_line": 19
+            },
+            "value": "MeridianOpaque"
+          },
+          "value": "MeridianOpaque"
+        },
+        {
+          "contract": "alert::service::cedar-worker",
+          "label_key": "service",
+          "name": "MeridianOpaque",
+          "role": "emitter",
+          "rule": "prometheus/meridian.json::groups[0].rules[1]",
+          "site": {
+            "document": 0,
+            "file": "prometheus/meridian.json",
+            "key": "groups[0].rules[1]",
+            "span": {
+              "first_scalar_line": 19,
+              "last_scalar_line": 22
+            }
+          },
+          "source": {
+            "address": "prometheus/meridian.json::groups[0].labels.service",
+            "document": 0,
+            "file": "prometheus/meridian.json",
+            "key": "groups[0].labels.service",
+            "known": true,
+            "label_key": "service",
+            "line": 7,
+            "span": {
+              "first_scalar_line": 7,
+              "last_scalar_line": 7
+            },
+            "value": "cedar-worker"
+          },
+          "value": "cedar-worker"
+        },
+        {
+          "contract": "alert::severity::warning",
+          "label_key": "severity",
+          "name": "MeridianOpaque",
+          "role": "emitter",
+          "rule": "prometheus/meridian.json::groups[0].rules[1]",
+          "site": {
+            "document": 0,
+            "file": "prometheus/meridian.json",
+            "key": "groups[0].rules[1]",
+            "span": {
+              "first_scalar_line": 19,
+              "last_scalar_line": 22
+            }
+          },
+          "source": {
+            "address": "prometheus/meridian.json::groups[0].labels.severity",
+            "document": 0,
+            "file": "prometheus/meridian.json",
+            "key": "groups[0].labels.severity",
+            "known": true,
+            "label_key": "severity",
+            "line": 8,
+            "span": {
+              "first_scalar_line": 8,
+              "last_scalar_line": 8
+            },
+            "value": "warning"
+          },
+          "value": "warning"
+        }
+      ],
+      "matchers": [
+        {
+          "condition_index": 0,
+          "contract": "alert::support::aurora",
+          "label_key": "support",
+          "operator": "=",
+          "receiver": "aurora-base",
+          "role": "matcher",
+          "route": "routing/alertmanager.yaml::route.routes[0]",
+          "site": {
+            "document": 0,
+            "file": "routing/alertmanager.yaml",
+            "key": "route.routes[0]",
+            "span": {
+              "first_scalar_line": 6,
+              "last_scalar_line": 15
+            }
+          },
+          "source": {
+            "address": "routing/alertmanager.yaml::route.routes[0].match.support",
+            "declared_route": "routing/alertmanager.yaml::route.routes[0]",
+            "document": 0,
+            "file": "routing/alertmanager.yaml",
+            "key": "route.routes[0].match.support",
+            "label_key": "support",
+            "line": 6,
+            "operator": "=",
+            "span": {
+              "first_scalar_line": 6,
+              "last_scalar_line": 6
+            },
+            "value": "aurora"
+          },
+          "value": "aurora"
+        },
+        {
+          "condition_index": 0,
+          "contract": "alert::support::aurora",
+          "label_key": "support",
+          "operator": "=",
+          "receiver": "blocked-by-first",
+          "role": "matcher",
+          "route": "routing/alertmanager.yaml::route.routes[2]",
+          "site": {
+            "document": 0,
+            "file": "routing/alertmanager.yaml",
+            "key": "route.routes[2]",
+            "span": {
+              "first_scalar_line": 20,
+              "last_scalar_line": 21
+            }
+          },
+          "source": {
+            "address": "routing/alertmanager.yaml::route.routes[2].match.support",
+            "declared_route": "routing/alertmanager.yaml::route.routes[2]",
+            "document": 0,
+            "file": "routing/alertmanager.yaml",
+            "key": "route.routes[2].match.support",
+            "label_key": "support",
+            "line": 20,
+            "operator": "=",
+            "span": {
+              "first_scalar_line": 20,
+              "last_scalar_line": 20
+            },
+            "value": "aurora"
+          },
+          "value": "aurora"
+        },
+        {
+          "condition_index": 0,
+          "contract": "alert::zone::red",
+          "label_key": "zone",
+          "operator": "=",
+          "receiver": "unknown-zone",
+          "role": "matcher",
+          "route": "routing/alertmanager.yaml::route.routes[4]",
+          "site": {
+            "document": 0,
+            "file": "routing/alertmanager.yaml",
+            "key": "route.routes[4]",
+            "span": {
+              "first_scalar_line": 26,
+              "last_scalar_line": 27
+            }
+          },
+          "source": {
+            "address": "routing/alertmanager.yaml::route.routes[4].matchers[0]",
+            "declared_route": "routing/alertmanager.yaml::route.routes[4]",
+            "document": 0,
+            "file": "routing/alertmanager.yaml",
+            "key": "route.routes[4].matchers[0]",
+            "label_key": "zone",
+            "line": 26,
+            "operator": "=",
+            "span": {
+              "first_scalar_line": 26,
+              "last_scalar_line": 26
+            },
+            "value": "red"
+          },
+          "value": "red"
+        },
+        {
+          "condition_index": 0,
+          "contract": "alert::service::quartz",
+          "label_key": "service",
+          "operator": "=",
+          "receiver": "blocked-by-unknown",
+          "role": "matcher",
+          "route": "routing/alertmanager.yaml::route.routes[5]",
+          "site": {
+            "document": 0,
+            "file": "routing/alertmanager.yaml",
+            "key": "route.routes[5]",
+            "span": {
+              "first_scalar_line": 29,
+              "last_scalar_line": 30
+            }
+          },
+          "source": {
+            "address": "routing/alertmanager.yaml::route.routes[5].match.service",
+            "declared_route": "routing/alertmanager.yaml::route.routes[5]",
+            "document": 0,
+            "file": "routing/alertmanager.yaml",
+            "key": "route.routes[5].match.service",
+            "label_key": "service",
+            "line": 29,
+            "operator": "=",
+            "span": {
+              "first_scalar_line": 29,
+              "last_scalar_line": 29
+            },
+            "value": "quartz"
+          },
+          "value": "quartz"
+        },
+        {
+          "condition_index": 0,
+          "contract": "alert::team::ledger",
+          "label_key": "team",
+          "operator": "=",
+          "receiver": "ledger-base",
+          "role": "matcher",
+          "route": "routing/native.json::spec.route",
+          "site": {
+            "document": 0,
+            "file": "routing/native.json",
+            "key": "spec.route",
+            "span": {
+              "first_scalar_line": 12,
+              "last_scalar_line": 58
+            }
+          },
+          "source": {
+            "address": "routing/native.json::spec.route.matchers[0].value",
+            "declared_route": "routing/native.json::spec.route",
+            "document": 0,
+            "file": "routing/native.json",
+            "key": "spec.route.matchers[0].value",
+            "label_key": "team",
+            "line": 16,
+            "operator": "=",
+            "span": {
+              "first_scalar_line": 16,
+              "last_scalar_line": 16
+            },
+            "value": "ledger"
+          },
+          "value": "ledger"
+        },
+        {
+          "condition_index": 0,
+          "contract": "alert::team::ledger",
+          "label_key": "team",
+          "operator": "=",
+          "receiver": "unknown-destination",
+          "role": "matcher",
+          "route": "routing/native.json::spec.route.routes[2]",
+          "site": {
+            "document": 0,
+            "file": "routing/native.json",
+            "key": "spec.route.routes[2]",
+            "span": {
+              "first_scalar_line": 43,
+              "last_scalar_line": 48
+            }
+          },
+          "source": {
+            "address": "routing/native.json::spec.route.matchers[0].value",
+            "declared_route": "routing/native.json::spec.route",
+            "document": 0,
+            "file": "routing/native.json",
+            "key": "spec.route.matchers[0].value",
+            "label_key": "team",
+            "line": 16,
+            "operator": "=",
+            "span": {
+              "first_scalar_line": 16,
+              "last_scalar_line": 16
+            },
+            "value": "ledger"
+          },
+          "value": "ledger"
+        },
+        {
+          "condition_index": 1,
+          "contract": "alert::unwritten::present",
+          "label_key": "unwritten",
+          "operator": "=",
+          "receiver": "unknown-destination",
+          "role": "matcher",
+          "route": "routing/native.json::spec.route.routes[2]",
+          "site": {
+            "document": 0,
+            "file": "routing/native.json",
+            "key": "spec.route.routes[2]",
+            "span": {
+              "first_scalar_line": 43,
+              "last_scalar_line": 48
+            }
+          },
+          "source": {
+            "address": "routing/native.json::spec.route.routes[2].matchers[0].value",
+            "declared_route": "routing/native.json::spec.route.routes[2]",
+            "document": 0,
+            "file": "routing/native.json",
+            "key": "spec.route.routes[2].matchers[0].value",
+            "label_key": "unwritten",
+            "line": 47,
+            "operator": "=",
+            "span": {
+              "first_scalar_line": 47,
+              "last_scalar_line": 47
+            },
+            "value": "present"
+          },
+          "value": "present"
+        },
+        {
+          "condition_index": 0,
+          "contract": "alert::team::ledger",
+          "label_key": "team",
+          "operator": "=",
+          "receiver": "blocked-ledger",
+          "role": "matcher",
+          "route": "routing/native.json::spec.route.routes[3]",
+          "site": {
+            "document": 0,
+            "file": "routing/native.json",
+            "key": "spec.route.routes[3]",
+            "span": {
+              "first_scalar_line": 53,
+              "last_scalar_line": 58
+            }
+          },
+          "source": {
+            "address": "routing/native.json::spec.route.matchers[0].value",
+            "declared_route": "routing/native.json::spec.route",
+            "document": 0,
+            "file": "routing/native.json",
+            "key": "spec.route.matchers[0].value",
+            "label_key": "team",
+            "line": 16,
+            "operator": "=",
+            "span": {
+              "first_scalar_line": 16,
+              "last_scalar_line": 16
+            },
+            "value": "ledger"
+          },
+          "value": "ledger"
+        },
+        {
+          "condition_index": 1,
+          "contract": "alert::service::ledger-api",
+          "label_key": "service",
+          "operator": "=",
+          "receiver": "blocked-ledger",
+          "role": "matcher",
+          "route": "routing/native.json::spec.route.routes[3]",
+          "site": {
+            "document": 0,
+            "file": "routing/native.json",
+            "key": "spec.route.routes[3]",
+            "span": {
+              "first_scalar_line": 53,
+              "last_scalar_line": 58
+            }
+          },
+          "source": {
+            "address": "routing/native.json::spec.route.routes[3].matchers[0].value",
+            "declared_route": "routing/native.json::spec.route.routes[3]",
+            "document": 0,
+            "file": "routing/native.json",
+            "key": "spec.route.routes[3].matchers[0].value",
+            "label_key": "service",
+            "line": 57,
+            "operator": "=",
+            "span": {
+              "first_scalar_line": 57,
+              "last_scalar_line": 57
+            },
+            "value": "ledger-api"
+          },
+          "value": "ledger-api"
+        }
+      ],
+      "status_reports_alert_orphans": true
+    },
+    "emitters_only_scope": {
+      "links": [],
+      "per_side_absence": "no matcher in the workspace",
+      "source_paths": [
+        "grafana/provisioning.yaml",
+        "kubernetes/bundle.yaml",
+        "kubernetes/ledger.json",
+        "loki/harbor.yaml",
+        "loki/quartz.json",
+        "prometheus/aurora.yaml",
+        "prometheus/meridian.json"
+      ],
+      "status_alert_orphan_lines": 0
+    },
+    "matchers_only_scope": {
+      "links": [],
+      "per_side_absence": "no emitter in the workspace",
+      "source_paths": [
+        "routing/alertmanager.yaml",
+        "routing/native.json"
+      ],
+      "status_alert_orphan_lines": 0
+    },
+    "scope_rule": "status noise requires emitter and matcher roles of the alert kind in that exact repository/workspace scope"
+  },
+  "source_edits": [
+    {
+      "expected": "expected-same-size-edit.json",
+      "file": "prometheus/aurora.yaml",
+      "phase": "support-borneo",
+      "replace_exactly_once": {
+        "after": "support: borneo",
+        "before": "support: aurora"
+      },
+      "sha256_after": "d415da4d9911fcbef92e75023603299dcf2a74025daae4c657f0c4399a4b829a",
+      "sha256_before": "3c6358843e8fe807b5d1f11bb6825cb66ab72b89752bfcf00ede9fa322a0320a",
+      "starts_from": "baseline"
+    }
+  ],
+  "status": "SOURCE_AUTHORED_NOT_EXECUTED"
+}

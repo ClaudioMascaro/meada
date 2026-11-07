@@ -1,0 +1,31 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "Name": {
+      "Type": "String",
+      "Default": "audit"
+    }
+  },
+  "Resources": {
+    "Stream": {
+      "Type": "AWS::Kinesis::Stream",
+      "Properties": {
+        "Name": {"Fn::Sub": "${Name}-events"},
+        "ShardCount": 1
+      }
+    },
+    "Consumer": {
+      "Type": "AWS::Lambda::Function",
+      "DependsOn": ["Stream"],
+      "Properties": {
+        "FunctionName": {"Ref": "Name"},
+        "Environment": {
+          "Variables": {
+            "STREAM": {"Ref": "Stream"},
+            "STREAM_ARN": {"Fn::GetAtt": ["Stream", "Arn"]}
+          }
+        }
+      }
+    }
+  }
+}

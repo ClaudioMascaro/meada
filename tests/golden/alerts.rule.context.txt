@@ -1,0 +1,14 @@
+example.com/acme/monitoring rules.yaml:5-7 [0].groups[0].rules[0]
+type: AlertRule
+name: "Local"
+root: rules.yaml
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/monitoring rules.yaml:5 [0].groups[0].rules[0].alert = "Local"
+example.com/acme/monitoring rules.yaml:6 [0].groups[0].rules[0].expr = "up == 0"
+example.com/acme/monitoring rules.yaml:7 [0].groups[0].rules[0].labels.support = "team-b"
+emitter: alert::alertname::Local
+emitter: alert::region::eu
+emitter: alert::support::team-b

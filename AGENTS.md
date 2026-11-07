@@ -47,6 +47,10 @@ write tools; one index per repository; determinism) live in
   summary, without creating a `.prove-it` receipt.
 - Mutation audits are explicit manual GitHub Actions `workflow_dispatch` runs, never an
   automatic task-completion step or a consequence of editing a skill.
+- For product integration handoff, also run `scripts/clippy-features` locally; it reads the CI
+  feature matrix (ADR 0012). Documentation and harness-only follow-ups do not repeat it.
+- GitHub Actions owns the full integration, UI and deployment checks. CI for the exact PR
+  head must be green before marking the PR ready for review or merging into main.
 - `.githooks/` runs part of the gate locally: `cargo fmt --check` and no em dash in staged
   Markdown on commit; on push, a check against the maintainer's private-term list. Enable it
   once per clone with `git config core.hooksPath .githooks`.

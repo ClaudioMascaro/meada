@@ -1,0 +1,17 @@
+example.com/resource-via/app values.yaml#groups[1].rules[0].labels.support (line 11)
+provides resource::routing::team-b
+  reader: example.com/resource-via/infra::main.tf::opsgenie_team_routing_rule.team_b [declared: resource::routing::team-b]
+example.com/resource-via/infra main.tf:1-3 opsgenie_team_routing_rule.team_b
+type: opsgenie_team_routing_rule
+name: "team-b"
+root: .
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/resource-via/infra main.tf:2 resource.opsgenie_team_routing_rule.team_b.name = "team-b"
+consumes resource::routing::team-b
+  writer: example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support [declared: resource::routing::team-b]
+resource::routing::team-b
+  example.com/resource-via/app writer values.yaml#groups[1].rules[0].labels.support (line 11) (no provisioner in the workspace)
+  example.com/resource-via/infra reader main.tf:1 opsgenie_team_routing_rule.team_b (no provisioner in the workspace)

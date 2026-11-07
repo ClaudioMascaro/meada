@@ -1,0 +1,11 @@
+alerts:
+  loki:
+    - alert: HealthCheckFailing
+      expr: count_over_time({app="health-monitor"} |= "FAILED" [5m]) > 0
+      labels:
+        support: team-b
+        owner: team-b
+image:
+  repository: ghcr.io/acme/app
+  tag: "1.4.2"
+replicaCount: 2

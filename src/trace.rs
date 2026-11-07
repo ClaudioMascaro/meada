@@ -44,7 +44,11 @@ type Call<'a> = (usize, &'a CallSite);
 /// The workspace as one graph of symbols, calls and links.
 pub(crate) struct Graph<'a> {
     workspace: &'a Workspace,
+    exports: &'a [Export],
+    provisions: Vec<meada_core::export::Provision>,
+    executions: Vec<meada_core::export::Execution>,
     symbols: HashMap<&'a str, (usize, &'a Symbol)>,
+    iac: HashMap<String, (usize, &'a crate::iac::Node)>,
     calls: HashMap<&'a str, Call<'a>>,
     /// The calls each symbol (or file, for top-level calls) makes, in source order.
     callees: HashMap<&'a str, Vec<Call<'a>>>,
@@ -72,11 +76,35 @@ pub(crate) struct Graph<'a> {
 }
 
 impl<'a> Graph<'a> {
+    /// A receiving operation keeps its call identity; its continuation is the owner's body.
+    fn reader_call(&self, id: &str) -> Option<Call<'a>> {
+        self.consumers
+            .get(id)?
+            .iter()
+            .any(|c| contract::flows_to_consumer(c.contract.as_deref()))
+            .then(|| self.calls.get(id).copied())
+            .flatten()
+    }
+
+    fn callees_at(&self, id: &str) -> &[Call<'a>] {
+        let owner = self
+            .reader_call(id)
+            .map_or(id, |(_, call)| call.caller.as_str());
+        self.callees.get(owner).map_or(&[], Vec::as_slice)
+    }
+
     /// `exports` in workspace order, and every link between them.
     pub(crate) fn new(workspace: &'a Workspace, exports: &'a [Export], links: &'a [Link]) -> Self {
         let mut graph = Self {
             workspace,
+            exports,
+            provisions: crate::iac::provision::links(exports),
+            executions: contract::KINDS
+                .iter()
+                .flat_map(|k| k.executions(exports, links))
+                .collect(),
             symbols: HashMap::new(),
+            iac: HashMap::new(),
             calls: HashMap::new(),
             callees: HashMap::new(),
             callers: HashMap::new(),
@@ -89,6 +117,12 @@ impl<'a> Graph<'a> {
             entry_points: HashMap::new(),
         };
         for (n, export) in exports.iter().enumerate() {
+            for node in &export.iac {
+                graph
+                    .iac
+                    .entry(node.identity(&export.repository))
+                    .or_insert((n, node));
+            }
             for e in &export.entry_points {
                 graph.entry_points.insert(&e.identity, (n, e));
             }
@@ -193,6 +227,135 @@ impl<'a> Graph<'a> {
         walk.finish(budget)
     }
 
+    /// Continue an IaC node through its ordinary links and downward provisioning/execution
+    /// hops, without repeating the node or adding a second footer.
+    pub(crate) fn attached_rows(
+        &self,
+        repository: usize,
+        node: &crate::iac::Node,
+        depth: usize,
+        direction: Direction,
+    ) -> Vec<Row> {
+        let identity = format!(
+            "{}::{}::{}",
+            self.exports[repository].repository, node.path, node.address
+        );
+        let mut walk = Walk {
+            graph: self,
+            direction,
+            files: self
+                .workspace
+                .repos
+                .iter()
+                .map(|r| Files::new(&r.root))
+                .collect(),
+            rows: Vec::new(),
+            ancestors: Vec::new(),
+            expanded: HashSet::new(),
+        };
+        // The borrowed link endpoints carry the same identity as the IaC node. Entering
+        // it uses the ordinary kind-directed traversal; omit the already-rendered root.
+        if let Some((&site, _)) = self
+            .into
+            .get_key_value(identity.as_str())
+            .or_else(|| self.out.get_key_value(identity.as_str()))
+        {
+            walk.enter(
+                site,
+                depth.saturating_sub(1),
+                Row::call(String::new(), repository, None),
+            );
+            walk.rows.remove(0);
+        }
+        if direction == Direction::Up {
+            return walk.rows;
+        }
+        for link in self
+            .provisions
+            .iter()
+            .filter(|l| l.provisioner == identity && l.root == node.root)
+        {
+            let id = link.side.as_str();
+            // The link is owned by this graph; find the same site in its borrowed exports.
+            let call = self.calls.get(id).copied();
+            let Some(site) = self
+                .exports
+                .iter()
+                .flat_map(crate::iac::provision::uses)
+                .map(|(site, _)| site)
+                .find(|s| *s == id)
+            else {
+                continue;
+            };
+            let (n, text) = match call {
+                Some(c) => (c.0, format!("{} {}", walk.site(c), walk.caller(c))),
+                None => walk.node(site),
+            };
+            let mut row = Row::call(
+                format!(
+                    "provisions {} [{}: {}] {text}",
+                    link.contract,
+                    link.level.name(),
+                    link.reason
+                ),
+                n,
+                Some(link.level),
+            );
+            row.link = true;
+            match call {
+                Some(c) => {
+                    walk.push(depth, row);
+                    walk.call_down(c, depth + 1, &mut HashSet::new());
+                }
+                None if self.ends(site) && self.into.get(site).is_none_or(Vec::is_empty) => {
+                    walk.push(depth, row)
+                }
+                None => walk.enter(site, depth, row),
+            }
+        }
+        for execution in self
+            .executions
+            .iter()
+            .filter(|x| x.workload == identity && x.root == node.root)
+        {
+            let Some(n) = self
+                .exports
+                .iter()
+                .position(|e| e.repository == execution.repository)
+            else {
+                continue;
+            };
+            let mut row = Row::call(
+                format!(
+                    "runs code {} {} [{}: {}]",
+                    execution.repository,
+                    execution.path,
+                    execution.level.name(),
+                    execution.reason
+                ),
+                n,
+                Some(execution.level),
+            );
+            row.link = true;
+            walk.push(depth, row);
+            if execution.level != Level::Ambiguous {
+                for entry in self.exports[n].entry_points.iter().filter(|e| {
+                    self.symbols
+                        .get(e.site.as_str())
+                        .is_some_and(|(_, s)| in_path(&s.span.path, &execution.path))
+                }) {
+                    let (n, text) = walk.node(&entry.site);
+                    walk.enter(
+                        &entry.site,
+                        depth + 1,
+                        Row::call(text, n, Some(execution.level)),
+                    );
+                }
+            }
+        }
+        walk.rows
+    }
+
     /// The starts `from` names: the providers of a route, else one symbol, else one call site.
     /// A name that fits several symbols or call sites lists them instead of guessing.
     fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
@@ -206,6 +369,14 @@ impl<'a> Graph<'a> {
             };
         }
         // A route is a whole contract (`GET /users` names one too), or a path on any method.
+        let mut sites: Vec<&str> = (contract::KINDS.iter())
+            .flat_map(|kind| kind.starts(from, &self.providers))
+            .collect();
+        sites.sort();
+        sites.dedup();
+        if !sites.is_empty() {
+            return Lookup::Nodes(sites);
+        }
         if let Some(kind) = contract::kind_of(from)
             && let Some((provider, consumer)) = kind.sides()
         {
@@ -216,13 +387,23 @@ impl<'a> Graph<'a> {
                 kind.prefix()
             )]);
         }
-        let mut sites: Vec<&str> = (contract::KINDS.iter())
-            .flat_map(|kind| kind.starts(from, &self.providers))
-            .collect();
-        sites.sort();
-        sites.dedup();
-        if !sites.is_empty() {
-            return Lookup::Nodes(sites);
+        let keys = config_starts(self.exports, from);
+        if !keys.is_empty() {
+            return Lookup::Nodes(keys);
+        }
+        if self.is_repo(from)
+            && self
+                .provisions
+                .iter()
+                .any(|l| crate::iac::provision::at_site(l, from))
+        {
+            let id = self
+                .workspace
+                .repos
+                .iter()
+                .find(|r| r.identity == from)
+                .unwrap();
+            return Lookup::Nodes(vec![&id.identity]);
         }
         let suffix = format!("::{from}");
         let fits = |id: &str| id == from || id.ends_with(&suffix);
@@ -246,9 +427,7 @@ impl<'a> Graph<'a> {
         calls.sort_by_key(|(_, c)| &c.id);
         match calls[..] {
             [call] => Lookup::Call(call),
-            [] => Lookup::Answer(vec![format!(
-                "no symbol, route or call site matches `{from}`"
-            )]),
+            [] => Lookup::Answer(vec![no_start(from)]),
             _ => {
                 let mut lines = vec![format!(
                     "`{from}` fits {} call sites; pass one of:",
@@ -312,8 +491,73 @@ impl<'a> Graph<'a> {
     /// Whether the chain ends at `id`, reached through a link: a whole repository, or a side
     /// only a document lists, since no code of it is indexed.
     fn ends(&self, id: &str) -> bool {
-        self.is_repo(id) || self.documented.contains_key(id)
+        self.is_repo(id)
+            || self.documented.contains_key(id)
+            || self.exports.iter().any(|e| {
+                e.config_uses.iter().any(|u| u.site == id)
+                    && !e.config_sites.iter().any(|s| s.id == id)
+            })
     }
+}
+
+/// The answer's line when `from` names no symbol, route or call site.
+pub(crate) fn no_start(from: &str) -> String {
+    format!("no symbol, route or call site matches `{from}`")
+}
+
+/// A key can carry declared sides, automatic uses, or both. An unqualified query keeps
+/// every visible repository's match, with each canonical key entering the trace once.
+fn config_starts<'a>(exports: &'a [Export], from: &str) -> Vec<&'a str> {
+    let declared = crate::config_values::sites::found(exports, from);
+    let uses = crate::iac::config_uses::found(exports, from);
+    let mut seen = HashSet::new();
+    declared
+        .into_iter()
+        .map(|(_, s)| s.id.as_str())
+        .chain(uses.into_iter().map(|(_, u)| u.site.as_str()))
+        .filter(|site| seen.insert(*site))
+        .collect()
+}
+
+fn in_path(file: &str, directory: &str) -> bool {
+    directory == "."
+        || file == directory
+        || file
+            .strip_prefix(directory)
+            .is_some_and(|s| s.starts_with('/'))
+}
+
+/// Read the entry points that workload execution can reach before constructing the graph.
+pub(crate) fn read_executions(partial: &mut Partial, links: &[Link]) -> Result<()> {
+    let executions = contract::KINDS
+        .iter()
+        .flat_map(|k| k.executions(&partial.exports, links))
+        .collect::<Vec<_>>();
+    let mut starts = Vec::new();
+    for execution in executions {
+        let Some(n) = partial
+            .exports
+            .iter()
+            .position(|e| e.repository == execution.repository)
+        else {
+            continue;
+        };
+        let sites = partial.exports[n]
+            .entry_points
+            .iter()
+            .map(|e| e.site.clone())
+            .collect::<Vec<_>>();
+        partial.symbols(Some(n), &sites)?;
+        starts.extend(
+            partial.exports[n]
+                .symbols
+                .iter()
+                .filter(|s| in_path(&s.span.path, &execution.path))
+                .map(|s| s.id.clone()),
+        );
+    }
+    read(partial, links, starts, Direction::Down, true)?;
+    Ok(())
 }
 
 /// The nodes `start` names, as `Graph::find` and `Graph::changed` find them, read into
@@ -347,9 +591,6 @@ pub(crate) fn starts(
             Direction::Up => Vec::new(),
         });
     }
-    if contract::kind_of(from).is_some_and(|kind| kind.sides().is_some()) {
-        return Ok(Vec::new());
-    }
     let providers: Vec<(&str, &str)> = (partial.exports.iter())
         .flat_map(|e| &e.providers)
         .map(|p| (p.contract.as_str(), p.site.as_str()))
@@ -360,6 +601,20 @@ pub(crate) fn starts(
         .collect();
     if !sites.is_empty() {
         return Ok(sites);
+    }
+    if contract::kind_of(from).is_some_and(|kind| kind.sides().is_some()) {
+        return Ok(Vec::new());
+    }
+    let keys = config_starts(&partial.exports, from);
+    if !keys.is_empty() {
+        return Ok(keys.into_iter().map(str::to_string).collect());
+    }
+    if partial.exports.iter().any(|e| e.repository == from)
+        && crate::iac::provision::links(&partial.exports)
+            .iter()
+            .any(|l| crate::iac::provision::at_site(l, from))
+    {
+        return Ok(vec![from.to_string()]);
     }
     let mut symbols = HashSet::new();
     for n in 0..partial.exports.len() {
@@ -401,6 +656,13 @@ pub(crate) fn read(
     direction: Direction,
     candidates: bool,
 ) -> Result<HashSet<String>> {
+    let receiving: HashSet<String> = partial
+        .exports
+        .iter()
+        .flat_map(|export| &export.consumers)
+        .filter(|consumer| contract::flows_to_consumer(consumer.contract.as_deref()))
+        .map(|consumer| consumer.site.clone())
+        .collect();
     let mut by_consumer: HashMap<&str, Vec<&Link>> = HashMap::new();
     let mut by_provider: HashMap<&str, Vec<&Link>> = HashMap::new();
     for l in links {
@@ -422,12 +684,18 @@ pub(crate) fn read(
             .collect();
         partial.symbols(None, &new)?;
         let sites = partial.calls(None, &new)?;
+        partial.callers_of(&sites)?;
         let mut next = Vec::new();
         for id in &new {
             across(id, &mut next);
         }
         match direction {
             Direction::Down => {
+                for (_, call) in &sites {
+                    if receiving.contains(&call.id) {
+                        next.push(call.caller.clone());
+                    }
+                }
                 let mut calls = sites;
                 calls.extend(partial.callees(None, &new)?);
                 for (_, c) in &calls {
@@ -436,6 +704,17 @@ pub(crate) fn read(
                 }
             }
             Direction::Up => {
+                // Provisioning sides at producing calls belong to their enclosing symbol.
+                for (_, call) in partial.callees(None, &new)? {
+                    next.extend(
+                        by_consumer
+                            .get(call.id.as_str())
+                            .into_iter()
+                            .flatten()
+                            .filter(|link| contract::flows_to_consumer(Some(&link.contract)))
+                            .map(|link| link.provider.clone()),
+                    );
+                }
                 let mut calls = sites;
                 calls.extend(partial.callers(None, &new, candidates)?);
                 next.extend(calls.into_iter().map(|(_, c)| c.caller));
@@ -503,6 +782,10 @@ impl<'a> Walk<'_, 'a> {
     /// A call site as the start: the call, then what it reaches or where it sits.
     fn root_call(&mut self, call: Call<'a>) {
         let text = format!("{} {}", self.site(call), callee(&call.1.id));
+        if self.direction == Direction::Down && self.graph.reader_call(&call.1.id).is_some() {
+            self.enter(&call.1.id, 0, Row::call(text, call.0, None));
+            return;
+        }
         self.push(0, Row::call(text, call.0, None));
         match self.direction {
             Direction::Down => self.call_down(call, 1, &mut HashSet::new()),
@@ -543,7 +826,7 @@ impl<'a> Walk<'_, 'a> {
         let mut shown = HashSet::new();
         match self.direction {
             Direction::Down => {
-                for &call in graph.callees.get(id).into_iter().flatten() {
+                for &call in graph.callees_at(id) {
                     self.call_down(call, depth + 1, &mut shown);
                 }
                 // A method of a declarative client is a consumer with no call of its own.
@@ -557,13 +840,35 @@ impl<'a> Walk<'_, 'a> {
                 {
                     let reader = link.consumer.as_str();
                     let ends = graph.ends(reader);
-                    if (ends || graph.symbols.contains_key(reader)) && shown.insert((reader, true))
+                    if (ends
+                        || graph
+                            .exports
+                            .iter()
+                            .any(|e| e.config_sites.iter().any(|s| s.id == reader))
+                        || graph.iac.contains_key(reader)
+                        || graph.symbols.contains_key(reader)
+                        || graph.reader_call(reader).is_some())
+                        && shown.insert((reader, true))
                     {
                         self.reach(reader, depth + 1, link);
                     }
                 }
             }
             Direction::Up => {
+                self.executors_up(id, depth + 1);
+                self.provisioners_up(id, depth + 1);
+                for &(_, c) in graph.callees.get(id).into_iter().flatten() {
+                    self.provisioners_up(&c.id, depth + 1);
+                    for link in graph
+                        .out
+                        .get(c.id.as_str())
+                        .into_iter()
+                        .flatten()
+                        .filter(|link| contract::flows_to_consumer(Some(&link.contract)))
+                    {
+                        self.writer_up(link, depth + 1, &mut shown);
+                    }
+                }
                 for &call @ (n, c) in graph.callers.get(id).into_iter().flatten() {
                     if !shown.insert((c.caller.as_str(), false)) {
                         continue;
@@ -594,26 +899,79 @@ impl<'a> Walk<'_, 'a> {
                 // repository-level writer ends the branch.
                 for link in (graph.out.get(id).into_iter().flatten()).filter(|l| !calls_on_link(l))
                 {
-                    let writer = link.provider.as_str();
-                    if let Some(&call @ (n, c)) = graph.calls.get(writer) {
-                        if shown.insert((c.caller.as_str(), true)) {
-                            let text = format!(
-                                "{} {} {}",
-                                arrow(link),
-                                self.site(call),
-                                self.caller(call)
-                            );
-                            self.enter(&c.caller, depth + 1, Row::link(text, n, link));
-                        }
-                        continue;
-                    }
-                    if shown.insert((writer, true)) {
-                        self.reach(writer, depth + 1, link);
-                    }
+                    self.writer_up(link, depth + 1, &mut shown);
                 }
             }
         }
         self.ancestors.pop();
+    }
+
+    fn writer_up(&mut self, link: &'a Link, depth: usize, shown: &mut HashSet<(&'a str, bool)>) {
+        let writer = link.provider.as_str();
+        if let Some(&call @ (n, c)) = self.graph.calls.get(writer) {
+            if shown.insert((c.caller.as_str(), true)) {
+                let text = format!("{} {} {}", arrow(link), self.site(call), self.caller(call));
+                self.enter(&c.caller, depth, Row::link(text, n, link));
+            }
+        } else if shown.insert((writer, true)) {
+            self.reach(writer, depth, link);
+        }
+    }
+
+    /// Upstream of a contract side is every root that provisions it.
+    fn provisioners_up(&mut self, site: &str, depth: usize) {
+        let graph = self.graph;
+        for link in graph
+            .provisions
+            .iter()
+            .filter(|l| crate::iac::provision::at_site(l, site))
+        {
+            if let Some((n, p)) = crate::iac::provision::target(graph.exports, link) {
+                let text = format!(
+                    "provisions {} [{}: {}] {}",
+                    link.contract,
+                    link.level.name(),
+                    link.reason,
+                    p.place(&graph.exports[n].repository)
+                );
+                let mut row = Row::call(text, n, Some(link.level));
+                row.link = true;
+                self.push(depth, row);
+            }
+        }
+    }
+
+    /// A code symbol is upstream of the workload that runs its repository or code directory.
+    fn executors_up(&mut self, id: &str, depth: usize) {
+        let graph = self.graph;
+        let Some(&(n, symbol)) = graph.symbols.get(id) else {
+            return;
+        };
+        for execution in graph.executions.iter().filter(|x| {
+            x.repository == graph.exports[n].repository && in_path(&symbol.span.path, &x.path)
+        }) {
+            for (m, export) in graph.exports.iter().enumerate() {
+                for node in &export.iac {
+                    if node.identity(&export.repository) == execution.workload
+                        && node.root == execution.root
+                    {
+                        let text = format!(
+                            "runs code [{}: {}] {} {}:{} {} (root {})",
+                            execution.level.name(),
+                            execution.reason,
+                            export.repository,
+                            node.path,
+                            node.line,
+                            node.address,
+                            node.root
+                        );
+                        let mut row = Row::call(text, m, Some(execution.level));
+                        row.link = true;
+                        self.push(depth, row);
+                    }
+                }
+            }
+        }
     }
 
     /// What one call reaches: its targets in its repository, and, when it consumes a
@@ -728,6 +1086,30 @@ impl<'a> Walk<'_, 'a> {
             Some((_, s)) => {
                 let at = self.files[n].at(&s.span.path, s.span.start);
                 format!("{identity} {at} {}", label(id))
+            }
+            None if graph.calls.contains_key(id) => {
+                let call = graph.calls[id];
+                format!("{} {}", self.site(call), self.caller(call))
+            }
+            None if graph.iac.contains_key(id) => {
+                let (_, node) = graph.iac[id];
+                format!("{identity} {}:{} {}", node.path, node.line, node.address)
+            }
+            None if graph.exports[n].config_sites.iter().any(|s| s.id == id) => {
+                let site = graph.exports[n]
+                    .config_sites
+                    .iter()
+                    .find(|s| s.id == id)
+                    .unwrap();
+                format!("{identity} {}", site.place())
+            }
+            None if graph.exports[n].config_uses.iter().any(|u| u.site == id) => {
+                let u = graph.exports[n]
+                    .config_uses
+                    .iter()
+                    .find(|u| u.site == id)
+                    .unwrap();
+                format!("{identity} use {} [{}]", u.place(), u.level.name())
             }
             None if graph.is_repo(id) => format!("{identity} {REPOSITORY_LEVEL}"),
             None => match document {
@@ -860,7 +1242,7 @@ impl<'a> Graph<'a> {
         let mut edges = Vec::new();
         self.sides_at(id, self.repo(id), &mut edges);
         let mut shown = HashSet::new();
-        for &call in self.callees.get(id).into_iter().flatten() {
+        for &call in self.callees_at(id) {
             self.call_edges(call, &mut shown, &mut edges);
         }
         // A method of a declarative client is a consumer with no call of its own.
@@ -871,7 +1253,9 @@ impl<'a> Graph<'a> {
         // the branch.
         for link in (self.into.get(id).into_iter().flatten()).filter(|l| !calls_on_link(l)) {
             let reader = link.consumer.as_str();
-            let reaches = self.ends(reader) || self.symbols.contains_key(reader);
+            let reaches = self.ends(reader)
+                || self.symbols.contains_key(reader)
+                || self.reader_call(reader).is_some();
             if reaches && shown.insert((reader, true)) {
                 edges.push(Edge::Link { to: reader, link });
             }
@@ -968,9 +1352,13 @@ impl<'a> Graph<'a> {
         at_definition: bool,
     ) -> Vec<(&'a Consumer, Vec<&'a Link>)> {
         let consumers = self.consumers.get(site).into_iter().flatten();
-        let consumers = consumers
-            .copied()
-            .filter(|c| !at_definition || contract::calls_from_definition(c.contract.as_deref()));
+        let consumers = consumers.copied().filter(|c| {
+            if at_definition {
+                contract::calls_from_definition(c.contract.as_deref())
+            } else {
+                !contract::flows_to_consumer(c.contract.as_deref())
+            }
+        });
         consumers
             .map(|consumer| {
                 let out = self.out.get(site).into_iter().flatten().copied();
@@ -1015,6 +1403,12 @@ impl<'a> Graph<'a> {
         let mut up: HashMap<&str, Vec<&str>> = HashMap::new();
         let nodes: HashSet<&str> = (self.symbols.keys().chain(self.callees.keys()))
             .copied()
+            .chain(
+                self.consumers
+                    .keys()
+                    .copied()
+                    .filter(|id| self.reader_call(id).is_some()),
+            )
             .collect();
         for from in nodes {
             for edge in self.edges(from) {
@@ -1024,7 +1418,15 @@ impl<'a> Graph<'a> {
             }
         }
         let mut reached = HashSet::from([id]);
-        let mut todo = vec![id];
+        reached.extend(
+            self.callees
+                .get(id)
+                .into_iter()
+                .flatten()
+                .filter(|(_, call)| self.reader_call(&call.id).is_some())
+                .map(|(_, call)| call.id.as_str()),
+        );
+        let mut todo: Vec<_> = reached.iter().copied().collect();
         while let Some(node) = todo.pop() {
             for &caller in up.get(node).into_iter().flatten() {
                 if reached.insert(caller) {

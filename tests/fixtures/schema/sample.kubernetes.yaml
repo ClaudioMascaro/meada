@@ -1,0 +1,43 @@
+# Kubernetes objects as the IaC nodes store them (#651): a document each, the address with its
+# group and namespace, the references by how an object names another, the images of a workload.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      serviceAccountName: runner
+      containers:
+        - name: main
+          image: ghcr.io/acme/web:1.0
+          env:
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef: {name: credentials, key: token}
+          envFrom:
+            - configMapRef:
+                name: settings
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector:
+    app: web
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: settings
+data:
+  QUEUE_URL: https://sqs.us-east-1.amazonaws.com/123456789012/orders
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: runner

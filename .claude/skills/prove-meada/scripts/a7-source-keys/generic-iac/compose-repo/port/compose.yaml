@@ -1,0 +1,17 @@
+services:
+  api:
+    image: ${REGISTRY:-docker.io}/proof-api:${TAG:-one}
+    build: ./src
+    depends_on: [store]
+    links: [store:db]
+    networks: [shared]
+  store:
+    image: redis:7
+    build: /proof-denied
+    networks: [shared]
+  cache:
+    image: alpine:3
+    build: https://example.invalid/source
+    networks: [shared]
+networks:
+  shared: {}

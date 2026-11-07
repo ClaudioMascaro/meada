@@ -391,12 +391,40 @@
   but a call (`self.http = http`, marked in `lang/python.rs`) is not read; a parameter given a
   client takes the base of every caller that passes one, and several different bases make it a
   hole.
+- `http/ts/clients.rs` (`joined`, #686): a first argument `new URL(reference, base)` of the global
+  `URL` (`Value::New` of `GLOBAL_URL`, so a file's own `URL` is left alone) is replaced by the
+  join of the two before the `fetch` is read, in the argument, through a constant and in a client
+  wrapper's call sites. The join is `http/join.rs`'s RFC 3986 resolver, which the WHATWG URL
+  Standard's constructor agrees with for the references it reads: a literal base with its scheme
+  and authority visible, and a reference that is absolute, `//host/x`, `/x` or relative (the
+  base's directory ends at its last `/`, so `orders` over `https://h/api` is `/orders`). Over a
+  base that is an environment read or a hole as its whole origin (`${API_URL}`, or followed by a
+  path) only an absolute-path reference is read, `opaque_lead`: `/orders` keeps the lead
+  (`http::GET::/orders`, `via env:API_URL`). Unknown, so unresolved: a relative reference or a
+  `//host/x` over an opaque base, a reference that starts with a read or a hole, a query or a
+  fragment alone (they keep a path the join does not place, even over a literal base), a base
+  with its authority half opaque (`https://${H}` is read; `${H}:8080` is not), a `..` that would
+  remove a segment holding a part that is not text, and a base or reference that is itself a
+  `new URL`. A parameter on either side is resolved at the call sites, where the pieces are
+  joined again. `.href`, `toString()` and `String(u)` of a two-argument `new URL` are not read.
 - Backstage proxy endpoints (#616, `http/ts/config.rs`): a `fetch` URL whose leading literal text
   is `/api/proxy/<ep>` (also what `getBaseUrl('proxy')` folds to), `<ep>` an endpoint of
   `proxy.endpoints` in the `app-config*.yaml` files (the lookup of the configuration reads
-  above), the longest matching endpoint, followed by `/`, `?`, `#` or the end of the URL. Only
-  the `target` form is read: the string shorthand (`'/ep': 'https://...'`) and a `|` in an
-  endpoint name are not. A target that is exactly `${VAR}` is the variable, one that is
+  above), the longest matching endpoint, followed by `/`, `?`, `#` or the end of the URL. With
+  no `proxy.endpoints.*` key in the flattened set of every file the endpoints are the keys of
+  `proxy` that start with `/` (Backstage's legacy shape, #690: `endpoints` wins when any file
+  has it, so a legacy key beside it is no endpoint); a string value is `{ target }` in either
+  shape (`config::expand`, before the flattening), and the options another file gives the same
+  endpoint apply to it. A `|` in an endpoint name is not read. An endpoint whose name has a `.`
+  and a key named `target` below it are told apart only by the `.target` suffix, so a string
+  endpoint named `/a.target` reads as the endpoint `/a`. A `proxy.endpoints`, a whole `proxy` or
+  a root behind an include that is not followed counts as the table, as an empty `endpoints`
+  object does, so it hides the legacy keys of every file and no endpoint is read from it (#709;
+  `meada status` names the include); an include whose `#` key path ends at a key alone absent
+  does not, since Backstage leaves that key out. An `$env` beside another key at one of
+  `TABLE_PATHS` (the root, `proxy`, `proxy.endpoints`) hides them too, and `meada status` names
+  nothing there. A target that is exactly `${VAR}` is
+  the variable, one that is
   a literal `http(s)://` URL is the host (a trailing `/` dropped, its path kept); any other
   target (`${VAR}/v2`, `${VAR:-default}`, a URL with a placeholder) leaves the URL as written, with a
   `client:` `via` the link's reason shows, and `meada status` names the endpoint and its calls.
@@ -417,3 +445,33 @@
   not exactly `${VAR}` (a literal, `${VAR:-default}`, text around the placeholder), a key no file
   holds and a read passed in from another file's wrapper leave the base unresolved. The pack reads the call by its member name alone, so the receiver is
   not checked: a `getString` of another library with a key a config holds reads the same.
+- Backstage `$include` and `$env` (#689, `http/ts/config/includes.rs`): an include nests at most
+  `DEPTH` (8) deep, one root follows at most `INCLUDES` (64) includes (every file it reaches
+  counted, refused ones past the path checks included) and grafts at most `GRAFTED_MAX`
+  (`lang::MAX_BYTES`, 1 MiB) of included files, each include counting its file again; the include
+  past a bound, a cycle (a file and key path whose children are being read), an absolute path, a
+  path that leaves the repository, a `${` in it, an extension other than `.json`, `.yaml` and `.yml`
+  (case-sensitive, as Backstage's), a symbolic link on the way, a file the walk does not see
+  (absent, ignored or hidden, all `missing`), a file past `lang::MAX_BYTES` or that does not
+  parse, a missing key path, a sibling key and a value that is not text are not followed: the
+  subtree is null, so a read under it stays a hole, and `meada status` names the include with its
+  reason. A root past `lang::MAX_BYTES` is dropped, and a root or a partial of more than one YAML
+  document is unreadable, as Backstage's `yaml.parse` refuses it (#709). A root that is one
+  `$include` is followed, as Backstage transforms the root too (#709). Not read at all, and not
+  named: an include inside a list (lists are not flattened), `$include` as the value an include
+  gives (Backstage does not apply it), `$env` beside another key (the object is unread) and
+  `$file` (its object stays as written, so no read reaches the file). The rows `meada status`
+  reads (`Role::Unfollowed`) have no code site and sit in the TS and JavaScript group's first
+  file, so a repository without TS or JavaScript files names none. Backstage roots no longer
+  drop a document holding Spring's profile keys (`spring.profiles`), which only `read_yaml` checks.
+  The cycle check compares a file and its key path with those whose children are being read
+  (#709): Backstage never transforms the value an include gives, only its children, so a file
+  that includes itself at the root, or another key path of itself, keeps the include as written,
+  and only a child that names one of them again is a `cycle`. A grafted root is flattened under
+  `spring::flatten`'s `YAML_KEY_BUDGET`
+  whole, so grafts that push its joined keys past it drop the root's keys, inline ones included,
+  with no status line. The includes refused before the count (absolute, outside, `${`, extension,
+  sibling, not a path) are each named, as many as the root writes (linear in its bytes). The graft
+  recurses, bounded by `DEPTH` + 1 documents of at most `MAX_NESTING` levels each. A partial whose
+  name ends with `tsconfig.json` joins the TS pack's configs and is read as a tsconfig too. The
+  index grafts every root on each freshness check (`packs_of`), and the extraction once more.

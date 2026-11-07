@@ -1,19 +1,93 @@
 # Test modules by subject
 
+- `custom_iac` (#671): source-authored whole 43-entry inventory, Strimzi identity, custom
+  group/kind paths, exact/prefix private modules and refresh, six registry resources/workloads,
+  Lambda source/package refusal, image/container environments, and Rabbit operator bindings
+  with real endpoint scopes, full deliveries/provisions and bidirectional traces. Type-table
+  census tests cover every provisioning/module/topology row; `package::hostile` has a focused
+  custom-topology fan-out row, and Channel tests repeated-hash routing without expansion.
 - `src/package/hostile.rs` (unit, `cfg(test)`): the table `probes` of the readers of manifests and
   configurations, a row each for `package.json`, `tsconfig.json`, `pyproject.toml`,
   `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, Gradle builds, `gradle.properties` and
   version catalogs (also `Maven::inherit` over many builds), `.csproj` and
   `Directory.Build.props` (also `Nuget::inherit`), `msbuild::read` and `props`, Spring's
-  `application.properties` and `.yml` (also placeholders) and `appsettings.json`, and the walks
+  `application.properties` and `.yml` (also placeholders), `appsettings.json`, the YAML and JSON
+  event reader (`document::events::read`: many documents, deep and wide, aliases fanning out and
+  nesting one level deeper each, JSON deep and wide and past `serde_json`'s limit), the config
+  values a file stores (`config_values::read`: long keys nested deep, many scalars, secrets in
+  many documents, and eight rows of Terraform: long labels nested deep, many attributes, many
+  blocks, deep brackets, a long heredoc, a heredoc of interpolations, a long expression, many
+  tfvars), the IaC nodes one root stores (`iac::evaluate`, #649: a chain of resources, locals
+  naming each other twice, every resource naming a wide local, a module calling itself, wide
+  counts; #650's evaluator: a list doubled by locals under a `for_each`, a `for` in a `for` in a
+  `for` over a wide list, names through cyclic locals, modules nested past the ceiling each
+  passing a name down), and the walks
   `Maven::entries` and `Nuget::entries` over modules and projects that pass on to each other.
   Each row builds a file within `lang::MAX_BYTES` (many keys, deep nesting, wide fan-out), reads
-  it on a thread of its own and answers the size of what came back; the test holds every row to
-  30 s and four times `MAX_BYTES`, and names the rows that missed. A new reader adds its row.
-- Test modules of `tests/it/` by subject: `decorations` (the `decorations` fixture: Java, Kotlin, C#,
+  it on a pool of one thread per core and answers the size of what came back; the test holds
+  every row to 30 s from its own start and four times `MAX_BYTES`, and names the rows that missed.
+  A new reader adds its row.
+- Test modules of `tests/it/` by subject: `config_values` (#639, the `config-values` fixture:
+  Helm values with #638's alert labels, a multi-document Kubernetes file with a `Secret`, a
+  workflow under `.github/`, a lockfile, a Helm template that does not parse, a hidden `.vscode/`
+  and a `.meadaignore`d directory, and #640's `terraform-values`: a `.tf` file with OpsGenie
+  routing rules and an SQS queue, a `.tf.json` file, a `.tofu` file shadowing a `.tf` one, a
+  `broken.tf`, a sensitive variable given values by `terraform.tfvars` and `envs/prd.tfvars`, and
+  a hidden `.terraform/`, against `terraform-values.search.txt` and `terraform-values.status.txt`,
+  and a `.tf` edit that makes a `.tfvars` value redacted or shown; `search` kind `value` against
+  `config-values.search.txt`, `meada status` against `config-values.status.txt`, the default
+  search's fallback, and no value in the export nor a secret in the index file; `freshness` edits
+  a config file alone, and `oidc` scopes the values by the grant), `iac` (#649, the
+  `terraform-nodes` fixture: a root `envs/prod` with resources, a data block, a `count`, a
+  `for_each` and a registry module, calling `modules/queue` twice and `modules/worker` with an
+  output of the first, and a root `envs/stage` calling `modules/queue` once: `search` kind `iac`,
+  `context` and `trace` both ways against `terraform-nodes.{search,context,trace}.txt`, the default
+  search leaving nodes out, an edited, added and deleted `.tf` file equal to a cold index, and a
+  row rewritten by hand surviving a refresh no Terraform file changed in, and no node in the
+  export; #650's `terraform-names` fixture, a root `envs/prod` naming its nodes from locals,
+  variables, `terraform.tfvars`, `regions.auto.tfvars`, functions, a `for_each` over a literal
+  set and one over a variable, a local module's input and output, `terraform.workspace`, a data
+  source and a registry module, and a root `envs/stage` calling the same module: `search` and
+  `context` against `terraform-names.{search,context}.txt`, and a changed var file evaluating
+  its root again while a row rewritten by hand in the other root survives), `crossplane` (#655,
+  the `crossplane-nodes` fixture: two XRDs, a composition of four resources, a pipeline
+  composition, a claim beside them and one away from them, a composite resource and a managed
+  resource beside its CRD: `search` kind `iac`, `context` and `trace` against
+  `crossplane-nodes.{search,context,trace}.txt`, a patch added and an XRD deleted changing names
+  and roles at the next query, and no object in the export; the unit tests of
+  `kube::crossplane` for roles, references, patches, pipelines and `COMPOSED_MAX`),
+  `kubernetes` (#651,
+  the `kubernetes-nodes` fixture: a base with a Deployment, a Service, a ConfigMap and a Secret
+  in one file of two documents, an Ingress and a ServiceAccount, overlays `dev` (namespace,
+  prefix, image tag) and `prod` (namespace, suffix, renamed image, a remote base), plain
+  manifests in `raw/` (three documents in a file, a JSON Job) and a Helm template: `search` kind
+  `iac`, `context` and `trace` against `kubernetes-nodes.{search,context,trace}.txt`, `meada
+  status` counting the entries not followed (a symlinked base and one above the root included),
+  no object in the export, an edited, added and deleted manifest or kustomization equal to a
+  cold index, a row rewritten by hand surviving a refresh no manifest changed in, and a Terraform
+  root and a Kubernetes unit of one directory each keeping their rows when the other changes),
+  `compose` (#652, the `compose-nodes` fixture: a project with an override file, `search` kind
+  `iac`, `context` and `trace` against `compose-nodes.{search,context,trace}.txt`, and an edited
+  then deleted override equal to a cold index; the unit tests of `iac::compose` for variable
+  expansion, merge keys and the ceilings),
+  `cloudformation` (#653, in `iac`: the `cloudformation-nodes` fixture, a SAM application, a plain
+  template with parameters, a JSON template and a file that is no template; `search` kind `iac`,
+  `context` and `trace` against `cloudformation-nodes.{search,context,trace}.txt`, a `NoEcho`
+  default redacted, a changed, added, deleted and no-longer-template file equal to a cold index,
+  a row rewritten by hand surviving the edit of another template, and template and Kubernetes
+  nodes keeping each other's rows; the unit tests of `iac::cloudformation` for the intrinsic
+  functions and the ceilings, those of `document::events` for the tagged reading),
+  `serverless` (#654, in `iac`: the `serverless-nodes` fixture, two services and a
+  `serverless.yml` with no `service`; `search` kind `iac`, `context` and `trace` against
+  `serverless-nodes.{search,context,trace}.txt`, a changed, no-longer-service and deleted file
+  equal to a cold index, a row rewritten by hand surviving the edit of another service, and the
+  size ceiling; the unit tests of `iac::serverless` for the variable sources, `opt:` defaults,
+  events and the ceilings),
+  `decorations` (the `decorations` fixture: Java, Kotlin, C#,
   Python and Rust calls that decorate a definition carry `CallSite::decorates`, ordinary calls do
   not, and `context` lists them under `annotations:`), `docs` (the repository map against the code:
-  `ponytail:` limits in `ceilings.md`, entry point kinds and process marks in their lists, a line
+  `ponytail:` limits in `ceilings.md`, rejection of `shortcut:` in Rust comments under `src/` and
+  `meada-core/src/`, entry point kinds and process marks in their lists, a line
   per module naming its area file, each `docs/agents` Markdown file staying within its
   [documented byte budget](../../ceilings/server-accounts-workspaces-and-deploy.md), with the
   splitter's command in its failure, and every relative link of those files resolving; the splitter,
@@ -350,3 +424,62 @@
   schema-to-shape reader (`schema.rs`) and the YAML reader are unit tests in `src/document/`,
   with the hostile inputs each limit stops (server variables naming each other, 200,000 nested
   block sequences, a 10,000-long reference chain, one wide schema read for many routes).
+
+- `provision` also covers orphan reporting (#657) over `orphan-app` and `orphan-infra`:
+  complete status output in mixed and one-sided scopes, search/context side markers,
+  broker/resource-kind isolation, unresolved sides, same-repository uses, pattern matching,
+  independent roots and a changed IaC name. `orphan*.status.txt` and `orphan*.context.txt`
+  hold the whole answers.
+
+- `aws_sdk` (#660): the `aws-sdk-{java,go,csharp,batches,origins,alias-env}` fixtures prove SDK
+  constructor evidence, exact and opaque factory alternatives, hidden constructors and
+  constructor-scoped fields, named arguments, hidden standard-collection heads, request alias
+  writes, batch names, ARN normalization and aliased environment
+  provenance through the engine export. Sibling Go/.NET repositories assert the whole set of
+  data/provisioning links and exact versus declared evidence, and reject unresolved links.
+  Generated full-file-ceiling Java/Go/C# factory lattices must retain both uses within 30 s.
+
+- `images.rs` (#662): image normalization and builders/runners across sibling repositories,
+  Compose and Helm evidence, Kustomize image overrides, direct code paths without images,
+  trace in both directions, scope-aware orphans, segment-bounded patterns, ambiguous image
+  open items, safe-path and symlink refresh, plus export/context/trace goldens. The
+  `image-evaluation-roots` fixture preserves identical-image runners in two overlays and
+  collapses repeated evidence in one root after refresh.
+
+- `gcp.rs` (#667): sibling GCP infrastructure/app fixtures cover complete provisioners and
+  config uses, disjoint Pub/Sub subscriptions and filtered delivery, instance-qualified SQL
+  databases with default provenance, Cloud Run v1/v2 service and job image/environment scope,
+  unknown/secret/wrong-kind targets, ambiguous builders, refresh and scope-aware orphans.
+  Export/context/trace/status goldens retain complete answers; unknown environment fan-out
+  stays within the existing time and stored-byte ceilings.
+
+- `resources.rs` (#641): sibling `resource-via-app` and `resource-via-infra` fixtures place
+  declarations at indexed IaC addresses and exact keys, including nested/quoted selectors and
+  document indexes. Whole exported side/node/link sets cover all IaC formats, template
+  qualification, instance keys containing `#`, stale/missing/ambiguous locations, secret/cut
+  selector guards and ignored/out-of-repository paths. Context, both trace directions,
+  removal/restoration and read-only server manifest scope use the Engine seam and goldens.
+  Controls reject null/empty locations and HCL expression/template selector equality, retain
+  inferred matches alongside declared keys across repositories, and continue read-write keys.
+
+- `alerts.rs` (#672): alert labels and Alertmanager routes over sibling `alert-monitoring` and
+  `alert-app` fixtures, equality and regex levels, conjunctions, receiver context, bidirectional
+  traces, Helm negatives and scope-aware orphan refresh, with complete export goldens.
+
+- `patterns.rs` (#674): sibling `pattern-infra`/`pattern-app` fixtures cover channel and
+  resource anchors, ambiguous literal names, short/interior and pattern-to-pattern negatives,
+  export/context/trace goldens, both provisioning orientations, real human CLI decisions,
+  independent roots and target/source staleness. Image builder-pattern choices complement
+  `images.rs`'s runner patterns. Literal asterisks, retained runner decisions after a builder
+  choice and overlapping literal/pattern providers are controls;
+  partial/full items preserve SDK source locations. Config-key choices retain indexed locations
+  through human replay; redacted keys, cut values and ordinary keys sharing a JSON line with a
+  Secret keep their payloads out of items and CLI model previews. Query growth cases list 2,000 runner
+  names, 5,000 provisioner names and 10,000 selector-resolved config-key sources with two fixed
+  provisioners under a time bound. The latter asserts the complete source and candidate sets.
+  `iac::pattern` unit tests cross each
+  named matcher limit.
+
+- `tests/it/aws_workloads.rs`: Lambda/SAM/Serverless/ECS image/direct execution and scoped
+  environments, typed identities, all curated CFN aliases, JSON encoders, unknown overrides,
+  path-only refresh/refusals, archive opacity, ambiguity and expansion bounds (#664).

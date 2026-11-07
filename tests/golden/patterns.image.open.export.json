@@ -1,0 +1,35 @@
+{
+  "format": 1,
+  "repository": "example.com/pattern/app",
+  "commit": "d9c4c26158d049ee0d9a56098f92855bff5923e3",
+  "dirty": true,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "image::ghcr.io/pattern/orders-*",
+      "site": "example.com/pattern/app",
+      "at": ".github/workflows/build.yml#jobs.image.steps[0].with.tags"
+    }
+  ],
+  "consumers": [],
+  "links": [
+    {
+      "consumer": "example.com/pattern/infra::compose.yaml::services.east",
+      "provider": "example.com/pattern/app",
+      "contract": "image::ghcr.io/pattern/orders-east",
+      "level": "ambiguous",
+      "reason": "image::ghcr.io/pattern/orders-east; .github/workflows/build.yml#jobs.image.steps[0].with.tags; pattern image::ghcr.io/pattern/orders-* on image::ghcr.io/pattern/orders-east; multiple literal runner names",
+      "root": "."
+    },
+    {
+      "consumer": "example.com/pattern/infra::compose.yaml::services.west",
+      "provider": "example.com/pattern/app",
+      "contract": "image::ghcr.io/pattern/orders-west",
+      "level": "ambiguous",
+      "reason": "image::ghcr.io/pattern/orders-west; .github/workflows/build.yml#jobs.image.steps[0].with.tags; pattern image::ghcr.io/pattern/orders-* on image::ghcr.io/pattern/orders-west; multiple literal runner names",
+      "root": "."
+    }
+  ]
+}

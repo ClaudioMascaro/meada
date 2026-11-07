@@ -32,12 +32,14 @@ Un recurso compartido que ningún código nombra, como una tabla o un bucket, en
 kind = "postgres"                        # identificador en minúsculas
 id = "orders"
 role = "write"                           # read, write o read-write
-via = ["src/orders.ts::cancelOrder"]     # opcional: los símbolos que hacen el acceso
+via = ["src/orders.ts::cancelOrder"]     # opcional: las ubicaciones que hacen el acceso
 ```
 
 Cada escritor enlaza con cada lector del mismo recurso en otro repositorio, en el nivel
-`declared`. Sin `via`, o si ningún `via` corresponde a un símbolo, el lado es el repositorio
+`declared`. Sin `via`, o si ningún `via` corresponde a un símbolo, nodo IaC o clave, el lado es el repositorio
 entero.
+
+Los SDK AWS de Java 2.x, Go v2 y .NET también nombran recursos directamente desde el código: por ejemplo, `PutObject` en `uploads` escribe `resource::s3::uploads`, y `GetObject` en ese bucket lee el mismo contrato. Los usos escritos enlazan en `exact`; una declaración explícita conserva `declared`. Un bloque Terraform `aws_s3_bucket` del mismo nombre enlaza a todos estos usos como aprovisionador. No hace falta repetir los usos como `[[resource]]`. Construya el cliente en código o páselo mediante llamadas exactas; el tipo de una interfaz inyectada por sí solo no basta. Los nombres del entorno quedan sin resolver, con la variable en el export. Consulte las [operaciones reconocidas](capabilities.md#sdk-aws-en-java-go-y-c).
 
 Una ruta que solo registra un archivo de prueba (`*_test.go`, `*.test.*`, `*.spec.*`,
 `test_*.py`, `*_test.py`, un directorio `tests` o `__tests__`, `src/test` en JVM) no es
@@ -93,3 +95,63 @@ Migrations/
 ```
 
 Un archivo que un nuevo valor por defecto o una nueva entrada excluye sale del índice en el siguiente refresh, como un archivo borrado.
+
+## Ubicaciones de recursos declarados
+
+El `via` de `[[resource]]` acepta símbolos (`src/orders.ts::cancelOrder`), direcciones IaC y
+`<archivo>#<ruta de clave>`. El lado pertenece al bloque o la clave, accesible por `context` y
+`trace`, y sus enlaces siguen siendo `declared`. Las direcciones incluyen Terraform/OpenTofu
+(`aws_sqs_queue.orders`), Kubernetes/Crossplane (`Deployment.apps/shop/api`), Compose
+(`services.api`), CloudFormation/SAM (`template.yaml::Orders`) y Serverless
+(`serverless.yml::functions.api`). Use `<archivo>::<dirección>` para distinguir archivos. La ubicación identifica el bloque de
+origen; el calificador ` (root ...)` de consultas IaC no es una forma de `via`.
+Una dirección que coincide con varios bloques de origen necesita el calificador de archivo;
+sin él, el `via` está obsoleto.
+
+Las rutas usan puntos, índices (`groups[0].name`) y claves entre comillas JSON
+(`metadata.labels["app.kubernetes.io/name"]`). En listas, `[clave=valor]` selecciona elementos
+por igualdad del valor completo, por ejemplo
+`values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support`.
+La ubicación procede de valores indexados y sus rutas padre.
+Los valores nulos y contenedores vacíos no tienen valor indexado; su `via` está obsoleto.
+Un selector puede encontrar varios elementos; cada clave encontrada recibe un lado. Los
+valores marcados como `redacted` o recortados no sirven para seleccionar elementos. Las expresiones
+y plantillas HCL no satisfacen la igualdad de un selector. Los archivos siguen
+las reglas del índice, incluido `.meadaignore`; un `via` no abre archivos por su cuenta.
+
+Un `via` sin coincidencia está obsoleto y aparece en las líneas existentes de `meada status`.
+Sin ningún `via` válido, el lado vuelve al repositorio completo. Esto conecta etiquetas en
+valores Helm con reglas de enrutamiento mediante declaraciones sin renderizar plantillas.
+
+```toml
+[[resource]]
+kind = "routing"
+id = "team-b"
+role = "write"
+via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
+```
+
+
+## Mapeos privados de IaC
+
+Asigne una fuente de módulo o un grupo/tipo personalizado a una entrada existente de la tabla de tipos. `entry` usa `<formato>:<tipo>`, por ejemplo `terraform:aws_sqs_queue`. El ejemplo lee el nombre del argumento declarado por el módulo o del campo del objeto:
+
+```toml
+[[iac.module]]
+source_prefix = "git::https://example.com/platform/modules"
+entry = "terraform:aws_sqs_queue"
+input = "queue_name"
+
+[[iac.module]]
+source = "git::https://example.com/platform/modules/priority"
+entry = "terraform:aws_sns_topic"
+input = "settings.topic"
+
+[[iac.custom_resource]]
+group = "platform.example.com"
+kind = "MessageQueue"
+entry = "terraform:aws_sqs_queue"
+key_path = "spec.endpoints[0].name"
+```
+
+Cada `[[iac.module]]` elige exactamente uno entre `source` y `source_prefix`. Gana una fuente exacta; después gana el prefijo más largo, limitado a una frontera `/` o `?`, sin capturar un vecino como `modules-other`. `input` admite puntos, índices y claves entre comillas JSON, sin selectores. `[[iac.custom_resource]]` requiere `group`, `kind`, `entry` y `key_path`, con la misma sintaxis. Los mapeos de módulo también pueden seleccionar `terraform:aws_lambda_function` o `terraform:aws_ecs_task_definition`, con las entradas Lambda/ECS documentadas en capacidades; otros workloads se rechazan. Los recursos personalizados seleccionan entradas de provisionamiento. El valor debe aportar la identidad requerida por la entrada, incluidos calificadores. Una entrada desconocida causa error que cita su nombre y `meada.toml`. Hay como máximo 256 mapeos, con textos y rutas de hasta 1 KiB. La configuración participa en el índice: cambiar o quitar el mapeo recalcula los nodos afectados. Ningún módulo se descarga ni se ejecuta.

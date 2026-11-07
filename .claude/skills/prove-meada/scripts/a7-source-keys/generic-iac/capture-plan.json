@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "status": "SOURCE_KEY_READY_NOT_RUNTIME_PROOF",
+  "scope_count": 6,
+  "scopes": [
+    {
+      "name": "generic-boutique",
+      "entry": "boutique",
+      "expected_keys": [
+        "kubernetes-kustomize.expected.json"
+      ],
+      "queries": "boutique.queries.jsonl",
+      "query_count": 841,
+      "expected_nodes": 283,
+      "expected_reference_groups": 147,
+      "lifecycle": null
+    },
+    {
+      "name": "generic-kube-prometheus",
+      "entry": "kube-prometheus",
+      "expected_keys": [
+        "kubernetes-kustomize.expected.json"
+      ],
+      "queries": "kube-prometheus.queries.jsonl",
+      "query_count": 363,
+      "expected_nodes": 114,
+      "expected_reference_groups": 20,
+      "lifecycle": null
+    },
+    {
+      "name": "generic-crossplane-aws",
+      "entry": "crossplane-aws",
+      "expected_keys": [
+        "crossplane.expected.json"
+      ],
+      "queries": "crossplane-aws.queries.jsonl",
+      "query_count": 41,
+      "expected_nodes": 10,
+      "expected_reference_groups": 1,
+      "lifecycle": null
+    },
+    {
+      "name": "generic-kube-controls",
+      "source": "kube-repo",
+      "source_identity": "kube-repo-identity.json",
+      "expected_keys": [
+        "kubernetes-kustomize.expected.json",
+        "crossplane.expected.json"
+      ],
+      "queries": "a7-generic-kube-source-key.queries.jsonl",
+      "query_count": 180,
+      "expected_nodes": 34,
+      "expected_reference_groups": 31,
+      "lifecycle": "neutral-kube-lifecycle.json"
+    },
+    {
+      "name": "generic-compose-controls",
+      "source": "compose-repo",
+      "source_identity": "compose-repo-identity.json",
+      "expected_keys": [
+        "compose.expected.json"
+      ],
+      "queries": "compose.jsonl",
+      "query_count": 41,
+      "expected_nodes": 10,
+      "expected_reference_groups": 20,
+      "lifecycle": "compose.expected.json#source_edits"
+    },
+    {
+      "name": "serverless-nodes",
+      "entry": "a7-sls",
+      "expected_keys": [
+        "../serverless-expected.json"
+      ],
+      "queries": "../serverless.jsonl",
+      "query_count": 43,
+      "expected_nodes": 9,
+      "expected_reference_groups": 2,
+      "lifecycle": "../serverless-expected.json#source_edits"
+    }
+  ],
+  "total_expected_source_nodes": 460,
+  "total_expected_reference_groups": 221,
+  "total_baseline_queries": 1509,
+  "source_hashes": "source-sha256.json",
+  "query_scope_rule": "Run each exact per-source query file only against the source/entry in that row. The requested per-format aggregate .jsonl files concatenate several repository scopes and are source-key indexes only; do not pass them to a single capture invocation. queries.jsonl is the neutral kube/crossplane scope only.",
+  "neutral_git_rule": "Initialize from the frozen tracked files and symlinks with the identity JSON origin/fixed_git/commit_message, excluding .git from any tracked product files. Require the expected input commit and byte hashes.",
+  "public_source_rule": "The helper fetches the unchanged exact public infra pins. Retained local source/ bytes, complete Git trees and per-blob SHA1/SHA256 permit independent review; they need not be vendored into tracked product files. Artifact inputs from public CI must match these same immutable hashes.",
+  "capture_rule": "Use only existing bounded public CI capture helper, full CLI status/export, all source-selected context/search/up/down trace results and same-scope HTTP byte parity. CAPTURED is not acceptance.",
+  "runtime_verdict": "UNPROVEN"
+}

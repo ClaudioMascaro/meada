@@ -637,6 +637,149 @@ mod tests {
         assert_eq!(requests(&control), []);
     }
 
+    /// A field holds the environment read every composite literal that sets it gives it (a
+    /// literal sets the fields it names, https://go.dev/ref/spec#Composite_literals), a
+    /// constructor's parameter through every exact caller; an assignment to a selector writes the
+    /// field (https://go.dev/ref/spec#Assignment_statements), and the field is then unknown.
+    #[test]
+    fn a_field_holds_the_environment_read_every_literal_gives_it() {
+        let head = "package x\n\nimport (\n\t\"net/http\"\n\t\"os\"\n\t\"strings\"\n)\n\n\
+            type C struct{ base string }\n\n\
+            func (c *C) send(method, path string) { http.NewRequest(method, c.base+path, nil) }\n\
+            func (c *C) Direct() { http.Get(c.base + \"/orders\") }\n\
+            func (c *C) Orders() { c.send(\"GET\", \"/orders\") }\n";
+        let vias = |rest: &str| -> Vec<Option<String>> {
+            let found = requests(&format!("{head}{rest}"));
+            found.into_iter().map(|(_, via)| via).collect()
+        };
+        let read = Some("env:API_URL".to_string());
+        let new = "func New(base string) *C { return &C{base: base} }\n";
+        let getenv =
+            "func A() *C { return New(strings.TrimRight(os.Getenv(\"API_URL\"), \"/\")) }\n";
+        // Directly, and through a constructor whose every caller passes the read.
+        let direct = "func A() *C { return &C{base: os.Getenv(\"API_URL\")} }\n";
+        assert_eq!(vias(direct), [read.clone(), read.clone()]);
+        let both = format!("{new}{getenv}func B() *C {{ return New(os.Getenv(\"API_URL\")) }}\n");
+        assert_eq!(vias(&both), [read.clone(), read.clone()]);
+        // A constructor of a constructor.
+        let outer = format!(
+            "{new}func Outer(b string) *C {{ return New(b) }}\n\
+             func A() *C {{ return Outer(os.Getenv(\"API_URL\")) }}\n"
+        );
+        assert_eq!(vias(&outer), [read.clone(), read.clone()]);
+        // The control of the name match below: an exact call of a constructor method.
+        let exact = "type F struct{}\nfunc (f *F) Make(b string) *C { return &C{base: b} }\n\
+             func A() *C { f := &F{}; return f.Make(os.Getenv(\"API_URL\")) }\n";
+        assert_eq!(vias(exact), [read.clone(), read.clone()]);
+        let unknown = vec![None, None];
+        for rest in [
+            // Two literals, or two callers, give different reads.
+            format!("{direct}func B() *C {{ return &C{{base: os.Getenv(\"OTHER_URL\")}} }}\n"),
+            format!("{new}{getenv}func B() *C {{ return New(os.Getenv(\"OTHER_URL\")) }}\n"),
+            // A literal by position.
+            "func A() C { return C{os.Getenv(\"API_URL\")} }\n".to_string(),
+            format!("{direct}func B() C {{ return C{{os.Getenv(\"API_URL\")}} }}\n"),
+            // A literal of a type the source does not tell is the struct's (an alias).
+            format!("{direct}type B = C\nvar b = B{{base: os.Getenv(\"API_URL\")}}\n"),
+            // No literal sets the field.
+            String::new(),
+            // A write through a selector anywhere.
+            format!("{direct}func (c *C) Set(b string) {{ c.base = b }}\n"),
+            // A constructor with no caller, or one a name match alone reaches.
+            new.to_string(),
+            "type F struct{}\nfunc (f *F) Make(b string) *C { return &C{base: b} }\n\
+             func A(x interface{ Make(string) *C }) *C { return x.Make(os.Getenv(\"API_URL\")) }\n"
+                .to_string(),
+            // A literal string, or a read with more around it.
+            "func A() *C { return &C{base: \"http://localhost:3000\"} }\n".to_string(),
+            "func A() *C { return &C{base: os.Getenv(\"API_URL\") + \"/v1\"} }\n".to_string(),
+            format!("{new}{getenv}func B() *C {{ return New(\"http://localhost:3000\") }}\n"),
+            // A constructor that calls itself.
+            "func New(b string) *C { New(b); return &C{base: b} }\n".to_string(),
+            // Two fields set from each other.
+            "type D struct{ base string }\n\
+             func A(d *D) *C { return &C{base: d.base} }\n\
+             func B(c *C) *D { return &D{base: c.base} }\n"
+                .to_string(),
+        ] {
+            assert_eq!(vias(&rest), unknown, "{rest}");
+        }
+    }
+
+    /// `T0.c` holds what `m0` gives it from `T1.c`, and so on to `Tn.c`, which a literal sets to
+    /// a read; `reads` methods read `T0.c`.
+    fn read_through_fields(n: usize, reads: usize) -> Vec<Request> {
+        let mut src = "package x\n\nimport (\n\t\"net/http\"\n\t\"os\"\n)\n".to_string();
+        for j in 0..reads {
+            src += &format!("\nfunc (t *T0) Get{j}() {{ http.Get(t.c + \"/s\") }}\n");
+        }
+        for i in 0..=n {
+            src += &format!("\ntype T{i} struct {{ c string }}\n");
+            src += &match i < n {
+                true => format!(
+                    "func m{i}(t *T{}) *T{i} {{ return &T{i}{{c: t.c}} }}\n",
+                    i + 1
+                ),
+                false => {
+                    format!("func m{i}() *T{i} {{ return &T{i}{{c: os.Getenv(\"API_URL\")}} }}\n")
+                }
+            };
+        }
+        requests(&src)
+    }
+
+    #[test]
+    fn a_field_read_through_fields_past_the_limit_is_unknown() {
+        let read = |n| read_through_fields(n, 1).pop().unwrap().1;
+        assert_eq!(read(3).as_deref(), Some("env:API_URL"));
+        assert_eq!(
+            read(crate::resolve::FIELD_DEPTH - 1).as_deref(),
+            Some("env:API_URL")
+        );
+        assert_eq!(read(crate::resolve::FIELD_DEPTH), None);
+    }
+
+    /// Each field is folded once: many reads of a field held through a chain of fields stay
+    /// within the file's budget.
+    #[test]
+    fn a_field_many_methods_read_is_folded_once() {
+        let found = read_through_fields(crate::resolve::FIELD_DEPTH - 1, 2000);
+        assert_eq!(found.len(), 2000);
+        assert!(
+            found
+                .iter()
+                .all(|(_, via)| via.as_deref() == Some("env:API_URL"))
+        );
+    }
+
+    /// A lattice of constructors, each calling the next twice, ends within the file's budget:
+    /// every path up the callers is climbed (as `Code::expand` climbs a wrapper's), each climb
+    /// charged, so 2^40 paths stop at the budget and leave the field unknown.
+    #[test]
+    fn a_field_through_a_lattice_of_constructors_ends_in_bounded_time() {
+        let lattice = |n: usize| {
+            let mut src = "package x\n\nimport (\n\t\"net/http\"\n\t\"os\"\n)\n\n\
+                type C struct{ base string }\n\n\
+                func (c *C) Get() { http.Get(c.base + \"/s\") }\n\n\
+                func N0(b string) *C { return &C{base: b} }\n"
+                .to_string();
+            for i in 1..=n {
+                let p = i - 1;
+                src += &format!("func N{i}(b string) *C {{ N{p}(b); return N{p}(b) }}\n");
+            }
+            src += &format!("func Main() *C {{ return N{n}(os.Getenv(\"API_URL\")) }}\n");
+            let at = std::time::Instant::now();
+            let found = requests(&src);
+            (found, at.elapsed())
+        };
+        let (found, _) = lattice(3);
+        assert_eq!(found, sent(Some("env:API_URL")));
+        let (found, took) = lattice(40);
+        assert_eq!(found, sent(None));
+        // Measured at about 0.6 s in a local debug build.
+        assert!(took < std::time::Duration::from_secs(15), "{took:?}");
+    }
+
     #[test]
     fn a_request_field_written_through_a_selector_is_no_consumer() {
         // The ceiling of #621: the field's declared type is not read.

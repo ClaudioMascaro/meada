@@ -1,0 +1,51 @@
+# A8 peer workspace cases (spec #683, ticket #684), read by a8-peers.sh. Tab-separated:
+# workspace, consumer function (the third part of its site), field (contract or via), answer
+# key, state, link, what 1.2.0 prints, case. State: control (the answer key and the base
+# binary), landed (the spec), pending (the spec once its A8 ticket lands; until then it must read
+# as the 1.2.0 column and does not count). Link: - when #683 names none, else the one link the
+# consumer must have: provider repository, level (* any), then text its reason must hold.
+# The ticket that lands a flow turns its rows from pending to landed in the same PR.
+g8	ordersTpl	contract	http::GET::/orders	control	-	http::GET::/orders	control: template string
+g8	ordersUrl	contract	http::GET::/orders	landed	-	null	new URL + searchParams + toString()
+g8	ordersUrlEnv	contract	http::GET::/orders	landed	-	null	new URL(env) + toString()
+g8	ordersUrlEnv	via	env:API_URL	landed	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	new URL(env) + toString(): via
+g8	ordersHref	contract	http::GET::/orders	landed	-	null	new URL(...).href
+g8	ordersString	contract	http::GET::/orders	landed	-	null	new URL + String(u)
+g8	ordersStringHidden	contract	null	control	-	null	control: parameter hides the runtime String conversion
+g8	ordersStringHidden	via	null	control	-	null	control: opaque String callback has no host provenance
+g8	ordersStringSloppy	contract	null	control	-	null	control: non-strict block function hides the runtime String conversion
+g8	ordersStringSloppy	via	null	control	-	null	control: non-strict block function has no host provenance
+g8	ordersInTemplate	contract	http::GET::/orders	landed	-	null	new URL + ${u} in a template string
+g8	ordersJoinAbsolute	contract	http::GET::/orders	landed	-	null	new URL(absolute, base): the reference is itself
+g8	ordersJoinAbsolute	via	host:api.example.com	landed	-	null	new URL(absolute, base): host from the reference
+g8	ordersJoinNetwork	contract	http::GET::/orders	landed	-	null	new URL(//host/x, base)
+g8	ordersJoinNetwork	via	host:api.example.com	landed	-	null	new URL(//host/x, base): host from the reference
+g8	ordersJoinPath	contract	http::GET::/orders	landed	-	null	new URL(/x, base): replaces the base path
+g8	ordersJoinPath	via	host:api.example.com	landed	-	null	new URL(/x, base): the base host
+g8	ordersJoinSlash	contract	http::GET::/api/orders	landed	-	null	new URL(x, base/api/): joins the directory
+g8	ordersJoinNoSlash	contract	http::GET::/orders	landed	-	null	new URL(x, base/api): drops the last segment
+g8	ordersJoinEnv	contract	http::GET::/orders	landed	-	null	new URL(/x, env): keeps the opaque lead
+g8	ordersJoinEnv	via	env:API_URL	landed	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	new URL(/x, env): via
+g8	ordersJoinEnvRelative	contract	null	control	-	null	control: new URL(x, env) stays unresolved
+g8	ordersJoinEnvRef	contract	null	control	-	null	control: a reference that starts with a read stays unresolved
+g8	ordersJoinQuery	contract	null	control	-	null	control: a query-only reference stays unresolved
+g8	ordersJoinParam	contract	http::GET::/orders	landed	-	null	new URL(param, base): resolved at the call site
+g8	joinGet	contract	no consumer	landed	-	null	new URL(param, base): the wrapper itself stops being a consumer
+g8	ordersJoinHole	contract	http::GET::/orders	landed	-	null	new URL(/x, hole): keeps the opaque lead
+g8	ordersJoinFragment	contract	null	control	-	null	control: a fragment-only reference stays unresolved
+g8	ordersJoinParamBase	contract	http::GET::/orders	landed	-	null	new URL(/x, param): resolved at the call site
+g8	joinFrom	contract	no consumer	landed	-	null	new URL(/x, param): the wrapper itself stops being a consumer
+g8	ordersWritten	contract	null	control	-	null	control: a write to the path leaves the URL unknown
+g9	OrdersInline	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: Go tag read inline
+g9	ordersInline	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: TS config.getString inline
+g9	Client.OrdersDirect	via	env:API_URL	landed	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	Go field, direct use
+g9	Client.Orders	via	env:API_URL	landed	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	Go field, through the send() wrapper
+g9	OrdersClient.list	via	env:API_URL	landed	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	TS field set in the constructor
+g10a	ordersConfig	via	env:API_URL	control	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	env:API_URL	control: config value inline (g10a)
+g10b	ordersConfig	via	env:API_URL	landed	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	config value via $include file#key (g10b)
+g10c	ordersConfig	via	env:API_URL	landed	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	config block via $include file (g10c)
+g10d	listClusters	contract	http::GET::/clusters	control	example.com/acme/inventory inferred INVENTORY_URL through the proxy endpoint /inventory	http::GET::/clusters	control: proxy.endpoints inline (g10d)
+g10e	listClusters	contract	http::GET::/clusters	landed	example.com/acme/inventory * INVENTORY_URL through the proxy endpoint /inventory	http::GET::/api/proxy/inventory/clusters	legacy proxy (no endpoints:) inline (g10e)
+g10f	listClusters	contract	http::GET::/clusters	landed	example.com/acme/inventory * INVENTORY_URL through the proxy endpoint /inventory	http::GET::/api/proxy/inventory/clusters	proxy.endpoints via $include (g10f)
+g10g	listClusters	contract	http::GET::/clusters	landed	example.com/acme/inventory * INVENTORY_URL through the proxy endpoint /inventory	http::GET::/api/proxy/inventory/clusters	legacy proxy via $include (g10g)
+g10h	ordersConfig	via	env:API_URL	landed	example.com/acme/api inferred base URL from API_URL, a base_url_env of peer example.com/acme/api	null	config value as $env (g10h, #689)

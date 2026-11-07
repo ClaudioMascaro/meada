@@ -1,0 +1,69 @@
+example.com/provision/infra envs/dev/main.tf:1-1 aws_sqs_queue.orders
+type: aws_sqs_queue
+name: "orders"
+root: envs/dev
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/provision/infra envs/dev/main.tf:1 resource.aws_sqs_queue.orders.name = "orders"
+channel::sqs::orders
+  example.com/provision/app producer src/producer.ts:9 enqueueOrder
+  example.com/provision/app consumer src/consumer.ts:7 drain
+  example.com/provision/infra use envs/prod/terraform.tfvars#queue (line 1) [inferred]
+  example.com/provision/infra provisioner envs/dev/main.tf:1 aws_sqs_queue.orders (root envs/dev)
+  example.com/provision/infra provisioner envs/prod/main.tf:3 aws_sqs_queue.orders (root envs/prod)
+
+example.com/provision/infra envs/prod/main.tf:4-4 aws_s3_bucket.archive
+type: aws_s3_bucket
+name: "archive"
+root: envs/prod
+overridable:
+example.com/provision/infra envs/prod/main.tf:2 var.bucket (default)
+references: none
+referenced by: none
+values:
+example.com/provision/infra envs/prod/main.tf:4 resource.aws_s3_bucket.archive.bucket = var.bucket
+resource::s3::archive
+  example.com/provision/app writer src/producer.ts:7 enqueueOrder
+  example.com/provision/app reader (repository-level)
+  example.com/provision/infra provisioner envs/dev/main.tf:2 aws_s3_bucket.archive (root envs/dev)
+  example.com/provision/infra provisioner envs/prod/main.tf:4 aws_s3_bucket.archive (root envs/prod)
+
+example.com/provision/app src/producer.ts:7-11 enqueueOrder
+community: none
+processes: 1 (1 export; 1 repository): enqueueOrder (example.com/provision/app)
+async function enqueueOrder(body: string) {
+  await client.send(
+    new SendMessageCommand({ QueueUrl: `${BASE}/orders`, MessageBody: body }),
+  );
+}
+callers: none
+callees:
+example.com/provision/app src/producer.ts:9 (unresolved) SendMessageCommand
+example.com/provision/app src/producer.ts:8 (unresolved) client.send
+provisioners:
+example.com/provision/infra envs/dev/main.tf:1 aws_sqs_queue.orders (root envs/dev) [exact: channel::sqs::orders]
+example.com/provision/infra envs/dev/main.tf:2 aws_s3_bucket.archive (root envs/dev) [declared: resource::s3::archive]
+example.com/provision/infra envs/prod/main.tf:3 aws_sqs_queue.orders (root envs/prod) [inferred: channel::sqs::orders; overridable: example.com/provision/infra envs/prod/terraform.tfvars:1 var.queue (tfvars)]
+example.com/provision/infra envs/prod/main.tf:4 aws_s3_bucket.archive (root envs/prod) [inferred: resource::s3::archive; overridable: example.com/provision/infra envs/prod/main.tf:2 var.bucket (default)]
+contracts:
+example.com/provision/app src/producer.ts:7 provides resource::s3::archive
+example.com/provision/app src/producer.ts:9 produces channel::sqs::orders
+
+channel::sqs::orders
+  example.com/provision/app producer src/producer.ts:9 enqueueOrder
+  example.com/provision/app consumer src/consumer.ts:7 drain
+  example.com/provision/infra use envs/prod/terraform.tfvars#queue (line 1) [inferred]
+  example.com/provision/infra provisioner envs/dev/main.tf:1 aws_sqs_queue.orders (root envs/dev)
+  example.com/provision/infra provisioner envs/prod/main.tf:3 aws_sqs_queue.orders (root envs/prod)
+
+resource::s3::archive
+  example.com/provision/app writer src/producer.ts:7 enqueueOrder
+  example.com/provision/app reader (repository-level)
+  example.com/provision/infra provisioner envs/dev/main.tf:2 aws_s3_bucket.archive (root envs/dev)
+  example.com/provision/infra provisioner envs/prod/main.tf:4 aws_s3_bucket.archive (root envs/prod)
+
+`module.shared.aws_sqs_queue.this` fits 2 IaC nodes; pass one of:
+example.com/provision/infra modules/queue/main.tf:1 module.shared.aws_sqs_queue.this (root envs/dev)
+example.com/provision/infra modules/queue/main.tf:1 module.shared.aws_sqs_queue.this (root envs/prod)

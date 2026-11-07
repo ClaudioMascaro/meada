@@ -12,6 +12,7 @@ pub struct Message {
     /// The channel name as evaluated, kept as it is; `None` when it cannot be evaluated (an
     /// unresolved side, never linked).
     pub name: Option<String>,
+    pub environment: Option<String>,
     /// The call site: the producing or subscribing call, or the call of a client wrapper that
     /// leads to it, as its file and position in `Facts::calls`.
     pub path: String,
@@ -19,6 +20,7 @@ pub struct Message {
     pub role: Side,
 }
 
+#[derive(Clone)]
 pub enum Side {
     /// The provider side of the channel.
     Producer,
@@ -113,6 +115,7 @@ pub fn produce_with<'a>(
                  ..
              }| {
                 names.into_iter().map(move |name| Message {
+                    environment: None,
                     broker,
                     name,
                     path: site.into(),
@@ -158,6 +161,7 @@ pub fn consume_with<'a>(
                     name: code.files()[site].calls[at].scope.clone(),
                 });
                 names.into_iter().map(move |name| Message {
+                    environment: None,
                     broker,
                     name,
                     path: site.into(),
@@ -214,6 +218,7 @@ pub fn publish_with<'a>(
              }| {
                 let (name, role) = publication(exchange, key);
                 Message {
+                    environment: None,
                     broker: "amqp",
                     name,
                     path: site.into(),
@@ -250,6 +255,7 @@ pub fn bind_with<'a>(
                     return None;
                 };
                 Some(Message {
+                    environment: None,
                     broker: "amqp",
                     name: Some(queue),
                     path: site.into(),

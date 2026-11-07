@@ -1,8 +1,27 @@
 # Language packs
 
+The TypeScript and JavaScript packs retain `undefined` as a shadowable name in values and
+binding patterns, including the grammar's dedicated `undefined` node. Kinds ask the existing
+lexical binding query before treating the unbound name as a runtime value.
+The existing parent walk recognizes the grammar's erroneous comparison recovery of a bare
+`undefined =>` parameter only when its one-byte `=` error touches the `>` token. One
+equal-length parser-only spelling repair restores arrow nodes; every fact still reads the
+original bytes and spans. Malformed `= >`, strings, comments and comparisons are not arrows.
+
 Detail behind the [architecture map](../architecture.md), which keeps the flow, identities,
 seams and invariants (the limits are in [Known ceilings](../ceilings.md)). The code wins over
 this file, and a change to these modules updates it.
+
+TS/JS `String(u)` is a runtime conversion only outside lexical bindings of `String`.
+The parent walk merges binding scope ranges once, then checks each conversion by binary
+search. Parameters, catches, expression names, block declarations, imports and function-scoped
+`var` preserve their own visibility. A write outside those bindings can replace the global.
+Ordinary non-strict block functions also create an enclosing function/program binding
+(ECMAScript Annex B); modules (`.mjs` or import/export syntax), class bodies and strict directive
+prologues retain block scope.
+Strict scope markers are collected once with the parent map, without rescanning every
+conversion. Async and generator block declarations retain their lexical scope.
+Scope lookup reuses `FOLD_DEPTH`; an unestablished scope leaves the runtime opaque.
 
 The steps that add a language pack, and the forms of the builder languages and Go
 environment reads; the architecture map keeps the lead of the first:
@@ -62,9 +81,16 @@ environment reads; the architecture map keeps the lead of the first:
   constructor calls, all count); a function some exact call reaches climbs to its callers as
   before, so the injected value never stands in for what a caller passes. A
   constructor's parameter a `final` field holds (`Const::scope`, the constructor the value is
-  written in) is no wrapper's parameter: it is injected or unknown, never climbed. The values
+  written in) is no wrapper's parameter: it is injected or unknown, never climbed. The TS pack
+  writes the same constant for a `readonly`, `private` or `#x` field written once
+  (`lang/ts.rs` `sealed_field`, #688), which `this.f` (a `Ref`) reads. The values
   an injector gives are transient like the arguments they stand for, so the index stays free of
-  them. `jvm/spring.rs` is the JVM packs' injector (Spring's `@Value`, `spring::inject`, which is
+  them. A field no injection fills (and no file writes through a selector) is what
+  `Code::field_read` folds (#687): the one environment read every Go composite literal that sets
+  it gives (`Code::field_values`), a constructor's parameter climbed through its exact callers
+  with its own `wants`, so the constructor is never a wrapper of the walk that reads the field;
+  a memo per field (`Code::field_reads`, `Unknown` while it is folded) and `FIELD_DEPTH` bound it.
+  `jvm/spring.rs` is the JVM packs' injector (Spring's `@Value`, `spring::inject`, which is
   given the annotation with what it marks, and nothing for `Injected::Param`), and
   `http/csharp/clients.rs` C#'s (an `HttpClient` constructor parameter, `Injected::Param` only); `spring::resolved` is the one
   rule for an annotation's text Spring resolves (`@Value`, a Feign `url` or `path`, a listener's
@@ -202,17 +228,21 @@ environment reads; the architecture map keeps the lead of the first:
   three more: `config_files` names with a `**/` prefix (every `Cargo.toml` the walk finds, in
   path order, or with `**/*.ext` every file ending so, as C#'s `**/*.csproj`; `lang::names_config`
   in the index and in `meada decide`, each read as a root config is (`read_config`) and folded into the configs digest on
-  every refresh) and `layout`, which `refresh` calls once per pack and refresh with the configs
+  every refresh; `config_inputs` (#689) names the further files those configs name, which the
+  index reads the same way when the walk sees them and appends to the pack's configs, a symbolic
+  link on the way going to `Indexed::symlinks`, both in the digest: the TS pack's are Backstage's
+  `$include` targets, asked for by `http/ts/config.rs` grafting each root as the reader does) and
+  `layout`, which `refresh` calls once per pack and refresh with the configs
   and every file the pack parsed, and which answers five things from one build (Rust's crate
   `Tree`, so the manifests are parsed and the module trees walked once): `Layout::members` (the
   files it builds; the rest keep their facts in `files` with an empty `resolved` and no rows,
   and leave the export), `Layout::modules` (by default the pack's `modules`; it answers with a shared
   list, `Rc<[String]>`, so a lookup costs the same whatever the namespace holds), `Layout::published`
   and `Layout::programs` (both below), and `Layout::reaches` (default: none, every file), the
-  files a name match may reach from a caller (`Resolver::reaching`, called by `refresh`):
+  files a name match may reach from a caller (`Resolver::with_layout`, called by `refresh`):
   Rust's are its crate's and those of the repository's libraries it depends on. A language whose
   files share one scope (a Go package: the files of one directory that declare one package; Java and Kotlin packages, which share the Java layout, as C# namespaces do) says which through `Layout::shared`, groups of files that
-  `Resolver::with_shared` takes: a name a file and its imports leave unbound is looked up
+  `Resolver::with_layout` takes: a name a file and its imports leave unbound is looked up
   among the top-level definitions and constants of the others in its group, private ones
   included (`Resolver::sibling`, at the end of `lexical_as`), and an import that names any
   file of a group (`Modules` gives the first candidate, which stands for them all) exports what
@@ -543,3 +573,11 @@ environment reads; the architecture map keeps the lead of the first:
   parameters, which a call's argument names (`Value::Function`) and which folds into the
   symbol around it unless a kind claims it; `new[] { .. }`, `new T[] { .. }` and `[..]` are
   lists.
+
+
+Python records unknown return evidence for bare returns, possible fallthrough and generators.
+`Def::asynchronous` distinguishes coroutine-producing functions; `Call::awaited` and
+`Value::Await` retain await syntax, including through a named pending coroutine. The
+syntax-only `exits` check follows terminal return/raise and complete if/elif/else branches
+within `VALUE_DEPTH`. The generic complete factory reader in `names/python/arguments.rs`
+consumes this evidence; ordinary value expansion still unwraps await as before.

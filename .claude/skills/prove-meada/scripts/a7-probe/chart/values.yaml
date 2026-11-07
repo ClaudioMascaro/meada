@@ -1,0 +1,27 @@
+# Helm values: #638's labels, an image, anchors and an alias.
+fullnameOverride: zzprove-orders
+image:
+  repository: ghcr.io/zz-prove/orders
+  tag: "1.4.2"
+alerts:
+  loki:
+    - name: zzprove-errors
+      labels: &team
+        support: team-b
+        owner: team-b
+    - name: zzprove-latency
+      labels: *team
+replicaCount: 3
+ratio: 0.25
+hex: 0x1F
+octal: 0o17
+enabled: True
+legacyYes: yes
+nothing: null
+tilde: ~
+empty:
+quotedNumber: "8080"
+nested:
+  - [one-zzprove, two-zzprove]
+  - - three-zzprove
+handlerName: route

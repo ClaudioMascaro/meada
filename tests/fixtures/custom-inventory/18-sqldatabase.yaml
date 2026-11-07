@@ -1,0 +1,9 @@
+apiVersion: sql.cnrm.cloud.google.com/v1beta1
+kind: SQLDatabase
+metadata:
+  name: operator-18
+  namespace: platform
+spec:
+  resourceID: ledger
+  instanceRef:
+    external: kcc-primary

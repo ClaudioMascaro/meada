@@ -42,13 +42,22 @@
   `Found::shape`s of a side reached several ways merged, as JSON in `contracts.shape`, which `export` loads into `Provider::shape` and
   `Consumer::shape`). The extraction reads values the index does not keep, so it parses again
   the files whose values the last extraction read (the `valued` table, `Code::read`) before its
-  first pass, then each file a kind misses (`Code::misses`) until none does; a pack that missed
+  first pass, each through the values cache (`index/values.rs`, `values.db` beside the index, ADR
+  0027): an entry keyed by the file's bytes, setting, pack and Meada's build gives back what the
+  parse would, so of an unchanged file nothing is parsed, and each extraction writes what it
+  parsed and drops the entries of the files no longer in `valued`; then each file a kind misses (`Code::misses`) until none does; a pack that missed
   nothing in a pass is done and is not extracted again (#391). A group of packs that resolve
   together (`lang::resolver_of`) none of whose files was changed, deleted or stamped by a join is
-  kept when `meta.configs` (which folds Meada's version in), the member files and the stored
-  `exports` match what this refresh found (`unchanged_groups`): its files are neither re-parsed
-  for values, extracted nor resolved, its `contracts`, `symbols` and `calls` rows stay, and the
-  entry points read its sides and reach from them (`stored_reach`). That rests on a group's
+  kept when `meta.configs` (which folds Meada's version in) and the member files match what this
+  refresh found (`candidate_groups`) and every group not kept exports what its stored `exports`
+  rows say: its files are neither re-parsed for values, extracted nor resolved, no resolver is
+  built for it (its `exports`, `flexible` and `families` rows stand for one's, since a resolver
+  reads its group's files and its pack's configs alone, #610), its `contracts`, `symbols` and
+  `calls` rows stay, and the entry points read its sides and reach from them (`stored_reach`).
+  `Resolver::with_layout` resolves every call once as it builds (for `callers`) under the pack's
+  `reaches` when the pack has no extension methods, and `resolve_file` reads those answers back
+  (`Resolver::resolved_at`); an `exact` one in any pack, since only a name match reads `reaches`.
+  That rests on a group's
   extraction reading only its own files and finding contracts only in them (debug assertions
   in `refresh`); `Names::without` marks a question about an inline definition of a kept file,
   which makes the refresh start over keeping nothing (`refresh_keeping`). `refresh(db, root,
@@ -87,8 +96,10 @@
 - `community.rs`: communities (spec #31). Last in `refresh`, after the code rows,
   `write_communities` rewrites the `communities` table (name, member) from the `calls` rows at
   `exact` or `inferred`: each symbol in one is a node (a top-level caller is a file, no node),
-  so an unchanged repository keeps its rows through the early exit and a
-  changed one recomputes them from scratch. `communities(calls, dir)` builds the undirected
+  so an unchanged repository keeps its rows through the early exit, and a refresh recomputes
+  them from scratch when a rewritten file's symbols or `exact` and `inferred` calls differ from
+  its stored ones (`stored_graph`, `graph`), a file was deleted or left out, or the configs digest
+  moved (#610). `communities(calls, dir)` builds the undirected
   graph (a call site adds 1 to the edge between two distinct symbols, a call to self none, so a
   node with no edge is a singleton community) and runs Leiden as spec #31 fixes
   it, in `i128` only: `local_moving` (identity-order queue, largest strictly positive gain
