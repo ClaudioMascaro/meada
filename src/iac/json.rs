@@ -106,7 +106,7 @@ impl Read<'_> {
                     names[0].to_string(),
                     Variable {
                         default: body.get("default").map(|v| self.expressions.read(v, true)),
-                        sensitive: body.get("sensitive") == Some(&Value::Bool(true)),
+                        sensitive: crate::config_values::is_sensitive(body.get("sensitive")),
                         path: self.path.into(),
                         line,
                     },

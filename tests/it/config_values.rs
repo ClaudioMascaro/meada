@@ -289,6 +289,15 @@ fn a_tfvars_file_follows_the_sensitive_variables_of_the_files_around_it() {
     password("terraform.tfvars:2 db_password = \"root-tfvars-secret\"");
     password("envs/prd.tfvars:2 db_password = \"envs-tfvars-secret\"");
 
+    // Terraform converts the string "true" to the boolean.
+    fs::write(
+        &main,
+        text.replace("sensitive = true", "sensitive = \"true\""),
+    )
+    .unwrap();
+    common::age(&repo);
+    password("terraform.tfvars:2 db_password = redacted");
+
     fs::write(&main, text).unwrap();
     common::age(&repo);
     password("terraform.tfvars:2 db_password = redacted");

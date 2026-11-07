@@ -732,7 +732,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
             ("variable", [name]) => {
                 let variable = Variable {
                     default: attr("default").cloned(),
-                    sensitive: matches!(attr("sensitive"), Some(Expression::Bool(b)) if *b.value()),
+                    sensitive: crate::config_values::hcl::is_sensitive(attr("sensitive")),
                     path: path.to_string(),
                     line: line(b.span().map_or(0, |s| s.start)),
                 };
@@ -3072,6 +3072,19 @@ mod tests {
                 "a.wide ~ \"*\"",
             ]
         );
+    }
+
+    /// Terraform converts `sensitive = "true"` to the boolean: such a variable never resolves.
+    #[test]
+    fn a_variable_marked_sensitive_by_a_string_is_never_resolved() {
+        let tf = concat!(
+            "variable \"s\" {\n  sensitive = \"true\"\n  default = \"tok\"\n}\n",
+            "resource \"a\" \"s\" { name = \"q-${var.s}\" }\n",
+        );
+        let json = r#"{"variable": {"s": {"sensitive": "true", "default": "tok"}},
+ "resource": {"a": {"s": {"name": "q-${var.s}"}}}}"#;
+        assert_eq!(names(&[("main.tf", tf)]), ["a.s ~ \"q-*\""]);
+        assert_eq!(names(&[("main.tf.json", json)]), ["a.s ~ \"q-*\""]);
     }
 
     /// A template keeps its literal text and every part that resolves; what is never evaluated

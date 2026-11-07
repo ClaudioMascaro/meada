@@ -19,7 +19,7 @@ use crate::document::events::{self, Step, Syntax};
 use crate::lang;
 use crate::msg::Msg;
 
-mod hcl;
+pub(crate) mod hcl;
 pub(crate) mod sites;
 
 pub(crate) use hcl::nested_past;
@@ -134,9 +134,9 @@ pub(crate) fn parent(path: &str) -> &str {
 /// gives. Part of `Sensitive::of` when a Terraform file that may declare variables is unreadable.
 pub(crate) const ANY_VARIABLE: &str = "*";
 
-/// The sensitive variables a `.tfvars` file is read against: the names declared `sensitive = true`
-/// by any Terraform file found (a var-file can be given to a module in any directory, and
-/// redacting too much is the safe direction), and `ANY_VARIABLE` when a Terraform file in its
+/// The sensitive variables a `.tfvars` file is read against: the names any Terraform file found
+/// declares sensitive (`is_sensitive`), since a var-file can be given to a module in any directory
+/// and redacting too much is the safe direction, and `ANY_VARIABLE` when a Terraform file in its
 /// directory or above it is unreadable, since the variables it declares are unknown. Computed
 /// once per refresh from the rows of the files found, after every file but the `.tfvars` ones is
 /// refreshed.
@@ -206,15 +206,28 @@ impl<'a> Sensitive<'a> {
 
     fn load(&self) -> Result<(BTreeSet<String>, Vec<String>)> {
         let mut statement = self.db.prepare(
-            "SELECT path, key FROM config_values \
-             WHERE type = 'boolean' AND value = 'true' AND key LIKE 'variable%.sensitive'",
+            "SELECT path, key, type, value FROM config_values WHERE key LIKE 'variable%.sensitive'",
         )?;
         let mut names = BTreeSet::new();
-        for row in
-            statement.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
-        {
-            let (path, key) = row?;
-            if let (true, Some(name)) = (self.found.contains(path.as_str()), variable(&key)) {
+        for row in statement.query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, Option<String>>(3)?,
+            ))
+        })? {
+            let (path, key, kind, value) = row?;
+            // A row keeps a boolean or a string as its text, and any other expression as written.
+            let attribute = match (kind.as_str(), value) {
+                ("boolean", Some(v)) => Value::Bool(v == "true"),
+                ("string", Some(v)) => Value::String(v),
+                _ => Value::Bool(true),
+            };
+            if !self.found.contains(path.as_str()) || !is_sensitive(Some(&attribute)) {
+                continue;
+            }
+            if let Some(name) = variable(&key) {
                 names.insert(name);
             }
         }
@@ -278,8 +291,8 @@ enum SecretPlace {
     Root,
     /// Under `items[n].data` or `items[n].stringData` of a list.
     Item(usize),
-    /// Under `variable.<name>.default` of a Terraform JSON file: secret when the variable says
-    /// `"sensitive": true`.
+    /// Under `variable.<name>.default` of a Terraform JSON file: secret when the variable is
+    /// sensitive (`is_sensitive`).
     Variable(Vec<Step>),
     /// Under the top-level key `<name>` of a `.tfvars.json` file: secret when the variable is
     /// sensitive.
@@ -366,7 +379,7 @@ fn json_secret_body(path: &[Step], body: &Value) -> bool {
         return false;
     }
     if section == "variable" {
-        return body.get("sensitive") == Some(&Value::Bool(true));
+        return is_sensitive(body.get("sensitive"));
     }
     path.iter()
         .filter_map(|step| match step {
@@ -427,6 +440,14 @@ fn json_string(file: &str, path: &[Step], s: &str) -> (&'static str, String) {
         "string" => ("string", s.replace("$${", "${").replace("%%{", "%{")),
         kind => (kind, serde_json::to_string(s).unwrap_or_default()),
     }
+}
+
+/// Whether a Terraform variable whose `sensitive` attribute reads `attribute` is sensitive: unless
+/// the attribute is absent, null, `false` or `"false"`. Terraform converts the string `"true"` as
+/// well and refuses the other values, so they count as sensitive, which can only redact too much.
+pub(crate) fn is_sensitive(attribute: Option<&Value>) -> bool {
+    !matches!(attribute, None | Some(Value::Null | Value::Bool(false)))
+        && attribute.and_then(Value::as_str) != Some("false")
 }
 
 /// Whether `object` is a Kubernetes `Secret`: an object with an `apiVersion` and `kind: Secret`.
@@ -1143,6 +1164,30 @@ mod tests {
         assert_eq!(shown("[1].metadata.name").as_deref(), Some("db"));
         assert_eq!(shown("[2].items[1].data.open").as_deref(), Some("yes"));
         assert_eq!(shown("[3].data.noversion").as_deref(), Some("kept"));
+    }
+
+    /// A byte order mark, which some editors write first, is no part of the first key: a `Secret`
+    /// behind one stays a `Secret`, and a JSON file behind one reads.
+    #[test]
+    fn a_byte_order_mark_before_the_first_key_changes_nothing() {
+        let secret = "\u{feff}apiVersion: v1\nkind: Secret\nstringData:\n  token: hunter2\n";
+        let (_, rows) = read("secret.yaml", secret.as_bytes());
+        let seen: Vec<_> = (rows.iter())
+            .map(|r| (r.key.as_str(), r.value.as_deref()))
+            .collect();
+        assert_eq!(
+            seen,
+            [
+                ("apiVersion", Some("v1")),
+                ("kind", Some("Secret")),
+                ("stringData.token", None)
+            ]
+        );
+        let (_, rows) = read("appsettings.json", "\u{feff}{\"a\": 1}".as_bytes());
+        let seen: Vec<_> = (rows.iter())
+            .map(|r| (r.key.as_str(), r.value.as_deref()))
+            .collect();
+        assert_eq!(seen, [("a", Some("1"))]);
     }
 
     #[test]

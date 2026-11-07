@@ -200,6 +200,8 @@ impl<'s, 'f> Reader<'s, 'f> {
         src: &'s [u8],
         each: &'f mut dyn FnMut(Scalar<'_>),
     ) -> Result<Self, Error> {
+        // A byte order mark some editors write first is no part of the first key (YAML 1.2 §5.2).
+        let src = src.strip_prefix("\u{feff}".as_bytes()).unwrap_or(src);
         let source = match syntax {
             Syntax::Yaml => Source::Yaml(Box::new(Parser::new_from_str(text(src)?))),
             Syntax::Json => {

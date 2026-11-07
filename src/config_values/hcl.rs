@@ -12,8 +12,8 @@
 //! an interpolation or a directive). A list or an object of literal keys is read element by
 //! element, as YAML is; an object with a key that is no literal is one `expression`.
 //!
-//! A `variable` with `sensitive = true` keeps its `default` redacted, and a `.tfvars` file every
-//! value it gives to a sensitive variable (`Sensitive`): key path, type and line, no value.
+//! A sensitive `variable` (`is_sensitive`) keeps its `default` redacted, and a `.tfvars` file
+//! every value it gives to a sensitive variable (`Sensitive`): key path, type and line, no value.
 //! An `aws_ssm_parameter` resource with literal `type = "SecureString"` redacts its `value`.
 
 use std::collections::{BTreeSet, HashMap};
@@ -225,12 +225,11 @@ impl Walk<'_> {
                         path.push(Step::Index(*n));
                         *n += 1;
                     }
-                    // A variable's `default` is secret when it says `sensitive = true`.
+                    // A variable's `default` is secret when the variable is sensitive.
                     let sensitive = depth == 0
                         && b.ident.as_str() == "variable"
                         && b.labels.len() == 1
-                        && (b.body.get_attribute("sensitive"))
-                            .is_some_and(|a| matches!(&a.value, Expression::Bool(v) if *v.value()));
+                        && is_sensitive(b.body.get_attribute("sensitive").map(|a| &a.value));
                     let secure = depth == 0
                         && b.ident.as_str() == "resource"
                         && b.labels.len() == 2
@@ -324,6 +323,19 @@ impl Walk<'_> {
             _ => self.leaf(path, shown(hidden, written), "expression", offset),
         }
     }
+}
+
+/// Whether a `variable` block whose `sensitive` attribute is `attribute` is sensitive
+/// (`super::is_sensitive`): an expression other than a literal counts as `true`, which can only
+/// redact too much.
+pub(crate) fn is_sensitive(attribute: Option<&Expression>) -> bool {
+    let literal = attribute.map(|e| match e {
+        Expression::Null(_) => serde_json::Value::Null,
+        Expression::Bool(b) => serde_json::Value::Bool(*b.value()),
+        Expression::String(s) => serde_json::Value::from(s.value().as_str()),
+        _ => serde_json::Value::Bool(true),
+    });
+    super::is_sensitive(literal.as_ref())
 }
 
 /// `text`, unless it is secret.
@@ -616,6 +628,46 @@ mod tests {
         );
         assert_eq!(shown("variable.plain.default").as_deref(), Some("shown"));
         assert!(!format!("{found:?}").contains("hunter2"));
+    }
+
+    /// Terraform converts the string `"true"` to the boolean, and refuses every value but a
+    /// boolean or its string: only an absent, `false` or `"false"` attribute shows the default.
+    #[test]
+    fn a_variable_is_sensitive_unless_its_attribute_is_false() {
+        let text = concat!(
+            "variable \"a\" {\n  sensitive = \"true\"\n  default = \"secret-a\"\n}\n",
+            "variable \"b\" {\n  sensitive = !false\n  default = \"secret-b\"\n}\n",
+            "variable \"c\" {\n  sensitive = \"false\"\n  default = \"shown-c\"\n}\n",
+            "variable \"d\" {\n  sensitive = false\n  default = \"shown-d\"\n}\n",
+        );
+        let json = r#"{"variable": {
+  "a": {"sensitive": "true", "default": "secret-a"},
+  "c": {"sensitive": "false", "default": "shown-c"}
+}}"#;
+        let defaults = |path: &str, text: &str| {
+            let (_, found) = read(path, text.as_bytes());
+            (found.into_iter())
+                .filter(|r| r.key.ends_with(".default"))
+                .map(|r| (r.key, r.value))
+                .collect::<Vec<_>>()
+        };
+        let row = |key: &str, value: Option<&str>| (key.to_string(), value.map(String::from));
+        assert_eq!(
+            defaults("variables.tf", text),
+            [
+                row("variable.a.default", None),
+                row("variable.b.default", None),
+                row("variable.c.default", Some("shown-c")),
+                row("variable.d.default", Some("shown-d")),
+            ]
+        );
+        assert_eq!(
+            defaults("variables.tf.json", json),
+            [
+                row("variable.a.default", None),
+                row("variable.c.default", Some("shown-c")),
+            ]
+        );
     }
 
     #[test]

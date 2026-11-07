@@ -174,9 +174,9 @@ All notable changes to Meada are recorded here. The format follows
   block's type and labels and the attribute's name (`resource.aws_sqs_queue.orders.name`), a
   repeated block `[n]`; a literal keeps its type, and an expression or a template is stored as
   written under the type `expression` or `template`. A `.tofu` file shadows the `.tf` file of
-  the same name. The `default` of a `variable` with `sensitive = true` and every value a
-  `.tfvars` file gives a variable of that name are stored as `redacted`. A file that does
-  not parse is skipped and counted by `meada status` (#640).
+  the same name. The `default` of a `variable` with `sensitive = true` (or `"true"`) and every
+  value a `.tfvars` file gives a variable of that name are stored as `redacted`. A file that
+  does not parse is skipped and counted by `meada status` (#640).
 - A Go struct field that keeps a base URL (`c.base`) carries the environment read every
   composite literal of the repository that sets it gives it, directly or through a constructor's
   parameter whose callers in the repository all pass that read, so a method that reads the field,
