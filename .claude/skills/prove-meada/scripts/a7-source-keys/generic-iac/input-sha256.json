@@ -6,9 +6,9 @@
     "../serverless.jsonl": "ca93ffdc08f046022073e13ca4959460bff078e61711db619f37912366fe8351",
     "a7-generic-kube-source-key.queries.jsonl": "cfe4add02a7cf78086773a1c2e55bbe30fe6a264a7fa417d2f6c2fe74081d704",
     "boutique.queries.jsonl": "b3fca39a7ddea50d4749e9603b471fcb547b6a22ec4e4c13607ae1823553b2dd",
-    "capture-plan.json": "65d1172f5db8f19d4e9875be3a44ba06dbf3f91ea235cd1418572bdc5a08534a",
+    "capture-plan.json": "17fd8dda2c0daccb39b7a984a38070903ba52326edba644230ae59981b90858a",
     "compose-repo-identity.json": "7c664aeca4551dc5178e5b5c509416c7e8001cba3ea64e07193a3aeafa284baf",
-    "compose.expected.json": "9d86d22f25c454a22cc15d89a8848993b2dc25b7fa5ae90a1dea7098eaebcf56",
+    "compose.expected.json": "c088795149dc6e810088a3d1df470f3e5de97a73767ba33c583ec02289b5d5c1",
     "compose.jsonl": "aa0d85d6f68128c135fca10ccb5b239db0c67aa762719476a00569294efab291",
     "crossplane-aws.queries.jsonl": "e4e6a6c20d09c0b1514991100a350786dbdb27d62180930ebdfc65048e4a9c33",
     "crossplane.a7-generic-kube-source-key.jsonl": "fa608d64281d3ecb3b74667f6c79d928fa9e1da51bf60c951ffc75fe3f39e4c8",
@@ -26,7 +26,7 @@
     "queries.jsonl": "cfe4add02a7cf78086773a1c2e55bbe30fe6a264a7fa417d2f6c2fe74081d704",
     "source-inventory.json": "bf50b516ac8966be5c08a527a1fa838d1298ce21a0aa1f85b970d2adae2769ea",
     "source-sha256.json": "d98de56fd645a7269e4aefd033b54da0eac7b9a259e418899cc4ac23f844a0f0",
-    "PLAN.md": "80f6acc279f6f59c9990629333fde21dc8cfa3b5d74aac9ddb84054d5913aef5"
+    "PLAN.md": "5482df5b24e0e2683a11e839fb74bb279cb2ab4f854771031c88f3611a9799b2"
   },
   "fixture_identities": [
     "compose-repo-identity.json",

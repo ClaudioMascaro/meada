@@ -63,7 +63,7 @@ source copies are fetched at the unchanged existing pins. The independent keys s
 - native HCL: 72 whole value rows and 38 queries, with literal/sensitivity edits;
 - complete pinned monitoring: 808 queries, preserving the original 434-query preparation;
 - adjacent monitoring: 151 queries, one label edit and both role-only scopes;
-- six generic IaC/Serverless scopes: 460 nodes, 217 reference groups and 1,509 queries, with
+- six generic IaC/Serverless scopes: 460 nodes, 221 reference groups and 1,509 queries, with
   the exact per-repository query files from `generic-iac/capture-plan.json`.
 
 `a7-source-capture.py` uses the existing transports for the eleven frozen source edits:
