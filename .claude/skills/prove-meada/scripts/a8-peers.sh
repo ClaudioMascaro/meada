@@ -174,6 +174,13 @@ export async function ordersWritten(base: string) {
   return fetch(moved.toString());
 }
 EOF
+  cat > g8/src/sloppy.js <<'EOF'
+// Non-strict block functions also bind their enclosing function (ECMAScript Annex B).
+function ordersStringSloppy() {
+  { function String(value) { return transform(value); } }
+  return fetch(String(new URL('https://api.example.com/orders')));
+}
+EOF
   mk g8
 }
 

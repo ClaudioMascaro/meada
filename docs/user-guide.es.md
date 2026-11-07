@@ -1482,7 +1482,7 @@ Las URLs construidas con `new URL(x)` o `new URL(ref, base)` se leen solo para e
 sin reasignación o el export nombrado `URL` de `url` o `node:url` por `import` o
 `require` no ocultado. Paquetes desconocidos, aliases de repositorio y otros exports quedan opacos.
 
-`String(u)` respeta las declaraciones locales de `String` y pasa la URL solo cuando la llamada usa la conversión global. Las asignaciones e incrementos que pueden reemplazar esa conversión dejan la URL sin resolver. Una declaración local conserva la conversión global fuera de su ámbito.
+`String(u)` respeta las declaraciones locales de `String` y pasa la URL solo cuando la llamada usa la conversión global. Las asignaciones e incrementos que pueden reemplazar esa conversión dejan la URL sin resolver. Una declaración local conserva la conversión global fuera de su ámbito. Las funciones declaradas en bloques de JavaScript sin modo estricto también ocultan la conversión en la función contenedora; los módulos, las clases y `use strict` conservan el ámbito del bloque.
 
 | Papel | Biblioteca |
 | --- | --- |

@@ -16,6 +16,11 @@ TS/JS `String(u)` is a runtime conversion only outside lexical bindings of `Stri
 The parent walk merges binding scope ranges once, then checks each conversion by binary
 search. Parameters, catches, expression names, block declarations, imports and function-scoped
 `var` preserve their own visibility. A write outside those bindings can replace the global.
+Ordinary non-strict block functions also create an enclosing function/program binding
+(ECMAScript Annex B); modules (`.mjs` or import/export syntax), class bodies and strict directive
+prologues retain block scope.
+Strict scope markers are collected once with the parent map, without rescanning every
+conversion. Async and generator block declarations retain their lexical scope.
 Scope lookup reuses `FOLD_DEPTH`; an unestablished scope leaves the runtime opaque.
 
 The steps that add a language pack, and the forms of the builder languages and Go
