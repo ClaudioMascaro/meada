@@ -56,6 +56,9 @@ def capture(run, scope, base, head, repos):
             command('cli-mcp', [python, SCRIPTS / 'prove.py', 'run', '--base-bin', run / 'bin/meada-base',
                                '--head-bin', run / 'bin/meada-head', '--repos', repos, '--run', run, '--http'])
         if scope['console']:
+            # The base can leave same-version core artifacts in the shared Cargo target.
+            command('clean-console-core', ['cargo', 'clean', '-p', 'meada-core', '--target-dir',
+                                          os.environ.get('CARGO_TARGET_DIR', str(Path.cwd() / 'target'))], required=True)
             command('build-console', [SCRIPTS / 'build.sh', 'head-ui', '.', run,
                                      'ui,accounts' if scope['accounts'] else 'ui'], required=True)
             command('console-start', [python, SCRIPTS / 'console.py', 'start', '--bin', run / 'bin/meada-head-ui',
@@ -129,6 +132,14 @@ def selftest():
             run = Path(temp) / 'proof'
             assert capture(run, scope, 'a' * 40, 'b' * 40, 'meada') == 2
         assert json.loads((run / 'receipt.json').read_text())['capture'] == 'BLOCKED'
+    with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
+        scope['console'] = True
+        with patch('subprocess.run', return_value=subprocess.CompletedProcess([], 0)):
+            run = Path(temp) / 'proof'
+            assert capture(run, scope, 'a' * 40, 'b' * 40, 'meada') == 0
+        names = [step['name'] for step in json.loads((run / 'receipt.json').read_text())['steps']]
+        assert names.index('build-base') < names.index('clean-console-core') < names.index('build-console')
+        assert names[-2:] == ['console-stop', 'clean']
     print('prove-ci selftest: local guard, capture status, failure retention and cleanup passed')
 
 

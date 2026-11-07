@@ -297,7 +297,9 @@ Send the findings back to the agent that made the change: the failing steps, the
 
 ## Gotchas
 
-- On a machine with 8 GB of RAM or less, run CI heavy commands through the documented `bounded` wrapper. The whole corpus took 98 s with release builds on 2026-11-02; debug builds index several times slower.
+- CI uses the workflow's timeout and worker limits; `bounded` applies to local gate commands.
+  Keep the corpus time and memory budgets unchanged. The whole corpus took 98 s with release
+  builds on 2026-11-02; debug builds index several times slower.
 - Linux carries a forked child's pre-exec peak into its `ru_maxrss`, so the script measures through a small fresh interpreter. Do not "simplify" that away: every entry would report the script's own size.
 - Read a script's verdict from its first output line or its report, never from `$?` after a pipe (zsh's `pipestatus` and `| tail` hide it).
 - After editing a script, run `python3 $S/prove.py selftest` (the comparison logic on two small exports).
