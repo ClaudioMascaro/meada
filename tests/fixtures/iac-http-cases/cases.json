@@ -1,5 +1,26 @@
 [
   {
+    "name": "sls-unread-http-fields",
+    "fixture": "serverless",
+    "file": "serverless.yml",
+    "providers": []
+  },
+  {
+    "name": "sls-known-expanded-wildcard",
+    "fixture": "serverless",
+    "file": "serverless.yml",
+    "providers": [
+      {
+        "contract": "http::ANY::/known-one/{}",
+        "site": "example.com/route-oracle/serverless::runtime.ts::inventory"
+      },
+      {
+        "contract": "http::ANY::/known-two/{}",
+        "site": "example.com/route-oracle/serverless::runtime.ts::inventory"
+      }
+    ]
+  },
+  {
     "name": "rest-bare-lambda-arn",
     "fixture": "terraform",
     "file": "main.tf",

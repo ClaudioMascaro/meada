@@ -14,7 +14,8 @@ unknown expansions. It reads identities and explicitly modeled declarations, nev
 deployment-time attributes. No cloud policy is added to the engine or language readers.
 
 SAM's existing evaluator records Api/HttpApi method/path fields. Serverless records separate
-HTTP fields while reading its bounded event list, so a path cannot masquerade as a method.
+known string HTTP fields while reading its bounded event list, so a path cannot masquerade
+as a method. Ref/object event labels and unknown sentinels never become literal HTTP fields.
 All formats store `Node.routes`; HTTP's ordinary config-summary dispatch consumes those facts.
 
 `http/iac.rs` normalizes literal contracts through the existing HTTP normalization. Handler

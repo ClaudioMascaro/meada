@@ -40,6 +40,8 @@ functions:
       - httpApi: {method: PATCH, path: '/stock/{sku}'}
       - httpApi: '*'
       - http: {path: 'GET /invented'}
+      - httpApi: {method: {Fn::If: [Choose, GET, POST]}, path: /unknown-method}
+      - httpApi: {method: GET, path: {Ref: UnknownPath}}
 '''
 TF = '''data "archive_file" "source" {
  type = "zip"
@@ -53,8 +55,10 @@ resource "aws_lambda_function" "arc" {
  handler = "index.orbit"
  filename = data.archive_file.source.output_path
 }
-resource "aws_apigatewayv2_api" "public" { name = "arcs-http"
- protocol_type = "HTTP" }
+resource "aws_apigatewayv2_api" "public" {
+ name = "arcs-http"
+ protocol_type = "HTTP"
+}
 resource "aws_apigatewayv2_integration" "arc" {
  api_id = aws_apigatewayv2_api.public.id
  integration_type = "AWS_PROXY"
@@ -74,6 +78,48 @@ def dump(run, name, data):
 
 def provider(contract, site):
     return {'contract': contract, 'site': PREFIX + site}
+
+
+def code_source_display_control(head, base, control, run):
+    """The old binary supplies missing-code display policy, independently of IaC providers."""
+    path = control / 'app/ready/route.ts'
+    source = path.read_bytes()
+    queries = [
+        {'tool': 'trace', 'arguments': {'from': 'checkReady', 'direction': 'down', 'budget': 10000}},
+        {'tool': 'context', 'arguments': {'symbol': 'http::GET::/ready', 'budget': 10000}},
+    ]
+    records = {}
+    for label, binary in [('head', head), ('base', base)]:
+        manifest = f'control-{label}.toml'
+        write(run, manifest, f'index_dir = "control-{label}-indexes"\n[[repository]]\nrepo = "{PREFIX}control"\npath = "{control}"\n')
+        subprocess.run([binary, 'index', '--workspace', manifest], cwd=run, check=True,
+                       stdout=(run / f'{label}-control-index.out').open('w'),
+                       stderr=(run / f'{label}-control-index.err').open('w'))
+        port = free_port()
+        server = subprocess.Popen([binary, 'mcp', '--listen', f'127.0.0.1:{port}', '--workspace', manifest], cwd=run,
+                                  stdout=(run / f'{label}-control-http.out').open('w'),
+                                  stderr=(run / f'{label}-control-http.err').open('w'))
+        try:
+            for _ in range(100):
+                try:
+                    socket.create_connection(('127.0.0.1', port), timeout=1).close()
+                    break
+                except OSError:
+                    time.sleep(.1)
+            client = Http(f'http://127.0.0.1:{port}/{PREFIX}control')
+            ask = lambda: [answer(client.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})) for q in queries]
+            before = ask()
+            path.unlink()
+            after = ask()
+            assert after == [text.replace('app/ready/route.ts:1', 'app/ready/route.ts') for text in before]
+            data = json.loads(subprocess.check_output([binary, 'export', '--workspace', manifest, '--repo', PREFIX + 'control'], cwd=run, text=True))
+            records[label] = {'before': before, 'after': after, 'providers': data['providers'], 'links': data['links']}
+            dump(run, f'{label}-code-source-deleted.json', records[label])
+        finally:
+            server.terminate()
+            server.wait(timeout=30)
+            path.write_bytes(source)
+    assert records['head'] == records['base']
 
 
 def main():
@@ -199,6 +245,7 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
         _, head_text, _ = mcp_answers(binary, control, query, run / 'control-head.err')
         _, base_text, _ = mcp_answers(str(Path(args.base_bin).resolve()), control, query, run / 'control-base.err')
         assert head_text == base_text
+        code_source_display_control(binary, str(Path(args.base_bin).resolve()), control, run)
 
     queries = [
         {'tool': 'context', 'arguments': {'symbol': 'readGarden', 'budget': 10000}},
@@ -229,13 +276,20 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
         replies = [answer(client.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})) for q in queries]
         dump(run, 'http-answers.json', replies)
         assert replies == texts
-        for name, path in [('sam', 'template.yaml'), ('sam', 'runtime/handler.ts'), ('sam', 'decoy.ts'),
-                           ('serverless', 'serverless.yml'), ('serverless', 'worker.ts'),
-                           ('terraform', 'main.tf'), ('terraform', 'runtime/index.ts')]:
+        for name, path in [('sam', 'template.yaml'), ('serverless', 'serverless.yml'), ('terraform', 'main.tf')]:
             (repos[name] / path).unlink()
         deleted = [answer(client.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})) for q in queries]
         dump(run, 'source-deleted-http.json', deleted)
         assert deleted == texts
+        for name, path in [('sam', 'runtime/handler.ts'), ('sam', 'decoy.ts'),
+                           ('serverless', 'worker.ts'), ('terraform', 'runtime/index.ts')]:
+            (repos[name] / path).unlink()
+        handlers_deleted = [answer(client.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})) for q in queries]
+        dump(run, 'handler-source-deleted-http.json', handlers_deleted)
+        expected_display = [text.replace('runtime/handler.ts:1', 'runtime/handler.ts')
+                            .replace('worker.ts:1', 'worker.ts')
+                            .replace('runtime/index.ts:1', 'runtime/index.ts') for text in texts]
+        assert handlers_deleted == expected_display
         for name in names:
             readonly = json.loads(subprocess.check_output([binary, 'export', '--workspace', 'workspace.toml', '--repo', PREFIX + name], cwd=run, text=True))
             dump(run, f'source-deleted-{name}.json', readonly)
@@ -246,7 +300,7 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
         server.wait(timeout=30)
     dump(run, 'checks.json', {'verdict': 'PROVED', 'answer_key': '#666/#642; ADR 0005/0025/0026',
                              'providers': 5, 'links': 5, 'base_parity': bool(args.base_bin),
-                             'surfaces': ['CLI export', 'MCP stdio', 'MCP HTTP', 'source-deleted read-only export/HTTP']})
+                             'surfaces': ['CLI export', 'MCP stdio', 'MCP HTTP', 'IaC-source-deleted byte parity', 'handler-source-deleted graph and baseline display parity']})
     print('checks passed; evidence:', run)
 
 

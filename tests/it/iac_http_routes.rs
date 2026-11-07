@@ -276,6 +276,57 @@ fn whole_workspace(case: &str) -> Vec<std::path::PathBuf> {
 }
 
 #[test]
+fn an_unread_serverless_method_never_serves_delete_or_other_consumers() {
+    let repos = whole_workspace("iac_http_unread_method_link");
+    let source = std::fs::read_to_string(repos[1].join("serverless.yml")).unwrap();
+    std::fs::write(
+        repos[1].join("serverless.yml"),
+        source.replace("method: PATCH", "method: {Fn::If: [IsGet, GET, POST]}"),
+    )
+    .unwrap();
+    let source = std::fs::read_to_string(repos[3].join("client.ts")).unwrap();
+    std::fs::write(
+        repos[3].join("client.ts"),
+        source + "\nexport function removeInventory(sku: string) { return fetch(`https://inventory.example.test/inventory/${sku}`, { method: 'DELETE' }); }\n",
+    )
+    .unwrap();
+    assert_eq!(providers(&repos[1]), json!([]));
+    let exported = Engine::open(&repos[3]).unwrap().export().unwrap();
+    let data: Value = serde_json::from_str(&exported).unwrap();
+    let links = data["links"].as_array().unwrap();
+    let expected = [
+        (
+            "createOrchard",
+            "http::POST::/orchards",
+            "sam::runtime/app.ts::orchard",
+        ),
+        (
+            "readOrbit",
+            "http::GET::/orbits/{}",
+            "terraform::runtime/index.ts::handleOrbits",
+        ),
+        (
+            "readOrchard",
+            "http::GET::/orchards/{}",
+            "sam::runtime/app.ts::orchard",
+        ),
+    ];
+    assert_eq!(links.len(), expected.len(), "{exported}");
+    for (link, (caller, contract, target)) in links.iter().zip(expected) {
+        assert_eq!(
+            link["consumer"],
+            format!("example.com/route-oracle/consumer::client.ts::{caller}::fetch#0")
+        );
+        assert_eq!(link["contract"], contract);
+        assert_eq!(
+            link["provider"],
+            format!("example.com/route-oracle/{target}")
+        );
+        assert_eq!(link["level"], "exact");
+    }
+}
+
+#[test]
 fn all_declared_routes_link_across_repositories_and_queries_match_every_row() {
     let repos = whole_workspace("iac_http_whole");
     let consumer = Engine::open(&repos[3]).unwrap();

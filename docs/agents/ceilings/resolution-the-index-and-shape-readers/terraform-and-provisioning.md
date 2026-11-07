@@ -122,4 +122,5 @@
   known. Serverless reads its existing bounded event list and keeps method/path distinct;
   only a method field's `*` means `ANY`. Handler validation reuses `image/code.rs`, with a
   unique supported local module or explicit source file and an existing stored symbol;
-  archives and unsafe/ambiguous paths use the repository. No query reads source paths.
+  archives and unsafe/ambiguous paths use the repository. Provider resolution never validates
+  paths during queries; existing code rendering may read source for line displays.

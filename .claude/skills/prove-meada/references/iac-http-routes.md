@@ -19,18 +19,20 @@ An opaque archive preserves literal routes at the repository site and incoming l
 that repository's export. Restoration must restore the original exact link set.
 
 CLI exports drive the whole graph; MCP stdio and HTTP queries must agree. Delete all three
-IaC sources and every IaC handler/decoy source after server-mode indexing, then repeat
-read-only HTTP queries and every repo's
-provider/link export: all remain identical, including the aliased handler. The standalone
-code HTTP control keeps every baseline export field and its context bytes. Source hashes,
-oracles, raw MCP wire logs and complete exports remain in the run directory. Only a local
-loopback listener is started, and it is stopped in `finally`.
+IaC sources after server-mode indexing and require byte-identical read-only HTTP queries.
+Then delete every IaC handler/decoy source: every repo's complete provider/link set and handler
+identity must remain unchanged. Existing rendering drops a code file's line annotation when
+that file is absent; the exact transformation is the only permitted text difference and is
+checked against both binaries on a separate ordinary code HTTP control. That control also
+keeps every baseline export field and its source-available context bytes. Source hashes,
+oracles, raw MCP wire logs and complete exports remain in the run directory. Only local
+loopback listeners are started, and each is stopped in `finally`.
 
 | Method | Surface | Answer key | Catches | Misses | Setup / run |
 |---|---|---|---|---|---|
 | Complete source-derived sets | CLI export | 4: #666/#642 and ADRs | Extra/missing routes, wrong handlers/levels, fake targets and fallback | Other cloud formats beyond the finite inventory | none / seconds |
 | Existing-byte parity | CLI export, MCP context | 1: exact base binary | Shared index/HTTP regressions on code routes | Unrelated app flows | supplied base / seconds |
-| Transport and stored-fact parity | MCP stdio/HTTP, read-only export | 1: same graph and query | Partial hydration, source reads at query time, copied-surface drift | Browser rendering | none / seconds |
+| Transport and stored-fact parity | MCP stdio/HTTP, read-only export | 1: same graph and query | Partial hydration, query-time IaC/path validation, copied-surface drift | Browser rendering | none / seconds |
 
 These methods are already approved by #642 Testing Decisions and the continuation brief.
 The focused Engine tests cover the broader native/JSON, REST, quick-create and adjacent

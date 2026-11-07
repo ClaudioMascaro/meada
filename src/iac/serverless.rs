@@ -762,7 +762,13 @@ fn event_text(vars: &mut Vars, event: &Value, at: &mut Vec<Step>) -> Option<Reso
     Some(out)
 }
 
-/// Keep the method and path fields distinct: a path containing `GET /x` is not a method.
+/// HTTP fields keep known string expansions and reject unresolved segments.
+fn http_string(vars: &mut Vars, text: &str, at: &[Step]) -> Option<Resolved> {
+    let segments = vars.string(text, at);
+    (!segments.iter().any(|seg| matches!(seg, Seg::Unknown(_)))).then(|| text_of(&segments))
+}
+
+/// Keep method and path distinct. Generic Ref labels and unknown `*` sentinels are not fields.
 fn http_route(
     vars: &mut Vars,
     event: &Value,
@@ -781,17 +787,17 @@ fn http_route(
         Value::String(text) => {
             let parts = text.split_whitespace().collect::<Vec<_>>();
             match parts.as_slice() {
-                [method, path] => Some((
-                    text_of(&vars.string(method, at)),
-                    text_of(&vars.string(path, at)),
-                )),
+                [method, path] => http_string(vars, method, at).zip(http_string(vars, path, at)),
                 _ => None,
             }
         }
         Value::Object(map) => {
             let mut part = |key: &str| {
                 at.push(Step::Key(key.into()));
-                let value = map.get(key).and_then(|v| event_value(vars, v, at));
+                let value = map
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .and_then(|text| http_string(vars, text, at));
                 at.pop();
                 value
             };
