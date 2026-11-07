@@ -1,10 +1,10 @@
 # The core crate (`meada-core`)
 
-Detail behind the [architecture map](../architecture.md), which keeps the flow, identities,
+Detail behind the [architecture map](../architecture.md), which routes flow, identities,
 seams and invariants (the limits are in [Known ceilings](../ceilings.md)). The code wins over
 this file, and a change to these modules updates it.
 
-The crates are described in the [architecture map](../architecture.md#crates). The modules of
+The crates are described in the [crate overview](overview/crates.md). The modules of
 `meada-core`:
 
 - `meada-core/src/manifest.rs`: a workspace manifest's `[[repository]]` (`EntryFile`,
