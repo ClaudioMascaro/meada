@@ -21,7 +21,7 @@ CREATE INDEX candidates_call ON candidates (call);
 CREATE INDEX candidates_target ON candidates (target);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
-    method TEXT, fragments TEXT, shape TEXT
+    method TEXT, fragments TEXT, shape TEXT, identity TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (
@@ -82,6 +82,27 @@ CREATE INDEX iac_images_address ON iac_images (root, address);
 CREATE TABLE iac_unresolved (
     root TEXT NOT NULL, path TEXT NOT NULL, entry TEXT NOT NULL, reason TEXT NOT NULL
 );
+
+receiver_identity
+[
+  {
+    "kind": "subscription",
+    "parts": [
+      {
+        "Literal": "orders"
+      },
+      {
+        "Environment": "SUBSCRIPTION"
+      }
+    ]
+  },
+  {
+    "kind": "entity",
+    "parts": [
+      "Unresolved"
+    ]
+  }
+]
 
 sample.ts
 {

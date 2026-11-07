@@ -11,3 +11,5 @@ a ticket accepted, each with its value and its reason. Detail behind the
 - [HTTP routes and clients (C# and Swift)](ceilings/http-clients-csharp-swift.md)
 - [Channel clients](ceilings/channel-clients.md)
 - [Server, accounts, workspaces and deploy](ceilings/server-accounts-workspaces-and-deploy.md)
+
+- [Azure SDK clients](ceilings/azure-sdk-clients.md): bounded five-group inventory, shared evaluation controls and scoped receiver names.

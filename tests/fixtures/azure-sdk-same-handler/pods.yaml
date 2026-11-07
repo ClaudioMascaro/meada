@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Pod
+metadata: {name: same-handler}
+spec:
+  containers:
+    - name: worker
+      image: ghcr.io/probe/azure-sdk-worker:v1
+      env: [{name: BUS, value: orders}]

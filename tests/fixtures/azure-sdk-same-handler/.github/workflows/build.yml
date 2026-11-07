@@ -1,0 +1,6 @@
+jobs:
+  publish:
+    steps:
+      - uses: docker/build-push-action@v6
+        with:
+          tags: ghcr.io/probe/azure-sdk-worker:v1

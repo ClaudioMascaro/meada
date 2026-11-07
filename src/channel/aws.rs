@@ -107,6 +107,7 @@ impl Operation {
             Argument::Unresolved => (None, "sdk:aws".into()),
         };
         Found {
+            identity: None,
             role: Role::Provider,
             site: Site::Call {
                 path: path.into(),

@@ -27,3 +27,9 @@ evidence for presentation.
   stored in `contracts.role`; the site does not imply it (a channel producer is a `Site::Call`, a channel
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
   in the index: unnamed inline segments drop, and an empty result is the file's top level.
+
+`environment_identity` (#670) optionally resolves a private `ReceiverIdentity` from certain
+stored `EnvironmentValue` entries. Scope includes workload, IaC root and selected container;
+only the kind interprets subtype and companion components. A claimed empty result prevents
+scalar fallback. Legacy None retains `environment_name` / `environment_target`. Identity stays
+out of public exports, while `method` and `via` retain actual written operation/provenance.

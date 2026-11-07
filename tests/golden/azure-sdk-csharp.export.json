@@ -1,0 +1,412 @@
+{
+  "format": 1,
+  "repository": "local/azure-sdk-csharp",
+  "files": [
+    {
+      "path": "Worker.cs",
+      "hash": "be96affe492c42d6f543c61764af00b7cd5fe4d373f1ae47325b768fced24eec"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker",
+      "span": {
+        "path": "Worker.cs",
+        "start": 184,
+        "end": 1501
+      },
+      "hash": "f45f671e19dec844c5b024d95bf6c32bf5fe0adc526adff43757b3620d684955"
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Read()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1183,
+        "end": 1379
+      },
+      "hash": "b872eef58096f2b9764e70bb2b9c665e5fa6c6d8ad0e417fc0ecb85b7c56f208"
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Receive()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 355,
+        "end": 513
+      },
+      "hash": "f2bff8d695f341143ed6cf419a1ba217e192d4ed41b0ca81c9041176c7bf759e"
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.ReceiveEvents()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 822,
+        "end": 961
+      },
+      "hash": "3f9fe542f2031d085967235911f32dd097fcd609355db2c0524fe26ef661cc02"
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Secret()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1381,
+        "end": 1499
+      },
+      "hash": "094a40fd2991e488cc536c0c215651982a8eb290479ff0dc4c1c760fce8be97b"
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Send()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 200,
+        "end": 353
+      },
+      "hash": "dcacef58b0cc91d841155f8eca20348a1030fd73370a4c883c4e68fbb9092962"
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.SendEvents()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 688,
+        "end": 820
+      },
+      "hash": "c14d34783772fa391140ef5751947f5743bffa1e9dec8b51d211cd342db62cf2"
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Subscribe()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 515,
+        "end": 686
+      },
+      "hash": "7d4b30ea61224693a3941bae9833d7c1af439e342702d99b551efc5de72c8446"
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Write()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 963,
+        "end": 1181
+      },
+      "hash": "034c6776512f74eeb1e6008b418d6ca783aa1eb89b05c925110cbc81f250c83e"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Read()::(invocation_expression).GetBlobClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1263,
+        "end": 1340
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Read()::BlobServiceClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1217,
+        "end": 1250
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Read()::blob.DownloadToAsync#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1348,
+        "end": 1376
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Read()::storage.GetBlobContainerClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Read()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1263,
+        "end": 1311
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Receive()::ServiceBusClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 388,
+        "end": 420
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Receive()::bus.CreateReceiver#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 437,
+        "end": 472
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Receive()::receiver.ReceiveMessageAsync#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 480,
+        "end": 510
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.ReceiveEvents()::EventHubConsumerClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.ReceiveEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 866,
+        "end": 930
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.ReceiveEvents()::consumer.ReadEventsAsync#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.ReceiveEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 932,
+        "end": 958
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Secret()::SecretClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Secret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1416,
+        "end": 1451
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Secret()::secret.GetSecretAsync#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Secret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1459,
+        "end": 1496
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Send()::ServiceBusClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 230,
+        "end": 262
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Send()::bus.CreateSender#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 277,
+        "end": 310
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Send()::sender.SendMessageAsync#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 318,
+        "end": 350
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.SendEvents()::EventHubProducerClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.SendEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 729,
+        "end": 784
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.SendEvents()::producer.SendAsync#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.SendEvents()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 792,
+        "end": 817
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Subscribe()::ServiceBusClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Subscribe()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 550,
+        "end": 582
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Subscribe()::bus.CreateReceiver#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Subscribe()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 599,
+        "end": 643
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Subscribe()::receiver.ReceiveMessagesAsync#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Subscribe()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 651,
+        "end": 683
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Write()::BlobServiceClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Write()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 998,
+        "end": 1031
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Write()::blob.UploadAsync#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Write()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1156,
+        "end": 1178
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Write()::container.GetBlobClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Write()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1110,
+        "end": 1148
+      }
+    },
+    {
+      "id": "local/azure-sdk-csharp::Worker.cs::Worker.Write()::storage.GetBlobContainerClient#0",
+      "caller": "local/azure-sdk-csharp::Worker.cs::Worker.Write()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1049,
+        "end": 1097
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::eventhubs::events-csharp",
+      "site": "local/azure-sdk-csharp::Worker.cs::Worker.SendEvents()::producer.SendAsync#0"
+    },
+    {
+      "contract": "channel::servicebus::orders-csharp",
+      "site": "local/azure-sdk-csharp::Worker.cs::Worker.Send()::sender.SendMessageAsync#0"
+    },
+    {
+      "contract": "resource::azureblob::uploads-csharp",
+      "site": "local/azure-sdk-csharp::Worker.cs::Worker.Write()::blob.UploadAsync#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::azureblob::uploads-csharp",
+      "site": "local/azure-sdk-csharp::Worker.cs::Worker.Read()::blob.DownloadToAsync#0",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::orders-csharp",
+      "site": "local/azure-sdk-csharp::Worker.cs::Worker.Receive()",
+      "via": null
+    },
+    {
+      "contract": "channel::eventhubs::events-csharp",
+      "site": "local/azure-sdk-csharp::Worker.cs::Worker.ReceiveEvents()",
+      "via": null
+    },
+    {
+      "contract": "resource::keyvault::token-csharp",
+      "site": "local/azure-sdk-csharp::Worker.cs::Worker.Secret()::secret.GetSecretAsync#0",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::subscription:orders-csharp/audit",
+      "site": "local/azure-sdk-csharp::Worker.cs::Worker.Subscribe()",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/azure-sdk-csharp::Worker.cs::Worker.Read()::blob.DownloadToAsync#0",
+      "provider": "local/azure-sdk-csharp::Worker.cs::Worker.Write()::blob.UploadAsync#0",
+      "contract": "resource::azureblob::uploads-csharp",
+      "level": "exact",
+      "reason": "resource::azureblob::uploads-csharp"
+    },
+    {
+      "consumer": "local/azure-sdk-csharp::Worker.cs::Worker.Receive()",
+      "provider": "local/azure-sdk-csharp::Worker.cs::Worker.Send()::sender.SendMessageAsync#0",
+      "contract": "channel::servicebus::orders-csharp",
+      "level": "exact",
+      "reason": "channel::servicebus::orders-csharp"
+    },
+    {
+      "consumer": "local/azure-sdk-csharp::Worker.cs::Worker.ReceiveEvents()",
+      "provider": "local/azure-sdk-csharp::Worker.cs::Worker.SendEvents()::producer.SendAsync#0",
+      "contract": "channel::eventhubs::events-csharp",
+      "level": "exact",
+      "reason": "channel::eventhubs::events-csharp"
+    }
+  ]
+}

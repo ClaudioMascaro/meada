@@ -1,0 +1,368 @@
+{
+  "format": 1,
+  "repository": "local/azure-sdk-typed-env",
+  "files": [
+    {
+      "path": "worker.ts",
+      "hash": "5e4e74ad37ccb51a9221e9711a12ef76a53edf7c60a298972de63d060b35f1d1"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::publish",
+      "span": {
+        "path": "worker.ts",
+        "start": 598,
+        "end": 670
+      },
+      "hash": "e0a6bc2132d06f56202e0f9554f4f2a732a801fb5265015faf82b0e9e0d1e907"
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::queue",
+      "span": {
+        "path": "worker.ts",
+        "start": 213,
+        "end": 291
+      },
+      "hash": "679d97bf99d6ac3d922e5d45716a12c768221840e84b224cfc5f0e244c0bcb5e"
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::receive",
+      "span": {
+        "path": "worker.ts",
+        "start": 108,
+        "end": 205
+      },
+      "hash": "f9a815f20d0d1eaab9c1dee572f641524e81be983a92f3e7323bff7fbc0e0d31"
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::wrongQueue",
+      "span": {
+        "path": "worker.ts",
+        "start": 299,
+        "end": 380
+      },
+      "hash": "e7ef3d64a1a92de54cec36eb99e0de488e6ec5169c0eba6e93779c4a51ca3053"
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::wrongService",
+      "span": {
+        "path": "worker.ts",
+        "start": 505,
+        "end": 590
+      },
+      "hash": "7aec2b5c9cc04883770e99e297090da946870783542aff83e539b4b09bba2405"
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::wrongSubscription",
+      "span": {
+        "path": "worker.ts",
+        "start": 388,
+        "end": 497
+      },
+      "hash": "3a8974ab27fb8a678317532aaa27658d3edcc87cc2656f760a118e827c2de6e6"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::ServiceBusClient#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 67,
+        "end": 99
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::publish::(call_expression).sendMessages#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::publish",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 619,
+        "end": 667
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::publish::bus.createSender#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::publish",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 619,
+        "end": 645
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::queue::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::queue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 232,
+        "end": 288
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::queue::bus.createReceiver#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::queue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 232,
+        "end": 269
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::receive::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 129,
+        "end": 202
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::receive::bus.createReceiver#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 129,
+        "end": 183
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::wrongQueue::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::wrongQueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 323,
+        "end": 377
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::wrongQueue::bus.createReceiver#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::wrongQueue",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 323,
+        "end": 358
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::wrongService::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::wrongService",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 531,
+        "end": 587
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::wrongService::bus.createReceiver#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::wrongService",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 531,
+        "end": 568
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::wrongSubscription::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::wrongSubscription",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 419,
+        "end": 494
+      }
+    },
+    {
+      "id": "local/azure-sdk-typed-env::worker.ts::wrongSubscription::bus.createReceiver#0",
+      "caller": "local/azure-sdk-typed-env::worker.ts::wrongSubscription",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 419,
+        "end": 475
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::servicebus::orders",
+      "site": "local/azure-sdk-typed-env::worker.ts::publish::(call_expression).sendMessages#0"
+    },
+    {
+      "contract": "image::ghcr.io/probe/azure-sdk-worker",
+      "site": "local/azure-sdk-typed-env",
+      "at": ".github/workflows/build.yml#jobs.publish.steps[0].with.tags"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "image::ghcr.io/probe/azure-sdk-worker",
+      "site": "local/azure-sdk-typed-env::main.tf::azurerm_linux_function_app.worker",
+      "via": null,
+      "root": "."
+    },
+    {
+      "contract": "channel::servicebus::orders/subscriptions/audit",
+      "site": "local/azure-sdk-typed-env::worker.ts::queue",
+      "via": "workload:local/azure-sdk-typed-env::main.tf::azurerm_linux_function_app.worker (root .), env:QUEUE"
+    },
+    {
+      "contract": "channel::servicebus::subscription:orders/audit",
+      "site": "local/azure-sdk-typed-env::worker.ts::receive",
+      "via": "workload:local/azure-sdk-typed-env::main.tf::azurerm_linux_function_app.worker (root .), env:SUB; workload:local/azure-sdk-typed-env::main.tf::azurerm_linux_function_app.worker (root .), env:TOPIC"
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-typed-env::worker.ts::wrongQueue",
+      "via": "env:SUB"
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-typed-env::worker.ts::wrongService",
+      "via": "env:WRONG"
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-typed-env::worker.ts::wrongSubscription",
+      "via": "env:TOPIC"
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "local/azure-sdk-typed-env::main.tf::azurerm_linux_function_app.worker",
+      "address": "azurerm_linux_function_app.worker",
+      "type": "azurerm_linux_function_app",
+      "root": ".",
+      "path": "main.tf",
+      "line": 13,
+      "end_line": 30
+    },
+    {
+      "identity": "local/azure-sdk-typed-env::main.tf::azurerm_servicebus_queue.slash",
+      "address": "azurerm_servicebus_queue.slash",
+      "type": "azurerm_servicebus_queue",
+      "root": ".",
+      "path": "main.tf",
+      "line": 12,
+      "end_line": 12
+    },
+    {
+      "identity": "local/azure-sdk-typed-env::main.tf::azurerm_servicebus_subscription.audit",
+      "address": "azurerm_servicebus_subscription.audit",
+      "type": "azurerm_servicebus_subscription",
+      "root": ".",
+      "path": "main.tf",
+      "line": 2,
+      "end_line": 5
+    },
+    {
+      "identity": "local/azure-sdk-typed-env::main.tf::azurerm_servicebus_topic.orders",
+      "address": "azurerm_servicebus_topic.orders",
+      "type": "azurerm_servicebus_topic",
+      "root": ".",
+      "path": "main.tf",
+      "line": 1,
+      "end_line": 1
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::servicebus::orders",
+      "node": "local/azure-sdk-typed-env::main.tf::azurerm_servicebus_topic.orders",
+      "root": "."
+    },
+    {
+      "contract": "channel::servicebus::orders/subscriptions/audit",
+      "node": "local/azure-sdk-typed-env::main.tf::azurerm_servicebus_queue.slash",
+      "root": "."
+    },
+    {
+      "contract": "channel::servicebus::subscription:orders/audit",
+      "node": "local/azure-sdk-typed-env::main.tf::azurerm_servicebus_subscription.audit",
+      "root": "."
+    }
+  ],
+  "uses": [
+    {
+      "contract": "channel::eventhubs::orders",
+      "site": "local/azure-sdk-typed-env",
+      "at": "main.tf#resource.azurerm_linux_function_app.worker.app_settings.WRONG"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/azure-sdk-typed-env::main.tf::azurerm_linux_function_app.worker",
+      "provider": "local/azure-sdk-typed-env",
+      "contract": "image::ghcr.io/probe/azure-sdk-worker",
+      "level": "exact",
+      "reason": "image::ghcr.io/probe/azure-sdk-worker",
+      "root": "."
+    },
+    {
+      "consumer": "local/azure-sdk-typed-env::worker.ts::receive",
+      "provider": "local/azure-sdk-typed-env::worker.ts::publish::(call_expression).sendMessages#0",
+      "contract": "channel::servicebus::subscription:orders/audit",
+      "level": "inferred",
+      "reason": "channel::servicebus::subscription:orders/audit subscription azurerm_servicebus_subscription.audit (root .) via azurerm_servicebus_subscription_rule.filter; filter; workload:local/azure-sdk-typed-env::main.tf::azurerm_linux_function_app.worker (root .), env:SUB; workload:local/azure-sdk-typed-env::main.tf::azurerm_linux_function_app.worker (root .), env:TOPIC"
+    }
+  ],
+  "provisions": [
+    {
+      "side": "local/azure-sdk-typed-env::worker.ts::publish::(call_expression).sendMessages#0",
+      "provisioner": "local/azure-sdk-typed-env::main.tf::azurerm_servicebus_topic.orders",
+      "root": ".",
+      "contract": "channel::servicebus::orders",
+      "level": "exact",
+      "reason": "channel::servicebus::orders"
+    },
+    {
+      "side": "local/azure-sdk-typed-env::worker.ts::queue",
+      "provisioner": "local/azure-sdk-typed-env::main.tf::azurerm_servicebus_queue.slash",
+      "root": ".",
+      "contract": "channel::servicebus::orders/subscriptions/audit",
+      "level": "inferred",
+      "reason": "channel::servicebus::orders/subscriptions/audit; workload:local/azure-sdk-typed-env::main.tf::azurerm_linux_function_app.worker (root .), env:QUEUE"
+    },
+    {
+      "side": "local/azure-sdk-typed-env::worker.ts::receive",
+      "provisioner": "local/azure-sdk-typed-env::main.tf::azurerm_servicebus_subscription.audit",
+      "root": ".",
+      "contract": "channel::servicebus::subscription:orders/audit",
+      "level": "inferred",
+      "reason": "channel::servicebus::subscription:orders/audit; workload:local/azure-sdk-typed-env::main.tf::azurerm_linux_function_app.worker (root .), env:SUB; workload:local/azure-sdk-typed-env::main.tf::azurerm_linux_function_app.worker (root .), env:TOPIC"
+    }
+  ],
+  "subscriptions": [
+    {
+      "source": "channel::servicebus::orders",
+      "target": "channel::servicebus::subscription:orders/audit",
+      "node": "local/azure-sdk-typed-env::main.tf::azurerm_servicebus_subscription.audit",
+      "root": "."
+    }
+  ]
+}

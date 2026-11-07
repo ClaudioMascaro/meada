@@ -12,6 +12,12 @@ All notable changes to Meada are recorded here. The format follows
   create, SAM Api/HttpApi and Serverless http/httpApi events resolve to local handler symbols
   or the repository, with normalized parameters, cross-repository HTTP links and stored
   path/target evidence. Included in the meada/meada-core 1.4.0 minor release.
+- Azure SDK sides in JavaScript/TypeScript, Python, Java, Go and C# (#670): verified
+  constructors connect Service Bus and Event Hubs sends/receives, Blob container reads/writes
+  and Key Vault secret reads to physical contracts. New subscription receivers retain their
+  topic and subscription through exact factories and scoped workload environments. Existing
+  C# Service Bus forms keep their identities; resource readers retain each operation site.
+  The bounded inventory joins the shared meada/meada-core 1.4.0 minor release.
 
 - GCP SDK use sides in JavaScript/TypeScript, Python, Java, Go and C# (#668): verified client
   constructors connect Pub/Sub publish and subscription receive, Cloud Storage reads/writes

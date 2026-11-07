@@ -150,7 +150,7 @@ CREATE INDEX candidates_call ON candidates (call);
 CREATE INDEX candidates_target ON candidates (target);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
-    method TEXT, fragments TEXT, shape TEXT
+    method TEXT, fragments TEXT, shape TEXT, identity TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (
@@ -1387,6 +1387,7 @@ fn refresh_keeping(
             });
         }
         let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
+        let identity = f.identity.as_ref().map(serde_json::to_string).transpose()?;
         let key = (
             role,
             site,
@@ -1395,6 +1396,7 @@ fn refresh_keeping(
             path,
             &f.method,
             fragments.transpose()?,
+            identity,
         );
         let shape = rows.entry(key).or_default();
         match (shape.as_mut(), &f.shape) {
@@ -1403,11 +1405,13 @@ fn refresh_keeping(
             (_, None) => {}
         }
     }
-    for ((role, site, contract, via, path, method, fragments), shape) in rows {
+    for ((role, site, contract, via, path, method, fragments, identity), shape) in rows {
         let shape = shape.as_ref().map(serde_json::to_string).transpose()?;
         tx.execute(
-            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![role, contract, site, via, path, method, fragments, shape],
+            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                role, contract, site, via, path, method, fragments, shape, identity
+            ],
         )?;
     }
     tx.execute("DELETE FROM exports", [])?;
@@ -2519,13 +2523,22 @@ pub(crate) struct Export {
 /// Puts `providers` back in the order `export` reads them in, after a kind's `declare` added
 /// some.
 pub(crate) fn sort_providers(providers: &mut [Provider]) {
-    providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
+    providers.sort_by(|a, b| {
+        (&a.contract, &a.site, &a.identity).cmp(&(&b.contract, &b.site, &b.identity))
+    });
 }
 
 /// Puts `consumers` back in the order `export` reads them in, after a kind's `declare` added
 /// some.
 pub(crate) fn sort_consumers(consumers: &mut [Consumer]) {
-    consumers.sort_by(|a, b| (&a.site, &a.contract, &a.via).cmp(&(&b.site, &b.contract, &b.via)));
+    consumers.sort_by(|a, b| {
+        (&a.site, &a.contract, &a.via, &a.identity).cmp(&(
+            &b.site,
+            &b.contract,
+            &b.via,
+            &b.identity,
+        ))
+    });
 }
 
 impl Export {
@@ -2678,6 +2691,8 @@ pub(crate) struct Provider {
     pub(crate) via: Option<String>,
     /// The written SDK operation, when this side was extracted from code (`contracts.method`).
     pub(crate) method: Option<String>,
+    /// Private kind-owned receiver identity; never part of the public export schema.
+    pub(crate) identity: Option<crate::contract::ReceiverIdentity>,
     /// Configuration location for a repository-level builder.
     pub(crate) at: Option<String>,
     /// Evidence that this side's evaluated name is overridable.
@@ -2721,6 +2736,7 @@ pub(crate) struct Consumer {
     /// the parsed response (`contracts.shape`, spec #23).
     pub(crate) shape: Option<Shape>,
     pub(crate) method: Option<String>,
+    pub(crate) identity: Option<crate::contract::ReceiverIdentity>,
     pub(crate) fragments: Vec<String>,
     /// For a call through a package import, where it resolves in each provider of the package
     /// (`package::import`); `Packages::link` turns them into links.
@@ -2741,6 +2757,10 @@ impl Consumer {
 /// A `contracts.shape` value; one that does not parse reads as no shape.
 fn stored_shape(json: Option<String>) -> Option<Shape> {
     // ponytail: written by `refresh` only, so a bad value is an index to rebuild.
+    serde_json::from_str(&json?).ok()
+}
+
+fn stored_identity(json: Option<String>) -> Option<crate::contract::ReceiverIdentity> {
     serde_json::from_str(&json?).ok()
 }
 
@@ -2808,7 +2828,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         .collect();
     let providers = db
         .prepare(
-            "SELECT contract, site, shape, via, method FROM contracts WHERE role = 'provider' \
+            "SELECT contract, site, shape, via, method, identity FROM contracts WHERE role = 'provider' \
              ORDER BY contract, site",
         )?
         .query_map([], |r| {
@@ -2818,18 +2838,20 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                 shape: stored_shape(r.get(2)?),
                 via: r.get(3)?,
                 method: r.get(4)?,
+                identity: stored_identity(r.get(5)?),
                 ..Provider::default()
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
     let consumers = db
         .prepare(
-            "SELECT contract, site, via, method, fragments, shape FROM contracts \
+            "SELECT contract, site, via, method, fragments, shape, identity FROM contracts \
              WHERE role = 'consumer' ORDER BY site, contract, via",
         )?
         .query_map([], |r| {
             let fragments: Option<String> = r.get(4)?;
             Ok(Consumer {
+                identity: stored_identity(r.get(6)?),
                 contract: r.get(0)?,
                 site: r.get(1)?,
                 via: r.get(2)?,
@@ -3906,6 +3928,23 @@ mod tests {
     fn the_stored_format_matches_its_golden() {
         let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
         let mut actual = SCHEMA.trim_start().to_string();
+        let identity = [
+            crate::contract::ReceiverIdentity {
+                kind: "subscription".into(),
+                parts: vec![
+                    crate::names::Argument::Literal("orders".into()),
+                    crate::names::Argument::Environment("SUBSCRIPTION".into()),
+                ],
+            },
+            crate::contract::ReceiverIdentity {
+                kind: "entity".into(),
+                parts: vec![crate::names::Argument::Unresolved],
+            },
+        ];
+        actual += &format!(
+            "\nreceiver_identity\n{}\n",
+            serde_json::to_string_pretty(&identity).unwrap()
+        );
         for pack in lang::packs() {
             let name = format!("sample.{}", pack.extensions()[0]);
             let src = fs::read(tests.join("fixtures/schema").join(&name)).unwrap_or_else(|_| {

@@ -45,3 +45,5 @@ topic leaves within 24 KiB; the code wins over these entries.
 <a id="image-pattern-choices-674"></a>
 
 - [Image pattern choices (#674)](contracts/image-contracts-662.md#image-pattern-choices-674)
+
+- [Azure SDK use sides (#670)](contracts/azure-sdk-670.md): receiver identity, exact factory evidence, scoped companions and stored compatibility.

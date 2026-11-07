@@ -276,6 +276,7 @@ impl Operation {
             None => format!("resource::{}", self.service),
         };
         Found {
+            identity: None,
             role,
             site: Site::Call {
                 path: path.into(),

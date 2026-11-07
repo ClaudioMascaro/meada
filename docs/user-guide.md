@@ -1316,7 +1316,7 @@ são dois canais:
 | Redis streams | `redis` | |
 | BullMQ | `bullmq` | só em TypeScript e JavaScript |
 | JMS | `jms` | só em Java e Kotlin (Spring JMS) |
-| Azure Service Bus | `servicebus` | só em C# |
+| Azure Service Bus | `servicebus` | JS/TS, Python, Java, Go e C# |
 
 Os clientes de cada linguagem estão na seção 9. O Swift não tem leitura de canais no 1.0.
 
@@ -2327,3 +2327,21 @@ leituras somente no código executado pela imagem ou caminho correspondente, com
 `inferred`. Referências a segredos e valores desconhecidos ficam sem resolução. Consulte
 [as capacidades](site/pt/capabilities.md#azure-contratos-e-functions) para os tipos e
 limites; `context`, `trace`, export e órfãos seguem as mesmas regras de provisionamento.
+
+### Uso dos SDKs Azure nos cinco grupos de linguagens
+
+Construtores conhecidos dos SDKs Azure criam os lados das operações abaixo. JavaScript e TypeScript formam um grupo, com verificações separadas. Java usa os builders `com.azure` listados; JavaScript usa os construtores de `@azure/service-bus`, `@azure/event-hubs`, `@azure/storage-blob` e `@azure/keyvault-secrets`. Python usa `azure.servicebus`, `azure.eventhub`, `azure.storage.blob` e `azure.keyvault.secrets`, incluindo as versões `aio` e as fábricas `from_connection_string` dos três primeiros serviços. Go usa os pacotes correspondentes de `github.com/Azure/azure-sdk-for-go/sdk`: Service Bus e Event Hubs também aceitam fábricas `FromConnectionString`; Blob aceita `NewClient`, `NewClientWithNoCredential`, `NewClientWithSharedKeyCredential` e `NewClientFromConnectionString`. .NET usa `Azure.Messaging.ServiceBus`, `Azure.Messaging.EventHubs.Producer` / `.Consumer`, `Azure.Storage.Blobs` e `Azure.Security.KeyVault.Secrets`. Blob em JS também aceita `BlobServiceClient.fromConnectionString`.
+
+| Grupo | Service Bus produtor / consumidor | Event Hubs produtor / consumidor | Blob escritor / leitor | Key Vault leitor |
+| --- | --- | --- | --- | --- |
+| JavaScript + TypeScript | `createSender(name).sendMessages` / `createReceiver(queue)` or `(topic, subscription)`, then `receiveMessages` or `subscribe` | `EventHubProducerClient(..., hub).sendBatch` / `EventHubConsumerClient(group, ..., hub).subscribe` | service → `getContainerClient(container)` → `getBlockBlobClient(object)`: `upload`, `uploadData`, `uploadFile`, `uploadStream`; blob `download`, `downloadToBuffer`, `downloadToFile` | `SecretClient.getSecret(name)` |
+| Python | `get_queue_sender` / `get_topic_sender` → `send_messages`; `get_queue_receiver` / `get_subscription_receiver` → `receive_messages` | `eventhub_name` explícito: producer `send_batch` / consumer `receive` | service `get_blob_client(container, blob)` or `get_container_client(container).get_blob_client(blob)`: `upload_blob` / `download_blob` | `SecretClient.get_secret(name)` |
+| Java | `ServiceBusClientBuilder.sender().queueName` or `topicName` → `buildClient`: `sendMessage`, `sendMessages`; receiver `queueName` or `topicName` + `subscriptionName` → `buildClient().receiveMessages` | builder `connectionString(cs, hub)` or `credential(namespace, hub, credential)`: `buildProducerClient().send` / `consumerGroup(...).buildConsumerClient().receiveFromPartition` | `BlobServiceClientBuilder...buildClient().getBlobContainerClient(container).getBlobClient(object)`: `upload`, `uploadFromFile` / `downloadContent`, `downloadStream`, `downloadToFile` | `SecretClientBuilder...buildClient().getSecret(name)` |
+| Go | `NewSender` → `SendMessage`, `SendMessageBatch`; `NewReceiverForQueue` / `NewReceiverForSubscription` → `ReceiveMessages` | `NewProducerClient` → `SendEventDataBatch`; `NewConsumerClient` → `NewPartitionClient` → `ReceiveEvents` | `UploadBuffer`, `UploadFile`, `UploadStream` / `DownloadBuffer`, `DownloadFile`, `DownloadStream`, contêiner após `ctx` | `GetSecret(ctx, name, version, ...)` |
+| C# | envios, agendamentos e processadores existentes mantidos; novos `CreateReceiver(queue)` / `(topic, subscription)` → `ReceiveMessageAsync`, `ReceiveMessagesAsync` | hub explícito: producer `SendAsync` / consumer `ReadEventsAsync` | service → `GetBlobContainerClient(container)` → `GetBlobClient(object)`: `Upload`, `UploadAsync` / `DownloadTo`, `DownloadToAsync`; container `UploadBlob`, `UploadBlobAsync` | `SecretClient.GetSecret`, `GetSecretAsync` |
+
+Os nomes identificam filas/tópicos, hubs, contêineres de blobs e segredos. Grupo, partição, objeto e versão do segredo não alteram o contrato. IDs ARM e URLs de Blob/Key Vault suportados seguem a mesma normalização da infraestrutura e configuração. Uma nova assinatura de tópico é `channel::servicebus::subscription:<topic>/<subscription>`; uma fila com `/subscriptions/` continua distinta. Os processadores C# existentes mantêm a identidade do tópico.
+
+Um nome do ambiente continua não resolvido, com `env:NAME`, sem uma carga armazenada que execute o código. Tópico e assinatura só se combinam na mesma carga, raiz e contêiner; valores desconhecidos ou referências tipadas incompatíveis continuam não resolvidos. Links resolvidos pelo ambiente são `inferred`. Chamadas exatas de fábricas mantêm os nomes próprios dos receptores. Construtores ocultos, clientes apenas tipados, saltos por coincidência de nome, receptores reatribuídos e retornos opacos não criam novos lados SDK.
+
+O inventário é limitado. Strings de conexão e credenciais não são analisadas para obter nomes; Event Hubs exige um argumento explícito de hub. Construtores diretos de URL de Blob/Container, processadores de sessão, outras famílias de polling/streaming, operações de listagem/exclusão/metadados e outros SDKs ficam fora da lista. Apenas criar um cliente ou handle não dá direção.

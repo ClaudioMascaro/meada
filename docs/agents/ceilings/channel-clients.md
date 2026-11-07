@@ -36,7 +36,7 @@
   write, looked up by a map, never searched) are as many as the file's writes. Left out:
   MassTransit; `SubscribeSync`, `QueueSubscribe` and `Request` of NATS.Client, and NATS.Net v2 as
   a whole; `BasicGet` and a consumer class that overrides `HandleBasicDeliver` (the handler is
-  the method holding `BasicConsume`); `CreateReceiver` and `CreateSessionProcessor`; a Service
+  the method holding `BasicConsume`); `CreateSessionProcessor` (new constructor-backed polling receivers are covered by #670); a Service
   Bus sender made in another file than the one that sends; a stream read by an array of
   `StreamPosition` (unresolved); a `TopicPartition` as the Kafka target; a topic list built as
   `new List<string> { .. }` (unresolved); `request.QueueUrl = ..` set after the construction; a
