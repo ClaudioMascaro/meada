@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import socket
 import subprocess
+import sys
 import time
 
 from prove import Http, answer, free_port, git, mcp_answers
@@ -273,6 +274,8 @@ def main():
     run.mkdir(parents=True, exist_ok=False)
     roots, oracle = seed(run)
     if args.seed_only:
+        subprocess.run([sys.executable, str(Path(__file__).with_name('gcp-sdk-supplement.py')),
+                        '--run', str(run / 'supplement'), '--seed-only'], check=True)
         return
     assert args.head_bin, '--head-bin is required except with --seed-only'
     binary = str(Path(args.head_bin).resolve())
@@ -290,6 +293,9 @@ def main():
         path.write_text(original)
         restored = json.loads(capture(binary, root, run, language + '.restored', 'export'))
         assert restored == data
+    subprocess.run([sys.executable, str(Path(__file__).with_name('gcp-sdk-supplement.py')),
+                    '--head-bin', binary, '--run', str(run / 'supplement'),
+                    *(['--http'] if args.http else [])], check=True)
     saved(run, 'checks.json', {'checks': 'passed', 'answer_key': '#668/#642; official SDK inventory; base ADR 0026',
                               'independent': False, 'http': args.http, 'groups': list(EXT)})
     print('GCP SDK checks passed; independent checker judges scope and verdict')
