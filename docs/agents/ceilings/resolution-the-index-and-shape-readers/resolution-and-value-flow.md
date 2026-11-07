@@ -75,6 +75,9 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   folded deeper than that, through the items of lists and objects, the constants it names and
   the arguments callers pass, is unknown, and a value traced through more constants,
   parameters and return values than that, each into the next, has no origin.
+  `Code::eval` keeps variant-specific temporaries in separate helpers so an alias step does
+  not reserve the combined object/call frame. The Java HTTP local-chain regression also runs
+  in CI's debug profile: a debug0 pass alone does not establish stack safety at this limit.
   `FAMILY_DEPTH` (128): a class family (the class and its ancestors in C3 order) longer than
   that is absent, so every member of the class is unknown (a name match at most), and the
   linearization recurses no deeper down the bases. The bases count from where the walk
