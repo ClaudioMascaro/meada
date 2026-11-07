@@ -63,7 +63,7 @@
       "queries": "compose.jsonl",
       "query_count": 41,
       "expected_nodes": 10,
-      "expected_reference_groups": 16,
+      "expected_reference_groups": 20,
       "lifecycle": "compose.expected.json#source_edits"
     },
     {
@@ -80,7 +80,7 @@
     }
   ],
   "total_expected_source_nodes": 460,
-  "total_expected_reference_groups": 217,
+  "total_expected_reference_groups": 221,
   "total_baseline_queries": 1509,
   "source_hashes": "source-sha256.json",
   "query_scope_rule": "Run each exact per-source query file only against the source/entry in that row. The requested per-format aggregate .jsonl files concatenate several repository scopes and are source-key indexes only; do not pass them to a single capture invocation. queries.jsonl is the neutral kube/crossplane scope only.",

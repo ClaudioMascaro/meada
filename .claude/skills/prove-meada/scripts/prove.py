@@ -807,6 +807,22 @@ def cmd_selftest(_):
             assert row['value'] == (None if private else 'neutral-default'), (i, row)
             if 'Default: *default' in source:
                 assert row['line'] == next(n for n, line in enumerate(source.splitlines(), 1) if 'Default: *default' in line), row
+        # YAML test suite L24T/01 and JEF9/02 treat the EOF of a block
+        # content line as its final break. PyYAML omits it without this shim.
+        for source, value in [
+            ('foo: |\n  x\n   ', 'x\n \n'),
+            ('- |+\n   ', '\n'),
+            ('foo: |\n  x', 'x\n'),
+            ('foo: >\n  x\n  y', 'x y\n'),
+            ('foo: |-\n  x', 'x'),
+            ('foo: |+', ''),
+            ('foo: "x"', 'x'),
+            ('foo: x', 'x'),
+        ]:
+            (Path(d) / 'eof.yaml').write_text(source)
+            outcome = read_config(Path(d), 'eof.yaml')
+            assert outcome[0] == 'read' and len(outcome[1]) == 1, outcome
+            assert outcome[1][0]['value'] == value, (source, outcome)
     e = b'{\n  "format": 1,\n  "repository": "r",\n  "commit": "abc",\n  "dirty": false,\n  "files": []\n}\n'
     assert body(e) == b'{\n  "format": 1,\n  "repository": "r",\n  "files": []\n}\n', body(e)
     assert body(e) == body(e.replace(b'  "commit": "abc",\n  "dirty": false,\n', b"")) and quoted("r::a") == b'"r::a"'
@@ -1007,7 +1023,7 @@ def read_config(repo, rel, lockfiles=True):
         text = data.decode("utf-8")
         if rel.endswith(".json"):
             json.loads(text)  # JSON's own rules: a JSONC file with comments is unreadable
-        docs = list(yaml.compose_all(text.replace("\t", " ") if rel.endswith(".json") else text, Loader=AliasLoader))
+        docs = config_documents(text.replace("\t", " ") if rel.endswith(".json") else text)
         if len(docs) > DOCUMENTS_MAX:
             return ("unreadable", f"more than {DOCUMENTS_MAX} documents")
         rows = []
@@ -1026,6 +1042,35 @@ def read_config(repo, rel, lockfiles=True):
         if r["cut"]:
             r["value"] = r["value"].encode()[:VALUE_MAX].decode("utf-8", "ignore")
     return ("read", rows)
+
+
+def config_documents(text):
+    """Source-only EOF normalization from the official YAML test suite.
+
+    yaml/yaml-test-suite@6ad3d2c62885d82fc349026c136ef560838fdf3d,
+    L24T/01 and JEF9/02, supply the expected final break independently.
+    A header without a content line stays empty; quoted/plain scalars are untouched.
+    """
+    docs = list(yaml.compose_all(text, Loader=AliasLoader))
+    if not text or text.endswith(('\n', '\r')):
+        return docs
+    pending, seen = list(docs), set()
+    while pending:
+        node = pending.pop()
+        if node is None or id(node) in seen:
+            continue
+        seen.add(id(node))
+        if isinstance(node, AliasRef):
+            pending.append(node.node)
+        elif isinstance(node, yaml.ScalarNode):
+            if node.style in ('|', '>') and not text[node.end_mark.index:].strip() \
+                    and node.end_mark.line > node.start_mark.line:
+                return list(yaml.compose_all(text+'\n', Loader=AliasLoader))
+        elif isinstance(node, yaml.MappingNode):
+            pending.extend(child for pair in node.value for child in pair)
+        elif isinstance(node, yaml.SequenceNode):
+            pending.extend(node.value)
+    return docs
 
 
 def cfn_private_keys(node, prefix=""):

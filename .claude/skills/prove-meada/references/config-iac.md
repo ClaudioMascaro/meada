@@ -423,6 +423,10 @@ A difference on one of these is a question for the maintainer, BROKEN until answ
 - A base built before #639 knows no kind `value`: its value answers are refusals and are not compared. Only status, export and the default search answer to it.
 - A default search sampled only on config values never asks story 5's "as before when a symbol matches": `values` also asks three symbol names, and `a7-probe` holds a value equal to a symbol (audit 2026-11-04, M6, caught before only by luck of the corpus).
 - A difference on one of the oracle's conventions is a question for the maintainer, never a fix to the oracle.
+- EOF block scalars need a format key as well as parser agreement. PyYAML and ruamel omit
+  the final break that official YAML test-suite cases L24T/01 and JEF9/02 require.
+  `config_documents` follows those pinned cases, including strip/header-only controls;
+  it does not take the candidate's scalar text as its key.
 
 - `prove.py iac`'s oracle encodes #649's rules as its author read them, the same author as the code
   (#649 wrote both): a rule misread in both agrees with itself. The checker reads the ticket's

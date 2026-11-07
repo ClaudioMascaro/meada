@@ -5,9 +5,9 @@ material was used. No product runtime verdict is claimed. Final-source public CI
 still require independent whole-output judgment against these keys.
 
 Use `capture-plan.json` for the six exact repository/query scopes. It names 460 source nodes,
-217 native reference groups and 1,509 baseline queries: Boutique 283/147/841,
+221 native reference groups and 1,509 baseline queries: Boutique 283/147/841,
 kube-prometheus 114/20/363, Crossplane AWS 10/1/41, neutral Kubernetes/Crossplane 34/31/180,
-neutral Compose 10/16/41 and Serverless 9/2/43. The three numbers are nodes, references and
+neutral Compose 10/20/41 and Serverless 9/2/43. The three numbers are nodes, references and
 queries. Unknown kinds, including the two Skaffold Config objects, remain in the node key.
 Generic format completeness concerns these YAML/JSON/Compose/Serverless readers; the existing
 native Terraform and CloudFormation keys keep their own scopes.
@@ -66,3 +66,11 @@ unsupported, and neither this key nor a CAPTURED receipt accepts them.
 
 `input-sha256.json` freezes all ready keys and query pointers. Final source/key-bound CI
 comparison and the existing required proof groups remain UNPROVEN until judged independently.
+
+The Compose key was corrected after capture against the official format rule at
+`compose-spec/compose-spec@3a4a6995e4a971f6173dff9130cb3e38e6738651`, `container_spec.md`,
+section "implicit default network". Empty and absent `networks` both select default,
+so the explicit-empty observer has four directed references to/from the two services
+that omit networks. This source-authorized correction changes references 16 to 20;
+source files, node fields and all queries are unchanged. The key retains the exact
+source quote, hash and pre-correction count. No new independent judgment is claimed.

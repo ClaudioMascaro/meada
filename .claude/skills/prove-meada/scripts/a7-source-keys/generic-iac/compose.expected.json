@@ -78,14 +78,15 @@
   "rule_sources": [
     "#642 stories18-31,39",
     "ADR0025 Compose nodes, references and paths",
-    "docs/agents/ceilings/resolution-the-index-and-shape-readers/compose-cloudformation-serverless-and-images.md"
+    "docs/agents/ceilings/resolution-the-index-and-shape-readers/compose-cloudformation-serverless-and-images.md",
+    "https://github.com/compose-spec/compose-spec/blob/3a4a6995e4a971f6173dff9130cb3e38e6738651/container_spec.md#implicit-default-network"
   ],
   "derivation": "The ten services and sixteen exact reference groups below were hand-selected from the two small neutral projects before any product output. YAML parsing supplies source locations only; no Compose or general evaluator is run.",
   "inventory_complete": true,
   "runtime_verdict": "UNPROVEN",
   "counts": {
     "nodes": 10,
-    "references": 16,
+    "references": 20,
     "evaluation_units": 2,
     "queries": 41
   },
@@ -674,8 +675,62 @@
       },
       "handler": null,
       "events": [],
-      "references": [],
-      "referenced_by": [],
+      "references": [
+        {
+          "to": "services.drifter",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.observer",
+              "line": 16,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        },
+        {
+          "to": "services.watcher",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.observer",
+              "line": 16,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "services.drifter",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.drifter",
+              "line": 20,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        },
+        {
+          "from": "services.watcher",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.watcher",
+              "line": 22,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        }
+      ],
       "identity": "github.com/zz-prove/a7-generic-compose-source-key::harbor/docker-compose.yml::services.observer"
     },
     {
@@ -718,6 +773,19 @@
               "implicit": "project default network, networks/network_mode absent"
             }
           ]
+        },
+        {
+          "to": "services.observer",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.drifter",
+              "line": 20,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
         }
       ],
       "referenced_by": [
@@ -731,6 +799,19 @@
               "path": "services.watcher",
               "line": 22,
               "implicit": "project default network, networks/network_mode absent"
+            }
+          ]
+        },
+        {
+          "from": "services.observer",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.observer",
+              "line": 16,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
             }
           ]
         }
@@ -777,6 +858,19 @@
               "implicit": "project default network, networks/network_mode absent"
             }
           ]
+        },
+        {
+          "to": "services.observer",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.watcher",
+              "line": 22,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
         }
       ],
       "referenced_by": [
@@ -790,6 +884,19 @@
               "path": "services.drifter",
               "line": 20,
               "implicit": "project default network, networks/network_mode absent"
+            }
+          ]
+        },
+        {
+          "from": "services.observer",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.observer",
+              "line": 16,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
             }
           ]
         }
@@ -1070,6 +1177,70 @@
           "implicit": "project default network, networks/network_mode absent"
         }
       ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.drifter",
+      "to": "services.observer",
+      "via": "networks.default",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.drifter",
+          "line": 20,
+          "implicit": "project default network, networks empty or absent and network_mode absent"
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.observer",
+      "to": "services.drifter",
+      "via": "networks.default",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.observer",
+          "line": 16,
+          "implicit": "project default network, networks empty or absent and network_mode absent"
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.observer",
+      "to": "services.watcher",
+      "via": "networks.default",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.observer",
+          "line": 16,
+          "implicit": "project default network, networks empty or absent and network_mode absent"
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.watcher",
+      "to": "services.observer",
+      "via": "networks.default",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.watcher",
+          "line": 22,
+          "implicit": "project default network, networks empty or absent and network_mode absent"
+        }
+      ]
     }
   ],
   "negative_nodes": [
@@ -1173,7 +1344,7 @@
   ],
   "network_controls": [
     "port api/store/cache share explicit shared only; worker has default alone but still references api by depends_on.",
-    "harbor api/store share edge; drifter/watcher share implicit default; observer explicit empty networks and hoster network_mode host have no default-network references.",
+    "harbor api/store share edge; observer with networks: {} and drifter/watcher with omitted networks share implicit default; hoster network_mode host has no default-network references.",
     "Equal service names in port and harbor never create cross-unit references."
   ],
   "refresh": [
@@ -1303,7 +1474,7 @@
       "same_utf8_byte_count": true,
       "expected": {
         "node_count": 10,
-        "reference_count": 16,
+        "reference_count": 20,
         "changed_image": {
           "root": "port",
           "address": "services.api",
@@ -1326,7 +1497,7 @@
       "same_utf8_byte_count": true,
       "expected": {
         "node_count": 10,
-        "reference_count": 15,
+        "reference_count": 19,
         "removed_references": [
           {
             "root": "port",
@@ -1353,7 +1524,7 @@
       "same_utf8_byte_count": false,
       "expected": {
         "node_count": 9,
-        "reference_count": 14,
+        "reference_count": 18,
         "removed_nodes": [
           "services.worker (root port)"
         ],
@@ -1382,5 +1553,16 @@
       },
       "restoration": "Restore baseline exact bytes, then require original SHA256, complete node/reference/image/event sets, and matching warm/cold captures in both stdio/HTTP."
     }
-  ]
+  ],
+  "contract_correction": {
+    "reason": "Official Compose empty-or-absent rule supplies four omitted directed default-network references. Source, query bytes and all node fields are unchanged.",
+    "official_source_sha256": "1196ff70551305967d82e2f1764cdbf261d2c451698516d5a637fdb1e7cf77aa",
+    "official_source_bytes": 51169,
+    "official_source_commit": "3a4a6995e4a971f6173dff9130cb3e38e6738651",
+    "revised_after_runtime_capture": true,
+    "checker_mode": "inline",
+    "prior_reference_count": 16,
+    "reference_count": 20,
+    "source_quote": "If `networks` is empty or absent from the Compose file, Compose considers an implicit definition for the service to be connected to the `default` network."
+  }
 }
