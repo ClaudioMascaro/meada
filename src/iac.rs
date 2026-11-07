@@ -606,6 +606,36 @@ fn lines(text: &str) -> impl Fn(usize) -> usize {
     move |offset| newlines.partition_point(|&n| n < offset) + 1
 }
 
+/// `expr` as `hcl-rs` evaluates it in `ctx`, `None` when it fails or panics: the library's number
+/// type panics on a remainder by zero or an integer overflow, which a hostile file must not turn
+/// into a crash of indexing or of the server.
+fn evaluated(expr: &Expression, ctx: &Context) -> Option<Value> {
+    quiet(|| hcl::Expression::from(expr.clone()).evaluate(ctx).ok()).flatten()
+}
+
+thread_local! {
+    /// Whether this thread runs `quiet`, whose panics are expected and caught.
+    static QUIET: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// `f()`, `None` when it panics, without the panic message the default hook prints: the hook is
+/// wrapped once so that panics on threads outside `quiet` print as before.
+fn quiet<T>(f: impl FnOnce() -> T) -> Option<T> {
+    static HOOK: std::sync::Once = std::sync::Once::new();
+    HOOK.call_once(|| {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            if !QUIET.with(std::cell::Cell::get) {
+                previous(info);
+            }
+        }));
+    });
+    let outer = QUIET.with(|q| q.replace(true));
+    let out = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+    QUIET.with(|q| q.set(outer));
+    out.ok()
+}
+
 /// The text of `src` as HCL, `None` when it is not UTF-8 or nests past the HCL reader's ceiling
 /// (config values count it unreadable).
 fn text(src: &[u8]) -> Option<&str> {
@@ -637,7 +667,7 @@ fn read_var_file(path: &str, src: &[u8], module: &mut Module) {
             return;
         };
         for a in body.attributes() {
-            if let Ok(value) = hcl::Expression::from(a.value.clone()).evaluate(&Context::new()) {
+            if let Some(value) = evaluated(&a.value, &Context::new()) {
                 let at = line(a.span().map_or(0, |s| s.start));
                 values.push((a.key.as_str().to_string(), value, at));
             }
@@ -1577,8 +1607,8 @@ impl<'m> Eval<'m> {
             for (name, v) in roots {
                 self.ctx.declare_var(name, v);
             }
-            match hcl::Expression::from(expr.clone()).evaluate(&self.ctx) {
-                Ok(v) if size(&v) <= EVAL_VALUE_MAX => {
+            match evaluated(expr, &self.ctx) {
+                Some(v) if size(&v) <= EVAL_VALUE_MAX => {
                     return Evaluated {
                         val: Val::Known(v),
                         through,
@@ -3137,6 +3167,34 @@ mod tests {
             .collect();
         assert_eq!(q.name.as_deref(), Some("dev-shop-orders"));
         assert_eq!(through, [("var.env", 1, false), ("var.team", 4, false)]);
+    }
+
+    /// Arithmetic `hcl-rs` cannot do (a remainder by zero, which panics in its number type) leaves
+    /// the value unresolved, in a `.tf` file and in a var file alike, and `substr` past
+    /// `i64::MAX` takes the rest of the string as Terraform does: a hostile file never stops
+    /// indexing.
+    #[test]
+    fn arithmetic_the_evaluator_cannot_do_leaves_the_value_unresolved() {
+        let list = [
+            (
+                "main.tf",
+                concat!(
+                    "variable \"n\" {\n  default = 1\n}\n",
+                    "resource \"a\" \"rem\" { name = \"orders-${5 % 0}\" }\n",
+                    "resource \"a\" \"sub\" { name = substr(\"abc\", 1, 9223372036854775807) }\n",
+                    "resource \"a\" \"var\" { name = \"q-${var.n}\" }\n",
+                ),
+            ),
+            ("terraform.tfvars", "n = 7 % 0\n"),
+        ];
+        assert_eq!(
+            names(&list),
+            [
+                "a.rem ~ \"orders-*\"",
+                "a.sub = \"bc\"",
+                "a.var = \"q-1\" [var.n main.tf:1]",
+            ]
+        );
     }
 
     /// Terraform loads `terraform.tfvars`, then `terraform.tfvars.json`, then each `*.auto.tfvars`

@@ -246,7 +246,7 @@ fn substr(args: FuncArgs) -> Out {
     let end = match length {
         -1 => len,
         l if l < 0 => return Err("a negative length".into()),
-        l => (start + l).min(len),
+        l => start + l.min(len - start),
     };
     Ok(Value::String(
         chars[start as usize..end as usize].iter().collect(),
