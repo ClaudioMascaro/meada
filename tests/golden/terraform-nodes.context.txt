@@ -52,7 +52,7 @@ channel::sqs::dead-letters
 
 example.com/acme/infra envs/prod/main.tf:44-48 module.audit
 type: module
-name: none
+name: "audit"
 root: envs/prod
 overridable: none
 references: none
@@ -61,6 +61,8 @@ values:
 example.com/acme/infra envs/prod/main.tf:45 module.audit.source = "terraform-aws-modules/sqs/aws"
 example.com/acme/infra envs/prod/main.tf:46 module.audit.version = "4.0.0"
 example.com/acme/infra envs/prod/main.tf:47 module.audit.name = "audit"
+channel::sqs::audit
+  example.com/acme/infra provisioner envs/prod/main.tf:44 module.audit (root envs/prod) (no use in the workspace)
 
 example.com/acme/infra modules/worker/main.tf:5-8 module.worker.aws_lambda_event_source_mapping.this
 type: aws_lambda_event_source_mapping

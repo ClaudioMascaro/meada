@@ -55,6 +55,19 @@ def file_sha256(path):
     return digest.hexdigest()
 
 
+def expected_tools(base):
+    """#672 adds only the alert search description to the pre-config catalog."""
+    expected = copy.deepcopy(base)
+    search = next(tool for tool in expected if tool['name'] == 'search')
+    kind = search['inputSchema']['properties']['kind']
+    before = '`image` (an image builder or runner), or `ambiguous`'
+    after = '`image` (an image builder or runner), `alert` (an alert emitter or matcher), or `ambiguous`'
+    if kind['description'].count(before) != 1:
+        raise ValueError('pre-config search description differs from the pinned catalog')
+    kind['description'] = kind['description'].replace(before, after, 1)
+    return expected
+
+
 def seed(root):
     repos = {}
     for name in ['infra', 'app', 'plain']:
@@ -388,7 +401,7 @@ class Probe:
                 expected=expected_orphan_rows(oracle)
                 self.check(name+' complete orphan set/count',orphan_set(h[name]['status'])==(expected,len(expected)),h[name]['status'])
                 self.check(name+' existing status lines base parity',strip_orphans(h[name]['status'])==strip_orphans(b[name]['status']))
-        self.check('all existing tool descriptors base parity',b['tools']==h['tools'])
+        self.check('whole tool catalog preserves base plus #672 alert description',expected_tools(b['tools'])==h['tools'])
         self.check('plain all query tools base parity',b['plain_texts']==h['plain_texts'])
         for i,(q,text) in enumerate(zip(queries,h['texts'])):
             args=q['arguments']
@@ -567,8 +580,8 @@ class Probe:
         failed=[s for s in self.steps if not s['passed']]
         verdict='BLOCKED' if blocked else ('BROKEN' if failed else 'CHECKS PASSED; fresh checker must judge PROVED')
         write(self.run,'receipt.md',f'# Config uses #661 proof\n\n{verdict}\n\n'
-              'Checker: fresh independent proof agent, no feature code/tests read to derive expected results.\n'
-              'Scope: #661 new flow, base eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62 plus working tree.\n\n'
+              'Checker: scripted capture and comparisons; semantic judgment is recorded separately.\n'
+              'Scope: #661 new flow; exact base/head binary hashes and provenance are in identity.json.\n\n'
               '## What the change touches\n'
               '- Config use export, provisioning, status, context/search/trace: new, #661/#642 and base ADR0026 (rung 4).\n'
               '- Existing exports and value/code answers: base binary on identical inputs (rung 1).\n'

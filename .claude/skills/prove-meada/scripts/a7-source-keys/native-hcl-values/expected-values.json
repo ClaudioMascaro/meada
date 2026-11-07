@@ -1,6 +1,6 @@
 {
   "schema": "independent-native-hcl-source-key-v1",
-  "status": "SOURCE_KEY_FROZEN_NO_PRODUCT_EXECUTION",
+  "status": "SOURCE_KEY_CONTRACT_CORRECTED_PENDING_RUNTIME",
   "root_source": "fe0faf5dfd7408571bf982bc395ef10d1e456a0b",
   "independence": "Authored from issues 639/640/641/642, ADR 0025, documented ceilings and pinned official HCL/OpenTofu format rules before any candidate answer. No Meada runtime, database, implementation table, feature fixture, Terraform CLI or evaluator supplies these rows.",
   "origin": "https://example.com/a7-proof/native-hcl-values.git",
@@ -3696,9 +3696,9 @@
       "iac_nodes": 1,
       "shadowed_files_counted": 0,
       "declared_resource_unlinked_ids": [
-        "resource::native_fixture::botanical",
-        "resource::native_fixture::edge",
-        "resource::native_fixture::masked"
+        "resource::native-fixture::botanical",
+        "resource::native-fixture::edge",
+        "resource::native-fixture::masked"
       ],
       "stale_via_count": 0,
       "iac_orphan_lines": 0,
@@ -3715,9 +3715,9 @@
       "iac_nodes": 1,
       "shadowed_files_counted": 0,
       "declared_resource_unlinked_ids": [
-        "resource::native_fixture::botanical",
-        "resource::native_fixture::edge",
-        "resource::native_fixture::masked"
+        "resource::native-fixture::botanical",
+        "resource::native-fixture::edge",
+        "resource::native-fixture::masked"
       ],
       "stale_via_count": 0,
       "iac_orphan_lines": 0,
@@ -3734,9 +3734,9 @@
       "iac_nodes": 1,
       "shadowed_files_counted": 0,
       "declared_resource_unlinked_ids": [
-        "resource::native_fixture::botanical",
-        "resource::native_fixture::edge",
-        "resource::native_fixture::masked"
+        "resource::native-fixture::botanical",
+        "resource::native-fixture::edge",
+        "resource::native-fixture::masked"
       ],
       "stale_via_count": 0,
       "iac_orphan_lines": 0,
@@ -3753,9 +3753,9 @@
       "iac_nodes": 1,
       "shadowed_files_counted": 0,
       "declared_resource_unlinked_ids": [
-        "resource::native_fixture::botanical",
-        "resource::native_fixture::edge",
-        "resource::native_fixture::masked"
+        "resource::native-fixture::botanical",
+        "resource::native-fixture::edge",
+        "resource::native-fixture::masked"
       ],
       "stale_via_count": 0,
       "iac_orphan_lines": 0,
@@ -11119,7 +11119,7 @@
         "file": "botany.tf",
         "key": "locals.proof.ranked_exact",
         "line": 14,
-        "contract": "resource::native_fixture::botanical",
+        "contract": "resource::native-fixture::botanical",
         "role": "write",
         "level": "declared"
       },
@@ -11163,12 +11163,12 @@
       "query_index": 33,
       "tool": "context",
       "purpose": "declared resource context reaches exactly its source key without repeating scalar contents",
-      "symbol": "resource::native_fixture::botanical",
+      "symbol": "resource::native-fixture::botanical",
       "preserve_complete_answer": true,
       "declared_target": {
         "file": "botany.tf",
         "key": "locals.proof.ranked_exact",
-        "contract": "resource::native_fixture::botanical",
+        "contract": "resource::native-fixture::botanical",
         "role": "write",
         "level": "declared"
       },
@@ -11218,7 +11218,7 @@
         "file": "sensory/variables.tf",
         "key": "variable.proof.default.plain",
         "line": 3,
-        "contract": "resource::native_fixture::masked",
+        "contract": "resource::native-fixture::masked",
         "role": "write",
         "level": "declared"
       },
@@ -11262,12 +11262,12 @@
       "query_index": 35,
       "tool": "context",
       "purpose": "declared resource context reaches exactly its source key without repeating scalar contents",
-      "symbol": "resource::native_fixture::masked",
+      "symbol": "resource::native-fixture::masked",
       "preserve_complete_answer": true,
       "declared_target": {
         "file": "sensory/variables.tf",
         "key": "variable.proof.default.plain",
-        "contract": "resource::native_fixture::masked",
+        "contract": "resource::native-fixture::masked",
         "role": "write",
         "level": "declared"
       },
@@ -11317,7 +11317,7 @@
         "file": "boundary.tf",
         "key": "locals.proof.before_scalar",
         "line": 4,
-        "contract": "resource::native_fixture::edge",
+        "contract": "resource::native-fixture::edge",
         "role": "write",
         "level": "declared"
       },
@@ -11361,12 +11361,12 @@
       "query_index": 37,
       "tool": "context",
       "purpose": "declared resource context reaches exactly its source key without repeating scalar contents",
-      "symbol": "resource::native_fixture::edge",
+      "symbol": "resource::native-fixture::edge",
       "preserve_complete_answer": true,
       "declared_target": {
         "file": "boundary.tf",
         "key": "locals.proof.before_scalar",
-        "contract": "resource::native_fixture::edge",
+        "contract": "resource::native-fixture::edge",
         "role": "write",
         "level": "declared"
       },
@@ -11420,7 +11420,7 @@
       "bytes_after": 1114,
       "sha256_before": "148d946ca9ab59dd9375a28d5b32e6ab30a30efd770148b7f0f71b085192dbb0",
       "sha256_after": "a6323b47438dfbaf7ac91f1bd52286c9f551c217c23a4ffbb6f778f4751d8cb4",
-      "preserve_original_mtime_ns_for_warm_refresh": true,
+      "preserve_original_mtime_ns_for_warm_refresh": false,
       "query_file": "queries.jsonl",
       "warm_and_cold_must_equal_complete_phase_expectations": true,
       "restore_exact_original_bytes_and_mtime_after_phase": true,
@@ -11438,7 +11438,7 @@
       "bytes_after": 317,
       "sha256_before": "7202f72e69eacc7b93d08f5382821434d1af74a33f45ec65fc23fe5a8cfb0daf",
       "sha256_after": "9714035bab2047d27550e6bdc6c2d680355eae35ccd20ee33642f02b7d4ed24a",
-      "preserve_original_mtime_ns_for_warm_refresh": true,
+      "preserve_original_mtime_ns_for_warm_refresh": false,
       "query_file": "queries.jsonl",
       "warm_and_cold_must_equal_complete_phase_expectations": true,
       "restore_exact_original_bytes_and_mtime_after_phase": true,
@@ -11519,9 +11519,9 @@
   "export_expectations": {
     "config_value_rows": 0,
     "declared_contracts": [
-      "resource::native_fixture::botanical",
-      "resource::native_fixture::edge",
-      "resource::native_fixture::masked"
+      "resource::native-fixture::botanical",
+      "resource::native-fixture::edge",
+      "resource::native-fixture::masked"
     ],
     "declared_role": "write",
     "links": [],
@@ -11597,7 +11597,7 @@
     "search": "Require the entire high-budget row multiset and exact listed order, every file/key/line/value/cut/redacted field, and no unexpected row. Full result counts must equal the independent key. Do not filter surprises into success.",
     "kind_visibility": "Expected native kinds are complete. Search's public rendering lacks an explicit kind column; retain the complete direct-key metadata and record any kind that cannot be observed as UNPROVEN rather than claiming storage introspection.",
     "transports": "For each phase and each query use identical source, index, repository scope and query arguments; HTTP must copy the full stdio answer. Preserve both records, tool schemas, diagnostics and cleanup.",
-    "freshness": "Each same-size edit starts from baseline. Compare warm refresh with original size and mtime to a cold index of exactly the changed bytes, then restore all source hashes and query/status/export equivalence. Never change the answer key from a runtime result.",
+    "freshness": "Each same-size edit starts from baseline. Compare warm refresh after a visible mtime change (ADR 0004), with unchanged size, to a cold index of exactly the changed bytes, then restore all source hashes and query/status/export equivalence. Never change the answer key from a runtime result.",
     "unknown_payload_fields": "Preserve complete record/status/export/context/decision payloads. A new/unexpected field is review evidence, not discarded data. Independent runtime judgment is separate and may be BROKEN, BLOCKED or UNPROVEN."
   },
   "not_claimed": [
@@ -11608,13 +11608,20 @@
     "a runtime verdict"
   ],
   "fixture_git": {
-    "commit": "f670eb0f3584bb11f6927dd261368d3c8bc3cedc",
-    "tree": "e0457d521bea3a5206d3fb315057c09a6b2b7ed3",
-    "branch": "source-key",
-    "origin": "https://example.com/a7-proof/native-hcl-values.git",
-    "author_name": "Native HCL source key",
-    "author_email": "proof@example.com",
     "author_and_committer_date": "2026-11-07T00:00:00+00:00",
-    "commit_message": "test: add independent native HCL source fixture"
+    "author_email": "proof@example.com",
+    "author_name": "Native HCL source key",
+    "branch": "source-key",
+    "commit": "55173773dc7ea4e7972ea1409318aa62fe6c371d",
+    "commit_message": "test: add independent native HCL source fixture",
+    "origin": "https://example.com/a7-proof/native-hcl-values.git",
+    "tree": "74c3c2ceb25599d53f00cece62c0b211f135589f"
+  },
+  "revision": {
+    "reason": "Accepted manifest kind grammar and ADR 0004 stat-visible refresh recipe; row and source-edit expectations unchanged",
+    "prior_fixture_commit": "f670eb0f3584bb11f6927dd261368d3c8bc3cedc",
+    "original_row_authorship_preceded_runtime": true,
+    "revised_after_runtime_capture": true,
+    "checker_mode": "inline"
   }
 }

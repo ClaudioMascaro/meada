@@ -26,7 +26,7 @@
     "queries.jsonl": "cfe4add02a7cf78086773a1c2e55bbe30fe6a264a7fa417d2f6c2fe74081d704",
     "source-inventory.json": "bf50b516ac8966be5c08a527a1fa838d1298ce21a0aa1f85b970d2adae2769ea",
     "source-sha256.json": "d98de56fd645a7269e4aefd033b54da0eac7b9a259e418899cc4ac23f844a0f0",
-    "PLAN.md": "a3a2d03b3cfb3db5812b11ec080ff3cf077a1d60efc9c2177661057fc875b068"
+    "PLAN.md": "80f6acc279f6f59c9990629333fde21dc8cfa3b5d74aac9ddb84054d5913aef5"
   },
   "fixture_identities": [
     "compose-repo-identity.json",

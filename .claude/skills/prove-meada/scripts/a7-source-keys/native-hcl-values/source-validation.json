@@ -126,5 +126,7 @@
   "manifest_toml_parse": true,
   "source_author_python_ast_parse": true,
   "product_execution": false,
-  "candidate_answers_read": false
+  "candidate_answers_read": false,
+  "resource_kind_identifier_grammar": true,
+  "row_and_phase_expectations_equal_original": true
 }

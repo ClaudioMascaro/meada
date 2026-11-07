@@ -27,7 +27,7 @@
     },
     "meada.toml": {
       "bytes": 433,
-      "sha256": "62ca4a5e19b75fbe55683e73b0b85943d0c0c0c81cc5e800cc1cc3b689152a65"
+      "sha256": "d9e7798e55761090425fc072115062afc1a64c0fc5c33814ebe28eedc656b301"
     },
     "opaque/child/terraform.tfvars": {
       "bytes": 87,
@@ -71,10 +71,10 @@
     "author_email": "proof@example.com",
     "author_name": "Native HCL source key",
     "branch": "source-key",
-    "commit": "f670eb0f3584bb11f6927dd261368d3c8bc3cedc",
+    "commit": "55173773dc7ea4e7972ea1409318aa62fe6c371d",
     "commit_message": "test: add independent native HCL source fixture",
     "origin": "https://example.com/a7-proof/native-hcl-values.git",
-    "tree": "e0457d521bea3a5206d3fb315057c09a6b2b7ed3"
+    "tree": "74c3c2ceb25599d53f00cece62c0b211f135589f"
   },
   "frozen_at_utc": "2026-11-07T01:54:45Z",
   "hash_scope_note": "No .git metadata is included in file hashes. Reconstruct the exact origin/identity in CI. This manifest is bound externally by its own SHA256; it cannot include its own digest.",
@@ -85,27 +85,28 @@
       "sha256": "ae1134c8235325a7d6ee9608b1a18ab9ca5688b163d6f714c9cfb9134c450b4d"
     },
     "PLAN.md": {
-      "bytes": 6800,
-      "sha256": "daf1cd62f63f83521248d1d88c20e190080bfc98b473d42434f898fa6c8baa7f"
+      "bytes": 7569,
+      "sha256": "5c49584d964e99a7b8b057f3c007d5a8dbf7cf192a8f3cfec9ab585ec72b902e"
     },
     "author-key.py": {
-      "bytes": 31650,
-      "sha256": "c1da2403e265741423fcc8c3e1bf77fb910b3e681316d076d32c6f3fa3c1a4fa"
+      "bytes": 31684,
+      "sha256": "722cf9bd3971a278ebb813edae330cca72cbfb2eb579624fa51a6b8cf0a8929f"
     },
     "expected-values.json": {
-      "bytes": 574888,
-      "sha256": "4d38b64a1290191ba3741772bb705ea1d62c0dc5f5f06044d38e4577cd912cbb"
+      "bytes": 575282,
+      "sha256": "f10e7f2ff020c30a3502c1488b2273c91fb66d73eedfff2c87c048fc420a682a"
     },
     "queries.jsonl": {
       "bytes": 3729,
-      "sha256": "ce00ada4ec7953db6a0331c81930469d3bdef02b4955ecf18b6af9af3633a6dc"
+      "sha256": "368dc620d225f1903a7b4357fb8c7bd720d04ac0cdfc3703574b3cd9af46325c"
     },
     "source-validation.json": {
-      "bytes": 3765,
-      "sha256": "5f19d67a012e66e11cd0feb3fbb96997417e0b675b396c3928045e27e32da929"
+      "bytes": 3862,
+      "sha256": "5022d1fb6ab4cec0b69d140c3bdbd248931d64b307f60bc6821edfdafc74af95"
     }
   },
   "origin": "https://example.com/a7-proof/native-hcl-values.git",
+  "original_product_execution_before_row_authorship": false,
   "phase_fixture_files": {
     "baseline": {
       "botany.tf": {
@@ -130,7 +131,7 @@
       },
       "meada.toml": {
         "bytes": 433,
-        "sha256": "62ca4a5e19b75fbe55683e73b0b85943d0c0c0c81cc5e800cc1cc3b689152a65"
+        "sha256": "d9e7798e55761090425fc072115062afc1a64c0fc5c33814ebe28eedc656b301"
       },
       "opaque/child/terraform.tfvars": {
         "bytes": 87,
@@ -192,7 +193,7 @@
       },
       "meada.toml": {
         "bytes": 433,
-        "sha256": "62ca4a5e19b75fbe55683e73b0b85943d0c0c0c81cc5e800cc1cc3b689152a65"
+        "sha256": "d9e7798e55761090425fc072115062afc1a64c0fc5c33814ebe28eedc656b301"
       },
       "opaque/child/terraform.tfvars": {
         "bytes": 87,
@@ -254,7 +255,7 @@
       },
       "meada.toml": {
         "bytes": 433,
-        "sha256": "62ca4a5e19b75fbe55683e73b0b85943d0c0c0c81cc5e800cc1cc3b689152a65"
+        "sha256": "d9e7798e55761090425fc072115062afc1a64c0fc5c33814ebe28eedc656b301"
       },
       "opaque/child/terraform.tfvars": {
         "bytes": 87,
@@ -316,7 +317,7 @@
       },
       "meada.toml": {
         "bytes": 433,
-        "sha256": "62ca4a5e19b75fbe55683e73b0b85943d0c0c0c81cc5e800cc1cc3b689152a65"
+        "sha256": "d9e7798e55761090425fc072115062afc1a64c0fc5c33814ebe28eedc656b301"
       },
       "opaque/child/terraform.tfvars": {
         "bytes": 87,
@@ -356,9 +357,14 @@
       }
     }
   },
-  "product_execution_before_freeze": false,
+  "product_execution_before_freeze": true,
   "query_count": 38,
   "references": {
+    "references/adr-0004.md": {
+      "bytes": 5770,
+      "sha256": "2b92663a4d9c40f7b5606bff05a527bc82423931c1aed861b0ce4a26756fee79",
+      "source_url": "https://github.com/ClaudioMascaro/meada/blob/e031f54011fa1428db9231612d34edfe4e527c06/docs/adr/0004-index-storage-and-freshness.md"
+    },
     "references/adr-0025.md": {
       "bytes": 40108,
       "sha256": "30742a190d20d12dea9a9470a97dc9582e3fc1a9db6cb9192f43107b827e5483",
@@ -378,6 +384,11 @@
       "bytes": 36577,
       "sha256": "a99da24e075391fd097654dc6bf4da8ed8820d52b282ba9e44612f0f1f6feb14",
       "source_url": "https://github.com/hashicorp/hcl/blob/94e232b58b12531a80299e3aa7566f345e17c21b/hclsyntax/spec.md"
+    },
+    "references/ids.rs": {
+      "bytes": 7893,
+      "sha256": "94903bc18525ca32d0a6d5a11c982598b41a8307a476588d9dfcff6cd9dc6c6d",
+      "source_url": "https://github.com/ClaudioMascaro/meada/blob/e031f54011fa1428db9231612d34edfe4e527c06/meada-core/src/ids.rs"
     },
     "references/issue-639.json": {
       "bytes": 3342,
@@ -399,6 +410,11 @@
       "sha256": "5f05a16dad7b190c14979d2207ff8b119503a602e5950aaaeab2d30685a868f8",
       "source_url": "https://github.com/ClaudioMascaro/meada/issues/642"
     },
+    "references/manifest.rs": {
+      "bytes": 24959,
+      "sha256": "dd144b9a6cd59c36a9fbb7c660ada48e0e6d3692e9decef83a5834b72099abf1",
+      "source_url": "https://github.com/ClaudioMascaro/meada/blob/e031f54011fa1428db9231612d34edfe4e527c06/meada-core/src/manifest.rs"
+    },
     "references/opentofu-files.mdx": {
       "bytes": 3011,
       "sha256": "da989fa0f103cbd23b59852855e3cc8ee4006c9758001e948bba5ae3665544de",
@@ -411,9 +427,17 @@
     }
   },
   "repository_identity": "example.com/a7-proof/native-hcl-values",
+  "revised_at_utc": "2026-11-07T05:09:57.143803+00:00",
+  "revision": {
+    "checker_mode": "inline",
+    "original_row_authorship_preceded_runtime": true,
+    "prior_fixture_commit": "f670eb0f3584bb11f6927dd261368d3c8bc3cedc",
+    "reason": "Accepted manifest kind grammar and ADR 0004 stat-visible refresh recipe; row and source-edit expectations unchanged",
+    "revised_after_runtime_capture": true
+  },
   "root_source": "fe0faf5dfd7408571bf982bc395ef10d1e456a0b",
   "root_tree": "c81daebb8d6884f7beff34c433d2cc8d497024af",
-  "runtime_verdict": "PENDING_SEPARATE_INDEPENDENT_JUDGMENT",
+  "runtime_verdict": "PENDING_SEPARATE_INLINE_JUDGMENT",
   "schema": "independent-native-hcl-inputs-v1",
   "search_query_count": 31,
   "sensitivity_public_redacted_rows": 3,
@@ -423,6 +447,6 @@
     "section": "Native HCL values: missing independent whole-row key",
     "sha256": "4d6aaa4b6f21b77877dd087e47f2d0535359db1433eb4adbba298cb09ae805a4"
   },
-  "status": "SOURCE_KEY_FROZEN_NO_PRODUCT_EXECUTION",
+  "status": "SOURCE_KEY_CONTRACT_CORRECTED_PENDING_RUNTIME",
   "tracked_fixture_files": 15
 }

@@ -53,6 +53,10 @@ and symlinks must restore to the identity manifests. The Compose override-clear 
 the same source node/reference disappearance as removing its body; actual file unlink is a
 separate lifecycle case if CI elects to exercise it.
 
+Warm source edits change mtime, including the same-size edits. ADR 0004 hashes files
+after their mtime or size changes; an edit preserving both fields is outside that guarantee.
+Every phase still restores the exact original source bytes and mtime.
+
 The documented Compose reader records a lexically bounded symlink build path without reading
 it. Subsequent code/Dockerfile reading must refuse traversal. The generic key makes that
 distinction explicit. The source absence of the oversized public dashboard source is fixed; its
