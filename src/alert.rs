@@ -129,9 +129,9 @@ impl ContractKind for Alert {
         }
         crate::index::sort_providers(&mut export.providers);
         crate::index::sort_consumers(&mut export.consumers);
-        export
-            .consumers
-            .dedup_by(|a, b| a.site == b.site && a.contract == b.contract && a.via == b.via);
+        export.consumers.dedup_by(|a, b| {
+            a.site == b.site && a.contract == b.contract && a.via == b.via && a.root == b.root
+        });
     }
     fn link(
         &self,

@@ -1,0 +1,4 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: per-root}
+data: {route: forbidden-cross-root-topic}

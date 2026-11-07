@@ -249,7 +249,14 @@ impl ContractKind for Resource {
         providers.sort_by(|a, b| (&a.contract, &a.site).cmp(&(&b.contract, &b.site)));
         providers.dedup_by(|a, b| (&a.contract, &a.site) == (&b.contract, &b.site));
         let consumers = &mut export.consumers;
-        let key = |c: &Consumer| (c.site.clone(), c.contract.clone(), c.via.clone());
+        let key = |c: &Consumer| {
+            (
+                c.site.clone(),
+                c.contract.clone(),
+                c.via.clone(),
+                c.root.clone(),
+            )
+        };
         consumers.sort_by_key(key);
         consumers.dedup_by(|a, b| key(a) == key(b));
     }

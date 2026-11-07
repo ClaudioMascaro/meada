@@ -558,7 +558,9 @@ nombres de ko y expresiones Gradle no leídas no crean un constructor supuesto.
 Los ejecutores son containers e init containers de cargas Kubernetes, después de aplicar los
 overrides de imagen de Kustomize, servicios Compose e `image.repository` de valores Helm.
 No se renderizan templates Helm. `context` muestra la imagen y los repositorios constructores;
-`trace` recorre la relación en ambos sentidos hasta las entradas del código. Un contexto
+`trace` recorre la relación en ambos sentidos hasta las entradas del código. Los overlays que
+usan la misma carga e imagen conservan un ejecutor y su enlace por raíz de evaluación. Las
+evidencias repetidas de esa imagen en una carga y raíz forman un solo lado. Un contexto
 Compose local ejecuta directamente código del mismo repositorio en `exact`, incluso sin
 `image`, dentro de la raíz y sin atravesar enlaces simbólicos.
 

@@ -540,6 +540,102 @@ fn review_overlays_keep_their_own_image_in_context_and_execution() {
 }
 
 #[test]
+fn overlays_of_one_workload_keep_both_runners_of_the_same_image() {
+    let repo = fixture_repo(
+        "images_identical_overlay_roots",
+        "image-evaluation-roots",
+        Some("https://independent.invalid/azure/roots.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+    let raw = engine.export().unwrap();
+    let export: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    // These complete rows come from the two overlay roots in the fixture and ADR 0026.
+    assert_eq!(
+        export["providers"],
+        serde_json::json!([{
+            "contract": "image::ghcr.io/independent/root-review",
+            "site": "independent.invalid/azure/roots",
+            "at": ".github/workflows/image.yml#jobs.build.steps[0].with.tags"
+        }]),
+        "{raw}"
+    );
+    assert_eq!(
+        export["consumers"],
+        serde_json::json!([
+            {
+                "contract": "image::ghcr.io/independent/root-review",
+                "site": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+                "via": null,
+                "root": "overlays/left"
+            },
+            {
+                "contract": "image::ghcr.io/independent/root-review",
+                "site": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+                "via": null,
+                "root": "overlays/right"
+            }
+        ]),
+        "{raw}"
+    );
+    assert_eq!(
+        export["links"],
+        serde_json::json!([
+            {
+                "consumer": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+                "provider": "independent.invalid/azure/roots",
+                "contract": "image::ghcr.io/independent/root-review",
+                "level": "exact",
+                "reason": "image::ghcr.io/independent/root-review",
+                "root": "overlays/left"
+            },
+            {
+                "consumer": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+                "provider": "independent.invalid/azure/roots",
+                "contract": "image::ghcr.io/independent/root-review",
+                "level": "exact",
+                "reason": "image::ghcr.io/independent/root-review",
+                "root": "overlays/right"
+            }
+        ]),
+        "{raw}"
+    );
+    assert_golden("images.identical-overlay-roots.export.json", &raw);
+
+    // Repeated evidence in one root still describes one runner of the normalized image.
+    std::fs::remove_dir_all(repo.join("overlays/right")).unwrap();
+    let pod = repo.join("base/pod.yaml");
+    let mut source = std::fs::read_to_string(&pod).unwrap();
+    source.push_str("    - name: second\n      image: ghcr.io/independent/root-review:canary\n");
+    std::fs::write(pod, source).unwrap();
+    let raw = engine.export().unwrap();
+    let control: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(control["providers"], export["providers"], "{raw}");
+    assert_eq!(
+        control["consumers"],
+        serde_json::json!([{
+            "contract": "image::ghcr.io/independent/root-review",
+            "site": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+            "via": null,
+            "root": "overlays/left"
+        }]),
+        "{raw}"
+    );
+    assert_eq!(
+        control["links"],
+        serde_json::json!([{
+            "consumer": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+            "provider": "independent.invalid/azure/roots",
+            "contract": "image::ghcr.io/independent/root-review",
+            "level": "exact",
+            "reason": "image::ghcr.io/independent/root-review",
+            "root": "overlays/left"
+        }]),
+        "{raw}"
+    );
+    assert_golden("images.same-root-evidence.export.json", &raw);
+}
+
+#[test]
 fn review_remote_compose_build_publishes_without_a_direct_code_path() {
     let repo = fixture_repo(
         "images_remote_build",

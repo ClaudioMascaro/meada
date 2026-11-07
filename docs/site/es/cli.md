@@ -41,6 +41,9 @@ trace(from="Deployment.apps/shop/orders", direction="down")
 trace(from="orders.py::orders", direction="up")
 ```
 
+Si dos overlays usan la misma carga e imagen, la exportación conserva un enlace por raíz.
+En consultas IaC, añada la raíz a la dirección, por ejemplo `Pod/common (root overlays/right)`.
+
 Compose con `build: ./src` también llega al código sin publicar una imagen. `status` usa el
 ámbito visible para huérfanos; un constructor aislado recibe `no runner in the workspace` en
 las consultas. El console muestra las imágenes y sus ubicaciones en contratos, y las rutas

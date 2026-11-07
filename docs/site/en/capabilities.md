@@ -551,7 +551,9 @@ and unread Gradle expressions do not create a guessed builder.
 Runners are Kubernetes workload containers and init containers, after Kustomize image
 overrides, Compose services and Helm values files' `image.repository`. Helm templates are not
 rendered. `context` shows the image and builder repositories; `trace` crosses the relationship
-both ways, reaching code entry points. A local Compose context directly runs code in the same
+both ways, reaching code entry points. Overlays using the same workload and image retain a
+runner and its link per evaluation root. Repeated evidence of that image in one workload and
+root forms one side. A local Compose context directly runs code in the same
 repository at `exact`, even without `image`, inside the root and through no symbolic link.
 
 Literals link at `exact`; Compose defaults and Helm values at `inferred`, with their source in

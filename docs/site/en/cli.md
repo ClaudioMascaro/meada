@@ -38,6 +38,9 @@ trace(from="Deployment.apps/shop/orders", direction="down")
 trace(from="orders.py::orders", direction="up")
 ```
 
+When two overlays use the same workload and image, export retains one link per root.
+Qualify an IaC query address with its root, for example `Pod/common (root overlays/right)`.
+
 Compose with `build: ./src` also reaches code without publishing an image. `status` uses the
 visible scope for orphans; an isolated builder gets `no runner in the workspace` in queries.
 In the console, contracts show images and their locations, and Workload code shows direct

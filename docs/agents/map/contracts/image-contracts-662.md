@@ -31,6 +31,9 @@ single rule for a workload image's decision identity (site, contract and root); 
 retain the call-site identity. Item grouping and decision replay use that identity, while
 context and trace keep the workload's site. Helm's configuration-derived nodes participate in
 the same visible-export lookup as stored IaC nodes, so their exported identities start queries.
+Mixed consumer declaration passes and their sort order retain the evaluation root: identical
+workload sites and normalized images in distinct overlays stay distinct runners and links.
+Repeated image evidence for one workload and root still collapses to one side.
 
 ## Workload environment resolution (#663)
 

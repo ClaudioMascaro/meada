@@ -321,6 +321,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Image runners and links retain each evaluation root when Kustomize overlays reuse the same
+  workload and normalized image. Repeated image evidence within one workload and root still
+  collapses to one side.
 - A symbol's `context` shows the level, reason and provider of inferred HTTP call links whose
   recorded environment base selects a declared `base_url_env` peer, including through fields
   and Backstage config partials. Editing only a partial refreshes that explanation (#683).

@@ -553,6 +553,8 @@ Os executores são containers e init containers de cargas Kubernetes, com os ove
 imagem do Kustomize aplicados, serviços Compose e `image.repository` de arquivos de valores
 Helm. Templates Helm não são renderizados. `context` mostra a imagem e os repositórios
 construtores; `trace` percorre a relação nos dois sentidos, até as entradas do código.
+Overlays que usam a mesma carga e a mesma imagem preservam um executor e sua ligação por
+raiz de avaliação. Evidências repetidas da mesma imagem na mesma carga e raiz formam um só lado.
 Um contexto Compose local executa diretamente o código do mesmo repositório em `exact`,
 mesmo sem `image`, dentro da raiz e sem atravessar links simbólicos.
 

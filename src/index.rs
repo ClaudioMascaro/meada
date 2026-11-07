@@ -2546,7 +2546,9 @@ pub(crate) fn sort_providers(providers: &mut [Provider]) {
 /// Puts `consumers` back in the order `export` reads them in, after a kind's `declare` added
 /// some.
 pub(crate) fn sort_consumers(consumers: &mut [Consumer]) {
-    consumers.sort_by(|a, b| (&a.site, &a.contract, &a.via).cmp(&(&b.site, &b.contract, &b.via)));
+    consumers.sort_by(|a, b| {
+        (&a.site, &a.contract, &a.via, &a.root).cmp(&(&b.site, &b.contract, &b.via, &b.root))
+    });
 }
 
 impl Export {
