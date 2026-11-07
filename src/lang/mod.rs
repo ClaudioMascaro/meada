@@ -575,6 +575,10 @@ pub struct Facts {
     /// the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub bound: Vec<Bound>,
+    /// Scoped selector assignments/deletions, with their source order. None means this
+    /// parse does not establish complete write knowledge; no literal values are retained.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member_writes: Option<Vec<MemberWrite>>,
     /// What the file gives every file of its project, in the pack's spelling, which
     /// `LanguagePack::join` applies to each: C#'s `global using` directives (`A.B`, `static
     /// A.B`, `X = A.B`).
@@ -659,6 +663,34 @@ pub struct Bound {
     pub within: String,
     pub name: String,
     pub value: Value,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct MemberWrite {
+    pub scope: String,
+    pub object: String,
+    /// None is a computed selector that may write any member.
+    pub field: Option<String>,
+    pub range: Range<usize>,
+}
+
+impl Facts {
+    /// Retained selector evidence shares the existing source byte ceiling. Losing that
+    /// knowledge is explicit, never a truncated empty list that could prove immutability.
+    pub(crate) fn member_write(&mut self, write: MemberWrite, spent: &mut usize) {
+        *spent = spent.saturating_add(
+            std::mem::size_of::<MemberWrite>()
+                + write.scope.len()
+                + write.object.len()
+                + write.field.as_ref().map_or(0, String::len),
+        );
+        if *spent > MAX_BYTES {
+            self.member_writes = None;
+            self.budget.get_or_insert(MAX_BYTES);
+        } else if let Some(writes) = &mut self.member_writes {
+            writes.push(write);
+        }
+    }
 }
 
 /// What a method call's receiver is reached through from the call it is made on (Rust).
@@ -934,7 +966,7 @@ pub struct Def {
     /// A call fits the function only when written under `await` (Swift's `async`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub suspends: bool,
-    /// The call produces a coroutine; its written return values require an awaited call (Python).
+    /// The call produces an async result; its written return values require an awaited call.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub asynchronous: bool,
     /// The BLAKE3 of the exact bytes of `range`, in hex; empty until `hash_spans` fills it.

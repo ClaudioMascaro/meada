@@ -228,6 +228,23 @@ pub trait ContractKind {
     /// say, the others ignore it.
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found>;
 
+    /// Normalize a workload's literal value using the operation's identity policy.
+    fn environment_name(
+        &self,
+        contract: &str,
+        value: &str,
+        _operation: Option<&str>,
+    ) -> Option<String> {
+        environment_name(contract, value)
+    }
+
+    /// Whether a typed workload target is compatible with this operation and subtype.
+    fn environment_target(&self, contract: &str, target: &str, _operation: Option<&str>) -> bool {
+        target
+            .rsplit_once("::")
+            .is_some_and(|(prefix, _)| prefix == contract)
+    }
+
     /// Whether this kind reads configuration independently of a language pack.
     fn config_file(&self, _path: &str) -> bool {
         false
@@ -613,6 +630,24 @@ pub(crate) fn config_summary(
 pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
     let (prefix, _) = contract.split_once("::")?;
     KINDS.iter().copied().find(|k| k.prefix() == prefix)
+}
+
+/// Existing kind-neutral workload literal rules. Cloud-specific readers override the
+/// trait's question; orchestration retains only workload and typed-entry scope.
+pub(crate) fn environment_name(prefix: &str, value: &str) -> Option<String> {
+    if !(prefix.starts_with("channel::") || prefix.starts_with("resource::")) {
+        return None;
+    }
+    if let Some(contract) = crate::iac::types::identified(value) {
+        return (contract.rsplit_once("::")?.0 == prefix).then_some(contract);
+    }
+    (!value.is_empty()
+        && value.bytes().all(|b| {
+            b.is_ascii_alphanumeric()
+                || b"._-".contains(&b)
+                || (prefix.starts_with("resource::") && b == b'/')
+        }))
+    .then(|| format!("{prefix}::{value}"))
 }
 
 /// Explanation retained by a side resolved through a workload environment.

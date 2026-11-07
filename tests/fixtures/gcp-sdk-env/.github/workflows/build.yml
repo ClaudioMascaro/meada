@@ -1,0 +1,6 @@
+jobs:
+  build:
+    steps:
+      - uses: docker/build-push-action@v6
+        with:
+          tags: ghcr.io/acme/gcp-sdk-worker:v1

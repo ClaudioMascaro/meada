@@ -1,0 +1,410 @@
+{
+  "format": 1,
+  "repository": "local/gcp-sdk-csharp",
+  "files": [
+    {
+      "path": "Worker.cs",
+      "hash": "b3b2267a4b33d95b99e3fe54ba5be48e95432a936bbda1a8dd941a2100a21c11"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker",
+      "span": {
+        "path": "Worker.cs",
+        "start": 99,
+        "end": 1887
+      },
+      "hash": "fe2617a7cb660c830fd7b891645a40b4edc9350a069ea19c55f798f62b2e6583"
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1431,
+        "end": 1885
+      },
+      "hash": "37d0865c1c934aca66a0e8ee0f32207e8179619d93df65a9c57918443ffc3123"
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 501,
+        "end": 717
+      },
+      "hash": "25c66d0758b04d38209c24bde85c3ec2cd684467eb035c3f4f3261f8f026a2eb"
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 722,
+        "end": 1045
+      },
+      "hash": "8362b8fd5434813d9623c480ce88ec2838621835e03cc550a4e1e6250d91ac91"
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Receive()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 294,
+        "end": 496
+      },
+      "hash": "93c8d1780ad42e8f49076312249cd59d8fd4067ef5d96e59981775e89600ae33"
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Send()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 118,
+        "end": 289
+      },
+      "hash": "c7dc89a4329aa4c716b62726bbde75e8ae73f9967c57f19f6f825cd0ef4cda73"
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Token()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1050,
+        "end": 1223
+      },
+      "hash": "7006eb7d502fa59d92d8753c5cdced356a0a8e38d163b2945b3127ece1d011bd"
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.TokenAsync()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1228,
+        "end": 1426
+      },
+      "hash": "b3da9d9301e92319ad40c525b04e19e67d7329bbf9d5ecb712c97df323638921"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1562,
+        "end": 1605
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)::SecretManagerServiceClient.Create#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1789,
+        "end": 1824
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)::StorageClient.Create#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1676,
+        "end": 1698
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)::publisher.PublishAsync#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1621,
+        "end": 1652
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)::secrets.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1834,
+        "end": 1878
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)::storage.DownloadObject#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Hidden(object,object,object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1708,
+        "end": 1765
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::StorageClient.Create#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 540,
+        "end": 562
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.DownloadObject#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 647,
+        "end": 710
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.UploadObject#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 572,
+        "end": 637
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::StorageClient.Create#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 772,
+        "end": 794
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.DownloadObjectAsync#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 937,
+        "end": 1038
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.UploadObjectAsync#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 810,
+        "end": 921
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Receive()::SubscriberClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 348,
+        "end": 443
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Receive()::SubscriptionName.FromProjectSubscription#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 377,
+        "end": 442
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Receive()::subscriber.StartAsync#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 459,
+        "end": 489
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Send()::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 168,
+        "end": 235
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Send()::TopicName#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 196,
+        "end": 234
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Send()::publisher.PublishAsync#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 251,
+        "end": 282
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Token()::SecretManagerServiceClient.Create#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Token()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1087,
+        "end": 1122
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Token()::SecretVersionName#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Token()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1160,
+        "end": 1215
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.Token()::secrets.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.Token()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1132,
+        "end": 1216
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.TokenAsync()::SecretManagerServiceClient.Create#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.TokenAsync()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1276,
+        "end": 1311
+      }
+    },
+    {
+      "id": "local/gcp-sdk-csharp::Worker.cs::Worker.TokenAsync()::secrets.AccessSecretVersionAsync#0",
+      "caller": "local/gcp-sdk-csharp::Worker.cs::Worker.TokenAsync()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1327,
+        "end": 1419
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::pubsub::orders-csharp",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.Send()::publisher.PublishAsync#0"
+    },
+    {
+      "contract": "resource::gcs::uploads-csharp",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.UploadObject#0"
+    },
+    {
+      "contract": "resource::gcs::uploads-csharp",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.UploadObjectAsync#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::gcs::uploads-csharp",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.DownloadObject#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcs::uploads-csharp",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.DownloadObjectAsync#0",
+      "via": null
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-csharp",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.Receive()",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::token-csharp",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.Token()::secrets.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::token-csharp",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.TokenAsync()::secrets.AccessSecretVersionAsync#0",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.DownloadObject#0",
+      "provider": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.UploadObject#0",
+      "contract": "resource::gcs::uploads-csharp",
+      "level": "exact",
+      "reason": "resource::gcs::uploads-csharp"
+    },
+    {
+      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.DownloadObject#0",
+      "provider": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.UploadObjectAsync#0",
+      "contract": "resource::gcs::uploads-csharp",
+      "level": "exact",
+      "reason": "resource::gcs::uploads-csharp"
+    },
+    {
+      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.DownloadObjectAsync#0",
+      "provider": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.UploadObject#0",
+      "contract": "resource::gcs::uploads-csharp",
+      "level": "exact",
+      "reason": "resource::gcs::uploads-csharp"
+    },
+    {
+      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.DownloadObjectAsync#0",
+      "provider": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.UploadObjectAsync#0",
+      "contract": "resource::gcs::uploads-csharp",
+      "level": "exact",
+      "reason": "resource::gcs::uploads-csharp"
+    }
+  ]
+}

@@ -1,0 +1,912 @@
+{
+  "format": 1,
+  "repository": "local/gcp-sdk-helper-kinds",
+  "files": [
+    {
+      "path": "Scene.cs",
+      "hash": "d6c35a8a24ec93bf7464eec7eac831361666bd6086dbca1c23e1bc540be215d7"
+    },
+    {
+      "path": "Scene.java",
+      "hash": "e9ce1b348952698debcbeaa1a557af8b829f954fd91b6cf25a38ab0cd8638146"
+    },
+    {
+      "path": "scene.py",
+      "hash": "830635c3bfc6f5ac413c51c3f0f09e6bf6d142baf05b78015fea938cb0b81e0b"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene",
+      "span": {
+        "path": "Scene.cs",
+        "start": 98,
+        "end": 907
+      },
+      "hash": "ed6b185f68cde470e6da6875af687496e2fade05da391c9af3a09349fe794196"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Correct()",
+      "span": {
+        "path": "Scene.cs",
+        "start": 214,
+        "end": 328
+      },
+      "hash": "3f100da6b9f2b126bbff8216f4a2e46db0a173ff95e90a9e01d947c1d965df06"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Make(object)",
+      "span": {
+        "path": "Scene.cs",
+        "start": 114,
+        "end": 211
+      },
+      "hash": "5213cd5b53be49ce83319809e7249a2eecac9e626ec9e7b2f7f2b9ea8fee57e3"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Wrong()",
+      "span": {
+        "path": "Scene.cs",
+        "start": 331,
+        "end": 450
+      },
+      "hash": "405bd4eec372b45be9fb7f3889525435a0929d1999df133aa73c25b88b9c51f3"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongBucket()",
+      "span": {
+        "path": "Scene.cs",
+        "start": 614,
+        "end": 756
+      },
+      "hash": "efd184ca83af0fc017c0ff24cb75f1dc916cdab95e28ff27ea01692f0a59ecd8"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongReceive()",
+      "span": {
+        "path": "Scene.cs",
+        "start": 453,
+        "end": 611
+      },
+      "hash": "28fd4317f3dda97ec906af264ee056f561b2cc360601787c6d97bfb1cda887c7"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongSecret()",
+      "span": {
+        "path": "Scene.cs",
+        "start": 759,
+        "end": 905
+      },
+      "hash": "17cd5620b62d8b58e49ed678cb0df705940e72b8dc303d6b0fef7f5e304a097d"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene",
+      "span": {
+        "path": "Scene.java",
+        "start": 293,
+        "end": 980
+      },
+      "hash": "b6a29ceb01e580d631e8e957ef2477ed84c9cbbf6755cbe265dac19b6f1ade14"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Correct()",
+      "span": {
+        "path": "Scene.java",
+        "start": 386,
+        "end": 474
+      },
+      "hash": "5adac651e58ca4a73db0d6d43e88af2a59f28bd118754549acf4904d879364ae"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Wrong()",
+      "span": {
+        "path": "Scene.java",
+        "start": 477,
+        "end": 570
+      },
+      "hash": "183b4e76a6fea65e2535c149e1e9185aca38d58a44d0e12f3157ec9698391ebd"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()",
+      "span": {
+        "path": "Scene.java",
+        "start": 702,
+        "end": 845
+      },
+      "hash": "53867baa2d73316fc9258b11e8620513248892118ded7ecd492fc858168108a7"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongReceive()",
+      "span": {
+        "path": "Scene.java",
+        "start": 573,
+        "end": 699
+      },
+      "hash": "be8af21409f26702a3be3615f0b544130762aed82e63961d533112842b0471d0"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongSecret()",
+      "span": {
+        "path": "Scene.java",
+        "start": 848,
+        "end": 978
+      },
+      "hash": "0cf1ef7af491900f31274322636d76e98e6c3a102a739a724f49dd47a5fe58fc"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.make(Object)",
+      "span": {
+        "path": "Scene.java",
+        "start": 309,
+        "end": 383
+      },
+      "hash": "eda4eda364815df7e0d9baac625e15439d3c9ee68ae2c0105eca94a12097f034"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper",
+      "span": {
+        "path": "scene.py",
+        "start": 604,
+        "end": 747
+      },
+      "hash": "41669f0a125080e0dc3257ecdd6968646247963ad17f9e60c11ee8567da9f2ed"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::SecretWrongHelper",
+      "span": {
+        "path": "scene.py",
+        "start": 748,
+        "end": 919
+      },
+      "hash": "75fcaaa10ce8b24a5af648a8630d71ca150f4d4971bb322019583e5720768fc5"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::SubscriptionWrongHelper",
+      "span": {
+        "path": "scene.py",
+        "start": 452,
+        "end": 603
+      },
+      "hash": "25e1f68b6e539db0f64198c67ea62931049f743b8685a0035734b1525a3aa41a"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::TopicCorrect",
+      "span": {
+        "path": "scene.py",
+        "start": 60,
+        "end": 199
+      },
+      "hash": "2d31716ba70924987ede2a7803e4559808e963606047fb2394c55f17639c7deb"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongHelper",
+      "span": {
+        "path": "scene.py",
+        "start": 314,
+        "end": 451
+      },
+      "hash": "fa7486f711ad09f46a295258f68f01e2ec32ed2f489da270fdafc850afba1495"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongLiteral",
+      "span": {
+        "path": "scene.py",
+        "start": 200,
+        "end": 313
+      },
+      "hash": "5e1164c0de436c1357d5b3f9bbf94a637e56d991700003505c311c43ac899aad"
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::handler",
+      "span": {
+        "path": "scene.py",
+        "start": 920,
+        "end": 945
+      },
+      "hash": "6e03fc4576207884ed6c194a1ee583c9b76c1f873ca65beadb34d72bda530217"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Correct()::Make#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Correct()",
+      "target": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Make(object)",
+      "level": "exact",
+      "span": {
+        "path": "Scene.cs",
+        "start": 254,
+        "end": 292
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Correct()::TopicName#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Correct()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 259,
+        "end": 291
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Correct()::client.PublishAsync#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Correct()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 300,
+        "end": 325
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Make(object)::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Make(object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 175,
+        "end": 208
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Wrong()::Make#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Wrong()",
+      "target": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Make(object)",
+      "level": "exact",
+      "span": {
+        "path": "Scene.cs",
+        "start": 369,
+        "end": 414
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Wrong()::SubscriptionName#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Wrong()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 374,
+        "end": 413
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Wrong()::client.PublishAsync#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Wrong()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 422,
+        "end": 447
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongBucket()::StorageClient.Create#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 646,
+        "end": 668
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongBucket()::TopicName.FromProjectTopic#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 692,
+        "end": 738
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongBucket()::client.DownloadObject#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 670,
+        "end": 753
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongReceive()::SubscriberClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 498,
+        "end": 574
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongReceive()::TopicName.FromProjectTopic#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 527,
+        "end": 573
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongReceive()::client.StartAsync#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 582,
+        "end": 608
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongSecret()::SecretManagerServiceClient.Create#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 791,
+        "end": 826
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongSecret()::TopicName.FromProjectTopic#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 855,
+        "end": 901
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongSecret()::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 828,
+        "end": 902
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Correct()::TopicName.of#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Correct()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 419,
+        "end": 448
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Correct()::client.publish#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Correct()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 451,
+        "end": 471
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Correct()::make#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Correct()",
+      "target": "local/gcp-sdk-helper-kinds::Scene.java::Scene.make(Object)",
+      "level": "exact",
+      "span": {
+        "path": "Scene.java",
+        "start": 414,
+        "end": 449
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Wrong()::SubscriptionName.of#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Wrong()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 508,
+        "end": 544
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Wrong()::client.publish#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Wrong()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 547,
+        "end": 567
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Wrong()::make#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Wrong()",
+      "target": "local/gcp-sdk-helper-kinds::Scene.java::Scene.make(Object)",
+      "level": "exact",
+      "span": {
+        "path": "Scene.java",
+        "start": 503,
+        "end": 545
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 734,
+        "end": 769
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()::(method_invocation).getService#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 734,
+        "end": 782
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()::StorageOptions.newBuilder#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 734,
+        "end": 761
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()::TopicName.of#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 804,
+        "end": 834
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()::client.readAllBytes#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 784,
+        "end": 842
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongReceive()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 606,
+        "end": 675
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongReceive()::Subscriber.newBuilder#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 606,
+        "end": 667
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongReceive()::TopicName.of#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 628,
+        "end": 658
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongReceive()::client.startAsync#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongReceive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 677,
+        "end": 696
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongSecret()::SecretManagerServiceClient.create#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 880,
+        "end": 915
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongSecret()::TopicName.of#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 944,
+        "end": 974
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongSecret()::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongSecret()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 917,
+        "end": 975
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.make(Object)::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.make(Object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 346,
+        "end": 380
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::Scene.java::Scene.make(Object)::Publisher.newBuilder#0",
+      "caller": "local/gcp-sdk-helper-kinds::Scene.java::Scene.make(Object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.java",
+        "start": 346,
+        "end": 372
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper::(call).blob#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 633,
+        "end": 727
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper::(call).bucket#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 633,
+        "end": 717
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper::(call).download_as_bytes#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 633,
+        "end": 747
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper::pubsub_v1.PublisherClient.topic_path#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 657,
+        "end": 716
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper::storage.Client#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 633,
+        "end": 649
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::SecretWrongHelper::(call).access_secret_version#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::SecretWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 777,
+        "end": 919
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::SecretWrongHelper::pubsub_v1.PublisherClient.topic_path#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::SecretWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 858,
+        "end": 917
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::SecretWrongHelper::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::SecretWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 777,
+        "end": 819
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::SubscriptionWrongHelper::(call).subscribe#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::SubscriptionWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 487,
+        "end": 603
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::SubscriptionWrongHelper::pubsub_v1.PublisherClient.topic_path#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::SubscriptionWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 526,
+        "end": 585
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::SubscriptionWrongHelper::pubsub_v1.SubscriberClient#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::SubscriptionWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 487,
+        "end": 515
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::TopicCorrect::bus.publish#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::TopicCorrect",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 120,
+        "end": 199
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::TopicCorrect::pubsub_v1.PublisherClient#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::TopicCorrect",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 88,
+        "end": 115
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::TopicCorrect::pubsub_v1.PublisherClient.topic_path#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::TopicCorrect",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 132,
+        "end": 193
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongHelper::(call).publish#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 342,
+        "end": 451
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongHelper::pubsub_v1.PublisherClient#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 342,
+        "end": 369
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongHelper::pubsub_v1.SubscriberClient.subscription_path#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongHelper",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 378,
+        "end": 445
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongLiteral::(call).publish#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongLiteral",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 229,
+        "end": 313
+      }
+    },
+    {
+      "id": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongLiteral::pubsub_v1.PublisherClient#0",
+      "caller": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongLiteral",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 229,
+        "end": 256
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Wrong()::client.PublishAsync#0"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Wrong()::client.publish#0"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongHelper::(call).publish#0"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-helper-kinds::scene.py::TopicWrongLiteral::(call).publish#0"
+    },
+    {
+      "contract": "channel::pubsub::kind-control",
+      "site": "local/gcp-sdk-helper-kinds::scene.py::TopicCorrect::bus.publish#0"
+    },
+    {
+      "contract": "channel::pubsub::kind-csharp",
+      "site": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Correct()::client.PublishAsync#0"
+    },
+    {
+      "contract": "channel::pubsub::kind-java",
+      "site": "local/gcp-sdk-helper-kinds::Scene.java::Scene.Correct()::client.publish#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::gcs",
+      "site": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongBucket()::client.DownloadObject#0",
+      "via": null
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongReceive()",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-helper-kinds::Scene.cs::Scene.WrongSecret()::client.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcs",
+      "site": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongBucket()::client.readAllBytes#0",
+      "via": null
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongReceive()",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-helper-kinds::Scene.java::Scene.WrongSecret()::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcs",
+      "site": "local/gcp-sdk-helper-kinds::scene.py::BucketWrongHelper::(call).download_as_bytes#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-helper-kinds::scene.py::SecretWrongHelper::(call).access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-helper-kinds::scene.py::SubscriptionWrongHelper",
+      "via": null
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Correct()",
+        "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Make(object)",
+        "local/gcp-sdk-helper-kinds::Scene.cs::Scene.Wrong()"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/gcp-sdk-helper-kinds::Scene.java::Scene.Correct()",
+        "local/gcp-sdk-helper-kinds::Scene.java::Scene.Wrong()",
+        "local/gcp-sdk-helper-kinds::Scene.java::Scene.make(Object)"
+      ]
+    }
+  ],
+  "links": []
+}

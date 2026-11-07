@@ -56,7 +56,11 @@ impl LanguagePack for TsJs {
             .parse(src, None)
             .ok_or("tree-sitter returned no tree")?;
         let parents = Parents::new(tree.root_node(), src);
-        let mut facts = Facts::default();
+        let mut facts = Facts {
+            member_writes: Some(Vec::new()),
+            ..Facts::default()
+        };
+        let mut write_bytes = 0;
         let mut uses = uses::Uses::new(src, &parents);
         // The instance fields only their declaration or constructor may assign, or only their
         // class reach (`sealed_field`), by class and name, with their initializer; and every
@@ -97,6 +101,7 @@ impl LanguagePack for TsJs {
                 inner = qualify(&scope, &name);
                 functions.insert(node.id(), facts.defs.len());
                 facts.defs.push(Def {
+                    asynchronous: children(node).any(|n| n.kind() == "async"),
                     params: params(node, src, &inner, &parents),
                     returns: (node.child_by_field_name("return_type"))
                         .and_then(|t| types::returned(t, src, &parents)),
@@ -147,7 +152,19 @@ impl LanguagePack for TsJs {
                             on: None,
                             unwraps: false,
                             awaits: false,
-                            receiver: None,
+                            receiver: (function.kind() == "member_expression")
+                                .then(|| function.child_by_field_name("object"))
+                                .flatten()
+                                .filter(|object| {
+                                    matches!(
+                                        object.kind(),
+                                        "call_expression"
+                                            | "new_expression"
+                                            | "await_expression"
+                                            | "parenthesized_expression"
+                                    )
+                                })
+                                .map(|object| value(object, src, &scope, &parents)),
                             arg_types: arguments
                                 .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())
                                 .unwrap_or_default(),
@@ -197,6 +214,7 @@ impl LanguagePack for TsJs {
                 _ => {}
             }
             let named = binds(node, src, &parents);
+            selector_writes(node, src, &scope, &mut facts, &mut write_bytes);
             if node.kind() == "assignment_expression"
                 && named.is_some()
                 && let Some(Assigned {
@@ -834,6 +852,63 @@ fn member_written(node: Node, src: &[u8]) -> Option<String> {
         .then(|| text(object, src).to_string())
 }
 
+fn selector_writes(node: Node, src: &[u8], scope: &str, facts: &mut Facts, spent: &mut usize) {
+    if facts.member_writes.is_none() {
+        return;
+    }
+    let target = match node.kind() {
+        "assignment_expression" | "augmented_assignment_expression" => {
+            node.child_by_field_name("left")
+        }
+        "update_expression" => node
+            .child_by_field_name("argument")
+            .or_else(|| named(node).next()),
+        "unary_expression" if children(node).any(|n| text(n, src) == "delete") => node
+            .child_by_field_name("argument")
+            .or_else(|| named(node).next()),
+        _ => return,
+    };
+    let mut pending: Vec<_> = target.into_iter().collect();
+    while let Some(target) = pending.pop() {
+        if facts.member_writes.is_none() {
+            break;
+        }
+        let field = match target.kind() {
+            "member_expression" => target
+                .child_by_field_name("property")
+                .map(|p| text(p, src).to_string()),
+            "subscript_expression" => target
+                .child_by_field_name("index")
+                .filter(|n| n.kind() == "string")
+                .map(|n| unquote(n, src)),
+            "identifier" => continue,
+            "assignment_pattern" => {
+                pending.extend(target.child_by_field_name("left"));
+                continue;
+            }
+            "pair_pattern" => {
+                pending.extend(target.child_by_field_name("value"));
+                continue;
+            }
+            _ => {
+                pending.extend(named(target));
+                continue;
+            }
+        };
+        if let Some(object) = target.child_by_field_name("object") {
+            facts.member_write(
+                super::MemberWrite {
+                    scope: scope.into(),
+                    object: callee(object, src),
+                    field,
+                    range: node.byte_range(),
+                },
+                spent,
+            );
+        }
+    }
+}
+
 /// The string a function returns when that is all its body does: an arrow function's expression
 /// body, or a body of one `return`. An `async` function returns a promise, not a string.
 fn lone_string(node: Node, src: &[u8], scope: &str, up: &Parents) -> Option<Value> {
@@ -1329,7 +1404,9 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
             Value::Object(properties.collect())
         }
         "array" => Value::List(named(node).map(deeper).collect()),
-        "await_expression" => named(node).next().map_or(Value::Unknown, deeper),
+        "await_expression" => named(node)
+            .next()
+            .map_or(Value::Unknown, |n| Value::Await(Box::new(deeper(n)))),
         "number" => Value::Scalar(text(node, src).parse().ok()),
         "true" | "false" => Value::Scalar(None),
         "identifier" if text(node, src) == "undefined" => Value::Undefined,

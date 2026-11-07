@@ -1,0 +1,412 @@
+{
+  "format": 1,
+  "repository": "local/gcp-sdk-java",
+  "files": [
+    {
+      "path": "Worker.java",
+      "hash": "d88d64d863efa6ee33c875f983e1acbedf0d1af41b6fcc9a04f6d6424721b646"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker",
+      "span": {
+        "path": "Worker.java",
+        "start": 436,
+        "end": 1687
+      },
+      "hash": "c5d374fd33c9a2101723dfa281475b71a689d1460b9cf935ca25e31c1e3d806f"
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)",
+      "span": {
+        "path": "Worker.java",
+        "start": 1211,
+        "end": 1685
+      },
+      "hash": "fd90fbb0734ba9dc8f4b1da22f88812d2c3ba74b843eb9f407044951f7aa8e6e"
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.receive()",
+      "span": {
+        "path": "Worker.java",
+        "start": 606,
+        "end": 770
+      },
+      "hash": "2d0e4e3862ff3a9c9de9a41313e730bdcf5e5d4f20a0cb80750babd48c4f0f32"
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.send()",
+      "span": {
+        "path": "Worker.java",
+        "start": 455,
+        "end": 601
+      },
+      "hash": "d0e57e0cfaed9fbb0af537e8416eaeb1174504490742e82b142e9c2a35a52e42"
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.storage()",
+      "span": {
+        "path": "Worker.java",
+        "start": 775,
+        "end": 1031
+      },
+      "hash": "656cba89a7fab78b1656a8a11696ef3d6a8534c408e34118011609b0d0f6ab0f"
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.token()",
+      "span": {
+        "path": "Worker.java",
+        "start": 1036,
+        "end": 1206
+      },
+      "hash": "bfe41811f26825224e88bfb8e358688141ca433d76d475153a8aedc8e5cb5b83"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1356,
+        "end": 1400
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)::(method_invocation).build#1",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1460,
+        "end": 1495
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)::(method_invocation).getService#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1460,
+        "end": 1508
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)::Publisher.newBuilder#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1356,
+        "end": 1392
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)::SecretManagerServiceClient.create#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1589,
+        "end": 1624
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)::StorageOptions.newBuilder#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1460,
+        "end": 1487
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)::publisher.publish#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1410,
+        "end": 1436
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)::secrets.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1634,
+        "end": 1678
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)::storage.readAllBytes#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.hidden(Publisher,StorageOptions,SecretManagerServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1518,
+        "end": 1565
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.receive()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 648,
+        "end": 730
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.receive()::Subscriber.newBuilder#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 648,
+        "end": 722
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.receive()::SubscriptionName.of#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 670,
+        "end": 712
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.receive()::subscriber.startAsync#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.receive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 740,
+        "end": 763
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.send()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 493,
+        "end": 558
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.send()::Publisher.newBuilder#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 493,
+        "end": 550
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.send()::TopicName.of#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 514,
+        "end": 549
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.send()::publisher.publish#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 568,
+        "end": 594
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.storage()::(method_invocation).build#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.storage()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 814,
+        "end": 849
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.storage()::(method_invocation).build#1",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.storage()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 887,
+        "end": 956
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.storage()::(method_invocation).getService#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.storage()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 814,
+        "end": 862
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.storage()::BlobId.of#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.storage()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 907,
+        "end": 947
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.storage()::BlobInfo.newBuilder#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.storage()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 887,
+        "end": 948
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.storage()::StorageOptions.newBuilder#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.storage()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 814,
+        "end": 841
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.storage()::storage.create#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.storage()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 872,
+        "end": 963
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.storage()::storage.readAllBytes#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.storage()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 973,
+        "end": 1024
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.token()::SecretManagerServiceClient.create#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.token()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1073,
+        "end": 1108
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.token()::SecretVersionName.of#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.token()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1146,
+        "end": 1198
+      }
+    },
+    {
+      "id": "local/gcp-sdk-java::Worker.java::Worker.token()::secrets.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-java::Worker.java::Worker.token()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.java",
+        "start": 1118,
+        "end": 1199
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::pubsub::orders-java",
+      "site": "local/gcp-sdk-java::Worker.java::Worker.send()::publisher.publish#0"
+    },
+    {
+      "contract": "resource::gcs::uploads-java",
+      "site": "local/gcp-sdk-java::Worker.java::Worker.storage()::storage.create#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "channel::pubsub::subscriptions/orders-java",
+      "site": "local/gcp-sdk-java::Worker.java::Worker.receive()",
+      "via": null
+    },
+    {
+      "contract": "resource::gcs::uploads-java",
+      "site": "local/gcp-sdk-java::Worker.java::Worker.storage()::storage.readAllBytes#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::token-java",
+      "site": "local/gcp-sdk-java::Worker.java::Worker.token()::secrets.accessSecretVersion#0",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/gcp-sdk-java::Worker.java::Worker.storage()::storage.readAllBytes#0",
+      "provider": "local/gcp-sdk-java::Worker.java::Worker.storage()::storage.create#0",
+      "contract": "resource::gcs::uploads-java",
+      "level": "exact",
+      "reason": "resource::gcs::uploads-java"
+    }
+  ]
+}

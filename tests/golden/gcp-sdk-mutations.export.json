@@ -1,0 +1,2182 @@
+{
+  "format": 1,
+  "repository": "local/gcp-sdk-mutations",
+  "files": [
+    {
+      "path": "scene.go",
+      "hash": "2b8208c87c52da14949afc64446b90e7650ec453302e9ea62e0f6b0ffb2ddfd1"
+    },
+    {
+      "path": "scene.js",
+      "hash": "b9f5c15e7f22fd6a17d0a3bd2b56751221cf1425d511020aa8674b82cb1daea6"
+    },
+    {
+      "path": "scene.py",
+      "hash": "27e53caaa014c2995bd92005bf28d1cd3ad502df50126881f0048f97f050b183"
+    },
+    {
+      "path": "scene.ts",
+      "hash": "b9f5c15e7f22fd6a17d0a3bd2b56751221cf1425d511020aa8674b82cb1daea6"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::AliasSelected",
+      "span": {
+        "path": "scene.go",
+        "start": 1443,
+        "end": 1691
+      },
+      "hash": "c6a0acc186d6a2015dd057c3c2fefd7887dc01422762fef151fdcabf437cad4d"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::AliasWrite",
+      "span": {
+        "path": "scene.go",
+        "start": 640,
+        "end": 930
+      },
+      "hash": "282953c2beb6361402479bb56f9d6dd7e2dacc175d43a0b12b7f6e7a287f5a45"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::BeforeWrite",
+      "span": {
+        "path": "scene.go",
+        "start": 931,
+        "end": 1162
+      },
+      "hash": "29cc07003b83dfe54df65199882a0057de97fb899b22d3a6736300b7dd6dadb3"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::DirectWrite",
+      "span": {
+        "path": "scene.go",
+        "start": 360,
+        "end": 639
+      },
+      "hash": "d95f20ea05d3cf3386c4d4428dc6f28188131684996dc4fbcd80ef1f3548859c"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::HelperWrite",
+      "span": {
+        "path": "scene.go",
+        "start": 1775,
+        "end": 2001
+      },
+      "hash": "d22b44f0b3013bdb4f378bc99d04f4c1b33cb4e2e346600fcd28356316106de7"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::LateHelperWrite",
+      "span": {
+        "path": "scene.go",
+        "start": 2002,
+        "end": 2231
+      },
+      "hash": "4bc8045768c910afb8d862c72ba103503bf433e9af1b07547a6eebc161d31f64"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::OpaqueAlias",
+      "span": {
+        "path": "scene.go",
+        "start": 2459,
+        "end": 2790
+      },
+      "hash": "45b6213a5153bf83cbbf8d092c4e2a9c5e1eee59449a29b74422d74727319951"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::OtherField",
+      "span": {
+        "path": "scene.go",
+        "start": 2232,
+        "end": 2458
+      },
+      "hash": "5b4c4a024cbdad3038af82061358e620897f4878143e224093cc66d76818a546"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::OtherObject",
+      "span": {
+        "path": "scene.go",
+        "start": 1163,
+        "end": 1442
+      },
+      "hash": "9d36bf512def8845f43d8e5cf79611472bd4eed6eca70ceeac77b545f574bf26"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::Unchanged",
+      "span": {
+        "path": "scene.go",
+        "start": 151,
+        "end": 359
+      },
+      "hash": "00045e3d11a8c2b4accd0a58939b8e4ff48d39d919e0ab2d63cb3e3f77114c40"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::mutate",
+      "span": {
+        "path": "scene.go",
+        "start": 1692,
+        "end": 1774
+      },
+      "hash": "e64eae37a304ce42f1d2e4329c0454ba0a175ba50fbae11d9b6e0bfbaff49afb"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::AliasSelected",
+      "span": {
+        "path": "scene.js",
+        "start": 1256,
+        "end": 1484
+      },
+      "hash": "e60b6b27051b3264aec78c4677809a9488bdba3ab7897e37ec391154825929aa"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::AliasWrite",
+      "span": {
+        "path": "scene.js",
+        "start": 533,
+        "end": 803
+      },
+      "hash": "dd14be9e8aef5f26a81e13d0bd96d6f737db6f0f6dd1ad654bb19b3ee429fac8"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::BeforeWrite",
+      "span": {
+        "path": "scene.js",
+        "start": 811,
+        "end": 1017
+      },
+      "hash": "05969e8401b00599931dd6232eda439648689feb70409ad12d80deec2dc2a031"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::DeleteWrite",
+      "span": {
+        "path": "scene.js",
+        "start": 2196,
+        "end": 2401
+      },
+      "hash": "cde9ad1add886dff2af2de70a60016a37c48ad423e2c484dfd1f9caf102e45fd"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::DirectWrite",
+      "span": {
+        "path": "scene.js",
+        "start": 271,
+        "end": 525
+      },
+      "hash": "0992d5f422060f6baf94ff9625d2f022414e52dbce08b0a73f186df44cdd15dc"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::HelperOpaque",
+      "span": {
+        "path": "scene.js",
+        "start": 3223,
+        "end": 3445
+      },
+      "hash": "d358f5cbf47b12aa957f5fa0b1621b355d6b89d46fb27b490fedd732a3b5313b"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::HelperWrite",
+      "span": {
+        "path": "scene.js",
+        "start": 1543,
+        "end": 1744
+      },
+      "hash": "790336f71bc9da159fe10705b3347e9c0b6ea2abb9eefc5c6a735e0805e23066"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::LateHelperOpaque",
+      "span": {
+        "path": "scene.js",
+        "start": 3453,
+        "end": 3678
+      },
+      "hash": "af1b55aa05de2281b31aef63da3dd42313d1073ef176c6db2f80e438627054bd"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::LateHelperWrite",
+      "span": {
+        "path": "scene.js",
+        "start": 1752,
+        "end": 1956
+      },
+      "hash": "a5da38fd2bdcebabdbd66a4d424e841a45f49cb6213132bcfd0033d67f2da05b"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::MappingWrite",
+      "span": {
+        "path": "scene.js",
+        "start": 1964,
+        "end": 2188
+      },
+      "hash": "1e1159cd4d0a9b7fc262b4535cc3ca9dacb04e878d586a146d498e8d35da5b43"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::OpaqueAlias",
+      "span": {
+        "path": "scene.js",
+        "start": 2618,
+        "end": 2888
+      },
+      "hash": "b9c2d767d598c6e49ba163bd8f759f76077c00b5eceaab12a05249d218b3a3a1"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::OtherField",
+      "span": {
+        "path": "scene.js",
+        "start": 2409,
+        "end": 2610
+      },
+      "hash": "43bef404abbc7ad5c86ca26f4c54838e367a4f61120b32d2098b4a22edcb9028"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::OtherObject",
+      "span": {
+        "path": "scene.js",
+        "start": 1025,
+        "end": 1248
+      },
+      "hash": "caed6e15cbfec3c02d860c59bad70e55cb2b8d28e115783f07a0f4036a6c306d"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::PatternWrite",
+      "span": {
+        "path": "scene.js",
+        "start": 2896,
+        "end": 3108
+      },
+      "hash": "83293b40015d76711678b140b92accf3977005b5a320c78d1871050e1e46801c"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::Unchanged",
+      "span": {
+        "path": "scene.js",
+        "start": 80,
+        "end": 263
+      },
+      "hash": "146d21bc9d25f696c2b89a39fd97b73ee23200edf796aae687ae9ebdb865b08a"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::mutate",
+      "span": {
+        "path": "scene.js",
+        "start": 1485,
+        "end": 1535
+      },
+      "hash": "66656226e57051b5dab07d1f5e3ca66c5477e878bf727760675fce1b61549adc"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::mutateOpaque",
+      "span": {
+        "path": "scene.js",
+        "start": 3110,
+        "end": 3215
+      },
+      "hash": "41f625fbc9d7ca53e71fee3f8a1c671aaf4e8976f719fcd74b8861d9148f81e2"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::AliasSelected",
+      "span": {
+        "path": "scene.py",
+        "start": 1272,
+        "end": 1518
+      },
+      "hash": "cd357cdcb62e0ede2cd6d2177b01eac6d8c3c7b808a542dcc2df93193495ef27"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::AliasWrite",
+      "span": {
+        "path": "scene.py",
+        "start": 512,
+        "end": 800
+      },
+      "hash": "323e88b4224d5801992ba8a116e25c09c8427d766dd4963d5794b7c805bdfbc8"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::BeforeWrite",
+      "span": {
+        "path": "scene.py",
+        "start": 801,
+        "end": 1027
+      },
+      "hash": "cd0396602e71f7edf98977e6f7006156e692650ac8a3b93c258f6d2275de6498"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::DeleteWrite",
+      "span": {
+        "path": "scene.py",
+        "start": 2246,
+        "end": 2468
+      },
+      "hash": "45f789af8510cae4861eaef9542bc9f944276487ed54d4452c5286bb1a60cf2a"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::DirectWrite",
+      "span": {
+        "path": "scene.py",
+        "start": 237,
+        "end": 511
+      },
+      "hash": "24d6d606189cde3e2ccabf8115b79e145c8c8e7155a59f98a00d817c7394c286"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::HelperWrite",
+      "span": {
+        "path": "scene.py",
+        "start": 1568,
+        "end": 1786
+      },
+      "hash": "80c9b91298e697f75769e596d3ee884aa9370c8bcdd8176efb5d7624c5fe3773"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::LateHelperWrite",
+      "span": {
+        "path": "scene.py",
+        "start": 1787,
+        "end": 2008
+      },
+      "hash": "ccbba50e664304fe0f8b3201f43025e6c11d046eb5763535c922ce8a3425fa13"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::MappingWrite",
+      "span": {
+        "path": "scene.py",
+        "start": 2009,
+        "end": 2245
+      },
+      "hash": "b981d9c2346a0b678d5abeb605eec4f30662be5bd599954acf45b75f445285e9"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::OpaqueAlias",
+      "span": {
+        "path": "scene.py",
+        "start": 2700,
+        "end": 3002
+      },
+      "hash": "60af0fb04a12844fcb2e8bdc5841d0ea36ed227f87ba3002051b4dc294d4c56c"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::OtherField",
+      "span": {
+        "path": "scene.py",
+        "start": 2469,
+        "end": 2699
+      },
+      "hash": "c06cf689a90d40e233bbf9153b95030c58618e4dcc2994f0e905e0743b6c30f0"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::OtherObject",
+      "span": {
+        "path": "scene.py",
+        "start": 1028,
+        "end": 1271
+      },
+      "hash": "9dea13319de9d31f13400494c74a3545ad3c8053357c6135773a5940f964a984"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::Unchanged",
+      "span": {
+        "path": "scene.py",
+        "start": 40,
+        "end": 236
+      },
+      "hash": "b9131861984e04ef92dbd8845c632f4723f4c95a2567e7809c95ad510dce766a"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::mutate",
+      "span": {
+        "path": "scene.py",
+        "start": 1519,
+        "end": 1567
+      },
+      "hash": "ba2a93edc847f7852d0538460137717257faf5eebacd3d34da1e34463a475dd5"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::AliasSelected",
+      "span": {
+        "path": "scene.ts",
+        "start": 1256,
+        "end": 1484
+      },
+      "hash": "e60b6b27051b3264aec78c4677809a9488bdba3ab7897e37ec391154825929aa"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::AliasWrite",
+      "span": {
+        "path": "scene.ts",
+        "start": 533,
+        "end": 803
+      },
+      "hash": "dd14be9e8aef5f26a81e13d0bd96d6f737db6f0f6dd1ad654bb19b3ee429fac8"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::BeforeWrite",
+      "span": {
+        "path": "scene.ts",
+        "start": 811,
+        "end": 1017
+      },
+      "hash": "05969e8401b00599931dd6232eda439648689feb70409ad12d80deec2dc2a031"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::DeleteWrite",
+      "span": {
+        "path": "scene.ts",
+        "start": 2196,
+        "end": 2401
+      },
+      "hash": "cde9ad1add886dff2af2de70a60016a37c48ad423e2c484dfd1f9caf102e45fd"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::DirectWrite",
+      "span": {
+        "path": "scene.ts",
+        "start": 271,
+        "end": 525
+      },
+      "hash": "0992d5f422060f6baf94ff9625d2f022414e52dbce08b0a73f186df44cdd15dc"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::HelperOpaque",
+      "span": {
+        "path": "scene.ts",
+        "start": 3223,
+        "end": 3445
+      },
+      "hash": "d358f5cbf47b12aa957f5fa0b1621b355d6b89d46fb27b490fedd732a3b5313b"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::HelperWrite",
+      "span": {
+        "path": "scene.ts",
+        "start": 1543,
+        "end": 1744
+      },
+      "hash": "790336f71bc9da159fe10705b3347e9c0b6ea2abb9eefc5c6a735e0805e23066"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::LateHelperOpaque",
+      "span": {
+        "path": "scene.ts",
+        "start": 3453,
+        "end": 3678
+      },
+      "hash": "af1b55aa05de2281b31aef63da3dd42313d1073ef176c6db2f80e438627054bd"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::LateHelperWrite",
+      "span": {
+        "path": "scene.ts",
+        "start": 1752,
+        "end": 1956
+      },
+      "hash": "a5da38fd2bdcebabdbd66a4d424e841a45f49cb6213132bcfd0033d67f2da05b"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::MappingWrite",
+      "span": {
+        "path": "scene.ts",
+        "start": 1964,
+        "end": 2188
+      },
+      "hash": "1e1159cd4d0a9b7fc262b4535cc3ca9dacb04e878d586a146d498e8d35da5b43"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::OpaqueAlias",
+      "span": {
+        "path": "scene.ts",
+        "start": 2618,
+        "end": 2888
+      },
+      "hash": "b9c2d767d598c6e49ba163bd8f759f76077c00b5eceaab12a05249d218b3a3a1"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::OtherField",
+      "span": {
+        "path": "scene.ts",
+        "start": 2409,
+        "end": 2610
+      },
+      "hash": "43bef404abbc7ad5c86ca26f4c54838e367a4f61120b32d2098b4a22edcb9028"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::OtherObject",
+      "span": {
+        "path": "scene.ts",
+        "start": 1025,
+        "end": 1248
+      },
+      "hash": "caed6e15cbfec3c02d860c59bad70e55cb2b8d28e115783f07a0f4036a6c306d"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::PatternWrite",
+      "span": {
+        "path": "scene.ts",
+        "start": 2896,
+        "end": 3108
+      },
+      "hash": "83293b40015d76711678b140b92accf3977005b5a320c78d1871050e1e46801c"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::Unchanged",
+      "span": {
+        "path": "scene.ts",
+        "start": 80,
+        "end": 263
+      },
+      "hash": "146d21bc9d25f696c2b89a39fd97b73ee23200edf796aae687ae9ebdb865b08a"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::mutate",
+      "span": {
+        "path": "scene.ts",
+        "start": 1485,
+        "end": 1535
+      },
+      "hash": "66656226e57051b5dab07d1f5e3ca66c5477e878bf727760675fce1b61549adc"
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::mutateOpaque",
+      "span": {
+        "path": "scene.ts",
+        "start": 3110,
+        "end": 3215
+      },
+      "hash": "41f625fbc9d7ca53e71fee3f8a1c671aaf4e8976f719fcd74b8861d9148f81e2"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::AliasSelected::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::AliasSelected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 1652,
+        "end": 1689
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::AliasSelected::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::AliasSelected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 1478,
+        "end": 1506
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::AliasWrite::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::AliasWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 889,
+        "end": 928
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::AliasWrite::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::AliasWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 672,
+        "end": 700
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::BeforeWrite::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::BeforeWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 1100,
+        "end": 1139
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::BeforeWrite::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::BeforeWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 964,
+        "end": 992
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::DirectWrite::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::DirectWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 598,
+        "end": 637
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::DirectWrite::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::DirectWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 393,
+        "end": 421
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::HelperWrite::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::HelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 1960,
+        "end": 1999
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::HelperWrite::mutate#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::HelperWrite",
+      "target": "local/gcp-sdk-mutations::scene.go::mutate",
+      "level": "exact",
+      "span": {
+        "path": "scene.go",
+        "start": 1944,
+        "end": 1959
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::HelperWrite::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::HelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 1808,
+        "end": 1836
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::LateHelperWrite::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::LateHelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 2174,
+        "end": 2213
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::LateHelperWrite::mutate#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::LateHelperWrite",
+      "target": "local/gcp-sdk-mutations::scene.go::mutate",
+      "level": "exact",
+      "span": {
+        "path": "scene.go",
+        "start": 2214,
+        "end": 2229
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::LateHelperWrite::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::LateHelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 2039,
+        "end": 2067
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::OpaqueAlias::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::OpaqueAlias",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 2749,
+        "end": 2788
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::OpaqueAlias::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::OpaqueAlias",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 2501,
+        "end": 2529
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::OtherField::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::OtherField",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 2417,
+        "end": 2456
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::OtherField::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::OtherField",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 2264,
+        "end": 2292
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::OtherObject::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::OtherObject",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 1401,
+        "end": 1440
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::OtherObject::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::OtherObject",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 1196,
+        "end": 1224
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::Unchanged::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::Unchanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 318,
+        "end": 357
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.go::Unchanged::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.go::Unchanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.go",
+        "start": 182,
+        "end": 210
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::AliasSelected::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::AliasSelected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 1296,
+        "end": 1328
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::AliasSelected::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::AliasSelected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 1448,
+        "end": 1481
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::AliasWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::AliasWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 570,
+        "end": 602
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::AliasWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::AliasWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 765,
+        "end": 800
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::BeforeWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::BeforeWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 849,
+        "end": 881
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::BeforeWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::BeforeWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 958,
+        "end": 993
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::DeleteWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::DeleteWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 2234,
+        "end": 2266
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::DeleteWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::DeleteWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 2363,
+        "end": 2398
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::DirectWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::DirectWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 309,
+        "end": 341
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::DirectWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::DirectWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 487,
+        "end": 522
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::HelperOpaque::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::HelperOpaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 3265,
+        "end": 3297
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::HelperOpaque::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::HelperOpaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 3408,
+        "end": 3443
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::HelperOpaque::mutateOpaque#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::HelperOpaque",
+      "target": "local/gcp-sdk-mutations::scene.js::mutateOpaque",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 3381,
+        "end": 3407
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::HelperWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::HelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 1581,
+        "end": 1613
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::HelperWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::HelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 1706,
+        "end": 1741
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::HelperWrite::mutate#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::HelperWrite",
+      "target": "local/gcp-sdk-mutations::scene.js::mutate",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 1690,
+        "end": 1705
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::LateHelperOpaque::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::LateHelperOpaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 3499,
+        "end": 3531
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::LateHelperOpaque::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::LateHelperOpaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 3614,
+        "end": 3649
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::LateHelperOpaque::mutateOpaque#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::LateHelperOpaque",
+      "target": "local/gcp-sdk-mutations::scene.js::mutateOpaque",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 3650,
+        "end": 3676
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::LateHelperWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::LateHelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 1794,
+        "end": 1826
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::LateHelperWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::LateHelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 1902,
+        "end": 1937
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::LateHelperWrite::mutate#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::LateHelperWrite",
+      "target": "local/gcp-sdk-mutations::scene.js::mutate",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 1938,
+        "end": 1953
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::MappingWrite::Object.assign#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::MappingWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 2112,
+        "end": 2149
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::MappingWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::MappingWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 2003,
+        "end": 2035
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::MappingWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::MappingWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 2150,
+        "end": 2185
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::OpaqueAlias::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::OpaqueAlias",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 2660,
+        "end": 2692
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::OpaqueAlias::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::OpaqueAlias",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 2850,
+        "end": 2885
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::OtherField::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::OtherField",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 2446,
+        "end": 2478
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::OtherField::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::OtherField",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 2572,
+        "end": 2607
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::OtherObject::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::OtherObject",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 1063,
+        "end": 1095
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::OtherObject::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::OtherObject",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 1210,
+        "end": 1245
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::PatternWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::PatternWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 2934,
+        "end": 2966
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::PatternWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::PatternWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 3071,
+        "end": 3106
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::Unchanged::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::Unchanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 116,
+        "end": 148
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.js::Unchanged::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.js::Unchanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 225,
+        "end": 260
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::AliasSelected::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::AliasSelected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 1475,
+        "end": 1518
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::AliasSelected::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::AliasSelected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 1304,
+        "end": 1346
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::AliasWrite::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::AliasWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 755,
+        "end": 800
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::AliasWrite::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::AliasWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 541,
+        "end": 583
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::BeforeWrite::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::BeforeWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 954,
+        "end": 999
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::BeforeWrite::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::BeforeWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 831,
+        "end": 873
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::DeleteWrite::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::DeleteWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 2423,
+        "end": 2468
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::DeleteWrite::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::DeleteWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 2276,
+        "end": 2318
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::DirectWrite::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::DirectWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 466,
+        "end": 511
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::DirectWrite::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::DirectWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 267,
+        "end": 309
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::HelperWrite::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::HelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 1741,
+        "end": 1786
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::HelperWrite::mutate#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::HelperWrite",
+      "target": "local/gcp-sdk-mutations::scene.py::mutate",
+      "level": "exact",
+      "span": {
+        "path": "scene.py",
+        "start": 1721,
+        "end": 1736
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::HelperWrite::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::HelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 1598,
+        "end": 1640
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::LateHelperWrite::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::LateHelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 1943,
+        "end": 1988
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::LateHelperWrite::mutate#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::LateHelperWrite",
+      "target": "local/gcp-sdk-mutations::scene.py::mutate",
+      "level": "exact",
+      "span": {
+        "path": "scene.py",
+        "start": 1993,
+        "end": 2008
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::LateHelperWrite::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::LateHelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 1821,
+        "end": 1863
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::MappingWrite::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::MappingWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 2200,
+        "end": 2245
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::MappingWrite::request.update#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::MappingWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 2163,
+        "end": 2195
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::MappingWrite::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::MappingWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 2040,
+        "end": 2082
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::OpaqueAlias::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::OpaqueAlias",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 2957,
+        "end": 3002
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::OpaqueAlias::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::OpaqueAlias",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 2734,
+        "end": 2776
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::OtherField::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::OtherField",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 2654,
+        "end": 2699
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::OtherField::request.update#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::OtherField",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 2620,
+        "end": 2649
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::OtherField::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::OtherField",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 2498,
+        "end": 2540
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::OtherObject::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::OtherObject",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 1226,
+        "end": 1271
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::OtherObject::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::OtherObject",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 1058,
+        "end": 1100
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::Unchanged::client.access_secret_version#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::Unchanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 191,
+        "end": 236
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.py::Unchanged::secretmanager.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.py::Unchanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 68,
+        "end": 110
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::AliasSelected::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::AliasSelected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 1296,
+        "end": 1328
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::AliasSelected::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::AliasSelected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 1448,
+        "end": 1481
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::AliasWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::AliasWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 570,
+        "end": 602
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::AliasWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::AliasWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 765,
+        "end": 800
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::BeforeWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::BeforeWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 849,
+        "end": 881
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::BeforeWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::BeforeWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 958,
+        "end": 993
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::DeleteWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::DeleteWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 2234,
+        "end": 2266
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::DeleteWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::DeleteWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 2363,
+        "end": 2398
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::DirectWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::DirectWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 309,
+        "end": 341
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::DirectWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::DirectWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 487,
+        "end": 522
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::HelperOpaque::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::HelperOpaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 3265,
+        "end": 3297
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::HelperOpaque::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::HelperOpaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 3408,
+        "end": 3443
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::HelperOpaque::mutateOpaque#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::HelperOpaque",
+      "target": "local/gcp-sdk-mutations::scene.ts::mutateOpaque",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 3381,
+        "end": 3407
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::HelperWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::HelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 1581,
+        "end": 1613
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::HelperWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::HelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 1706,
+        "end": 1741
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::HelperWrite::mutate#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::HelperWrite",
+      "target": "local/gcp-sdk-mutations::scene.ts::mutate",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 1690,
+        "end": 1705
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::LateHelperOpaque::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::LateHelperOpaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 3499,
+        "end": 3531
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::LateHelperOpaque::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::LateHelperOpaque",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 3614,
+        "end": 3649
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::LateHelperOpaque::mutateOpaque#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::LateHelperOpaque",
+      "target": "local/gcp-sdk-mutations::scene.ts::mutateOpaque",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 3650,
+        "end": 3676
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::LateHelperWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::LateHelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 1794,
+        "end": 1826
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::LateHelperWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::LateHelperWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 1902,
+        "end": 1937
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::LateHelperWrite::mutate#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::LateHelperWrite",
+      "target": "local/gcp-sdk-mutations::scene.ts::mutate",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 1938,
+        "end": 1953
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::MappingWrite::Object.assign#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::MappingWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 2112,
+        "end": 2149
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::MappingWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::MappingWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 2003,
+        "end": 2035
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::MappingWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::MappingWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 2150,
+        "end": 2185
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::OpaqueAlias::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::OpaqueAlias",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 2660,
+        "end": 2692
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::OpaqueAlias::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::OpaqueAlias",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 2850,
+        "end": 2885
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::OtherField::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::OtherField",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 2446,
+        "end": 2478
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::OtherField::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::OtherField",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 2572,
+        "end": 2607
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::OtherObject::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::OtherObject",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 1063,
+        "end": 1095
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::OtherObject::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::OtherObject",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 1210,
+        "end": 1245
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::PatternWrite::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::PatternWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 2934,
+        "end": 2966
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::PatternWrite::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::PatternWrite",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 3071,
+        "end": 3106
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::Unchanged::SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::Unchanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 116,
+        "end": 148
+      }
+    },
+    {
+      "id": "local/gcp-sdk-mutations::scene.ts::Unchanged::client.accessSecretVersion#0",
+      "caller": "local/gcp-sdk-mutations::scene.ts::Unchanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 225,
+        "end": 260
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.go::AliasSelected::client.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.go::AliasWrite::client.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::before-write",
+      "site": "local/gcp-sdk-mutations::scene.go::BeforeWrite::client.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.go::DirectWrite::client.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.go::HelperWrite::client.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::late-helper",
+      "site": "local/gcp-sdk-mutations::scene.go::LateHelperWrite::client.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.go::OpaqueAlias::client.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::other-field",
+      "site": "local/gcp-sdk-mutations::scene.go::OtherField::client.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::other-object",
+      "site": "local/gcp-sdk-mutations::scene.go::OtherObject::client.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::steady-token",
+      "site": "local/gcp-sdk-mutations::scene.go::Unchanged::client.AccessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.js::AliasSelected::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.js::AliasWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::before-write",
+      "site": "local/gcp-sdk-mutations::scene.js::BeforeWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.js::DeleteWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.js::DirectWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.js::HelperOpaque::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.js::HelperWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::late-helper-opaque",
+      "site": "local/gcp-sdk-mutations::scene.js::LateHelperOpaque::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::late-helper",
+      "site": "local/gcp-sdk-mutations::scene.js::LateHelperWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.js::MappingWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.js::OpaqueAlias::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::other-field",
+      "site": "local/gcp-sdk-mutations::scene.js::OtherField::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::other-object",
+      "site": "local/gcp-sdk-mutations::scene.js::OtherObject::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.js::PatternWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::steady-token",
+      "site": "local/gcp-sdk-mutations::scene.js::Unchanged::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.py::AliasSelected::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.py::AliasWrite::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::before-write",
+      "site": "local/gcp-sdk-mutations::scene.py::BeforeWrite::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.py::DeleteWrite::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.py::DirectWrite::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.py::HelperWrite::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::late-helper",
+      "site": "local/gcp-sdk-mutations::scene.py::LateHelperWrite::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.py::MappingWrite::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.py::OpaqueAlias::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::other-field",
+      "site": "local/gcp-sdk-mutations::scene.py::OtherField::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::other-object",
+      "site": "local/gcp-sdk-mutations::scene.py::OtherObject::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::steady-token",
+      "site": "local/gcp-sdk-mutations::scene.py::Unchanged::client.access_secret_version#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.ts::AliasSelected::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.ts::AliasWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::before-write",
+      "site": "local/gcp-sdk-mutations::scene.ts::BeforeWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.ts::DeleteWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.ts::DirectWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.ts::HelperOpaque::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.ts::HelperWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::late-helper-opaque",
+      "site": "local/gcp-sdk-mutations::scene.ts::LateHelperOpaque::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::late-helper",
+      "site": "local/gcp-sdk-mutations::scene.ts::LateHelperWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.ts::MappingWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.ts::OpaqueAlias::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::other-field",
+      "site": "local/gcp-sdk-mutations::scene.ts::OtherField::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::other-object",
+      "site": "local/gcp-sdk-mutations::scene.ts::OtherObject::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager",
+      "site": "local/gcp-sdk-mutations::scene.ts::PatternWrite::client.accessSecretVersion#0",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::steady-token",
+      "site": "local/gcp-sdk-mutations::scene.ts::Unchanged::client.accessSecretVersion#0",
+      "via": null
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/gcp-sdk-mutations::scene.go::HelperWrite",
+        "local/gcp-sdk-mutations::scene.go::LateHelperWrite",
+        "local/gcp-sdk-mutations::scene.go::mutate"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/gcp-sdk-mutations::scene.js::HelperOpaque",
+        "local/gcp-sdk-mutations::scene.js::LateHelperOpaque",
+        "local/gcp-sdk-mutations::scene.js::mutateOpaque"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "local/gcp-sdk-mutations::scene.js::HelperWrite",
+        "local/gcp-sdk-mutations::scene.js::LateHelperWrite",
+        "local/gcp-sdk-mutations::scene.js::mutate"
+      ]
+    },
+    {
+      "name": ".#4",
+      "members": [
+        "local/gcp-sdk-mutations::scene.py::HelperWrite",
+        "local/gcp-sdk-mutations::scene.py::LateHelperWrite",
+        "local/gcp-sdk-mutations::scene.py::mutate"
+      ]
+    },
+    {
+      "name": ".#5",
+      "members": [
+        "local/gcp-sdk-mutations::scene.ts::HelperOpaque",
+        "local/gcp-sdk-mutations::scene.ts::LateHelperOpaque",
+        "local/gcp-sdk-mutations::scene.ts::mutateOpaque"
+      ]
+    },
+    {
+      "name": ".#6",
+      "members": [
+        "local/gcp-sdk-mutations::scene.ts::HelperWrite",
+        "local/gcp-sdk-mutations::scene.ts::LateHelperWrite",
+        "local/gcp-sdk-mutations::scene.ts::mutate"
+      ]
+    }
+  ],
+  "links": []
+}

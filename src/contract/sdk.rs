@@ -9,7 +9,76 @@ use std::collections::{BTreeMap, BTreeSet};
 mod csharp;
 mod go;
 mod java;
-mod origins;
+pub(crate) mod mutations;
+pub(crate) mod origins;
+
+/// Complete normalized argument identity for the shared constructor memo. The kind
+/// projects scalar leaves; object and list structure is language-neutral syntax.
+#[derive(Clone, Default, PartialEq, Eq, Hash)]
+pub(crate) enum Identity<T> {
+    #[default]
+    Unknown,
+    Leaf(T),
+    Object(Vec<(String, Identity<T>)>),
+    List(Vec<Identity<T>>),
+}
+
+impl<T> Identity<T> {
+    pub(crate) fn read(value: &Value, leaf: &impl Fn(&Value) -> Option<T>) -> Self {
+        match value {
+            Value::Object(fields) => Self::Object(
+                fields
+                    .iter()
+                    .map(|(key, value)| (key.clone(), Self::read(value, leaf)))
+                    .collect(),
+            ),
+            Value::List(values) => {
+                Self::List(values.iter().map(|value| Self::read(value, leaf)).collect())
+            }
+            _ => leaf(value).map_or(Self::Unknown, Self::Leaf),
+        }
+    }
+}
+
+/// A folded SDK name, retaining verified runtime environment aliases. Physical identity
+/// projection belongs to the caller's contract kind.
+pub(crate) fn argument<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    value: &Value,
+) -> Option<crate::names::Argument> {
+    use crate::names::Argument;
+    match value {
+        Value::Str(parts) => match parts.as_slice() {
+            [
+                Part::Read {
+                    scope,
+                    callee,
+                    key,
+                    then,
+                },
+            ] if then.is_empty() => {
+                let aliases = code.files()[path]
+                    .imports
+                    .iter()
+                    .map(|i| (i.local.as_str(), i.local.as_str()))
+                    .collect();
+                Some(
+                    if csharp::environment(code, path, scope, callee, &aliases) {
+                        Argument::Environment(key.clone())
+                    } else {
+                        Argument::Unresolved
+                    },
+                )
+            }
+            _ => crate::names::argument(value),
+        },
+        Value::Call(call) if code.pack().extensions().contains(&"go") => {
+            Some(go::environment(call).map_or(Argument::Unresolved, Argument::Environment))
+        }
+        _ => crate::names::argument(value),
+    }
+}
 
 /// The SDK spellings of one client, supplied by its contract kind.
 pub(crate) struct Client {

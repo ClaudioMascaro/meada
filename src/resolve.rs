@@ -17,6 +17,10 @@ use crate::lang::{
     Through, Ty, Value,
 };
 
+mod mutations;
+pub(crate) use mutations::MemberEffect;
+pub(crate) type CallWrites = for<'a> fn(&Code<'a>, &'a str, usize) -> Option<Vec<MemberEffect<'a>>>;
+
 /// A definition: the repository-relative path of its file and its qualified name.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Target<'a> {
@@ -3364,7 +3368,11 @@ impl<'a> Resolver<'a> {
                 return Binding::Param(Target { path, name: s }, n, field);
             }
             match self.receivers[path].get(&(s, name)) {
-                Some(Class::Imported) => return self.imported_in(path, name, seen, true),
+                Some(Class::Imported) => {
+                    return self
+                        .imported_at(path, s, name, seen)
+                        .unwrap_or_else(|| self.imported_in(path, name, seen, true));
+                }
                 Some(_) => return Binding::Local(path, s, name),
                 None => {}
             }
@@ -3690,6 +3698,14 @@ impl<'a> Resolver<'a> {
             let import = &imports[at];
             if let Imported::Path(target) = &import.name
                 && !seen.aliases.contains(&(path, target.as_str()))
+            {
+                return Some(self.import(path, scope, &import.source, &import.name, seen));
+            }
+            if !scope.is_empty()
+                && !matches!(
+                    import.name,
+                    Imported::Path(_) | Imported::Glob { .. } | Imported::All
+                )
             {
                 return Some(self.import(path, scope, &import.source, &import.name, seen));
             }
@@ -4725,6 +4741,10 @@ struct Fold<'a, 'i> {
     held: Vec<(&'a str, &'a str)>,
     nested: usize,
     chain: bool,
+    /// Preserve verified constructor type names for selected SDK identity arguments.
+    new_types: Option<fn(&str) -> bool>,
+    selected: Option<mutations::Selection<'a>>,
+    objects: Vec<(mutations::Object<'a>, usize)>,
     inject: Option<&'i Inject<'a, 'i>>,
     foreign: usize,
     /// How many struct fields deep the value is folded (`Code::field_read`).
@@ -4856,6 +4876,7 @@ pub struct Code<'a> {
     /// The last segment of every callee of the repository (`save` of `repo.save`, `C` of
     /// `(opaque).C`), built the first time a parameter is injected (`Code::may_be_called`).
     callees: OnceCell<HashSet<&'a str>>,
+    mutations: RefCell<HashMap<usize, mutations::Index<'a>>>,
     pack: &'static dyn LanguagePack,
 }
 
@@ -5019,6 +5040,7 @@ impl<'a> Code<'a> {
             literals: OnceCell::new(),
             field_reads: RefCell::new(HashMap::new()),
             callees: OnceCell::new(),
+            mutations: RefCell::new(HashMap::new()),
             pack,
         }
     }
@@ -5183,6 +5205,15 @@ impl<'a> Code<'a> {
         seen: &mut Vec<(&'a str, &'a str)>,
     ) -> Option<Made<'a>> {
         match value {
+            Value::Await(value)
+                if self
+                    .pack
+                    .extensions()
+                    .iter()
+                    .any(|e| matches!(*e, "ts" | "cs")) =>
+            {
+                self.made_by(path, scope, value, seen)
+            }
             Value::Ref(name) => self.trace(path, scope, name, seen),
             Value::Call(call) => {
                 let mut made = self.trace(path, scope, &call.callee, seen)?;
@@ -5450,6 +5481,16 @@ impl<'a> Code<'a> {
         by_path: bool,
     ) -> Option<Outside<'a>> {
         self.outside_read(path, scope, name, by_path, false)
+    }
+
+    /// An actual value binding hides an imported static-factory head, including in
+    /// languages whose type namespace may otherwise still name the imported class.
+    pub(crate) fn value_bound(&self, path: &'a str, scope: &'a str, name: &'a str) -> bool {
+        matches!(
+            self.resolver
+                .lexical(path, scope, name, &mut self.resolver.seen(path, scope)),
+            Binding::Param(..) | Binding::Local(..) | Binding::Const(..) | Binding::Hidden
+        )
     }
 
     /// `outside` for the callee of a decorator call (an annotation or attribute): no field of
@@ -6894,7 +6935,17 @@ impl<'a> Code<'a> {
                 properties
                     .iter()
                     .map(|(k, v)| {
-                        let v = self.eval(path, scope, v, frames, depth, fold, wants);
+                        let changed = fold.selected.zip(fold.objects.last().copied()).is_some_and(
+                            |(selected, (object, pointer))| {
+                                pointer == value as *const Value as usize
+                                    && self.member_changed(object, k, selected, frames)
+                            },
+                        );
+                        let v = if changed {
+                            Value::Unknown
+                        } else {
+                            self.eval(path, scope, v, frames, depth, fold, wants)
+                        };
                         (k.clone(), v)
                     })
                     .collect(),
@@ -6905,21 +6956,46 @@ impl<'a> Code<'a> {
                     .collect(),
             ),
             Value::New(callee, args) => Value::New(
-                callee.clone(),
+                if let Some(known) = fold.new_types {
+                    self.outside_written(path, scope, callee)
+                        .and_then(|o| crate::names::one(&o.spellings(), known).map(str::to_string))
+                        .unwrap_or_default()
+                } else {
+                    callee.clone()
+                },
                 (args.iter())
                     .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
                     .collect(),
             ),
             Value::Call(call) if fold.chain => {
+                // Some packs retain only a call's range in a value. Selected-argument
+                // folding uses that exact stored call, never a method-name lookup.
+                let stored = fold
+                    .new_types
+                    .and_then(|_| self.call_index(path, &call.range))
+                    .and_then(|index| self.call(path, index));
+                let scope = stored.map_or(scope, |c| c.scope.as_str());
+                let args = stored.map_or(call.args.as_slice(), |c| c.args.as_slice());
+                let kwargs = stored.map_or(call.kwargs.as_slice(), |c| c.kwargs.as_slice());
+                let receiver = call
+                    .receiver
+                    .as_deref()
+                    .or_else(|| stored.and_then(|c| c.receiver.as_ref()));
+                let receiver = match receiver {
+                    Some(receiver) => Some(Box::new(
+                        self.eval(path, scope, receiver, frames, depth, fold, wants),
+                    )),
+                    None if stored.is_some() => call.callee.rsplit_once('.').map(|(head, _)| {
+                        Box::new(self.name(path, scope, head, frames, depth, fold, wants))
+                    }),
+                    None => None,
+                };
                 let mut eval = |v| self.eval(path, scope, v, frames, depth, fold, wants);
-                let receiver = call.receiver.as_deref().map(|r| Box::new(eval(r)));
                 Value::Call(Invocation {
                     callee: call.callee.clone(),
                     receiver,
-                    args: call.args.iter().map(&mut eval).collect(),
-                    kwargs: (call.kwargs.iter())
-                        .map(|(k, v)| (k.clone(), eval(v)))
-                        .collect(),
+                    args: args.iter().map(&mut eval).collect(),
+                    kwargs: (kwargs.iter()).map(|(k, v)| (k.clone(), eval(v))).collect(),
                     range: call.range.clone(),
                 })
             }
@@ -6927,10 +7003,46 @@ impl<'a> Code<'a> {
                 .built(path, call, frames, depth, fold, wants)
                 .unwrap_or_else(|| value.clone()),
             Value::Ref(name) => self.name(path, scope, name, frames, depth, fold, wants),
+            Value::Member(name, member) if fold.selected.is_some() => {
+                let object = self.name(path, scope, name, frames, depth, fold, wants);
+                match object {
+                    Value::Object(fields) => crate::lang::property(&fields, member)
+                        .ok()
+                        .flatten()
+                        .cloned()
+                        .unwrap_or(Value::Unknown),
+                    _ => Value::Unknown,
+                }
+            }
             other => other.clone(),
         };
         fold.nested -= 1;
         folded
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn argument_value(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        let object = fold
+            .selected
+            .and_then(|_| object_value(value))
+            .map(|pointer| (mutations::Object::Value(path, pointer), pointer));
+        if let Some(object) = object {
+            fold.objects.push(object);
+        }
+        let result = self.eval(path, scope, value, frames, depth, fold, wants);
+        if object.is_some() {
+            fold.objects.pop();
+        }
+        result
     }
 
     /// What `call`, written in `path`, folds to when it is an exact call of a function that only
@@ -6992,10 +7104,20 @@ impl<'a> Code<'a> {
                 };
                 let foreign = usize::from(within != scope_of(constant));
                 fold.held.push((at, constant));
+                let object = fold
+                    .selected
+                    .and_then(|_| object_value(value))
+                    .map(|pointer| (mutations::Object::Constant(at, constant), pointer));
+                if let Some(object) = object {
+                    fold.objects.push(object);
+                }
                 fold.foreign += foreign;
                 let folded = self.eval(at, within, value, frames, depth, fold, wants);
                 fold.foreign -= foreign;
                 fold.held.pop();
+                if object.is_some() {
+                    fold.objects.pop();
+                }
                 folded
             }
             // `*args` and `**kwargs` hold what no single argument gives.
@@ -7016,11 +7138,17 @@ impl<'a> Code<'a> {
                     let arg = self.arg(frame.path, frame.index, function, n);
                     let param = self.param(function, n);
                     let bound = match (arg, param.and_then(|p| p.default.as_ref())) {
-                        (Some(arg), _) => {
-                            self.eval(frame.path, &call.scope, arg, frames, depth + 1, fold, wants)
-                        }
+                        (Some(arg), _) => self.argument_value(
+                            frame.path,
+                            &call.scope,
+                            arg,
+                            frames,
+                            depth + 1,
+                            fold,
+                            wants,
+                        ),
                         // A left-out argument takes the parameter's default.
-                        (None, Some(default)) => self.eval(
+                        (None, Some(default)) => self.argument_value(
                             function.path,
                             function.name,
                             default,
@@ -7095,6 +7223,18 @@ impl<'a> Code<'a> {
                     return Value::Unknown;
                 }
                 fold.held.push(held);
+                let object =
+                    fold.selected
+                        .and_then(|_| object_value(&bound.value))
+                        .map(|pointer| {
+                            (
+                                mutations::Object::Local(path, &bound.scope, &bound.name),
+                                pointer,
+                            )
+                        });
+                if let Some(object) = object {
+                    fold.objects.push(object);
+                }
                 let folded = self.eval(
                     path,
                     &bound.within,
@@ -7105,6 +7245,9 @@ impl<'a> Code<'a> {
                     wants,
                 );
                 fold.held.pop();
+                if object.is_some() {
+                    fold.objects.pop();
+                }
                 folded
             }
             // A field no file assigns holds what an annotation on it injects, else the
@@ -7148,6 +7291,14 @@ impl<'a> Code<'a> {
 
 /// `value` with every parameter left in it unknown; with `chain`, inside its calls too, which
 /// only `Expand::Chain` folds (elsewhere a call's arguments are as written).
+fn object_value(value: &Value) -> Option<usize> {
+    match value {
+        Value::Object(_) => Some(value as *const Value as usize),
+        Value::New(_, args) if args.len() == 1 => object_value(&args[0]),
+        _ => None,
+    }
+}
+
 fn unbind(value: Value, chain: bool) -> Value {
     let unbind = |v| unbind(v, chain);
     match value {
