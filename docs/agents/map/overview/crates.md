@@ -12,6 +12,10 @@ exporting `init`, `validate`, `workspaceVersionId`, `workspaceDiff`, `entriesTex
 `namedMessageProblem`, `resourceRoles`). CI's `core` job builds it
 with wasm-pack and checks both trees.
 
+Development builds optimize the `meada` package at level 1 to bound the resident code footprint
+of the indexing and contract readers. Cargo's test profile inherits that setting. The corpus
+proof keeps its original time, memory and export-size budgets against the historical builds.
+
 Every tree-sitter grammar is a crate except Kotlin's: `vendor/tree-sitter-kotlin-ng/` holds
 `tree-sitter-kotlin-ng` 1.1.0 with upstream PRs #21 and #13 and a local scanner patch
 (`PROVENANCE.md`), which the root's `build.rs` compiles and `lang/kotlin.rs` binds (ADR 0017). No
