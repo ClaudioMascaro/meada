@@ -57,7 +57,14 @@ uses run-owned loopback servers only. No push, external messages or cloud writes
 The independent checker additionally drives exact factory frames with two distinct returned
 handle names, a valid origin beside a same-spelled reassigned/shadowed scope in the same
 file, typed helpers (including hidden helpers), all documented adjacent async/v1 forms, and
-plain/structured/typed Cloud Run environment values. Use the official inventory and newly
+plain/structured/typed Cloud Run environment values. Independent corrective probes must also
+mutate a named request directly, through aliases and exact helper parameters, update/delete
+mapping fields, and keep same-file read-before-write, sibling-object and unrelated-field
+controls. Reject incompatible typed helper kinds through factory memoization, unawaited
+C# async factories and double awaits while preserving direct and late single awaits. Two
+identical resource reads in one function must retain distinct operation sites. Include an
+exhausted selector-evidence case: lost/truncated knowledge must never prove an unchanged
+initializer. Use the official inventory and newly
 authored neutral sources for those additions, never copy implementation fixtures as an
 oracle. The base `gcp.py` and `environment.py` flows must preserve #667 and #663 metadata,
 filter reasons and workload scope. Run relevant existing AWS/native-broker flows against

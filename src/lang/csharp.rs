@@ -530,6 +530,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 })
                 .collect();
             facts.defs.push(Def {
+                asynchronous: modifiers.contains(&"async"),
                 params,
                 bases: match kind {
                     Kind::Class => bases(node, src, &generics),
@@ -2158,8 +2159,10 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         "integer_literal" => Value::Scalar(text(node, src).parse().ok()),
         "boolean_literal" => Value::Scalar(None),
         "null_literal" => Value::Undefined,
-        // An awaited value is the value of its operand.
-        "parenthesized_expression" | "await_expression" => named(node)
+        "await_expression" => named(node).next().map_or(Value::Unknown, |n| {
+            Value::Await(Box::new(value(n, src, depth + 1)))
+        }),
+        "parenthesized_expression" => named(node)
             .next()
             .map_or(Value::Unknown, |n| value(n, src, depth + 1)),
         _ => Value::Unknown,
@@ -2544,7 +2547,7 @@ mod tests {
         assert!(scopes[0].len() > 2_000);
     }
 
-    /// What a call awaited is bound to: the call itself, as the same call not awaited is.
+    /// Await syntax survives around a held value, including parenthesized aliases.
     #[test]
     fn a_name_is_bound_to_the_call_it_awaits() {
         let source = "class C { IChannel _ch; IChannel Ch { get; set; }\n\
@@ -2558,7 +2561,10 @@ mod tests {
         let held = |name: &str| -> Vec<String> {
             (facts.bound.iter().filter(|b| b.name == name))
                 .map(|b| match &b.value {
-                    Value::Call(call) => call.callee.clone(),
+                    Value::Await(value) => match value.as_ref() {
+                        Value::Call(call) => call.callee.clone(),
+                        _ => "other".into(),
+                    },
                     _ => "other".into(),
                 })
                 .collect()
@@ -2568,6 +2574,12 @@ mod tests {
         assert_eq!(held("b"), ["Task.Delay"]);
         // A parenthesized await is the value of the expression inside.
         assert_eq!(held("n"), ["c.Count"]);
+        assert!(
+            facts
+                .bound
+                .iter()
+                .all(|b| matches!(b.value, Value::Await(_)))
+        );
     }
 
     /// Every write of a name is a `name=` of its own, a call or a construction by its value and

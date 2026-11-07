@@ -381,6 +381,27 @@ Its candidates name runner repositories and literal image contracts. Several run
 literal image are one name, and choosing that name retains them all. This is independent of a
 runner's ambiguity among several builders, whose existing decision identity is unchanged.
 
+
+### AWS workload execution (#664)
+
+Lambda image_uri, SAM ImageUri and each ECS container image are image runners, independent
+of whether the container declares environment entries. The format readers keep evaluated
+container images and provenance in the same stored node facts; image contracts project those
+facts alongside Compose and Kubernetes through one runner inventory.
+
+Local Lambda filename inputs, SAM CodeUri and an unambiguous Serverless handler source can
+create direct same-repository executions. An exact archive_file output_path traversal may
+follow only an explicit source_dir/source_file input, with no general data-source evaluation
+and no extraction. New paths are relative, contain no raw parent component and traverse no
+symlink; indexing alone checks existence, with path-sensitive configuration invalidation.
+
+SAM Globals and Serverless provider environment entries are overridden by the function, even
+when its value is unreadable. Environments retain their workload, container image and root.
+A known IaC resource reference can carry an optional typed contract identity without a fake
+URL/ARN; it resolves only a matching unresolved contract kind through the same scope index
+as literals. Secret contents, dynamic references and external values remain unavailable.
+Environment-derived names stay inferred with workload and variable provenance.
+
 ### Azure identifiers, subscriptions and Functions (#669)
 
 The AzureRM Terraform/OpenTofu entries are Service Bus queues, topics and subscriptions,
@@ -435,14 +456,21 @@ Making a topic, subscription, bucket or object handle alone supplies no directio
 | Python | `google.cloud.pubsub_v1.PublisherClient().publish(topic, ...)` / `SubscriberClient().subscribe(subscription, callback=...)` | `google.cloud.storage.Client().bucket(name).blob(object).upload_from_string(...)` / `.download_as_bytes()` | `google.cloud.secretmanager.SecretManagerServiceClient().access_secret_version(request={"name": name})` |
 | Java | `com.google.cloud.pubsub.v1.Publisher.newBuilder(topic).build().publish(...)` / `Subscriber.newBuilder(subscription, handler).build().startAsync()` | `com.google.cloud.storage.StorageOptions.newBuilder().build().getService().create(BlobInfo.newBuilder(BlobId.of(bucket, object)).build(), ...)` / `.readAllBytes(bucket, object)` | `com.google.cloud.secretmanager.v1.SecretManagerServiceClient.create().accessSecretVersion(name)` |
 | Go | `cloud.google.com/go/pubsub/v2.NewClient`: `Publisher(topic).Publish(...)` / `Subscriber(subscription).Receive(ctx, handler)`; v1 `cloud.google.com/go/pubsub` uses `Topic` / `Subscription` | `cloud.google.com/go/storage.NewClient`: `Bucket(bucket).Object(object).NewWriter(ctx)` / `.NewReader(ctx)` | `cloud.google.com/go/secretmanager/apiv1.NewClient`: `AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{Name: name})` |
-| C# | `Google.Cloud.PubSub.V1.PublisherClient.CreateAsync(topic).PublishAsync(...)` / `SubscriberClient.CreateAsync(subscription).StartAsync(handler)` | `Google.Cloud.Storage.V1.StorageClient.Create()`: `UploadObject(bucket, ...)`, `UploadObjectAsync` / `DownloadObject(bucket, ...)`, `DownloadObjectAsync` | `Google.Cloud.SecretManager.V1.SecretManagerServiceClient.Create()`: `AccessSecretVersion(name)`, `AccessSecretVersionAsync(name)` |
+| C# | `client = await Google.Cloud.PubSub.V1.PublisherClient.CreateAsync(topic); client.PublishAsync(...)` / `client = await SubscriberClient.CreateAsync(subscription); client.StartAsync(handler)` | `Google.Cloud.Storage.V1.StorageClient.Create()`: `UploadObject(bucket, ...)`, `UploadObjectAsync` / `DownloadObject(bucket, ...)`, `DownloadObjectAsync` | `Google.Cloud.SecretManager.V1.SecretManagerServiceClient.Create()`: `AccessSecretVersion(name)`, `AccessSecretVersionAsync(name)` |
 
 Names retained in receivers are evaluated in their constructor/factory call's scope and exact
 return frames. Two calls of a factory retain their own names. A known bucket is not erased by
 an unknown object. Verified Java `TopicName.of`, `SubscriptionName.of`, `SecretVersionName.of`,
 C# typed-name constructors and `FromProjectTopic`/`FromProjectSubscription`, and Python
 `topic_path`/`subscription_path` select the identity component; an identically named local helper
-does not. Complete structured identities use the shared GCP physical-name policy above.
+does not. Helper subtype survives factory memoization: a subscription helper cannot name a
+topic, bucket or secret. Complete structured identities use the shared GCP physical-name policy above.
+Selected request fields and factory identity arguments reject prior writes through exact aliases,
+including mapping update/deletion and exact helper parameters. Later writes, sibling objects
+and unrelated fields preserve valid names. Unknown or exhausted mutation evidence cannot
+prove an unchanged initializer. Async factory results retain await state; a bare C# Task and
+a twice-awaited C# client supply no receiver evidence. Resource reads retain each operation's
+call site, including identical calls within one function.
 
 Pub/Sub receive targets remain `subscriptions/<id>`, including a plain id supplied by a scoped
 workload environment. Receives never derive a topic from a subscription id. Literal SDK

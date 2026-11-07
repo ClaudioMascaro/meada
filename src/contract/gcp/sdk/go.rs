@@ -34,7 +34,14 @@ pub(super) fn step<'a>(
     };
     Some(Handle::named(
         stage,
-        argument(code, path, &call.scope, call.args.first(), frames),
+        argument(
+            code,
+            path,
+            &call.scope,
+            call.args.first(),
+            frames,
+            Some((path, index)),
+        ),
     ))
 }
 
@@ -58,10 +65,17 @@ pub(super) fn read<'a>(
         (Stage::Object, "NewWriter") => (Role::Provider, Stage::Object, handle.name),
         (Stage::Object, "NewReader") => (Role::Consumer, Stage::Object, handle.name),
         (Stage::Secret, "AccessSecretVersion") => {
-            let request = call
-                .args
-                .get(1)
-                .map(|v| code.value_within(path, &call.scope, v, &[], super::typed_name));
+            let request = call.args.get(1).map(|v| {
+                code.value_within_at(
+                    path,
+                    &call.scope,
+                    v,
+                    &[],
+                    Some((path, index)),
+                    super::typed_name,
+                    crate::contract::sdk::mutations::writes,
+                )
+            });
             (
                 Role::Consumer,
                 Stage::Secret,

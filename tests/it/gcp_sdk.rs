@@ -523,3 +523,269 @@ fn assert_inventory(text: &str, json: &Value, language: &str, writers: usize, re
         }
     }
 }
+
+#[test]
+fn named_requests_reject_prior_mutations_but_keep_other_objects_fields_and_later_writes() {
+    let (text, json) = export("gcp-sdk-mutations");
+    assert!(json["providers"].as_array().unwrap().is_empty(), "{text}");
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), 52, "{text}");
+    for file in ["scene.js", "scene.ts", "scene.py", "scene.go"] {
+        for (symbol, name) in [
+            ("Unchanged", "steady-token"),
+            ("BeforeWrite", "before-write"),
+            ("OtherObject", "other-object"),
+            ("LateHelperWrite", "late-helper"),
+            ("OtherField", "other-field"),
+        ] {
+            let side = consumers
+                .iter()
+                .find(|c| {
+                    c["site"].as_str().unwrap().contains(&format!("::{file}::"))
+                        && c["site"]
+                            .as_str()
+                            .unwrap()
+                            .contains(&format!("::{symbol}::"))
+                })
+                .unwrap();
+            assert_eq!(
+                side["contract"],
+                format!("resource::gcpsecretmanager::{name}"),
+                "{text}"
+            );
+        }
+        for symbol in [
+            "DirectWrite",
+            "AliasWrite",
+            "AliasSelected",
+            "HelperWrite",
+            "OpaqueAlias",
+        ] {
+            let side = consumers
+                .iter()
+                .find(|c| {
+                    c["site"].as_str().unwrap().contains(&format!("::{file}::"))
+                        && c["site"]
+                            .as_str()
+                            .unwrap()
+                            .contains(&format!("::{symbol}::"))
+                })
+                .unwrap();
+            assert_eq!(side["contract"], "resource::gcpsecretmanager", "{text}");
+        }
+    }
+    for file in ["scene.js", "scene.ts"] {
+        for (symbol, contract) in [
+            ("HelperOpaque", "resource::gcpsecretmanager"),
+            (
+                "LateHelperOpaque",
+                "resource::gcpsecretmanager::late-helper-opaque",
+            ),
+        ] {
+            let side = consumers
+                .iter()
+                .find(|c| {
+                    c["site"]
+                        .as_str()
+                        .unwrap()
+                        .contains(&format!("::{file}::{symbol}::"))
+                })
+                .unwrap();
+            assert_eq!(side["contract"], contract, "{text}");
+        }
+    }
+    assert!(
+        consumers
+            .iter()
+            .all(|c| !c["contract"].as_str().unwrap().contains("stale-")),
+        "{text}"
+    );
+    assert!(json["links"].as_array().unwrap().is_empty(), "{text}");
+    assert_golden("gcp-sdk-mutations.export.json", &text);
+}
+
+#[test]
+fn typed_name_helpers_retain_their_kind_through_factories_and_final_projection() {
+    let (text, json) = export("gcp-sdk-helper-kinds");
+    let providers = json["providers"].as_array().unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(providers.len(), 7, "{text}");
+    assert_eq!(consumers.len(), 9, "{text}");
+    for contract in [
+        "channel::pubsub::kind-control",
+        "channel::pubsub::kind-java",
+        "channel::pubsub::kind-csharp",
+    ] {
+        assert_eq!(
+            providers
+                .iter()
+                .filter(|p| p["contract"] == contract)
+                .count(),
+            1,
+            "{text}"
+        );
+    }
+    assert!(
+        providers.iter().chain(consumers).all(|s| !s["contract"]
+            .as_str()
+            .unwrap()
+            .contains("cross-kind")
+            && !s["contract"].as_str().unwrap().contains("wrong-")),
+        "{text}"
+    );
+    assert_eq!(
+        providers
+            .iter()
+            .filter(|p| p["contract"] == "channel::pubsub")
+            .count(),
+        4,
+        "{text}"
+    );
+    assert!(
+        consumers.iter().all(|c| [
+            "channel::pubsub",
+            "resource::gcs",
+            "resource::gcpsecretmanager"
+        ]
+        .contains(&c["contract"].as_str().unwrap())),
+        "{text}"
+    );
+    assert_golden("gcp-sdk-helper-kinds.export.json", &text);
+}
+
+#[test]
+fn asynchronous_factories_keep_await_state_through_exact_returns_and_aliases() {
+    let (text, json) = export("gcp-sdk-await");
+    let providers = json["providers"].as_array().unwrap();
+    assert_eq!(providers.len(), 8, "{text}");
+    assert_eq!(
+        providers
+            .iter()
+            .map(|p| p["contract"].as_str().unwrap())
+            .collect::<std::collections::BTreeSet<_>>(),
+        [
+            "channel::pubsub::await-valid",
+            "channel::pubsub::late-valid",
+            "channel::pubsub::await-js",
+            "channel::pubsub::late-js",
+            "channel::pubsub::await-ts",
+            "channel::pubsub::late-ts",
+            "channel::pubsub::await-python",
+            "channel::pubsub::late-python",
+        ]
+        .into_iter()
+        .collect(),
+        "{text}"
+    );
+    assert!(json["consumers"].as_array().unwrap().is_empty(), "{text}");
+    assert_golden("gcp-sdk-await.export.json", &text);
+}
+
+#[test]
+fn factory_memo_and_snapshot_names_share_scoped_mutation_and_call_time_evidence() {
+    let (text, json) = export("gcp-sdk-memo-mutations");
+    let providers = json["providers"].as_array().unwrap();
+    assert_eq!(providers.len(), 10, "{text}");
+    assert!(json["consumers"].as_array().unwrap().is_empty(), "{text}");
+    for language in ["js", "ts"] {
+        let before = providers
+            .iter()
+            .find(|p| {
+                p["site"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("::scene.{language}::before::"))
+            })
+            .unwrap();
+        assert_eq!(
+            before["contract"],
+            format!("channel::pubsub::snapshot-{language}"),
+            "{text}"
+        );
+        let after = providers
+            .iter()
+            .find(|p| {
+                p["site"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("::scene.{language}::after::"))
+            })
+            .unwrap();
+        assert_eq!(after["contract"], "channel::pubsub", "{text}");
+        for (symbol, expected) in [
+            ("inlineChanged", "channel::pubsub".to_string()),
+            (
+                "inlineBefore",
+                format!("channel::pubsub::inline-before-{language}"),
+            ),
+            ("defaultChanged", "channel::pubsub".to_string()),
+        ] {
+            let side = providers
+                .iter()
+                .find(|p| {
+                    p["site"]
+                        .as_str()
+                        .unwrap()
+                        .contains(&format!("::scene.{language}::{symbol}::"))
+                })
+                .unwrap();
+            assert_eq!(side["contract"], expected, "{text}");
+        }
+    }
+    assert_golden("gcp-sdk-memo-mutations.export.json", &text);
+}
+
+#[test]
+fn resource_readers_retain_every_distinct_operation_call_site() {
+    let (text, json) = export("gcp-sdk-resource-sites");
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), 4, "{text}");
+    assert!(json["providers"].as_array().unwrap().is_empty(), "{text}");
+    for contract in [
+        "resource::gcs::double-reads",
+        "resource::gcpsecretmanager::double-token",
+    ] {
+        let sites: std::collections::BTreeSet<_> = consumers
+            .iter()
+            .filter(|c| c["contract"] == contract)
+            .map(|c| c["site"].as_str().unwrap())
+            .collect();
+        assert_eq!(sites.len(), 2, "{text}");
+        assert!(
+            sites
+                .iter()
+                .all(|s| s.contains("::readTwice::") && (s.ends_with("#0") || s.ends_with("#1"))),
+            "{text}"
+        );
+    }
+    assert_golden("gcp-sdk-resource-sites.export.json", &text);
+}
+
+#[test]
+fn exhausted_selector_evidence_stays_unknown_without_spending_unbounded_work() {
+    let repo = fixture_repo("gcp_selector_budget", "gcp-sdk-resource-sites", None);
+    std::fs::remove_file(repo.join("reads.ts")).unwrap();
+    let mut source="import {SecretManagerServiceClient} from '@google-cloud/secret-manager';\nexport function limited() {const client=new SecretManagerServiceClient();const request={name:'projects/p/secrets/stale-budget/versions/latest'};\n".to_string();
+    source += &"request.timeout=0;\n".repeat(20_000);
+    source += "client.accessSecretVersion(request); }\nexport function literal() {new SecretManagerServiceClient().accessSecretVersion({name:'projects/p/secrets/budget-control/versions/latest'}); }\n";
+    assert!(source.len() < 1 << 20);
+    std::fs::write(repo.join("limited.ts"), source).unwrap();
+    let started = std::time::Instant::now();
+    let text = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(started.elapsed() < std::time::Duration::from_secs(30));
+    let json: Value = serde_json::from_str(&text).unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), 2, "{text}");
+    assert!(
+        consumers
+            .iter()
+            .any(|c| c["contract"] == "resource::gcpsecretmanager"),
+        "{text}"
+    );
+    assert!(
+        consumers
+            .iter()
+            .any(|c| c["contract"] == "resource::gcpsecretmanager::budget-control"),
+        "{text}"
+    );
+}

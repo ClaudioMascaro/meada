@@ -44,9 +44,14 @@ no symbol), and writes `$RUN/peers/peers.md`:
      the base, links included, and does not count against the verdict. A pending case that meets
      the spec prints `MEETS SPEC: mark it landed` and counts as a difference until its row says
      `landed`.
-2. **Everything else**: each export, without `commit`, `dirty` and the consumers, links and
-   processes of the landed cases, equal to the base's: a pending case's other fields and links
-   answer to the base.
+2. **Complete exports**: `a8-expected.jq` constructs the full expected export from the base
+   and only the specified resolutions. Existing inline controls supply full link rows;
+   unchanged consumer fields, call locations, ordinary process steps and process metadata
+   remain intact. Only `commit` and `dirty` are omitted. Unexpected fields, a second call,
+   additional links or process steps fail. Full untruncated diffs are retained in the run.
+
+`a8-peers.sh compare RUN` rechecks captured exports without reindexing. This supports
+captured-response fault probes; those are comparator checks, not product mutation evidence.
 
 Exit 0: no difference, 1: differences, 2: a run failed (BLOCKED). About 10 s with debug builds.
 
@@ -63,22 +68,28 @@ through `/create-prove-it`, and adds its paths to SKILL.md's Scope row.
 | Controls: template string, cleanenv tag inline, `config.getString` inline, `proxy.endpoints` inline | 5 | existing | control |
 | TS URL builders, one argument | 7 (`g8`) | #685 | landed |
 | TS `new URL(ref, base)` join | 19 rows, 15 functions (`g8`) | #686 | landed (4 controls) |
-| Go struct field | 2 (`g9`) | to come | pending |
+| Go struct field | 2 (`g9`) | #687 | landed |
 | TS readonly field | 1 (`g9`) | #688 | landed |
 | Backstage `$include` and `$env` | 3 (`g10b`, `g10c`, `g10h`) | #689 | landed |
 | Backstage proxy shapes | 3 (`g10e` to `g10g`) | #690 | landed (`g10f`, `endpoints` inside an include, landed with #689) |
 
 ## Could fool you
 
-- A case reads one field of the first consumer whose site names the function: a second call in
-  the same function is not read. Each consumer function holds one call.
-- The cases read the export (the CLI). The MCP answers on these workspaces (`context`, `trace`,
-  open items in `search`, over stdio and HTTP) are not driven by the script: a change that reaches
-  `src/mcp.rs` or the rendering runs `prove.py run --http` on the corpus beside it, and a checker
-  that wants the peers' MCP answers runs `meada mcp` in `$RUN/peers/head/<consumer>` by hand.
+- The table reads one field of the first consumer naming the function, so it alone can miss
+  a second call. The complete export comparison must run beside it; it preserves all calls.
+- `a8-mcp.py --head-bin BIN --base-bin BASE --run DIR` separately drives complete HTTP/stdio
+  replies, source/spec context/trace provenance, closed open items, ordinary HTTP answers
+  against base and a partial-only refresh with warm/cold full-export equality. A transport
+  parity pass alone is insufficient. Keep generic corpus proof when Scope reaches shared MCP.
 - The peers (`api`, `other`, `inventory`) are not exported on their own: they reach the check
   through the consumers' providers and links.
 - `pending` passes on 1.2.0's value, so a pending case proves only that nothing moved it. A ticket
   that lands a flow and leaves its rows `pending` gets `MEETS SPEC` (a difference), never a pass.
 - The link check takes the head's links of the case's consumer only; a link the change adds to a
   control's consumer fails the control, one added elsewhere shows in "Everything else".
+
+There are currently 40 rows: 30 landed, ten controls and none pending. The five original
+#684 controls each require their own real product mutation round. The bounded CI phases,
+frozen-key baseline, blind-checker boundary and honest score are in
+[a7-a8-audit.md](a7-a8-audit.md). No historical receipt or captured-response fault counts as
+that mutation audit.

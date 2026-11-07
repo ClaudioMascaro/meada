@@ -582,7 +582,7 @@
     },
     {
       "contract": "resource::gcs::uploads-go",
-      "site": "local/gcp-sdk-go::worker.go::objects",
+      "site": "local/gcp-sdk-go::worker.go::objects::object.NewReader#0",
       "via": null
     },
     {
@@ -592,13 +592,13 @@
     },
     {
       "contract": "resource::gcpsecretmanager::token-go",
-      "site": "local/gcp-sdk-go::worker.go::token",
+      "site": "local/gcp-sdk-go::worker.go::token::client.AccessSecretVersion#0",
       "via": null
     }
   ],
   "links": [
     {
-      "consumer": "local/gcp-sdk-go::worker.go::objects",
+      "consumer": "local/gcp-sdk-go::worker.go::objects::object.NewReader#0",
       "provider": "local/gcp-sdk-go::worker.go::objects::object.NewWriter#0",
       "contract": "resource::gcs::uploads-go",
       "level": "exact",

@@ -539,6 +539,11 @@ an `aws_s3_bucket` provisions `resource::s3::<name>` through `bucket`. The type 
 `src/iac/types.toml`, embedded in the binary, also reads names from ARNs and URLs. A declared
 `[[resource]]` with `kind = "s3"` and the same `id` joins that contract, keeping `declared`.
 
+CloudFormation and SAM use the same contracts for SQS, SNS, EventBridge, Kinesis, S3,
+DynamoDB (Table, GlobalTable and SimpleTable), RDS (instance or cluster), ElastiCache
+(cluster or group), SSM and Secrets Manager when the physical name is known. The property
+defining that name does not use its own resource; secrets contribute only their identity.
+
 Every producer, consumer, writer and reader links to each provisioner, identified by address
 and root module. Roots such as `envs/dev` and `envs/prod` are never ambiguous among themselves.
 Written names give `exact`; names passing through overridable values give `inferred`, with the
@@ -593,9 +598,11 @@ Constructor-backed GCP clients create Pub/Sub producers and subscription consume
 | Python | `PublisherClient().publish(topic, ...)` / `SubscriberClient().subscribe(subscription, callback=...)` | `storage.Client().bucket(name).blob(object).upload_from_string(...)` / `.download_as_bytes()` | `SecretManagerServiceClient().access_secret_version(request={"name": name})` |
 | Java | `Publisher.newBuilder(topic).build().publish(...)` / `Subscriber.newBuilder(subscription, handler).build().startAsync()` | `StorageOptions.newBuilder().build().getService().create(BlobInfo.newBuilder(BlobId.of(bucket, object)).build(), ...)` / `.readAllBytes(bucket, object)` | `SecretManagerServiceClient.create().accessSecretVersion(name)` |
 | Go | Pub/Sub v2 `NewClient`: `Publisher(topic).Publish(...)` / `Subscriber(subscription).Receive(ctx, handler)`; v1 `Topic` / `Subscription` | `storage.NewClient`: `Bucket(bucket).Object(object).NewWriter(ctx)` / `.NewReader(ctx)` | `secretmanager.NewClient`: `AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{Name: name})` |
-| C# | `PublisherClient.CreateAsync(topic).PublishAsync(...)` / `SubscriberClient.CreateAsync(subscription).StartAsync(handler)` | `StorageClient.Create()`: `UploadObject`, `UploadObjectAsync` / `DownloadObject`, `DownloadObjectAsync`, bucket as first argument | `SecretManagerServiceClient.Create()`: `AccessSecretVersion`, `AccessSecretVersionAsync` |
+| C# | `client = await PublisherClient.CreateAsync(topic); client.PublishAsync(...)` / `client = await SubscriberClient.CreateAsync(subscription); client.StartAsync(handler)` | `StorageClient.Create()`: `UploadObject`, `UploadObjectAsync` / `DownloadObject`, `DownloadObjectAsync`, bucket as first argument | `SecretManagerServiceClient.Create()`: `AccessSecretVersion`, `AccessSecretVersionAsync` |
 
 Literal topic, subscription, bucket and secret identities use the same normalization as Terraform and config. A subscription is `channel::pubsub::subscriptions/<id>` and never a guessed topic. Names read from the environment remain unresolved without a workload that actually runs the code; scoped values resolve at `inferred`, preserving the operation subtype. Hidden constructors, injected types without construction, name-matched factories, reassigned clients and opaque return alternatives supply no SDK side.
+
+Request fields changed before use leave the name unresolved; reads before the change and independent objects preserve their identity. Typed helpers must match the resource being used. In C#, await `CreateAsync` first, then invoke the operation on the returned client.
 
 ### AWS channels, data, secrets and subscriptions
 
@@ -2190,11 +2197,37 @@ role = "write"
 via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
 ```
 
+## AWS functions and tasks
+
+Terraform/OpenTofu Lambda runs `image_uri`; SAM runs `ImageUri`, and ECS tasks run each
+container image in `container_definitions`, including `jsonencode` expressions. These runners
+participate in image contracts, context, traces and orphans. Environment entries stay with
+their container and evaluation root, without reaching code belonging to another image.
+
+A local Lambda `filename` or SAM `CodeUri` directly connects code in the same repository.
+An exact `data.archive_file.<name>.output_path` reference may follow only its explicit local
+`source_dir` or `source_file` input. ZIP files remain opaque locations; their contents are
+never extracted. A Serverless handler such as `worker/send.dispatch` selects one existing
+local source file (`.ts`, `.js`, `.mjs`, `.cjs` or `.py`); ambiguous extensions remain unread.
+New paths must be relative, contain no `..` component and cross no symbolic link. S3, URLs
+and remote code do not become local paths.
+
+SAM merges `Globals.Function.Environment.Variables` with the function environment; Serverless
+merges `provider.environment` with `functions.<name>.environment`. The function wins, even
+when its override is unreadable. Terraform Lambda and ECS also supply their environments.
+Known resource references may carry the contract identity without inventing a deployment ARN
+or URL. Secrets, dynamic references and external values retain no contents. The code read
+resolves at `inferred`, with workload and variable in its reason; `context` and `trace` show
+both image execution and direct code paths.
+
+References such as `aws_sqs_queue.orders.url` and `aws_s3_bucket.assets.bucket` identify
+the contract without supplying a deployment URL; content attributes such as `value` stay unread.
+
 ## Workload environments
 
 An environment read naming a queue, topic or resource, such as `process.env.QUEUE_URL`,
 resolves only against entries of the workload running that code. Execution evidence comes
-from the image the repository publishes or a local Compose build context. Containers keep
+from the image the repository publishes or a checked local workload code path. Containers keep
 their own environments. Resolution is `inferred`, with the workload and variable in its reason.
 
 Kubernetes supplies literals, ConfigMap or Secret key references and `envFrom`; Compose supplies

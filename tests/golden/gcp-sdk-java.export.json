@@ -391,18 +391,18 @@
     },
     {
       "contract": "resource::gcs::uploads-java",
-      "site": "local/gcp-sdk-java::Worker.java::Worker.storage()",
+      "site": "local/gcp-sdk-java::Worker.java::Worker.storage()::storage.readAllBytes#0",
       "via": null
     },
     {
       "contract": "resource::gcpsecretmanager::token-java",
-      "site": "local/gcp-sdk-java::Worker.java::Worker.token()",
+      "site": "local/gcp-sdk-java::Worker.java::Worker.token()::secrets.accessSecretVersion#0",
       "via": null
     }
   ],
   "links": [
     {
-      "consumer": "local/gcp-sdk-java::Worker.java::Worker.storage()",
+      "consumer": "local/gcp-sdk-java::Worker.java::Worker.storage()::storage.readAllBytes#0",
       "provider": "local/gcp-sdk-java::Worker.java::Worker.storage()::storage.create#0",
       "contract": "resource::gcs::uploads-java",
       "level": "exact",

@@ -2,6 +2,8 @@ example.com/acme/infra sam/template.yaml:23-43 OrdersFunction
 type: AWS::Serverless::Function
 name: "shop-orders-dev"
 root: sam/template.yaml
+build: "sam/src/orders"
+handler: "app.handler"
 overridable:
 example.com/acme/infra sam/template.yaml:8 Parameters.AppName (default)
 example.com/acme/infra sam/template.yaml:11 Parameters.Stage (default)
@@ -24,6 +26,8 @@ example.com/acme/infra sam/template.yaml:38 Resources.OrdersFunction.Properties.
 example.com/acme/infra sam/template.yaml:39 Resources.OrdersFunction.Properties.Events.Create.Properties.RestApiId = "OrdersApi"
 example.com/acme/infra sam/template.yaml:41 Resources.OrdersFunction.Properties.Events.Work.Type = "SQS"
 example.com/acme/infra sam/template.yaml:43 Resources.OrdersFunction.Properties.Events.Work.Properties.Queue = "OrdersQueue.Arn"
+env OrdersFunction QUEUE_URL -> Ref OrdersQueue: channel::sqs::shop-orders-dev
+env OrdersFunction TABLE_NAME -> Ref OrdersTable: resource::dynamodb::shop-orders
 
 example.com/acme/infra sam/template.yaml:44-47 OrdersQueue
 type: AWS::SQS::Queue
@@ -39,6 +43,8 @@ example.com/acme/infra sam/template.yaml:23 OrdersFunction via Ref
 values:
 example.com/acme/infra sam/template.yaml:45 Resources.OrdersQueue.Type = "AWS::SQS::Queue"
 example.com/acme/infra sam/template.yaml:47 Resources.OrdersQueue.Properties.QueueName = "${AppName}-orders-${Stage}"
+channel::sqs::shop-orders-dev
+  example.com/acme/infra provisioner sam/template.yaml:44 OrdersQueue (root sam/template.yaml) (no use in the workspace)
 
 example.com/acme/infra sam/template.yaml:48-54 OrdersTable
 type: AWS::Serverless::SimpleTable
@@ -56,6 +62,8 @@ example.com/acme/infra sam/template.yaml:51 Resources.OrdersTable.Properties.Tab
 example.com/acme/infra sam/template.yaml:51 Resources.OrdersTable.Properties.TableName[1][1] = "orders"
 example.com/acme/infra sam/template.yaml:53 Resources.OrdersTable.Properties.PrimaryKey.Name = "id"
 example.com/acme/infra sam/template.yaml:54 Resources.OrdersTable.Properties.PrimaryKey.Type = "String"
+resource::dynamodb::shop-orders
+  example.com/acme/infra provisioner sam/template.yaml:48 OrdersTable (root sam/template.yaml) (no use in the workspace)
 
 `JobsQueue` fits 2 IaC nodes; pass one of:
 example.com/acme/infra cfn/queues.yaml:3 JobsQueue (root cfn/queues.yaml)
@@ -74,6 +82,8 @@ example.com/acme/infra cfn/stack.yaml:28 Resources.AlertsTopic.Type = "AWS::SNS:
 example.com/acme/infra cfn/stack.yaml:30 Resources.AlertsTopic.Properties.TopicName = "${AWS::StackName}-alerts"
 example.com/acme/infra cfn/stack.yaml:32 Resources.AlertsTopic.Properties.Subscription[0].Protocol = "sqs"
 example.com/acme/infra cfn/stack.yaml:33 Resources.AlertsTopic.Properties.Subscription[0].Endpoint = "JobsQueue.Arn"
+channel::sns::*-alerts
+  example.com/acme/infra provisioner cfn/stack.yaml:27 AlertsTopic (root cfn/stack.yaml) (no use in the workspace)
 
 example.com/acme/infra cfn/stack.yaml:34-37 AssetsBucket
 type: AWS::S3::Bucket
@@ -90,6 +100,8 @@ example.com/acme/infra cfn/stack.yaml:37 Resources.AssetsBucket.Properties.Bucke
 example.com/acme/infra cfn/stack.yaml:37 Resources.AssetsBucket.Properties.BucketName[1][0] = "assets"
 example.com/acme/infra cfn/stack.yaml:37 Resources.AssetsBucket.Properties.BucketName[1][1] = "Environment"
 example.com/acme/infra cfn/stack.yaml:37 Resources.AssetsBucket.Properties.BucketName[1][2] = "AWS::Region"
+resource::s3::assets-prod-*
+  example.com/acme/infra provisioner cfn/stack.yaml:34 AssetsBucket (root cfn/stack.yaml) (no use in the workspace)
 
 example.com/acme/infra cfn/stack.yaml:38-42 Database
 type: AWS::RDS::DBInstance
@@ -103,6 +115,8 @@ values:
 example.com/acme/infra cfn/stack.yaml:39 Resources.Database.Type = "AWS::RDS::DBInstance"
 example.com/acme/infra cfn/stack.yaml:41 Resources.Database.Properties.DBInstanceIdentifier = "${Environment}-db"
 example.com/acme/infra cfn/stack.yaml:42 Resources.Database.Properties.MasterUserPassword = "DbPassword"
+resource::rds::prod-db
+  example.com/acme/infra provisioner cfn/stack.yaml:38 Database (root cfn/stack.yaml) (no use in the workspace)
 
 example.com/acme/infra cfn/stack.yaml:43-52 QueueLogs
 type: AWS::Logs::LogGroup
@@ -149,6 +163,8 @@ example.com/acme/infra cfn/stack.yaml:60 Resources.BucketAlias.Type = "AWS::SSM:
 example.com/acme/infra cfn/stack.yaml:62 Resources.BucketAlias.Properties.Name = "AssetsBucket"
 example.com/acme/infra cfn/stack.yaml:63 Resources.BucketAlias.Properties.Type = "String"
 example.com/acme/infra cfn/stack.yaml:64 Resources.BucketAlias.Properties.Value = "alias"
+resource::ssm::assets-prod-*
+  example.com/acme/infra provisioner cfn/stack.yaml:59 BucketAlias (root cfn/stack.yaml) (no use in the workspace)
 
 example.com/acme/infra cfn/stack.yaml:65-70 Literal
 type: AWS::SSM::Parameter
@@ -162,6 +178,8 @@ example.com/acme/infra cfn/stack.yaml:66 Resources.Literal.Type = "AWS::SSM::Par
 example.com/acme/infra cfn/stack.yaml:68 Resources.Literal.Properties.Name = "${!NotAVariable}"
 example.com/acme/infra cfn/stack.yaml:69 Resources.Literal.Properties.Type = "String"
 example.com/acme/infra cfn/stack.yaml:70 Resources.Literal.Properties.Value = "literal ${!Escaped}"
+resource::ssm::${!NotAVariable}
+  example.com/acme/infra provisioner cfn/stack.yaml:65 Literal (root cfn/stack.yaml) (no use in the workspace)
 
 example.com/acme/infra cfn/stack.json:17-25 Consumer
 type: AWS::Lambda::Function
@@ -201,6 +219,8 @@ example.com/acme/infra cfn/stack.yaml:17 Resources.JobsQueue.DependsOn = "JobsDe
 example.com/acme/infra cfn/stack.yaml:19 Resources.JobsQueue.Properties.QueueName = "${Environment}-jobs"
 example.com/acme/infra cfn/stack.yaml:21 Resources.JobsQueue.Properties.RedrivePolicy.deadLetterTargetArn = "JobsDeadLetter.Arn"
 example.com/acme/infra cfn/stack.yaml:22 Resources.JobsQueue.Properties.RedrivePolicy.maxReceiveCount = 5
+channel::sqs::prod-jobs
+  example.com/acme/infra provisioner cfn/stack.yaml:15 JobsQueue (root cfn/stack.yaml) (no use in the workspace)
 
 example.com/acme/infra cfn/stack.json:10-14 Stream
 type: AWS::Kinesis::Stream
@@ -217,3 +237,5 @@ values:
 example.com/acme/infra cfn/stack.json:11 Resources.Stream.Type = "AWS::Kinesis::Stream"
 example.com/acme/infra cfn/stack.json:13 Resources.Stream.Properties.Name["Fn::Sub"] = "${Name}-events"
 example.com/acme/infra cfn/stack.json:14 Resources.Stream.Properties.ShardCount = 1
+channel::kinesis::audit-events
+  example.com/acme/infra provisioner cfn/stack.json:10 Stream (root cfn/stack.json) (no use in the workspace)

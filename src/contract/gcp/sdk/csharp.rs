@@ -6,6 +6,7 @@ pub(super) fn constructed<'a>(
     path: &'a str,
     index: usize,
     frames: &[Frame<'a>],
+    awaited: bool,
 ) -> Option<Handle> {
     let call = code.call(path, index)?;
     if code.value_bound(path, &call.scope, call.callee.split('.').next()?) {
@@ -28,6 +29,9 @@ pub(super) fn constructed<'a>(
         "Google.Cloud.Storage.V1.StorageClient.Create" => (Stage::Storage, ""),
         _ => (Stage::Secret, ""),
     };
+    if matches!(stage, Stage::Topic | Stage::Subscription) != awaited {
+        return None;
+    }
     Some(Handle::named(
         stage,
         argument(
@@ -36,6 +40,7 @@ pub(super) fn constructed<'a>(
             &call.scope,
             call.keyword(keyword).or_else(|| call.args.first()),
             frames,
+            Some((path, index)),
         ),
     ))
 }
@@ -73,6 +78,7 @@ pub(super) fn read<'a>(
                 &call.scope,
                 call.keyword("bucket").or_else(|| call.args.first()),
                 &[],
+                Some((path, index)),
             ),
         ),
         (Stage::Storage, "DownloadObject" | "DownloadObjectAsync") => (
@@ -84,6 +90,7 @@ pub(super) fn read<'a>(
                 &call.scope,
                 call.keyword("bucket").or_else(|| call.args.first()),
                 &[],
+                Some((path, index)),
             ),
         ),
         (Stage::Secret, "AccessSecretVersion" | "AccessSecretVersionAsync") => (
@@ -95,6 +102,7 @@ pub(super) fn read<'a>(
                 &call.scope,
                 call.keyword("name").or_else(|| call.args.first()),
                 &[],
+                Some((path, index)),
             ),
         ),
         _ => return None,

@@ -28,7 +28,7 @@ Each line names modules and the area that owns their detail. Split area indexes 
 relevant topic. The [full catalogue](map/overview/modules-src.md) retains each module's description.
 
 - `engine.rs`, `items.rs`, `trace.rs`, `partial.rs`, `drift_view.rs`, `render.rs`, `mcp.rs`, `main.rs`, `msg.rs`, `lib.rs`: queries, rendering, MCP and CLI. [queries](map/queries.md).
-- `workspace.rs`, `config.rs`, `repo.rs`, `index.rs`, `lang/`, `resolve.rs`, `community.rs`, `entry.rs`: workspace discovery, storage, packs and resolution. [indexing](map/indexing.md).
+- `workspace.rs`, `config.rs`, `repo.rs`, `index.rs`, `lang/`, `resolve.rs`, `resolve/`, `community.rs`, `entry.rs`: workspace discovery, storage, packs and resolution. [indexing](map/indexing.md).
 - `contract.rs`, `contract/`, `http.rs`, `http/`, `resource.rs`, `resource/`, `resource/via.rs`, `image.rs`, `image/config.rs`, `image/code.rs`, `image/patterns.rs`, `image/environment.rs`, `alert.rs`, `alert/` (labels, incident routing and explicit receiver forwarding), `channel.rs`, `channel/`, `package.rs`, `package/`: contract kinds, library forms and SDK extraction. [contracts](map/contracts.md).
 - `names.rs`, `names/`: external names and shared language readers. [languages](map/languages.md).
 - `contract/gcp/`, `contract/sdk/`: GCP SDK policy and shared constructor evidence. [GCP SDK use sides](map/contracts/gcp-sdk-668.md).

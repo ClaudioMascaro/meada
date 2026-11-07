@@ -762,6 +762,119 @@ fn event_text(vars: &mut Vars, event: &Value, at: &mut Vec<Step>) -> Option<Reso
     Some(out)
 }
 
+/// Provider entries precede function entries; even an unread override replaces the default.
+/// Resource references wait for the same CloudFormation evaluation used for resource nodes.
+fn environment<'a>(
+    vars: &mut Vars,
+    doc: &'a Value,
+    function: &'a Map<String, Value>,
+    key: &str,
+) -> (
+    Vec<super::environment::Entry>,
+    BTreeMap<&'a str, &'a str>,
+    usize,
+) {
+    let mut entries = BTreeMap::new();
+    let mut targets = BTreeMap::new();
+    let mut room = super::environment::ENVIRONMENT_BYTES_MAX;
+    let mut reserved = 0;
+    let unknown_override = function.get("environment").is_some_and(|v| {
+        v.as_object()
+            .is_none_or(|m| m.len() == 1 && m.keys().any(|k| k == "Ref" || k.starts_with("Fn::")))
+    });
+    for (variables, mut at) in [
+        (
+            doc.pointer("/provider/environment")
+                .and_then(Value::as_object),
+            vec![
+                Step::Key("provider".into()),
+                Step::Key("environment".into()),
+            ],
+        ),
+        (
+            function
+                .get("environment")
+                .filter(|_| !unknown_override)
+                .and_then(Value::as_object),
+            vec![
+                Step::Key("functions".into()),
+                Step::Key(key.into()),
+                Step::Key("environment".into()),
+            ],
+        ),
+    ] {
+        for (name, raw) in variables.into_iter().flatten() {
+            let reference = (!unknown_override)
+                .then(|| {
+                    raw.get("Ref").and_then(Value::as_str).or_else(|| {
+                        let (id, attr) = cloudformation::get_att(raw.get("Fn::GetAtt")?)?;
+                        let ty = doc["resources"]["Resources"][id]["Type"].as_str()?;
+                        let entry = super::types::entry("cloudformation", ty)?;
+                        attr.as_deref()
+                            .filter(|a| *a == "Arn" || *a == entry.name)
+                            .map(|_| id)
+                    })
+                })
+                .flatten();
+            at.push(Step::Key(name.clone()));
+            let (target, value) = if unknown_override {
+                ("Serverless environment (unresolved)".into(), None)
+            } else if let Some(id) = reference {
+                (format!("Serverless resource {id}"), None)
+            } else {
+                let part = match raw {
+                    Value::String(s) => Some(text_of(&vars.string(s, &at))),
+                    other => scalar_text(other).map(|text| Resolved {
+                        text,
+                        overridable: false,
+                    }),
+                };
+                match part {
+                    Some(p) if !p.text.contains("${") && !p.text.contains("{{resolve:") => (
+                        if p.overridable {
+                            "Serverless default"
+                        } else {
+                            "Serverless literal"
+                        }
+                        .into(),
+                        super::environment::literal(&p.text),
+                    ),
+                    _ => ("Serverless environment (unresolved)".into(), None),
+                }
+            };
+            at.pop();
+            // Reserve the bounded physical name before a reference's typed projection is copied.
+            let projection = reference.map_or(0, |_| PHYSICAL_NAME_MAX + 64);
+            let bytes = key.len()
+                + name.len()
+                + target.len()
+                + value.as_ref().map_or(0, String::len)
+                + projection;
+            let Some(left) = room.checked_sub(bytes) else {
+                return (Vec::new(), BTreeMap::new(), 0);
+            };
+            room = left;
+            reserved += projection;
+            targets.remove(name.as_str());
+            if let Some(id) = reference {
+                targets.insert(name.as_str(), id);
+            }
+            entries.insert(
+                name.as_str(),
+                super::environment::Entry {
+                    container: key.into(),
+                    image: None,
+                    name: name.clone(),
+                    target,
+                    value,
+                    contract: None,
+                },
+            );
+        }
+    }
+    (entries.into_values().collect(), targets, reserved)
+}
+
 /// The IaC nodes and references of the file `src` at `path`: none unless it is a service. The file
 /// is its own root, labelled by `path`.
 pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
@@ -856,6 +969,7 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     };
     let key_line = compose::KeyLines::new(&file_lines, "functions", &key_lines);
     let (mut nodes, mut references) = (Vec::new(), Vec::new());
+    let mut environment_targets = Vec::new();
     let mut room = ROOT_STORED_MAX;
     let mut take = |bytes: usize| match room.checked_sub(bytes) {
         Some(r) => {
@@ -864,8 +978,8 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
         }
         None => false,
     };
+    let empty = Map::new();
     if let Some(Value::Object(functions)) = doc.get("functions") {
-        let empty = Map::new();
         for (key, f) in functions.iter().take(NODES_MAX) {
             let body = f.as_object().unwrap_or(&empty);
             let mut at = vec![Step::Key("functions".into()), Step::Key(key.clone())];
@@ -914,14 +1028,21 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
                 }
                 at.pop();
             }
+            let (environment, targets, reserved) = environment(&mut vars, doc, body, key);
             let size = key.len()
                 + name.as_ref().map_or(0, String::len)
                 + handler.as_ref().map_or(0, |h| h.text.len())
-                + events.iter().map(|e| e.text.len()).sum::<usize>();
+                + events.iter().map(|e| e.text.len()).sum::<usize>()
+                + environment
+                    .iter()
+                    .map(super::environment::Entry::size)
+                    .sum::<usize>()
+                + reserved;
             if !take(size) {
                 break;
             }
             let address = format!("functions.{key}");
+            environment_targets.push(targets);
             nodes.push(Node {
                 address: address.clone(),
                 root: path.to_string(),
@@ -940,7 +1061,7 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
                 handler,
                 events,
                 subscription: None,
-                environment: Vec::new(),
+                environment,
                 images: Vec::new(),
                 provisioned: None,
                 ingress: Vec::new(),
@@ -974,6 +1095,27 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
         budget: room,
     };
     let (resource_nodes, resource_references) = cloudformation::nodes(&unit);
+    let targets = resource_nodes
+        .iter()
+        .filter_map(|n| {
+            let entry = super::types::entry("cloudformation", &n.ty)?;
+            let name = n
+                .name
+                .as_deref()
+                .filter(|s| !n.pattern && s.len() <= PHYSICAL_NAME_MAX)?;
+            Some((n.address.as_str(), (entry, name)))
+        })
+        .collect::<BTreeMap<_, _>>();
+    for (node, pending) in nodes.iter_mut().zip(environment_targets) {
+        for entry in &mut node.environment {
+            if let Some((ty, name)) = pending
+                .get(entry.name.as_str())
+                .and_then(|id| targets.get(id))
+            {
+                entry.contract = Some(ty.contract(name));
+            }
+        }
+    }
     for mut node in resource_nodes {
         // A synthetic parameter shows as the expression it stands for.
         for o in &mut node.overridable {

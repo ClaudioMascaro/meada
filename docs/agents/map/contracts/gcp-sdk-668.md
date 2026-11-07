@@ -17,12 +17,21 @@ keys avoid copying structured evidence at every memo entry. Unknown branches,
 hidden bindings, reassignment and name-matched hops invalidate evidence. Existing evaluation
 depth and work ceilings apply. No pending or private origin data enters exports.
 
-`Code::value_within` folds the selected identity argument in those frames while retaining
-verified external helper names. Its optional typed-construction predicate belongs to the kind;
-ordinary `Code::value` folding stays unchanged. TS/JS retain complex receiver expressions so
+`Code::value_within_at` folds a selected identity argument in those frames and at its honest
+call site, retaining verified external helper names and their resource subtype until projection.
+`resolve/mutations.rs` shares scoped, ordered selector effects and exact alias/caller binding
+between scalar selection and complete memo arguments. Missing or exhausted write knowledge
+stays unknown; a later write, another object or another field does not erase an earlier value.
+A constructor without a stored call site uses conservative all-writes mode. Default objects
+with writes remain unknown across invocations. `contract/sdk/mutations.rs` supplies standard
+mapping-call effects, with no SDK names in packs or resolution. Both syntax evidence bytes
+and query work use existing ceilings. Ordinary `Code::value` folding stays unchanged. TS/JS retain complex receiver expressions so
 inline `new` keeps construction evidence while a plain class call does not. `Code::value_bound` guards static factories
 against a value hiding the class name. Go records the first result of a multiple-result call
-as syntax-only value evidence; other result bindings remain unknown. SDK policy remains here.
+as syntax-only value evidence; other result bindings remain unknown. Await syntax and
+asynchronous definitions remain neutral facts; the kind and shared evidence walk require a
+C# async factory result to be awaited once. Resource readers use operation call sites;
+channel receives retain handler definition sites. SDK policy remains here.
 
 `ContractKind::environment_name` and `environment_target` let each kind normalize a plain or
 typed workload entry while preserving the stored SDK operation. Pub/Sub receives therefore

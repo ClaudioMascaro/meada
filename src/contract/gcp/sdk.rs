@@ -3,7 +3,7 @@
 use crate::contract::sdk::origins::{Evidence, Policy};
 use crate::contract::{Found, Role, Site};
 use crate::lang::{Value, property};
-use crate::names::{self, Argument};
+use crate::names;
 use crate::resolve::{Code, Frame};
 
 mod csharp;
@@ -40,6 +40,35 @@ enum Stage {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
+enum Argument {
+    Literal(String),
+    Environment(String),
+    Unresolved,
+    Typed(Stage, Box<Argument>),
+}
+impl Argument {
+    fn typed(stage: Stage, value: Argument) -> Self {
+        Self::Typed(stage, Box::new(value))
+    }
+    fn for_stage(mut self, stage: Stage) -> Self {
+        let canonical = |s| {
+            if matches!(s, Stage::Object | Stage::Storage) {
+                Stage::Bucket
+            } else {
+                s
+            }
+        };
+        while let Self::Typed(kind, inner) = self {
+            if canonical(kind) != canonical(stage) {
+                return Self::Unresolved;
+            }
+            self = *inner;
+        }
+        self
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
 struct Handle {
     stage: Stage,
     name: Argument,
@@ -57,36 +86,9 @@ impl Handle {
 }
 
 struct Gcp(Language);
-#[derive(Clone, Default, PartialEq, Eq, Hash)]
-enum Identity {
-    #[default]
-    Unknown,
-    Name(Argument),
-    Object(Vec<(String, Identity)>),
-    List(Vec<Identity>),
-}
-
-fn identity<'a>(code: &Code<'a>, path: &'a str, value: &Value) -> Identity {
-    match value {
-        Value::Object(fields) => Identity::Object(
-            fields
-                .iter()
-                .map(|(key, value)| (key.clone(), identity(code, path, value)))
-                .collect(),
-        ),
-        Value::List(values) => {
-            Identity::List(values.iter().map(|v| identity(code, path, v)).collect())
-        }
-        _ => match value_argument(code, path, value) {
-            Argument::Unresolved => Identity::Unknown,
-            name => Identity::Name(name),
-        },
-    }
-}
-
 impl<'a> Policy<'a> for Gcp {
     type Evidence = Handle;
-    type Argument = std::rc::Rc<Identity>;
+    type Argument = std::rc::Rc<crate::contract::sdk::Identity<Argument>>;
     fn constructed(
         &self,
         code: &Code<'a>,
@@ -110,14 +112,18 @@ impl<'a> Policy<'a> for Gcp {
         path: &'a str,
         index: usize,
         frames: &[Frame<'a>],
+        awaited: bool,
     ) -> Option<Handle> {
         let call = code.call(path, index)?;
         match self.0 {
             Language::Ts => None,
-            Language::Python => python::constructed(code, path, &call.scope, &call.callee),
+            Language::Python if !awaited => {
+                python::constructed(code, path, &call.scope, &call.callee)
+            }
+            Language::Python => None,
             Language::Java => java::constructed(code, path, index, frames),
             Language::Go => go::constructed(code, path, index),
-            Language::Csharp => csharp::constructed(code, path, index, frames),
+            Language::Csharp => csharp::constructed(code, path, index, frames, awaited),
         }
     }
     fn step(
@@ -143,9 +149,20 @@ impl<'a> Policy<'a> for Gcp {
         scope: &'a str,
         value: &'a Value,
         frames: &[Frame<'a>],
+        site: (&'a str, usize),
     ) -> Self::Argument {
-        let value = code.value_within(path, scope, value, frames, typed_name);
-        std::rc::Rc::new(identity(code, path, &value))
+        let value = code.value_within_at(
+            path,
+            scope,
+            value,
+            frames,
+            Some(site),
+            typed_name,
+            crate::contract::sdk::mutations::writes,
+        );
+        std::rc::Rc::new(crate::contract::sdk::Identity::read(&value, &|value| {
+            Some(value_argument(code, path, value)).filter(|name| *name != Argument::Unresolved)
+        }))
     }
 }
 
@@ -155,9 +172,20 @@ fn argument<'a>(
     scope: &'a str,
     value: Option<&'a Value>,
     frames: &[Frame<'a>],
+    site: Option<(&'a str, usize)>,
 ) -> Argument {
     value
-        .map(|v| code.value_within(path, scope, v, frames, typed_name))
+        .map(|v| {
+            code.value_within_at(
+                path,
+                scope,
+                v,
+                frames,
+                site,
+                typed_name,
+                crate::contract::sdk::mutations::writes,
+            )
+        })
         .map(|v| value_argument(code, path, &v))
         .unwrap_or(Argument::Unresolved)
 }
@@ -249,10 +277,11 @@ pub(crate) fn extract(code: &Code, channels: bool) -> Vec<Found> {
                 Stage::Secret if !channels => ("resource", "gcpsecretmanager"),
                 _ => continue,
             };
-            let (name, via) = match name {
+            let (name, via) = match name.for_stage(stage) {
                 Argument::Literal(name) => (physical(stage, &name), None),
                 Argument::Environment(env) => (None, Some(format!("env:{env}"))),
                 Argument::Unresolved => (None, None),
+                Argument::Typed(..) => unreachable!(),
             };
             let contract = Some(match name {
                 Some(name) => format!("{prefix}::{kind}::{name}"),
@@ -260,7 +289,7 @@ pub(crate) fn extract(code: &Code, channels: bool) -> Vec<Found> {
             });
             found.push(Found {
                 role,
-                site: if role == Role::Consumer {
+                site: if role == Role::Consumer && channels {
                     Site::Def {
                         path: path.into(),
                         name: stored.scope.clone(),
@@ -320,7 +349,14 @@ fn value_argument<'a>(code: &Code<'a>, path: &'a str, value: &Value) -> Argument
         )
         && let Some(name) = args.get(1)
     {
-        return value_argument(code, path, name);
+        return Argument::typed(
+            match ty.as_str() {
+                "Google.Cloud.PubSub.V1.TopicName" => Stage::Topic,
+                "Google.Cloud.PubSub.V1.SubscriptionName" => Stage::Subscription,
+                _ => Stage::Secret,
+            },
+            value_argument(code, path, name),
+        );
     }
     if let Value::Call(call) = value {
         for (class, constructor, method) in [
@@ -343,23 +379,38 @@ fn value_argument<'a>(code: &Code<'a>, path: &'a str, value: &Value) -> Argument
                 && verified
                 && let Some(name) = call.args.get(1)
             {
-                return value_argument(code, path, name);
+                return Argument::typed(
+                    if method == "topic_path" {
+                        Stage::Topic
+                    } else {
+                        Stage::Subscription
+                    },
+                    value_argument(code, path, name),
+                );
             }
         }
         let named = [
-            ("com.google.pubsub.v1.TopicName", 1),
-            ("com.google.pubsub.v1.SubscriptionName", 1),
-            ("com.google.cloud.secretmanager.v1.SecretVersionName", 1),
-            ("com.google.cloud.storage.BlobId", 0),
+            ("com.google.pubsub.v1.TopicName", 1, Stage::Topic),
+            (
+                "com.google.pubsub.v1.SubscriptionName",
+                1,
+                Stage::Subscription,
+            ),
+            (
+                "com.google.cloud.secretmanager.v1.SecretVersionName",
+                1,
+                Stage::Secret,
+            ),
+            ("com.google.cloud.storage.BlobId", 0, Stage::Bucket),
         ]
         .iter()
-        .find_map(|(class, index)| {
+        .find_map(|(class, index, stage)| {
             external(call, class, "of")
-                .then(|| call.args.get(*index))
+                .then(|| call.args.get(*index).map(|name| (*stage, name)))
                 .flatten()
         });
-        if let Some(name) = named {
-            return value_argument(code, path, name);
+        if let Some((stage, name)) = named {
+            return Argument::typed(stage, value_argument(code, path, name));
         }
         for (class, method) in [
             ("Google.Cloud.PubSub.V1.TopicName", "FromProjectTopic"),
@@ -371,7 +422,14 @@ fn value_argument<'a>(code: &Code<'a>, path: &'a str, value: &Value) -> Argument
             if external(call, class, method)
                 && let Some(name) = call.args.get(1)
             {
-                return value_argument(code, path, name);
+                return Argument::typed(
+                    if method == "FromProjectTopic" {
+                        Stage::Topic
+                    } else {
+                        Stage::Subscription
+                    },
+                    value_argument(code, path, name),
+                );
             }
         }
         if crate::resolve::method(&call.callee) == "build"
@@ -382,5 +440,9 @@ fn value_argument<'a>(code: &Code<'a>, path: &'a str, value: &Value) -> Argument
             return value_argument(code, path, blob);
         }
     }
-    crate::contract::sdk::argument(code, path, value).unwrap_or(Argument::Unresolved)
+    match crate::contract::sdk::argument(code, path, value) {
+        Some(names::Argument::Literal(value)) => Argument::Literal(value),
+        Some(names::Argument::Environment(value)) => Argument::Environment(value),
+        _ => Argument::Unresolved,
+    }
 }

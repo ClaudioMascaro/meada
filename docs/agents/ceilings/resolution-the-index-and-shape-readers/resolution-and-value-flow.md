@@ -1,10 +1,21 @@
 # Resolution and value flow
 
-`Code::value_within` (#668) folds one selected identity argument with exact return-call
+`Code::value_within_at` (#668) folds one selected identity argument with exact return-call
 frames and a kind-supplied typed-construction predicate. It uses the existing evaluation
 limits and does not change ordinary `Code::value`. Shared SDK evidence memoizes normalized
 frame argument names and client evidence; unknown alternatives invalidate the result. Go
 records only the first binding of a multiple-result call, leaving error/other results unknown.
+Scoped selector effects (`resolve/mutations.rs`) follow exact aliases and argument frames,
+compare actual read/write call order, and share selection/memo normalization. Retained write
+facts charge their names and scopes to `MAX_BYTES` (1 MiB); overflow removes complete write
+knowledge rather than keeping a partial list. Indexing, alias expansion and querying charge
+`EVAL_BUDGET` and `EVAL_DEPTH`. Missing facts/calls, opaque aliases, cycles or exhausted work
+cannot prove an object unchanged. A write to a shared default object is conservative across
+invocations; a constructor with no honest source call site uses all-writes mode. Standard
+mapping effects are supplied by `contract/sdk/mutations.rs`, never cloud policy in a pack.
+Typed helper subtypes stay in kind-owned identity and complete memo keys until projection;
+an incompatible helper stays unresolved. C# async SDK factories require one await; a bare
+Task or an already-awaited client awaited again supplies no receiver evidence.
 
 - `names.rs`, `http/csharp.rs`, `channel/java.rs` (#466): two cases are not pinned.
   (1) #358: a Rabbit `convertAndSend("orders", o)` whose `o` is a parameter of a type the
@@ -47,9 +58,10 @@ records only the first binding of a multiple-result call, leaving error/other re
   method called on a receiver whose class Meada cannot tell (in TypeScript any receiver but
   `this`, a `const api = new Api()` included), or a function called by a bare name no import
   binds, is read where it stands; value flow (`Code::origins`, for a parameter's arguments) does
-  not climb such a call either; a parameter captured by a closure is unknown (`Code::origins`
-  does not follow it either; nor a name its scope binds more than once, or an attribute not
-  assigned a call once in its class); a nested or rest
+  not climb such a call either; a parameter captured by a closure is unknown while a different function frame is active;
+  a root value walk without a bound frame may climb the outer function's exact callers.
+  `Code::origins` does not follow a name its scope binds more than once, or an attribute not
+  assigned a call once in its class; a nested or rest
   pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
   makes the names it may override unknown. `WRAPPER_DEPTH` (64): a wrapper more calls up than
   that is read where the climb stops, its parameters unknown. `EVAL_BUDGET` (2^16 per file):

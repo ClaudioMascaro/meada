@@ -12,7 +12,9 @@ All notable changes to Meada are recorded here. The format follows
   constructors connect Pub/Sub publish and subscription receive, Cloud Storage reads/writes
   and Secret Manager access to their physical contracts. Subscription identities remain
   distinct from topics through scoped workload environment resolution. The documented
-  operation inventory ships in the shared meada 1.4.0 minor release.
+  operation inventory ships in the shared meada 1.4.0 minor release. Scoped request mutations
+  leave stale names unresolved, typed helpers retain their resource kind through factories,
+  and asynchronous factories preserve await state.
 - The console graph has image builder-to-runner and alert emitter-to-matcher views, including
   links within a repository, alongside provisioner sides and provisioning links with roots,
   levels and reasons. A bilingual legend explains each role and keyboard navigation. The
@@ -24,6 +26,13 @@ All notable changes to Meada are recorded here. The format follows
   their field paths. Equality is exact; regex, prefix and containment are inferred.
   Missing or unread forwarding yields no link, and matching never predicts final team
   delivery. Included in the existing meada/meada-core 1.4.0 minor release (#673).
+- AWS workload execution and environments (#664): Terraform/OpenTofu Lambda images and local
+  code/archive inputs, SAM CodeUri/Handler/ImageUri with Globals overrides, Serverless handlers
+  with provider/function environments, and encoded ECS container images/environments. Known
+  resource references retain typed identities; secret and dynamic contents remain unread.
+  Context, bidirectional traces and scope-aware image orphans include these workloads; new
+  local paths refuse absolute paths, every parent component and symbolic links. Included in
+  the minor development release of meada and meada-core 1.4.0.
 
 - Terraform/OpenTofu JSON (`.tf.json`, `.tofu.json`) now creates IaC nodes with source spans,
   references, evaluated names and local module instances. JSON expression and literal rules

@@ -353,12 +353,12 @@
   "consumers": [
     {
       "contract": "resource::gcs::uploads-csharp",
-      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.DownloadObject#0",
       "via": null
     },
     {
       "contract": "resource::gcs::uploads-csharp",
-      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.DownloadObjectAsync#0",
       "via": null
     },
     {
@@ -368,39 +368,39 @@
     },
     {
       "contract": "resource::gcpsecretmanager::token-csharp",
-      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.Token()",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.Token()::secrets.AccessSecretVersion#0",
       "via": null
     },
     {
       "contract": "resource::gcpsecretmanager::token-csharp",
-      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.TokenAsync()",
+      "site": "local/gcp-sdk-csharp::Worker.cs::Worker.TokenAsync()::secrets.AccessSecretVersionAsync#0",
       "via": null
     }
   ],
   "links": [
     {
-      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()",
+      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.DownloadObject#0",
       "provider": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.UploadObject#0",
       "contract": "resource::gcs::uploads-csharp",
       "level": "exact",
       "reason": "resource::gcs::uploads-csharp"
     },
     {
-      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()",
+      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.DownloadObject#0",
       "provider": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.UploadObjectAsync#0",
       "contract": "resource::gcs::uploads-csharp",
       "level": "exact",
       "reason": "resource::gcs::uploads-csharp"
     },
     {
-      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()",
+      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.DownloadObjectAsync#0",
       "provider": "local/gcp-sdk-csharp::Worker.cs::Worker.Objects()::storage.UploadObject#0",
       "contract": "resource::gcs::uploads-csharp",
       "level": "exact",
       "reason": "resource::gcs::uploads-csharp"
     },
     {
-      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()",
+      "consumer": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.DownloadObjectAsync#0",
       "provider": "local/gcp-sdk-csharp::Worker.cs::Worker.ObjectsAsync()::storage.UploadObjectAsync#0",
       "contract": "resource::gcs::uploads-csharp",
       "level": "exact",

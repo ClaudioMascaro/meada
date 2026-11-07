@@ -9,7 +9,36 @@ use std::collections::{BTreeMap, BTreeSet};
 mod csharp;
 mod go;
 mod java;
+pub(crate) mod mutations;
 pub(crate) mod origins;
+
+/// Complete normalized argument identity for the shared constructor memo. The kind
+/// projects scalar leaves; object and list structure is language-neutral syntax.
+#[derive(Clone, Default, PartialEq, Eq, Hash)]
+pub(crate) enum Identity<T> {
+    #[default]
+    Unknown,
+    Leaf(T),
+    Object(Vec<(String, Identity<T>)>),
+    List(Vec<Identity<T>>),
+}
+
+impl<T> Identity<T> {
+    pub(crate) fn read(value: &Value, leaf: &impl Fn(&Value) -> Option<T>) -> Self {
+        match value {
+            Value::Object(fields) => Self::Object(
+                fields
+                    .iter()
+                    .map(|(key, value)| (key.clone(), Self::read(value, leaf)))
+                    .collect(),
+            ),
+            Value::List(values) => {
+                Self::List(values.iter().map(|value| Self::read(value, leaf)).collect())
+            }
+            _ => leaf(value).map_or(Self::Unknown, Self::Leaf),
+        }
+    }
+}
 
 /// A folded SDK name, retaining verified runtime environment aliases. Physical identity
 /// projection belongs to the caller's contract kind.

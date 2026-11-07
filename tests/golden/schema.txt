@@ -387,7 +387,8 @@ sample.ts
     "serve.item",
     "serve.error"
   ],
-  "receivers": []
+  "receivers": [],
+  "member_writes": []
 }
 
 sample.py
@@ -848,6 +849,26 @@ sample.py
       "name": "shape",
       "class": {
         "Named": "Circle"
+      }
+    }
+  ],
+  "member_writes": [
+    {
+      "scope": "Circle.__init__",
+      "object": "self",
+      "field": "radius",
+      "range": {
+        "start": 314,
+        "end": 334
+      }
+    },
+    {
+      "scope": "Circle.__init__",
+      "object": "self",
+      "field": "client",
+      "range": {
+        "start": 343,
+        "end": 365
       }
     }
   ]
@@ -1492,7 +1513,8 @@ sample.go
       }
     }
   ],
-  "package": "store"
+  "package": "store",
+  "member_writes": []
 }
 
 sample.java

@@ -31,10 +31,15 @@ pub(super) fn step<'a>(
         (Stage::Bucket, "file") => return Some(Handle::named(Stage::Object, parent.name)),
         _ => return None,
     };
-    Some(Handle::named(
-        stage,
-        argument(code, path, &call.scope, call.args.first(), frames),
-    ))
+    let name = argument(
+        code,
+        path,
+        &call.scope,
+        call.args.first(),
+        frames,
+        Some((path, index)),
+    );
+    Some(Handle::named(stage, name))
 }
 
 pub(super) fn operation(method: &str) -> bool {
@@ -54,14 +59,21 @@ pub(super) fn read<'a>(
     let role = match (handle.stage, crate::resolve::method(&call.callee)) {
         (Stage::Topic, "publishMessage") | (Stage::Object, "save") => Role::Provider,
         (Stage::Object, "download") => Role::Consumer,
-        (Stage::Subscription, "on") if matches!(argument(code, path, &call.scope, call.args.first(), &[]), Argument::Literal(ref s) if s == "message") => {
+        (Stage::Subscription, "on") if matches!(argument(code, path, &call.scope, call.args.first(), &[], Some((path, index))), Argument::Literal(ref s) if s == "message") => {
             Role::Consumer
         }
         (Stage::Secret, "accessSecretVersion") => {
-            let value = call
-                .args
-                .first()
-                .map(|v| code.value_within(path, &call.scope, v, &[], super::typed_name));
+            let value = call.args.first().map(|v| {
+                code.value_within_at(
+                    path,
+                    &call.scope,
+                    v,
+                    &[],
+                    Some((path, index)),
+                    super::typed_name,
+                    crate::contract::sdk::mutations::writes,
+                )
+            });
             return Some((
                 Role::Consumer,
                 Stage::Secret,

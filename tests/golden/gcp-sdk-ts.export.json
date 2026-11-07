@@ -686,7 +686,7 @@
   "consumers": [
     {
       "contract": "resource::gcs::uploads-js",
-      "site": "local/gcp-sdk-ts::send.js::read",
+      "site": "local/gcp-sdk-ts::send.js::read::object.download#0",
       "via": null
     },
     {
@@ -696,12 +696,12 @@
     },
     {
       "contract": "resource::gcpsecretmanager::token-js",
-      "site": "local/gcp-sdk-ts::send.js::secret",
+      "site": "local/gcp-sdk-ts::send.js::secret::secrets.accessSecretVersion#0",
       "via": null
     },
     {
       "contract": "resource::gcs::uploads-ts",
-      "site": "local/gcp-sdk-ts::send.ts::read",
+      "site": "local/gcp-sdk-ts::send.ts::read::object.download#0",
       "via": null
     },
     {
@@ -711,20 +711,20 @@
     },
     {
       "contract": "resource::gcpsecretmanager::token-ts",
-      "site": "local/gcp-sdk-ts::send.ts::secret",
+      "site": "local/gcp-sdk-ts::send.ts::secret::secrets.accessSecretVersion#0",
       "via": null
     }
   ],
   "links": [
     {
-      "consumer": "local/gcp-sdk-ts::send.js::read",
+      "consumer": "local/gcp-sdk-ts::send.js::read::object.download#0",
       "provider": "local/gcp-sdk-ts::send.js::write::object.save#0",
       "contract": "resource::gcs::uploads-js",
       "level": "exact",
       "reason": "resource::gcs::uploads-js"
     },
     {
-      "consumer": "local/gcp-sdk-ts::send.ts::read",
+      "consumer": "local/gcp-sdk-ts::send.ts::read::object.download#0",
       "provider": "local/gcp-sdk-ts::send.ts::write::object.save#0",
       "contract": "resource::gcs::uploads-ts",
       "level": "exact",

@@ -34,6 +34,7 @@ pub(super) fn step<'a>(
                 &call.scope,
                 call.args.first().or_else(|| call.keyword("bucket_name")),
                 frames,
+                Some((path, index)),
             ),
         )),
         (Stage::Bucket, "blob") => Some(Handle::named(Stage::Object, parent.name)),
@@ -69,6 +70,7 @@ pub(super) fn read<'a>(
                 &call.scope,
                 call.args.first().or_else(|| call.keyword("topic")),
                 &[],
+                Some((path, index)),
             ),
         ),
         (Stage::Subscriber, "subscribe") => (
@@ -80,6 +82,7 @@ pub(super) fn read<'a>(
                 &call.scope,
                 call.args.first().or_else(|| call.keyword("subscription")),
                 &[],
+                Some((path, index)),
             ),
         ),
         (Stage::Object, "upload_from_string") => (Role::Provider, Stage::Object, handle.name),
@@ -88,7 +91,17 @@ pub(super) fn read<'a>(
             let value = call
                 .keyword("request")
                 .or_else(|| call.args.first())
-                .map(|v| code.value_within(path, &call.scope, v, &[], super::typed_name));
+                .map(|v| {
+                    code.value_within_at(
+                        path,
+                        &call.scope,
+                        v,
+                        &[],
+                        Some((path, index)),
+                        super::typed_name,
+                        crate::contract::sdk::mutations::writes,
+                    )
+                });
             (
                 Role::Consumer,
                 Stage::Secret,

@@ -540,6 +540,11 @@ um `aws_s3_bucket` provisiona `resource::s3::<nome>` pelo argumento `bucket`. A 
 em `src/iac/types.toml`, embutida no binário, também lê nomes em ARNs e URLs. Um `[[resource]]`
 com `kind = "s3"` e o mesmo `id` participa desse contrato, mantendo o nível `declared`.
 
+CloudFormation e SAM usam os mesmos contratos para SQS, SNS, EventBridge, Kinesis, S3,
+DynamoDB (Table, GlobalTable e SimpleTable), RDS (instância ou cluster), ElastiCache
+(cluster ou grupo), SSM e Secrets Manager, quando o nome físico é conhecido. A propriedade
+que define esse nome não cria um uso do próprio recurso; segredos contribuem só com a identidade.
+
 Cada produtor, consumidor, escritor e leitor se liga a cada provisionador, identificado pelo
 endereço e pelo módulo raiz. Duas raízes como `envs/dev` e `envs/prod` não são ambíguas entre si.
 Nomes escritos dão `exact`; nomes que passam por valores sobrescrevíveis dão `inferred`, com
@@ -594,9 +599,11 @@ Clientes GCP com origem comprovada no construtor criam produtores Pub/Sub, consu
 | Python | `PublisherClient().publish(topic, ...)` / `SubscriberClient().subscribe(subscription, callback=...)` | `storage.Client().bucket(name).blob(object).upload_from_string(...)` / `.download_as_bytes()` | `SecretManagerServiceClient().access_secret_version(request={"name": name})` |
 | Java | `Publisher.newBuilder(topic).build().publish(...)` / `Subscriber.newBuilder(subscription, handler).build().startAsync()` | `StorageOptions.newBuilder().build().getService().create(BlobInfo.newBuilder(BlobId.of(bucket, object)).build(), ...)` / `.readAllBytes(bucket, object)` | `SecretManagerServiceClient.create().accessSecretVersion(name)` |
 | Go | Pub/Sub v2 `NewClient`: `Publisher(topic).Publish(...)` / `Subscriber(subscription).Receive(ctx, handler)`; v1 `Topic` / `Subscription` | `storage.NewClient`: `Bucket(bucket).Object(object).NewWriter(ctx)` / `.NewReader(ctx)` | `secretmanager.NewClient`: `AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{Name: name})` |
-| C# | `PublisherClient.CreateAsync(topic).PublishAsync(...)` / `SubscriberClient.CreateAsync(subscription).StartAsync(handler)` | `StorageClient.Create()`: `UploadObject`, `UploadObjectAsync` / `DownloadObject`, `DownloadObjectAsync`, bucket as first argument | `SecretManagerServiceClient.Create()`: `AccessSecretVersion`, `AccessSecretVersionAsync` |
+| C# | `client = await PublisherClient.CreateAsync(topic); client.PublishAsync(...)` / `client = await SubscriberClient.CreateAsync(subscription); client.StartAsync(handler)` | `StorageClient.Create()`: `UploadObject`, `UploadObjectAsync` / `DownloadObject`, `DownloadObjectAsync`, bucket as first argument | `SecretManagerServiceClient.Create()`: `AccessSecretVersion`, `AccessSecretVersionAsync` |
 
 Identidades literais de tópicos, assinaturas, buckets e segredos usam a mesma normalização do Terraform e da configuração. Uma assinatura é `channel::pubsub::subscriptions/<id>` e nunca um tópico adivinhado. Nomes lidos do ambiente continuam não resolvidos sem uma carga que execute o código; valores nesse escopo resolvem em `inferred`, preservando o subtipo da operação. Construtores ocultos, tipos injetados sem construção, fábricas encontradas só pelo nome, clientes reatribuídos e alternativas de retorno opacas não fornecem um lado de SDK.
+
+Campos de requisição alterados antes do uso deixam o nome não resolvido; leituras anteriores à alteração e objetos independentes preservam sua identidade. Helpers tipados precisam corresponder ao recurso usado. Em C#, primeiro aguarde `CreateAsync`, depois invoque a operação no cliente retornado.
 
 ### Canais, dados, segredos e assinaturas AWS
 
@@ -2193,11 +2200,37 @@ role = "write"
 via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
 ```
 
+## Funções e tarefas AWS
+
+Lambda em Terraform/OpenTofu executa `image_uri`; SAM executa `ImageUri`, e tarefas ECS
+executam as imagens de cada container em `container_definitions`, inclusive via `jsonencode`.
+Esses executores entram nos contratos de imagem, no contexto, nos rastros e nos órfãos.
+O ambiente acompanha o container e a raiz de avaliação, sem alcançar código de outra imagem.
+
+Um `filename` local de Lambda ou `CodeUri` de SAM liga diretamente o código do mesmo
+repositório. Uma referência exata a `data.archive_file.<nome>.output_path` pode seguir somente
+seu `source_dir` ou `source_file` local explícito. Arquivos ZIP ficam como locais opacos;
+seu conteúdo não é extraído. Um handler Serverless como `worker/send.dispatch` seleciona
+um único arquivo local existente (`.ts`, `.js`, `.mjs`, `.cjs` ou `.py`); extensões ambíguas
+ficam sem resolver. Caminhos novos devem ser relativos, sem nenhum componente `..` e sem
+atravessar links simbólicos. S3, URLs e código remoto não viram caminhos locais.
+
+SAM combina `Globals.Function.Environment.Variables` com o ambiente da função; Serverless
+combina `provider.environment` com `functions.<nome>.environment`. A função prevalece,
+mesmo quando o valor que substitui o padrão não pode ser lido. Terraform Lambda e ECS também
+fornecem seus ambientes. Referências conhecidas a recursos podem carregar a identidade do
+contrato sem inventar um ARN ou URL do deploy. Segredos, referências dinâmicas e valores
+externos continuam sem conteúdo. A leitura em código resolve em `inferred`, com workload e
+variável no motivo; `context` e `trace` mostram tanto a execução por imagem como o caminho direto.
+
+Referências como `aws_sqs_queue.orders.url` e `aws_s3_bucket.assets.bucket` identificam o
+contrato sem fornecer o URL do deploy; atributos de conteúdo como `value` continuam sem resolver.
+
 ## Ambiente dos workloads
 
 Uma leitura de ambiente que nomeia uma fila, tópico ou recurso, como `process.env.QUEUE_URL`,
 é resolvida somente pelas entradas do workload que executa aquele código. O vínculo de
-execução vem da imagem publicada pelo repositório ou de um contexto de build local do Compose.
+execução vem da imagem publicada pelo repositório ou de um caminho local verificado do workload.
 Containers diferentes mantêm seus próprios ambientes. A resolução fica em `inferred`, com
 o workload e a variável no motivo.
 

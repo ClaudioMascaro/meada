@@ -28,7 +28,14 @@ pub(super) fn constructed<'a>(
     };
     Some(Handle::named(
         stage,
-        argument(code, path, &call.scope, call.args.first(), frames),
+        argument(
+            code,
+            path,
+            &call.scope,
+            call.args.first(),
+            frames,
+            Some((path, index)),
+        ),
     ))
 }
 
@@ -69,17 +76,38 @@ pub(super) fn read<'a>(
         (Stage::Storage, "create") => (
             Role::Provider,
             Stage::Bucket,
-            argument(code, path, &call.scope, call.args.first(), &[]),
+            argument(
+                code,
+                path,
+                &call.scope,
+                call.args.first(),
+                &[],
+                Some((path, index)),
+            ),
         ),
         (Stage::Storage, "readAllBytes") => (
             Role::Consumer,
             Stage::Bucket,
-            argument(code, path, &call.scope, call.args.first(), &[]),
+            argument(
+                code,
+                path,
+                &call.scope,
+                call.args.first(),
+                &[],
+                Some((path, index)),
+            ),
         ),
         (Stage::Secret, "accessSecretVersion") => (
             Role::Consumer,
             Stage::Secret,
-            argument(code, path, &call.scope, call.args.first(), &[]),
+            argument(
+                code,
+                path,
+                &call.scope,
+                call.args.first(),
+                &[],
+                Some((path, index)),
+            ),
         ),
         _ => return None,
     })

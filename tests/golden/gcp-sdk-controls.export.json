@@ -4175,7 +4175,7 @@
   "consumers": [
     {
       "contract": "resource::gcs",
-      "site": "local/gcp-sdk-controls::Control.cs::Control.EnvBucket()",
+      "site": "local/gcp-sdk-controls::Control.cs::Control.EnvBucket()::client.DownloadObject#0",
       "via": "env:BUCKET_CSHARP"
     },
     {
@@ -4185,12 +4185,12 @@
     },
     {
       "contract": "resource::gcpsecretmanager",
-      "site": "local/gcp-sdk-controls::Control.cs::Control.EnvSecret()",
+      "site": "local/gcp-sdk-controls::Control.cs::Control.EnvSecret()::client.AccessSecretVersion#0",
       "via": "env:SECRET_CSHARP"
     },
     {
       "contract": "resource::gcs",
-      "site": "local/gcp-sdk-controls::Control.java::Control.envBucket()",
+      "site": "local/gcp-sdk-controls::Control.java::Control.envBucket()::client.readAllBytes#0",
       "via": "env:BUCKET_JAVA"
     },
     {
@@ -4200,12 +4200,12 @@
     },
     {
       "contract": "resource::gcpsecretmanager",
-      "site": "local/gcp-sdk-controls::Control.java::Control.envSecret()",
+      "site": "local/gcp-sdk-controls::Control.java::Control.envSecret()::client.accessSecretVersion#0",
       "via": "env:SECRET_JAVA"
     },
     {
       "contract": "resource::gcs",
-      "site": "local/gcp-sdk-controls::control.go::envBucket",
+      "site": "local/gcp-sdk-controls::control.go::envBucket::(call_expression).NewReader#0",
       "via": "env:BUCKET_GO"
     },
     {
@@ -4215,12 +4215,12 @@
     },
     {
       "contract": "resource::gcpsecretmanager",
-      "site": "local/gcp-sdk-controls::control.go::envSecret",
+      "site": "local/gcp-sdk-controls::control.go::envSecret::client.AccessSecretVersion#0",
       "via": "env:SECRET_GO"
     },
     {
       "contract": "resource::gcs",
-      "site": "local/gcp-sdk-controls::control.js::envBucket",
+      "site": "local/gcp-sdk-controls::control.js::envBucket::(call_expression).download#0",
       "via": "env:BUCKET_JS"
     },
     {
@@ -4230,12 +4230,12 @@
     },
     {
       "contract": "resource::gcpsecretmanager",
-      "site": "local/gcp-sdk-controls::control.js::envSecret",
+      "site": "local/gcp-sdk-controls::control.js::envSecret::secrets.accessSecretVersion#0",
       "via": "env:SECRET_JS"
     },
     {
       "contract": "resource::gcs",
-      "site": "local/gcp-sdk-controls::control.py::env_bucket",
+      "site": "local/gcp-sdk-controls::control.py::env_bucket::(call).download_as_bytes#0",
       "via": "env:BUCKET_PYTHON"
     },
     {
@@ -4245,12 +4245,12 @@
     },
     {
       "contract": "resource::gcpsecretmanager",
-      "site": "local/gcp-sdk-controls::control.py::env_secret",
+      "site": "local/gcp-sdk-controls::control.py::env_secret::secrets.access_secret_version#0",
       "via": "env:SECRET_PYTHON"
     },
     {
       "contract": "resource::gcs",
-      "site": "local/gcp-sdk-controls::control.ts::envBucket",
+      "site": "local/gcp-sdk-controls::control.ts::envBucket::(call_expression).download#0",
       "via": "env:BUCKET_TS"
     },
     {
@@ -4260,7 +4260,7 @@
     },
     {
       "contract": "resource::gcpsecretmanager",
-      "site": "local/gcp-sdk-controls::control.ts::envSecret",
+      "site": "local/gcp-sdk-controls::control.ts::envSecret::secrets.accessSecretVersion#0",
       "via": "env:SECRET_TS"
     }
   ],

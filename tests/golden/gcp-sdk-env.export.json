@@ -949,12 +949,12 @@
     },
     {
       "contract": "resource::gcs::uploads-env",
-      "site": "local/gcp-sdk-env::worker.ts::readBucket",
+      "site": "local/gcp-sdk-env::worker.ts::readBucket::(call_expression).download#0",
       "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:BUCKET"
     },
     {
       "contract": "resource::gcpsecretmanager::token-env",
-      "site": "local/gcp-sdk-env::worker.ts::readSecret",
+      "site": "local/gcp-sdk-env::worker.ts::readSecret::secrets.accessSecretVersion#0",
       "via": "workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:SECRET"
     },
     {
@@ -1604,7 +1604,7 @@
       "reason": "channel::pubsub::orders-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:TYPED_TOPIC"
     },
     {
-      "side": "local/gcp-sdk-env::worker.ts::readBucket",
+      "side": "local/gcp-sdk-env::worker.ts::readBucket::(call_expression).download#0",
       "provisioner": "local/gcp-sdk-env::main.tf::google_storage_bucket.uploads",
       "root": ".",
       "contract": "resource::gcs::uploads-env",
@@ -1612,7 +1612,7 @@
       "reason": "resource::gcs::uploads-env; workload:local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker (root .), env:BUCKET"
     },
     {
-      "side": "local/gcp-sdk-env::worker.ts::readSecret",
+      "side": "local/gcp-sdk-env::worker.ts::readSecret::secrets.accessSecretVersion#0",
       "provisioner": "local/gcp-sdk-env::main.tf::google_secret_manager_secret.token",
       "root": ".",
       "contract": "resource::gcpsecretmanager::token-env",

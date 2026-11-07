@@ -27,6 +27,7 @@ pub(crate) trait Policy<'a> {
         path: &'a str,
         index: usize,
         frames: &[Frame<'a>],
+        awaited: bool,
     ) -> Option<Self::Evidence>;
     fn step(
         &self,
@@ -48,6 +49,7 @@ pub(crate) trait Policy<'a> {
         _scope: &'a str,
         _value: &'a Value,
         _frames: &[Frame<'a>],
+        _site: (&'a str, usize),
     ) -> Self::Argument {
         Self::Argument::default()
     }
@@ -279,7 +281,14 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
                         .as_ref()
                         .and_then(|v| v.first())
                         .map(|&(at, within, v)| {
-                            self.policy.argument(self.code, at, within, v, &self.frames)
+                            self.policy.argument(
+                                self.code,
+                                at,
+                                within,
+                                v,
+                                &self.frames,
+                                (path, index),
+                            )
                         })
                         .unwrap_or_default();
                     arguments.push(Argument { client, name });
@@ -306,7 +315,13 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
             }
             return answer;
         }
-        if let Some(made) = self.policy.made(self.code, path, index, &self.frames) {
+        if let Some(made) = self.policy.made(
+            self.code,
+            path,
+            index,
+            &self.frames,
+            awaited || call.awaited,
+        ) {
             return Some(made);
         }
         let parent = match invocation.and_then(|c| c.receiver.as_deref()) {
@@ -338,7 +353,14 @@ impl<'a> Policy<'a> for Aws<'_> {
             && crate::names::known(code, path, scope, ty, |s| s == self.client.csharp).is_some())
         .then_some(())
     }
-    fn made(&self, code: &Code<'a>, path: &'a str, index: usize, _: &[Frame<'a>]) -> Option<()> {
+    fn made(
+        &self,
+        code: &Code<'a>,
+        path: &'a str,
+        index: usize,
+        _: &[Frame<'a>],
+        _: bool,
+    ) -> Option<()> {
         match self.language {
             Language::Java => java::made(code, path, index, self.client.java),
             Language::Go => go::made(code, path, index, self.client.go),

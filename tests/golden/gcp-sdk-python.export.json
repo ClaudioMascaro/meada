@@ -318,7 +318,7 @@
   "consumers": [
     {
       "contract": "resource::gcs::uploads-python",
-      "site": "local/gcp-sdk-python::worker.py::read",
+      "site": "local/gcp-sdk-python::worker.py::read::blob.download_as_bytes#0",
       "via": null
     },
     {
@@ -328,13 +328,13 @@
     },
     {
       "contract": "resource::gcpsecretmanager::token-python",
-      "site": "local/gcp-sdk-python::worker.py::token",
+      "site": "local/gcp-sdk-python::worker.py::token::secrets.access_secret_version#0",
       "via": null
     }
   ],
   "links": [
     {
-      "consumer": "local/gcp-sdk-python::worker.py::read",
+      "consumer": "local/gcp-sdk-python::worker.py::read::blob.download_as_bytes#0",
       "provider": "local/gcp-sdk-python::worker.py::write::blob.upload_from_string#0",
       "contract": "resource::gcs::uploads-python",
       "level": "exact",
