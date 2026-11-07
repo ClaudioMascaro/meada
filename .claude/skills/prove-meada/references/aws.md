@@ -36,7 +36,8 @@ No cloud APIs are called. A secrets-manager ARN uses AWS's six-character generat
 SSM ARN extraction preserves its parameter name's leading slash.
 
 The generated `oracle.json` lists every expected address/contract and source/target subscription
-pair before any Meada answer is inspected. Inspect `checks.json` and the raw CLI/MCP captures;
+pair, plus all non-defining literal-ARN config uses and their provisioning rows, before any
+Meada answer is inspected. Inspect `checks.json` and the raw CLI/MCP captures;
 a zero exit is only “checks passed”, and the independent checker writes the final verdict.
 A verifier crash is BLOCKED, an observed spec mismatch is BROKEN. Never change an assertion to
 match an observed answer. Send failures back to the implementation agent and rerun the same
@@ -72,11 +73,23 @@ flows after the app is fixed, at most three rounds.
 
 The neutral inputs cover Terraform/OpenTofu, not every IaC format the type table can map.
 Documented AsyncAPI producers exercise the new brokers without claiming new AWS SDK support.
-Declared resource readers intentionally keep their declared level. Orphan assertions require
+Declared resource readers intentionally keep their declared level. #661 also reads literal
+ARNs in subscription/target fields as directionless config uses, even when that route is
+refused. The neutral input therefore has 17 config uses and 18 extra provisioning rows,
+with exact source key locations; physical-name declarations and unresolved references do
+not add uses. The full rows are checked separately from the unchanged application sides.
+In particular, the refused topic's SQS ARN is still a config use of `channel::sqs::signal`,
+which has no provisioner. The S3 ARN target establishes a config use but no S3 orphan group
+because no S3 provisioner is in scope. These effects follow ADR 0026, not route acceptance.
+Orphan assertions require
 the complete #657 status set and row count: one unused provisioner and one missing use for
-each generated AWS group, plus the unprovisioned default EventBridge source. Duplicate rows,
-wrong directions, extra contracts and the superseded reporter fail. Isolated one-sided groups
-must have zero orphan rows. The checker still reads raw status to judge grouping and sites.
+each generated AWS group, plus the unprovisioned default EventBridge and config SQS sources.
+Duplicate rows, wrong directions, extra contracts and the superseded reporter fail. The
+infra-only copy now has both SNS/SQS sides and four independently derived orphans; it cannot
+prove a one-sided gate. A separate source with only defining provisioner attributes must
+have known provisioners, no uses and zero orphan rows, as does the use-only app scope.
+The checker still reads raw status to judge grouping and sites. Preserve the old 160/177
+failed receipts: byte-identical base outputs identify inherited verifier drift, not a pass.
 The generated names are static and hand-authored from the maintainer's spec; they do not cover
 all provider aliases, resource attributes or ARN partitions. The ordinary A7 evaluator proof
 and shared-code corpus remain necessary when those paths change. A console graph, grants and
@@ -123,6 +136,9 @@ return exactly their expected no-matches line with newline, and both ordinary ke
 remain visible. All twelve answers and the tool list must equal HTTP. The server is stopped
 by its own pid; raw CLI, query, stdio and HTTP evidence stays under the new run directory.
 This supplements format coverage and does not claim additional JSON IaC graph behavior.
+The bounded #676 baseline runs this supplement and the full AWS flow as separate named
+checks with separate evidence directories. Generic `provisions.py` alone does not cover
+these subscription, config-use and orphan controls.
 
 ## Shared image storage and trace supplement
 

@@ -810,6 +810,25 @@ def cmd_selftest(_):
     e = b'{\n  "format": 1,\n  "repository": "r",\n  "commit": "abc",\n  "dirty": false,\n  "files": []\n}\n'
     assert body(e) == b'{\n  "format": 1,\n  "repository": "r",\n  "files": []\n}\n', body(e)
     assert body(e) == body(e.replace(b'  "commit": "abc",\n  "dirty": false,\n', b"")) and quoted("r::a") == b'"r::a"'
+    rows = [{"path": "config.yaml", "line": i + 1, "key": f"labels[{i}]", "value": "team-b", "kind": "string", "cut": False}
+            for i in range(5)]
+    identity = 'example.com/budget'
+    full_lines = [f"{identity} {r['path']}:{r['line']} {r['key']} = {shown(r)}\n" for r in rows]
+    full = ''.join(full_lines)
+    assert len(full.encode('utf-8')) <= 120 * 4
+    assert not check_value_answer(identity, rows, 'team-b', full, budget=120)
+    budget = value_cut_budget(identity, rows, 'team-b')
+    assert len(full.encode('utf-8')) > budget * 4
+    assert check_value_answer(identity, rows, 'team-b', full, budget_cut=True, budget=budget)
+    note = '… cut after 2 of 5 lines (budget 50 tokens); raise budget for more\n'
+    cut = ''.join(full_lines[:2]) + note
+    assert not check_value_answer(identity, rows, 'team-b', cut, budget_cut=True, budget=50)
+    for bad in (cut.replace('after 2', 'after 3'), cut.replace('of 5', 'of 6'),
+                cut.replace('budget 50', 'budget 49'), ''.join(full_lines[:2]),
+                ''.join(reversed(full_lines[:2])) + note, full + note):
+        assert check_value_answer(identity, rows, 'team-b', bad, budget_cut=True, budget=50), bad
+    tiny = '… cut after 0 of 5 lines (budget 1 tokens); raise budget for more\n'
+    assert not check_value_answer(identity, rows, 'team-b', tiny, budget_cut=True, budget=1)
     print("selftest passed")
 
 
@@ -1130,11 +1149,23 @@ def parse_hit(line):
     return repo, path, int(num), key, got
 
 
-def check_value_answer(identity, rows, query, text, budget_cut=False):
+def value_cut_budget(identity, rows, query):
+    """Exercise a real cut: source-derived UTF-8 lines, four bytes/token (output grammar).
+
+    A hit count alone does not ensure a fixed budget cuts: CI's five team-b rows total
+    455 bytes and legitimately fit 120 tokens. Half the source answer's size gives room
+    away from numeric spelling boundaries and never needs more than the old 120 cap.
+    """
+    full = "".join(f"{identity} {r['path']}:{r['line']} {r['key']} = {shown(r)}\n"
+                   for r in expected_hits(rows, query))
+    return max(1, min(120, len(full.encode('utf-8')) // 8))
+
+
+def check_value_answer(identity, rows, query, text, budget_cut=False, budget=None):
     """Problems of one `search kind: value` answer against the oracle: the same hits, in order."""
     want = expected_hits(rows, query)
     lines = [l for l in text.splitlines() if l.strip()]
-    note = re.search(r"cut after (\d+) of (\d+) lines", lines[-1]) if lines else None
+    note = re.fullmatch(r"… cut after (\d+) of (\d+) lines \(budget (\d+) tokens\); raise budget for more", lines[-1]) if lines else None
     if note:
         lines = lines[:-1]
     if not want:
@@ -1143,11 +1174,22 @@ def check_value_answer(identity, rows, query, text, budget_cut=False):
     problems = []
     if budget_cut:
         if not note or int(note.group(2)) != len(want):
-            problems.append(f"budget: expected a cut note over {len(want)} lines, got {lines[-1:] if not note else note.group(0)}")
+            actual = note.group(0) if note else f"{len(lines)} response lines/{len(text.encode('utf-8'))} UTF-8 bytes without a cut note"
+            problems.append(f"budget: expected a cut note over {len(want)} lines, got {actual}")
+        if note and (int(note.group(1)) != len(lines) or len(lines) >= len(want)):
+            problems.append(f"budget: cut note's shown count does not match its proper prefix: {note.group(0)}")
     elif note:
         problems.append(f"cut at the default budget: {note.group(0)}; raise the query's budget")
     if not budget_cut and len(lines) != len(want):
         problems.append(f"{len(lines)} hits, oracle {len(want)}")
+    if budget is not None:
+        if note and int(note.group(3)) != budget:
+            problems.append(f"budget: cut note names {note.group(3)}, request used {budget}")
+        # The documented exception is only a cut note that cannot itself fit. Ordinary
+        # answers and any retained hit must fit the requested four-byte token estimate.
+        note_only_overflow = note and not lines and len((note.group(0) + '\n').encode('utf-8')) > 4 * budget
+        if len(text.encode('utf-8')) > 4 * budget and not note_only_overflow:
+            problems.append(f"budget: {len(text.encode('utf-8'))} UTF-8 bytes exceed {budget} tokens")
     for i, line in enumerate(lines):
         try:
             repo, path, num, key, got = parse_hit(line)
@@ -1284,7 +1326,9 @@ def cmd_values(a):
         queries = [{"tool": "search", "label": label, "arguments": {"query": q, "kind": "value", "budget": 200000}} for label, q in picked]
         big = max(range(len(picked)), key=lambda i: len(expected_hits(rows, picked[i][1])), default=None)
         if big is not None and len(expected_hits(rows, picked[big][1])) > 3:
-            queries.append({"tool": "search", "label": "budget", "arguments": {"query": picked[big][1], "kind": "value", "budget": 120}})
+            query = picked[big][1]
+            queries.append({"tool": "search", "label": "budget", "arguments": {
+                "query": query, "kind": "value", "budget": value_cut_budget(identity, rows, query)}})
         fallback = [q for label, q in picked if label in ("exact", "nothing")][:3]
         # Symbol names too: values added to a default search a symbol answers show only there
         # (audit 2026-11-04, M6: caught on one entry by luck of a value equal to a symbol name).
@@ -1306,7 +1350,7 @@ def cmd_values(a):
             args, ans = q["arguments"], h["answers"][i]
             label = q["label"]
             if args.get("kind") == "value":
-                problems = check_value_answer(identity, rows, args["query"], ans, budget_cut=label == "budget")
+                problems = check_value_answer(identity, rows, args["query"], ans, budget_cut=label == "budget", budget=args["budget"])
             elif "kind" not in args:  # story 5: as base when a symbol or contract matches, else the value hits
                 base_ans = b["answers"][i]
                 if not base_ans.startswith("no matches"):

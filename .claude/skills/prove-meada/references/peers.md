@@ -81,6 +81,9 @@ through `/create-prove-it`, and adds its paths to SKILL.md's Scope row.
   replies, source/spec context/trace provenance, closed open items, ordinary HTTP answers
   against base and a partial-only refresh with warm/cold full-export equality. A transport
   parity pass alone is insufficient. Keep generic corpus proof when Scope reaches shared MCP.
+  The four unmapped proxy cases retain the trusted inline base control's complete context
+  and trace (substituting only the neutral workspace identity). Their link/trace routing
+  reason remains required; a context explanation is required only for declared env peers.
 - The peers (`api`, `other`, `inventory`) are not exported on their own: they reach the check
   through the consumers' providers and links.
 - `pending` passes on 1.2.0's value, so a pending case proves only that nothing moved it. A ticket

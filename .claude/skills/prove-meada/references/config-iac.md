@@ -274,7 +274,11 @@ writes `values.md`:
    answer must equal the oracle's hits line by line: the same rows in the same order (exact,
    then prefix, then substring; then path, line, key path), the same repository, path, line, key
    path and shown value (`redacted`, a cut string with ` (cut)`). Then one value query again at
-   `budget: 120` (the cut note must name the oracle's line count), the default search on up to
+   a small budget derived from the source answer's UTF-8 size, at most 120 tokens (four
+   bytes per token). The probe must actually cut: five short rows can fit 120 tokens and
+   then correctly have no footer. Check the cut note's total/shown counts and requested
+   budget, ordered source prefix and byte cap; a note too large by itself is allowed as
+   documented in the output grammar. Then the default search on up to
    three of the values (the base's answer when the base finds a symbol or contract, else the
    value hits) and an unknown kind (`values`), which must be refused with `value` in its list.
 5. **`--http`**: the head serves the entry alone over HTTP and answers every query byte-equal to
@@ -373,7 +377,7 @@ A difference on one of these is a question for the maintainer, BROKEN until answ
 | 1 value equal, prefix, substring | exact and prefix queries, every hit against the oracle | |
 | 2 key paths | key path queries | |
 | 3 file, key path, value, type, line | every hit line: path, line, key path, shown value; numbers and booleans by value | the type itself is not printed: only through the shown form (quoted or not) |
-| 4 exact before prefix before substring, the budget | the order of every answer; the `budget: 120` query | |
+| 4 exact before prefix before substring, the budget | the order of every answer; the small cut budget derived from source rows | |
 | 5 default search unchanged, values as fallback | default search queries against the base and the oracle | |
 | 6 every YAML and JSON file, no opt-in | the status counts and hits from every file | |
 | 7 lockfiles and unreadable files counted | the status counts; `values.md` lists the oracle's unreadable files | the names are not printed by Meada (a follow-up of #639) |

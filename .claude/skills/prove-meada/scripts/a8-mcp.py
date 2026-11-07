@@ -12,6 +12,7 @@ import time
 from prove import Stdio, Http, answer, free_port, mcp_answers
 
 HERE = Path(__file__).resolve().parent
+PROXY_WORKSPACES = {'g10d', 'g10e', 'g10f', 'g10g'}
 
 
 def save(path, value):
@@ -50,6 +51,29 @@ def ordinary(head, base, source, folder):
         save(folder / (side + '.json'), {'queries': queries, 'tools': tools, 'answers': texts})
         observations.append(texts)
     assert observations[0] == observations[1], 'ordinary relative/host/template context or trace differs from base'
+
+
+def proxy_control(base, source, folder):
+    """Unmapped proxy context/trace copies the trusted existing inline endpoint control.
+
+    #683's adopted explanation policy opts in declared environment peers. These generated
+    proxy workspaces map API_URL to api, not INVENTORY_URL to inventory, so their plain
+    context remains unchanged. New proxy shapes must resolve as the old inline control.
+    """
+    root = scope(source, folder / 'work', 'g10d')
+    queries = [
+        {'tool': 'context', 'arguments': {'symbol': 'listClusters', 'budget': 16000}},
+        {'tool': 'trace', 'arguments': {'from': 'listClusters', 'direction': 'down', 'budget': 16000}},
+    ]
+    tools, texts, _ = mcp_answers(base, root, queries, folder / 'stdio.err')
+    save(folder / 'key.json', {'tools': tools, 'queries': queries, 'answers': texts})
+    return texts
+
+
+def check_proxy_answers(workspace, context, trace, control):
+    expected = [text.replace('example.com/acme/g10d', 'example.com/acme/' + workspace) for text in control]
+    assert context == expected[0], (workspace, 'unmapped proxy context differs from base inline control', context, expected[0])
+    assert trace == expected[1], (workspace, 'proxy trace differs from base inline control', trace, expected[1])
 
 
 def refresh(binary, source, folder):
@@ -126,6 +150,8 @@ def main():
     rows = [line.split('\t') for line in (HERE / 'a8-cases.tsv').read_text().splitlines()
             if line and not line.startswith('#')]
     workspaces = args.workspaces.split(',') if args.workspaces else list(dict.fromkeys(row[0] for row in rows))
+    proxy_key = proxy_control(str(Path(args.base_bin).resolve()), run / 'source', run / 'base-proxy-control') \
+        if PROXY_WORKSPACES.intersection(workspaces) else None
     checks = []
     for workspace in workspaces:
         folder = run / workspace
@@ -148,8 +174,12 @@ def main():
                     assert row[3] in context, (workspace, symbol, 'context contract', context)
                 if row[5] != '-':
                     repository, _, reason = row[5].split(' ', 2)
-                    assert reason in context, (workspace, symbol, 'context reason', reason, context)
+                    assert reason in trace, (workspace, symbol, 'trace reason', reason, trace)
                     assert repository in trace, (workspace, symbol, 'trace selected peer', trace)
+                    if workspace in PROXY_WORKSPACES:
+                        check_proxy_answers(workspace, context, trace, proxy_key)
+                    else:
+                        assert reason in context, (workspace, symbol, 'context reason', reason, context)
             # Table and complete-export comparison remain independent drivers. Here the
             # closed-item assertion is over precisely the expected linked source sites.
         listed = subprocess.run([binary, 'decide', '--list'], cwd=root, capture_output=True, timeout=90)
@@ -199,6 +229,7 @@ def main():
     with Path(binary).open('rb') as stream:
         binary_hash = hashlib.file_digest(stream, 'sha256').hexdigest()
     save(run / 'checks.json', {'checks': checks, 'include_only_refresh': True, 'ordinary_base_answer_parity': True,
+                              'proxy_context_trace_base_control': proxy_key is not None,
                               'binary_sha256': binary_hash, 'checker': 'script only, not independent or blind'})
     print('A8 query, HTTP and partial-only refresh checks passed for ' + ','.join(workspaces))
 

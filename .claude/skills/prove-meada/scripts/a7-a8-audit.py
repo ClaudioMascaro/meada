@@ -23,7 +23,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
 SKILL = HERE.parent
 PLAN = HERE / 'a7-a8-mutations.json'
-ALL = ('values', 'iac', 'terraform-json', 'ssm-values', 'provisions', 'environment',
+ALL = ('values', 'iac', 'terraform-json', 'ssm-values', 'aws-provisioners', 'provisions', 'environment',
        'http-services', 'alerts', 'incidents', 'incident-guards', 'aws-workloads',
        'gcp', 'azure', 'a8', 'a8-queries')
 
@@ -117,8 +117,8 @@ def build(source, output, logs):
 
 def commands(head, existing, base, run):
     py = sys.executable
-    def driver(name, *extra):
-        return [py, str(HERE / (name + '.py')), '--head-bin', str(head), '--run', str(run / name), *extra]
+    def driver(name, *extra, output=None):
+        return [py, str(HERE / (name + '.py')), '--head-bin', str(head), '--run', str(run / (output or name)), *extra]
     return {
         'values': [py, str(HERE / 'prove.py'), 'values', '--head-bin', str(head), '--base-bin', str(existing),
                    '--repos', 'a7-probe,a7-noconfig', '--sample', '2', '--http', '--run', str(run / 'values')],
@@ -126,6 +126,7 @@ def commands(head, existing, base, run):
                 '--repos', 'a7-iac,a7-names,a7-cfn', '--sample', '2', '--http', '--run', str(run / 'iac')],
         'terraform-json': driver('terraform-json', '--http'),
         'ssm-values': driver('aws', '--json-values'),
+        'aws-provisioners': driver('aws', '--base-bin', str(existing), output='aws-provisioners'),
         'provisions': driver('provisions'),
         'environment': driver('environment'),
         'http-services': driver('http-iac', '--base-bin', str(existing)),

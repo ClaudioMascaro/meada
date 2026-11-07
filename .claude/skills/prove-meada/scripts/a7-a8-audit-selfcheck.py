@@ -38,6 +38,10 @@ def main():
                                                'commit', '-qm', 'dummy audit safety input']):
             subprocess.run(['git', '-C', str(root), *command], check=True, capture_output=True)
         audit.ROOT, audit.SKILL, audit.PLAN = root, skill, plan
+        commands = audit.commands(root / 'dummy-head', root / 'dummy-existing', root / 'dummy-base', root / '.prove-it/runs/commands')
+        outputs = [command[command.index('--run') + 1] if '--run' in command else command[-1] for command in commands.values()]
+        assert set(commands) == set(audit.ALL) and len(set(outputs)) == len(audit.ALL)
+        checks.append({'check': 'every named flow has a distinct evidence directory, including both AWS modes', 'passed': True})
         baseline = root / '.prove-it/runs/baseline'
         (baseline / 'bin').mkdir(parents=True)
         for name in ('meada-clean', 'meada-base'):

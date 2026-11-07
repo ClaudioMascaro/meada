@@ -10,6 +10,9 @@ remain regressions. SDK/route flows added later retain their own receipts and Sc
 this bounded mix does not claim to mutate every child flow.
 
 The existing `CI` workflow's `proof-a7-a8` job runs the untouched baseline on PRs/pushes.
+Its 16 named checks include the full AWS subscription/provision/orphan flow separately from
+the JSON SSM and generic provisioning checks. The first e6d27d0 CI baseline covered only
+15 checks and failed two; it is retained as BROKEN and cannot authorize mutations.
 Full validation policy lives in [AGENTS.md](../../../../AGENTS.md). The manual phase inputs
 reuse that workflow; there is no second environment or workflow guide. If GitHub cannot
 dispatch a phase on the branch, leave it BLOCKED, never infer a pass from a local dry run.
@@ -84,6 +87,13 @@ closed-item checks, ordinary HTTP base-answer preservation, and partial-only con
 with context as the first reader after both edit and restoration. Context and trace each
 assert the source-selected API_URL/ALT_URL reason and peer, with warm/cold full-export
 equality and exact restoration.
+
+Only real declared environment peers require the adopted #683 context explanation. Unmapped
+proxy contexts stay byte-equal to the trusted existing inline proxy control (with the neutral
+workspace identity substituted for new shapes); complete proxy trace and link reasons remain
+required. A changed proxy context is a regression, not an occasion to add a new explanation.
+Value-budget probes derive a genuinely cutting cap from independent source-row UTF-8 bytes;
+complete answers that fit their requested cap correctly have no cut note.
 
 Generic IaC preserves existing annotation and contract-role tails without taking independent
 identity/type/root/name expectations from the head. The Terraform oracle reads an S3 name

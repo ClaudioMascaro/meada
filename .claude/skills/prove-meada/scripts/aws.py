@@ -54,17 +54,42 @@ def orphan_set_matches(text, expected):
             and ': no provisioner in the workspace' not in text)
 
 
-def expected_orphans():
+def expected_orphans(provisioners, config_uses):
     # Derived solely from the generated neutral source: each AWS group has one
     # explicit unused provisioner and missing use. The default EventBridge source
-    # intentionally has no bus provisioner. All generated SQS queues have uses.
+    # intentionally has no bus provisioner. #661 also reads non-defining literal ARNs
+    # in the subscription config, independently of whether the route is accepted.
     expected = {}
     for prefix in dict.fromkeys(case[2] for case in CASES):
         kind = prefix.split('::')[1]
         expected[f'{prefix}::unused-{kind}'] = 'no use'
         expected[f'{prefix}::missing-{kind}'] = 'no provisioner'
     expected['channel::eventbridge::default'] = 'no provisioner'
+    provided = set(provisioners.values())
+    groups = {c.rsplit('::', 1)[0] for c in provided}
+    for use in config_uses:
+        if use['contract'] not in provided and use['contract'].rsplit('::', 1)[0] in groups:
+            expected[use['contract']] = 'no provisioner'
     return expected
+
+
+def config_only_orphans(provisioners, config_uses):
+    """ADR 0026's both-sides gate on the independently generated infra-only source."""
+    provided, used = set(provisioners.values()), {u['contract'] for u in config_uses}
+    groups = {c.rsplit('::', 1)[0] for c in provided} & {c.rsplit('::', 1)[0] for c in used}
+    return {**{c: 'no use' for c in provided - used if c.rsplit('::', 1)[0] in groups},
+            **{c: 'no provisioner' for c in used - provided if c.rsplit('::', 1)[0] in groups}}
+
+
+def config_provisions(provisioners, config_uses):
+    """Each source config use provisions against every matching literal/ARN declaration."""
+    return [{'side': use['site'], 'at': use['at'], 'provisioner': f'{REMOTE}infra::main.tofu::{address}',
+             'root': '.', 'contract': contract, 'level': 'exact', 'reason': contract + '; config ' + use['at']}
+            for use in config_uses for address, contract in provisioners.items() if contract == use['contract']]
+
+
+def canonical_rows(rows):
+    return sorted(json.dumps(row, sort_keys=True) for row in rows)
 
 
 def document(broker, names):
@@ -84,7 +109,23 @@ def seed(run):
     manifest = '[serve]\ndocuments = ["sns.asyncapi.json", "eventbridge.asyncapi.json", "kinesis.asyncapi.json"]\n'\
         + f'[[peer]]\nrepo = "{REMOTE}infra"\n'
     code = 'import boto3\nqueue = boto3.client("sqs")\n'
-    tf, expected, bindings = '', {}, []
+    tf, expected, bindings, config_uses = '', {}, [], []
+    def reference_block(typ, label, body):
+        # Read only literal ARN fields in these neutral subscription/target blocks. Defining
+        # physical-name attributes are intentionally outside this source key. Expressions
+        # such as aws_sqs_queue.sns_refs.arn are not stored literal config identifiers.
+        for key, quoted in re.findall(r'^\s*(\w+)\s*=\s*("arn:[^"\n]+")\s*$', body, re.M):
+            value = json.loads(quoted)
+            channel = re.fullmatch(r'arn:aws:(sqs|sns):[^:]+:\d{12}:([A-Za-z0-9_-]+)', value)
+            if channel:
+                contract = f'channel::{channel[1]}::{channel[2]}'
+            elif value.startswith('arn:aws:s3:::'):
+                contract = 'resource::s3::' + value.removeprefix('arn:aws:s3:::').split('/', 1)[0]
+            else:
+                raise ValueError('Unkeyed neutral ARN fixture: ' + value)
+            config_uses.append({'contract': contract, 'site': REMOTE + 'infra',
+                                'at': f'main.tofu#resource.{typ}.{label}.{key}'})
+        return block(typ, label, body)
     channel_names = {kind: [] for kind in ['sns', 'eventbridge', 'kinesis']}
     # Two provisioners per identity exercise ARN extraction independently of name matching.
     for i, (typ, attr, prefix, name, arn) in enumerate(CASES):
@@ -134,7 +175,7 @@ def seed(run):
         if filtered:
             body += '\n  filter_policy = "{\\"severity\\":[\\"high\\"]}"'
         address = 'aws_sns_topic_subscription.' + label
-        tf += block('aws_sns_topic_subscription', label, body)
+        tf += reference_block('aws_sns_topic_subscription', label, body)
         bindings.append((f'channel::sns::signal', f'channel::sqs::{queue}', address,
                          'inferred' if filtered else 'exact', 'sns.asyncapi.json'))
     # A second bus with the SAME physical rule name must select its own producer.
@@ -157,22 +198,22 @@ def seed(run):
         target = f'  rule = aws_cloudwatch_event_rule.{label}.name\n  arn = "arn:aws:sqs:eu-west-1:123456789012:{queue}"'
         if bus:
             target += '\n  event_bus_name = ' + json.dumps(bus)
-        tf += block('aws_cloudwatch_event_target', label, target)
+        tf += reference_block('aws_cloudwatch_event_target', label, target)
         bindings.append((f'channel::eventbridge::{bus or "default"}', f'channel::sqs::{queue}',
                          f'aws_cloudwatch_event_target.{label}', 'inferred' if filtered else 'exact',
                          'eventbridge.asyncapi.json'))
-    tf += block('aws_sns_topic_subscription', 'bad_protocol', '  topic_arn = "arn:aws:sns:eu-west-1:123456789012:signal"\n  protocol = "https"\n  endpoint = "arn:aws:sqs:eu-west-1:123456789012:bad_protocol"')
-    tf += block('aws_sns_topic_subscription', 'bad_topic', '  topic_arn = "arn:aws:sqs:eu-west-1:123456789012:signal"\n  protocol = "sqs"\n  endpoint = "arn:aws:sqs:eu-west-1:123456789012:bad_topic"')
-    tf += block('aws_cloudwatch_event_target', 'bad_rule', '  rule = "no-such-rule"\n  event_bus_name = "hub"\n  arn = "arn:aws:sqs:eu-west-1:123456789012:bad_rule"')
-    tf += block('aws_cloudwatch_event_target', 'bad_bus', '  rule = "rule-open"\n  event_bus_name = "other-bus"\n  arn = "arn:aws:sqs:eu-west-1:123456789012:bad_bus"')
-    tf += block('aws_cloudwatch_event_target', 'bad_target', '  rule = "rule-open"\n  event_bus_name = "hub"\n  arn = "arn:aws:s3:::bad_target"')
+    tf += reference_block('aws_sns_topic_subscription', 'bad_protocol', '  topic_arn = "arn:aws:sns:eu-west-1:123456789012:signal"\n  protocol = "https"\n  endpoint = "arn:aws:sqs:eu-west-1:123456789012:bad_protocol"')
+    tf += reference_block('aws_sns_topic_subscription', 'bad_topic', '  topic_arn = "arn:aws:sqs:eu-west-1:123456789012:signal"\n  protocol = "sqs"\n  endpoint = "arn:aws:sqs:eu-west-1:123456789012:bad_topic"')
+    tf += reference_block('aws_cloudwatch_event_target', 'bad_rule', '  rule = "no-such-rule"\n  event_bus_name = "hub"\n  arn = "arn:aws:sqs:eu-west-1:123456789012:bad_rule"')
+    tf += reference_block('aws_cloudwatch_event_target', 'bad_bus', '  rule = "rule-open"\n  event_bus_name = "other-bus"\n  arn = "arn:aws:sqs:eu-west-1:123456789012:bad_bus"')
+    tf += reference_block('aws_cloudwatch_event_target', 'bad_target', '  rule = "rule-open"\n  event_bus_name = "hub"\n  arn = "arn:aws:s3:::bad_target"')
     tf += block('aws_cloudwatch_event_rule', 'timer_only', '  name = "timer-only"\n  event_bus_name = "hub"\n  schedule_expression = "rate(5 minutes)"')
-    tf += block('aws_cloudwatch_event_target', 'timer_only', '  rule = aws_cloudwatch_event_rule.timer_only.name\n  event_bus_name = "hub"\n  arn = "arn:aws:sqs:eu-west-1:123456789012:timer_only"')
+    tf += reference_block('aws_cloudwatch_event_target', 'timer_only', '  rule = aws_cloudwatch_event_rule.timer_only.name\n  event_bus_name = "hub"\n  arn = "arn:aws:sqs:eu-west-1:123456789012:timer_only"')
     # Two declarations with the same bus/name make a literal target ambiguous.
     # Certain or absent forbids selecting the first declaration arbitrarily.
     for label in ['ambiguous_first', 'ambiguous_second']:
         tf += block('aws_cloudwatch_event_rule', label, '  name = "rule-ambiguous"\n  event_bus_name = "hub"')
-    tf += block('aws_cloudwatch_event_target', 'ambiguous_rule', '  rule = "rule-ambiguous"\n  event_bus_name = "hub"\n  arn = "arn:aws:sqs:eu-west-1:123456789012:ambiguous_rule"')
+    tf += reference_block('aws_cloudwatch_event_target', 'ambiguous_rule', '  rule = "rule-ambiguous"\n  event_bus_name = "hub"\n  arn = "arn:aws:sqs:eu-west-1:123456789012:ambiguous_rule"')
     channel_names['eventbridge'].append('default')
     write(infra, 'main.tofu', tf)
     # OpenTofu overrides a same-basename .tf. A stale or duplicate .tf must not provision.
@@ -184,7 +225,7 @@ def seed(run):
     for root in [infra, app]:
         git('add', '.', cwd=root)
         git('commit', '-qm', 'independent AWS public-surface probe', cwd=root)
-    return infra, app, expected, bindings
+    return infra, app, expected, bindings, config_uses
 
 
 class Probe:
@@ -309,9 +350,12 @@ def main():
             return json_values(head, run, probe)
         for label, binary in [('head', head), ('base', base)]:
             probe.command(binary, run, label + '-identity', '--version')
-        infra, app, expected, bindings = seed(run)
+        infra, app, expected, bindings, config_uses = seed(run)
+        config_links = config_provisions(expected, config_uses)
         write(run, 'oracle.json', json.dumps({'provisioners': expected, 'subscriptions': bindings,
-                                             'orphans': expected_orphans()}, indent=2))
+                                             'config_uses': config_uses, 'config_provisions': config_links,
+                                             'orphans': expected_orphans(expected, config_uses),
+                                             'infra_only_orphans': config_only_orphans(expected, config_uses)}, indent=2))
         data = json.loads(probe.command(head, infra, 'export', 'export'))
         app_data = json.loads(probe.command(head, app, 'app-export', 'export'))
         status = probe.command(head, infra, 'status', 'status')
@@ -321,9 +365,12 @@ def main():
                     {'missing': sorted(set(expected.items()) - got), 'extra': sorted(got - set(expected.items()))})
         provisions = data.get('provisions', [])
         used = {address: contract for address, contract in expected.items() if '.orphan' not in address}
-        probe.check('complete provisioning link count', len(provisions) == len(used), provisions)
+        probe.check('complete source config-use set', canonical_rows(data.get('uses', [])) == canonical_rows(config_uses), data.get('uses'))
+        probe.check('application has no config uses', app_data.get('uses', []) == [], app_data.get('uses'))
+        got_config_links = [l for l in provisions if l['side'] == REMOTE + 'infra']
+        probe.check('complete config provisioning rows', canonical_rows(got_config_links) == canonical_rows(config_links), got_config_links)
+        probe.check('complete provisioning link count', len(provisions) == len(used) + len(config_links), provisions)
         for address, contract in used.items():
-            links = [l for l in provisions if l['contract'] == contract and l['provisioner'].endswith('::' + address)]
             if contract.startswith('resource::'):
                 case = next(i for i, c in enumerate(CASES) if contract == f'{c[2]}::{c[3]}')
                 side = f'{REMOTE}app::app.py::read_case_{case}'
@@ -335,6 +382,8 @@ def main():
                 _, broker, name = contract.split('::')
                 side = f'{REMOTE}app::{broker}.asyncapi.json::{broker} send {name}'
                 level = 'exact'
+            links = [l for l in provisions if l['contract'] == contract and l['provisioner'].endswith('::' + address)
+                     and l['side'] == side]
             probe.check('provisions ' + address,
                         len(links) == 1 and links[0]['side'] == side and links[0]['level'] == level
                         and links[0]['root'] == '.', links)
@@ -343,7 +392,7 @@ def main():
             kind = prefix.split('::')[1]
             probe.check('status unused ' + kind, 'unused-' + kind in status, status)
             probe.check('status missing ' + kind, 'missing-' + kind in status, status)
-        probe.check('complete scope-aware orphan set and count', orphan_set_matches(status, expected_orphans()), status)
+        probe.check('complete scope-aware orphan set and count', orphan_set_matches(status, expected_orphans(expected, config_uses)), status)
         subs = data.get('subscriptions', [])
         actual_pairs = {(s['source'], s['target']) for s in subs}
         expected_pairs = {(s, t) for s, t, _, _, _ in bindings}
@@ -456,8 +505,9 @@ def main():
         fields = ['provisioners', 'provisions', 'subscriptions', 'links']
         probe.check('restore round trip', all(restored.get(f) == data.get(f) for f in fields)
                     and all(restored_app.get(f) == app_data.get(f) for f in fields))
-        # Orphan output requires BOTH a use and a provisioner of that broker/kind in scope.
-        for name, source in [('only-provisioners', infra), ('only-uses', app)]:
+        # The infra file now has legitimate #661 config uses, so isolation is a mixed
+        # SNS/SQS scope. It must not be mislabeled as provision-only or blessed with no rows.
+        for name, source in [('infra-config-only', infra), ('only-uses', app)]:
             isolated = run / 'work' / name
             shutil.copytree(source, isolated, ignore=shutil.ignore_patterns('.git', '.meada'))
             manifest = isolated / 'meada.toml'
@@ -474,8 +524,33 @@ def main():
                            and not isolated_export.get('provisioners'))
             probe.check('orphan gate known rows ' + name, present, 'A no-row or not-indexed status cannot prove the gate.')
             isolated_status = probe.command(head, isolated, name + '-status', 'status')
+            if source == infra:
+                identity = 'local/' + name
+                expected_uses = [dict(u, site=identity) for u in config_uses]
+                probe.check('isolated complete config uses', isolated_export['repository'] == identity
+                            and canonical_rows(isolated_export.get('uses', [])) == canonical_rows(expected_uses), isolated_export.get('uses'))
+                isolated_config_links = config_provisions(expected, expected_uses)
+                for link in isolated_config_links:
+                    link['provisioner'] = link['provisioner'].replace(REMOTE + 'infra::', identity + '::', 1)
+                probe.check('isolated complete config provisions',
+                            canonical_rows(isolated_export.get('provisions', [])) == canonical_rows(isolated_config_links), isolated_export.get('provisions'))
             probe.check('orphan gate ' + name, 'not indexed' not in isolated_status
-                        and orphan_set_matches(isolated_status, {}), isolated_status)
+                        and orphan_set_matches(isolated_status, config_only_orphans(expected, config_uses) if source == infra else {}), isolated_status)
+        # A genuinely one-sided source remains required. Defining ARN attributes create
+        # provisioners without creating config uses of themselves (ADR 0026).
+        isolated = run / 'work/only-provisioners'
+        isolated.mkdir()
+        write(isolated, 'meada.toml', '')
+        write(isolated, 'main.tofu', ''.join(block(typ, label, f'  {attr} = {json.dumps(value)}')
+              for typ, attr, _, name, arn in CASES for label, value in [('literal', name), ('arn', arn)]))
+        git('init', '-q', cwd=isolated)
+        git('add', '.', cwd=isolated)
+        git('commit', '-qm', 'independent provision-only gate control', cwd=isolated)
+        isolated_export = json.loads(probe.command(head, isolated, 'only-provisioners-export', 'export'))
+        probe.check('orphan gate known rows only-provisioners', len(isolated_export.get('provisioners', [])) == 2 * len(CASES)
+                    and not any(isolated_export.get(field) for field in ['uses', 'providers', 'consumers']), isolated_export)
+        isolated_status = probe.command(head, isolated, 'only-provisioners-status', 'status')
+        probe.check('orphan gate only-provisioners', 'not indexed' not in isolated_status and orphan_set_matches(isolated_status, {}), isolated_status)
         # Unchanged code-only flow is driven on the same neutral repository with both binaries.
         clean = run / 'work/plain'
         clean.mkdir()
@@ -497,7 +572,7 @@ def main():
         probe.check('code-only MCP base parity', bt == ht)
         failed = [c for c in probe.checks if not c['passed']]
         verdict = 'BROKEN' if failed else 'CHECKS PASSED; independent checker must judge PROVED'
-        write(run, 'receipt.md', f'# AWS #658 proof\n\n{verdict}\n\nChecker: independent AWS proof agent.\n'
+        write(run, 'receipt.md', f'# AWS #658 proof\n\n{verdict}\n\nChecker: script only, not blind or independent.\n'
               'New flows: #658, #642, base ADR0025/0026 (rung 4). HTTP: stdio parity (rung 1). '
               'Existing code-only flow: base binary (rung 1).\n\n'
               'Review correction before the first run: exact EventBridge fixtures omit both pattern and schedule '
@@ -510,6 +585,10 @@ def main():
               'The second attempt asked base status after HEAD had overwritten the shared index; '
               'each status now runs immediately after its own version indexes the repository. '
               'Isolated orphan scopes are explicitly indexed and show known rows before status is checked.\n\n'
+              'Maintenance: #661 config identifiers in subscription fields are independent use sides, '
+              'even when a route is refused. Full source-keyed config use/provision sets are checked; '
+              'infra-only SNS/SQS now has both sides and four source-derived orphans. A separate '
+              'clean provision-only source preserves the zero-orphan gate. Old failed receipts remain intact.\n\n'
               f'{len(probe.checks)} checks; {len(failed)} failures. Raw checks: checks.json; '
               'CLI: export/status/refresh/restore.out; MCP: queries.json, stdio.json, http.json.\n\n'
               'Not covered: cloud SDK additions (separate tickets), console rendering, grants; '
