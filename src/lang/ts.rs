@@ -35,6 +35,13 @@ const VALUE_DEPTH: usize = 64;
 // shallow, whatever the file.
 const FOLD_DEPTH: usize = 256;
 
+/// How many bytes of receivers (`Call::receiver`) `value` reads in one file: each call of a
+/// method chain reads the chain below it again. Past it a receiver is `Unknown`, which the SDK
+/// kinds read as no client.
+// ponytail: real files read a few kilobytes of receivers; one budget per file keeps a crafted
+// chain from costing the square of its length.
+const RECEIVER_BUDGET: usize = 1 << 20;
+
 pub struct TsJs;
 
 impl LanguagePack for TsJs {
@@ -84,6 +91,7 @@ impl LanguagePack for TsJs {
             ..Facts::default()
         };
         let mut write_bytes = 0;
+        let mut receiver_bytes = 0;
         let mut uses = uses::Uses::new(src, &parents);
         // The instance fields only their declaration or constructor may assign, or only their
         // class reach (`sealed_field`), by class and name, with their initializer; and every
@@ -187,7 +195,13 @@ impl LanguagePack for TsJs {
                                             | "parenthesized_expression"
                                     )
                                 })
-                                .map(|object| value(object, src, &scope, &parents)),
+                                .map(|object| {
+                                    receiver_bytes += object.byte_range().len();
+                                    match receiver_bytes <= RECEIVER_BUDGET {
+                                        true => value(object, src, &scope, &parents),
+                                        false => Value::Unknown,
+                                    }
+                                }),
                             arg_types: arguments
                                 .map(|a| named(a).map(|arg| cast(arg, src, &parents)).collect())
                                 .unwrap_or_default(),
@@ -2830,6 +2844,24 @@ mod tests {
         let member = parse(&format!("a{}.f();", ".b".repeat(n)));
         assert_eq!(member.calls.len(), 1);
         assert!(member.calls[0].callee.len() < 10 * FOLD_DEPTH);
+    }
+
+    #[test]
+    fn a_long_method_chain_is_read_in_linear_time() {
+        // Each call of the chain reads the chain below it as its receiver: the receivers of a
+        // file share one budget of bytes, past which a receiver is unknown.
+        let n = 30_000;
+        let source = format!("const a = process.env.X{};", ".trim()".repeat(n));
+        let start = std::time::Instant::now();
+        let facts = TsJs.parse("a.ts", source.as_bytes()).unwrap();
+        let took = start.elapsed();
+        assert_eq!(facts.calls.len(), n);
+        let unknown = (facts.calls.iter())
+            .filter(|c| matches!(c.receiver, Some(Value::Unknown)))
+            .count();
+        assert!(0 < unknown && unknown < n, "{unknown}");
+        // 1.1 s measured in a local debug build; the bound is over twenty times that.
+        assert!(took.as_secs() < 25, "{took:?}");
     }
 
     #[test]

@@ -250,6 +250,9 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   ones), since qualified names and `Resolver::lexical` cost time cubic in the nesting; a function
   written in place there is `Value::Unknown`. `VALUE_DEPTH` (64): a value nested deeper in
   arguments, objects, arrays and the receivers of method chains is `Unknown` from there.
+  `RECEIVER_BUDGET` (1 MiB): the receivers a file's calls keep (`Call::receiver`, which the SDK
+  kinds follow) share one budget of bytes, since each call of a chain reads the chain below it
+  again; past it a receiver is `Unknown`, so a call there gives no SDK evidence.
   `FOLD_DEPTH` (256): a `+` chain or a chain of string method calls folds only that deep (the
   rest is a hole), and a member chain in a callee is cut to the node kind. Finding the lexical
   scope of a runtime `String` binding uses the same bound; if it is not reached, the file's
