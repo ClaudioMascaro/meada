@@ -704,6 +704,8 @@ struct Parents<'t> {
     /// Whether the file binds a `URL` other than the runtime constructor: `new URL(x)` is then
     /// no runtime global.
     url_declared: bool,
+    /// Merged lexical scopes that hide the runtime String conversion.
+    string_shadows: Vec<Range<usize>>,
     /// Bare `undefined =>` parameters the grammar recovered as a comparison.
     arrow_parameters: Vec<usize>,
 }
@@ -717,6 +719,8 @@ impl<'t> Parents<'t> {
         let mut url_required = false;
         let mut require_declared = false;
         let mut arrow_parameters = Vec::new();
+        let mut string_bindings = Vec::new();
+        let mut string_writes = Vec::new();
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
             if node.kind() == "binary_expression"
@@ -735,11 +739,18 @@ impl<'t> Parents<'t> {
             url_declared |= shadows_runtime(node, src, "URL");
             url_required |= runtime_url_require(node, src);
             require_declared |= shadows_runtime(node, src, "require");
+            if shadows_runtime(node, src, "String")
+                && !(node.kind() == "for_in_statement"
+                    && node.child_by_field_name("kind").is_none())
+            {
+                string_bindings.push(node);
+            }
             written.extend(member_written(node, src));
             let target = match node.kind() {
                 "assignment_expression" | "augmented_assignment_expression" => {
                     node.child_by_field_name("left")
                 }
+                "update_expression" => node.child_by_field_name("argument"),
                 "for_in_statement" => node
                     .child_by_field_name("kind")
                     .is_none()
@@ -747,7 +758,11 @@ impl<'t> Parents<'t> {
                     .flatten(),
                 _ => None,
             };
-            assigned.extend(target.map(|t| bound(t, src)).unwrap_or_default());
+            let names = target.map(|t| bound(t, src)).unwrap_or_default();
+            if names.iter().any(|name| name == "String") {
+                string_writes.push(node.start_byte());
+            }
+            assigned.extend(names);
             for child in children(node) {
                 up.insert(child.id(), node);
                 stack.push(child);
@@ -755,17 +770,92 @@ impl<'t> Parents<'t> {
         }
         url_declared |= assigned.contains("URL")
             || (url_required && (require_declared || assigned.contains("require")));
-        Self {
+        let mut parents = Self {
             up,
             assigned,
             written,
             url_declared,
+            string_shadows: Vec::new(),
             arrow_parameters,
+        };
+        let mut scopes: Vec<_> = string_bindings
+            .into_iter()
+            .map(|node| parents.string_scope(node, src, root))
+            .collect();
+        scopes.sort_by_key(|scope| scope.start);
+        for scope in scopes {
+            if let Some(last) = parents.string_shadows.last_mut()
+                && last.end >= scope.start
+            {
+                last.end = last.end.max(scope.end);
+            } else {
+                parents.string_shadows.push(scope);
+            }
         }
+        // An assignment outside a lexical String binding can replace the global itself.
+        if string_writes
+            .into_iter()
+            .any(|at| !parents.string_hidden(at))
+        {
+            parents.string_shadows = vec![root.byte_range()];
+        }
+        parents
     }
 
     fn of(&self, node: Node) -> Option<Node<'t>> {
         self.up.get(&node.id()).copied()
+    }
+
+    fn string_hidden(&self, at: usize) -> bool {
+        let next = self
+            .string_shadows
+            .partition_point(|scope| scope.start <= at);
+        next > 0 && at < self.string_shadows[next - 1].end
+    }
+
+    /// Parameters and expression names belong to their own function; declarations belong
+    /// to their enclosing lexical scope, or function for var. A bounded lookup that cannot
+    /// establish the scope conservatively hides the runtime throughout the file.
+    fn string_scope(&self, node: Node<'t>, src: &[u8], root: Node<'t>) -> Range<usize> {
+        match node.kind() {
+            "formal_parameters" => {
+                return self.of(node).unwrap_or(root).byte_range();
+            }
+            "catch_clause"
+            | "arrow_function"
+            | "function_expression"
+            | "function"
+            | "generator_function"
+            | "class" => return node.byte_range(),
+            "for_in_statement"
+                if node
+                    .child_by_field_name("kind")
+                    .is_none_or(|kind| text(kind, src) != "var") =>
+            {
+                return node.byte_range();
+            }
+            _ => {}
+        }
+        let function = self
+            .of(node)
+            .is_some_and(|parent| parent.kind() == "variable_declaration")
+            || node.kind() == "for_in_statement";
+        let mut at = self.of(node);
+        for _ in 0..FOLD_DEPTH {
+            let Some(parent) = at else { break };
+            if parent.kind() == "program"
+                || (function && BODIES.contains(&parent.kind()))
+                || (!function
+                    && matches!(
+                        parent.kind(),
+                        "statement_block" | "for_statement" | "for_in_statement" | "switch_body"
+                    ))
+            {
+                return parent.byte_range();
+            }
+            at = self.of(parent);
+        }
+        root.byte_range()
     }
 }
 
@@ -1654,7 +1744,10 @@ fn url_form(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
                 {
                     url(function.child_by_field_name("object")?)
                 }
-                "identifier" if text(function, src) == "String" => {
+                "identifier"
+                    if text(function, src) == "String"
+                        && !up.string_hidden(function.start_byte()) =>
+                {
                     let argument = one(arguments)?;
                     parts(argument).filter(|_| !written(argument))
                 }

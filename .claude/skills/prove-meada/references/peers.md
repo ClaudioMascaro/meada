@@ -66,7 +66,7 @@ through `/create-prove-it`, and adds its paths to SKILL.md's Scope row.
 | Flow (#683) | Cases | Ticket | State |
 |---|---|---|---|
 | Controls: template string, cleanenv tag inline, `config.getString` inline, `proxy.endpoints` inline | 5 | existing | control |
-| TS URL builders, one argument | 7 (`g8`) | #685 | landed |
+| TS URL builders, one argument and lexical String controls | 9 (`g8`) | #685 | landed |
 | TS `new URL(ref, base)` join | 19 rows, 15 functions (`g8`) | #686 | landed (4 controls) |
 | Go struct field | 2 (`g9`) | #687 | landed |
 | TS readonly field | 1 (`g9`) | #688 | landed |
@@ -91,7 +91,10 @@ through `/create-prove-it`, and adds its paths to SKILL.md's Scope row.
 - The link check takes the head's links of the case's consumer only; a link the change adds to a
   control's consumer fails the control, one added elsewhere shows in "Everything else".
 
-There are currently 40 rows: 30 landed, ten controls and none pending. The five original
+There are currently 42 rows: 30 landed, twelve controls and none pending. The two String
+shadow controls retain an opaque callback's unknown contract and host while the same file's
+global String conversion still resolves. They reproduce a hidden-name defect found during
+inline review; the uncorrected binary invents the callback's route. The five original
 #684 controls each require their own real product mutation round. The bounded CI phases,
 frozen-key baseline, blind-checker boundary and honest score are in
 [a7-a8-audit.md](a7-a8-audit.md). No historical receipt or captured-response fault counts as

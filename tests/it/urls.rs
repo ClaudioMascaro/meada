@@ -14,6 +14,121 @@ fn api(case: &str) -> PathBuf {
     fixture_repo(case, "http-api", Some("https://example.com/acme/api.git"))
 }
 
+#[test]
+fn a_shadowed_string_conversion_keeps_the_url_unknown_without_hiding_the_global_elsewhere() {
+    let repo = fixture_repo("urls_string_shadow", "http-url-builder", None);
+    std::fs::remove_dir_all(repo.join("src")).unwrap();
+    std::fs::create_dir(repo.join("src")).unwrap();
+    std::fs::write(
+        repo.join("src/client.ts"),
+        "export function hidden(String: (value: URL) => string) {\n\
+           const value = new URL('https://api.example.com/api/vets');\n\
+           return fetch(String(value));\n\
+         }\n\
+         export function control() {\n\
+           const value = new URL('https://api.example.com/api/vets');\n\
+           return fetch(String(value));\n\
+         }\n",
+    )
+    .unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), 2, "{export}");
+    for consumer in consumers {
+        let site = consumer["site"].as_str().unwrap();
+        if site.contains("::hidden::") {
+            assert!(consumer["contract"].is_null(), "{export}");
+            assert!(consumer["via"].is_null(), "{export}");
+        } else {
+            assert!(site.contains("::control::"), "{export}");
+            assert_eq!(consumer["contract"], "http::GET::/api/vets", "{export}");
+            assert_eq!(consumer["via"], "host:api.example.com", "{export}");
+        }
+    }
+}
+
+#[test]
+fn string_url_conversions_respect_bindings_and_global_writes_in_javascript_and_typescript() {
+    let repo = fixture_repo("urls_string_bindings", "http-url-builder", None);
+    std::fs::remove_dir_all(repo.join("src")).unwrap();
+    std::fs::create_dir(repo.join("src")).unwrap();
+    let cases = [
+        ("parameter", "export function hidden(String) {", "}"),
+        ("destructured", "export function hidden({ String }) {", "}"),
+        ("arrow", "export const hidden = String => {", "};"),
+        (
+            "local",
+            "export function hidden() { const String = convert;",
+            "}",
+        ),
+        (
+            "catch",
+            "export function hidden() { try { opaque(); } catch (String) {",
+            "}}",
+        ),
+        (
+            "loop_lexical",
+            "export function hidden() { for (const String of converters) {",
+            "}}",
+        ),
+        (
+            "loop_var",
+            "export function hidden() { for (var String of converters) {}",
+            "}",
+        ),
+        (
+            "imported",
+            "import String from 'opaque-string'; export function hidden() {",
+            "}",
+        ),
+        (
+            "declared",
+            "function String(value) { return transform(value); } export function hidden() {",
+            "}",
+        ),
+        ("updated", "String++; export function hidden() {", "}"),
+    ];
+    let body =
+        "const value = new URL('https://api.example.com/api/vets'); return fetch(String(value));";
+    for extension in ["js", "ts"] {
+        for (name, before, after) in cases {
+            std::fs::write(
+                repo.join(format!("src/{name}.{extension}")),
+                format!("{before}\n{body}\n{after}\n"),
+            )
+            .unwrap();
+        }
+        for (name, prefix) in [
+            ("control", ""),
+            (
+                "expression",
+                "const converter = function String(value) { return transform(value); };",
+            ),
+        ] {
+            std::fs::write(
+                repo.join(format!("src/{name}.{extension}")),
+                format!("{prefix}\nexport function visible() {{ {body} }}\n"),
+            )
+            .unwrap();
+        }
+    }
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), (cases.len() + 2) * 2, "{export}");
+    for consumer in consumers {
+        let site = consumer["site"].as_str().unwrap();
+        if site.contains("::src/control.") || site.contains("::src/expression.") {
+            assert_eq!(consumer["contract"], "http::GET::/api/vets", "{export}");
+            assert_eq!(consumer["via"], "host:api.example.com", "{export}");
+        } else {
+            assert!(consumer["contract"].is_null(), "{site}: {export}");
+            assert!(consumer["via"].is_null(), "{site}: {export}");
+        }
+    }
+}
+
 /// A binding named URL is the runtime constructor only when its export proves it. Unknown
 /// packages, repository aliases and other exports must not invent consumers or links (#709).
 #[test]

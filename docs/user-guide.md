@@ -1458,6 +1458,8 @@ URLs montadas por `new URL(x)` ou `new URL(ref, base)` são lidas somente para o
 sem reatribuição ou o export nomeado `URL` de `url` ou `node:url` por `import` ou
 `require` não ocultado. Pacotes desconhecidos, aliases de repositório e outros exports ficam opacos.
 
+`String(u)` respeita as declarações locais de `String` e só repassa a URL quando a chamada usa a conversão global. Atribuições e incrementos que podem substituir essa conversão deixam a URL sem resolver. Uma declaração local preserva a conversão global fora de seu escopo.
+
 | Papel | Biblioteca |
 | --- | --- |
 | Consumidor | `fetch` global, e uma chamada a um parâmetro cujo padrão é `fetch` |
