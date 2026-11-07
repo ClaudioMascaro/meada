@@ -30,17 +30,27 @@ write tools; one index per repository; determinism) live in
 ## Workflow
 
 - Conventional Commits.
-- Before every local commit: `cargo fmt --check`, `cargo check --locked` and only the focused
-  regression tests relevant to the change.
-- Before handing off integration, also run `cargo clippy --locked --all-targets -- -D warnings`
-  and `scripts/clippy-features` locally. The script reads the feature matrix from CI (ADR 0012).
-- GitHub Actions owns the full test suites, UI, documentation and deployment checks. CI for the
-  exact PR head must be green before marking the PR ready for review or merging into main.
-- Before a change is called done, `/prove-meada` runs on it and the PR body's Evidence section
-  names its receipt (`.prove-it/runs/`, kept out of git); a change whose diff reaches a surface of
-  the skill's Scope table is not done on a BROKEN verdict.
-  Record proof scope separately from CI validation; run heavy integration proof in CI where
-  applicable.
+- Local gate before every commit: `gate --staged` delegates to `scripts/check`, selecting checks
+  from the staged diff or, on a clean tree, the last commit. Docs, agent instructions and harness
+  configuration get pertinent static checks and harness self-checks, without rebuilding the
+  product, running its full suite or producing a `.prove-it` receipt. Unknown or product paths
+  conservatively run the full applicable gate: fmt, clippy and tests, plus the relevant cloud
+  feature checks (ADR 0012). Heavy commands run through `bounded`; see the local workflow policy.
+- Product E2E runs only in GitHub Actions, for a relevant large implementation marked with the
+  `e2e` label on a non-draft PR. Locally, `/prove-meada` prepares the scope and answer keys or
+  reads CI evidence; it does not build or start the product. Docs-only follow-up commits also
+  skip E2E. Existing artifacts retain their original SHA; pending evidence stays pending.
+- For E2E, the PR Evidence section identifies the workflow run, tested SHA and artifact or
+  receipt. Capture is not judgment: `CAPTURED` is never `PROVED`, and a relevant surface is not
+  done on a `BROKEN` verdict. Without the required CI evidence, report what remains pending.
+  For docs, instructions or harness-only validation, report E2E `N/A` in the ordinary validation
+  summary, without creating a `.prove-it` receipt.
+- Mutation audits are explicit manual GitHub Actions `workflow_dispatch` runs, never an
+  automatic task-completion step or a consequence of editing a skill.
+- For product integration handoff, also run `scripts/clippy-features` locally; it reads the CI
+  feature matrix (ADR 0012). Documentation and harness-only follow-ups do not repeat it.
+- GitHub Actions owns the full integration, UI and deployment checks. CI for the exact PR
+  head must be green before marking the PR ready for review or merging into main.
 - `.githooks/` runs part of the gate locally: `cargo fmt --check` and no em dash in staged
   Markdown on commit; on push, a check against the maintainer's private-term list. Enable it
   once per clone with `git config core.hooksPath .githooks`.

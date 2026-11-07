@@ -1,5 +1,9 @@
 # CLI and MCP: the detail behind `prove.py run`
 
+These product execution commands are CI-only recipes under `AGENTS.md`. Locally, prepare
+inputs or read the matching run artifact; do not build or start the product.
+
+
 ## What one run does
 
 For each corpus entry (`scripts/corpus.tsv`), with the head binary first and then the base:

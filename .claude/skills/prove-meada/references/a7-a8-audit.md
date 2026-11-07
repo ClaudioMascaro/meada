@@ -9,10 +9,12 @@ The two inline config controls exercise different mapping layers. Additional A8 
 remain regressions. SDK/route flows added later retain their own receipts and Scope rows;
 this bounded mix does not claim to mutate every child flow.
 
-The existing `CI` workflow's `proof-a7-a8` job runs the untouched baseline on PRs/pushes.
-Its 26 named native checks include the full AWS subscription/provision/orphan flow separately
-from JSON SSM and generic provisioning, GCP/Azure and JVM/Go/.NET AWS SDK drivers, IaC HTTP routes, custom
-mappings, declared resources, orphans, patterns and image regressions. The executable
+The existing `CI` workflow runs `proof-a7-a8` only through explicit `workflow_dispatch`
+phases: `baseline`, `candidate`, `check` and `final`. Ordinary PR/push runs use the scoped
+routine gates and selected milestone E2E; they run neither this audit's baseline nor mutations.
+The manual baseline's 26 named native checks include the full AWS subscription/provision/orphan
+flow separately from JSON SSM and generic provisioning, GCP/Azure and JVM/Go/.NET AWS SDK
+drivers, IaC HTTP routes, custom mappings, declared resources, orphans, patterns and image regressions. The executable
 `commands()` inventory fixes their distinct evidence directories. The supported IaC oracle
 also covers the existing public `terraform-sqs` and `sam-rust` pins. The e6d27d0 baseline failed
 two of 15 checks; the 2669d15 baseline failed two of 16 through the later A8 product regression.
@@ -24,9 +26,11 @@ dispatch a phase on the branch, leave it BLOCKED, never infer a pass from a loca
 ## Baseline and phase boundaries
 
 `a7-a8-audit.py baseline` builds immutable default-feature binaries for the exact checkout,
-its merge-base with main and the three existing drivers' historical bases below. It copies
-each before releasing the compiler lock, pins every
-skill/answer-key byte and drives the fixed source-derived checks. `baseline.json` records the
+its merge-base with the associated open PR's actual base SHA and the three existing drivers'
+historical bases below. The workflow resolves exactly one open PR for the repository owner
+and dispatched branch, validates its base SHA and computes that merge-base. Missing or
+ambiguous PRs block the baseline. It copies each binary before releasing the compiler lock,
+pins every skill/answer-key byte and drives the fixed source-derived checks. `baseline.json` records the
 source commit/tree, actual build commits, binary SHA256s, keys, flows and raw check results.
 The accepted clean A7 binary supplies existing A7 annotation/whole-export bytes; independent
 source/spec oracles supply new A7 semantics. A8 additionally compares the original base on
@@ -35,14 +39,17 @@ identical generated input. HTTP parity supplements these keys. It never replaces
 | Packet binary | Purpose and immutable source |
 |---|---|
 | `bin/meada-clean` | exact frozen head, existing A7 annotation/export key |
-| `bin/meada-base` | actual merge-base with main, A8 original fields and corpus |
+| `bin/meada-base` | actual PR merge-base, A8 original fields and corpus |
 | `bin/meada-pre-config` | before #661: `6a5eca5853193d205bcf756983b41e9cb16ffa9d` |
 | `bin/meada-pre-image` | before #662: `eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62` |
 | `bin/meada-pre-extensions` | compatible A7 before #666/#668/#670/#671: `e6d27d0d7c046eceb8771f17111f00511a8d6c3d` |
 
-The existing frontend job reuses its UI build, Chromium and pinned browser tools. `ui-check`
-drives the full `aws-sdk.py`, `config_uses.py` and `images.py --public` flows with their required
-bases and UI flags, beside the existing #675 graph check. `a7-a8-ui` retains its immutable
+The ordinary `frontend` job depends only on scope selection and also builds/uploads the
+exact dispatched source for an explicit manual baseline. The separate `proof-a7-a8-ui` job
+runs only after that frontend and `proof-a7-a8` baseline both succeed. It checks out the same
+source SHA, downloads that frontend and baseline manifest, and prepares the pinned browser
+tools and UI binary. `ui-check` drives the full `aws-sdk.py`, `config_uses.py` and
+`images.py --public` flows with their required bases and UI flags, beside the existing #675 graph check. `a7-a8-ui` retains its immutable
 `bin/meada-ui`, `frontend/` bytes, raw captures and a receipt bound to the actual source/tree, complete verifier
 digest, baseline manifest, UI binary and frontend bytes. This is clean final-source evidence,
 not coverage of a native mutant. None of the 13 required mutations needs a UI candidate.
@@ -123,10 +130,13 @@ exact restoration and the final clean bound judgment, and reports `COMPLETE_NOT_
 Blind rounds remain incomplete and the fresh/blind counts remain zero. Omitting this flag
 keeps the independent completion requirements; an inline judgment never supplies independence.
 
-Manual native-baseline dispatch does not run the frontend. Use the baseline and UI/scope
-packets from a normal exact-head PR/push run, or a separately produced supplement bound to
-that exact manifest; `ui_run` defaults to `baseline_run`. A same-source claim without the
-actual matching receipts cannot authorize a candidate.
+A successful explicit `baseline` dispatch produces all three bound packets: `a7-a8-baseline`,
+`a7-a8-ui` and `a7-a8-scope`. Failed captures retain their available artifacts and fail the job;
+a skipped job supplies no evidence. Later phases reuse the frozen baseline and UI/scope
+packets, with `ui_run` defaulting to `baseline_run`. A separately produced supplement must
+match that exact manifest. A same-source claim without the actual matching receipts cannot
+authorize a candidate. Captures and script checks still leave A7/A8 acceptance pending until
+the required source/spec and receipt judgments are retained.
 
 1. Dispatch `candidate` with the frozen `baseline_run`, one `mutation` ID and the actual
    baseline attestation and bound UI/scope artifacts. The isolated CI checkout must be clean. One exact anchor is required;

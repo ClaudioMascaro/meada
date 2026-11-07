@@ -1,0 +1,468 @@
+#!/usr/bin/env python3
+"""Select the local gate and CI proof scopes from one conservative path policy."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+import tomllib
+
+FLAGS = "routine product e2e cli console accounts deploy container goldens".split()
+SHA = re.compile(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}")
+CLOUD = "snapshot valkey generation-pointer refresh-lock oidc github-app postgres directory ui workspaces proposals accounts".split()
+DEPLOY_SCRIPTS = {"scripts/compose-check", "scripts/helm-check", "scripts/container-smoke", "scripts/ui-tarball"}
+DEPLOY_WORKFLOWS = {f".github/workflows/{name}.yml" for name in ("compose", "helm", "container", "release")}
+
+
+def run(*args, capture=False, input=None):
+    result = subprocess.run(args, input=input, stdout=subprocess.PIPE if capture else None,
+                            stderr=subprocess.PIPE if capture else None)
+    if result.returncode:
+        detail = result.stderr.decode(errors="replace")[:1500] if capture else ""
+        raise RuntimeError(f"{' '.join(args)} exited {result.returncode}: {detail}")
+    return result.stdout if capture else None
+
+
+def git(*args, input=None):
+    return run("git", *args, capture=True, input=input).decode(errors="surrogateescape").strip("\n")
+
+
+def commit(value):
+    if not isinstance(value, str) or not SHA.fullmatch(value) or set(value) == {"0"}:
+        raise RuntimeError(f"expected a full nonzero commit SHA, got {value!r}")
+    return git("rev-parse", "--verify", f"{value}^{{commit}}")
+
+
+def empty_tree():
+    return git("hash-object", "-t", "tree", "--stdin", input=b"")
+
+
+def names(args):
+    # Disabling rename detection preserves both the removed and added path in the policy.
+    return [p for p in git("diff", "--name-only", "--no-renames", "-z", *args, "--").split("\0") if p]
+
+
+def light(path):
+    p = Path(path)
+    return (path.startswith(("docs/", "scripts/docs/", ".github/", ".claude/hooks/"))
+            or (len(p.parts) == 1 and (p.suffix == ".md" or p.name.startswith("LICENSE")))
+            or path in {".agents/skills-lock.json", ".claude/settings.json", ".mcp.json",
+                        "scripts/check", "scripts/prove-ci", "tests/it/docs.rs", "examples/split_agents.rs"}
+            or (path.startswith((".agents/skills/", ".claude/skills/"))
+                and p.suffix in {".md", ".json", ".yaml", ".yml", ".toml"})
+            or path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/")))
+
+
+def proof_driver(path):
+    return (path == "scripts/prove-ci"
+            or (path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/"))
+                and Path(path).suffix not in {".md", ".json", ".yaml", ".yml", ".toml"}))
+
+
+def scopes(paths):
+    out = dict.fromkeys(FLAGS, False)
+    all_repos = False
+    for path in paths:
+        driver = proof_driver(path)
+        out["product"] |= not light(path)
+        if path in DEPLOY_WORKFLOWS:
+            out["deploy"] = True
+        if light(path) and not driver:
+            continue
+        if driver:
+            if Path(path).name.startswith("console"):
+                out["console"] = out["accounts"] = True
+            elif path.endswith("corpus.tsv") or path.endswith("prove.py"):
+                out["cli"] = all_repos = True
+            else:
+                for key in ("cli", "console", "accounts", "deploy", "container", "goldens"):
+                    out[key] = True
+                all_repos = True
+        elif path.startswith("deploy/") or path in DEPLOY_SCRIPTS or Path(path).name.startswith("Dockerfile"):
+            out["deploy"] = True
+            out["container"] |= Path(path).name.startswith("Dockerfile") or path in {"scripts/container-smoke", "scripts/ui-tarball"}
+        elif path.startswith("ui/") or path == "src/ui.rs" or path.startswith("src/ui/"):
+            out["console"] = True
+            out["accounts"] |= bool(re.search(r"account|local|auth|audit", path, re.I))
+        elif re.match(r"src/(accounts|postgres|audit|directory|oidc|grant|github_app|workspaces|proposals|snapshot|valkey)(\.rs|/)", path):
+            out["console"] = True
+            out["accounts"] |= bool(re.match(r"src/(accounts|postgres|audit|oidc|grant)(\.rs|/)", path))
+        elif path.startswith("tests/") and not path.startswith(("tests/golden/", "tests/fixtures/")):
+            # Unit and integration tests retain the product gate, without requesting E2E.
+            continue
+        else:
+            out["cli"] = out["console"] = all_repos = True
+            out["goldens"] |= path.startswith("tests/golden/")
+            out["accounts"] |= path in {"Cargo.toml", "Cargo.lock", "build.rs", "rust-toolchain.toml"} or path.startswith("meada-core/")
+    out["cli"] |= out["console"]
+    out["repos"] = "all" if all_repos else "meada"
+    return out
+
+
+def ci_selection(event, payload):
+    out = dict.fromkeys(FLAGS, False)
+    out.update(base="", head="", repos="meada")
+    if event == "pull_request":
+        pr = payload["pull_request"]
+        base, head = commit(pr["base"]["sha"]), commit(pr["head"]["sha"])
+        base = commit(git("merge-base", base, head))
+        args = [base, head]
+        paths = names(args)
+        out.update(scopes(paths), base=base, head=head)
+        action = payload.get("action")
+        out["routine"] = action in {"opened", "reopened", "synchronize"}
+        eligible = action in {"opened", "reopened", "ready_for_review", "synchronize"} or (
+            action == "labeled" and payload.get("label", {}).get("name") == "e2e")
+        labels = {label["name"] for label in pr.get("labels", [])}
+        relevant = any(not light(p) or proof_driver(p) for p in paths) and any(
+            out[k] for k in ("cli", "console", "deploy", "container", "goldens"))
+        # Only a new relevant update should repeat E2E on an already-labeled PR.
+        if action == "synchronize" and payload.get("before"):
+            try:
+                before = commit(payload["before"])
+            except RuntimeError:
+                pass  # Missing/zero/unavailable previous heads use the full PR diff.
+            else:
+                updates = names([before, head])
+                update = scopes(updates)
+                relevant &= any(update[k] for k in ("cli", "console", "deploy", "container", "goldens")) and any(
+                    not light(p) or proof_driver(p) for p in updates)
+        out["e2e"] = eligible and not pr.get("draft", True) and "e2e" in labels and relevant
+        return out, args, paths
+    if event == "push":
+        head = commit(payload["after"])
+        before = payload.get("before")
+        if isinstance(before, str) and SHA.fullmatch(before) and set(before) == {"0"}:
+            base = empty_tree()
+        else:
+            base = commit(before)
+        args = [base, head]
+        paths = names(args)
+        out.update(scopes(paths), routine=True, base=base, head=head)
+        return out, args, paths
+    # Manual corpus audits use an explicit workflow job, never automatic selectors.
+    head = commit(git("rev-parse", "HEAD"))
+    out.update(base=head, head=head)
+    return out, [head, head], []
+
+
+def local_selection():
+    if git("diff", "--name-only", "--no-renames", "-z", "--"):
+        raise RuntimeError("unstaged changes: stage the complete candidate before running scripts/check")
+    if git("ls-files", "--others", "--exclude-standard", "-z"):
+        raise RuntimeError("untracked files: stage or remove them before running scripts/check")
+    # An unborn branch is allowed only with a nonempty staged candidate.
+    exists = subprocess.run(["git", "rev-parse", "--verify", "HEAD"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if exists.returncode:
+        branch = git("symbolic-ref", "-q", "HEAD")
+        ref = subprocess.run(["git", "show-ref", "--verify", "--quiet", branch])
+        if ref.returncode != 1:
+            raise RuntimeError("HEAD is invalid rather than an unborn branch")
+    head = commit(exists.stdout.decode().strip()) if exists.returncode == 0 else empty_tree()
+    args = ["--cached", head]
+    paths = names(args)
+    if paths:
+        return args, paths, git("write-tree")
+    if exists.returncode:
+        raise RuntimeError("no staged changes and no commit to check")
+    parents = git("rev-list", "--parents", "-n", "1", head).split()
+    base = commit(parents[1]) if len(parents) > 1 else empty_tree()
+    args = [base, head]
+    return args, names(args), head
+
+
+def bounded(*args):
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        run(*args)
+    else:
+        run("bounded", *args)
+
+
+def rust_tests(source, destination):
+    bounded("rustc", "--edition=2024", "--test", str(source), "-o", str(destination))
+    bounded(str(destination), "--test-threads=2")
+
+
+def static(args, paths, tree):
+    run("git", "diff", "--check", *args, "--")
+    markdown = [p for p in paths if p.endswith(".md")]
+    if markdown:
+        patch = git("diff", "--no-ext-diff", "--no-renames", "-U0", *args, "--", *markdown)
+        if any(line.startswith("+") and not line.startswith("+++") and "\u2014" in line for line in patch.splitlines()):
+            raise RuntimeError("added Markdown contains an em dash; use a comma, colon or parentheses")
+    root = Path.cwd().resolve()
+    for name in paths:
+        path = Path(name)
+        if not path.exists() and not path.is_symlink():
+            continue  # Deleted paths still contribute to the scope.
+        target = path.resolve(strict=True)
+        if not target.is_relative_to(root):
+            raise RuntimeError(f"{name}: a touched symlink leaves the repository")
+        if path.is_symlink():
+            continue
+        if not path.is_file():
+            continue
+        if name.startswith(("tests/fixtures/", "tests/golden/")):
+            continue  # Deliberately malformed product inputs belong to the product tests.
+        if not (light(name) or name.startswith(("deploy/", "ui/", "scripts/"))
+                or name in {"Cargo.toml", "meada-core/Cargo.toml", "rust-toolchain.toml", "dist-workspace.toml"}):
+            continue
+        suffix = path.suffix.lower()
+        if suffix == ".json":
+            json.loads(path.read_text())
+        elif suffix == ".toml":
+            tomllib.loads(path.read_text())
+        elif suffix in {".yaml", ".yml"}:
+            if name.startswith("deploy/helm/") and "/templates/" in name:
+                continue  # The existing renderer below validates Go templates as rendered YAML.
+            try:
+                import yaml
+            except ImportError as error:
+                raise RuntimeError("YAML validation requires PyYAML; install scripts/docs/requirements.txt in a venv") from error
+            list(yaml.safe_load_all(path.read_text()))
+        elif suffix == ".py" or (not suffix and path.read_bytes()[:100].startswith(b"#!/usr/bin/env python")):
+            compile(path.read_bytes(), name, "exec")
+        elif suffix in {".js", ".mjs"}:
+            run("node", "--check", name)
+        elif suffix in {".sh", ".bash"} or (not suffix and path.read_bytes()[:100].startswith((b"#!/bin/sh", b"#!/bin/bash", b"#!/usr/bin/env bash"))):
+            run("bash" if suffix == ".bash" or b"bash" in path.read_bytes().splitlines()[0] else "sh", "-n", name)
+    if any(p.startswith("deploy/helm/") or p == "scripts/helm-check" for p in paths):
+        bounded(sys.executable, "scripts/helm-check")
+    skill_names = {Path(p).parts[2] for p in paths if p.startswith(".agents/skills/") and len(Path(p).parts) > 2}
+    lock = Path(".agents/skills-lock.json")
+    if lock.exists() and (skill_names or str(lock) in paths):
+        entries = json.loads(lock.read_text())["skills"]
+        for name in entries if str(lock) in paths else skill_names:
+            if name in entries:
+                actual = git("rev-parse", f"{tree}:.agents/skills/{name}")
+                if actual != entries[name]["tree"]:
+                    raise RuntimeError(f"{name}: skills-lock.json tree differs from the candidate tree ({actual})")
+    with tempfile.TemporaryDirectory(prefix="meada-check-") as tmp:
+        tmp = Path(tmp)
+        if any(p.startswith(("docs/", "src/", "meada-core/src/")) or p == "tests/it/docs.rs" for p in paths):
+            text = Path("tests/it/docs.rs").read_text()
+            marker = "#[test]\nfn changelog_union_merge_keeps_both_bullets()"
+            if text.count(marker) != 1:
+                raise RuntimeError("docs.rs standalone boundary changed; update scripts/check before reusing its tests")
+            source = tmp / "docs.rs"
+            prefix = re.sub(r"(?:^///[^\n]*\n)+$", "", text.split(marker)[0], flags=re.M)
+            source.write_text(prefix)
+            rust_tests(source, tmp / "docs-tests")
+        if "examples/split_agents.rs" in paths:
+            rust_tests(Path("examples/split_agents.rs"), tmp / "split-tests")
+    if "scripts/check" in paths:
+        bounded(sys.executable, "scripts/check", "--selftest")
+    if "scripts/prove-ci" in paths and Path("scripts/prove-ci").exists():
+        bounded(sys.executable, "scripts/prove-ci", "--selftest")
+    print(f"Static checks passed for {len(paths)} changed paths.", flush=True)
+
+
+def cloud_features(paths):
+    features = set()
+    for path in paths:
+        for feature in CLOUD:
+            stem = feature.replace("-", "_")
+            if path.startswith(("src/", "tests/it/")) and stem in [Path(part).stem for part in Path(path).parts[1:]]:
+                features.add(feature)
+        if path.startswith("ui/") or path == "src/audit.rs":
+            features.add("ui")
+        if path.startswith("src/grant"):
+            features.add("oidc")
+        if path == "src/catalog.rs":
+            features.add("workspaces")
+        if re.match(r"src/snapshot/(generations|heartbeat|versions)(\.rs|/)", path):
+            features.add("generation-pointer")
+        if re.match(r"src/snapshot/(lock|operation)(\.rs|/)", path):
+            features.add("refresh-lock")
+        if path.endswith(".rs") and Path(path).is_file():
+            features.update(set(re.findall(r'feature\s*=\s*"([^"]+)"', Path(path).read_text())) & set(CLOUD))
+    if any(p in {"Cargo.toml", "Cargo.lock", "build.rs", "src/main.rs", "src/lib.rs", "src/config.rs", "src/modules.rs"} for p in paths):
+        features.update(CLOUD)
+    return sorted(features)
+
+
+def product_gate(paths):
+    bounded("cargo", "fmt", "--check")
+    bounded("cargo", "clippy", "--locked", "--all-targets", "--", "-D", "warnings")
+    bounded("cargo", "test", "--locked")
+    for feature in cloud_features(paths):
+        bounded("cargo", "clippy", "--locked", "--all-targets", "--features", feature, "--", "-D", "warnings")
+        bounded("cargo", "test", "--locked", "--features", feature)
+    if any(p.startswith(("ui/", "meada-core/")) for p in paths):
+        bounded("npm", "--prefix", "ui", "ci")
+        bounded("npm", "--prefix", "ui", "run", "wasm")
+        bounded("npm", "--prefix", "ui", "run", "build")
+        bounded("npm", "--prefix", "ui", "test")
+
+
+def selftest():
+    cases = [
+        (["README.md", "docs/agents/architecture.md", ".claude/settings.json", ".github/workflows/ci.yml"], False, False, False),
+        (["src/lang/rust.rs"], True, True, True),
+        (["README.md", "src/main.rs"], True, True, True),
+        (["new-unknown-config"], True, True, True),
+        (["ui/src/AccountPages.tsx"], True, True, True),
+        (["tests/it/query.rs"], True, False, False),
+        (["tests/golden/query.txt"], True, True, True),
+        ([".claude/skills/prove-meada/scripts/console.py"], False, True, True),
+        ([".claude/skills/prove-meada/SKILL.md", ".agents/skills-lock.json"], False, False, False),
+    ]
+    for paths, product, cli, console in cases:
+        found = scopes(paths)
+        assert (found["product"], found["cli"], found["console"]) == (product, cli, console), (paths, found)
+    assert scopes(["tests/golden/query.txt"])["goldens"]
+    assert scopes(["ui/src/local.ts"])["accounts"]
+    assert scopes(["deploy/compose/console.yml"])["deploy"]
+    assert scopes(["Dockerfile"])["container"]
+    assert "accounts" in cloud_features(["src/ui/accounts/administration.rs"])
+    assert "generation-pointer" in cloud_features(["src/snapshot/generations.rs"])
+    old = Path.cwd()
+    with tempfile.TemporaryDirectory(prefix="meada-check-selftest-") as tmp:
+        os.chdir(tmp)
+        try:
+            git("init", "-q", "-b", "integration")
+            git("config", "user.name", "Check selftest")
+            git("config", "user.email", "check@example.invalid")
+            git("config", "commit.gpgsign", "false")
+            def write(name, text):
+                path = Path(name)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text)
+            def save(name, text):
+                write(name, text)
+                git("add", "--", name)
+                git("-c", "core.hooksPath=/dev/null", "commit", "-qm", "fixture")
+                return git("rev-parse", "HEAD")
+            def refused(call):
+                try:
+                    call()
+                except RuntimeError:
+                    return
+                raise AssertionError("unsafe input was accepted")
+            write("README.md", "base\n")
+            refused(local_selection)  # Untracked files cannot be omitted from the gate.
+            git("add", ".")
+            args, paths, _ = local_selection()
+            assert paths == ["README.md"] and args[0] == "--cached"
+            base = save("README.md", "base\n")
+            args, paths, _ = local_selection()
+            assert paths == ["README.md"]  # Initial clean commit uses an empty tree.
+            head = save("src/main.rs", "fn main() {}\n")
+            payload = {"action": "opened", "pull_request": {"base": {"sha": base}, "head": {"sha": head}, "draft": False, "labels": [{"name": "e2e"}]}}
+            def select(action="opened", **values):
+                payload["action"] = action
+                payload.update(values)
+                return ci_selection("pull_request", payload)[0]
+            assert select()["e2e"] and select()["routine"]
+            payload["pull_request"]["draft"] = True
+            assert not select()["e2e"]
+            payload["pull_request"]["draft"] = False
+            assert select("ready_for_review")["e2e"] and not select("ready_for_review")["routine"]
+            assert select("labeled", label={"name": "e2e"})["e2e"]
+            assert not select("labeled", label={"name": "other"})["e2e"]
+            payload["pull_request"]["labels"] = []
+            assert not select()["e2e"]
+            payload["pull_request"]["labels"] = [{"name": "e2e"}]
+            code = save("src/main.rs", "fn main() { println!(\"changed\"); }\n")
+            payload["pull_request"]["head"]["sha"] = code
+            assert select("synchronize", before=head)["e2e"]
+            docs = save("README.md", "updated docs\n")
+            payload["pull_request"]["head"]["sha"] = docs
+            chosen = select("synchronize", before=code)
+            assert chosen["routine"] and chosen["product"] and not chosen["e2e"]
+            assert select("synchronize", before="0" * 40)["e2e"]
+            assert select("synchronize", before="f" * 40)["e2e"]
+            assert select("synchronize", before=None)["e2e"]
+            # Compare against the PR's declared base, even when it is not the default branch.
+            git("checkout", "-qb", "advanced-base", base)
+            advanced = save("src/only-base.rs", "base change\n")
+            payload["pull_request"]["base"]["sha"] = advanced
+            chosen, _, changed = ci_selection("pull_request", payload)
+            assert chosen["base"] == base and "src/only-base.rs" not in changed
+            workflow = save(".github/workflows/helm.yml", "name: fixture\n")
+            payload["pull_request"]["base"]["sha"] = advanced
+            payload["pull_request"]["head"]["sha"] = workflow
+            assert not select("opened")["e2e"]
+            assert not select("ready_for_review")["e2e"]
+            driver = save(".claude/skills/prove-meada/scripts/console.py", "pass\n")
+            payload["pull_request"]["head"]["sha"] = driver
+            chosen = select("synchronize", before=workflow)
+            assert chosen["e2e"] and chosen["cli"] and chosen["console"] and not chosen["product"]
+            git("checkout", "-q", "integration")
+            Path("docs").mkdir()
+            git("mv", "src/main.rs", "docs/renamed.rs")
+            _, changed, _ = local_selection()
+            assert {"src/main.rs", "docs/renamed.rs"} <= set(changed) and scopes(changed)["product"]
+            git("-c", "core.hooksPath=/dev/null", "commit", "-qm", "rename fixture")
+            save("src/delete.rs", "delete me\n")
+            git("rm", "-q", "src/delete.rs")
+            assert "src/delete.rs" in local_selection()[1]
+            write("README.md", "unstaged\n")
+            refused(local_selection)
+            refused(lambda: commit("--help"))
+            refused(lambda: commit("f" * 40))
+            refused(lambda: ci_selection("push", {"before": "f" * 40, "after": docs}))
+            pushed = ci_selection("push", {"before": "0" * 40, "after": docs})[0]
+            assert pushed["routine"] and not pushed["e2e"] and pushed["product"]
+            manual = ci_selection("workflow_dispatch", {})[0]
+            assert not any(manual[key] for key in FLAGS)
+            write("event.json", json.dumps({"before": "0" * 40, "after": docs}))
+            env = dict(os.environ, GITHUB_EVENT_PATH=str(Path("event.json").resolve()), GITHUB_EVENT_NAME="push",
+                       GITHUB_OUTPUT=str(Path("outputs").resolve()), GITHUB_STEP_SUMMARY=str(Path("summary").resolve()))
+            command = subprocess.run([sys.executable, str(old / "scripts/check"), "--ci"], env=env,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            assert command.returncode == 0, command.stderr.decode()
+            outputs = dict(line.split("=", 1) for line in Path("outputs").read_text().splitlines())
+            assert set(outputs) == set(FLAGS) | {"base", "head", "repos"}
+            assert outputs["routine"] == outputs["product"] == "true" and outputs["e2e"] == "false"
+            assert "Selected checks" in Path("summary").read_text()
+        finally:
+            os.chdir(old)
+    print("scripts/check selftest: path policy and disposable Git/event cases passed.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--selftest", action="store_true")
+    mode.add_argument("--ci", action="store_true")
+    mode.add_argument("--static", action="store_true")
+    options = parser.parse_args()
+    if options.selftest:
+        selftest()
+        return
+    os.chdir(git("rev-parse", "--show-toplevel"))
+    if options.ci or (options.static and os.environ.get("GITHUB_EVENT_PATH")):
+        payload = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+        selected, args, paths = ci_selection(os.environ["GITHUB_EVENT_NAME"], payload)
+        tree = commit(git("rev-parse", "HEAD"))
+    else:
+        args, paths, tree = local_selection()
+        selected = scopes(paths)
+    if options.ci:
+        lines = [f"{key}={str(value).lower() if isinstance(value, bool) else value}" for key, value in selected.items()]
+        output = os.environ.get("GITHUB_OUTPUT")
+        if output:
+            with open(output, "a") as stream:
+                stream.write("\n".join(lines) + "\n")
+        summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary:
+            with open(summary, "a") as stream:
+                stream.write("### Selected checks\n\n" + "\n".join(f"- `{line}`" for line in lines) + f"\n\nChanged paths: {len(paths)}.\n")
+        print("\n".join(lines))
+        return
+    static(args, paths, tree)
+    if not options.static and selected["product"]:
+        product_gate(paths)
+    elif not options.static:
+        print("Documentation/harness candidate: product builds and E2E are not selected.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (RuntimeError, OSError, ValueError, KeyError) as error:
+        sys.exit(f"scripts/check: {error}")
