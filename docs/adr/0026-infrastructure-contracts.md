@@ -543,3 +543,11 @@ value; the contract row key, internal sorting and declaration deduplication incl
 existing schema-golden hash deterministically rebuilds source indexes from an older layout;
 read-only servers consume the rebuilt stored summaries without rereading source or environment.
 No cloud parsing enters the generic engine, index, environment collector or language packs.
+
+Queue receiver overloads distinguish options from subscription names by proven argument form,
+not positional count: JS/TS object literals or exact folded objects, and C# verified
+`ServiceBusReceiverOptions` constructions. Explicit unshadowed JS/TS `undefined` and named C#
+`options: null` select the queue form. Bare C# positional null remains ambiguous. An opaque or
+reassigned argument supplies no exact entity; strings retain the topic/subscription form.
+The C# options constructor category is retained in private memo keys, preventing a valid first
+factory call from making a later opaque actual look like options. No new walker is involved.

@@ -29,3 +29,9 @@ Internal side sorting retains the optional identity; declaration deduplication p
 while a contract is unresolved. A queue and
 subscription may share a handler, unresolved prefix and environment variable; dropping either
 before workload resolution would erase a real qualified side. Legacy None retains prior keys.
+
+Receiver overload policy folds only the second argument through the guarded shared API.
+TS object form and unshadowed explicit undefined prove queue options; C# accepts the verified
+options constructor, whose category also remains distinct in normalized memo arguments.
+Opaque/reassigned actuals cannot reuse a preceding options factory result. String arguments
+continue to identify subscriptions; legacy C# send/processor paths are unchanged.

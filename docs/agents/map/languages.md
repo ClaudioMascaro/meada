@@ -1,5 +1,9 @@
 # Language packs
 
+The TypeScript and JavaScript packs retain `undefined` as a shadowable name in values and
+binding patterns, including the grammar's dedicated `undefined` node. Kinds ask the existing
+lexical binding query before treating the unbound name as a runtime value.
+
 Detail behind the [architecture map](../architecture.md), which keeps the flow, identities,
 seams and invariants (the limits are in [Known ceilings](../ceilings.md)). The code wins over
 this file, and a change to these modules updates it.

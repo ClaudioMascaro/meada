@@ -55,7 +55,23 @@ pub(super) fn step<'a>(
     };
     Some(match (parent.stage, crate::resolve::method(&call.callee)) {
         (Stage::Bus, "CreateReceiver") => {
-            if call.keyword("subscriptionName").is_some() || call.args.len() >= 2 {
+            let options = call.args.get(1).is_some_and(|value| {
+                matches!(
+                    code.value_within_at(
+                        path,
+                        &call.scope,
+                        value,
+                        frames,
+                        Some((path, index)),
+                        super::receiver_options,
+                        crate::contract::sdk::mutations::writes,
+                    ),
+                    Value::New(ty, _) if super::receiver_options(&ty)
+                )
+            });
+            if call.keyword("subscriptionName").is_some()
+                || (call.args.len() >= 2 && !(call.args.len() == 2 && options))
+            {
                 Handle::subscription(name("topicName", 0), name("subscriptionName", 1))
             } else {
                 Handle::named(Stage::Receiver, name("queueName", 0))

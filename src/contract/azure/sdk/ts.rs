@@ -44,12 +44,25 @@ pub(super) fn step<'a>(
     Some(match (parent.stage, crate::resolve::method(&call.callee)) {
         (Stage::Bus, "createSender") => Handle::named(Stage::Sender, name()),
         (Stage::Bus, "createReceiver") => {
-            if call
-                .args
-                .get(1)
-                .is_some_and(|v| matches!(v, Value::Object(_)))
-                || call.args.len() == 1
-            {
+            let options = call.args.get(1).is_some_and(|value| {
+                let object = matches!(
+                    code.value_within_at(
+                        path,
+                        &call.scope,
+                        value,
+                        frames,
+                        Some((path, index)),
+                        |_| false,
+                        crate::contract::sdk::mutations::writes,
+                    ),
+                    Value::Object(_)
+                );
+                object
+                    || ((matches!(value, Value::Undefined)
+                        || matches!(value, Value::Ref(name) if name == "undefined"))
+                        && !code.value_bound(path, &call.scope, "undefined"))
+            });
+            if call.args.len() == 1 || (call.args.len() == 2 && options) {
                 Handle::named(Stage::Receiver, name())
             } else {
                 Handle::subscription(

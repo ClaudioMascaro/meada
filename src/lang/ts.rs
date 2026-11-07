@@ -968,7 +968,7 @@ fn bound_nodes(pattern: Node) -> Vec<Node> {
     let mut stack = vec![pattern];
     while let Some(node) = stack.pop() {
         match node.kind() {
-            "identifier" | "shorthand_property_identifier_pattern" => out.push(node),
+            "identifier" | "undefined" | "shorthand_property_identifier_pattern" => out.push(node),
             "pair_pattern" => stack.extend(node.child_by_field_name("value")),
             "assignment_pattern" | "object_assignment_pattern" => {
                 stack.extend(node.child_by_field_name("left"))
@@ -1022,7 +1022,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
     else {
         return Vec::new();
     };
-    if list.kind() == "identifier" {
+    if matches!(list.kind(), "identifier" | "undefined") {
         return vec![Param {
             name: text(list, src).to_string(),
             binds: Binds::Any,
@@ -1048,7 +1048,7 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
             };
             Param {
                 name: pattern
-                    .filter(|n| n.kind() == "identifier")
+                    .filter(|n| matches!(n.kind(), "identifier" | "undefined"))
                     .map_or("", |n| text(n, src))
                     .to_string(),
                 binds: Binds::Any,
@@ -1409,8 +1409,8 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
             .map_or(Value::Unknown, |n| Value::Await(Box::new(deeper(n)))),
         "number" => Value::Scalar(text(node, src).parse().ok()),
         "true" | "false" => Value::Scalar(None),
-        "identifier" if text(node, src) == "undefined" => Value::Undefined,
-        "identifier" => Value::Ref(text(node, src).to_string()),
+        // `undefined` is a shadowable name, including the grammar's dedicated node.
+        "identifier" | "undefined" => Value::Ref(text(node, src).to_string()),
         "member_expression" if let Some(name) = this_member(node, src, up) => Value::Ref(name),
         kind if FUNCTIONS.contains(&kind) && written_in_place(node, up) => {
             function(scope, &inline(node))

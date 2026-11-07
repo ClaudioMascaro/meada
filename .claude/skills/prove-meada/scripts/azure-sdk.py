@@ -1304,7 +1304,125 @@ EXTRA_SOURCES = {'origins': {'worker.ts': 'import { ServiceBusClient as Bus, Ser
                                                  '      - uses: docker/build-push-action@v6\n'
                                                  '        with:\n'
                                                  '          tags: '
-                                                 'ghcr.io/probe/azure-sdk-worker:v1\n'}}
+                                                 'ghcr.io/probe/azure-sdk-worker:v1\n'},
+ 'overloads': {'worker.ts': "import { ServiceBusClient } from '@azure/service-bus';\n"
+                            'const bus = new ServiceBusClient(connection);\n'
+                            'export function inlineOptions() { '
+                            "bus.createReceiver('typescript-inline', "
+                            "{receiveMode:'peekLock'}).receiveMessages(1); }\n"
+                            'export function namedOptions() { const '
+                            "options={receiveMode:'peekLock'}; "
+                            "bus.createReceiver('typescript-named',options).receiveMessages(1); }\n"
+                            'export function undefinedOptions() { '
+                            "bus.createReceiver('typescript-undefined',undefined).receiveMessages(1); "
+                            '}\n'
+                            'export function changedFields() { const '
+                            "options={receiveMode:'peekLock'}; options.receiveMode=runtime; "
+                            "bus.createReceiver('typescript-fields',options).receiveMessages(1); "
+                            '}\n'
+                            "export function reassigned() { let options={receiveMode:'peekLock'}; "
+                            'options=opaque; '
+                            "bus.createReceiver('unproven-typescript-reassigned',options).receiveMessages(1); "
+                            '}\n'
+                            'export function unknownOptions(options) { '
+                            "bus.createReceiver('unproven-typescript-unknown',options).receiveMessages(1); "
+                            '}\n'
+                            'export function hiddenUndefined(undefined) { '
+                            "bus.createReceiver('unproven-typescript-shadow',undefined).receiveMessages(1); "
+                            '}\n'
+                            "export function stringSubscription() { const subscription='audit'; "
+                            "bus.createReceiver('typescript-topic',subscription,{receiveMode:'peekLock'}).receiveMessages(1); "
+                            '}\n'
+                            'function make(options) { return '
+                            "bus.createReceiver('typescript-factory',options); }\n"
+                            'export function exactFactories() { '
+                            "make({receiveMode:'peekLock'}).receiveMessages(1); "
+                            'make(opaque).receiveMessages(1); }\n'
+                            'export function unaffected() { '
+                            "bus.createReceiver('typescript-unaffected').receiveMessages(1); }\n",
+               'worker.js': "import { ServiceBusClient } from '@azure/service-bus';\n"
+                            'const bus = new ServiceBusClient(connection);\n'
+                            'export function inlineOptions() { '
+                            "bus.createReceiver('javascript-inline', "
+                            "{receiveMode:'peekLock'}).receiveMessages(1); }\n"
+                            'export function namedOptions() { const '
+                            "options={receiveMode:'peekLock'}; "
+                            "bus.createReceiver('javascript-named',options).receiveMessages(1); }\n"
+                            'export function undefinedOptions() { '
+                            "bus.createReceiver('javascript-undefined',undefined).receiveMessages(1); "
+                            '}\n'
+                            'export function changedFields() { const '
+                            "options={receiveMode:'peekLock'}; options.receiveMode=runtime; "
+                            "bus.createReceiver('javascript-fields',options).receiveMessages(1); "
+                            '}\n'
+                            "export function reassigned() { let options={receiveMode:'peekLock'}; "
+                            'options=opaque; '
+                            "bus.createReceiver('unproven-javascript-reassigned',options).receiveMessages(1); "
+                            '}\n'
+                            'export function unknownOptions(options) { '
+                            "bus.createReceiver('unproven-javascript-unknown',options).receiveMessages(1); "
+                            '}\n'
+                            'export function hiddenUndefined(undefined) { '
+                            "bus.createReceiver('unproven-javascript-shadow',undefined).receiveMessages(1); "
+                            '}\n'
+                            "export function stringSubscription() { const subscription='audit'; "
+                            "bus.createReceiver('javascript-topic',subscription,{receiveMode:'peekLock'}).receiveMessages(1); "
+                            '}\n'
+                            'function make(options) { return '
+                            "bus.createReceiver('javascript-factory',options); }\n"
+                            'export function exactFactories() { '
+                            "make({receiveMode:'peekLock'}).receiveMessages(1); "
+                            'make(opaque).receiveMessages(1); }\n'
+                            'export function unaffected() { '
+                            "bus.createReceiver('javascript-unaffected').receiveMessages(1); }\n",
+               'Worker.cs': 'using Azure.Messaging.ServiceBus;\n'
+                            'class Worker {\n'
+                            ' async Task InlineOptions() { var bus=new '
+                            'ServiceBusClient(connection); await '
+                            'bus.CreateReceiver("csharp-inline",new '
+                            'ServiceBusReceiverOptions()).ReceiveMessageAsync(); }\n'
+                            ' async Task NamedOptions() { var bus=new '
+                            'ServiceBusClient(connection); var options=new '
+                            'ServiceBusReceiverOptions(); await '
+                            'bus.CreateReceiver("csharp-named",options).ReceiveMessageAsync(); }\n'
+                            ' async Task NullNamedOptions() { var bus=new '
+                            'ServiceBusClient(connection); await '
+                            'bus.CreateReceiver("csharp-null-named",options:null).ReceiveMessageAsync(); '
+                            '}\n'
+                            ' async Task ChangedFields() { var bus=new '
+                            'ServiceBusClient(connection); var options=new '
+                            'ServiceBusReceiverOptions(); options.ReceiveMode=runtime; await '
+                            'bus.CreateReceiver("csharp-fields",options).ReceiveMessageAsync(); }\n'
+                            ' async Task Reassigned() { var bus=new ServiceBusClient(connection); '
+                            'var options=new ServiceBusReceiverOptions(); options=opaque; await '
+                            'bus.CreateReceiver("unproven-csharp-reassigned",options).ReceiveMessageAsync(); '
+                            '}\n'
+                            ' async Task UnknownOptions(ServiceBusReceiverOptions options) { var '
+                            'bus=new ServiceBusClient(connection); await '
+                            'bus.CreateReceiver("unproven-csharp-unknown",options).ReceiveMessageAsync(); '
+                            '}\n'
+                            ' async Task StringSubscription() { var bus=new '
+                            'ServiceBusClient(connection); var subscription="audit"; await '
+                            'bus.CreateReceiver("csharp-topic",subscription,new '
+                            'ServiceBusReceiverOptions()).ReceiveMessageAsync(); }\n'
+                            ' ServiceBusReceiver Make(ServiceBusReceiverOptions options) { return '
+                            'new '
+                            'ServiceBusClient(connection).CreateReceiver("csharp-factory",options); '
+                            '}\n'
+                            ' async Task ExactFactories() { await Make(new '
+                            'ServiceBusReceiverOptions()).ReceiveMessageAsync(); await '
+                            'Make(opaque).ReceiveMessageAsync(); }\n'
+                            ' async Task Unaffected() { var bus=new ServiceBusClient(connection); '
+                            'await bus.CreateReceiver("csharp-unaffected").ReceiveMessageAsync(); '
+                            '}\n'
+                            ' class Hidden {\n'
+                            '  class ServiceBusReceiverOptions {}\n'
+                            '  async Task HiddenOptions() { var bus=new '
+                            'ServiceBusClient(connection); await '
+                            'bus.CreateReceiver("unproven-csharp-hidden",new '
+                            'ServiceBusReceiverOptions()).ReceiveMessageAsync(); }\n'
+                            ' }\n'
+                            '}\n'}}
 
 def write(root, name, content):
     target = root / name
@@ -1442,6 +1560,11 @@ def extra_oracle(minimum):
     out['mutation']={'providers':[],'consumers':[sb+'subscription:memo/audit',sb+'subscription:snapshot/audit',sb+'subscription:sibling/audit']+['channel::servicebus']*3}
     out['values']={'providers':[image,eh+'events-env',blob+'uploads-env','channel::eventhubs'],'consumers':[image,eh+'events-env',blob+'uploads-env',kv+'token-env','resource::azureblob','resource::keyvault','resource::keyvault','resource::keyvault']}
     out['same-handler']={'providers':[image],'consumers':[image,sb+'orders',sb+'subscription:orders/audit']}
+    receivers=[]
+    for language in ['javascript','typescript','csharp']:
+        receivers += [sb+language+'-'+suffix for suffix in ['inline','named','fields','factory','unaffected']]
+        receivers += [sb+language+('-null-named' if language=='csharp' else '-undefined'),sb+'subscription:'+language+'-topic/audit']
+    out['overloads']={'providers':[],'consumers':receivers+['channel::servicebus']*12}
     return out
 
 

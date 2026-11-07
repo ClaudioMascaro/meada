@@ -564,3 +564,56 @@ fn queue_and_subscription_in_one_handler_survive_private_identity_deduplication(
     );
     assert_golden("azure-sdk-same-handler.export.json", &text);
 }
+
+#[test]
+fn receiver_options_preserve_queue_overloads_without_promoting_unknown_second_arguments() {
+    let (text, json) = export("azure-sdk-overloads");
+    assert!(json["providers"].as_array().unwrap().is_empty(), "{text}");
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), 33, "{text}");
+    for language in ["javascript", "typescript", "csharp"] {
+        for suffix in ["inline", "named", "fields", "factory", "unaffected"] {
+            let contract = format!("channel::servicebus::{language}-{suffix}");
+            assert_eq!(
+                consumers
+                    .iter()
+                    .filter(|side| side["contract"] == contract)
+                    .count(),
+                1,
+                "{text}"
+            );
+        }
+        let optional = if language == "csharp" {
+            "null-named"
+        } else {
+            "undefined"
+        };
+        assert!(
+            consumers
+                .iter()
+                .any(|side| side["contract"]
+                    == format!("channel::servicebus::{language}-{optional}")),
+            "{text}"
+        );
+        assert!(
+            consumers.iter().any(|side| side["contract"]
+                == format!("channel::servicebus::subscription:{language}-topic/audit")),
+            "{text}"
+        );
+    }
+    assert_eq!(
+        consumers
+            .iter()
+            .filter(|side| side["contract"] == "channel::servicebus")
+            .count(),
+        12,
+        "{text}"
+    );
+    assert!(
+        consumers
+            .iter()
+            .all(|side| !side["contract"].as_str().unwrap().contains("unproven")),
+        "{text}"
+    );
+    assert_golden("azure-sdk-overloads.export.json", &text);
+}

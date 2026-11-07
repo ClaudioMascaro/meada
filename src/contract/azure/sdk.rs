@@ -78,9 +78,20 @@ impl Handle {
 }
 
 struct Azure(Language);
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum Parameter {
+    Name(Argument),
+    ReceiverOptions,
+}
+
+fn receiver_options(ty: &str) -> bool {
+    ty == "Azure.Messaging.ServiceBus.ServiceBusReceiverOptions"
+}
+
 impl<'a> Policy<'a> for Azure {
     type Evidence = Handle;
-    type Argument = std::rc::Rc<crate::contract::sdk::Identity<Argument>>;
+    type Argument = std::rc::Rc<crate::contract::sdk::Identity<Parameter>>;
     fn constructed(
         &self,
         code: &Code<'a>,
@@ -168,11 +179,17 @@ impl<'a> Policy<'a> for Azure {
             value,
             frames,
             Some(site),
-            |_| false,
+            receiver_options,
             crate::contract::sdk::mutations::writes,
         );
         std::rc::Rc::new(crate::contract::sdk::Identity::read(&value, &|v| {
-            Some(value_argument(code, path, v)).filter(|name| *name != Argument::Unresolved)
+            if matches!(v, Value::New(ty, _) if receiver_options(ty)) {
+                Some(Parameter::ReceiverOptions)
+            } else {
+                Some(value_argument(code, path, v))
+                    .filter(|name| *name != Argument::Unresolved)
+                    .map(Parameter::Name)
+            }
         }))
     }
 }
