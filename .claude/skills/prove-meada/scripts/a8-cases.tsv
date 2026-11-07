@@ -13,6 +13,8 @@ g8	ordersHref	contract	http::GET::/orders	landed	-	null	new URL(...).href
 g8	ordersString	contract	http::GET::/orders	landed	-	null	new URL + String(u)
 g8	ordersStringHidden	contract	null	control	-	null	control: parameter hides the runtime String conversion
 g8	ordersStringHidden	via	null	control	-	null	control: opaque String callback has no host provenance
+g8	ordersStringSloppy	contract	null	control	-	null	control: non-strict block function hides the runtime String conversion
+g8	ordersStringSloppy	via	null	control	-	null	control: non-strict block function has no host provenance
 g8	ordersInTemplate	contract	http::GET::/orders	landed	-	null	new URL + ${u} in a template string
 g8	ordersJoinAbsolute	contract	http::GET::/orders	landed	-	null	new URL(absolute, base): the reference is itself
 g8	ordersJoinAbsolute	via	host:api.example.com	landed	-	null	new URL(absolute, base): host from the reference

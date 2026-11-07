@@ -129,6 +129,104 @@ fn string_url_conversions_respect_bindings_and_global_writes_in_javascript_and_t
     }
 }
 
+/// Annex B makes a block function a function-scoped binding in non-strict JavaScript.
+/// Modules, directive prologues and class bodies keep the declaration inside its block.
+#[test]
+fn block_string_functions_follow_the_enclosing_javascript_strict_mode() {
+    let repo = fixture_repo("urls_string_block_functions", "http-url-builder", None);
+    std::fs::remove_dir_all(repo.join("src")).unwrap();
+    std::fs::create_dir(repo.join("src")).unwrap();
+    let body = "return fetch(String(new URL('https://api.example.com/api/vets')));";
+    let declaration = "{ function String(value) { return transform(value); } }";
+    let cases = [
+        (
+            "sloppy_function.js",
+            format!("function probe() {{ {declaration} {body} }}"),
+            false,
+        ),
+        (
+            "sloppy_program.js",
+            format!("{declaration} function probe() {{ {body} }}"),
+            false,
+        ),
+        (
+            "strict_function.js",
+            format!("function probe() {{ /* directive */ 'use strict'; {declaration} {body} }}"),
+            true,
+        ),
+        (
+            "strict_program.js",
+            format!("'use strict'; {declaration} function probe() {{ {body} }}"),
+            true,
+        ),
+        (
+            "module.js",
+            format!("export function probe() {{ {declaration} {body} }}"),
+            true,
+        ),
+        (
+            "class.js",
+            format!("class Client {{ probe() {{ {declaration} {body} }} }}"),
+            true,
+        ),
+        (
+            "unrelated.js",
+            format!("function other() {{ {declaration} }} function probe() {{ {body} }}"),
+            true,
+        ),
+        (
+            "generator.js",
+            format!(
+                "function probe() {{ {{ function* String(value) {{ yield value; }} }} {body} }}"
+            ),
+            true,
+        ),
+        (
+            "async.js",
+            format!(
+                "function probe() {{ {{ async function String(value) {{ return value; }} }} {body} }}"
+            ),
+            true,
+        ),
+        (
+            "module_extension.mjs",
+            format!("function probe() {{ {declaration} {body} }}"),
+            true,
+        ),
+    ];
+    for (name, source, _) in &cases {
+        std::fs::write(repo.join(format!("src/{name}")), source).unwrap();
+    }
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), cases.len(), "{export}");
+    for (name, _, global) in cases {
+        let consumer = consumers
+            .iter()
+            .find(|c| {
+                c["site"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("::src/{name}::"))
+            })
+            .unwrap();
+        if global {
+            assert_eq!(
+                consumer["contract"], "http::GET::/api/vets",
+                "{name}: {consumer}"
+            );
+            assert_eq!(
+                consumer["via"], "host:api.example.com",
+                "{name}: {consumer}"
+            );
+        } else {
+            assert!(consumer["contract"].is_null(), "{name}: {consumer}");
+            assert!(consumer["via"].is_null(), "{name}: {consumer}");
+        }
+    }
+}
+
 /// A binding named URL is the runtime constructor only when its export proves it. Unknown
 /// packages, repository aliases and other exports must not invent consumers or links (#709).
 #[test]

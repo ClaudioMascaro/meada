@@ -253,7 +253,8 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   `FOLD_DEPTH` (256): a `+` chain or a chain of string method calls folds only that deep (the
   rest is a hole), and a member chain in a callee is cut to the node kind. Finding the lexical
   scope of a runtime `String` binding uses the same bound; if it is not reached, the file's
-  runtime conversion stays opaque. The parent of every node is read once (`Parents`, which
+  runtime conversion stays opaque. Strict-mode ancestry uses that bound too, falling back
+  conservatively to the non-strict enclosing binding. The parent of every node is read once (`Parents`, which
   `lang/ts/uses.rs` and `lang/ts/types.rs` climb too), as `Node::parent` is linear in the
   tree's depth.
 - `lang/ts.rs` (`url_form`, `Parents::written`, #685): `new URL(x)` of one argument is `x`, and

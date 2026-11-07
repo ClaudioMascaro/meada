@@ -55,7 +55,8 @@ impl LanguagePack for TsJs {
         let tree = parser
             .parse(src, None)
             .ok_or("tree-sitter returned no tree")?;
-        let parents = Parents::new(tree.root_node(), src);
+        let module = path.ends_with(".mjs");
+        let parents = Parents::new(tree.root_node(), src, module);
         // The grammar gives `undefined` a dedicated token and recovers its bare arrow
         // parameter as `undefined = > body`. Reparse only that adjacent `=>` form with an
         // equal-length identifier token. All facts still read the original bytes and spans.
@@ -74,7 +75,7 @@ impl LanguagePack for TsJs {
         };
         let root = repaired.as_ref().unwrap_or(&tree).root_node();
         let parents = if repaired.is_some() {
-            Parents::new(root, src)
+            Parents::new(root, src, module)
         } else {
             parents
         };
@@ -706,12 +707,14 @@ struct Parents<'t> {
     url_declared: bool,
     /// Merged lexical scopes that hide the runtime String conversion.
     string_shadows: Vec<Range<usize>>,
+    /// Modules, class bodies and functions/programs with a strict directive prologue.
+    strict_scopes: HashSet<usize>,
     /// Bare `undefined =>` parameters the grammar recovered as a comparison.
     arrow_parameters: Vec<usize>,
 }
 
 impl<'t> Parents<'t> {
-    fn new(root: Node<'t>, src: &[u8]) -> Self {
+    fn new(root: Node<'t>, src: &[u8], module: bool) -> Self {
         let mut up = HashMap::new();
         let mut assigned = HashSet::new();
         let mut written = HashSet::new();
@@ -721,8 +724,25 @@ impl<'t> Parents<'t> {
         let mut arrow_parameters = Vec::new();
         let mut string_bindings = Vec::new();
         let mut string_writes = Vec::new();
+        let mut strict_scopes = HashSet::new();
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
+            let body = if node.kind() == "program" {
+                Some(node)
+            } else if BODIES.contains(&node.kind()) {
+                node.child_by_field_name("body")
+            } else {
+                None
+            };
+            if node.kind() == "class_body"
+                || body.is_some_and(|body| strict_directive(body, src))
+                || node.kind() == "program"
+                    && (module
+                        || named(node)
+                            .any(|n| matches!(n.kind(), "import_statement" | "export_statement")))
+            {
+                strict_scopes.insert(node.id());
+            }
             if node.kind() == "binary_expression"
                 && let Some(left) = node.child_by_field_name("left")
                 && left.kind() == "undefined"
@@ -776,6 +796,7 @@ impl<'t> Parents<'t> {
             written,
             url_declared,
             string_shadows: Vec::new(),
+            strict_scopes,
             arrow_parameters,
         };
         let mut scopes: Vec<_> = string_bindings
@@ -839,7 +860,12 @@ impl<'t> Parents<'t> {
         let function = self
             .of(node)
             .is_some_and(|parent| parent.kind() == "variable_declaration")
-            || node.kind() == "for_in_statement";
+            || node.kind() == "for_in_statement"
+            // Annex B also creates an enclosing var binding for ordinary block functions
+            // in non-strict code. Async and generator declarations stay block scoped.
+            || node.kind() == "function_declaration"
+                && !children(node).any(|child| child.kind() == "async")
+                && !self.enclosing_strict(node);
         let mut at = self.of(node);
         for _ in 0..FOLD_DEPTH {
             let Some(parent) = at else { break };
@@ -857,6 +883,38 @@ impl<'t> Parents<'t> {
         }
         root.byte_range()
     }
+
+    fn enclosing_strict(&self, node: Node) -> bool {
+        let mut at = self.of(node);
+        for _ in 0..FOLD_DEPTH {
+            let Some(parent) = at else { break };
+            if self.strict_scopes.contains(&parent.id()) {
+                return true;
+            }
+            at = self.of(parent);
+        }
+        false
+    }
+}
+
+/// Only raw string-literal directive statements can enable strict mode. Comments do not
+/// end the prologue, but an ordinary expression does (ECMAScript 14.1.1).
+fn strict_directive(body: Node, src: &[u8]) -> bool {
+    for statement in named(body) {
+        if matches!(statement.kind(), "comment" | "hash_bang_line") {
+            continue;
+        }
+        if statement.kind() != "expression_statement" {
+            return false;
+        }
+        let Some(literal) = named(statement).next().filter(|n| n.kind() == "string") else {
+            return false;
+        };
+        if matches!(text(literal, src), "\"use strict\"" | "'use strict'") {
+            return true;
+        }
+    }
+    false
 }
 
 /// Whether `node` binds `name`, hiding the runtime name. Only the named `URL` export of Node's
