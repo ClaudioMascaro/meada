@@ -17,7 +17,7 @@
       },
       "path": "skills/audit-prove-it",
       "upstreamTree": "99d1fe97d3ca3340d03fdd21648877541415b8a1",
-      "tree": "99d1fe97d3ca3340d03fdd21648877541415b8a1"
+      "tree": "be5922c87b77eb5ebe928baffaa7f696ef3170ab"
     },
     "chief-of-staff": {
       "path": "skills/in-progress/chief-of-staff",
@@ -46,7 +46,7 @@
       },
       "path": "skills/create-prove-it",
       "upstreamTree": "18f1d9f03f3736c2a8652f7485b918664baae727",
-      "tree": "18f1d9f03f3736c2a8652f7485b918664baae727"
+      "tree": "75308b1e83a0ef897ea35543d155af4e58cc43f6"
     },
     "diagnosing-bugs": {
       "path": "skills/engineering/diagnosing-bugs",
@@ -86,12 +86,12 @@
     "implement": {
       "path": "skills/engineering/implement",
       "upstreamTree": "4804b466ab26c9b9d8d42917547db133d1f20a9f",
-      "tree": "4804b466ab26c9b9d8d42917547db133d1f20a9f"
+      "tree": "c0484bebb7b902fb682d0c5b6f5d2aefa872e21d"
     },
     "implement-spec": {
       "path": "skills/engineering/implement-spec",
       "upstreamTree": "407c196f5c88af53c71efc8f31ee37c02dbb12e7",
-      "tree": "6655c7ddd7a351c05830d9c516e9cfad8bf41d99"
+      "tree": "8d1494b5901fe7d56053d11e7feff21a75e1593f"
     },
     "improve-codebase-architecture": {
       "path": "skills/engineering/improve-codebase-architecture",
@@ -110,7 +110,7 @@
       },
       "path": "skills/maintain-prove-it",
       "upstreamTree": "be43531a1ee4054f9e3c37714851fbba1c0d5de4",
-      "tree": "be43531a1ee4054f9e3c37714851fbba1c0d5de4"
+      "tree": "a47a995b3feb844067c263e65a47455ea2d7ca0c"
     },
     "migrate-to-shoehorn": {
       "path": "skills/misc/migrate-to-shoehorn",
