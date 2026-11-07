@@ -56,6 +56,9 @@ def capture(run, scope, base, head, repos):
             command('cli-mcp', [python, SCRIPTS / 'prove.py', 'run', '--base-bin', run / 'bin/meada-base',
                                '--head-bin', run / 'bin/meada-head', '--repos', repos, '--run', run, '--http'])
         if scope['console']:
+            # The base can leave same-version core artifacts in the shared Cargo target.
+            command('clean-console-core', ['cargo', 'clean', '-p', 'meada-core', '--target-dir',
+                                          os.environ.get('CARGO_TARGET_DIR', str(Path.cwd() / 'target'))], required=True)
             command('build-console', [SCRIPTS / 'build.sh', 'head-ui', '.', run,
                                      'ui,accounts' if scope['accounts'] else 'ui'], required=True)
             entries = sorted((run / 'head').glob('*/export1.json'))
@@ -166,6 +169,7 @@ def selftest():
                 assert capture(run, scope, 'a' * 40, 'b' * 40, 'all') == api_exit
             receipt = json.loads((run / 'receipt.json').read_text())
             names = [step['name'] for step in receipt['steps']]
+            assert names.index('build-base') < names.index('clean-console-core') < names.index('build-console')
             for entry in ('meada', 'click'):
                 assert names.index(f'console-{entry}-start') < names.index(f'console-{entry}-api') < names.index(f'console-{entry}-stop')
                 assert (run / 'console-api' / entry / 'head').resolve() == run / 'head'

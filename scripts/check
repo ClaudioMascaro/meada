@@ -59,7 +59,14 @@ def light(path):
 def proof_driver(path):
     return (path == "scripts/prove-ci"
             or (path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/"))
-                and Path(path).suffix not in {".md", ".json", ".yaml", ".yml", ".toml"}))
+                and Path(path).suffix != ".md"
+                and (len(Path(path).parts) > 5 or Path(path).suffix not in {".json", ".yaml", ".yml", ".toml"})))
+
+
+def fixture(path):
+    return (path.startswith(("tests/fixtures/", "tests/golden/"))
+            or (path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/"))
+                and len(Path(path).parts) > 5))
 
 
 def scopes(paths):
@@ -195,6 +202,8 @@ def static(args, paths, tree):
             raise RuntimeError("added Markdown contains an em dash; use a comma, colon or parentheses")
     root = Path.cwd().resolve()
     for name in paths:
+        if fixture(name):
+            continue  # Product inputs include malformed files, Helm templates and CloudFormation tags.
         path = Path(name)
         if not path.exists() and not path.is_symlink():
             continue  # Deleted paths still contribute to the scope.
@@ -205,8 +214,6 @@ def static(args, paths, tree):
             continue
         if not path.is_file():
             continue
-        if name.startswith(("tests/fixtures/", "tests/golden/")):
-            continue  # Deliberately malformed product inputs belong to the product tests.
         if not (light(name) or name.startswith(("deploy/", "ui/", "scripts/"))
                 or name in {"Cargo.toml", "meada-core/Cargo.toml", "rust-toolchain.toml", "dist-workspace.toml"}):
             continue
@@ -409,6 +416,22 @@ def selftest():
             assert pushed["routine"] and not pushed["e2e"] and pushed["product"]
             manual = ci_selection("workflow_dispatch", {})[0]
             assert not any(manual[key] for key in FLAGS)
+            inputs = [".claude/skills/prove-meada/scripts/a7-probe/chart/templates/deployment.yaml",
+                      ".claude/skills/prove-meada/scripts/a7-cfn/sam/template.yaml",
+                      "tests/fixtures/invalid/data.json"]
+            for path in inputs:
+                write(path, "{{ intentionally invalid input\n")
+            static([base, docs], inputs, docs)
+            for path in inputs[:2]:
+                assert scopes([path])["cli"] and scopes([path])["console"] and not scopes([path])["product"]
+            assert not proof_driver(".claude/skills/prove-meada/scripts/a7-probe/README.md")
+            write(".claude/settings.json", "invalid configuration\n")
+            try:
+                static([base, docs], [".claude/settings.json"], docs)
+            except json.JSONDecodeError:
+                pass
+            else:
+                raise AssertionError("invalid harness configuration was accepted")
             write("event.json", json.dumps({"before": "0" * 40, "after": docs}))
             env = dict(os.environ, GITHUB_EVENT_PATH=str(Path("event.json").resolve()), GITHUB_EVENT_NAME="push",
                        GITHUB_OUTPUT=str(Path("outputs").resolve()), GITHUB_STEP_SUMMARY=str(Path("summary").resolve()))
