@@ -1,5 +1,9 @@
 # Deploy
 
+These product execution commands are CI-only recipes under `AGENTS.md`. Locally, prepare
+inputs or read the matching run artifact; do not build or start the product.
+
+
 ## Renders, base against head
 
 ```bash

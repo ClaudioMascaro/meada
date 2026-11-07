@@ -10,7 +10,7 @@ If the user passes a ticket reference, fetch it from the issue tracker and state
 
 Call the Skill tool with "tdd" where possible, at pre-agreed seams.
 
-Run typechecking regularly, single test files regularly, and the full test suite once at the end.
+Follow `AGENTS.md` for validation scope and the pre-commit gate. Use focused checks while implementing, then run the applicable `scripts/check` gate through `gate --staged`. Documentation, instructions and harness-only edits get static and self-checks, with E2E `N/A` in the validation summary and no proof receipt. Prepare or read CI evidence only when the E2E policy applies.
 
 Once done, call the Skill tool with "code-review" to review the work.
 

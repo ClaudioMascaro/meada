@@ -1,11 +1,11 @@
 # Flow of a query and server mode
 
-Detail behind the [architecture map](../architecture.md), which keeps the flow, identities,
+Detail behind the [architecture map](../architecture.md), which routes flow, identities,
 seams and invariants (the limits are in [Known ceilings](../ceilings.md)). The code wins over
 this file, and a change to these modules updates it.
 
-The first paragraph of the flow, how a workspace opens and what `Engine` reads, is in the
-[architecture map](../architecture.md#flow). The rest:
+How a workspace opens and what `Engine` reads is in the
+[flow overview](overview/flow.md). The rest:
 
 The status report and readiness share one `Manifest::read_listed`, including a managed version
 swap during the informational Valkey probe; `ready` also reuses one listed manifest across

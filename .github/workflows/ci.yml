@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, labeled, ready_for_review]
   push:
     # loop/**: the backlog loop's ticket branches, where this run is the gate before the merge.
     branches: [main, 'loop/**']
@@ -21,13 +22,54 @@ permissions:
 # first cargo command. The image is pinned: `ubuntu-latest` moves to 26.04 from 2026-10-19
 # (actions/runner-images#14748), and a new image is a change of its own.
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      routine: ${{ steps.scope.outputs.routine }}
+      product: ${{ steps.scope.outputs.product }}
+      e2e: ${{ steps.scope.outputs.e2e }}
+      cli: ${{ steps.scope.outputs.cli }}
+      console: ${{ steps.scope.outputs.console }}
+      accounts: ${{ steps.scope.outputs.accounts }}
+      deploy: ${{ steps.scope.outputs.deploy }}
+      container: ${{ steps.scope.outputs.container }}
+      goldens: ${{ steps.scope.outputs.goldens }}
+      base: ${{ steps.scope.outputs.base }}
+      head: ${{ steps.scope.outputs.head }}
+      repos: ${{ steps.scope.outputs.repos }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select routine gates and milestone E2E
+        id: scope
+        run: python3 scripts/check --ci
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        if: steps.scope.outputs.deploy == 'true' && steps.scope.outputs.product == 'true'
+        with:
+          version: v3.19.0
+      - name: Check the verification harness and documentation
+        if: steps.scope.outputs.routine == 'true'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/check-venv"
+          "$RUNNER_TEMP/check-venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3
+          "$RUNNER_TEMP/check-venv/bin/python" scripts/check --selftest
+          "$RUNNER_TEMP/check-venv/bin/python" scripts/prove-ci --selftest
+          "$RUNNER_TEMP/check-venv/bin/python" scripts/check --static
+
   fmt:
+    needs: changes
+    if: needs.changes.outputs.routine == 'true' && needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: cargo fmt --check
 
   clippy:
+    needs: changes
+    if: needs.changes.outputs.routine == 'true' && needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -37,6 +79,8 @@ jobs:
   # Each cloud feature builds alone (ADR 0012), and in the pairs the code gates on. Clippy only:
   # the tests need services, and the `cloud` job runs them with `--all-features`.
   clippy-features:
+    needs: changes
+    if: needs.changes.outputs.routine == 'true' && needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -72,6 +116,8 @@ jobs:
       - run: cargo clippy --locked --all-targets --features ${{ matrix.features }} -- -D warnings
 
   test:
+    needs: changes
+    if: needs.changes.outputs.routine == 'true' && needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -79,6 +125,8 @@ jobs:
       - run: cargo test --locked
 
   benchmark:
+    needs: changes
+    if: needs.changes.outputs.routine == 'true' && needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -105,6 +153,8 @@ jobs:
 
   # Cloud modules (ADR 0012): every feature, against a local Valkey and S3-compatible server.
   cloud:
+    needs: changes
+    if: needs.changes.outputs.routine == 'true' && needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
     # scripts/test-services mirrors these services and env; tests/it/test_services.rs keeps them in step.
     services:
@@ -191,9 +241,13 @@ jobs:
   # The standalone frontend gate (ADR 0014). Rust contributors need neither Node nor wasm-pack.
   # Keep the core dependency boundaries here beside its browser build.
   frontend:
+    needs: changes
+    if: (needs.changes.outputs.routine == 'true' && needs.changes.outputs.product == 'true') || (needs.changes.outputs.e2e == 'true' && needs.changes.outputs.console == 'true')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: rustup target add wasm32-unknown-unknown
       - name: meada-core carries none of the binary's crates
@@ -235,8 +289,103 @@ jobs:
         working-directory: ui
       - run: npm test
         working-directory: ui
+      - name: Retain the frontend for selected E2E
+        if: needs.changes.outputs.e2e == 'true' && needs.changes.outputs.console == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: meada-ui-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ui/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  prove-meada:
+    needs: [changes, frontend]
+    if: >-
+      always() && !cancelled() && needs.changes.result == 'success' &&
+      needs.changes.outputs.e2e == 'true' &&
+      (needs.changes.outputs.console != 'true' || needs.frontend.result == 'success')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: '2'
+      RUST_TEST_THREADS: '2'
+      PROVE_BASE: ${{ needs.changes.outputs.base }}
+      PROVE_HEAD: ${{ needs.changes.outputs.head }}
+      PROVE_REPOS: ${{ needs.changes.outputs.repos }}
+      PROVE_CLI: ${{ needs.changes.outputs.cli }}
+      PROVE_CONSOLE: ${{ needs.changes.outputs.console }}
+      PROVE_ACCOUNTS: ${{ needs.changes.outputs.accounts }}
+      PROVE_DEPLOY: ${{ needs.changes.outputs.deploy }}
+      PROVE_CONTAINER: ${{ needs.changes.outputs.container }}
+      PROVE_GOLDENS: ${{ needs.changes.outputs.goldens }}
+      PROVE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      MEADA_TEST_POSTGRES_URL: postgres://postgres:meada-test@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.changes.outputs.head }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Prepare proof readers
+        run: |
+          echo "PROVE_RUN=$RUNNER_TEMP/prove-meada" >> "$GITHUB_ENV"
+          echo "PROVE_NODE=$RUNNER_TEMP/prove-node" >> "$GITHUB_ENV"
+          python3 -m venv "$RUNNER_TEMP/prove-venv"
+          "$RUNNER_TEMP/prove-venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        if: env.PROVE_DEPLOY == 'true'
+        with:
+          version: v3.19.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: env.PROVE_CONSOLE == 'true'
+        with:
+          name: meada-ui-${{ needs.changes.outputs.head }}
+          path: ui/dist
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: env.PROVE_CONSOLE == 'true'
+        with:
+          node-version-file: ui/.nvmrc
+      - name: Prepare browser proof tools
+        if: env.PROVE_CONSOLE == 'true'
+        run: |
+          npm install --prefix "$PROVE_NODE" --no-audit --no-fund playwright-core@1.61.1 axe-core@4.12.1
+          "$PROVE_NODE/node_modules/.bin/playwright-core" install --with-deps chromium
+      - name: Start the accounts proof database
+        if: env.PROVE_ACCOUNTS == 'true'
+        run: |
+          docker run -d --name zz-prove-postgres -p 5432:5432 -e POSTGRES_PASSWORD=meada-test postgres:15-alpine
+          timeout 60 bash -c 'until docker exec zz-prove-postgres pg_isready -U postgres; do sleep 1; done'
+      - name: Capture selected behavior against the PR base
+        run: '"$RUNNER_TEMP/prove-venv/bin/python" scripts/prove-ci'
+      - name: Stop the accounts proof database
+        if: always() && env.PROVE_ACCOUNTS == 'true'
+        run: docker rm -f zz-prove-postgres
+      - name: Retain evidence and failures (capture is not PROVED)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: prove-meada-${{ github.event.pull_request.number }}-${{ needs.changes.outputs.head }}
+          path: |
+            ${{ runner.temp }}/prove-meada/receipt.json
+            ${{ runner.temp }}/prove-meada/*.md
+            ${{ runner.temp }}/prove-meada/logs
+            ${{ runner.temp }}/prove-meada/queries
+            ${{ runner.temp }}/prove-meada/base
+            ${{ runner.temp }}/prove-meada/head
+            ${{ runner.temp }}/prove-meada/http
+            ${{ runner.temp }}/prove-meada/console
+            ${{ runner.temp }}/prove-meada/deploy
+            ${{ runner.temp }}/prove-meada/bin/*.from
+            !${{ runner.temp }}/prove-meada/console/private.pem
+            !${{ runner.temp }}/prove-meada/console/indexes
+            !${{ runner.temp }}/prove-meada/http/**/indexes
+          if-no-files-found: warn
+          retention-days: 30
 
   docs:
+    needs: changes
+    if: needs.changes.outputs.routine == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
