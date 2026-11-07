@@ -393,7 +393,7 @@ entries and configuration values stay outside the export.
 
 ### GCP SDK clients
 
-The five GCP SDK groups (JavaScript/TypeScript, Python, Java, Go and C#) recognize the documented Pub/Sub publish and subscription receive, Cloud Storage read/write and Secret Manager access forms. The [user guide](../../user-guide.en.md#gcp-sdk-use-in-five-language-groups) lists the exact operations and constructors. Topic/subscription handles retain distinct identities, including workload environment resolution; an environment read alone stays unresolved.
+The five GCP SDK groups (JavaScript/TypeScript, Python, Java, Go and C#) recognize the documented Pub/Sub publish and subscription receive, Cloud Storage read/write and Secret Manager access forms. The [user guide](https://github.com/ClaudioMascaro/meada/blob/main/docs/user-guide.en.md#gcp-sdk-use-in-five-language-groups) lists the exact operations and constructors. Topic/subscription handles retain distinct identities, including workload environment resolution; an environment read alone stays unresolved.
 
 ### AWS channels, data, secrets and subscriptions
 
