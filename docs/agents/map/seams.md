@@ -1,11 +1,12 @@
 # Seams: ecosystems, shared readers and libraries
 
-Detail behind the [architecture map](../architecture.md), which keeps the flow, identities,
+Detail behind the [architecture map](../architecture.md), which routes flow, identities,
 seams and invariants (the limits are in [Known ceilings](../ceilings.md)). The code wins over
 this file, and a change to these modules updates it.
 
 The extension steps of the package ecosystems, the readers the JVM and .NET share, and the
-entries per library of the HTTP and channel kinds. The architecture map keeps the other seams.
+entries per library of the HTTP and channel kinds. The other extension steps are in
+[Seams and what extends them](overview/seams-and-what-extends-them.md).
 
 - `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
   JVM: `dotnet/msbuild.rs` reads an SDK-style project file (`msbuild::read`: whether it is a

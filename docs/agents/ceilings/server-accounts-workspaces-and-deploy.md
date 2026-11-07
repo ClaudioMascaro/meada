@@ -1,7 +1,11 @@
 # Server, accounts, workspaces and deploy
 
-- `tests/it/docs.rs` (#644): `MAP_BUDGET` (64 KiB, the repository map) and `AREA_BUDGET` (64 KiB, every
-  other Markdown file under `docs/agents`) bound a file in bytes, so an agent reads it in one call;
+- `tests/it/docs.rs` (#644): `MAP_BUDGET` (8 KiB, the architecture, contracts and
+  resolution/index/shape ceiling indexes), `DETAIL_BUDGET` (24 KiB, their relocated topic
+  leaves under `map/overview/`, `map/contracts/` and
+  `ceilings/resolution-the-index-and-shape-readers/`) and `AREA_BUDGET` (64 KiB, the other
+  Markdown files under `docs/agents`) bound a file in bytes, keeping mandatory routing small
+  while untouched areas await their own split;
   a file past its budget fails `every_agents_markdown_file_stays_within_its_budget` with its path,
   its size, its budget and `cargo run --example split_agents -- <file>`, which splits it by its
   `## ` headings (the splitter does not split inside a section: a part still past the budget needs
