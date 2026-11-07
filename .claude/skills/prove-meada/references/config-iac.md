@@ -314,6 +314,9 @@ type, physical name, file, first and last line, root module) and the references,
    status adds only defaults the base did not already redact. Existing A7 annotation and
    context contract-role tails retain the base's complete bytes, while node identities,
    types, roots and supported physical names still answer to the independent source oracle.
+   SAM contexts also require literal `CodeUri` and `Handler` metadata from the template,
+   with function properties overriding `Globals.Function` (#664). Missing or changed
+   metadata fails without shifting or discarding the references and values that follow.
    Dedicated provision/orphan flows judge those tails' semantics independently.
 2. **Queries over stdio**, budget 200,000: per sampled node (`--sample`, 8: half with references
    both ways) `search` kind `iac` on its address, a five-character prefix and its physical name,

@@ -731,7 +731,7 @@ aprovisionamiento y export.
 
 ### SDK de Azure en cinco grupos de lenguajes
 
-Los constructores conocidos de los SDK de Azure en JavaScript/TypeScript, Python, Java, Go y C# crean productores/consumidores de Service Bus y Event Hubs, escritores/lectores de contenedores Blob y lectores de secretos Key Vault. La [guía de usuario](../../user-guide.es.md#uso-de-los-sdk-de-azure-en-cinco-grupos-de-lenguajes) enumera constructores y operaciones. Los receptores de suscripción conservan tema y suscripción dentro de la misma carga, raíz y contenedor; los nombres del entorno sin esa evidencia siguen sin resolverse. Las formas C# existentes de Service Bus conservan la identidad del tema.
+Los constructores conocidos de los SDK de Azure en JavaScript/TypeScript, Python, Java, Go y C# crean productores/consumidores de Service Bus y Event Hubs, escritores/lectores de contenedores Blob y lectores de secretos Key Vault. La [guía de usuario](https://github.com/ClaudioMascaro/meada/blob/main/docs/user-guide.es.md#uso-de-los-sdk-de-azure-en-cinco-grupos-de-lenguajes) enumera constructores y operaciones. Los receptores de suscripción conservan tema y suscripción dentro de la misma carga, raíz y contenedor; los nombres del entorno sin esa evidencia siguen sin resolverse. Las formas C# existentes de Service Bus conservan la identidad del tema.
 
 ## Recursos personalizados y módulos de infraestructura
 
