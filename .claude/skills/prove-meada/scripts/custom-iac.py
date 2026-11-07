@@ -202,20 +202,71 @@ key_path = "spec.target"
 '''
     write(infra, 'meada.toml', config)
     tf = '''variable "stage" { default = "blue" }
-module "private" { source = "git::https://example.com/private/modules/queue" queue_name = "private-${var.stage}" }
-module "priority" { source = "git::https://example.com/private/modules/priority" settings = { name = "urgent" } }
-module "neighbor" { source = "git::https://example.com/private/modules-other/queue" queue_name = "never-neighbor" }
-module "queue" { source = "terraform-aws-modules/sqs/aws" name = "registry-jobs" }
-module "topic" { source = "terraform-aws-modules/sns/aws" name = "registry-events" fifo_topic = true }
-module "bucket" { source = "terraform-aws-modules/s3-bucket/aws" bucket = "registry-assets" }
-module "table" { source = "terraform-aws-modules/dynamodb-table/aws" name = "registry-ledger" }
-module "function" { source = "terraform-aws-modules/lambda/aws" function_name = "processor" package_type = "Image" image_uri = "registry.example.com/probe671/function:1" environment_variables = { JOBS = "registry-jobs" } }
-module "service" { source = "terraform-aws-modules/ecs/aws//modules/service" name = "processor-service" container_definitions = { worker = { image = "registry.example.com/probe671/service:1", environment = [{ name = "JOBS", value = "private-blue" }] }, off = { create = false, image = "registry.example.com/probe671/service:1", environment = [{name = "JOBS", value = "never-disabled"}] } } }
-module "off" { source = "terraform-aws-modules/sqs/aws" name = "never-off" create = false }
-module "zero" { source = "terraform-aws-modules/sqs/aws" name = "never-zero" count = 0 }
-module "maybe" { source = "terraform-aws-modules/sqs/aws" name = "never-maybe" create = data.external.unread.result }
-module "unknown" { source = "terraform-aws-modules/sqs/aws" name = data.external.unread.result }
-module "prefix" { source = "terraform-aws-modules/sqs/aws" name = "prefix" use_name_prefix = true }
+module "private" {
+ source = "git::https://example.com/private/modules/queue"
+ queue_name = "private-${var.stage}"
+}
+module "priority" {
+ source = "git::https://example.com/private/modules/priority"
+ settings = { name = "urgent" }
+}
+module "neighbor" {
+ source = "git::https://example.com/private/modules-other/queue"
+ queue_name = "never-neighbor"
+}
+module "queue" {
+ source = "terraform-aws-modules/sqs/aws"
+ name = "registry-jobs"
+}
+module "topic" {
+ source = "terraform-aws-modules/sns/aws"
+ name = "registry-events"
+ fifo_topic = true
+}
+module "bucket" {
+ source = "terraform-aws-modules/s3-bucket/aws"
+ bucket = "registry-assets"
+}
+module "table" {
+ source = "terraform-aws-modules/dynamodb-table/aws"
+ name = "registry-ledger"
+}
+module "function" {
+ source = "terraform-aws-modules/lambda/aws"
+ function_name = "processor"
+ package_type = "Image"
+ image_uri = "registry.example.com/probe671/function:1"
+ environment_variables = { JOBS = "registry-jobs" }
+}
+module "service" {
+ source = "terraform-aws-modules/ecs/aws//modules/service"
+ name = "processor-service"
+ container_definitions = { worker = { image = "registry.example.com/probe671/service:1", environment = [{ name = "JOBS", value = "private-blue" }] }, off = { create = false, image = "registry.example.com/probe671/service:1", environment = [{name = "JOBS", value = "never-disabled"}] } }
+}
+module "off" {
+ source = "terraform-aws-modules/sqs/aws"
+ name = "never-off"
+ create = false
+}
+module "zero" {
+ source = "terraform-aws-modules/sqs/aws"
+ name = "never-zero"
+ count = 0
+}
+module "maybe" {
+ source = "terraform-aws-modules/sqs/aws"
+ name = "never-maybe"
+ create = data.external.unread.result
+}
+module "unknown" {
+ source = "terraform-aws-modules/sqs/aws"
+ name = data.external.unread.result
+}
+module "prefix" {
+ source = "terraform-aws-modules/sqs/aws"
+ name = "prefix"
+ use_name_prefix = true
+}
 '''
     write(infra, 'main.tf', tf)
     custom = {'apiVersion': 'platform.example.com/v1', 'kind': 'MessageQueue', 'metadata': {'name': 'custom-object'}, 'spec': {'target': 'private-custom'}}
@@ -225,11 +276,34 @@ module "prefix" { source = "terraform-aws-modules/sqs/aws" name = "prefix" use_n
     baseline = capture(binary, infra, run, 'modules', 'export')
     assert provisioners(baseline) == wanted, baseline
     assert [(c['contract'], c['site']) for c in baseline.get('consumers', [])] == [('image::registry.example.com/probe671/function', REMOTE+'infra::main.tf::module.function'), ('image::registry.example.com/probe671/service', REMOTE+'infra::main.tf::module.service')], baseline
-    tf += '''module "source_function" { source = "terraform-aws-modules/lambda/aws" function_name = "local-source" source_path = "code" handler = "handler.processJob" }
-module "package_function" { source = "terraform-aws-modules/lambda/aws" function_name = "opaque-package" create_package = false local_existing_package = "bundle/function.zip" }
-module "list_source" { source = "terraform-aws-modules/lambda/aws" function_name = "never-list" source_path = ["code"] }
-module "parent_source" { source = "terraform-aws-modules/lambda/aws" function_name = "never-parent" source_path = "../outside" }
-module "unread_package" { source = "terraform-aws-modules/lambda/aws" function_name = "never-package" source_path = "code" create_package = data.external.unread.result }
+    tf += '''module "source_function" {
+ source = "terraform-aws-modules/lambda/aws"
+ function_name = "local-source"
+ source_path = "code"
+ handler = "handler.processJob"
+}
+module "package_function" {
+ source = "terraform-aws-modules/lambda/aws"
+ function_name = "opaque-package"
+ create_package = false
+ local_existing_package = "bundle/function.zip"
+}
+module "list_source" {
+ source = "terraform-aws-modules/lambda/aws"
+ function_name = "never-list"
+ source_path = ["code"]
+}
+module "parent_source" {
+ source = "terraform-aws-modules/lambda/aws"
+ function_name = "never-parent"
+ source_path = "../outside"
+}
+module "unread_package" {
+ source = "terraform-aws-modules/lambda/aws"
+ function_name = "never-package"
+ source_path = "code"
+ create_package = data.external.unread.result
+}
 '''
     write(infra, 'main.tf', tf)
     code = 'export function processJob() { return "done"; }\n'
