@@ -617,3 +617,39 @@ fn receiver_options_preserve_queue_overloads_without_promoting_unknown_second_ar
     );
     assert_golden("azure-sdk-overloads.export.json", &text);
 }
+
+#[test]
+fn arrow_parameters_named_undefined_never_make_a_queue_delivery() {
+    let (text, json) = export("azure-sdk-arrow-bindings");
+    assert_eq!(json["providers"].as_array().unwrap().len(), 2, "{text}");
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), 12, "{text}");
+    for ext in ["js", "ts"] {
+        for name in ["bare", "commented", "parenthesized", "asynchronous"] {
+            let site = format!("::worker.{ext}::{name}");
+            let side = consumers
+                .iter()
+                .find(|side| side["site"].as_str().unwrap().ends_with(&site))
+                .unwrap_or_else(|| panic!("missing {site}: {text}"));
+            assert_eq!(side["contract"], "channel::servicebus", "{text}");
+        }
+        for (name, entity) in [("unaffected", "shadowed-route"), ("builtin", "builtin")] {
+            let site = format!("::worker.{ext}::{name}");
+            assert!(
+                consumers
+                    .iter()
+                    .any(|side| side["site"].as_str().unwrap().ends_with(&site)
+                        && side["contract"] == format!("channel::servicebus::{entity}-{ext}")),
+                "{text}"
+            );
+        }
+    }
+    let links = json["links"].as_array().unwrap();
+    assert_eq!(links.len(), 2, "{text}");
+    assert!(
+        links.iter().all(|link| link["level"] == "exact"
+            && link["consumer"].as_str().unwrap().ends_with("::unaffected")),
+        "{text}"
+    );
+    assert_golden("azure-sdk-arrow-bindings.export.json", &text);
+}

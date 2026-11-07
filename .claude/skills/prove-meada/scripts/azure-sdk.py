@@ -1424,6 +1424,39 @@ EXTRA_SOURCES = {'origins': {'worker.ts': 'import { ServiceBusClient as Bus, Ser
                             ' }\n'
                             '}\n'}}
 
+EXTRA_SOURCES['arrow-bindings'] = {'worker.js': "import { ServiceBusClient } from '@azure/service-bus';\n"
+              'const bus=new ServiceBusClient(connection);\n'
+              'export function send() { '
+              "bus.createSender('shadowed-route-js').sendMessages(message); }\n"
+              'export const bare = undefined => '
+              "bus.createReceiver('shadowed-route-js',undefined).receiveMessages(1);\n"
+              'export const commented = undefined /* parameter */ => '
+              "bus.createReceiver('shadowed-route-js',undefined).receiveMessages(1);\n"
+              'export const parenthesized = (undefined) => '
+              "bus.createReceiver('shadowed-route-js',undefined).receiveMessages(1);\n"
+              'export const asynchronous = async undefined => '
+              "bus.createReceiver('shadowed-route-js',undefined).receiveMessages(1);\n"
+              'export const unaffected = options => '
+              "bus.createReceiver('shadowed-route-js').receiveMessages(1);\n"
+              'export function builtin() { '
+              "bus.createReceiver('builtin-js',undefined).receiveMessages(1); }\n",
+ 'worker.ts': "import { ServiceBusClient } from '@azure/service-bus';\n"
+              'const bus=new ServiceBusClient(connection);\n'
+              'export function send() { '
+              "bus.createSender('shadowed-route-ts').sendMessages(message); }\n"
+              'export const bare = undefined => '
+              "bus.createReceiver('shadowed-route-ts',undefined).receiveMessages(1);\n"
+              'export const commented = undefined /* parameter */ => '
+              "bus.createReceiver('shadowed-route-ts',undefined).receiveMessages(1);\n"
+              'export const parenthesized = (undefined) => '
+              "bus.createReceiver('shadowed-route-ts',undefined).receiveMessages(1);\n"
+              'export const asynchronous = async undefined => '
+              "bus.createReceiver('shadowed-route-ts',undefined).receiveMessages(1);\n"
+              'export const unaffected = options => '
+              "bus.createReceiver('shadowed-route-ts').receiveMessages(1);\n"
+              'export function builtin() { '
+              "bus.createReceiver('builtin-ts',undefined).receiveMessages(1); }\n"}
+
 def write(root, name, content):
     target = root / name
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -1565,6 +1598,7 @@ def extra_oracle(minimum):
         receivers += [sb+language+'-'+suffix for suffix in ['inline','named','fields','factory','unaffected']]
         receivers += [sb+language+('-null-named' if language=='csharp' else '-undefined'),sb+'subscription:'+language+'-topic/audit']
     out['overloads']={'providers':[],'consumers':receivers+['channel::servicebus']*12}
+    out['arrow-bindings']={'providers':[sb+'shadowed-route-js',sb+'shadowed-route-ts'], 'consumers':[sb+'shadowed-route-js',sb+'builtin-js',sb+'shadowed-route-ts',sb+'builtin-ts']+['channel::servicebus']*8}
     return out
 
 
@@ -1654,6 +1688,9 @@ def run_extra(binary,roots,oracles,run,http):
                 identities=[json.loads(row[0]) for row in db.execute('SELECT identity FROM contracts WHERE identity IS NOT NULL')]
             assert identities and all(token not in json.dumps(identities) for token in ['SharedAccessKey','Endpoint','AZURE_SDK_CREDENTIAL_CANARY_670'])
             save(run,label+'.private-identities.json',identities)
+        if label=='arrow-bindings':
+            assert len(data['links'])==2 and all(link['level']=='exact' and link['consumer'].endswith('::unaffected') for link in data['links']),data['links']
+            assert all(side['contract']=='channel::servicebus' for side in data['consumers'] if side['site'].endswith(('::bare','::commented','::parenthesized','::asynchronous'))),data['consumers']
         if label=='origins':
             for file in ['worker.js','worker.ts','worker.py','worker.go','Worker.java','Worker.cs']:
                 assert any(call['span']['path']==file and call['level'] in ['inferred','ambiguous'] and ('::unknown.make' in call['id'] or '::foreign.' in call['id']) for call in data['calls']),file

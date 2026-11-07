@@ -56,6 +56,28 @@ impl LanguagePack for TsJs {
             .parse(src, None)
             .ok_or("tree-sitter returned no tree")?;
         let parents = Parents::new(tree.root_node(), src);
+        // The grammar gives `undefined` a dedicated token and recovers its bare arrow
+        // parameter as `undefined = > body`. Reparse only that adjacent `=>` form with an
+        // equal-length identifier token. All facts still read the original bytes and spans.
+        let repaired = if parents.arrow_parameters.is_empty() {
+            None
+        } else {
+            let mut syntax = src.to_vec();
+            for &at in &parents.arrow_parameters {
+                syntax[at] = b'_';
+            }
+            Some(
+                parser
+                    .parse(&syntax, None)
+                    .ok_or("tree-sitter returned no tree")?,
+            )
+        };
+        let root = repaired.as_ref().unwrap_or(&tree).root_node();
+        let parents = if repaired.is_some() {
+            Parents::new(root, src)
+        } else {
+            parents
+        };
         let mut facts = Facts {
             member_writes: Some(Vec::new()),
             ..Facts::default()
@@ -73,10 +95,10 @@ impl LanguagePack for TsJs {
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
-            node: tree.root_node(),
+            node: root,
             scope: String::new(),
             depth: 0,
-            body: tree.root_node(),
+            body: root,
             binding: None,
         }];
         while let Some(Visit {
@@ -682,6 +704,8 @@ struct Parents<'t> {
     /// Whether the file binds a `URL` other than the runtime constructor: `new URL(x)` is then
     /// no runtime global.
     url_declared: bool,
+    /// Bare `undefined =>` parameters the grammar recovered as a comparison.
+    arrow_parameters: Vec<usize>,
 }
 
 impl<'t> Parents<'t> {
@@ -692,8 +716,22 @@ impl<'t> Parents<'t> {
         let mut url_declared = false;
         let mut url_required = false;
         let mut require_declared = false;
+        let mut arrow_parameters = Vec::new();
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
+            if node.kind() == "binary_expression"
+                && let Some(left) = node.child_by_field_name("left")
+                && left.kind() == "undefined"
+                && let Some(operator) = node.child_by_field_name("operator")
+                && operator.kind() == ">"
+                && let Some(at) = operator.start_byte().checked_sub(1)
+                && src.get(at..operator.end_byte()) == Some(b"=>")
+                && children(node).any(|child| {
+                    child.is_error() && child.start_byte() == at && child.end_byte() == at + 1
+                })
+            {
+                arrow_parameters.push(left.start_byte());
+            }
             url_declared |= shadows_runtime(node, src, "URL");
             url_required |= runtime_url_require(node, src);
             require_declared |= shadows_runtime(node, src, "require");
@@ -722,6 +760,7 @@ impl<'t> Parents<'t> {
             assigned,
             written,
             url_declared,
+            arrow_parameters,
         }
     }
 
@@ -1425,17 +1464,23 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                         .then(|| f.child_by_field_name("object"))
                         .flatten()
                         .map(|object| Box::new(deeper(object)));
-                    Value::Call(Invocation {
+                    let awaited = awaited_artifact(node);
+                    let call = Value::Call(Invocation {
                         callee: callee(f, src),
                         receiver,
                         args: args.map_or(Vec::new(), |a| named(a).map(deeper).collect()),
                         kwargs: Vec::new(),
                         // The span of the call in `Facts::calls`.
-                        range: match awaited_artifact(node) {
+                        range: match awaited {
                             true => f.start_byte()..node.end_byte(),
                             false => node.byte_range(),
                         },
-                    })
+                    });
+                    if awaited {
+                        Value::Await(Box::new(call))
+                    } else {
+                        call
+                    }
                 })
             }
             None if kind == "new_expression" => callee_node(node).map_or(Value::Unknown, |f| {
@@ -2391,6 +2436,40 @@ mod tests {
         TsJs.parse("a.ts", src.as_bytes()).unwrap()
     }
 
+    #[test]
+    fn a_bare_undefined_arrow_retains_its_parameter_scope_and_original_spans() {
+        let src = "const bare = undefined => read(undefined);\n\
+                   const commented = undefined /* parameter */ => read(undefined);\n\
+                   const parenthesized = (undefined) => read(undefined);\n\
+                   const asynchronous = async undefined => read(undefined);\n\
+                   const ordinary = value => read(value);\n\
+                   const comparison = undefined > read(undefined);\n\
+                   const malformed = undefined = > read(undefined);\n\
+                   const text = 'undefined => read(undefined)';\n\
+                   // const comment = undefined => read(undefined);\n";
+        for path in ["a.js", "a.ts"] {
+            let facts = TsJs.parse(path, src.as_bytes()).unwrap();
+            let functions = [
+                ("bare", "undefined"),
+                ("commented", "undefined"),
+                ("parenthesized", "undefined"),
+                ("asynchronous", "undefined"),
+                ("ordinary", "value"),
+            ];
+            assert_eq!(facts.defs.len(), functions.len(), "{path}");
+            for (name, parameter) in functions {
+                let def = facts.defs.iter().find(|d| d.name == name).unwrap();
+                assert_eq!(def.params.len(), 1, "{path}: {name}");
+                assert_eq!(def.params[0].name, parameter, "{path}: {name}");
+                let call = facts.calls.iter().find(|c| c.scope == name).unwrap();
+                assert_eq!(&src[call.range.clone()], format!("read({parameter})"));
+                assert!(matches!(&call.args[0], Value::Ref(name) if name == parameter));
+                assert!(src[def.range.clone()].contains(parameter));
+            }
+            assert_eq!(facts.calls.iter().filter(|c| c.scope.is_empty()).count(), 2);
+        }
+    }
+
     fn depth(value: &Value) -> usize {
         match value {
             Value::New(_, args) => 1 + args.iter().map(depth).max().unwrap_or(0),
@@ -2652,13 +2731,20 @@ mod tests {
 
     #[test]
     fn an_awaited_typed_call_is_a_call_value() {
-        let facts = parse("async function f() { g(await get<Row>(\"/x\"), await get(\"/y\")); }");
+        let source = "async function f() { g(await get<Row>(\"/x\"), await get(\"/y\")); }";
+        let facts = parse(source);
         let call = facts.calls.iter().find(|c| c.callee == "g").unwrap();
         assert_eq!(call.args.len(), 2);
-        assert!(
-            call.args
-                .iter()
-                .all(|a| matches!(a, Value::Call(call) if call.callee == "get"))
-        );
+        for (value, written) in call.args.iter().zip(["get<Row>(\"/x\")", "get(\"/y\")"]) {
+            let Value::Await(value) = value else {
+                panic!("await syntax is retained");
+            };
+            let Value::Call(call) = value.as_ref() else {
+                panic!("awaited get call");
+            };
+            assert_eq!(call.callee, "get");
+            assert_eq!(call.args.len(), 1);
+            assert_eq!(&source[call.range.clone()], written);
+        }
     }
 }

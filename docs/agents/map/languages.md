@@ -3,6 +3,10 @@
 The TypeScript and JavaScript packs retain `undefined` as a shadowable name in values and
 binding patterns, including the grammar's dedicated `undefined` node. Kinds ask the existing
 lexical binding query before treating the unbound name as a runtime value.
+The existing parent walk recognizes the grammar's erroneous comparison recovery of a bare
+`undefined =>` parameter only when its one-byte `=` error touches the `>` token. One
+equal-length parser-only spelling repair restores arrow nodes; every fact still reads the
+original bytes and spans. Malformed `= >`, strings, comments and comparisons are not arrows.
 
 Detail behind the [architecture map](../architecture.md), which keeps the flow, identities,
 seams and invariants (the limits are in [Known ceilings](../ceilings.md)). The code wins over
