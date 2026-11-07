@@ -316,6 +316,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- Development and test builds optimize the main `meada` package at level 1 to reduce the
+  resident code footprint of the expanded indexing and contract readers.
+
 - A refresh reads the values of the files it did not change from a values cache beside the index
   (`values.db`, ADR 0027) instead of parsing them again: on this repository, a one-line edit of a
   Rust file refreshes in 1.4 s instead of 3.4 s. The refreshed index still equals a cold one, and
@@ -326,6 +329,9 @@ All notable changes to Meada are recorded here. The format follows
   refreshes in 1.0 s instead of 1.5 s, with the same index (#610).
 
 ### Fixed
+
+- Python framework and Go router tables retain stable identities in optimized builds, so
+  Flask blueprints keep their mounted routes and standard Go mux matching stays consistent.
 
 - TypeScript and JavaScript URL consumers respect lexical bindings and writes of `String`
   (#683). A callback named `String` no longer invents a route or host, and a local binding

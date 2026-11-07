@@ -115,7 +115,8 @@ const GIN_ROUTES: &[(&str, Serves)] = &[
     ("Handle", Serves::Given),
 ];
 
-const ROUTERS: &[Router] = &[
+// STDLIB and the router lookups must refer to the same table allocation.
+static ROUTERS: &[Router] = &[
     Router {
         package: "net/http",
         made: &["NewServeMux"],

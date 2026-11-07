@@ -255,6 +255,11 @@ rmcp = { version = "3.5.1", features = [
 inherits = "release"
 lto = "thin"
 
+# Keep indexing and contract code compact in development builds as the graph grows.
+# This also avoids paying for unoptimized serialization code on every CLI invocation.
+[profile.dev.package.meada]
+opt-level = 1
+
 # The argon2id hashes of local accounts (ADR 0024) at full speed in debug builds too: unoptimised,
 # one 19 MiB hash takes a large part of a second, and the console's tests hash many, some in a row
 # under one account's lock.

@@ -68,7 +68,9 @@ Infrastructure routing and its shared inference explanation:
   path; a scope or a mount prefix Meada cannot read serves nothing (never the root). `routes![..]`
   is the one provider-side macro read; each handler in it resolves exactly through `use`, or yields nothing (`Code::outside` with the path flag reads the outside name of a callee, a path call's head among types and modules, so a `fn rocket()` does not hide the crate in `rocket::build()`; a bare route attribute comes from the `#[macro_use] extern crate` of its crate's root; `Code::mentions` tells whether a file refers to a name, which, over the handler's crate (every crate when `Code::published` says its file may be imported), decides whether an unregistered handler is served at its own path), reached through `Code::origins` with `Follow::Values`: a route counts only
   on a receiver that traces back to its framework's constructor (named by `Code::outside`; Express
-  also takes an unimported or local name), so `@app.get` on a Flask app yields nothing. Each
+  also takes an unimported or local name), so `@app.get` on a Flask app yields nothing.
+  The Python framework and Go router tables have static storage: identity comparisons for mounts
+  and the standard mux use one allocation, including in optimized builds. Each
   route is served under every prefix (`prefixes`): the segment of each mount (`use`,
   `include_router`, `mount`, `register_blueprint`; Python's in `Framework::mounts`) under every
   prefix of the router it is mounted on; FastAPI's mount segment is the given prefix (or
