@@ -1,0 +1,18 @@
+{
+  "groups": [
+    {
+      "name": "quartz-logs",
+      "rules": [
+        {
+          "alert": "QuartzUnknown",
+          "expr": "sum(rate({app=\"quartz\"}[5m])) > 1",
+          "labels": {
+            "support": "quartz",
+            "service": "quartz",
+            "severity": "warning"
+          }
+        }
+      ]
+    }
+  ]
+}

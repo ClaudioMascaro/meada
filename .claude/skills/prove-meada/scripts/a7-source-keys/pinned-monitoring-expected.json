@@ -1,0 +1,2970 @@
+{
+  "counts": {
+    "alert_rules": 141,
+    "literal_emitter_labels": 290,
+    "recording_rules": 96,
+    "route_conditions": 1,
+    "route_nodes": 2,
+    "unreadable_files": 1
+  },
+  "non_rule_files": [
+    {
+      "document": 0,
+      "file": "manifests/alertmanager-secret.yaml",
+      "kind": "Secret"
+    }
+  ],
+  "purpose": "source-only pre-answer key, no runtime verdict",
+  "recording_rules": [
+    {
+      "file": "manifests/grafana-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[0]",
+      "record": "namespace_job_handler_statuscode:grafana_http_request_duration_seconds_count:rate5m"
+    },
+    {
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[2].rules[0]",
+      "record": "instance:node_cpu:rate:sum"
+    },
+    {
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[2].rules[1]",
+      "record": "instance:node_network_receive_bytes:rate:sum"
+    },
+    {
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[2].rules[2]",
+      "record": "instance:node_network_transmit_bytes:rate:sum"
+    },
+    {
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[2].rules[3]",
+      "record": "instance:node_cpu:ratio"
+    },
+    {
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[2].rules[4]",
+      "record": "cluster:node_cpu:sum_rate5m"
+    },
+    {
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[2].rules[5]",
+      "record": "cluster:node_cpu:ratio"
+    },
+    {
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[3].rules[0]",
+      "record": "count:up1"
+    },
+    {
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[3].rules[1]",
+      "record": "count:up0"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[0]",
+      "record": "code_verb:apiserver_request_total:increase30d"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[1]",
+      "record": "code:apiserver_request_total:increase30d"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[2]",
+      "record": "code:apiserver_request_total:increase30d"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[3]",
+      "record": "cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase1h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[4]",
+      "record": "cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[5]",
+      "record": "cluster_verb_scope:apiserver_request_sli_duration_seconds_count:increase1h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[6]",
+      "record": "cluster_verb_scope:apiserver_request_sli_duration_seconds_count:increase30d"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[7]",
+      "record": "apiserver_request:availability30d"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[8]",
+      "record": "apiserver_request:availability30d"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[9]",
+      "record": "apiserver_request:availability30d"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[10]",
+      "record": "code_resource:apiserver_request_total:rate5m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[11]",
+      "record": "code_resource:apiserver_request_total:rate5m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[12]",
+      "record": "code_verb:apiserver_request_total:increase1h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[13]",
+      "record": "code_verb:apiserver_request_total:increase1h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[14]",
+      "record": "code_verb:apiserver_request_total:increase1h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[9].rules[15]",
+      "record": "code_verb:apiserver_request_total:increase1h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[0]",
+      "record": "cluster_verb:apiserver_request_sli_bad_events:rate5m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[1]",
+      "record": "cluster_verb:apiserver_request_sli_bad_events:rate5m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[2]",
+      "record": "cluster_verb:apiserver_request_sli_events:rate5m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[3]",
+      "record": "cluster_verb:apiserver_request_sli_events:rate5m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[4]",
+      "record": "apiserver_request:burnrate5m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[5]",
+      "record": "apiserver_request:burnrate1h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[6]",
+      "record": "apiserver_request:burnrate1h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[7]",
+      "record": "apiserver_request:burnrate2h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[8]",
+      "record": "apiserver_request:burnrate2h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[9]",
+      "record": "apiserver_request:burnrate30m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[10]",
+      "record": "apiserver_request:burnrate30m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[11]",
+      "record": "apiserver_request:burnrate6h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[12]",
+      "record": "apiserver_request:burnrate6h"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[13]",
+      "record": "apiserver_request:burnrate1d"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[10].rules[14]",
+      "record": "apiserver_request:burnrate3d"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[11].rules[0]",
+      "record": "cluster_quantile:apiserver_request_sli_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[11].rules[1]",
+      "record": "cluster_quantile:apiserver_request_sli_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[12].rules[0]",
+      "record": "node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate5m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[12].rules[1]",
+      "record": "node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[13].rules[0]",
+      "record": "node_namespace_pod_container:container_memory_working_set_bytes"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[14].rules[0]",
+      "record": "node_namespace_pod_container:container_memory_rss"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[15].rules[0]",
+      "record": "node_namespace_pod_container:container_memory_cache"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[16].rules[0]",
+      "record": "node_namespace_pod_container:container_memory_swap"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[17].rules[0]",
+      "record": "cluster:namespace:pod_memory:active:kube_pod_container_resource_requests"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[17].rules[1]",
+      "record": "namespace_memory:kube_pod_container_resource_requests:sum"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[18].rules[0]",
+      "record": "cluster:namespace:pod_cpu:active:kube_pod_container_resource_requests"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[18].rules[1]",
+      "record": "namespace_cpu:kube_pod_container_resource_requests:sum"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[19].rules[0]",
+      "record": "cluster:namespace:pod_memory:active:kube_pod_container_resource_limits"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[19].rules[1]",
+      "record": "namespace_memory:kube_pod_container_resource_limits:sum"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[20].rules[0]",
+      "record": "cluster:namespace:pod_cpu:active:kube_pod_container_resource_limits"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[20].rules[1]",
+      "record": "namespace_cpu:kube_pod_container_resource_limits:sum"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[21].rules[0]",
+      "record": "namespace_workload_pod:kube_pod_owner:relabel"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[21].rules[1]",
+      "record": "namespace_workload_pod:kube_pod_owner:relabel"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[21].rules[2]",
+      "record": "namespace_workload_pod:kube_pod_owner:relabel"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[21].rules[3]",
+      "record": "namespace_workload_pod:kube_pod_owner:relabel"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[21].rules[4]",
+      "record": "namespace_workload_pod:kube_pod_owner:relabel"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[21].rules[5]",
+      "record": "namespace_workload_pod:kube_pod_owner:relabel"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[21].rules[6]",
+      "record": "namespace_workload_pod:kube_pod_owner:relabel"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[21].rules[7]",
+      "record": "namespace_workload_pod:kube_pod_owner:relabel"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[22].rules[0]",
+      "record": "cluster_quantile:scheduler_scheduling_attempt_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[22].rules[1]",
+      "record": "cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[22].rules[2]",
+      "record": "cluster_quantile:scheduler_pod_scheduling_sli_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[22].rules[3]",
+      "record": "cluster_quantile:scheduler_scheduling_attempt_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[22].rules[4]",
+      "record": "cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[22].rules[5]",
+      "record": "cluster_quantile:scheduler_pod_scheduling_sli_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[22].rules[6]",
+      "record": "cluster_quantile:scheduler_scheduling_attempt_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[22].rules[7]",
+      "record": "cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[22].rules[8]",
+      "record": "cluster_quantile:scheduler_pod_scheduling_sli_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[23].rules[0]",
+      "record": "node_namespace_pod:kube_pod_info:"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[23].rules[1]",
+      "record": "node:node_num_cpu:sum"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[23].rules[2]",
+      "record": ":node_memory_MemAvailable_bytes:sum"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[23].rules[3]",
+      "record": "node:node_cpu_utilization:ratio_rate5m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[23].rules[4]",
+      "record": "cluster:node_cpu:ratio_rate5m"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[24].rules[0]",
+      "record": "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[24].rules[1]",
+      "record": "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[24].rules[2]",
+      "record": "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[0]",
+      "record": "instance:node_num_cpu:sum"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[1]",
+      "record": "instance:node_cpu_utilisation:rate5m"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[2]",
+      "record": "instance:node_load1_per_cpu:ratio"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[3]",
+      "record": "instance:node_memory_utilisation:ratio"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[4]",
+      "record": "instance:node_vmstat_pgmajfault:rate5m"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[5]",
+      "record": "instance_device:node_disk_io_time_seconds:rate5m"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[6]",
+      "record": "instance_device:node_disk_io_time_weighted_seconds:rate5m"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[7]",
+      "record": "instance:node_network_receive_bytes_excluding_lo:rate5m"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[8]",
+      "record": "instance:node_network_transmit_bytes_excluding_lo:rate5m"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[9]",
+      "record": "instance:node_network_receive_drop_excluding_lo:rate5m"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[10]",
+      "record": "instance:node_network_transmit_drop_excluding_lo:rate5m"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[11]",
+      "record": "instance:node_network_receive_bytes_physical:rate5m"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[12]",
+      "record": "instance:node_network_transmit_bytes_physical:rate5m"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[13]",
+      "record": "instance:node_network_receive_drop_physical:rate5m"
+    },
+    {
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[14]",
+      "record": "instance:node_network_transmit_drop_physical:rate5m"
+    }
+  ],
+  "routes": [
+    {
+      "conditions": [],
+      "continue": false,
+      "file": "examples/alertmanager-config.yaml",
+      "key": "route",
+      "matchers_raw": [],
+      "receiver": "null"
+    },
+    {
+      "conditions": [
+        {
+          "key": "alertname",
+          "operator": "=",
+          "value": "Watchdog"
+        }
+      ],
+      "continue": false,
+      "file": "examples/alertmanager-config.yaml",
+      "key": "route.routes[0]",
+      "matchers_raw": [],
+      "receiver": "null"
+    }
+  ],
+  "rules": [
+    {
+      "alert": "AlertmanagerFailedReload",
+      "file": "manifests/alertmanager-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "AlertmanagerFailedReload"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "AlertmanagerMembersInconsistent",
+      "file": "manifests/alertmanager-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "AlertmanagerMembersInconsistent"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "AlertmanagerFailedToSendAlerts",
+      "file": "manifests/alertmanager-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "AlertmanagerFailedToSendAlerts"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "AlertmanagerClusterFailedToSendAlerts",
+      "file": "manifests/alertmanager-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[3]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "AlertmanagerClusterFailedToSendAlerts"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "AlertmanagerClusterFailedToSendAlerts",
+      "file": "manifests/alertmanager-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[4]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "AlertmanagerClusterFailedToSendAlerts"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "AlertmanagerConfigInconsistent",
+      "file": "manifests/alertmanager-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[5]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "AlertmanagerConfigInconsistent"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "AlertmanagerClusterDown",
+      "file": "manifests/alertmanager-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[6]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "AlertmanagerClusterDown"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "AlertmanagerClusterCrashlooping",
+      "file": "manifests/alertmanager-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[7]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "AlertmanagerClusterCrashlooping"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "AlertmanagerClusterFailedPeers",
+      "file": "manifests/alertmanager-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[8]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "AlertmanagerClusterFailedPeers"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "GrafanaRequestsFailing",
+      "file": "manifests/grafana-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "GrafanaRequestsFailing"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "TargetDown",
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "TargetDown"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "Watchdog",
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "Watchdog"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "alert": "InfoInhibitor",
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "InfoInhibitor"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "alert": "NodeNetworkInterfaceFlapping",
+      "file": "manifests/kubePrometheus-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeNetworkInterfaceFlapping"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeStateMetricsListErrors",
+      "file": "manifests/kubeStateMetrics-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeStateMetricsListErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubeStateMetricsWatchErrors",
+      "file": "manifests/kubeStateMetrics-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeStateMetricsWatchErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubeStateMetricsShardingMismatch",
+      "file": "manifests/kubeStateMetrics-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeStateMetricsShardingMismatch"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubeStateMetricsShardsMissing",
+      "file": "manifests/kubeStateMetrics-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[3]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeStateMetricsShardsMissing"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubePodCrashLooping",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubePodCrashLooping"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubePodNotReady",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubePodNotReady"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeDeploymentGenerationMismatch",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeDeploymentGenerationMismatch"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeDeploymentReplicasMismatch",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[3]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeDeploymentReplicasMismatch"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeDeploymentRolloutStuck",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[4]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeDeploymentRolloutStuck"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeStatefulSetReplicasMismatch",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[5]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeStatefulSetReplicasMismatch"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeStatefulSetGenerationMismatch",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[6]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeStatefulSetGenerationMismatch"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeStatefulSetUpdateNotRolledOut",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[7]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeStatefulSetUpdateNotRolledOut"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeDaemonSetRolloutStuck",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[8]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeDaemonSetRolloutStuck"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeContainerWaiting",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[9]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeContainerWaiting"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeDaemonSetNotScheduled",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[10]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeDaemonSetNotScheduled"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeDaemonSetMisScheduled",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[11]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeDaemonSetMisScheduled"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeJobNotCompleted",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[12]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeJobNotCompleted"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeJobFailed",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[13]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeJobFailed"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeHpaReplicasMismatch",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[14]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeHpaReplicasMismatch"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeHpaMaxedOut",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[15]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeHpaMaxedOut"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubePdbNotEnoughHealthyPods",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[16]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubePdbNotEnoughHealthyPods"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeCPUOvercommit",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeCPUOvercommit"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeMemoryOvercommit",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeMemoryOvercommit"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeCPUQuotaOvercommit",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeCPUQuotaOvercommit"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeMemoryQuotaOvercommit",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[3]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeMemoryQuotaOvercommit"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeQuotaAlmostFull",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[4]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeQuotaAlmostFull"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "info"
+        }
+      ]
+    },
+    {
+      "alert": "KubeQuotaFullyUsed",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[5]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeQuotaFullyUsed"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "info"
+        }
+      ]
+    },
+    {
+      "alert": "KubeQuotaExceeded",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[6]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeQuotaExceeded"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "CPUThrottlingHigh",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[7]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "CPUThrottlingHigh"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "info"
+        }
+      ]
+    },
+    {
+      "alert": "KubePersistentVolumeFillingUp",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[2].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubePersistentVolumeFillingUp"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubePersistentVolumeFillingUp",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[2].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubePersistentVolumeFillingUp"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubePersistentVolumeInodesFillingUp",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[2].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubePersistentVolumeInodesFillingUp"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubePersistentVolumeInodesFillingUp",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[2].rules[3]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubePersistentVolumeInodesFillingUp"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubePersistentVolumeErrors",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[2].rules[4]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubePersistentVolumeErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubeVersionMismatch",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[3].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeVersionMismatch"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeClientErrors",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[3].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeClientErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeAPIErrorBudgetBurn",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[4].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeAPIErrorBudgetBurn"
+        },
+        {
+          "key": "long",
+          "literal": true,
+          "value": "1h"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        },
+        {
+          "key": "short",
+          "literal": true,
+          "value": "5m"
+        }
+      ]
+    },
+    {
+      "alert": "KubeAPIErrorBudgetBurn",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[4].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeAPIErrorBudgetBurn"
+        },
+        {
+          "key": "long",
+          "literal": true,
+          "value": "6h"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        },
+        {
+          "key": "short",
+          "literal": true,
+          "value": "30m"
+        }
+      ]
+    },
+    {
+      "alert": "KubeAPIErrorBudgetBurn",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[4].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeAPIErrorBudgetBurn"
+        },
+        {
+          "key": "long",
+          "literal": true,
+          "value": "1d"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        },
+        {
+          "key": "short",
+          "literal": true,
+          "value": "2h"
+        }
+      ]
+    },
+    {
+      "alert": "KubeAPIErrorBudgetBurn",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[4].rules[3]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeAPIErrorBudgetBurn"
+        },
+        {
+          "key": "long",
+          "literal": true,
+          "value": "3d"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        },
+        {
+          "key": "short",
+          "literal": true,
+          "value": "6h"
+        }
+      ]
+    },
+    {
+      "alert": "KubeClientCertificateExpiration",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[5].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeClientCertificateExpiration"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeClientCertificateExpiration",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[5].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeClientCertificateExpiration"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubeAggregatedAPIErrors",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[5].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeAggregatedAPIErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeAggregatedAPIDown",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[5].rules[3]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeAggregatedAPIDown"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeAPIDown",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[5].rules[4]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeAPIDown"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubeAPIInstanceUnreachable",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[5].rules[5]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeAPIInstanceUnreachable"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeAPITerminatedRequests",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[5].rules[6]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeAPITerminatedRequests"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeNodeNotReady",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeNodeNotReady"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeNodePressure",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeNodePressure"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "info"
+        }
+      ]
+    },
+    {
+      "alert": "KubeNodeUnreachable",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeNodeUnreachable"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeletTooManyPods",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[3]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeletTooManyPods"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "info"
+        }
+      ]
+    },
+    {
+      "alert": "KubeNodeReadinessFlapping",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[4]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeNodeReadinessFlapping"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeNodeEviction",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[5]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeNodeEviction"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "info"
+        }
+      ]
+    },
+    {
+      "alert": "KubeletPlegDurationHigh",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[6]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeletPlegDurationHigh"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeletPodStartUpLatencyHigh",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[7]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeletPodStartUpLatencyHigh"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeletClientCertificateExpiration",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[8]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeletClientCertificateExpiration"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeletClientCertificateExpiration",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[9]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeletClientCertificateExpiration"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubeletServerCertificateExpiration",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[10]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeletServerCertificateExpiration"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeletServerCertificateExpiration",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[11]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeletServerCertificateExpiration"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubeletClientCertificateRenewalErrors",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[12]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeletClientCertificateRenewalErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeletServerCertificateRenewalErrors",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[13]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeletServerCertificateRenewalErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeletInstanceUnreachable",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[14]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeletInstanceUnreachable"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeletDown",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[6].rules[15]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeletDown"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubeSchedulerDown",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[7].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeSchedulerDown"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubeSchedulerInstanceUnreachable",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[7].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeSchedulerInstanceUnreachable"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "KubeControllerManagerDown",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[8].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeControllerManagerDown"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "KubeControllerManagerInstanceUnreachable",
+      "file": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "key": "spec.groups[8].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "KubeControllerManagerInstanceUnreachable"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeFilesystemSpaceFillingUp",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeFilesystemSpaceFillingUp"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeFilesystemSpaceFillingUp",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeFilesystemSpaceFillingUp"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "NodeFilesystemAlmostOutOfSpace",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeFilesystemAlmostOutOfSpace"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeFilesystemAlmostOutOfSpace",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[3]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeFilesystemAlmostOutOfSpace"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "NodeFilesystemFilesFillingUp",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[4]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeFilesystemFilesFillingUp"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeFilesystemFilesFillingUp",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[5]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeFilesystemFilesFillingUp"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "NodeFilesystemAlmostOutOfFiles",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[6]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeFilesystemAlmostOutOfFiles"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeFilesystemAlmostOutOfFiles",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[7]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeFilesystemAlmostOutOfFiles"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "NodeNetworkReceiveErrs",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[8]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeNetworkReceiveErrs"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeNetworkTransmitErrs",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[9]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeNetworkTransmitErrs"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeHighNumberConntrackEntriesUsed",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[10]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeHighNumberConntrackEntriesUsed"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeTextFileCollectorScrapeError",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[11]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeTextFileCollectorScrapeError"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeClockSkewDetected",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[12]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeClockSkewDetected"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeClockNotSynchronising",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[13]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeClockNotSynchronising"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeRAIDDegraded",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[14]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeRAIDDegraded"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "NodeRAIDDiskFailure",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[15]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeRAIDDiskFailure"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeFileDescriptorLimit",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[16]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeFileDescriptorLimit"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeFileDescriptorLimit",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[17]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeFileDescriptorLimit"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "NodeCPUHighUsage",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[18]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeCPUHighUsage"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "info"
+        }
+      ]
+    },
+    {
+      "alert": "NodeSystemSaturation",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[19]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeSystemSaturation"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeMemoryMajorPagesFaults",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[20]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeMemoryMajorPagesFaults"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeMemoryHighUtilization",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[21]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeMemoryHighUtilization"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeDiskIOSaturation",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[22]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeDiskIOSaturation"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeSystemdServiceFailed",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[23]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeSystemdServiceFailed"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeSystemdServiceCrashlooping",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[24]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeSystemdServiceCrashlooping"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "NodeBondingDegraded",
+      "file": "manifests/nodeExporter-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[25]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "NodeBondingDegraded"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusBadConfig",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusBadConfig"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusSDRefreshFailure",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusSDRefreshFailure"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusKubernetesListWatchFailures",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusKubernetesListWatchFailures"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusNotificationQueueRunningFull",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[3]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusNotificationQueueRunningFull"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusErrorSendingAlertsToSomeAlertmanagers",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[4]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusErrorSendingAlertsToSomeAlertmanagers"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusNotConnectedToAlertmanagers",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[5]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusNotConnectedToAlertmanagers"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusTSDBReloadsFailing",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[6]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusTSDBReloadsFailing"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusTSDBCompactionsFailing",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[7]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusTSDBCompactionsFailing"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusNotIngestingSamples",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[8]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusNotIngestingSamples"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusDuplicateTimestamps",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[9]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusDuplicateTimestamps"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusOutOfOrderTimestamps",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[10]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusOutOfOrderTimestamps"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusRemoteStorageFailures",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[11]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusRemoteStorageFailures"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusRemoteWriteBehind",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[12]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusRemoteWriteBehind"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusRemoteWriteDesiredShards",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[13]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusRemoteWriteDesiredShards"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusRuleFailures",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[14]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusRuleFailures"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusMissingRuleEvaluations",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[15]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusMissingRuleEvaluations"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusTargetLimitHit",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[16]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusTargetLimitHit"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusLabelLimitHit",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[17]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusLabelLimitHit"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusScrapeBodySizeLimitHit",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[18]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusScrapeBodySizeLimitHit"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusScrapeSampleLimitHit",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[19]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusScrapeSampleLimitHit"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusTargetSyncFailure",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[20]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusTargetSyncFailure"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusHighQueryLoad",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[21]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusHighQueryLoad"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusErrorSendingAlertsToAnyAlertmanager",
+      "file": "manifests/prometheus-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[22]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusErrorSendingAlertsToAnyAlertmanager"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "critical"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusOperatorListErrors",
+      "file": "manifests/prometheusOperator-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusOperatorListErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusOperatorWatchErrors",
+      "file": "manifests/prometheusOperator-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[1]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusOperatorWatchErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusOperatorSyncFailed",
+      "file": "manifests/prometheusOperator-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[2]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusOperatorSyncFailed"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusOperatorReconcileErrors",
+      "file": "manifests/prometheusOperator-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[3]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusOperatorReconcileErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusOperatorStatusUpdateErrors",
+      "file": "manifests/prometheusOperator-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[4]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusOperatorStatusUpdateErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusOperatorNodeLookupErrors",
+      "file": "manifests/prometheusOperator-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[5]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusOperatorNodeLookupErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusOperatorNotReady",
+      "file": "manifests/prometheusOperator-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[6]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusOperatorNotReady"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "PrometheusOperatorRejectedResources",
+      "file": "manifests/prometheusOperator-prometheusRule.yaml",
+      "key": "spec.groups[0].rules[7]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "PrometheusOperatorRejectedResources"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "ConfigReloaderSidecarErrors",
+      "file": "manifests/prometheusOperator-prometheusRule.yaml",
+      "key": "spec.groups[1].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "ConfigReloaderSidecarErrors"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "ExampleAlert",
+      "file": "examples/existingrule.json",
+      "key": "groups[0].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "ExampleAlert"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    },
+    {
+      "alert": "ExampleAlert",
+      "file": "examples/existingrule.yaml",
+      "key": "groups[0].rules[0]",
+      "labels": [
+        {
+          "key": "alertname",
+          "literal": true,
+          "value": "ExampleAlert"
+        },
+        {
+          "key": "severity",
+          "literal": true,
+          "value": "warning"
+        }
+      ]
+    }
+  ],
+  "source_commit": "b6c2f62b287524652592e6e2f7ea0d3054cb8ac6",
+  "unreadable": [
+    {
+      "file": "examples/alertmanager-config-with-template.yaml",
+      "reason": "mapping values are not allowed here\n  in \"<byte string>\", line 21, column 9:\n       title: '{{ template \"slack.title\" . }}'\n            ^"
+    }
+  ]
+}

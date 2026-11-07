@@ -1,0 +1,111 @@
+{"tool": "search", "arguments": {"query": "/", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Composition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Composition.apiextensions.crossplane.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "clusters.aws.platformref.upbound.io", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "apis/clusters/composition.yaml::Composition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io (root apis/clusters)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "apis/clusters/composition.yaml::Composition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io (root apis/clusters)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "apis/clusters/composition.yaml::Composition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io (root apis/clusters)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CompositeResourceDefinition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CompositeResourceDefinition.apiextensions.crossplane.io", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "apis/clusters/definition.yaml::CompositeResourceDefinition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io (root apis/clusters)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "apis/clusters/definition.yaml::CompositeResourceDefinition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io (root apis/clusters)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "apis/clusters/definition.yaml::CompositeResourceDefinition.apiextensions.crossplane.io/clusters.aws.platformref.upbound.io (root apis/clusters)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "App.platform.upbound.io/default/platform-ref-aws-ghost", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "App.platform.upbound.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "platform-ref-aws-ghost", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/app-xr.yaml::App.platform.upbound.io/default/platform-ref-aws-ghost (root examples)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ProviderConfig.aws.m.upbound.io/default", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ProviderConfig.aws.m.upbound.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "default", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/aws-default-provider.yaml::ProviderConfig.aws.m.upbound.io/default (root examples)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Cluster.aws.platformref.upbound.io/default/platform-ref-aws", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Cluster.aws.platformref.upbound.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "platform-ref-aws", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/cluster-xr.yaml::Cluster.aws.platformref.upbound.io/default/platform-ref-aws (root examples)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Configuration.pkg.crossplane.io/platform-ref-aws", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Configuration.pkg.crossplane.io", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/configuration.yaml::Configuration.pkg.crossplane.io/platform-ref-aws (root examples)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "SQLInstance.aws.platform.upbound.io/default/platform-ref-aws-db-mariadb", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "SQLInstance.aws.platform.upbound.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "platform-ref-aws-db-mariadb", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/mariadb-xr.yaml::SQLInstance.aws.platform.upbound.io/default/platform-ref-aws-db-mariadb (root examples)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "SQLInstance.aws.platform.upbound.io/default/platform-ref-aws-db-postgres", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "platform-ref-aws-db-postgres", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/postgres-xr.yaml::SQLInstance.aws.platform.upbound.io/default/platform-ref-aws-db-postgres (root examples)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Secret/default/psqlsecret", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Secret", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "psqlsecret", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/postgres-xr.yaml::Secret/default/psqlsecret (root examples)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Project.meta.dev.upbound.io/platform-ref-aws", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Project.meta.dev.upbound.io", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "upbound.yaml::Project.meta.dev.upbound.io/platform-ref-aws (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "/", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CompositeResourceDefinition.apiextensions.crossplane.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "xrelays.proof.example.org", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::CompositeResourceDefinition.apiextensions.crossplane.io/xrelays.proof.example.org (root xp-one)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Composition.apiextensions.crossplane.io/proof-route", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Composition.apiextensions.crossplane.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "proof-route", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route (root xp-one)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "deliveries.relay.proof.example.org", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::CustomResourceDefinition.apiextensions.k8s.io/deliveries.relay.proof.example.org (root xp-one)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Relay.proof.example.org/amber/request", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Relay.proof.example.org", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "request", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::Relay.proof.example.org/amber/request (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Relay.proof.example.org/amber/request (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Relay.proof.example.org/amber/request (root xp-one)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "XRelay.proof.example.org/amber/reality", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "XRelay.proof.example.org", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "reality", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::XRelay.proof.example.org/amber/reality (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::XRelay.proof.example.org/amber/reality (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::XRelay.proof.example.org/amber/reality (root xp-one)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Delivery.relay.proof.example.org/amber/standalone", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Delivery.relay.proof.example.org", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "external-route", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::Delivery.relay.proof.example.org/amber/standalone (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Delivery.relay.proof.example.org/amber/standalone (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Delivery.relay.proof.example.org/amber/standalone (root xp-one)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Composition.apiextensions.crossplane.io/proof-pipeline", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "proof-pipeline", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-pipeline (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-pipeline (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-pipeline (root xp-one)", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-two/bundle.yaml::Relay.proof.example.org/amber/request (root xp-two)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Delivery.relay.proof.example.org/amber/remote", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "remote", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-two/bundle.yaml::Delivery.relay.proof.example.org/amber/remote (root xp-two)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Composition.apiextensions.crossplane.io/proof-route/literal", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "public-route", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/literal (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/literal (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/literal (root xp-one)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Composition.apiextensions.crossplane.io/proof-route/patched", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "*", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/patched (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/patched (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/patched (root xp-one)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Composition.apiextensions.crossplane.io/proof-route/unnamed", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/unnamed (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/unnamed (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/unnamed (root xp-one)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Composition.apiextensions.crossplane.io/proof-route/nested", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "nested", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/nested (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/nested (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-route/nested (root xp-one)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Composition.apiextensions.crossplane.io/proof-pipeline/pipe", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "pipe-external", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-pipeline/pipe (root xp-one)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-pipeline/pipe (root xp-one)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "xp-one/bundle.yaml::Composition.apiextensions.crossplane.io/proof-pipeline/pipe (root xp-one)", "direction": "up", "budget": 200000}}

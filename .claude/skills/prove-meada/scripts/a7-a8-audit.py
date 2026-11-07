@@ -25,10 +25,22 @@ SKILL = HERE.parent
 PLAN = HERE / 'a7-a8-mutations.json'
 ALL = ('values', 'iac', 'terraform-json', 'ssm-values', 'aws-provisioners', 'provisions', 'environment',
        'http-services', 'alerts', 'incidents', 'incident-guards', 'aws-workloads',
-       'gcp', 'azure', 'a8', 'a8-queries')
+       'gcp', 'azure', 'a8', 'a8-queries', 'iac-http-routes', 'gcp-sdk', 'azure-sdk', 'custom-iac',
+       'aws-sdk-jvm-go-dotnet', 'resource-via', 'orphans', 'patterns', 'images-mixed', 'image-ko')
+UI_FLOWS = ('aws-sdk-js-python', 'config-uses', 'images')
+SEPARATE_SCOPE = ('corpus-api-viewer', 'public-infra', 'native-hcl', 'serverless', 'generic-iac', 'supplementary-sdk')
+SOURCE_CAPTURES = ('pinned-monitoring', 'adjacent-monitoring', 'native-hcl-values', 'generic-boutique',
+                   'generic-kube-prometheus', 'generic-crossplane-aws', 'generic-kube-controls',
+                   'generic-compose-controls', 'serverless-nodes')
+# Historical keys required by the existing drivers, not the final clean binary.
+PRE_CONFIG = '6a5eca5853193d205bcf756983b41e9cb16ffa9d'  # before #661, after cloud prerequisites
+PRE_IMAGE = 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62'  # before #662
+PRE_EXTENSIONS = 'e6d27d0d7c046eceb8771f17111f00511a8d6c3d'  # compatible A7 before #666/#668/#670/#671
 
 
 def digest(path):
+    if Path(path).is_symlink():
+        return hashlib.sha256(os.fsencode(os.readlink(path))).hexdigest()
     with Path(path).open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
@@ -44,7 +56,11 @@ def git(*args):
 
 def keys():
     return {str(p.relative_to(ROOT)): digest(p) for p in sorted(SKILL.rglob('*'))
-            if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc'}
+            if (p.is_file() or p.is_symlink()) and '__pycache__' not in p.parts and p.suffix != '.pyc'}
+
+
+def keyset_hash(keyset):
+    return hashlib.sha256(json.dumps(keyset, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
 def status():
@@ -54,7 +70,7 @@ def status():
 def tracked():
     files = subprocess.check_output(['git', '-C', str(ROOT), 'ls-files', '-z']).split(b'\0')
     return {os.fsdecode(p): digest(ROOT / os.fsdecode(p)) for p in files
-            if p and (ROOT / os.fsdecode(p)).is_file()}
+            if p and ((ROOT / os.fsdecode(p)).is_file() or (ROOT / os.fsdecode(p)).is_symlink())}
 
 
 def record_command(command, folder, name, cwd=ROOT, env=None, timeout=1200):
@@ -115,7 +131,7 @@ def build(source, output, logs):
                                             'sha256': digest(output), 'features': 'default'})
 
 
-def commands(head, existing, base, run):
+def commands(head, existing, base, run, extensions):
     py = sys.executable
     def driver(name, *extra, output=None):
         return [py, str(HERE / (name + '.py')), '--head-bin', str(head), '--run', str(run / (output or name)), *extra]
@@ -123,7 +139,7 @@ def commands(head, existing, base, run):
         'values': [py, str(HERE / 'prove.py'), 'values', '--head-bin', str(head), '--base-bin', str(existing),
                    '--repos', 'a7-probe,a7-noconfig', '--sample', '2', '--http', '--run', str(run / 'values')],
         'iac': [py, str(HERE / 'prove.py'), 'iac', '--head-bin', str(head), '--base-bin', str(existing),
-                '--repos', 'a7-iac,a7-names,a7-cfn', '--sample', '2', '--http', '--run', str(run / 'iac')],
+                '--repos', 'a7-iac,a7-names,a7-cfn,terraform-sqs,sam-rust', '--sample', '2', '--http', '--run', str(run / 'iac')],
         'terraform-json': driver('terraform-json', '--http'),
         'ssm-values': driver('aws', '--json-values'),
         'aws-provisioners': driver('aws', '--base-bin', str(existing), output='aws-provisioners'),
@@ -138,11 +154,21 @@ def commands(head, existing, base, run):
         'azure': driver('azure', '--http'),
         'a8': ['sh', str(HERE / 'a8-peers.sh'), 'check', str(base), str(head), str(run / 'a8')],
         'a8-queries': driver('a8-mcp', '--base-bin', str(base)),
+        'iac-http-routes': driver('iac-http-routes', '--base-bin', str(extensions)),
+        'gcp-sdk': driver('gcp-sdk', '--http'),
+        'azure-sdk': driver('azure-sdk', '--http'),
+        'custom-iac': driver('custom-iac', '--base-bin', str(extensions), '--http'),
+        'aws-sdk-jvm-go-dotnet': driver('aws-sdk-jvm-go-dotnet', '--http'),
+        'resource-via': driver('resource-via', '--http'),
+        'orphans': driver('orphans', '--base-bin', str(existing), '--base-has-orphans', '--http'),
+        'patterns': driver('patterns', '--http'),
+        'images-mixed': driver('images-mixed', '--base-bin', str(existing)),
+        'image-ko': driver('image-ko'),
     }
 
 
-def check_flows(head, existing, base, run, flows):
-    planned, results = commands(head, existing, base, run), []
+def check_flows(head, existing, base, run, flows, extensions):
+    planned, results = commands(head, existing, base, run, extensions), []
     for flow in flows:
         print('Driving ' + flow, flush=True)
         code = record_command(planned[flow], run / 'logs', flow)
@@ -156,7 +182,7 @@ def check_flows(head, existing, base, run, flows):
     return receipt
 
 
-def read_manifest(packet):
+def read_manifest(packet, require_checks=True):
     packet = Path(packet).resolve()
     manifest = json.loads((packet / 'baseline.json').read_text())
     if manifest['source_commit'] != git('rev-parse', 'HEAD'):
@@ -166,7 +192,7 @@ def read_manifest(packet):
     for name, expected in manifest['binaries'].items():
         if digest(packet / 'bin' / name) != expected['sha256']:
             raise RuntimeError('BLOCKED: baseline binary pin mismatch: ' + name)
-    if manifest['checks']['script_result'] != 'CHECKS_PASSED' or manifest['checks']['scope'] != list(ALL):
+    if require_checks and (manifest['checks']['script_result'] != 'CHECKS_PASSED' or manifest['checks']['scope'] != list(ALL)):
         raise RuntimeError('BLOCKED: baseline checks are incomplete or failing')
     return packet, manifest
 
@@ -180,20 +206,25 @@ def baseline(args):
     base = git('rev-parse', '--verify', args.base_ref + '^{commit}')
     baseline_bin, base_bin = run / 'bin/meada-clean', run / 'bin/meada-base'
     build(ROOT, baseline_bin, run / 'head-build')
-    worktree = run / 'source-base'
-    subprocess.run(['git', '-C', str(ROOT), 'worktree', 'add', '--detach', str(worktree), base], check=True)
-    try:
-        build(worktree, base_bin, run / 'base-build')
-    finally:
-        subprocess.run(['git', '-C', str(ROOT), 'worktree', 'remove', '--force', str(worktree)], check=True)
-    checks = check_flows(baseline_bin, baseline_bin, base_bin, run / 'checks', ALL)
+    historical = {'meada-base': base, 'meada-pre-config': PRE_CONFIG,
+                  'meada-pre-image': PRE_IMAGE, 'meada-pre-extensions': PRE_EXTENSIONS}
+    for label, revision in historical.items():
+        worktree = run / ('source-' + label)
+        subprocess.run(['git', '-C', str(ROOT), 'worktree', 'add', '--detach', str(worktree), revision], check=True)
+        try:
+            build(worktree, run / 'bin' / label, run / (label + '-build'))
+        finally:
+            subprocess.run(['git', '-C', str(ROOT), 'worktree', 'remove', '--force', str(worktree)], check=True)
+    checks = check_flows(baseline_bin, baseline_bin, base_bin, run / 'checks', ALL, run / 'bin/meada-pre-extensions')
     manifest = {'source_commit': head, 'source_tree': git('rev-parse', 'HEAD^{tree}'), 'base_commit': base,
                 'verifier_keys': keys(), 'binaries': {
-                    'meada-clean': {'sha256': digest(baseline_bin), 'built_commit': head},
-                    'meada-base': {'sha256': digest(base_bin), 'built_commit': base}},
+                    label: {'sha256': digest(run / 'bin' / label), 'built_commit': revision}
+                    for label, revision in {'meada-clean': head, **historical}.items()},
                 'checks': checks,
+                'requires_ui_receipt': True,
+                'required_separate_scope': list(SEPARATE_SCOPE),
                 'existing_answer_key': 'immutable clean A7 binary; A8 unchanged fields additionally use merge-base',
-                'not_covered': ['remaining scoped child flows, UI and whole-app proof require their own receipts',
+                'not_covered': ['Separate UI/corpus/API/public-source and supplementary controls require bound receipts',
                                 'GitHub CI full suites/UI/docs/deployment remain separate from this audit',
                                 'a script pass is not a PROVED baseline or a blind mutation verdict']}
     save(run / 'baseline.json', manifest)
@@ -203,17 +234,65 @@ def baseline(args):
     return 0 if checks['script_result'] == 'CHECKS_PASSED' else 1
 
 
-def attestation(packet, raw):
+def attestation(packet, raw, ui_receipt=None, scope_receipt=None):
     judged = json.loads(raw)
     if judged.get('verdict') != 'PROVED' or not judged.get('checker') or not judged.get('receipt') \
             or judged.get('baseline_manifest_sha256') != digest(packet / 'baseline.json'):
-        raise RuntimeError('BLOCKED: need a real fresh-checker PROVED receipt for this exact clean baseline')
+        raise RuntimeError('BLOCKED: need an actual PROVED judgment for this exact clean baseline')
+    manifest = json.loads((packet / 'baseline.json').read_text())
+    if manifest.get('requires_ui_receipt'):
+        if not ui_receipt:
+            raise RuntimeError('BLOCKED: same-source UI supplemental receipt is required, not a UI candidate binary')
+        ui = json.loads(Path(ui_receipt).read_text())
+        ui_packet = Path(ui_receipt).parent
+        frontend = ui_packet / 'frontend'
+        if ui.get('source_commit') != manifest['source_commit'] or ui.get('source_tree') != manifest['source_tree'] \
+                or ui.get('baseline_manifest_sha256') != digest(packet / 'baseline.json') \
+                or ui.get('verifier_keyset_sha256') != keyset_hash(manifest['verifier_keys']) \
+                or ui.get('script_result') != 'CHECKS_PASSED' or ui.get('scope') != list(UI_FLOWS) or ui.get('console_graph') != 'success' \
+                or ui.get('source_and_binary_unchanged') is not True \
+                or digest(ui_packet / 'bin/meada-ui') != ui.get('ui_binary_sha256') \
+                or {str(p.relative_to(frontend)): digest(p) for p in sorted(frontend.rglob('*')) if p.is_file()} != ui.get('frontend_sha256') \
+                or sorted((item['flow'], item['exit']) for item in ui.get('checks', [])) != sorted((name, 0) for name in UI_FLOWS) \
+                or judged.get('ui_receipt_sha256') != digest(ui_receipt):
+            raise RuntimeError('BLOCKED: UI receipt is failing or not bound to this actual source/key judgment')
+        if not scope_receipt:
+            raise RuntimeError('BLOCKED: actual corpus/API/viewer receipt is required beside independent source judgments')
+        captured = json.loads(Path(scope_receipt).read_text())
+        from prove import corpus
+        entries = list(corpus())
+        expected = ['corpus', 'viewer-start', 'viewer-pages', 'viewer-stop', 'source-and-ui-binary-unchanged']
+        expected += [name + '-' + phase for name in entries for phase in ('ui-stdio', 'start', 'api', 'stop')]
+        # Source-confirmed changes from main are adjudicated, never silently reblessed.
+        # Only that comparison may have exit 1; the fresh checker must judge every
+        # delta and budget. API, feature parity, viewer and cleanup must pass directly.
+        failures = [item for item in captured.get('checks', []) if item['exit']]
+        if captured.get('source_commit') != manifest['source_commit'] or captured.get('source_tree') != manifest['source_tree'] \
+                or captured.get('baseline_manifest_sha256') != digest(packet / 'baseline.json') \
+                or captured.get('verifier_keyset_sha256') != keyset_hash(manifest['verifier_keys']) \
+                or captured.get('ui_binary_sha256') != ui.get('ui_binary_sha256') \
+                or captured.get('frontend_sha256') != ui.get('frontend_sha256') \
+                or captured.get('script_result') not in ('CHECKS_PASSED', 'BROKEN') \
+                or captured.get('capture_result') != 'CAPTURED' \
+                or captured.get('entries') != entries \
+                or sorted(item['flow'] for item in captured.get('checks', [])) != sorted(expected) \
+                or sorted((item['flow'], item['exit']) for item in captured.get('source_captures', [])) != sorted((name, 0) for name in SOURCE_CAPTURES) \
+                or any(item['flow'] != 'corpus' or item['exit'] != 1 for item in failures) \
+                or judged.get('scope_receipt_sha256') != digest(scope_receipt):
+            raise RuntimeError('BLOCKED: scope capture is incomplete/failing or not bound to this source/key/UI judgment')
+        scope = judged.get('separate_scope_receipt', {})
+        if not scope.get('receipt') or not re.fullmatch(r'[0-9a-f]{64}', str(scope.get('sha256', ''))) \
+                or scope.get('verdict') != 'PROVED' or set(scope.get('covers', [])) != set(SEPARATE_SCOPE) \
+                or scope.get('source_commit') != manifest['source_commit'] \
+                or scope.get('verifier_keyset_sha256') != keyset_hash(manifest['verifier_keys']):
+            raise RuntimeError('BLOCKED: fresh checker must bind actual separate corpus/API/source-scope evidence')
     return judged
 
 
 def candidate(args):
     packet, manifest = read_manifest(args.baseline)
-    judged = attestation(packet, os.environ.get('PROVE_BASELINE_ATTESTATION', ''))
+    judged = attestation(packet, os.environ.get('PROVE_BASELINE_ATTESTATION', ''),
+                         getattr(args, 'ui_receipt', None), getattr(args, 'scope_receipt', None))
     case = next(c for c in json.loads(PLAN.read_text()) if c['id'] == args.mutation)
     run = Path(args.run).resolve()
     run.mkdir(parents=True, exist_ok=False)
@@ -270,11 +349,176 @@ def check(args):
         if info['baseline_manifest_sha256'] != digest(packet / 'baseline.json') \
                 or info['source_commit'] != manifest['source_commit'] or info['binary_sha256'] != digest(head):
             raise RuntimeError('BLOCKED: candidate does not belong to this frozen baseline')
-    receipt = check_flows(head, packet / 'bin/meada-clean', packet / 'bin/meada-base', run, ALL)
+    receipt = check_flows(head, packet / 'bin/meada-clean', packet / 'bin/meada-base', run, ALL, packet / 'bin/meada-pre-extensions')
     receipt['baseline_manifest_sha256'] = digest(packet / 'baseline.json')
     receipt['phase'] = 'candidate check' if args.candidate else 'final clean rerun'
     save(run / 'checks.json', receipt)
     return 0 if receipt['script_result'] == 'CHECKS_PASSED' else 1
+
+
+def ui_check(args):
+    """Same-head clean UI supplement. Never claimed as coverage of a native-only mutant."""
+    packet, manifest = read_manifest(args.baseline, require_checks=False)
+    if status():
+        raise RuntimeError('BLOCKED: UI supplement requires a clean checkout')
+    run = Path(args.run).resolve()
+    run.mkdir(parents=True, exist_ok=False)
+    binary, ui = Path(args.head_bin).resolve(), Path(args.ui_dir).resolve()
+    frozen = run / 'bin/meada-ui'
+    frozen.parent.mkdir()
+    shutil.copy2(binary, frozen)
+    binary = frozen
+    shutil.copytree(ui, run / 'frontend')
+    ui = run / 'frontend'
+    py = sys.executable
+    planned = {
+        'aws-sdk-js-python': [py, str(HERE / 'aws-sdk.py'), '--head-bin', str(binary),
+            '--base-bin', str(packet / 'bin/meada-pre-extensions'), '--ui-bin', str(binary), '--ui-dir', str(ui),
+            '--run', str(run / 'aws-sdk-js-python')],
+        'config-uses': [py, str(HERE / 'config_uses.py'), '--head-bin', str(binary),
+            '--base-bin', str(packet / 'bin/meada-pre-config'), '--http', '--ui-dir', str(ui), '--run', str(run / 'config-uses')],
+        'images': [py, str(HERE / 'images.py'), '--head-bin', str(binary), '--base-bin', str(packet / 'bin/meada-pre-image'),
+            '--http', '--public', '--ui-bin', str(binary), '--ui-dir', str(ui), '--run', str(run / 'images')],
+    }
+    receipt = {'source_commit': manifest['source_commit'], 'source_tree': manifest['source_tree'],
+        'baseline_manifest_sha256': digest(packet / 'baseline.json'),
+        'verifier_keyset_sha256': keyset_hash(manifest['verifier_keys']), 'scope': list(UI_FLOWS),
+        'ui_binary_sha256': digest(binary), 'frontend_sha256': {str(p.relative_to(ui)): digest(p) for p in sorted(ui.rglob('*')) if p.is_file()},
+        'console_graph': args.console_graph, 'script_result': 'BLOCKED',
+        'checker': 'script only; clean UI supplement, zero mutant UI coverage', 'checks': []}
+    save(run / 'receipt.json', receipt)
+    for flow, command in planned.items():
+        code = record_command(command, run / 'logs', flow)
+        receipt['checks'].append({'flow': flow, 'exit': code})
+        save(run / 'receipt.json', receipt)
+    receipt['source_and_binary_unchanged'] = not status() and keys() == manifest['verifier_keys'] \
+        and git('rev-parse', 'HEAD') == manifest['source_commit'] and digest(binary) == receipt['ui_binary_sha256'] \
+        and all(digest(packet / 'bin' / name) == pin['sha256'] for name, pin in manifest['binaries'].items()) \
+        and {str(p.relative_to(ui)): digest(p) for p in sorted(ui.rglob('*')) if p.is_file()} == receipt['frontend_sha256']
+    failed = any(item['exit'] for item in receipt['checks']) or args.console_graph != 'success' or not receipt['source_and_binary_unchanged']
+    blocked = any(item['exit'] in (2, 124) for item in receipt['checks']) or args.console_graph in ('', 'skipped', 'cancelled') \
+        or not receipt['source_and_binary_unchanged']
+    receipt['script_result'] = 'BLOCKED' if blocked else 'BROKEN' if failed else 'CHECKS_PASSED'
+    save(run / 'receipt.json', receipt)
+    return 1 if failed else 0
+
+
+def scope_check(args):
+    """Existing corpus/API/viewer mechanics; independent source supplements stay pending."""
+    from prove import corpus, mcp_answers
+    packet, manifest = read_manifest(args.baseline, require_checks=False)
+    if status():
+        raise RuntimeError('BLOCKED: scope capture requires a clean checkout')
+    run = Path(args.run).resolve()
+    run.mkdir(parents=True, exist_ok=False)
+    binary, ui = Path(args.head_bin).resolve(), Path(args.ui_dir).resolve()
+    os.environ['LANG'] = 'C.UTF-8'
+    receipt = {'source_commit': manifest['source_commit'], 'source_tree': manifest['source_tree'],
+        'baseline_manifest_sha256': digest(packet / 'baseline.json'),
+        'verifier_keyset_sha256': keyset_hash(manifest['verifier_keys']), 'ui_binary_sha256': digest(binary),
+        'frontend_sha256': {str(p.relative_to(ui)): digest(p) for p in sorted(ui.rglob('*')) if p.is_file()},
+        'corpus_table_sha256': digest(HERE / 'corpus.tsv'), 'entries': list(corpus()),
+        'script_result': 'BLOCKED', 'checker': 'script only; no independent source judgment', 'checks': [], 'source_captures': [],
+        'pending_independent_scope': list(SEPARATE_SCOPE[1:]) + ['source/spec judgment of every corpus delta']}
+    save(run / 'receipt.json', receipt)
+    save(run / 'corpus-pins.json', {name: {'packs': entry[0], 'url': entry[1],
+        'pin': manifest['source_commit'] if entry[1] == 'self' else entry[2]} for name, entry in corpus().items()})
+    target = run / 'corpus'
+    code = record_command([sys.executable, str(HERE / 'prove.py'), 'run', '--base-bin', str(packet / 'bin/meada-base'),
+        '--head-bin', str(packet / 'bin/meada-clean'), '--repos', 'all', '--run', str(target), '--http'],
+        run / 'logs', 'corpus', timeout=2700)
+    receipt['checks'].append({'flow': 'corpus', 'exit': code})
+    save(run / 'receipt.json', receipt)
+    for name in corpus():  # exact loader membership, seven pinned repositories/eight packs
+        record_path = target / 'head' / name / 'record.json'
+        if not record_path.is_file():
+            receipt['checks'].append({'flow': name + '-api', 'exit': 2, 'reason': 'native corpus record unavailable'})
+            save(run / 'receipt.json', receipt)
+            continue
+        record = json.loads(record_path.read_text())
+        if record.get('failed') or not record.get('answers'):
+            receipt['checks'].append({'flow': name + '-api', 'exit': 2, 'reason': 'native corpus record incomplete'})
+            save(run / 'receipt.json', receipt)
+            continue
+        out = run / 'ui-stdio' / name
+        out.mkdir(parents=True)
+        try:
+            tools, texts, seconds = mcp_answers(binary, target / 'work/head' / name, record['queries'], out / 'mcp.err')
+            save(out / 'record.json', {'tools': tools, 'answers': texts, 'queries': record['queries'],
+                'seconds': seconds, 'native_record_sha256': digest(record_path), 'ui_binary_sha256': digest(binary)})
+            equal = tools == record.get('tools') and texts == record.get('answers')
+            code = 0 if equal else 1
+        except Exception as error:
+            save(out / 'blocked.json', {'error': repr(error)})
+            code = 2
+        receipt['checks'].append({'flow': name + '-ui-stdio', 'exit': code})
+        try:
+            for phase, extra in [('start', ['--bin', str(binary), '--ui-dir', str(ui), '--repos', name]), ('api', [])]:
+                result = record_command([sys.executable, str(HERE / 'console.py'), phase, '--run', str(target), *extra],
+                                        run / 'logs', name + '-' + phase)
+                receipt['checks'].append({'flow': name + '-' + phase, 'exit': result})
+                if result:
+                    break
+        finally:
+            code = record_command([sys.executable, str(HERE / 'console.py'), 'stop', '--run', str(target)],
+                                  run / 'logs', name + '-stop', timeout=60)
+            receipt['checks'].append({'flow': name + '-stop', 'exit': code})
+            if (target / 'console').exists():
+                shutil.move(str(target / 'console'), str(target / ('console-' + name)))
+        save(run / 'receipt.json', receipt)
+    try:
+        result = record_command([sys.executable, str(HERE / 'console.py'), 'start', '--bin', str(binary),
+            '--ui-dir', str(ui), '--run', str(target)], run / 'logs', 'viewer-start')
+        receipt['checks'].append({'flow': 'viewer-start', 'exit': result})
+        if not result:
+            result = record_command(['node', str(HERE / 'console-pages.mjs'), str(target)], run / 'logs', 'viewer-pages')
+            receipt['checks'].append({'flow': 'viewer-pages', 'exit': result})
+    finally:
+        code = record_command([sys.executable, str(HERE / 'console.py'), 'stop', '--run', str(target)],
+                              run / 'logs', 'viewer-stop', timeout=60)
+        receipt['checks'].append({'flow': 'viewer-stop', 'exit': code})
+        if (target / 'console').exists():
+            shutil.move(str(target / 'console'), str(target / 'console-viewer'))
+    source_keys = HERE / 'a7-source-keys'
+    monitoring, adjacent, hcl, generic = [source_keys / name for name in
+        ('pinned-monitoring-completeness', 'adjacent-monitoring', 'native-hcl-values', 'generic-iac')]
+    captures = [
+        ('pinned-monitoring', ['--entry', 'kube-prometheus'], monitoring / 'queries.jsonl', monitoring / 'input-sha256.json', None),
+        ('adjacent-monitoring', ['--source', str(adjacent / 'repo'), '--name', 'adjacent-monitoring'],
+            adjacent / 'queries.jsonl', adjacent / 'input-sha256.json', adjacent / 'phase-plan.json'),
+        ('native-hcl-values', ['--source', str(hcl / 'repo'), '--name', 'native-hcl-values'],
+            hcl / 'queries.jsonl', hcl / 'input-sha256.json', hcl / 'expected-values.json'),
+    ]
+    for scope in json.loads((generic / 'capture-plan.json').read_text())['scopes']:
+        inputs = ['--entry', scope['entry']] if 'entry' in scope else ['--source', str(generic / scope['source']), '--name', scope['name']]
+        source_key = generic / 'source-sha256.json' if 'entry' in scope else generic / scope['source_identity']
+        phase_key = generic / scope['lifecycle'].split('#')[0] if scope['lifecycle'] else None
+        captures.append((scope['name'], inputs, generic / scope['queries'], source_key, phase_key))
+    if tuple(name for name, *_ in captures) != SOURCE_CAPTURES:
+        raise RuntimeError('BLOCKED: frozen source capture scope changed')
+    for name, inputs, queries, source_key, phase_key in captures:
+        command = [sys.executable, str(HERE / 'a7-source-capture.py'), '--head-bin', str(packet / 'bin/meada-clean'),
+            *inputs, '--queries', str(queries), '--source-key', str(source_key), '--run', str(run / 'source' / name)]
+        if phase_key:
+            command += ['--phase-key', str(phase_key)]
+        code = record_command(command, run / 'logs', 'capture-' + name, timeout=2700)
+        receipt['source_captures'].append({'flow': name, 'exit': code, 'semantic_judgment': 'PENDING'})
+        save(run / 'receipt.json', receipt)
+    unchanged = not status() and digest(binary) == receipt['ui_binary_sha256'] \
+        and git('rev-parse', 'HEAD') == manifest['source_commit'] and keys() == manifest['verifier_keys'] \
+        and all(digest(packet / 'bin' / name) == pin['sha256'] for name, pin in manifest['binaries'].items()) \
+        and {str(p.relative_to(ui)): digest(p) for p in sorted(ui.rglob('*')) if p.is_file()} == receipt['frontend_sha256']
+    receipt['checks'].append({'flow': 'source-and-ui-binary-unchanged', 'exit': 0 if unchanged else 2})
+    all_checks = receipt['checks'] + receipt['source_captures']
+    failed = any(item['exit'] for item in all_checks)
+    blocked = any(item['exit'] in (2, 124) for item in all_checks)
+    receipt['script_result'] = 'BLOCKED' if blocked else 'BROKEN' if failed else 'CHECKS_PASSED'
+    capture_failed = any(item['exit'] and (item['flow'] != 'corpus' or item['exit'] != 1) for item in all_checks)
+    receipt['capture_result'] = 'INCOMPLETE' if capture_failed else 'CAPTURED'
+    save(run / 'receipt.json', receipt)
+    # A completed capture is not a semantic pass over corpus differences. Their raw
+    # exit 1 and BROKEN script result stay visible until the fresh source judgment.
+    return 2 if blocked else 1 if capture_failed else 0
 
 
 def blind_result(judgment, names_symptom):
@@ -342,8 +586,16 @@ def report(args):
     final_clean = final['phase'] == 'final clean rerun' and final['script_result'] == 'CHECKS_PASSED' \
         and final['baseline_manifest_sha256'] == baseline_hash \
         and final['head_binary_sha256'] == json.loads((packet / 'baseline.json').read_text())['binaries']['meada-clean']['sha256']
-    independent_final = judged.get('verdict') == 'PROVED' and judged.get('receipt') and judged.get('checker') \
-        and judged.get('baseline_manifest_sha256') == baseline_hash
+    final_judgment_error = None
+    try:
+        attestation(packet, Path(args.final_judgment).read_text(),
+                    getattr(args, 'ui_receipt', None), getattr(args, 'scope_receipt', None))
+        final_judgment_valid = True
+    except (OSError, ValueError, RuntimeError) as error:
+        final_judgment_valid, final_judgment_error = False, str(error)
+    not_blind = getattr(args, 'not_blind', False)
+    inline_final = judged.get('checker_mode') == 'inline'
+    independent_final = final_judgment_valid and not inline_final
     missing = [name for name in planned if name not in latest]
     caught = sum(item['result'] == 'caught' for item in current)
     scripts = sum(item['script_caught'] for item in current)
@@ -352,18 +604,29 @@ def report(args):
     luck = [item['mutation'] for item in current if item['result'] == 'caught by luck']
     incomplete = [item['mutation'] for item in current if item['result'] == 'incomplete']
     script_only = [item['mutation'] for item in current if item['script_caught'] and not item['blind_caught']]
-    complete = not (missing or missed or luck or incomplete) and caught == len(planned) \
+    complete = not not_blind and not (missing or missed or luck or incomplete) and caught == len(planned) \
         and blind == len(planned) and final_clean and independent_final
-    result = {'audit_result': 'COMPLETE' if complete else 'INCOMPLETE', 'baseline_manifest_sha256': baseline_hash,
+    # audit-prove-it permits scripted checks when fresh agents are unavailable or forbidden.
+    # Keep their blind judgments incomplete and give the explicit fallback its own result.
+    script_complete = bool(not_blind and inline_final and final_clean and final_judgment_valid
+        and not missing and len(current) == len(planned) and all(
+            item['script_caught'] and item['script_detection'] == 'caught' and item['checker_caught']
+            and not item['fresh_blind_checker'] and item['judgment'].get('checker_mode') == 'inline'
+            for item in current))
+    result = {'audit_result': 'COMPLETE_NOT_BLIND' if script_complete else 'COMPLETE' if complete else 'INCOMPLETE',
+              'checker_mode': 'inline, not blind or independent' if not_blind else 'fresh blind',
+              'script_only_complete': script_complete, 'final_judgment_valid': bool(final_judgment_valid),
+              'baseline_manifest_sha256': baseline_hash,
               'planned': len(planned), 'caught': caught, 'script_caught': scripts, 'fresh_blind_rounds': blind,
               'script_only_detections': script_only, 'missed': missed, 'caught_by_luck': luck, 'incomplete_rounds': incomplete,
               'script_only_count': len(script_only), 'missed_count': len(missed),
               'caught_by_luck_count': len(luck), 'incomplete_count': len(incomplete), 'missing_count': len(missing),
               'missing': missing, 'final_clean_checks': bool(final_clean), 'final_fresh_verdict': bool(independent_final),
-              'history': history, 'latest': current, 'final_judgment': judged,
+              'history': history, 'latest': current, 'final_judgment': judged, 'final_judgment_error': final_judgment_error,
               'limit': 'Bounded observed bugs, not a whole-app proof or a general completeness claim.'}
     save(args.output, result)
-    lines = ['# A7/A8 bounded audit', '', f"Result: {result['audit_result']}; {caught}/{len(planned)} blind catches, {scripts} script detections, {blind} fresh blind judgments.",
+    lines = ['# A7/A8 bounded audit', '', 'Mode: ' + result['checker_mode'] + '.', '',
+             f"Result: {result['audit_result']}; {caught}/{len(planned)} blind catches, {scripts} script detections, {blind} fresh blind judgments.",
              f'Final clean checks: {bool(final_clean)}; final independent PROVED: {bool(independent_final)}.', '',
              '| Mutation | Result | Script caught | Fresh blind | Symptom |', '|---|---|---|---|---|']
     lines += [f"| {item['mutation']} | {item['result']} | {item['script_caught']} | {item['fresh_blind_checker']} | {item['symptom'].replace('|', '/')} |"
@@ -372,7 +635,7 @@ def report(args):
               'Missed: ' + (', '.join(missed) or 'none'), 'Incomplete: ' + (', '.join(incomplete) or 'none'),
               'Script detections without a blind catch: ' + (', '.join(script_only) or 'none'), '', result['limit']]
     Path(args.output).with_suffix('.md').write_text('\n'.join(lines) + '\n')
-    return 0 if complete else 1
+    return 0 if complete or script_complete else 1
 
 
 def validate_plan():
@@ -394,21 +657,33 @@ def main():
     p.add_argument('--baseline', required=True)
     p.add_argument('--run', required=True)
     p.add_argument('--mutation', required=True, choices=[c['id'] for c in json.loads(PLAN.read_text())])
+    p.add_argument('--ui-receipt')
+    p.add_argument('--scope-receipt')
     p = sub.add_parser('check')
     p.add_argument('--baseline', required=True)
     p.add_argument('--candidate')
     p.add_argument('--run', required=True)
+    p = sub.add_parser('ui-check')
+    for option in ('baseline', 'head-bin', 'ui-dir', 'run', 'console-graph'):
+        p.add_argument('--' + option, required=True)
+    p = sub.add_parser('scope-check')
+    for option in ('baseline', 'head-bin', 'ui-dir', 'run'):
+        p.add_argument('--' + option, required=True)
     p = sub.add_parser('score')
     for option in ('auditor', 'checks', 'judgment', 'output'):
         p.add_argument('--' + option, required=True)
     p = sub.add_parser('report')
+    p.add_argument('--not-blind', action='store_true',
+                   help='explicit script-only audit fallback; requires inline judgments and never claims independence')
     for option in ('baseline', 'final', 'final-judgment', 'output'):
         p.add_argument('--' + option, required=True)
     p.add_argument('--rounds', nargs='*', required=True, help='chronological score files, retaining misses before repairs')
+    p.add_argument('--ui-receipt')
+    p.add_argument('--scope-receipt')
     sub.add_parser('validate-plan')
     args = parser.parse_args()
     try:
-        return validate_plan() if args.phase == 'validate-plan' else globals()[args.phase](args)
+        return validate_plan() if args.phase == 'validate-plan' else globals()[args.phase.replace('-', '_')](args)
     except (OSError, ValueError, RuntimeError, StopIteration, AssertionError, KeyError) as error:
         print('BLOCKED: ' + str(error), file=sys.stderr)
         return 2

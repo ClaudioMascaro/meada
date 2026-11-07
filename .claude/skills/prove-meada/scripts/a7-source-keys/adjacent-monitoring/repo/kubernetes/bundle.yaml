@@ -1,0 +1,44 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: meadow-signals
+  namespace: signals
+  labels:
+    support: metadata-ghost
+spec:
+  groups:
+    - name: meadow-group
+      labels:
+        support: aurora
+        service: cedar-meadow
+        severity: warning
+      rules:
+        - alert: MeadowCritical
+          expr: vector(1)
+          labels:
+            severity: critical
+        - record: meadow:capacity:sum
+          expr: vector(1)
+          labels:
+            support: meadow-recording-ghost
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: not-public-monitoring
+  labels:
+    support: secret-metadata-ghost
+stringData:
+  rules.yaml: |
+    groups:
+      - name: hidden
+        rules:
+          - alert: SecretGhost
+            expr: vector(1)
+            labels:
+              support: secret-payload-ghost
+  alertmanager.yaml: |
+    route:
+      receiver: secret-receiver-ghost
+      match:
+        support: aurora

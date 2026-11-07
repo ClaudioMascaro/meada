@@ -1,0 +1,130 @@
+{
+  "fixture_git_clean": true,
+  "tracked_files": 15,
+  "hcl_or_var_files": 14,
+  "source_bytes_including_manifest": 6607,
+  "baseline_row_count": 72,
+  "baseline_redacted_rows": 14,
+  "sensitivity_public_redacted_rows": 3,
+  "cut_rows": 2,
+  "kind_counts": {
+    "string": 41,
+    "number": 8,
+    "boolean": 10,
+    "expression": 9,
+    "template": 4
+  },
+  "query_count": 38,
+  "search_query_count": 31,
+  "context_query_count": 7,
+  "changed_row_ids_by_phase": {
+    "literal_changed": [
+      "botany.tf#locals.proof.refresh"
+    ],
+    "sensitivity_public": [
+      "sensory/variables.tf#variable.proof.default.plain",
+      "sensory/variables.tf#variable.proof.default.nested[0]",
+      "sensory/variables.tf#variable.proof.default.quantity",
+      "sensory/variables.tf#variable.proof.default.enabled",
+      "sensory/variables.tf#variable.proof.default.opaque",
+      "sensory/variables.tf#variable.proof.default.template",
+      "sensory/variables.tf#variable.proof.sensitive",
+      "visible/terraform.tfvars#proof.plain",
+      "visible/terraform.tfvars#proof.list[0]",
+      "visible/terraform.tfvars#proof.list[1]",
+      "visible/terraform.tfvars#proof[\"with.dot\"]",
+      "visible/petal.auto.tfvars#proof"
+    ]
+  },
+  "hcl_syntax_checker": "python-hcl2 7.3.1, parse only; never eval or row extraction",
+  "syntax_results": [
+    {
+      "file": "botany.tf",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "boundary.tf",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "depth/at.tf",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "depth/over.tf",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "facets.tf",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "opaque/child/terraform.tfvars",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "opaque/incomplete.tf",
+      "independent_native_syntax_parse": false,
+      "expected_syntax_parse": false,
+      "semantic_oracle": false
+    },
+    {
+      "file": "sensory/variables.tf",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "shadow/fern.tf",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "shadow/fern.tofu",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "textiles.tf",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "visible/petal.auto.tfvars",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "visible/terraform.tfvars",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    },
+    {
+      "file": "visible/variables.tf",
+      "independent_native_syntax_parse": true,
+      "expected_syntax_parse": true,
+      "semantic_oracle": false
+    }
+  ],
+  "manifest_toml_parse": true,
+  "source_author_python_ast_parse": true,
+  "product_execution": false,
+  "candidate_answers_read": false
+}

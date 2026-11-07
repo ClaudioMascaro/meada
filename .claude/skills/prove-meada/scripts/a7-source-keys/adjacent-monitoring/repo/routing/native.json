@@ -1,0 +1,79 @@
+{
+  "apiVersion": "monitoring.coreos.com/v1alpha1",
+  "kind": "AlertmanagerConfig",
+  "metadata": {
+    "name": "ledger-dispatch",
+    "labels": {
+      "support": "route-metadata-ghost"
+    }
+  },
+  "spec": {
+    "route": {
+      "receiver": "ledger-base",
+      "matchers": [
+        {
+          "name": "team",
+          "value": "ledger",
+          "matchType": "="
+        }
+      ],
+      "routes": [
+        {
+          "matchers": [
+            {
+              "name": "severity",
+              "value": "warn",
+              "matchType": "="
+            }
+          ],
+          "continue": true
+        },
+        {
+          "receiver": "ledger-regex",
+          "matchers": [
+            {
+              "name": "service",
+              "value": "ledger-.+",
+              "regex": true
+            }
+          ],
+          "continue": true
+        },
+        {
+          "receiver": "unknown-destination",
+          "matchers": [
+            {
+              "name": "unwritten",
+              "value": "present",
+              "matchType": "="
+            }
+          ]
+        },
+        {
+          "receiver": "blocked-ledger",
+          "matchers": [
+            {
+              "name": "service",
+              "value": "ledger-api",
+              "matchType": "="
+            }
+          ]
+        }
+      ]
+    },
+    "receivers": [
+      {
+        "name": "ledger-base"
+      },
+      {
+        "name": "ledger-regex"
+      },
+      {
+        "name": "unknown-destination"
+      },
+      {
+        "name": "blocked-ledger"
+      }
+    ]
+  }
+}

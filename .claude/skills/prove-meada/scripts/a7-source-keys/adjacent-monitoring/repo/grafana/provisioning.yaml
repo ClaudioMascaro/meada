@@ -1,0 +1,41 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: beacon-panels
+    folder: independent-signals
+    interval: 60s
+    rules:
+      - uid: beacon-critical
+        title: BeaconCritical
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: __expr__
+            model:
+              expression: 1 > 0
+              type: math
+              refId: A
+        for: 60s
+        labels:
+          support: aurora
+          service: cedar-grafana
+          severity: critical
+          alertname: WrittenGrafanaName
+        annotations:
+          support: grafana-annotation-ghost
+      - uid: beacon-ledger
+        title: BeaconLedger
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: __expr__
+            model:
+              expression: 1 > 0
+              type: math
+              refId: A
+        for: 60s
+        labels:
+          support: ledger
+          service: ledger-ui
+          severity: critical
+          team: ledger

@@ -1,0 +1,40 @@
+route:
+  receiver: default-mail
+  group_by: [alertname, service]
+  routes:
+    - match:
+        support: aurora
+      receiver: aurora-base
+      continue: true
+      routes:
+        - matchers:
+            - 'severity = "critical"'
+          receiver: aurora-pager
+        - match_re:
+            service: cedar-.+
+          receiver: aurora-regex
+    - matchers:
+        - 'support="aurora"'
+      receiver: aurora-copy
+    - match:
+        support: aurora
+      receiver: blocked-by-first
+    - match_re:
+        service: harbor-.+
+      receiver: harbor-logs
+    - matchers:
+        - 'zone="red"'
+      receiver: unknown-zone
+    - match:
+        service: quartz
+      receiver: blocked-by-unknown
+receivers:
+  - name: default-mail
+  - name: aurora-base
+  - name: aurora-pager
+  - name: aurora-regex
+  - name: aurora-copy
+  - name: blocked-by-first
+  - name: harbor-logs
+  - name: unknown-zone
+  - name: blocked-by-unknown

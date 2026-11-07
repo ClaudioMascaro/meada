@@ -1,0 +1,84 @@
+{
+  "commit": "b6c2f62b287524652592e6e2f7ea0d3054cb8ac6",
+  "files": [
+    {
+      "path": "manifests/alertmanager-prometheusRule.yaml",
+      "sha": "7acb6bebc1e722c1f9738ceb7b9e97209a6d049e",
+      "sha256": "795f2c0a7312364c0bf47ce9206530f198b0e274cf3c2a21c02132296f99f2e7",
+      "size": 8114
+    },
+    {
+      "path": "manifests/alertmanager-secret.yaml",
+      "sha": "e8c3bac3f06fc737ed4a570835195240d16d4bb8",
+      "sha256": "5505874e1abf30beadcee875e19a06f76cf73e60bd4954eb579d845b6c25e9f2",
+      "size": 1443
+    },
+    {
+      "path": "manifests/grafana-prometheusRule.yaml",
+      "sha": "b9161c575e0887ef2eb5258cacc9ef0b581b50ca",
+      "sha256": "ef07841b4043580a1b3a4b87cce2ed79c6b8d21fc4e07954badbaab173ecd9d4",
+      "size": 1423
+    },
+    {
+      "path": "manifests/kubePrometheus-prometheusRule.yaml",
+      "sha": "f14be25a7417c6611422f091e80975f4def2c17a",
+      "sha256": "5bf4529862bf908953a6331c926d9a21435a69b0946187bbf40fcb17e62231c6",
+      "size": 4350
+    },
+    {
+      "path": "manifests/kubeStateMetrics-prometheusRule.yaml",
+      "sha": "9d2650af06d3d63048db3a8099de433a6c479f41",
+      "sha256": "098ce9003b41990335714b981aa40289c37ef9597432b09c21a513f5908a9dd1",
+      "size": 3183
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "sha": "348469fc09a525764aee230ad107976cd65b8fd9",
+      "sha256": "a5545dabab60c1d8f63c49e9da59f3bd9e77368d98abcce7a78f415fb9ce1b43",
+      "size": 84422
+    },
+    {
+      "path": "manifests/nodeExporter-prometheusRule.yaml",
+      "sha": "f53de25b162bc41c0ff13adbd98827e7ffdf50f3",
+      "sha256": "ae160575bd33a4d17281180caf0ccdd513957a66cb790f25627ff1dd110a9a2a",
+      "size": 21237
+    },
+    {
+      "path": "manifests/prometheus-prometheusRule.yaml",
+      "sha": "aea8606b87f0519119c5c6e5f7bee3a2a0b98148",
+      "sha256": "5469dcbc360b7a5487a4e6625b955c98d3504728393acf8a6e531a04cf398c16",
+      "size": 17233
+    },
+    {
+      "path": "manifests/prometheusOperator-prometheusRule.yaml",
+      "sha": "38acc79cec7ae7435e34dad26cc777f05aa094bc",
+      "sha256": "ea33fc88d13dac23c2b9455e68dbacb31d39a285b4f8a8cbff1709e71ed15d8b",
+      "size": 6591
+    },
+    {
+      "path": "examples/alertmanager-config-with-template.yaml",
+      "sha": "383332b5d15768524fed5a6ed3fc90aecb8f8af6",
+      "sha256": "0a5cf5fe79cd740ca585c475132f370ae2f93cb7c539a0a4fa67b4873de0b92c",
+      "size": 619
+    },
+    {
+      "path": "examples/alertmanager-config.yaml",
+      "sha": "87391e795f898623136cd51594468f5eaa6b35e9",
+      "sha256": "4096eed799a32571d69c2454a1f350b2275c04ac53a68f064062b845f3a0f537",
+      "size": 897
+    },
+    {
+      "path": "examples/existingrule.json",
+      "sha": "8486eb7d721506133c2720706f48892e6190e2d4",
+      "sha256": "61ad3af81ee3daad2a2f5d329c9bfbac04c714226e884fc9f76cccca74af1f87",
+      "size": 181
+    },
+    {
+      "path": "examples/existingrule.yaml",
+      "sha": "ab5de27041282bd0fe173bc8ad0e8401811c5e29",
+      "sha256": "4ca3bbed8f27372ebf5d35d1f5e23b930963ee90cb82e55f65884f55f05750d0",
+      "size": 183
+    }
+  ],
+  "source_only": true
+}

@@ -1,0 +1,8 @@
+{{- if .Values.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}-signals
+spec:
+  groups: {{ .Values.groups | toYaml }}
+{{- end }}

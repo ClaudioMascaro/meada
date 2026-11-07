@@ -1,0 +1,18 @@
+# Declared targets make direct key context part of the #641 public contract.
+[[resource]]
+kind = "native_fixture"
+id = "botanical"
+role = "write"
+via = ["botany.tf#locals.proof.ranked_exact"]
+
+[[resource]]
+kind = "native_fixture"
+id = "masked"
+role = "write"
+via = ["sensory/variables.tf#variable.proof.default.plain"]
+
+[[resource]]
+kind = "native_fixture"
+id = "edge"
+role = "write"
+via = ["boundary.tf#locals.proof.before_scalar"]

@@ -1,0 +1,817 @@
+{
+  "repository": "prometheus-operator/kube-prometheus",
+  "commit": "b6c2f62b287524652592e6e2f7ea0d3054cb8ac6",
+  "files": [
+    {
+      "path": ".github/dependabot.yml",
+      "size": 285,
+      "git_blob_sha1": "f4ae8cd2c2eb7b90ac9743df6121335c4548d63b",
+      "sha256": "f0610a7c7faa89aa9fdd28eff421b7bfb636bd71b112a6db5daf57f8abff3a0d"
+    },
+    {
+      "path": ".github/workflows/action-lint.yaml",
+      "size": 821,
+      "git_blob_sha1": "bdf973a57c808164b7c0926c9d1304a0046fd077",
+      "sha256": "5b029ad445df7c4e2656b53dff4c3db15b5488fb411eec25f6a6c7413b505c3d"
+    },
+    {
+      "path": ".github/workflows/ci.yaml",
+      "size": 10256,
+      "git_blob_sha1": "a06ad694229d348b1d9eac03da434dfc7b6e076e",
+      "sha256": "12ca8b4a8c0930a30f15b0d146355e1fd88f7a5daf3697bb2f04ae5f98d68822"
+    },
+    {
+      "path": ".github/workflows/stale.yaml",
+      "size": 886,
+      "git_blob_sha1": "a9f943040d1318f2f763d6abd4ddf116021581ce",
+      "sha256": "eb3ec8cb221e0004234b99d56569823ee629e84bf1912fc3ea94f8ce1e5598ae"
+    },
+    {
+      "path": ".github/workflows/versions.yaml",
+      "size": 3824,
+      "git_blob_sha1": "6902ddf1de525cd46efb4b6892a2672aa6aa2165",
+      "sha256": "74c254f9c4caa268ecd31d407ff3c0d0844dbd590aca777144f5bb192a417211"
+    },
+    {
+      "path": ".gitignore",
+      "size": 312,
+      "git_blob_sha1": "65b8eb04daed559eff3db2f59d2ba54808e8c0ac",
+      "sha256": "1e04fcb5e1d3e12fd4e4a3ac336a2c01afb26733fb82ddbdf71bcfd9311ae23f"
+    },
+    {
+      "path": ".gitpod.yml",
+      "size": 1474,
+      "git_blob_sha1": "47ce355ee55e71c138738d79dc990271586da92e",
+      "sha256": "a9065c12685e3142ee48ee0cf4d98d9bb0c130d7642a031a245d19bfd5a1210f"
+    },
+    {
+      "path": ".mdox.validate.yaml",
+      "size": 993,
+      "git_blob_sha1": "f8273c3e1d71d8117562185423c7bdbaca5043f9",
+      "sha256": "363687660710cc09a2eadd5a0f275c2885a00c319e7b6f5333abffbf62ba8b61"
+    },
+    {
+      "path": "examples/alertmanager-config-with-template.yaml",
+      "size": 619,
+      "git_blob_sha1": "383332b5d15768524fed5a6ed3fc90aecb8f8af6",
+      "sha256": "0a5cf5fe79cd740ca585c475132f370ae2f93cb7c539a0a4fa67b4873de0b92c"
+    },
+    {
+      "path": "examples/alertmanager-config.yaml",
+      "size": 897,
+      "git_blob_sha1": "87391e795f898623136cd51594468f5eaa6b35e9",
+      "sha256": "4096eed799a32571d69c2454a1f350b2275c04ac53a68f064062b845f3a0f537"
+    },
+    {
+      "path": "examples/basic-auth/secrets.yaml",
+      "size": 128,
+      "git_blob_sha1": "fa0dd897c0d2a66c096dc33f08274fbba0197ad4",
+      "sha256": "fa8ada5b7bfbea04d48397510c94d93ec24fed624e4c99cdd170d2be7bcc3121"
+    },
+    {
+      "path": "examples/basic-auth/service-monitor.yaml",
+      "size": 427,
+      "git_blob_sha1": "82ac0b6557d235a635d7b04b61df3019f0d78bca",
+      "sha256": "974e4188be64427dec68d85543b54a54e7bef0562ff0e2892463626cd6e96114"
+    },
+    {
+      "path": "examples/continuous-delivery/argocd/application.yaml",
+      "size": 587,
+      "git_blob_sha1": "1bc1264e749c606f73583c995f0e10c663d6c744",
+      "sha256": "7b809e02f5103a57bb91c3faa0a2bd19968066133a02b1bff15f89725e831e30"
+    },
+    {
+      "path": "examples/continuous-delivery/argocd/appproject.yaml",
+      "size": 613,
+      "git_blob_sha1": "a571b7820c61d28926481a63250e3921ec83a6ba",
+      "sha256": "d3978ec9579107d5aae8f1498b6574dc600e468254af1e5b400b0bd35c13bf3b"
+    },
+    {
+      "path": "examples/example-app/example-app.yaml",
+      "size": 750,
+      "git_blob_sha1": "71d9e5671c728d82498f42921a4e549d2e3e30d0",
+      "sha256": "5b34ae36d38f637dd8226eb39513be46508721fff7f446b7f0e5dd34ae003ef9"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-alertmanager-discovery-role-binding.yaml",
+      "size": 294,
+      "git_blob_sha1": "7a179fe0650bb8125601882a1b16c1270ce49708",
+      "sha256": "d19ba1c691934c265804e5a4d8aa7a23962080a8d2e34720d4b78a5a6416caec"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-alertmanager-discovery-role.yaml",
+      "size": 218,
+      "git_blob_sha1": "cb9f2886603bcb276b63ca31b9af8f2c52266f3c",
+      "sha256": "b494cecb84702395245c0a70e8e84e60ac159eb8e1e13d06df27853370a3f817"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-role-binding.yaml",
+      "size": 288,
+      "git_blob_sha1": "e40a52ca25bb5a7f8ae8553531e7d66ac0379a1f",
+      "sha256": "67f59477be18efb86f872505e0f3cbf345f15cffb92e3e2a0d338dd76658fdf3"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-role.yaml",
+      "size": 292,
+      "git_blob_sha1": "634ad6b9a072b087c1217411c1639709e87a8f73",
+      "sha256": "025b5e5ae957551b831810546c6c2ac2f317c0856beef32354bac1a7dfce1c4f"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-service-account.yaml",
+      "size": 95,
+      "git_blob_sha1": "4dd7c26be6408de223ba3614a904cab3ac9d908c",
+      "sha256": "853377ec07b8176e33699131db8a7c856b9f998e12a0ac9ee95add02dc994ab4"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-svc.yaml",
+      "size": 244,
+      "git_blob_sha1": "7002e8f18a691e4fddbd9cd29ae9ec3fcf8f0188",
+      "sha256": "aebdbf560b69f29b12a5fae6ca3a147114161382f08dfd4ac2338619a7c6e7fa"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend.yaml",
+      "size": 662,
+      "git_blob_sha1": "d56515293e6db54fe99cbf91015ee596b3c04877",
+      "sha256": "e53c51006a721f31d8fed9c74138f7cec40563518f7d9e13b4e5c3e4b48db45e"
+    },
+    {
+      "path": "examples/example-app/servicemonitor-frontend.yaml",
+      "size": 316,
+      "git_blob_sha1": "2bc935af75770096dac81820e544e29912737348",
+      "sha256": "d9b09adb60a3e207146bee8efa0d9f7c739c527d7647adbe7d229537202c49c8"
+    },
+    {
+      "path": "examples/example-grafana-dashboard.json",
+      "size": 4768,
+      "git_blob_sha1": "a891040be1c044ad2fa596fdd0f95f9750df0318",
+      "sha256": "aa7201a7f5554deff6db0d0b9698c715bb6f204bbd58c08146402710efb1214a"
+    },
+    {
+      "path": "examples/existingrule.json",
+      "size": 181,
+      "git_blob_sha1": "8486eb7d721506133c2720706f48892e6190e2d4",
+      "sha256": "61ad3af81ee3daad2a2f5d329c9bfbac04c714226e884fc9f76cccca74af1f87"
+    },
+    {
+      "path": "examples/existingrule.yaml",
+      "size": 183,
+      "git_blob_sha1": "ab5de27041282bd0fe173bc8ad0e8401811c5e29",
+      "sha256": "4ca3bbed8f27372ebf5d35d1f5e23b930963ee90cb82e55f65884f55f05750d0"
+    },
+    {
+      "path": "jsonnet/kube-prometheus/.gitignore",
+      "size": 30,
+      "git_blob_sha1": "52a75ecba7d108a48c1a496227a324b28cb0fdbe",
+      "sha256": "64448ab87b2caff430cc109585d3fe473665abd05536d9bbef1c7eda36e92c26"
+    },
+    {
+      "path": "jsonnet/kube-prometheus/addons/weave-net/grafana-weave-net-cluster.json",
+      "size": 75361,
+      "git_blob_sha1": "102269f0b03f8cee4cbab505d1a9f9223d5d8c78",
+      "sha256": "c8f94261d34392ddf9d2b20c981fa4817f25d3f9b8a2209f5bb6bd0bdd0b38e2"
+    },
+    {
+      "path": "jsonnet/kube-prometheus/addons/weave-net/grafana-weave-net.json",
+      "size": 58543,
+      "git_blob_sha1": "fb0e5049daacd939243d38f316f192eef5aa7953",
+      "sha256": "fa2ec92c52c047d7ffca3ff6ca86edcf028dca6a69255b9e5ce0afe077f08726"
+    },
+    {
+      "path": "jsonnet/kube-prometheus/jsonnetfile.json",
+      "size": 3400,
+      "git_blob_sha1": "8123ccda65cec10bce07f122448cd2d0d289878b",
+      "sha256": "cc0c751d1674470fb9584f982be731774d642dad84fbcaae62b087dd5fbd283e"
+    },
+    {
+      "path": "jsonnet/kube-prometheus/versions.json",
+      "size": 399,
+      "git_blob_sha1": "e53532e63b1b3f6b0b81f4f559c489e614e5aa4a",
+      "sha256": "e3b185886197bcfa23d5b78c2793e2e3504f29974af587ce684f33aaa5b82a0a"
+    },
+    {
+      "path": "jsonnetfile.json",
+      "size": 400,
+      "git_blob_sha1": "d48ecd629bfae90cfa6f462471658ddcd8f20ead",
+      "sha256": "d76f9b011c286cd1f006ca8956c2b25a0c9584efc84e95a50018ebc41c8085f2"
+    },
+    {
+      "path": "jsonnetfile.lock.json",
+      "size": 7226,
+      "git_blob_sha1": "6524ae9381aa8526b0285af97f9bf80c130b09d4",
+      "sha256": "d0476dd311ea3ad3d9af0dbff2182fd38623bbf269bbe99e4edc2f11b65dd563"
+    },
+    {
+      "path": "kubescape-exceptions.json",
+      "size": 1807,
+      "git_blob_sha1": "77cdaab3a9a9923c67c60835c17a5ab7358cd8c2",
+      "sha256": "bc3000ed77e34760c9af33441336a225fffdf54a05050c8fdf0009fb3952551c"
+    },
+    {
+      "path": "kustomization.yaml",
+      "size": 4902,
+      "git_blob_sha1": "e0d8039ed7384d3598b1a1901aa5e3c68a461fec",
+      "sha256": "de8f2f6844e1b54d82646171940ba33998d42e3316e3101734d7d72dfd385549"
+    },
+    {
+      "path": "manifests/alertmanager-alertmanager.yaml",
+      "size": 975,
+      "git_blob_sha1": "dadd0abbfa69bbeb690aff9d39e0d4889d27236a",
+      "sha256": "e69ff8f8a3fd848877dcb191f8e246b5b83c0f1147f566b3bea31f9ac2351cf5"
+    },
+    {
+      "path": "manifests/alertmanager-networkPolicy.yaml",
+      "size": 977,
+      "git_blob_sha1": "d4706882ad781e5312e058bcc3dd3c5795aa5e13",
+      "sha256": "65657cc05c0e703d290814b275f5cecbff1cae99a700d3c40186b6d16b04b279"
+    },
+    {
+      "path": "manifests/alertmanager-podDisruptionBudget.yaml",
+      "size": 561,
+      "git_blob_sha1": "1925659c22e4a68bcdcef1c8a0e485e6409934b1",
+      "sha256": "9fb3c6278b29e125e9283a63097e5074837f04389c6270eb29a2bb7a50b7d244"
+    },
+    {
+      "path": "manifests/alertmanager-prometheusRule.yaml",
+      "size": 8114,
+      "git_blob_sha1": "7acb6bebc1e722c1f9738ceb7b9e97209a6d049e",
+      "sha256": "795f2c0a7312364c0bf47ce9206530f198b0e274cf3c2a21c02132296f99f2e7"
+    },
+    {
+      "path": "manifests/alertmanager-secret.yaml",
+      "size": 1443,
+      "git_blob_sha1": "e8c3bac3f06fc737ed4a570835195240d16d4bb8",
+      "sha256": "5505874e1abf30beadcee875e19a06f76cf73e60bd4954eb579d845b6c25e9f2"
+    },
+    {
+      "path": "manifests/alertmanager-service.yaml",
+      "size": 650,
+      "git_blob_sha1": "35e56106287e8fcce466f1901272434c25feb4ef",
+      "sha256": "6d8727872ff92c8e98a53fc3f13a5f00a2ffae8f1285742b61691e58ee2f7e6e"
+    },
+    {
+      "path": "manifests/alertmanager-serviceAccount.yaml",
+      "size": 351,
+      "git_blob_sha1": "d5670a59673eebe8353ad678d2cf2a57459cfc8f",
+      "sha256": "29bdbcf8dc84aeef780fceec6ee770ab80f82ffbe5e292c01d8c08be23994c95"
+    },
+    {
+      "path": "manifests/alertmanager-serviceMonitor.yaml",
+      "size": 637,
+      "git_blob_sha1": "ded36f5f69aa4403ab257e58eb10fb2d0f1a0b3f",
+      "sha256": "693df6afcaff0157b041aae1f3cfe78cf41ede65a5da2ab4b606ab3c1536da44"
+    },
+    {
+      "path": "manifests/blackboxExporter-clusterRole.yaml",
+      "size": 470,
+      "git_blob_sha1": "5dedfcad8bac6110eac7c0d1c2b123d1f06c08f4",
+      "sha256": "cc0d1e1d51c9a6c88cb9e89d95a0a00561cd6a35d6b7f8769ed35a91ed75094e"
+    },
+    {
+      "path": "manifests/blackboxExporter-clusterRoleBinding.yaml",
+      "size": 461,
+      "git_blob_sha1": "ad1de57fc6d4cba79c4ee71154a1656ba42f1bd5",
+      "sha256": "fcb3e074d466461c942bda378b2c64d4d2a20094ac1aae8fd910ea7316e2989a"
+    },
+    {
+      "path": "manifests/blackboxExporter-configuration.yaml",
+      "size": 1392,
+      "git_blob_sha1": "e4c52d2c502cd2b218f1a6ac8eda84f56edcd7cf",
+      "sha256": "5b377fcbe1ba6576547eb721c6d71241c941587d1b206ce10f2cf872d5aaabfc"
+    },
+    {
+      "path": "manifests/blackboxExporter-deployment.yaml",
+      "size": 3645,
+      "git_blob_sha1": "353467474552d0f153b9ee7ed977d391145bce00",
+      "sha256": "dd2d9f8dd2fd11cbc418725775249d25a567b18ea269fb5e44e0df365cb3c506"
+    },
+    {
+      "path": "manifests/blackboxExporter-networkPolicy.yaml",
+      "size": 722,
+      "git_blob_sha1": "5528a4fdaa8326549594ea06280a15986219742c",
+      "sha256": "e812777ddb25e4e7dd6b2a7abe08df1ea19cac1dabd04fc6f1b47c15e56acb45"
+    },
+    {
+      "path": "manifests/blackboxExporter-service.yaml",
+      "size": 540,
+      "git_blob_sha1": "f742664bf5c8f1c2177216b5ae85bc682dbca0d8",
+      "sha256": "4a86f6eb7d0afd9568d69784901fcc225aa157852c0e3f83f203d58192afaa22"
+    },
+    {
+      "path": "manifests/blackboxExporter-serviceAccount.yaml",
+      "size": 315,
+      "git_blob_sha1": "c777627ca9d3f263fb8c86180d816366818d48ac",
+      "sha256": "cf5f26490f6cc5a3538d403f47545268573f91f76a3f3c112418d327c581b1d5"
+    },
+    {
+      "path": "manifests/blackboxExporter-serviceMonitor.yaml",
+      "size": 680,
+      "git_blob_sha1": "8a0de5022f3331a9e31e590457251c6f741b12eb",
+      "sha256": "797ae59798c3069a547b38baf5a5f2787674cb9b26dce214180fe0a9fd709557"
+    },
+    {
+      "path": "manifests/grafana-config.yaml",
+      "size": 345,
+      "git_blob_sha1": "65f6a7411f9f785b9b9d749190f3c41a7ad64d6b",
+      "sha256": "f445470993e9224f41c6b3e074c9c6940eb08171e2aa0bdff2f961a8baca59e2"
+    },
+    {
+      "path": "manifests/grafana-dashboardDatasources.yaml",
+      "size": 681,
+      "git_blob_sha1": "56318f0dd424de26c15abf7e238ceba4ca652fa8",
+      "sha256": "c858b97972348103c136c88f81150107c976393b7b80f58ba3ce38850ab8a790"
+    },
+    {
+      "path": "manifests/grafana-dashboardDefinitions.yaml",
+      "size": 1053739,
+      "git_blob_sha1": "9de2fb2a6c734280a57494694be9f5285c08bba4",
+      "sha256": "4b61f21cbbeb49550469643dcb3c58f8b039d58dc5200064dc0bfa02ee503858"
+    },
+    {
+      "path": "manifests/grafana-dashboardSources.yaml",
+      "size": 659,
+      "git_blob_sha1": "714a62562073a444a6a5315869217b6c9e8bd6cb",
+      "sha256": "2b6c4a51a1049935948c7d18e28dd40c92159f8b8645f2e4ea9864112a6e3003"
+    },
+    {
+      "path": "manifests/grafana-deployment.yaml",
+      "size": 11806,
+      "git_blob_sha1": "dbf39cba7d1488d0e152704e99b42260fa480737",
+      "sha256": "7096768f770e5a67f98dcc0b0586dd63bacfe1bcf8b2cf2d7d3a73ad7c8b61af"
+    },
+    {
+      "path": "manifests/grafana-networkPolicy.yaml",
+      "size": 652,
+      "git_blob_sha1": "9ba1f11497bcd72689a9cb836d51af80dac27c40",
+      "sha256": "6a00ea66bfbf5b44cb6a825183c1c1b3d7a1f2d524cb6c3cc187ffa75861a4ad"
+    },
+    {
+      "path": "manifests/grafana-prometheusRule.yaml",
+      "size": 1423,
+      "git_blob_sha1": "b9161c575e0887ef2eb5258cacc9ef0b581b50ca",
+      "sha256": "ef07841b4043580a1b3a4b87cce2ed79c6b8d21fc4e07954badbaab173ecd9d4"
+    },
+    {
+      "path": "manifests/grafana-service.yaml",
+      "size": 453,
+      "git_blob_sha1": "461f05b5b7ba4d6017df54bbc16ab414430b673c",
+      "sha256": "fb8262f011fdcaa2271fb3b1bf7b7b6979ad3e27f6eb3499a6ae289e2555ba43"
+    },
+    {
+      "path": "manifests/grafana-serviceAccount.yaml",
+      "size": 294,
+      "git_blob_sha1": "b69b63f6573ec1c4e08114157a11b2e1c0e256b5",
+      "sha256": "f95b31d203be164f521b3c5138fbf8fb250326149f12b7a76dc4e34144119175"
+    },
+    {
+      "path": "manifests/grafana-serviceMonitor.yaml",
+      "size": 399,
+      "git_blob_sha1": "28459014565ae1c43b860f27d2a1d9b0c6bbabc3",
+      "sha256": "fe59dcd733473cbc5804286d3a61d462dfd570b6bb2678743782e587d6c2c21f"
+    },
+    {
+      "path": "manifests/kubePrometheus-prometheusRule.yaml",
+      "size": 4350,
+      "git_blob_sha1": "f14be25a7417c6611422f091e80975f4def2c17a",
+      "sha256": "5bf4529862bf908953a6331c926d9a21435a69b0946187bbf40fcb17e62231c6"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-clusterRole.yaml",
+      "size": 2134,
+      "git_blob_sha1": "a6ed07b69a7c7997c2715d4b95d2e057992a0607",
+      "sha256": "154a5865ca3bce270c1d81339a73858e8dfbb6fdce1e4eed2986f3e47943d3d5"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-clusterRoleBinding.yaml",
+      "size": 465,
+      "git_blob_sha1": "aab74e153d00f1ba13751857a442dafdffb5b915",
+      "sha256": "f905d0518747dc64a0632577430c5570d5ea58a9fd3fa1e1649c2a4f270eedad"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-deployment.yaml",
+      "size": 3617,
+      "git_blob_sha1": "f6c721169f4acf262c826a5f8a1b402c1ea266cd",
+      "sha256": "2b2ab8bc26c4db3d58f4744f2ba470c186ece604a02730e96f698541cdc4a203"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-networkPolicy.yaml",
+      "size": 724,
+      "git_blob_sha1": "d0d0cf629005bc4cce93a476eecc7106a3b11ad1",
+      "sha256": "2734513603ad0d1935516e447e2b9fcf8cb886cc8413f51040b92c6e7065629b"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-prometheusRule.yaml",
+      "size": 3183,
+      "git_blob_sha1": "9d2650af06d3d63048db3a8099de433a6c479f41",
+      "sha256": "098ce9003b41990335714b981aa40289c37ef9597432b09c21a513f5908a9dd1"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-service.yaml",
+      "size": 581,
+      "git_blob_sha1": "118b206158c16467d62dfadfb52633faa89677a1",
+      "sha256": "5d71a899a9435a0f16d085faf0d8a1bff3846dddfc4ad9221253944a328fc7ee"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-serviceAccount.yaml",
+      "size": 317,
+      "git_blob_sha1": "1acbe9efc1d11b435f7a9b505834968db0319c44",
+      "sha256": "1633cdf5d5d662a0f89828681ca33c5c33fc7bebe1c2441d117e27253736e095"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-serviceMonitor.yaml",
+      "size": 1164,
+      "git_blob_sha1": "7879d00376195d2155acc22447df32f2b4d1e1ca",
+      "sha256": "1504f21f92b4e0f650182e5ce002a69a47f09913292c406dfcfcad3e1b58a7fd"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "size": 84422,
+      "git_blob_sha1": "348469fc09a525764aee230ad107976cd65b8fd9",
+      "sha256": "a5545dabab60c1d8f63c49e9da59f3bd9e77368d98abcce7a78f415fb9ce1b43"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-serviceMonitorApiserver.yaml",
+      "size": 7824,
+      "git_blob_sha1": "a5189cac31e86a30f0f37a716059030563a7649c",
+      "sha256": "c9da3b711903f70d386a8c6adad5cbead1f56987ed1f203f1ee71579b435980c"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-serviceMonitorCoreDNS.yaml",
+      "size": 635,
+      "git_blob_sha1": "78998a4e133f391ff0b5bcbb0cfa54168a4289f9",
+      "sha256": "a4c9f4d7ca3298c04c73ab105f03fb5422c05cd37fa072373170abf4b8640450"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-serviceMonitorKubeControllerManager.yaml",
+      "size": 7005,
+      "git_blob_sha1": "f69823e4370b76450a501bfd760f4b320b886d23",
+      "sha256": "95dee25218a9886e938861de05a51dd56310f0871d891f6bf7ce8517644491b2"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-serviceMonitorKubeScheduler.yaml",
+      "size": 942,
+      "git_blob_sha1": "70d66c5cfe967ceaa270cbad5026b54a03c607dd",
+      "sha256": "3e00fc58c019976b063814f3152f20fe09a0dbe2b635a4d737044a14bf0e12e2"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-serviceMonitorKubelet.yaml",
+      "size": 8407,
+      "git_blob_sha1": "b651ca8d6645e3186eaf761fdbc28e772049b3a3",
+      "sha256": "d5df62f38aee95e064f0c07a55b72e5e60f454a6b59a857117fec40b7d55cc76"
+    },
+    {
+      "path": "manifests/nodeExporter-clusterRole.yaml",
+      "size": 462,
+      "git_blob_sha1": "0084fd6fba7409502ee0306bb38e77d035f71e2b",
+      "sha256": "6210c388548e8059d56f11efc05b129382873d6863e9956fb2fcc60337dcbe13"
+    },
+    {
+      "path": "manifests/nodeExporter-clusterRoleBinding.yaml",
+      "size": 445,
+      "git_blob_sha1": "1d441cfb3e1a2e9cd257c7f2097e4bc3d6bf84d5",
+      "sha256": "fca8df5200aba9ce80eb4e25c37c1a3134880c533b091f148e05a16e01b20591"
+    },
+    {
+      "path": "manifests/nodeExporter-daemonset.yaml",
+      "size": 3775,
+      "git_blob_sha1": "c61b0482219a9b9e44b1069c6cc5d4a8bcabf841",
+      "sha256": "ec8a9a143f62e9fe3301202dad07e6cc95df27b460839be36e1f68b69450b495"
+    },
+    {
+      "path": "manifests/nodeExporter-networkPolicy.yaml",
+      "size": 672,
+      "git_blob_sha1": "c6b3ca5611957901aaeb4704026dcf216759b0c2",
+      "sha256": "62aed0692342da2f80c65c6b552524b52d78182c108774548d51753feebb5a77"
+    },
+    {
+      "path": "manifests/nodeExporter-prometheusRule.yaml",
+      "size": 21237,
+      "git_blob_sha1": "f53de25b162bc41c0ff13adbd98827e7ffdf50f3",
+      "sha256": "ae160575bd33a4d17281180caf0ccdd513957a66cb790f25627ff1dd110a9a2a"
+    },
+    {
+      "path": "manifests/nodeExporter-service.yaml",
+      "size": 493,
+      "git_blob_sha1": "2736dbab41a7e2577176770e0bd28b14bd67e527",
+      "sha256": "8f6973358639fd20068c6b61e7d091d6d8c08c80144d423208bda0d98b7c22c2"
+    },
+    {
+      "path": "manifests/nodeExporter-serviceAccount.yaml",
+      "size": 307,
+      "git_blob_sha1": "9dd6d1f4f80df0a1f0f0233aa8258d3d43473e71",
+      "sha256": "e5f1a0bf352858bb4cf9c5389c1d40549666f7526353f99fe613c7d0b6bad828"
+    },
+    {
+      "path": "manifests/nodeExporter-serviceMonitor.yaml",
+      "size": 851,
+      "git_blob_sha1": "5e3c46f0ace4e230d78e88f48a9f7fe72082206b",
+      "sha256": "9d3be13a964c8d404fde9c7ba635e6f84eba12519d83d1e98014cacf4022a654"
+    },
+    {
+      "path": "manifests/prometheus-clusterRole.yaml",
+      "size": 448,
+      "git_blob_sha1": "405a15816d420f7898c82f290f7c621ceca6a357",
+      "sha256": "dd69c248e29d3cfd8a6a8b143eb36639bd98e3d19105ba798123bd456106a5f8"
+    },
+    {
+      "path": "manifests/prometheus-clusterRoleBinding.yaml",
+      "size": 483,
+      "git_blob_sha1": "d5db3209967224c8cdbcd87f115c4e51e6996f1c",
+      "sha256": "b09a471a8aaba9b46250d3fc1347bc740f56996b2d9f45097954a6f69b71790d"
+    },
+    {
+      "path": "manifests/prometheus-networkPolicy.yaml",
+      "size": 1073,
+      "git_blob_sha1": "5e7e2d0d4fa8a758444859f0da7da2dbf9a90989",
+      "sha256": "377d7a0a03bccd809543d82061e65cd961129de6aaf7316988cd019a98815136"
+    },
+    {
+      "path": "manifests/prometheus-podDisruptionBudget.yaml",
+      "size": 546,
+      "git_blob_sha1": "5a8778e21e382930caadbd7be9cb98106f53f637",
+      "sha256": "f3e5b66e11d6a7630ec5645ebbb502ca236ad3294d3a764301b28aaaa04e535f"
+    },
+    {
+      "path": "manifests/prometheus-prometheus.yaml",
+      "size": 1339,
+      "git_blob_sha1": "7c86b55c42e9caa78906e0afb069952b1c1f9eb9",
+      "sha256": "91540194914f7d445904905866e9a5105f01e7908229003e39ee2c5c206c5c73"
+    },
+    {
+      "path": "manifests/prometheus-prometheusRule.yaml",
+      "size": 17233,
+      "git_blob_sha1": "aea8606b87f0519119c5c6e5f7bee3a2a0b98148",
+      "sha256": "5469dcbc360b7a5487a4e6625b955c98d3504728393acf8a6e531a04cf398c16"
+    },
+    {
+      "path": "manifests/prometheus-roleBindingConfig.yaml",
+      "size": 507,
+      "git_blob_sha1": "6a76f27ce286466a59a233993ac791df695a8d17",
+      "sha256": "be4bd4c4b80dfd9a9f9db285dc6b9359e0d4b3584481db35cd25333a3f0ab7e8"
+    },
+    {
+      "path": "manifests/prometheus-roleBindingSpecificNamespaces.yaml",
+      "size": 1661,
+      "git_blob_sha1": "ca9fd1248b458ffecc7d9210597731365f345a56",
+      "sha256": "947577a3f5f049330479fcbb12961a0c83d9556c23ce07126f88b7c14e1198e1"
+    },
+    {
+      "path": "manifests/prometheus-roleConfig.yaml",
+      "size": 402,
+      "git_blob_sha1": "9c1eb69448d5319464c58cf6aeec8417d82190c2",
+      "sha256": "bcbb4c889b978023ff01d5822c1756bd580a572f0d8562c19fba95f539934f80"
+    },
+    {
+      "path": "manifests/prometheus-roleSpecificNamespaces.yaml",
+      "size": 2467,
+      "git_blob_sha1": "ac366ed7803e269982d22988bd5718e3e74614f5",
+      "sha256": "736bd919f29ea774c83b394eb51f3e28e40182b8381128bd9d64830df8b8e13a"
+    },
+    {
+      "path": "manifests/prometheus-service.yaml",
+      "size": 637,
+      "git_blob_sha1": "71e41107347f1d573c4369181b26994cc1173536",
+      "sha256": "fc6e2203aad3b1084a5e06f6a9ce9ea99d8fd34bbbc6b506a1ed21b1645db14f"
+    },
+    {
+      "path": "manifests/prometheus-serviceAccount.yaml",
+      "size": 342,
+      "git_blob_sha1": "087993a2602e74688999c19efee8f9d5cd7416de",
+      "sha256": "32388005ec99b4a4b54bfd2a2972626bf9d535328a78997f948ed512ea790a70"
+    },
+    {
+      "path": "manifests/prometheus-serviceMonitor.yaml",
+      "size": 624,
+      "git_blob_sha1": "f17760a96ddd3f112d3f9f154fb7b5e21e445cb1",
+      "sha256": "d6c9d57ab597698567c36aec1296eb574c52d11e6911239de5d804a62bf941aa"
+    },
+    {
+      "path": "manifests/prometheusAdapter-apiService.yaml",
+      "size": 483,
+      "git_blob_sha1": "4618e9c1b58a9cf66f8934ad9ba6e96ad3492a53",
+      "sha256": "e7092f74b283460de49d332956ee14dbe9633fbfbc5a791daa2d6857560511b6"
+    },
+    {
+      "path": "manifests/prometheusAdapter-clusterRole.yaml",
+      "size": 410,
+      "git_blob_sha1": "d1af3163f0e026d259b2ca630a44a6285885e11e",
+      "sha256": "95cf612af3a11fd6b8e96ff822d6a25123ca824ac3f9e520dd20b580e35981e4"
+    },
+    {
+      "path": "manifests/prometheusAdapter-clusterRoleAggregatedMetricsReader.yaml",
+      "size": 577,
+      "git_blob_sha1": "672c8c43b90fab386911ffdf73ac1af24a22625f",
+      "sha256": "47f032670df7f3cc9be17119dbbcad190a549974e2ee84f4b006b8cd6ad1b3bb"
+    },
+    {
+      "path": "manifests/prometheusAdapter-clusterRoleBinding.yaml",
+      "size": 472,
+      "git_blob_sha1": "1c6cb3000797b98252873080d615360b454274bd",
+      "sha256": "91b7427f3d7140d630a9c4d15bc830fcc358b9009fd52cb215791b85832d4aa9"
+    },
+    {
+      "path": "manifests/prometheusAdapter-clusterRoleBindingDelegator.yaml",
+      "size": 495,
+      "git_blob_sha1": "63f7ccc7eba6a0fd5941d9c36a1d93001443b1ee",
+      "sha256": "70f1f08265a4e64433b2424d9be7626132634b09844c280772f9c0b0f0e1331e"
+    },
+    {
+      "path": "manifests/prometheusAdapter-clusterRoleServerResources.yaml",
+      "size": 379,
+      "git_blob_sha1": "22eba1d0291f5869fc7ab2fcdb5cf6a5e017e7cd",
+      "sha256": "babe806dc43c4ead9fbe2513cbcdadd6b654e27b4996a123ac56d9df52b283a9"
+    },
+    {
+      "path": "manifests/prometheusAdapter-configMap.yaml",
+      "size": 2205,
+      "git_blob_sha1": "a39a87430eed66ce83f448cdbd43a628d16b0501",
+      "sha256": "a929ba7c4857cdbaa53771a61a3ccfaa599b50eb09dced37c654f044b8e8460f"
+    },
+    {
+      "path": "manifests/prometheusAdapter-deployment.yaml",
+      "size": 3426,
+      "git_blob_sha1": "d97e02a582bdc04f947eaf935c0691fa924f0683",
+      "sha256": "ec7a29df16f18d131f636f4e9747fdfaa3bf6e7b5822aaa566cfabad349c75aa"
+    },
+    {
+      "path": "manifests/prometheusAdapter-networkPolicy.yaml",
+      "size": 565,
+      "git_blob_sha1": "df8c6644acc550e810bbcdda486418c859b0c660",
+      "sha256": "306c69d7df933fd969716e3921f3c1e26ffbfec1b7e9b0a77314ff6423c167e7"
+    },
+    {
+      "path": "manifests/prometheusAdapter-podDisruptionBudget.yaml",
+      "size": 502,
+      "git_blob_sha1": "09348f7e95fee182292b1e9ab172a4cd3cc44c06",
+      "sha256": "13723a06a4f5774761fc6966a1c0f662be3fbd39f1c1b4bf66b02fb8957ad047"
+    },
+    {
+      "path": "manifests/prometheusAdapter-roleBindingAuthReader.yaml",
+      "size": 516,
+      "git_blob_sha1": "c21491a51bc365f4d9b30a2930254c2ac7c7080d",
+      "sha256": "445f272837df2e42ceef8c67474fe2d97b2ea5589699cb0a62c903083faf2f01"
+    },
+    {
+      "path": "manifests/prometheusAdapter-service.yaml",
+      "size": 502,
+      "git_blob_sha1": "033f93eb9eb29e22236169b83720b6ee23bf8a1c",
+      "sha256": "635a67577cbe362d0af0df112dc64b95970456e268e8e3e65d45a97ebfa03bec"
+    },
+    {
+      "path": "manifests/prometheusAdapter-serviceAccount.yaml",
+      "size": 324,
+      "git_blob_sha1": "04ab178745408e6b494f8b2297100c6620acb8f3",
+      "sha256": "6134e89176aa931212209f00b35641fee5c74eba095422418d9aec81b44bf874"
+    },
+    {
+      "path": "manifests/prometheusAdapter-serviceMonitor.yaml",
+      "size": 907,
+      "git_blob_sha1": "0fe1e8a9d6822821bcfd53a5c2769fd95db1017b",
+      "sha256": "04db8e9ffb14aed561a1cb4e21fe664acf70b60b8c5fb5e8c9932ed2d78b86f5"
+    },
+    {
+      "path": "manifests/prometheusOperator-clusterRole.yaml",
+      "size": 2613,
+      "git_blob_sha1": "f69d01e413113de2c2ab0ea01c98a5a5962afde6",
+      "sha256": "efe122e18de1cbe02ebd099fb35740b3257246f6d7cb1a219a415c87f8232346"
+    },
+    {
+      "path": "manifests/prometheusOperator-clusterRoleBinding.yaml",
+      "size": 471,
+      "git_blob_sha1": "ea1bacb401f6bdf194fb67810a11fc800a33788a",
+      "sha256": "ff1bd7af8ebfe6b4be434eee76b4a5608e5d4bc879582ffa85db43f1507d2f7a"
+    },
+    {
+      "path": "manifests/prometheusOperator-deployment.yaml",
+      "size": 2997,
+      "git_blob_sha1": "0d79684d0c11a0e6227e711884ed87f24b8ca824",
+      "sha256": "fcdc94df892c624b6ca3bdff008f1ac93cab5c7cdcabe62d285b47c04c98aab2"
+    },
+    {
+      "path": "manifests/prometheusOperator-networkPolicy.yaml",
+      "size": 694,
+      "git_blob_sha1": "9bfd462793deb57ac46d4f079eff64b20fbaa05a",
+      "sha256": "5b50419a526c49358d1bb2f2ae372920a2c1a53198be372f8f6b52cd070054dc"
+    },
+    {
+      "path": "manifests/prometheusOperator-prometheusRule.yaml",
+      "size": 6591,
+      "git_blob_sha1": "38acc79cec7ae7435e34dad26cc777f05aa094bc",
+      "sha256": "ea33fc88d13dac23c2b9455e68dbacb31d39a285b4f8a8cbff1709e71ed15d8b"
+    },
+    {
+      "path": "manifests/prometheusOperator-service.yaml",
+      "size": 515,
+      "git_blob_sha1": "32c9c11a6288b3cb8c27549019e3e6c68a8f6bae",
+      "sha256": "b6c7125abf840c2f05bead8b900d31a5c43e1b0cd152cf0e826da3431a4c4048"
+    },
+    {
+      "path": "manifests/prometheusOperator-serviceAccount.yaml",
+      "size": 321,
+      "git_blob_sha1": "667f3a8e49e1acfc0a818c70bec13bd2e1ea0b65",
+      "sha256": "5f7cea8606b76bdda848cd8112538f9551df622c8ef2cfa2a41cee388f35c254"
+    },
+    {
+      "path": "manifests/prometheusOperator-serviceMonitor.yaml",
+      "size": 715,
+      "git_blob_sha1": "4af3855e0b14351acb3907413af05678557fbe69",
+      "sha256": "e0fab19b7ad02af2631e230c7bc8f23d0aef35b05458ef18e41e6d50674b37f2"
+    },
+    {
+      "path": "manifests/setup/0alertmanagerConfigCustomResourceDefinition.yaml",
+      "size": 768244,
+      "git_blob_sha1": "93a6287063d936dae49a437da70dba3b1b739592",
+      "sha256": "19a77db958f9b710ad0528f927e2e27de7f4a31acd8d0257e42c249e701fda94"
+    },
+    {
+      "path": "manifests/setup/0alertmanagerCustomResourceDefinition.yaml",
+      "size": 625321,
+      "git_blob_sha1": "a09776cb027e087380c4a0127e9b4918a1a2e6b7",
+      "sha256": "daca10113adfa27d39fb4a22a77bcdcc6abcaa5bbc67f626bd433af06a5b6dce"
+    },
+    {
+      "path": "manifests/setup/0podmonitorCustomResourceDefinition.yaml",
+      "size": 72364,
+      "git_blob_sha1": "37e062bf15edd4afdd562eb0eb432bd0e6864790",
+      "sha256": "a693f924b62845b44a75f93562312b9be00a35db6e0a37fd28a07167270f9996"
+    },
+    {
+      "path": "manifests/setup/0probeCustomResourceDefinition.yaml",
+      "size": 69940,
+      "git_blob_sha1": "c2fe9dd919474b6b4d17c75f89e0d39600ac91c9",
+      "sha256": "06a205ea906c02bbd5d849ff51fde3f310577a6d75a8429126666726d2f35d93"
+    },
+    {
+      "path": "manifests/setup/0prometheusCustomResourceDefinition.yaml",
+      "size": 834604,
+      "git_blob_sha1": "c5ab357cce5ac4e3060ef14fcb5dc5fa503d70b7",
+      "sha256": "72e2a743ad38747ee562721e780b8b1f90db5dd3280c276eed637dc2daa694f9"
+    },
+    {
+      "path": "manifests/setup/0prometheusagentCustomResourceDefinition.yaml",
+      "size": 707657,
+      "git_blob_sha1": "773e9ce16d8424d06be2c482c8a575a8544b16a8",
+      "sha256": "794bf8f6467d11f512c2c92fd29e91179f5bc8f0a50458ef67fdbe16377f25c2"
+    },
+    {
+      "path": "manifests/setup/0prometheusruleCustomResourceDefinition.yaml",
+      "size": 12694,
+      "git_blob_sha1": "1cd491d1fef3c2a06114c06d3ce89e8c2c35b498",
+      "sha256": "f8d5cbac3c1368274f58fc234e2b8e7695a22d8d843a1588d3108abbe58d766b"
+    },
+    {
+      "path": "manifests/setup/0scrapeconfigCustomResourceDefinition.yaml",
+      "size": 699007,
+      "git_blob_sha1": "1e27fb6b5778e039063c92bf6205b15de9013acb",
+      "sha256": "3733f868737587ca12bef52a216e869206d1e6e98fae189b660dd32acf3f76cc"
+    },
+    {
+      "path": "manifests/setup/0servicemonitorCustomResourceDefinition.yaml",
+      "size": 73283,
+      "git_blob_sha1": "f0077de4143fe9fc89d54aa2282f17a47b383851",
+      "sha256": "60b649be58df8d841deb9a59877af6e8bdaa5d2552a82a2a94a34446fb456d92"
+    },
+    {
+      "path": "manifests/setup/0thanosrulerCustomResourceDefinition.yaml",
+      "size": 604690,
+      "git_blob_sha1": "378edafef3b3379e0444677a0c11201f54aafea6",
+      "sha256": "bd8b782752c0a38aebf6c1292c38d17eb77e5de63e60bb21b03cf3b2414ba4ae"
+    },
+    {
+      "path": "manifests/setup/namespace.yaml",
+      "size": 170,
+      "git_blob_sha1": "5ca07c8edcb33479ad5399607e409651e093ec9d",
+      "sha256": "b1203a107dad0d01d2024178b2006f0d3bad911202d1fe0e9474ec822066ac7f"
+    },
+    {
+      "path": "tests/e2e/kind/config.yml",
+      "size": 568,
+      "git_blob_sha1": "be70b28fd09c19d3aff7a86c314d22381837669b",
+      "sha256": "dba30a205f208076269857fa62874a6bcbd1d5bed8e21c5003c51ee00e85bdab"
+    },
+    {
+      "path": "tests/e2e/kind/kube-router.yaml",
+      "size": 4503,
+      "git_blob_sha1": "b63ea7e31ab42df8c0754b38d691acee5c1d9f15",
+      "sha256": "e1219133d913ebdac0fd1e61cd86349f4d0cfe35d7527e431edf6df8eb4334f1"
+    },
+    {
+      "path": "tests/e2e/kind/kubernetesControlPlane-kubeControllerManagerPrometheusDiscoveryService.yaml",
+      "size": 325,
+      "git_blob_sha1": "c0082adc5571a8b6ce889008d0af7ce0249363cc",
+      "sha256": "6a4042fe277834e1e249d030bf25d6d809a8fcfdbc5092abfac6c17cd35a0edc"
+    },
+    {
+      "path": "tests/e2e/kind/kubernetesControlPlane-kubeSchedulerPrometheusDiscoveryService.yaml",
+      "size": 298,
+      "git_blob_sha1": "38903ab307b13d1fa771d722596db2b346bae6cb",
+      "sha256": "c922e9a102b9f3305930b4d7e508d7f41dd6c1aeff5240205616d74aa4b4ca91"
+    },
+    {
+      "path": "tests/e2e/kind/patches/kube-controller-manager.yaml",
+      "size": 201,
+      "git_blob_sha1": "fb41faf1a878a050ae5830dae30359fedeb21a9a",
+      "sha256": "bb4a41e34d8242638b3ecd1c00f511f72b7884e2033bcaea2b31b6d5cbba4f0a"
+    }
+  ],
+  "verified_files": 135
+}

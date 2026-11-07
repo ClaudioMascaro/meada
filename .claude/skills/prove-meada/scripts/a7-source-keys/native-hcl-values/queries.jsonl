@@ -1,0 +1,38 @@
+{"tool": "search", "arguments": {"query": "proof", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "proof", "budget": 1, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "MossNeedle", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "MOSSNEEDLE", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "qz", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "maples", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "willow", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "proof", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "native-secret-saffron", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "native-secret-walnut", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "native-secret-call", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "native-secret-", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "7319", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "tfvars-secret-lavender", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "tfvars-secret-camellia", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "auto-secret-marigold", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "ancestor-secret-verbena", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "shadow-secret-juniper", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "shadowed-teak", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "depth-refused-", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "TAIL", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "locals.proof.object", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "resource.neutral_widget.proof.sample", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "proof[\"with.dot\"]", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "locals.proof.nothing", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "locals.proof.empty_list", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "locals.proof.empty_object", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "active-elm", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "source-authored sensitivity control", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "public-birch", "budget": 200000, "kind": "value"}}
+{"tool": "search", "arguments": {"query": "locals.proof.before_scalar", "budget": 200000, "kind": "value"}}
+{"tool": "context", "arguments": {"symbol": "facets.tf::neutral_widget.proof", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "botany.tf#locals.proof.ranked_exact", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "resource::native_fixture::botanical", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "sensory/variables.tf#variable.proof.default.plain", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "resource::native_fixture::masked", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "boundary.tf#locals.proof.before_scalar", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "resource::native_fixture::edge", "budget": 200000}}

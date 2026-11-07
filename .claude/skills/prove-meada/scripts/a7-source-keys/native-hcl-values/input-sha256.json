@@ -1,0 +1,428 @@
+{
+  "baseline_redacted_rows": 14,
+  "context_query_count": 7,
+  "expected_rows": 72,
+  "final_candidate_source_and_binary": "PENDING_EXACT_SOURCE_KEY_BOUND_PUBLIC_CI",
+  "fixture_bytes": 6607,
+  "fixture_files": {
+    "botany.tf": {
+      "bytes": 1114,
+      "sha256": "148d946ca9ab59dd9375a28d5b32e6ab30a30efd770148b7f0f71b085192dbb0"
+    },
+    "boundary.tf": {
+      "bytes": 3169,
+      "sha256": "d63473735f49441f8604ca53d3c8720a0042c8497876d64c7271b2cd30d617dc"
+    },
+    "depth/at.tf": {
+      "bytes": 102,
+      "sha256": "737d59756e3e5aa95f0efdb46b94d7a8cdff74b719a07d85a9a6ea7f5dc24e0b"
+    },
+    "depth/over.tf": {
+      "bytes": 102,
+      "sha256": "b774792be9bfc2c3afbe6f3b8c340ace9d3521e43e866b36ed5ee880ac1ce5bc"
+    },
+    "facets.tf": {
+      "bytes": 374,
+      "sha256": "5ff2ccdb1db8132f7bf33a114a3c78e5b0cafa0afb1352bd62c2436311e6ca5f"
+    },
+    "meada.toml": {
+      "bytes": 433,
+      "sha256": "62ca4a5e19b75fbe55683e73b0b85943d0c0c0c81cc5e800cc1cc3b689152a65"
+    },
+    "opaque/child/terraform.tfvars": {
+      "bytes": 87,
+      "sha256": "ea1a2655248adcc2127d6ed3c1081145b2a7b8ae7eeaa0697111156a7b7ec347"
+    },
+    "opaque/incomplete.tf": {
+      "bytes": 19,
+      "sha256": "6aaead055ed192927fd013244cb011ee24ecb311b66007f05f04e9413ea20735"
+    },
+    "sensory/variables.tf": {
+      "bytes": 317,
+      "sha256": "7202f72e69eacc7b93d08f5382821434d1af74a33f45ec65fc23fe5a8cfb0daf"
+    },
+    "shadow/fern.tf": {
+      "bytes": 113,
+      "sha256": "4557278737e5a45bfb243d690b98f80f0609a61e692d36e4dcc2061ebd7149b1"
+    },
+    "shadow/fern.tofu": {
+      "bytes": 53,
+      "sha256": "a6d2a331e6a4fc55f41fc351e13009774ee630fab3f2d7c1caddd94ce88a3587"
+    },
+    "textiles.tf": {
+      "bytes": 459,
+      "sha256": "368c4604fa4a274fca6d858428480d820b183ea26ea6f82af50e8fa925e174cd"
+    },
+    "visible/petal.auto.tfvars": {
+      "bytes": 31,
+      "sha256": "ea5b8269f2d62a192a7d4951936b268b358d8c2ab35b26a458279765050bbf67"
+    },
+    "visible/terraform.tfvars": {
+      "bytes": 113,
+      "sha256": "0ad7ba84b8c3db9749a0637e62d2bf09971457e3c6700734efcbf818a88e00cd"
+    },
+    "visible/variables.tf": {
+      "bytes": 121,
+      "sha256": "d0147dc64eb159efaf2d9c99f6a29846190d840ab1bb1786e6befac32ca7ca40"
+    }
+  },
+  "fixture_git": {
+    "author_and_committer_date": "2026-11-07T00:00:00+00:00",
+    "author_email": "proof@example.com",
+    "author_name": "Native HCL source key",
+    "branch": "source-key",
+    "commit": "f670eb0f3584bb11f6927dd261368d3c8bc3cedc",
+    "commit_message": "test: add independent native HCL source fixture",
+    "origin": "https://example.com/a7-proof/native-hcl-values.git",
+    "tree": "e0457d521bea3a5206d3fb315057c09a6b2b7ed3"
+  },
+  "frozen_at_utc": "2026-11-07T01:54:45Z",
+  "hash_scope_note": "No .git metadata is included in file hashes. Reconstruct the exact origin/identity in CI. This manifest is bound externally by its own SHA256; it cannot include its own digest.",
+  "hcl_or_var_files": 14,
+  "key_files": {
+    "ASSUMPTIONS.md": {
+      "bytes": 2345,
+      "sha256": "ae1134c8235325a7d6ee9608b1a18ab9ca5688b163d6f714c9cfb9134c450b4d"
+    },
+    "PLAN.md": {
+      "bytes": 6800,
+      "sha256": "daf1cd62f63f83521248d1d88c20e190080bfc98b473d42434f898fa6c8baa7f"
+    },
+    "author-key.py": {
+      "bytes": 31650,
+      "sha256": "c1da2403e265741423fcc8c3e1bf77fb910b3e681316d076d32c6f3fa3c1a4fa"
+    },
+    "expected-values.json": {
+      "bytes": 574888,
+      "sha256": "4d38b64a1290191ba3741772bb705ea1d62c0dc5f5f06044d38e4577cd912cbb"
+    },
+    "queries.jsonl": {
+      "bytes": 3729,
+      "sha256": "ce00ada4ec7953db6a0331c81930469d3bdef02b4955ecf18b6af9af3633a6dc"
+    },
+    "source-validation.json": {
+      "bytes": 3765,
+      "sha256": "5f19d67a012e66e11cd0feb3fbb96997417e0b675b396c3928045e27e32da929"
+    }
+  },
+  "origin": "https://example.com/a7-proof/native-hcl-values.git",
+  "phase_fixture_files": {
+    "baseline": {
+      "botany.tf": {
+        "bytes": 1114,
+        "sha256": "148d946ca9ab59dd9375a28d5b32e6ab30a30efd770148b7f0f71b085192dbb0"
+      },
+      "boundary.tf": {
+        "bytes": 3169,
+        "sha256": "d63473735f49441f8604ca53d3c8720a0042c8497876d64c7271b2cd30d617dc"
+      },
+      "depth/at.tf": {
+        "bytes": 102,
+        "sha256": "737d59756e3e5aa95f0efdb46b94d7a8cdff74b719a07d85a9a6ea7f5dc24e0b"
+      },
+      "depth/over.tf": {
+        "bytes": 102,
+        "sha256": "b774792be9bfc2c3afbe6f3b8c340ace9d3521e43e866b36ed5ee880ac1ce5bc"
+      },
+      "facets.tf": {
+        "bytes": 374,
+        "sha256": "5ff2ccdb1db8132f7bf33a114a3c78e5b0cafa0afb1352bd62c2436311e6ca5f"
+      },
+      "meada.toml": {
+        "bytes": 433,
+        "sha256": "62ca4a5e19b75fbe55683e73b0b85943d0c0c0c81cc5e800cc1cc3b689152a65"
+      },
+      "opaque/child/terraform.tfvars": {
+        "bytes": 87,
+        "sha256": "ea1a2655248adcc2127d6ed3c1081145b2a7b8ae7eeaa0697111156a7b7ec347"
+      },
+      "opaque/incomplete.tf": {
+        "bytes": 19,
+        "sha256": "6aaead055ed192927fd013244cb011ee24ecb311b66007f05f04e9413ea20735"
+      },
+      "sensory/variables.tf": {
+        "bytes": 317,
+        "sha256": "7202f72e69eacc7b93d08f5382821434d1af74a33f45ec65fc23fe5a8cfb0daf"
+      },
+      "shadow/fern.tf": {
+        "bytes": 113,
+        "sha256": "4557278737e5a45bfb243d690b98f80f0609a61e692d36e4dcc2061ebd7149b1"
+      },
+      "shadow/fern.tofu": {
+        "bytes": 53,
+        "sha256": "a6d2a331e6a4fc55f41fc351e13009774ee630fab3f2d7c1caddd94ce88a3587"
+      },
+      "textiles.tf": {
+        "bytes": 459,
+        "sha256": "368c4604fa4a274fca6d858428480d820b183ea26ea6f82af50e8fa925e174cd"
+      },
+      "visible/petal.auto.tfvars": {
+        "bytes": 31,
+        "sha256": "ea5b8269f2d62a192a7d4951936b268b358d8c2ab35b26a458279765050bbf67"
+      },
+      "visible/terraform.tfvars": {
+        "bytes": 113,
+        "sha256": "0ad7ba84b8c3db9749a0637e62d2bf09971457e3c6700734efcbf818a88e00cd"
+      },
+      "visible/variables.tf": {
+        "bytes": 121,
+        "sha256": "d0147dc64eb159efaf2d9c99f6a29846190d840ab1bb1786e6befac32ca7ca40"
+      }
+    },
+    "literal_changed": {
+      "botany.tf": {
+        "bytes": 1114,
+        "sha256": "a6323b47438dfbaf7ac91f1bd52286c9f551c217c23a4ffbb6f778f4751d8cb4"
+      },
+      "boundary.tf": {
+        "bytes": 3169,
+        "sha256": "d63473735f49441f8604ca53d3c8720a0042c8497876d64c7271b2cd30d617dc"
+      },
+      "depth/at.tf": {
+        "bytes": 102,
+        "sha256": "737d59756e3e5aa95f0efdb46b94d7a8cdff74b719a07d85a9a6ea7f5dc24e0b"
+      },
+      "depth/over.tf": {
+        "bytes": 102,
+        "sha256": "b774792be9bfc2c3afbe6f3b8c340ace9d3521e43e866b36ed5ee880ac1ce5bc"
+      },
+      "facets.tf": {
+        "bytes": 374,
+        "sha256": "5ff2ccdb1db8132f7bf33a114a3c78e5b0cafa0afb1352bd62c2436311e6ca5f"
+      },
+      "meada.toml": {
+        "bytes": 433,
+        "sha256": "62ca4a5e19b75fbe55683e73b0b85943d0c0c0c81cc5e800cc1cc3b689152a65"
+      },
+      "opaque/child/terraform.tfvars": {
+        "bytes": 87,
+        "sha256": "ea1a2655248adcc2127d6ed3c1081145b2a7b8ae7eeaa0697111156a7b7ec347"
+      },
+      "opaque/incomplete.tf": {
+        "bytes": 19,
+        "sha256": "6aaead055ed192927fd013244cb011ee24ecb311b66007f05f04e9413ea20735"
+      },
+      "sensory/variables.tf": {
+        "bytes": 317,
+        "sha256": "7202f72e69eacc7b93d08f5382821434d1af74a33f45ec65fc23fe5a8cfb0daf"
+      },
+      "shadow/fern.tf": {
+        "bytes": 113,
+        "sha256": "4557278737e5a45bfb243d690b98f80f0609a61e692d36e4dcc2061ebd7149b1"
+      },
+      "shadow/fern.tofu": {
+        "bytes": 53,
+        "sha256": "a6d2a331e6a4fc55f41fc351e13009774ee630fab3f2d7c1caddd94ce88a3587"
+      },
+      "textiles.tf": {
+        "bytes": 459,
+        "sha256": "368c4604fa4a274fca6d858428480d820b183ea26ea6f82af50e8fa925e174cd"
+      },
+      "visible/petal.auto.tfvars": {
+        "bytes": 31,
+        "sha256": "ea5b8269f2d62a192a7d4951936b268b358d8c2ab35b26a458279765050bbf67"
+      },
+      "visible/terraform.tfvars": {
+        "bytes": 113,
+        "sha256": "0ad7ba84b8c3db9749a0637e62d2bf09971457e3c6700734efcbf818a88e00cd"
+      },
+      "visible/variables.tf": {
+        "bytes": 121,
+        "sha256": "d0147dc64eb159efaf2d9c99f6a29846190d840ab1bb1786e6befac32ca7ca40"
+      }
+    },
+    "restored": {
+      "botany.tf": {
+        "bytes": 1114,
+        "sha256": "148d946ca9ab59dd9375a28d5b32e6ab30a30efd770148b7f0f71b085192dbb0"
+      },
+      "boundary.tf": {
+        "bytes": 3169,
+        "sha256": "d63473735f49441f8604ca53d3c8720a0042c8497876d64c7271b2cd30d617dc"
+      },
+      "depth/at.tf": {
+        "bytes": 102,
+        "sha256": "737d59756e3e5aa95f0efdb46b94d7a8cdff74b719a07d85a9a6ea7f5dc24e0b"
+      },
+      "depth/over.tf": {
+        "bytes": 102,
+        "sha256": "b774792be9bfc2c3afbe6f3b8c340ace9d3521e43e866b36ed5ee880ac1ce5bc"
+      },
+      "facets.tf": {
+        "bytes": 374,
+        "sha256": "5ff2ccdb1db8132f7bf33a114a3c78e5b0cafa0afb1352bd62c2436311e6ca5f"
+      },
+      "meada.toml": {
+        "bytes": 433,
+        "sha256": "62ca4a5e19b75fbe55683e73b0b85943d0c0c0c81cc5e800cc1cc3b689152a65"
+      },
+      "opaque/child/terraform.tfvars": {
+        "bytes": 87,
+        "sha256": "ea1a2655248adcc2127d6ed3c1081145b2a7b8ae7eeaa0697111156a7b7ec347"
+      },
+      "opaque/incomplete.tf": {
+        "bytes": 19,
+        "sha256": "6aaead055ed192927fd013244cb011ee24ecb311b66007f05f04e9413ea20735"
+      },
+      "sensory/variables.tf": {
+        "bytes": 317,
+        "sha256": "7202f72e69eacc7b93d08f5382821434d1af74a33f45ec65fc23fe5a8cfb0daf"
+      },
+      "shadow/fern.tf": {
+        "bytes": 113,
+        "sha256": "4557278737e5a45bfb243d690b98f80f0609a61e692d36e4dcc2061ebd7149b1"
+      },
+      "shadow/fern.tofu": {
+        "bytes": 53,
+        "sha256": "a6d2a331e6a4fc55f41fc351e13009774ee630fab3f2d7c1caddd94ce88a3587"
+      },
+      "textiles.tf": {
+        "bytes": 459,
+        "sha256": "368c4604fa4a274fca6d858428480d820b183ea26ea6f82af50e8fa925e174cd"
+      },
+      "visible/petal.auto.tfvars": {
+        "bytes": 31,
+        "sha256": "ea5b8269f2d62a192a7d4951936b268b358d8c2ab35b26a458279765050bbf67"
+      },
+      "visible/terraform.tfvars": {
+        "bytes": 113,
+        "sha256": "0ad7ba84b8c3db9749a0637e62d2bf09971457e3c6700734efcbf818a88e00cd"
+      },
+      "visible/variables.tf": {
+        "bytes": 121,
+        "sha256": "d0147dc64eb159efaf2d9c99f6a29846190d840ab1bb1786e6befac32ca7ca40"
+      }
+    },
+    "sensitivity_public": {
+      "botany.tf": {
+        "bytes": 1114,
+        "sha256": "148d946ca9ab59dd9375a28d5b32e6ab30a30efd770148b7f0f71b085192dbb0"
+      },
+      "boundary.tf": {
+        "bytes": 3169,
+        "sha256": "d63473735f49441f8604ca53d3c8720a0042c8497876d64c7271b2cd30d617dc"
+      },
+      "depth/at.tf": {
+        "bytes": 102,
+        "sha256": "737d59756e3e5aa95f0efdb46b94d7a8cdff74b719a07d85a9a6ea7f5dc24e0b"
+      },
+      "depth/over.tf": {
+        "bytes": 102,
+        "sha256": "b774792be9bfc2c3afbe6f3b8c340ace9d3521e43e866b36ed5ee880ac1ce5bc"
+      },
+      "facets.tf": {
+        "bytes": 374,
+        "sha256": "5ff2ccdb1db8132f7bf33a114a3c78e5b0cafa0afb1352bd62c2436311e6ca5f"
+      },
+      "meada.toml": {
+        "bytes": 433,
+        "sha256": "62ca4a5e19b75fbe55683e73b0b85943d0c0c0c81cc5e800cc1cc3b689152a65"
+      },
+      "opaque/child/terraform.tfvars": {
+        "bytes": 87,
+        "sha256": "ea1a2655248adcc2127d6ed3c1081145b2a7b8ae7eeaa0697111156a7b7ec347"
+      },
+      "opaque/incomplete.tf": {
+        "bytes": 19,
+        "sha256": "6aaead055ed192927fd013244cb011ee24ecb311b66007f05f04e9413ea20735"
+      },
+      "sensory/variables.tf": {
+        "bytes": 317,
+        "sha256": "9714035bab2047d27550e6bdc6c2d680355eae35ccd20ee33642f02b7d4ed24a"
+      },
+      "shadow/fern.tf": {
+        "bytes": 113,
+        "sha256": "4557278737e5a45bfb243d690b98f80f0609a61e692d36e4dcc2061ebd7149b1"
+      },
+      "shadow/fern.tofu": {
+        "bytes": 53,
+        "sha256": "a6d2a331e6a4fc55f41fc351e13009774ee630fab3f2d7c1caddd94ce88a3587"
+      },
+      "textiles.tf": {
+        "bytes": 459,
+        "sha256": "368c4604fa4a274fca6d858428480d820b183ea26ea6f82af50e8fa925e174cd"
+      },
+      "visible/petal.auto.tfvars": {
+        "bytes": 31,
+        "sha256": "ea5b8269f2d62a192a7d4951936b268b358d8c2ab35b26a458279765050bbf67"
+      },
+      "visible/terraform.tfvars": {
+        "bytes": 113,
+        "sha256": "0ad7ba84b8c3db9749a0637e62d2bf09971457e3c6700734efcbf818a88e00cd"
+      },
+      "visible/variables.tf": {
+        "bytes": 121,
+        "sha256": "d0147dc64eb159efaf2d9c99f6a29846190d840ab1bb1786e6befac32ca7ca40"
+      }
+    }
+  },
+  "product_execution_before_freeze": false,
+  "query_count": 38,
+  "references": {
+    "references/adr-0025.md": {
+      "bytes": 40108,
+      "sha256": "30742a190d20d12dea9a9470a97dc9582e3fc1a9db6cb9192f43107b827e5483",
+      "source_url": "https://github.com/ClaudioMascaro/meada/blob/fe0faf5dfd7408571bf982bc395ef10d1e456a0b/docs/adr/0025-config-and-iac-in-the-index.md"
+    },
+    "references/configuration-values-ceilings.md": {
+      "bytes": 4219,
+      "sha256": "84322358e0aa27f5143f0e68e9d9406d6a1accd86e7e9dd3d31a077118fddfb3",
+      "source_url": "https://github.com/ClaudioMascaro/meada/blob/fe0faf5dfd7408571bf982bc395ef10d1e456a0b/docs/agents/ceilings/resolution-the-index-and-shape-readers/configuration-values.md"
+    },
+    "references/hcl-language-spec.md": {
+      "bytes": 32576,
+      "sha256": "704438a9a842cf39868edc5c31ba479fad691205a3b05aae23fa076821f7a973",
+      "source_url": "https://github.com/hashicorp/hcl/blob/94e232b58b12531a80299e3aa7566f345e17c21b/spec.md"
+    },
+    "references/hcl-native-syntax.md": {
+      "bytes": 36577,
+      "sha256": "a99da24e075391fd097654dc6bf4da8ed8820d52b282ba9e44612f0f1f6feb14",
+      "source_url": "https://github.com/hashicorp/hcl/blob/94e232b58b12531a80299e3aa7566f345e17c21b/hclsyntax/spec.md"
+    },
+    "references/issue-639.json": {
+      "bytes": 3342,
+      "sha256": "91c401eb9b62d5b4d9e8380172b4147eb5d219f460f09a44a46563a74ef5c795",
+      "source_url": "https://github.com/ClaudioMascaro/meada/issues/639"
+    },
+    "references/issue-640.json": {
+      "bytes": 2439,
+      "sha256": "e4e5ebfa44a95541748fb10a53aea715ff507b73536f096bcc2e3b33176b270a",
+      "source_url": "https://github.com/ClaudioMascaro/meada/issues/640"
+    },
+    "references/issue-641.md": {
+      "bytes": 1663,
+      "sha256": "bbad7f49acc7666719db48c8e5f444ce8ab6481653bf37992152f136ae23df16",
+      "source_url": "https://github.com/ClaudioMascaro/meada/issues/641"
+    },
+    "references/issue-642.md": {
+      "bytes": 43114,
+      "sha256": "5f05a16dad7b190c14979d2207ff8b119503a602e5950aaaeab2d30685a868f8",
+      "source_url": "https://github.com/ClaudioMascaro/meada/issues/642"
+    },
+    "references/opentofu-files.mdx": {
+      "bytes": 3011,
+      "sha256": "da989fa0f103cbd23b59852855e3cc8ee4006c9758001e948bba5ae3665544de",
+      "source_url": "https://github.com/opentofu/opentofu/blob/c570669d0fed5787f18d2f017f56b2658e2e6cce/website/docs/language/files/index.mdx"
+    },
+    "references/user-guide.en.md": {
+      "bytes": 134975,
+      "sha256": "d7a60ed977bd426e35860e797f3bef4e9548c6af8d1f636897922c3e2652c313",
+      "source_url": "https://github.com/ClaudioMascaro/meada/blob/fe0faf5dfd7408571bf982bc395ef10d1e456a0b/docs/user-guide.en.md"
+    }
+  },
+  "repository_identity": "example.com/a7-proof/native-hcl-values",
+  "root_source": "fe0faf5dfd7408571bf982bc395ef10d1e456a0b",
+  "root_tree": "c81daebb8d6884f7beff34c433d2cc8d497024af",
+  "runtime_verdict": "PENDING_SEPARATE_INDEPENDENT_JUDGMENT",
+  "schema": "independent-native-hcl-inputs-v1",
+  "search_query_count": 31,
+  "sensitivity_public_redacted_rows": 3,
+  "source_check_plan": {
+    "bytes": 14457,
+    "path": "/workspace/a7-a8-context/final-proof-supplements/SOURCE_CHECK_PLAN.md",
+    "section": "Native HCL values: missing independent whole-row key",
+    "sha256": "4d6aaa4b6f21b77877dd087e47f2d0535359db1433eb4adbba298cb09ae805a4"
+  },
+  "status": "SOURCE_KEY_FROZEN_NO_PRODUCT_EXECUTION",
+  "tracked_fixture_files": 15
+}
