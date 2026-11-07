@@ -395,7 +395,7 @@ ambiente e valores de configuração ficam fora do export.
 
 ### Clientes dos SDKs GCP
 
-Os cinco grupos de SDKs GCP (JavaScript/TypeScript, Python, Java, Go e C#) reconhecem as formas documentadas de publicação e recebimento por assinatura Pub/Sub, leitura/escrita no Cloud Storage e acesso ao Secret Manager. O [guia do usuário](../../user-guide.md#uso-dos-sdks-gcp-em-cinco-grupos-de-linguagens) lista as operações e os construtores exatos. Tópicos e assinaturas mantêm identidades distintas, inclusive na resolução do ambiente da carga; uma leitura do ambiente sozinha continua não resolvida.
+Os cinco grupos de SDKs GCP (JavaScript/TypeScript, Python, Java, Go e C#) reconhecem as formas documentadas de publicação e recebimento por assinatura Pub/Sub, leitura/escrita no Cloud Storage e acesso ao Secret Manager. O [guia do usuário](https://github.com/ClaudioMascaro/meada/blob/main/docs/user-guide.md#uso-dos-sdks-gcp-em-cinco-grupos-de-linguagens) lista as operações e os construtores exatos. Tópicos e assinaturas mantêm identidades distintas, inclusive na resolução do ambiente da carga; uma leitura do ambiente sozinha continua não resolvida.
 
 ### Canais, dados, segredos e assinaturas AWS
 
