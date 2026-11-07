@@ -1,0 +1,10 @@
+{
+  "module": {
+    "store": {
+      "source": "private/storage",
+      "settings": {
+        "bucket": "module-assets"
+      }
+    }
+  }
+}

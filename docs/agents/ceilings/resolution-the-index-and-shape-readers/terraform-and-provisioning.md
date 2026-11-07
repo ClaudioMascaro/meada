@@ -1,5 +1,12 @@
 # Terraform and provisioning
 
+- Private mappings (#671): `MAPPINGS_MAX` (`iac/mapping.rs`) is 256 module/custom-resource entries per
+  repository configuration, above ordinary in-house abstraction inventories. Each source,
+  entry and key path is bounded by `config_values::VALUE_MAX` (1 KiB), with selectors refused.
+  Overflow/unknown entry is an error naming meada.toml. Registry/private input evaluation and
+  source/code projection reuse existing Eval and root/repository storage ceilings; no module
+  content is downloaded. Tests include 257 entries and invalid paths, plus native evaluator
+  hostile rows. Workload input maps use the existing field-scan/environment budgets.
 - `AZURE_IDENTIFIER_MAX` (`contract/azure.rs`, #669): 1,024 bytes, checked before splitting
   identifiers or allocating projected components. Longer ARM/URL/typed-name text stays
   unresolved. Azure projections, rule indexes and Function summaries share the existing

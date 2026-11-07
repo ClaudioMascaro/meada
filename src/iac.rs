@@ -62,6 +62,7 @@ mod functions;
 mod gcp;
 mod http;
 pub(crate) mod json;
+pub(crate) mod mapping;
 pub(crate) mod orphans;
 pub(crate) mod pattern;
 pub(crate) mod provision;
@@ -166,6 +167,16 @@ pub(crate) struct Projection {
     pub name: Option<String>,
     pub pattern: bool,
     pub through: Vec<Overridable>,
+    /// A curated entry selected by a module source or Kubernetes group and kind.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry: Option<String>,
+    /// Defining input key paths, excluded from directionless uses of their own resource.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub defining: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<mapping::Code>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binding: Option<mapping::Binding>,
 }
 
 /// Literal routing evidence after a Kubernetes overlay has renamed its Service.
@@ -193,6 +204,10 @@ impl Route {
 impl Projection {
     pub(crate) fn size(&self) -> usize {
         self.name.as_ref().map_or(0, String::len)
+            + self.entry.as_ref().map_or(0, String::len)
+            + self.defining.iter().map(String::len).sum::<usize>()
+            + self.code.as_ref().map_or(0, |c| c.key.len() + 24)
+            + self.binding.as_ref().map_or(0, mapping::Binding::size)
             + self
                 .through
                 .iter()
@@ -1023,6 +1038,7 @@ struct Instance<'m> {
 /// The evaluation of a repository's Terraform files, root by root.
 struct Eval<'m> {
     modules: &'m BTreeMap<String, Module>,
+    mappings: &'m mapping::Config,
     instances: Vec<Instance<'m>>,
     /// The targets each reference resolves to in an instance, once computed.
     memo: HashMap<(usize, &'m Ref), Vec<String>>,
@@ -1054,11 +1070,16 @@ struct Eval<'m> {
 }
 
 impl<'m> Eval<'m> {
-    fn new(modules: &'m BTreeMap<String, Module>, left: usize) -> Eval<'m> {
+    fn new(
+        modules: &'m BTreeMap<String, Module>,
+        mappings: &'m mapping::Config,
+        left: usize,
+    ) -> Eval<'m> {
         let mut ctx = Context::new();
         functions::declare(&mut ctx);
         Eval {
             modules,
+            mappings,
             instances: Vec::new(),
             memo: HashMap::new(),
             open: HashSet::new(),
@@ -1165,6 +1186,7 @@ impl<'m> Eval<'m> {
             node.overridable = found.through.into_iter().collect();
         }
         for &(node, instance, block, ref each) in &pending {
+            self.mapped_module(node, instance, each.as_ref(), block);
             if self.bound_instance(instance)
                 && (each.is_some() || (block.count.is_none() && block.for_each.is_none()))
             {
@@ -1189,6 +1211,7 @@ impl<'m> Eval<'m> {
             self.gcp_workload(node, instance, each.as_ref(), block);
             self.azure_workload(node, instance, each.as_ref(), block);
             self.workload(node, instance, each.as_ref(), block);
+            self.module_workload(node, instance, each.as_ref(), block);
         }
         self.http_routes(&pending);
         for &(node, instance, block, ref each) in &pending {
@@ -1730,13 +1753,19 @@ fn label(dir: &str) -> &str {
 /// The Terraform files of one repository read into modules, one per directory.
 pub(crate) struct Repository {
     modules: BTreeMap<String, Module>,
+    mappings: mapping::Config,
     /// The Compose files (#652), by path.
     compose: Vec<(String, Vec<u8>)>,
 }
 
 impl Repository {
     /// Reads the Terraform files `files` (path and bytes, `is_input`) of one repository.
+    #[cfg(test)]
     pub(crate) fn read(files: &[(String, Vec<u8>)]) -> Repository {
+        Self::read_with(files, &mapping::Config::default())
+    }
+
+    pub(crate) fn read_with(files: &[(String, Vec<u8>)], mappings: &mapping::Config) -> Repository {
         let mut modules: BTreeMap<String, Module> = BTreeMap::new();
         let mut sorted: Vec<&(String, Vec<u8>)> = files.iter().collect();
         sorted.sort_by(|a, b| a.0.cmp(&b.0));
@@ -1749,7 +1778,11 @@ impl Repository {
             let dir = config_values::parent(path).to_string();
             read(path, src, modules.entry(dir).or_default());
         }
-        Repository { modules, compose }
+        Repository {
+            modules,
+            compose,
+            mappings: mappings.clone(),
+        }
     }
 
     /// The directories each local module call of the module at `dir` names.
@@ -1807,7 +1840,7 @@ impl Repository {
         pick: impl Fn(&str) -> bool,
         left: usize,
     ) -> (Vec<Node>, Vec<Reference>) {
-        let mut eval = Eval::new(&self.modules, left);
+        let mut eval = Eval::new(&self.modules, &self.mappings, left);
         let terraform = self.terraform_units();
         let mut compose_dirs: Vec<&str> = (self.compose.iter())
             .map(|(p, _)| config_values::parent(p))

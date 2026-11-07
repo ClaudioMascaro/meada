@@ -1,0 +1,260 @@
+[
+  {
+    "path": "00-kafkatopic.yaml",
+    "address": "KafkaTopic.kafka.strimzi.io/platform/operator-00",
+    "contract": "channel::kafka::parcel-events",
+    "name": "parcel-events"
+  },
+  {
+    "path": "01-queue.yaml",
+    "address": "Queue.rabbitmq.com/platform/operator-01",
+    "contract": "channel::amqp::inbox",
+    "name": "inbox"
+  },
+  {
+    "path": "02-queue.yaml",
+    "address": "Queue.sqs.services.k8s.aws/platform/operator-02",
+    "contract": "channel::sqs::ack-parcels",
+    "name": "ack-parcels"
+  },
+  {
+    "path": "03-bucket.yaml",
+    "address": "Bucket.s3.services.k8s.aws/platform/operator-03",
+    "contract": "resource::s3::ack-assets",
+    "name": "ack-assets"
+  },
+  {
+    "path": "04-topic.yaml",
+    "address": "Topic.sns.services.k8s.aws/platform/operator-04",
+    "contract": "channel::sns::ack-notices",
+    "name": "ack-notices"
+  },
+  {
+    "path": "05-eventbus.yaml",
+    "address": "EventBus.eventbridge.services.k8s.aws/platform/operator-05",
+    "contract": "channel::eventbridge::ack-events",
+    "name": "ack-events"
+  },
+  {
+    "path": "06-stream.yaml",
+    "address": "Stream.kinesis.services.k8s.aws/platform/operator-06",
+    "contract": "channel::kinesis::ack-stream",
+    "name": "ack-stream"
+  },
+  {
+    "path": "07-table.yaml",
+    "address": "Table.dynamodb.services.k8s.aws/platform/operator-07",
+    "contract": "resource::dynamodb::ack-ledger",
+    "name": "ack-ledger"
+  },
+  {
+    "path": "08-dbinstance.yaml",
+    "address": "DBInstance.rds.services.k8s.aws/platform/operator-08",
+    "contract": "resource::rds::ack-primary",
+    "name": "ack-primary"
+  },
+  {
+    "path": "09-dbcluster.yaml",
+    "address": "DBCluster.rds.services.k8s.aws/platform/operator-09",
+    "contract": "resource::rds::ack-cluster",
+    "name": "ack-cluster"
+  },
+  {
+    "path": "10-cachecluster.yaml",
+    "address": "CacheCluster.elasticache.services.k8s.aws/platform/operator-10",
+    "contract": "resource::elasticache::ack-cache",
+    "name": "ack-cache"
+  },
+  {
+    "path": "11-replicationgroup.yaml",
+    "address": "ReplicationGroup.elasticache.services.k8s.aws/platform/operator-11",
+    "contract": "resource::elasticache::ack-replicas",
+    "name": "ack-replicas"
+  },
+  {
+    "path": "12-parameter.yaml",
+    "address": "Parameter.ssm.services.k8s.aws/platform/operator-12",
+    "contract": "resource::ssm::/ack/config",
+    "name": "/ack/config"
+  },
+  {
+    "path": "13-secret.yaml",
+    "address": "Secret.secretsmanager.services.k8s.aws/platform/operator-13",
+    "contract": "resource::secretsmanager::ack-token",
+    "name": "ack-token"
+  },
+  {
+    "path": "14-pubsubtopic.yaml",
+    "address": "PubSubTopic.pubsub.cnrm.cloud.google.com/platform/operator-14",
+    "contract": "channel::pubsub::kcc-notices",
+    "name": "kcc-notices"
+  },
+  {
+    "path": "15-pubsubsubscription.yaml",
+    "address": "PubSubSubscription.pubsub.cnrm.cloud.google.com/platform/operator-15",
+    "contract": "channel::pubsub::subscriptions/kcc-audit",
+    "name": "kcc-audit"
+  },
+  {
+    "path": "16-storagebucket.yaml",
+    "address": "StorageBucket.storage.cnrm.cloud.google.com/platform/operator-16",
+    "contract": "resource::gcs::kcc-assets",
+    "name": "kcc-assets"
+  },
+  {
+    "path": "17-sqlinstance.yaml",
+    "address": "SQLInstance.sql.cnrm.cloud.google.com/platform/operator-17",
+    "contract": "resource::cloudsql::kcc-primary",
+    "name": "kcc-primary"
+  },
+  {
+    "path": "18-sqldatabase.yaml",
+    "address": "SQLDatabase.sql.cnrm.cloud.google.com/platform/operator-18",
+    "contract": "resource::cloudsql::kcc-primary/ledger",
+    "name": "ledger"
+  },
+  {
+    "path": "19-secretmanagersecret.yaml",
+    "address": "SecretManagerSecret.secretmanager.cnrm.cloud.google.com/platform/operator-19",
+    "contract": "resource::gcpsecretmanager::kcc-token",
+    "name": "kcc-token"
+  },
+  {
+    "path": "20-queue.yaml",
+    "address": "Queue.sqs.aws.upbound.io/platform/operator-20",
+    "contract": "channel::sqs::xp-parcels",
+    "name": "xp-parcels"
+  },
+  {
+    "path": "21-bucket.yaml",
+    "address": "Bucket.s3.aws.upbound.io/platform/operator-21",
+    "contract": "resource::s3::xp-assets",
+    "name": "xp-assets"
+  },
+  {
+    "path": "22-topic.yaml",
+    "address": "Topic.sns.aws.upbound.io/platform/operator-22",
+    "contract": "channel::sns::xp-notices",
+    "name": "xp-notices"
+  },
+  {
+    "path": "23-bus.yaml",
+    "address": "Bus.cloudwatchevents.aws.upbound.io/platform/operator-23",
+    "contract": "channel::eventbridge::xp-events",
+    "name": "xp-events"
+  },
+  {
+    "path": "24-stream.yaml",
+    "address": "Stream.kinesis.aws.upbound.io/platform/operator-24",
+    "contract": "channel::kinesis::xp-stream",
+    "name": "xp-stream"
+  },
+  {
+    "path": "25-table.yaml",
+    "address": "Table.dynamodb.aws.upbound.io/platform/operator-25",
+    "contract": "resource::dynamodb::xp-ledger",
+    "name": "xp-ledger"
+  },
+  {
+    "path": "26-instance.yaml",
+    "address": "Instance.rds.aws.upbound.io/platform/operator-26",
+    "contract": "resource::rds::xp-primary",
+    "name": "xp-primary"
+  },
+  {
+    "path": "27-cluster.yaml",
+    "address": "Cluster.elasticache.aws.upbound.io/platform/operator-27",
+    "contract": "resource::elasticache::xp-cache",
+    "name": "xp-cache"
+  },
+  {
+    "path": "28-parameter.yaml",
+    "address": "Parameter.ssm.aws.upbound.io/platform/operator-28",
+    "contract": "resource::ssm::/xp/config",
+    "name": "/xp/config"
+  },
+  {
+    "path": "29-secret.yaml",
+    "address": "Secret.secretsmanager.aws.upbound.io/platform/operator-29",
+    "contract": "resource::secretsmanager::xp-token",
+    "name": "xp-token"
+  },
+  {
+    "path": "30-topic.yaml",
+    "address": "Topic.pubsub.gcp.upbound.io/platform/operator-30",
+    "contract": "channel::pubsub::xp-notices",
+    "name": "xp-notices"
+  },
+  {
+    "path": "31-subscription.yaml",
+    "address": "Subscription.pubsub.gcp.upbound.io/platform/operator-31",
+    "contract": "channel::pubsub::subscriptions/xp-audit",
+    "name": "xp-audit"
+  },
+  {
+    "path": "32-bucket.yaml",
+    "address": "Bucket.storage.gcp.upbound.io/platform/operator-32",
+    "contract": "resource::gcs::xp-gcp-assets",
+    "name": "xp-gcp-assets"
+  },
+  {
+    "path": "33-databaseinstance.yaml",
+    "address": "DatabaseInstance.sql.gcp.upbound.io/platform/operator-33",
+    "contract": "resource::cloudsql::xp-sql",
+    "name": "xp-sql"
+  },
+  {
+    "path": "34-database.yaml",
+    "address": "Database.sql.gcp.upbound.io/platform/operator-34",
+    "contract": "resource::cloudsql::xp-sql/ledger",
+    "name": "ledger"
+  },
+  {
+    "path": "35-secret.yaml",
+    "address": "Secret.secretmanager.gcp.upbound.io/platform/operator-35",
+    "contract": "resource::gcpsecretmanager::xp-gcp-token",
+    "name": "xp-gcp-token"
+  },
+  {
+    "path": "36-queue.yaml",
+    "address": "Queue.servicebus.azure.upbound.io/platform/operator-36",
+    "contract": "channel::servicebus::xp-parcels",
+    "name": "/subscriptions/proof/resourceGroups/r/providers/Microsoft.ServiceBus/namespaces/bus/queues/xp-parcels"
+  },
+  {
+    "path": "37-topic.yaml",
+    "address": "Topic.servicebus.azure.upbound.io/platform/operator-37",
+    "contract": "channel::servicebus::xp-notices",
+    "name": "/subscriptions/proof/resourceGroups/r/providers/Microsoft.ServiceBus/namespaces/bus/topics/xp-notices"
+  },
+  {
+    "path": "38-subscription.yaml",
+    "address": "Subscription.servicebus.azure.upbound.io/platform/operator-38",
+    "contract": "channel::servicebus::subscription:xp-notices/xp-audit",
+    "name": "/subscriptions/proof/resourceGroups/r/providers/Microsoft.ServiceBus/namespaces/bus/topics/xp-notices/subscriptions/xp-audit"
+  },
+  {
+    "path": "39-eventhub.yaml",
+    "address": "EventHub.eventhub.azure.upbound.io/platform/operator-39",
+    "contract": "channel::eventhubs::xp-events",
+    "name": "/subscriptions/proof/resourceGroups/r/providers/Microsoft.EventHub/namespaces/hubs/eventhubs/xp-events"
+  },
+  {
+    "path": "40-account.yaml",
+    "address": "Account.storage.azure.upbound.io/platform/operator-40",
+    "contract": "resource::azurestorage::xpassetsstore",
+    "name": "/subscriptions/proof/resourceGroups/r/providers/Microsoft.Storage/storageAccounts/xpassetsstore"
+  },
+  {
+    "path": "41-container.yaml",
+    "address": "Container.storage.azure.upbound.io/platform/operator-41",
+    "contract": "resource::azureblob::xp-assets",
+    "name": "/subscriptions/proof/resourceGroups/r/providers/Microsoft.Storage/storageAccounts/xpassetsstore/blobServices/default/containers/xp-assets"
+  },
+  {
+    "path": "42-secret.yaml",
+    "address": "Secret.keyvault.azure.upbound.io/platform/operator-42",
+    "contract": "resource::keyvault::xp-token",
+    "name": "https://proof.vault.azure.net/secrets/xp-token/123"
+  }
+]

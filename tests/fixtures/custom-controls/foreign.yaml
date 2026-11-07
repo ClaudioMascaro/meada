@@ -1,0 +1,13 @@
+apiVersion: sqs.aws.upbound.io/v1beta1
+kind: Queue
+metadata:
+  name: foreign-arm-identity
+  annotations:
+    crossplane.io/external-name: /subscriptions/proof/resourceGroups/r/providers/Microsoft.Storage/storageAccounts/assets
+---
+apiVersion: s3.aws.upbound.io/v1beta1
+kind: Bucket
+metadata:
+  name: foreign-authority-identity
+  annotations:
+    crossplane.io/external-name: //pubsub.googleapis.com/projects/proof/topics/not-a-bucket

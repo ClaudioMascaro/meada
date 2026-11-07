@@ -24,6 +24,14 @@ pub(crate) mod azure;
 pub(crate) mod gcp;
 pub(crate) mod sdk;
 
+/// A kind's additional, already-routed use of infrastructure, kept only for this query.
+pub struct ProvisionUse {
+    pub site: String,
+    pub contract: String,
+    pub level: Level,
+    pub reason: String,
+}
+
 /// A contract the repository holds, before the index gives its site an identity.
 pub struct Found {
     pub role: Role,
@@ -316,6 +324,12 @@ pub trait ContractKind {
     /// A prepared view that depends on every kind's workspace step, before links are read.
     fn workspace_ready(&self, _exports: &mut [Export], _repositories: &[Repository]) {}
 
+    /// Batch projected uses whose contract is known only after the workspace is prepared.
+    /// The tuple identifies the repository holding the real source site; raw sides stay intact.
+    fn provision_uses(&self, _exports: &[Export]) -> Vec<(usize, ProvisionUse)> {
+        Vec::new()
+    }
+
     /// The links from `consumer`, held by the repository `from`, to the providers of the
     /// workspace (each with the repository holding it) and, for a queue, the publishes the
     /// bindings of the workspace's `exports` route to it. Several fitting providers are all
@@ -594,11 +608,21 @@ pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages,
 
 /// Shared phase order for whole exports and answer-sized reads.
 pub(crate) fn workspace_steps(exports: &mut [Export], repositories: &[Repository]) {
+    for export in exports.iter_mut() {
+        export.provision_uses.clear();
+    }
     for kind in KINDS {
         kind.workspace_step(exports, repositories);
     }
     for kind in KINDS {
         kind.workspace_ready(exports, repositories);
+    }
+    for kind in KINDS {
+        for (repository, side) in kind.provision_uses(exports) {
+            if let Some(export) = exports.get_mut(repository) {
+                export.provision_uses.push(side);
+            }
+        }
     }
 }
 

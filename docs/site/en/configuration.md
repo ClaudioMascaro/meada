@@ -126,3 +126,28 @@ id = "team-b"
 role = "write"
 via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
 ```
+
+
+## Private IaC mappings
+
+Map a module source or custom group/type to an existing type table entry. `entry` uses `<format>:<type>`, for example `terraform:aws_sqs_queue`. The example reads the name from the module's declared input or the object's field:
+
+```toml
+[[iac.module]]
+source_prefix = "git::https://example.com/platform/modules"
+entry = "terraform:aws_sqs_queue"
+input = "queue_name"
+
+[[iac.module]]
+source = "git::https://example.com/platform/modules/priority"
+entry = "terraform:aws_sns_topic"
+input = "settings.topic"
+
+[[iac.custom_resource]]
+group = "platform.example.com"
+kind = "MessageQueue"
+entry = "terraform:aws_sqs_queue"
+key_path = "spec.endpoints[0].name"
+```
+
+Each `[[iac.module]]` chooses exactly one of `source` and `source_prefix`. An exact source wins; otherwise the longest prefix wins, bounded by `/` or `?`, so a neighbor such as `modules-other` does not match. `input` supports dots, indexes and JSON-quoted keys, without selectors. `[[iac.custom_resource]]` requires `group`, `kind`, `entry` and `key_path`, with the same path syntax. Module mappings can also select `terraform:aws_lambda_function` or `terraform:aws_ecs_task_definition`, with the Lambda/ECS inputs documented in capabilities; other workloads are refused. Custom resource mappings select provisioning entries. The value must supply the identity the entry requires, including qualifiers. An unknown entry causes an error naming it and `meada.toml`. There are at most 256 mappings, with text and paths of at most 1 KiB. Configuration participates in indexing: changing or removing a mapping re-evaluates affected nodes. No module is downloaded or executed.

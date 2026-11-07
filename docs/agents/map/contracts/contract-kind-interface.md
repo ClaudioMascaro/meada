@@ -3,6 +3,10 @@
 `contract::workspace_steps` shares phase order between full and answer-sized queries: every
 `workspace_step`, then every `workspace_ready`. The latter prepares views that depend on other
 kinds' completed steps (HTTP routing depends on the image kind's pattern decisions).
+Then each kind's default-empty `provision_uses` hook can prepare additional infrastructure uses
+in one batch. Rows retain their real site, contract, level and reason in a transient Export
+field; Channel uses one Routes view for operator queue bindings (#671), without replacing raw
+producer sides or teaching the engine broker policies.
 `explain_inferred` also receives the link and visible exports so a kind can reuse its prepared
 evidence for presentation.
 

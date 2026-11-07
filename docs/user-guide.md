@@ -2327,3 +2327,8 @@ leituras somente no código executado pela imagem ou caminho correspondente, com
 `inferred`. Referências a segredos e valores desconhecidos ficam sem resolução. Consulte
 [as capacidades](site/pt/capabilities.md#azure-contratos-e-functions) para os tipos e
 limites; `context`, `trace`, export e órfãos seguem as mesmas regras de provisionamento.
+
+
+### Recursos personalizados e módulos de infraestrutura
+
+A infraestrutura definida por Strimzi, Config Connector, ACK ou pelas famílias Crossplane listadas pode aparecer como provisionador do mesmo contrato usado pelo código. Por exemplo, `KafkaTopic` com `metadata.name: topic-object` e `spec.topicName: shipments` aparece em `search` com `kind = "iac"` pelo objeto e por `shipments`; `context` mostra `channel::kafka::shipments`. `trace` desce do nó até seus usos e sobe do uso até a infraestrutura. Para um módulo privado, declare `[[iac.module]]` no `meada.toml`; para seu próprio CRD, use `[[iac.custom_resource]]`. Consulte o inventário exato e os limites em [capacidades](site/pt/capabilities.md#recursos-personalizados-e-módulos-de-infraestrutura) e a [configuração](site/pt/configuration.md#mapeamentos-privados-de-iac). Nomes incompletos continuam pesquisáveis, sem receber um provisionador inventado.

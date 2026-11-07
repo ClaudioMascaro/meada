@@ -272,6 +272,20 @@ bypasses the workspace filter.
 This ADR amends ADR 0005, which carries the dated amendment (2026-11-04): its contract kinds,
 its rule on environment variables and its `inferred` level change as the sections above say.
 
+### Curated abstraction projection (#671)
+
+The embedded type table maps a bounded documented custom-resource inventory and registry
+module source/input rows onto existing kinds. Private mappings select these same entries.
+Physical names remain on IaC nodes; canonical contract targets and explicit unknown targets
+are separate stored projections. Creation controls that are false or unknown establish no side.
+No operator, module, cloud API, packager or archive is executed while indexing.
+
+RabbitMQ Queue provisions AMQP; Exchange supplies routing metadata and is no channel; Binding
+routes only through real, uniquely resolved endpoints of a supported type. Routed publish uses
+retain the actual code site, exact/inferred route level and binding reason. A neutral batch hook
+on ContractKind exposes these additional uses to provisioning, with an empty default for other
+kinds. The engine does not learn broker policies and raw producers stay unchanged.
+
 ## Considered options
 
 - **Provisioning links in `links`, as consumer to provider.** Rejected: a provisioner neither

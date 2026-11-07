@@ -27,6 +27,14 @@
 # (`types::tests::every_entry_has_a_fixture_case`).
 
 [[entry]]
+format = "kubernetes"
+type = "KafkaTopic.kafka.strimzi.io"
+contract = "channel"
+kind = "kafka"
+name = "spec.topicName"
+fallback = "metadata.name"
+
+[[entry]]
 format = "terraform"
 type = "aws_sqs_queue"
 contract = "channel"
@@ -428,3 +436,414 @@ type = "azurerm_windows_function_app"
 images = []
 code = "zip_deploy_file"
 code_file = true
+
+# Curated custom resources (#671); every row is exercised by custom-inventory.
+
+[[entry]]
+format = "kubernetes"
+type = "Queue.rabbitmq.com"
+contract = "channel"
+kind = "amqp"
+name = "spec.name"
+
+[[entry]]
+format = "kubernetes"
+type = "Queue.sqs.services.k8s.aws"
+contract = "channel"
+kind = "sqs"
+name = "spec.queueName"
+basis = "terraform:aws_sqs_queue"
+
+[[entry]]
+format = "kubernetes"
+type = "Bucket.s3.services.k8s.aws"
+contract = "resource"
+kind = "s3"
+name = "spec.name"
+basis = "terraform:aws_s3_bucket"
+
+[[entry]]
+format = "kubernetes"
+type = "Topic.sns.services.k8s.aws"
+contract = "channel"
+kind = "sns"
+name = "spec.name"
+basis = "terraform:aws_sns_topic"
+
+[[entry]]
+format = "kubernetes"
+type = "EventBus.eventbridge.services.k8s.aws"
+contract = "channel"
+kind = "eventbridge"
+name = "spec.name"
+basis = "terraform:aws_cloudwatch_event_bus"
+
+[[entry]]
+format = "kubernetes"
+type = "Stream.kinesis.services.k8s.aws"
+contract = "channel"
+kind = "kinesis"
+name = "spec.name"
+basis = "terraform:aws_kinesis_stream"
+
+[[entry]]
+format = "kubernetes"
+type = "Table.dynamodb.services.k8s.aws"
+contract = "resource"
+kind = "dynamodb"
+name = "spec.tableName"
+basis = "terraform:aws_dynamodb_table"
+
+[[entry]]
+format = "kubernetes"
+type = "DBInstance.rds.services.k8s.aws"
+contract = "resource"
+kind = "rds"
+name = "spec.dbInstanceIdentifier"
+basis = "terraform:aws_db_instance"
+
+[[entry]]
+format = "kubernetes"
+type = "DBCluster.rds.services.k8s.aws"
+contract = "resource"
+kind = "rds"
+name = "spec.dbClusterIdentifier"
+basis = "terraform:aws_rds_cluster"
+
+[[entry]]
+format = "kubernetes"
+type = "CacheCluster.elasticache.services.k8s.aws"
+contract = "resource"
+kind = "elasticache"
+name = "spec.cacheClusterID"
+basis = "terraform:aws_elasticache_cluster"
+
+[[entry]]
+format = "kubernetes"
+type = "ReplicationGroup.elasticache.services.k8s.aws"
+contract = "resource"
+kind = "elasticache"
+name = "spec.replicationGroupID"
+basis = "terraform:aws_elasticache_replication_group"
+
+[[entry]]
+format = "kubernetes"
+type = "Parameter.ssm.services.k8s.aws"
+contract = "resource"
+kind = "ssm"
+name = "spec.name"
+basis = "terraform:aws_ssm_parameter"
+
+[[entry]]
+format = "kubernetes"
+type = "Secret.secretsmanager.services.k8s.aws"
+contract = "resource"
+kind = "secretsmanager"
+name = "spec.name"
+basis = "terraform:aws_secretsmanager_secret"
+
+[[entry]]
+format = "kubernetes"
+type = "PubSubTopic.pubsub.cnrm.cloud.google.com"
+contract = "channel"
+kind = "pubsub"
+name = "spec.resourceID"
+basis = "terraform:google_pubsub_topic"
+fallback = "metadata.name"
+
+[[entry]]
+format = "kubernetes"
+type = "PubSubSubscription.pubsub.cnrm.cloud.google.com"
+contract = "channel"
+kind = "pubsub"
+name = "spec.resourceID"
+basis = "terraform:google_pubsub_subscription"
+fallback = "metadata.name"
+source = "spec.topicRef"
+source_type = "PubSubTopic.pubsub.cnrm.cloud.google.com"
+filter = "spec.filter"
+
+[[entry]]
+format = "kubernetes"
+type = "StorageBucket.storage.cnrm.cloud.google.com"
+contract = "resource"
+kind = "gcs"
+name = "spec.resourceID"
+basis = "terraform:google_storage_bucket"
+fallback = "metadata.name"
+
+[[entry]]
+format = "kubernetes"
+type = "SQLInstance.sql.cnrm.cloud.google.com"
+contract = "resource"
+kind = "cloudsql"
+name = "spec.resourceID"
+basis = "terraform:google_sql_database_instance"
+fallback = "metadata.name"
+
+[[entry]]
+format = "kubernetes"
+type = "SQLDatabase.sql.cnrm.cloud.google.com"
+contract = "resource"
+kind = "cloudsql"
+name = "spec.resourceID"
+basis = "terraform:google_sql_database"
+fallback = "metadata.name"
+qualifier = "spec.instanceRef"
+qualifier_type = "SQLInstance.sql.cnrm.cloud.google.com"
+
+[[entry]]
+format = "kubernetes"
+type = "SecretManagerSecret.secretmanager.cnrm.cloud.google.com"
+contract = "resource"
+kind = "gcpsecretmanager"
+name = "spec.resourceID"
+basis = "terraform:google_secret_manager_secret"
+fallback = "metadata.name"
+
+[[entry]]
+format = "kubernetes"
+type = "Queue.sqs.aws.upbound.io"
+contract = "channel"
+kind = "sqs"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_sqs_queue"
+
+[[entry]]
+format = "kubernetes"
+type = "Bucket.s3.aws.upbound.io"
+contract = "resource"
+kind = "s3"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_s3_bucket"
+
+[[entry]]
+format = "kubernetes"
+type = "Topic.sns.aws.upbound.io"
+contract = "channel"
+kind = "sns"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_sns_topic"
+
+[[entry]]
+format = "kubernetes"
+type = "Bus.cloudwatchevents.aws.upbound.io"
+contract = "channel"
+kind = "eventbridge"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_cloudwatch_event_bus"
+
+[[entry]]
+format = "kubernetes"
+type = "Stream.kinesis.aws.upbound.io"
+contract = "channel"
+kind = "kinesis"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_kinesis_stream"
+
+[[entry]]
+format = "kubernetes"
+type = "Table.dynamodb.aws.upbound.io"
+contract = "resource"
+kind = "dynamodb"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_dynamodb_table"
+
+[[entry]]
+format = "kubernetes"
+type = "Instance.rds.aws.upbound.io"
+contract = "resource"
+kind = "rds"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_db_instance"
+
+[[entry]]
+format = "kubernetes"
+type = "Cluster.elasticache.aws.upbound.io"
+contract = "resource"
+kind = "elasticache"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_elasticache_cluster"
+
+[[entry]]
+format = "kubernetes"
+type = "Parameter.ssm.aws.upbound.io"
+contract = "resource"
+kind = "ssm"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_ssm_parameter"
+
+[[entry]]
+format = "kubernetes"
+type = "Secret.secretsmanager.aws.upbound.io"
+contract = "resource"
+kind = "secretsmanager"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_secretsmanager_secret"
+
+[[entry]]
+format = "kubernetes"
+type = "Topic.pubsub.gcp.upbound.io"
+contract = "channel"
+kind = "pubsub"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_pubsub_topic"
+
+[[entry]]
+format = "kubernetes"
+type = "Subscription.pubsub.gcp.upbound.io"
+contract = "channel"
+kind = "pubsub"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_pubsub_subscription"
+source = "spec.forProvider.topic"
+source_ref = "spec.forProvider.topicRef"
+source_type = "Topic.pubsub.gcp.upbound.io"
+filter = "spec.forProvider.filter"
+
+[[entry]]
+format = "kubernetes"
+type = "Bucket.storage.gcp.upbound.io"
+contract = "resource"
+kind = "gcs"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_storage_bucket"
+
+[[entry]]
+format = "kubernetes"
+type = "DatabaseInstance.sql.gcp.upbound.io"
+contract = "resource"
+kind = "cloudsql"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_sql_database_instance"
+
+[[entry]]
+format = "kubernetes"
+type = "Database.sql.gcp.upbound.io"
+contract = "resource"
+kind = "cloudsql"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_sql_database"
+qualifier = "spec.forProvider.instance"
+qualifier_ref = "spec.forProvider.instanceRef"
+qualifier_type = "DatabaseInstance.sql.gcp.upbound.io"
+
+[[entry]]
+format = "kubernetes"
+type = "Secret.secretmanager.gcp.upbound.io"
+contract = "resource"
+kind = "gcpsecretmanager"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_secret_manager_secret"
+
+[[entry]]
+format = "kubernetes"
+type = "Queue.servicebus.azure.upbound.io"
+contract = "channel"
+kind = "servicebus"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_servicebus_queue"
+
+[[entry]]
+format = "kubernetes"
+type = "Topic.servicebus.azure.upbound.io"
+contract = "channel"
+kind = "servicebus"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_servicebus_topic"
+
+[[entry]]
+format = "kubernetes"
+type = "Subscription.servicebus.azure.upbound.io"
+contract = "channel"
+kind = "servicebus"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_servicebus_subscription"
+
+[[entry]]
+format = "kubernetes"
+type = "EventHub.eventhub.azure.upbound.io"
+contract = "channel"
+kind = "eventhubs"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_eventhub"
+
+[[entry]]
+format = "kubernetes"
+type = "Account.storage.azure.upbound.io"
+contract = "resource"
+kind = "azurestorage"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_storage_account"
+
+[[entry]]
+format = "kubernetes"
+type = "Container.storage.azure.upbound.io"
+contract = "resource"
+kind = "azureblob"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_storage_container"
+
+[[entry]]
+format = "kubernetes"
+type = "Secret.keyvault.azure.upbound.io"
+contract = "resource"
+kind = "keyvault"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_key_vault_secret"
+
+# Registry sources read only these declared inputs; no module is downloaded or evaluated.
+[[module]]
+source = "terraform-aws-modules/sqs/aws"
+entry = "terraform:aws_sqs_queue"
+input = "name"
+create = ["create"]
+fifo = "fifo_queue"
+prefix = "use_name_prefix"
+
+[[module]]
+source = "terraform-aws-modules/sns/aws"
+entry = "terraform:aws_sns_topic"
+input = "name"
+create = ["create"]
+fifo = "fifo_topic"
+prefix = "use_name_prefix"
+
+[[module]]
+source = "terraform-aws-modules/s3-bucket/aws"
+entry = "terraform:aws_s3_bucket"
+input = "bucket"
+create = ["create", "create_bucket"]
+
+[[module]]
+source = "terraform-aws-modules/dynamodb-table/aws"
+entry = "terraform:aws_dynamodb_table"
+input = "name"
+create = ["create", "create_table"]
+
+[[module]]
+source = "terraform-aws-modules/lambda/aws"
+entry = "terraform:aws_lambda_function"
+input = "function_name"
+create = ["create", "create_function", "putin_khuylo"]
+disable = ["create_layer"]
+
+[[module]]
+source = "terraform-aws-modules/ecs/aws//modules/service"
+entry = "terraform:aws_ecs_task_definition"
+input = "name"
+create = ["create", "create_service", "create_task_definition"]
+
+# Rabbit topology roles are distinct from channel provisioners.
+[[topology]]
+format = "kubernetes"
+type = "Queue.rabbitmq.com"
+role = "queue"
+[[topology]]
+format = "kubernetes"
+type = "Exchange.rabbitmq.com"
+role = "exchange"
+[[topology]]
+format = "kubernetes"
+type = "Binding.rabbitmq.com"
+role = "binding"

@@ -1,0 +1,9 @@
+[[iac.module]]
+source="private/storage"
+entry="terraform:aws_s3_bucket"
+input='settings["bucket"]'
+[[iac.custom_resource]]
+group="review.invalid"
+kind="Store"
+entry="terraform:aws_s3_bucket"
+key_path='spec["bucket"]'

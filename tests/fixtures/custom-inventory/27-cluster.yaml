@@ -1,0 +1,10 @@
+apiVersion: elasticache.aws.upbound.io/v1beta1
+kind: Cluster
+metadata:
+  name: operator-27
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: xp-cache
+spec:
+  forProvider:
+    region: us-east-1

@@ -130,3 +130,28 @@ id = "team-b"
 role = "write"
 via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
 ```
+
+
+## Mapeos privados de IaC
+
+Asigne una fuente de módulo o un grupo/tipo personalizado a una entrada existente de la tabla de tipos. `entry` usa `<formato>:<tipo>`, por ejemplo `terraform:aws_sqs_queue`. El ejemplo lee el nombre del argumento declarado por el módulo o del campo del objeto:
+
+```toml
+[[iac.module]]
+source_prefix = "git::https://example.com/platform/modules"
+entry = "terraform:aws_sqs_queue"
+input = "queue_name"
+
+[[iac.module]]
+source = "git::https://example.com/platform/modules/priority"
+entry = "terraform:aws_sns_topic"
+input = "settings.topic"
+
+[[iac.custom_resource]]
+group = "platform.example.com"
+kind = "MessageQueue"
+entry = "terraform:aws_sqs_queue"
+key_path = "spec.endpoints[0].name"
+```
+
+Cada `[[iac.module]]` elige exactamente uno entre `source` y `source_prefix`. Gana una fuente exacta; después gana el prefijo más largo, limitado a una frontera `/` o `?`, sin capturar un vecino como `modules-other`. `input` admite puntos, índices y claves entre comillas JSON, sin selectores. `[[iac.custom_resource]]` requiere `group`, `kind`, `entry` y `key_path`, con la misma sintaxis. Los mapeos de módulo también pueden seleccionar `terraform:aws_lambda_function` o `terraform:aws_ecs_task_definition`, con las entradas Lambda/ECS documentadas en capacidades; otros workloads se rechazan. Los recursos personalizados seleccionan entradas de provisionamiento. El valor debe aportar la identidad requerida por la entrada, incluidos calificadores. Una entrada desconocida causa error que cita su nombre y `meada.toml`. Hay como máximo 256 mapeos, con textos y rutas de hasta 1 KiB. La configuración participa en el índice: cambiar o quitar el mapeo recalcula los nodos afectados. Ningún módulo se descarga ni se ejecuta.

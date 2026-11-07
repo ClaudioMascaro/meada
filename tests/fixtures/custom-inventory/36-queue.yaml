@@ -1,0 +1,9 @@
+apiVersion: servicebus.azure.upbound.io/v1beta1
+kind: Queue
+metadata:
+  name: operator-36
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: /subscriptions/proof/resourceGroups/r/providers/Microsoft.ServiceBus/namespaces/bus/queues/xp-parcels
+spec:
+  forProvider: {}

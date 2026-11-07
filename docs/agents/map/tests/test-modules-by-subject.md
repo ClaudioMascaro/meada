@@ -1,5 +1,11 @@
 # Test modules by subject
 
+- `custom_iac` (#671): source-authored whole 43-entry inventory, Strimzi identity, custom
+  group/kind paths, exact/prefix private modules and refresh, six registry resources/workloads,
+  Lambda source/package refusal, image/container environments, and Rabbit operator bindings
+  with real endpoint scopes, full deliveries/provisions and bidirectional traces. Type-table
+  census tests cover every provisioning/module/topology row; `package::hostile` has a focused
+  custom-topology fan-out row, and Channel tests repeated-hash routing without expansion.
 - `src/package/hostile.rs` (unit, `cfg(test)`): the table `probes` of the readers of manifests and
   configurations, a row each for `package.json`, `tsconfig.json`, `pyproject.toml`,
   `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, Gradle builds, `gradle.properties` and

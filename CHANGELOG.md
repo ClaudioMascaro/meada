@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Curated operators and private IaC mappings (#671): 43 explicit Strimzi, RabbitMQ Queue,
+  ACK, Config Connector and Crossplane AWS/GCP/Azure types provision existing contracts.
+  RabbitMQ Exchange/Binding topology routes real publishes to queues without inventing an
+  exchange channel. Six terraform-aws-modules sources read declared resource and Lambda/ECS
+  workload inputs; `meada.toml` maps exact/private source prefixes and custom group/kind key
+  paths to curated entries. Unknown identities and creation controls remain conservative.
+  This joins the existing 1.4.0 minor development release.
 - IaC HTTP route providers (#666): Terraform/OpenTofu API Gateway HTTP/REST and explicit quick
   create, SAM Api/HttpApi and Serverless http/httpApi events resolve to local handler symbols
   or the repository, with normalized parameters, cross-repository HTTP links and stored

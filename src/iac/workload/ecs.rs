@@ -324,4 +324,121 @@ impl<'m> Eval<'m> {
             self.nodes[node].environment = facts.environment;
         }
     }
+    /// The registry service module declares a map keyed by container name, not encoded JSON.
+    pub(in crate::iac) fn ecs_module(
+        &mut self,
+        node: usize,
+        at: usize,
+        each: Option<&Each>,
+        block: &'m Block,
+        gates: &std::collections::BTreeSet<super::super::Overridable>,
+    ) {
+        let Some(arg) = block.args.get("container_definitions") else {
+            return;
+        };
+        let mut facts = Facts::new(self.root_left.min(self.left));
+        if let Expression::Object(containers) = &arg.expr {
+            if !self.ecs_fields(&arg.expr, 1) {
+                return;
+            }
+            for (key, value) in containers.iter() {
+                let entry = value.expr();
+                if !self.ecs_fields(entry, 6) {
+                    facts.unread();
+                    break;
+                }
+                let key = match key {
+                    ObjectKey::Ident(key) => Some(key.as_str().to_string()),
+                    ObjectKey::Expression(expr) => match self.value(at, each, expr, 0).val {
+                        Val::Known(Value::String(key)) => Some(key),
+                        _ => None,
+                    },
+                };
+                let Some(key) = key else {
+                    facts.node.images.clear();
+                    facts.unread();
+                    break;
+                };
+                if field(entry, "create").is_some_and(|expr| {
+                    !matches!(
+                        self.value(at, each, expr, 0).val,
+                        Val::Known(Value::Bool(true))
+                    )
+                }) {
+                    continue;
+                }
+                let name = match field(entry, "name") {
+                    None => key,
+                    Some(expr) => match self.value(at, each, expr, 0).val {
+                        Val::Known(Value::Null) => key,
+                        Val::Known(Value::String(name)) if !name.is_empty() => name,
+                        _ => continue,
+                    },
+                };
+                let image = field(entry, "image").and_then(|expr| {
+                    let mut found = self.value(at, each, expr, 0);
+                    let (text, _) = found.text();
+                    found.through.extend(gates.iter().cloned());
+                    (text != "*").then(|| (text, found.through.into_iter().collect::<Vec<_>>()))
+                });
+                if let Some((image, through)) = &image
+                    && !facts.image(&name, image, !through.is_empty(), through)
+                {
+                    break;
+                }
+                let image = image.as_ref().map(|(image, _)| image.as_str());
+                for (key, secret) in [("environment", false), ("secrets", true)] {
+                    if let Some(expr) = field(entry, key) {
+                        self.ecs_environment(&mut facts, at, each, (&name, image), expr, secret);
+                    }
+                }
+            }
+        } else {
+            let Evaluated {
+                val: Val::Known(Value::Object(containers)),
+                mut through,
+            } = self.value(at, each, &arg.expr, 0)
+            else {
+                return;
+            };
+            through.extend(gates.iter().cloned());
+            let through = through.into_iter().collect::<Vec<_>>();
+            for (key, container) in containers {
+                let Ok(entry) = serde_json::to_value(container) else {
+                    facts.unread();
+                    break;
+                };
+                if entry
+                    .get("create")
+                    .is_some_and(|v| v.as_bool() != Some(true))
+                {
+                    continue;
+                }
+                let name = match entry.get("name") {
+                    None | Some(Json::Null) => key.as_str(),
+                    Some(Json::String(name)) if !name.is_empty() => name,
+                    _ => continue,
+                };
+                let image = entry
+                    .get("image")
+                    .and_then(Json::as_str)
+                    .filter(|s| *s != "*");
+                if let Some(image) = image
+                    && !facts.image(name, image, !through.is_empty(), &through)
+                {
+                    break;
+                }
+                for (key, secret) in [("environment", false), ("secrets", true)] {
+                    if let Some(value) = entry.get(key) {
+                        Self::ecs_json_environment(&mut facts, name, image, value, secret);
+                    }
+                }
+            }
+        }
+        let facts = facts.finish();
+        if self.charge(facts.workload_size()) {
+            self.nodes[node].images = facts.images;
+            self.nodes[node].environment = facts.environment;
+        }
+    }
 }

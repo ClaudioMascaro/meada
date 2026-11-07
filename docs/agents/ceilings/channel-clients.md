@@ -78,9 +78,14 @@
   `CHAIN` (64): a builder chain (`FutureRecord::to(t).payload(p)`, an SQS `send_message()...`,
   redis `StreamReadOptions`) is read to that many calls below the form (`Code::chain`, itself
   bounded by `FLUENT_CHAIN`); a longer one is not a producer or a consumer.
-- `channel.rs`: broker clusters are not modelled (one name of one broker kind is one channel
-  across the workspace), and an exchange's type is not read: every binding pattern follows
-  topic-exchange rules.
+- `channel.rs`: broker clusters are not part of contract identity (one name of one broker kind
+  is one channel across the workspace). Code-declared bindings retain topic rules. Operator
+  bindings (#671) first require matching cluster/vhost/namespace endpoints and a supported
+  Exchange type; headers, unknown types and direct wildcard keys establish no queue route.
+  `AMQP_ROUTING_MAX` is 255 bytes, AMQP 0-9-1's short-string maximum, for routing names/keys.
+  `pattern_matches` uses bounded dynamic programming over words, with repeated `#` tested
+  against a failing tail instead of recursively expanding combinations. Oversized input stays
+  unmatched. Other brokers retain their existing matching rules.
 
 - AWS SDKs in Java 2.x, Go v2 and .NET (#660): operation tables live in `channel/aws.rs` and
   `resource/aws.rs`; the mechanical readers and complete constructor evidence live in

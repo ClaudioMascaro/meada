@@ -1,0 +1,10 @@
+apiVersion: rds.aws.upbound.io/v1beta1
+kind: Instance
+metadata:
+  name: operator-26
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: xp-primary
+spec:
+  forProvider:
+    region: us-east-1

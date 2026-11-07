@@ -35,6 +35,26 @@ const SIDES: (&str, &str) = ("producer", "consumer");
 /// The start of every channel contract identifier.
 const PREFIX: &str = "channel::";
 
+// ponytail: AMQP 0-9-1 exchange/queue names and routing keys are short strings, at most 255 bytes.
+const AMQP_ROUTING_MAX: usize = 255;
+
+pub(crate) fn amqp_name(name: &str) -> bool {
+    !name.is_empty() && name.len() <= AMQP_ROUTING_MAX && !name.chars().any(char::is_control)
+}
+
+/// Operator types are explicit: direct wildcards stay literal and cannot use topic matching.
+pub(crate) fn topology_pattern<'a>(exchange: &str, key: &'a str) -> Option<&'a str> {
+    if key.len() > AMQP_ROUTING_MAX {
+        return None;
+    }
+    match exchange {
+        "topic" => Some(key),
+        "direct" if !key.contains(['*', '#']) => Some(key),
+        "fanout" => Some("#"),
+        _ => None,
+    }
+}
+
 /// The contract identifier of the channel `name` of `broker`, kept as evaluated. A side whose
 /// name could not be evaluated is `channel::<broker>`: it names its broker kind, never links
 /// and is not an open item.
@@ -79,19 +99,30 @@ impl<'a> Routes<'a> {
 
 /// Whether the topic-exchange `pattern` matches the routing `key`: words split at `.`, `*` is
 /// exactly one word and `#` zero or more.
-// ponytail: an exchange's type (`assertExchange`) is not read, so every pattern follows
-// topic-exchange rules, a direct or fanout exchange included.
+// Code-declared bindings retain topic rules; operator bindings first select a supported
+// pattern with topology_pattern. Dynamic programming keeps repeated `#` linear per key word.
 fn pattern_matches(pattern: &str, key: &str) -> bool {
-    fn go(pattern: &[&str], key: &[&str]) -> bool {
-        match pattern.split_first() {
-            None => key.is_empty(),
-            Some((&"#", rest)) => (0..=key.len()).any(|n| go(rest, &key[n..])),
-            Some((&"*", rest)) => !key.is_empty() && go(rest, &key[1..]),
-            Some((word, rest)) => key.first() == Some(word) && go(rest, &key[1..]),
-        }
+    if pattern.len() > AMQP_ROUTING_MAX || key.len() > AMQP_ROUTING_MAX {
+        return false;
     }
-    let words = |text| Vec::from_iter(str::split(text, '.'));
-    go(&words(pattern), &words(key))
+    let key = key.split('.').collect::<Vec<_>>();
+    let mut previous = vec![false; key.len() + 1];
+    previous[0] = true;
+    for word in pattern.split('.') {
+        let mut next = vec![false; key.len() + 1];
+        if word == "#" {
+            next[0] = previous[0];
+            for i in 1..=key.len() {
+                next[i] = previous[i] || next[i - 1];
+            }
+        } else {
+            for i in 1..=key.len() {
+                next[i] = previous[i - 1] && (word == "*" || word == key[i - 1]);
+            }
+        }
+        previous = next;
+    }
+    previous[key.len()]
 }
 
 /// The call a message was made at.
@@ -368,8 +399,51 @@ impl ContractKind for Channel {
                 }
             }
         }
+        for node in &export.iac {
+            let Some(binding) = node.provisioned.as_ref().and_then(|p| p.binding.as_ref()) else {
+                continue;
+            };
+            let mut side = Binding::default();
+            side.contract = binding.contract.clone();
+            side.exchange = binding.exchange.clone();
+            side.pattern = binding.pattern.clone();
+            side.site = node.identity(&export.repository);
+            if !export.bindings.contains(&side) {
+                export.bindings.push(side);
+            }
+        }
         index::sort_providers(&mut export.providers);
         index::sort_consumers(&mut export.consumers);
+    }
+
+    fn provision_uses(&self, exports: &[Export]) -> Vec<(usize, crate::contract::ProvisionUse)> {
+        // Earlier code-only workspaces retain their bytes. Infrastructure makes this an
+        // indexed group; each real binding can then project its publish's queue use.
+        if !exports
+            .iter()
+            .flat_map(|e| &e.provisioners)
+            .any(|p| p.contract.starts_with("channel::amqp::"))
+        {
+            return Vec::new();
+        }
+        let routes = Routes::new(exports);
+        let mut uses = Vec::new();
+        for (n, export) in exports.iter().enumerate() {
+            for publish in &export.publishes {
+                for (contract, (level, reason)) in routes.reached(publish) {
+                    uses.push((
+                        n,
+                        crate::contract::ProvisionUse {
+                            site: publish.site.clone(),
+                            contract: contract.into(),
+                            level,
+                            reason,
+                        },
+                    ));
+                }
+            }
+        }
+        uses
     }
 
     /// The publish at `call` and each queue the bindings of the workspace route it to.
@@ -752,6 +826,24 @@ mod tests {
         for (pattern, key, matches) in table {
             assert_eq!(pattern_matches(pattern, key), matches, "{pattern} on {key}");
         }
+    }
+
+    #[test]
+    fn amqp_repeated_hashes_do_not_expand_and_oversized_keys_are_refused() {
+        let pattern = format!("{}.missing", vec!["#"; 100].join("."));
+        let key = vec!["a"; 100].join(".");
+        let start = std::time::Instant::now();
+        for _ in 0..100 {
+            assert!(!pattern_matches(&pattern, &key));
+        }
+        assert!(start.elapsed() < std::time::Duration::from_secs(2));
+        let oversized = "a".repeat(super::AMQP_ROUTING_MAX + 1);
+        assert!(!pattern_matches("#", &oversized));
+        assert!(!pattern_matches(&oversized, "a"));
+        assert!(super::topology_pattern("topic", &oversized).is_none());
+        assert!(super::topology_pattern("direct", "order.*").is_none());
+        assert_eq!(super::topology_pattern("fanout", "ignored"), Some("#"));
+        assert!(super::topology_pattern("headers", "order.created").is_none());
     }
 
     /// A publish at a call adds its own line and one per queue its bindings route it to; a

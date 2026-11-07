@@ -82,6 +82,9 @@ pub(super) struct Base {
     pub block: String,
     /// How the composition holds it: `resources` or `pipeline <step>`.
     pub via: String,
+    pub custom: Option<super::custom::Name>,
+    pub topology: Option<super::topology::Facts>,
+    pub namespace: Option<String>,
 }
 
 /// What a Crossplane object, or a definition of a kind, offers the roles and the references.
@@ -147,9 +150,51 @@ fn renamed(patches: &Value, renaming: &HashSet<&str>) -> bool {
     })
 }
 
+/// Unknown patch sets and nested sets cannot establish a literal identity. Index the sets
+/// once per composition; their fields are inspected without copying or expanding resources.
+fn patches_affect(
+    patches: &Value,
+    sets: &HashMap<&str, Option<&Value>>,
+    affected: impl Fn(&str) -> bool,
+) -> bool {
+    let writes = |patch: &Value| {
+        let ty = text(patch, &["type"]).unwrap_or("FromCompositeFieldPath");
+        if OUTWARD.contains(&ty) {
+            return false;
+        }
+        if !matches!(
+            ty,
+            "FromCompositeFieldPath"
+                | "FromEnvironmentFieldPath"
+                | "CombineFromComposite"
+                | "CombineFromEnvironment"
+        ) {
+            return true;
+        }
+        text(patch, &["toFieldPath"])
+            .or_else(|| text(patch, &["fromFieldPath"]))
+            .is_none_or(&affected)
+    };
+    (patches.as_array().into_iter().flatten()).any(|patch| {
+        if text(patch, &["type"]) != Some("PatchSet") {
+            return writes(patch);
+        }
+        let set = text(patch, &["patchSetName"])
+            .and_then(|name| sets.get(name))
+            .copied()
+            .flatten();
+        set.is_none_or(|set| list(set, &["patches"]).any(writes))
+    })
+}
+
 /// The resources of the composition `value` whose block starts its key paths with `block`, each
 /// with the lines `span` gives it (its step's index in the pipeline, if any, and its own).
-fn bases(value: &Value, block: &str, span: Span) -> Vec<Base> {
+fn bases(
+    value: &Value,
+    block: &str,
+    span: Span,
+    mappings: &crate::iac::mapping::Config,
+) -> Vec<Base> {
     let dot = if block.is_empty() { "" } else { "." };
     let mut out = Vec::new();
     let mut take = |resources: &Value, sets: &Value, step: Option<usize>, via: String| {
@@ -158,6 +203,15 @@ fn bases(value: &Value, block: &str, span: Span) -> Vec<Base> {
             None => format!("{block}{dot}spec.resources"),
         };
         let renaming = renaming(sets);
+        let mut named_sets = HashMap::new();
+        for set in sets.as_array().into_iter().flatten() {
+            if let Some(name) = text(set, &["name"]) {
+                named_sets
+                    .entry(name)
+                    .and_modify(|v| *v = None)
+                    .or_insert(Some(set));
+            }
+        }
         for (i, r) in (resources.as_array().into_iter().flatten()).enumerate() {
             if out.len() == COMPOSED_MAX {
                 return;
@@ -173,6 +227,21 @@ fn bases(value: &Value, block: &str, span: Span) -> Vec<Base> {
                 true => None,
                 false => external(base).or_else(|| name_at(base, &["metadata", "name"])),
             };
+            let mut custom = super::custom::read(base, kind, group_of(api), mappings);
+            if let Some(custom) = &mut custom
+                && patches_affect(&r["patches"], &named_sets, |path| custom.affected(path))
+            {
+                let retain_name = !patches_affect(&r["patches"], &named_sets, |path| {
+                    custom.fields_affected(path)
+                });
+                custom.invalidate(retain_name);
+            }
+            let mut topology = super::topology::read(base, kind, group_of(api));
+            if let Some(topology) = &mut topology
+                && patches_affect(&r["patches"], &named_sets, |path| topology.affected(path))
+            {
+                topology.invalidate();
+            }
             let (line, end_line) = span(step, i).unwrap_or((1, 1));
             out.push(Base {
                 resource,
@@ -182,6 +251,9 @@ fn bases(value: &Value, block: &str, span: Span) -> Vec<Base> {
                 end_line,
                 block: format!("{at_key}[{i}]"),
                 via: via.clone(),
+                custom,
+                topology,
+                namespace: text(base, &["metadata", "namespace"]).map(String::from),
             });
         }
     };
@@ -203,7 +275,14 @@ fn bases(value: &Value, block: &str, span: Span) -> Vec<Base> {
 }
 
 /// The Crossplane facts of the object `value` of `kind` in `group`, whose block is `block`.
-pub(super) fn facts(value: &Value, kind: &str, group: &str, block: &str, span: Span) -> Facts {
+pub(super) fn facts(
+    value: &Value,
+    kind: &str,
+    group: &str,
+    block: &str,
+    span: Span,
+    mappings: &crate::iac::mapping::Config,
+) -> Facts {
     let mut facts = Facts::default();
     let spec = &value["spec"];
     let kind_at = |path: &[&str]| Some((text(spec, &["group"])?.to_string(), name_at(spec, path)?));
@@ -224,7 +303,7 @@ pub(super) fn facts(value: &Value, kind: &str, group: &str, block: &str, span: S
             let r = &spec["compositeTypeRef"];
             facts.composes = (text(r, &["apiVersion"]).zip(name_at(r, &["kind"])))
                 .map(|(api, kind)| (group_of(api).to_string(), kind));
-            facts.bases = bases(value, block, span);
+            facts.bases = bases(value, block, span, mappings);
         }
         _ if cluster_scoped(group) => {}
         _ => {

@@ -34,6 +34,17 @@ pub(crate) struct Entry {
     pub kind: String,
     /// The argument that holds the physical name.
     pub name: String,
+    /// A format-defined default, used only when the primary property is absent.
+    pub fallback: Option<String>,
+    /// An alias reuses the canonical entry's identifier policy, without guessing from its kind.
+    pub basis: Option<String>,
+    pub qualifier: Option<String>,
+    pub qualifier_ref: Option<String>,
+    pub qualifier_type: Option<String>,
+    pub source: Option<String>,
+    pub source_ref: Option<String>,
+    pub source_type: Option<String>,
+    pub filter: Option<String>,
     #[serde(default)]
     pub forms: Vec<String>,
 }
@@ -44,6 +55,60 @@ struct Table {
     entry: Vec<Entry>,
     #[serde(default)]
     workload: Vec<Workload>,
+    #[serde(default)]
+    module: Vec<Registry>,
+    #[serde(default)]
+    topology: Vec<Topology>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum TopologyRole {
+    Queue,
+    Exchange,
+    Binding,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Topology {
+    pub format: String,
+    #[serde(rename = "type")]
+    pub ty: String,
+    pub role: TopologyRole,
+}
+
+static TOPOLOGY: LazyLock<Vec<Topology>> =
+    LazyLock::new(|| toml::from_str::<Table>(TABLE).map_or_else(|_| Vec::new(), |t| t.topology));
+
+pub(crate) fn topology(ty: &str) -> Option<TopologyRole> {
+    TOPOLOGY
+        .iter()
+        .find(|row| row.format == "kubernetes" && row.ty == ty)
+        .map(|row| row.role)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Registry {
+    pub source: String,
+    pub entry: String,
+    pub input: String,
+    pub create: Vec<String>,
+    #[serde(default)]
+    pub disable: Vec<String>,
+    pub fifo: Option<String>,
+    pub prefix: Option<String>,
+}
+
+static REGISTRY: LazyLock<Vec<Registry>> =
+    LazyLock::new(|| toml::from_str::<Table>(TABLE).map_or_else(|_| Vec::new(), |t| t.module));
+
+pub(crate) fn registry(source: &str) -> Option<&'static Registry> {
+    let source = source
+        .strip_prefix("registry.terraform.io/")
+        .unwrap_or(source);
+    REGISTRY.iter().find(|m| m.source == source)
 }
 
 /// A type that runs code, with the image and code paths its format reads.
@@ -68,6 +133,18 @@ pub(crate) fn workload(format: &str, ty: &str) -> Option<&'static Workload> {
     WORKLOADS.iter().find(|w| w.format == format && w.ty == ty)
 }
 
+pub(crate) fn named_workload(id: &str) -> Option<&'static Workload> {
+    let (format, ty) = id.split_once(':')?;
+    workload(format, ty)
+}
+
+pub(crate) fn workload_of(node: &super::Node) -> Option<&'static Workload> {
+    if let Some(id) = node.provisioned.as_ref().and_then(|p| p.entry.as_deref()) {
+        return named_workload(id);
+    }
+    workload(format_of(&node.path)?, &node.ty)
+}
+
 static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {
     // The table is the repository's own file, checked by `the_table_parses`.
     toml::from_str::<Table>(TABLE).map_or_else(|_| Vec::new(), |t| t.entry)
@@ -78,8 +155,26 @@ pub(crate) fn entry(format: &str, ty: &str) -> Option<&'static Entry> {
     ENTRIES.iter().find(|e| e.format == format && e.ty == ty)
 }
 
+/// A configuration or stored mapping names an entry by its complete `format:type` identity.
+pub(crate) fn named(id: &str) -> Option<&'static Entry> {
+    let (format, ty) = id.split_once(':')?;
+    entry(format, ty)
+}
+
+/// Mapped nodes retain their physical type; their projection selects the curated entry.
+pub(crate) fn node_entry(node: &super::Node) -> Option<&'static Entry> {
+    match node.provisioned.as_ref().and_then(|p| p.entry.as_deref()) {
+        Some(id) => named(id),
+        None => provision_entry(&node.path, &node.block, &node.ty),
+    }
+}
+
 pub(crate) fn entries(format: &str) -> impl Iterator<Item = &'static Entry> + '_ {
     ENTRIES.iter().filter(move |e| e.format == format)
+}
+
+pub(crate) fn stamp() -> blake3::Hash {
+    blake3::hash(TABLE.as_bytes())
 }
 
 /// A type-table entry is a provisioner only in the format's resource declaration section.
@@ -141,6 +236,60 @@ pub(crate) fn identified(text: &str) -> Option<String> {
 }
 
 impl Entry {
+    pub(crate) fn canonical(&self) -> Option<&Entry> {
+        match self.basis.as_deref() {
+            Some(id) => named(id).filter(|entry| entry.basis.is_none()),
+            None => Some(self),
+        }
+    }
+    /// A mapped input cannot fall back to a malformed structured identifier or bare composite.
+    pub(crate) fn mapped(&self, text: &str, pattern: bool) -> Option<String> {
+        if self.basis.is_some() {
+            return self.canonical()?.mapped(text, pattern);
+        }
+        if self.kind == "amqp" && !pattern {
+            return crate::channel::amqp_name(text).then(|| text.into());
+        }
+        if pattern {
+            if self.ty.starts_with("google_") {
+                return crate::contract::gcp::pattern(&self.ty, text);
+            }
+            if self.ty.starts_with("azurerm_") {
+                return crate::contract::azure::pattern(&self.ty, text);
+            }
+        }
+        if text.is_empty() || text.len() > crate::config_values::VALUE_MAX {
+            return None;
+        }
+        if self.ty == "google_sql_database" {
+            let (instance, database) = text.split_once('/')?;
+            return crate::contract::gcp::database(instance, database);
+        }
+        if self.ty == "azurerm_servicebus_subscription" {
+            return crate::contract::azure::subscription(text);
+        }
+        let target = self.project(text)?;
+        let structured = ["arn:", "projects/", "/subscriptions/", "//"]
+            .iter()
+            .any(|prefix| {
+                target
+                    .get(..prefix.len())
+                    .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+            });
+        (!structured
+            && !target.contains("://")
+            && !target.contains(['$', '{', '}', '?', '#'])
+            && !target.chars().any(char::is_whitespace)
+            && (!pattern || super::pattern::supported(&target)))
+        .then_some(target)
+    }
+
+    pub(crate) fn target_is_supported(&self, name: &str) -> bool {
+        if self.kind == "amqp" {
+            return crate::channel::amqp_name(name);
+        }
+        !name.starts_with("arn:") && !name.contains("://")
+    }
     pub(crate) fn defining_key(&self, block: &str) -> String {
         if self.format == "cloudformation" {
             format!("{block}.Properties.{}", self.name)
@@ -151,6 +300,9 @@ impl Entry {
 
     /// Provider-specific identity validation belongs to the kind, shared with SDK/config readers.
     pub(crate) fn project(&self, text: &str) -> Option<String> {
+        if self.basis.is_some() {
+            return self.canonical()?.project(text);
+        }
         use crate::contract::gcp;
         match self.ty.as_str() {
             "azurerm_servicebus_queue" | "azurerm_servicebus_topic" => {
@@ -311,6 +463,21 @@ mod tests {
         assert_eq!(table.entry.len(), ENTRIES.len());
     }
 
+    #[test]
+    fn stored_projection_defaults_preserve_the_explicit_unknown_state() {
+        let old: crate::iac::Projection =
+            serde_json::from_str(r#"{"name":null,"pattern":false,"through":[]}"#).unwrap();
+        assert!(old.name.is_none() && old.entry.is_none() && old.binding.is_none());
+        assert!(old.defining.is_empty() && old.code.is_none());
+        let known: crate::iac::Projection =
+            serde_json::from_str(r#"{"name":"literal","pattern":false,"through":[]}"#).unwrap();
+        assert_eq!(known.name.as_deref(), Some("literal"));
+        assert_eq!(
+            serde_json::to_value(known).unwrap(),
+            serde_json::json!({"name":"literal","pattern":false,"through":[]})
+        );
+    }
+
     /// Every format's entry has an evaluated, named resource in the provisioning fixtures.
     #[test]
     fn every_entry_has_a_fixture_case() {
@@ -329,6 +496,8 @@ mod tests {
             fixtures.join("aws-workload-aliases"),
             fixtures.join("azure-infra"),
             fixtures.join("gcp-infra"),
+            fixtures.join("custom-strimzi"),
+            fixtures.join("custom-inventory"),
         ];
         while let Some(dir) = dirs.pop() {
             for e in std::fs::read_dir(&dir).unwrap() {
@@ -346,16 +515,69 @@ mod tests {
                 }
             }
         }
-        let (nodes, _) = crate::iac::evaluate(&files);
+        let (mut nodes, _) = crate::iac::evaluate(&files);
+        nodes.extend(crate::kube::evaluate(&files).nodes);
         for e in ENTRIES.iter() {
             assert!(
-                nodes.iter().any(|n| n.ty == e.ty
-                    && format_of(&n.path) == Some(e.format.as_str())
-                    && provision_entry(&n.path, &n.block, &n.ty).is_some()
-                    && n.name.as_deref().is_some_and(|name| !name.is_empty())),
+                nodes.iter().any(|n| node_entry(n)
+                    .is_some_and(|known| known.format == e.format && known.ty == e.ty)
+                    && n.provisioned
+                        .as_ref()
+                        .map_or(n.name.as_deref(), |p| p.name.as_deref())
+                        .is_some_and(|name| !name.is_empty())),
                 "no evaluated fixture case for {} {}",
                 e.format,
                 e.ty
+            );
+        }
+    }
+
+    #[test]
+    fn every_registry_source_has_a_named_evaluated_fixture_case() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/custom-registry/main.tf");
+        let files = vec![("main.tf".into(), std::fs::read(path).unwrap())];
+        let repository = crate::iac::Repository::read(&files);
+        let (nodes, _) = repository.evaluate(|_| true, super::super::STORED_MAX);
+        for row in REGISTRY.iter() {
+            let blocks = repository
+                .modules
+                .values()
+                .flat_map(|m| &m.blocks)
+                .filter(|b| b.source.as_deref() == Some(row.source.as_str()));
+            assert!(
+                blocks.into_iter().any(|b| nodes.iter().any(|n| {
+                    n.address == format!("module.{}", b.name)
+                        && n.provisioned.as_ref().is_some_and(|p| {
+                            p.entry.as_deref() == Some(row.entry.as_str())
+                                && (p.name.is_some() || !n.images.is_empty())
+                        })
+                })),
+                "no evaluated registry fixture for {}",
+                row.source
+            );
+        }
+    }
+
+    #[test]
+    fn every_topology_role_has_a_named_or_routed_evaluated_fixture_case() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/custom-rabbit/resources.yaml");
+        let out = crate::kube::evaluate(&[("resources.yaml".into(), std::fs::read(path).unwrap())]);
+        for row in TOPOLOGY.iter() {
+            assert!(
+                out.nodes.iter().any(|node| {
+                    node.address.starts_with(&format!("{}/", row.ty))
+                        && match row.role {
+                            TopologyRole::Binding => node
+                                .provisioned
+                                .as_ref()
+                                .is_some_and(|p| p.binding.is_some()),
+                            _ => node.name.as_deref().is_some_and(|name| !name.is_empty()),
+                        }
+                }),
+                "no evaluated topology fixture for {}",
+                row.ty
             );
         }
     }

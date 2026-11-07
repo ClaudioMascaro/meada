@@ -1,0 +1,9 @@
+apiVersion: storage.gcp.upbound.io/v1beta2
+kind: Bucket
+metadata:
+  name: operator-32
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: xp-gcp-assets
+spec:
+  forProvider: {}

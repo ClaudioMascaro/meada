@@ -188,6 +188,9 @@ fn objects(files: Vec<(&str, String)>) -> usize {
     let out = crate::kube::evaluate(&files);
     let nodes = out.nodes.iter().map(|n| {
         n.address.len()
+            + n.provisioned
+                .as_ref()
+                .map_or(0, crate::iac::Projection::size)
             + n.environment
                 .iter()
                 .map(crate::iac::environment::Entry::size)
@@ -1558,6 +1561,17 @@ resource "aws_apigatewayv2_route" "wide" {{
             },
         ),
         ("kubernetes: ingress host/path fan-out", ingress_fanout),
+        ("kubernetes: custom topology binding fan-out", || {
+            let bindings = count(900, |i| {
+                format!(
+                    "---\napiVersion: rabbitmq.com/v1beta1\nkind: Binding\nmetadata: {{name: b{i}}}\nspec:\n  rabbitmqClusterReference: {{name: broker}}\n  source: events\n  destination: inbox\n  destinationType: queue\n  routingKey: order.*\n"
+                )
+            });
+            let endpoints = "apiVersion: rabbitmq.com/v1beta1\nkind: Queue\nmetadata: {name: q}\nspec:\n  rabbitmqClusterReference: {name: broker}\n  name: inbox\n---\napiVersion: rabbitmq.com/v1beta1\nkind: Exchange\nmetadata: {name: ex}\nspec:\n  rabbitmqClusterReference: {name: broker}\n  name: events\n  type: topic\n";
+            let mut text = format!("{endpoints}{bindings}");
+            text.push_str(&" ".repeat(MAX_BYTES - text.len()));
+            objects(vec![("rabbit.yaml", text)])
+        }),
         ("kubernetes: services selecting many workloads", || {
             let pair = |i: usize| {
                 format!(
@@ -1687,6 +1701,20 @@ fn azure_reader_stays_bounded_on_a_full_file() {
     let size = probe();
     let elapsed = start.elapsed();
     eprintln!("Azure IaC hostile probe: {elapsed:?}, {size} stored bytes");
+    assert!(size > 1000 && size <= MAX_OUT, "{size}");
+    assert!(elapsed < BUDGET, "{elapsed:?}");
+}
+
+#[test]
+fn custom_topology_reader_stays_bounded_on_a_full_file() {
+    let (_, probe) = probes()
+        .into_iter()
+        .find(|(name, _)| *name == "kubernetes: custom topology binding fan-out")
+        .unwrap();
+    let start = Instant::now();
+    let size = probe();
+    let elapsed = start.elapsed();
+    eprintln!("Custom topology hostile probe: {elapsed:?}, {size} stored bytes");
     assert!(size > 1000 && size <= MAX_OUT, "{size}");
     assert!(elapsed < BUDGET, "{elapsed:?}");
 }

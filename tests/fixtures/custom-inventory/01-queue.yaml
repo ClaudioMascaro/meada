@@ -1,0 +1,10 @@
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: operator-01
+  namespace: platform
+spec:
+  name: inbox
+  rabbitmqClusterReference:
+    name: broker
+  vhost: /

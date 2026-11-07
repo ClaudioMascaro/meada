@@ -200,6 +200,13 @@ facts. `environment` may also retain a typed known contract target without a lit
 These facts stay under the existing IaC budgets and are described in the
 [AWS workload topic](../contracts/aws-workloads-664.md).
 
+Curated/private mappings (#671) extend the same optional `provisioned` JSON with defaulted
+`entry` (curated format:type), `defining` (identity key paths), `code` (declared input key and
+file-only flag) and `binding` (queue contract, exchange and routing pattern). Physical Node.name
+and explicit unresolved projection remain distinct. Configuration/table hashes participate in
+`meta.configs` so a mapping change/removal or binary table change re-evaluates affected inputs.
+`Export.provision_uses` is a kind-prepared transient batch and is never persisted or exported as
+raw directed sides. See [custom IaC](../contracts/custom-iac-671.md).
 
 IaC HTTP providers (#666) retain `iac::Node::routes` in the `iac_nodes.routes` JSON column:
 resolved method/path values and their declaration location. HTTP's contract-config summary

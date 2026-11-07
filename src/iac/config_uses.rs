@@ -35,21 +35,19 @@ impl Side {
 pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     // A creation's defining name is its provisioner, not a second side using itself.
     // Other config attributes in the same IaC file can still name resources they use.
-    let mut nodes = db.prepare("SELECT path, block, type FROM iac_nodes")?;
-    let definitions = nodes
-        .query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-            ))
-        })?
-        .filter_map(|row| match row {
-            Ok((path, block, ty)) => types::provision_entry(&path, &block, &ty)
-                .map(|entry| Ok((path, entry.defining_key(&block)))),
-            Err(error) => Some(Err(error)),
-        })
-        .collect::<rusqlite::Result<std::collections::HashSet<_>>>()?;
+    let mut definitions = std::collections::HashSet::new();
+    for node in super::nodes(db)? {
+        if let Some(mapped) = node.provisioned.as_ref().filter(|p| !p.defining.is_empty()) {
+            definitions.extend(
+                mapped
+                    .defining
+                    .iter()
+                    .map(|key| (node.path.clone(), key.clone())),
+            );
+        } else if let Some(entry) = types::node_entry(&node) {
+            definitions.insert((node.path, entry.defining_key(&node.block)));
+        }
+    }
     let mut query = db.prepare(
         "SELECT path, key, value, line FROM config_values \
          WHERE type = 'string' AND value IS NOT NULL AND cut = 0",
