@@ -74,7 +74,11 @@ outside that guarantee. Each phase retains warm/cold and restored warm/cold
 answers, full responses/status/export, same-scope HTTP replies and exact copy/cmp/hash/mtime
 restoration. Only JSON-RPC IDs are excluded from whole response comparisons; raw replies
 remain intact. Explicit HCL privacy constraints inspect responses and diagnostics, excluding
-request arguments and input/key files. Source CAPTURED is never semantic acceptance.
+request arguments and input/key files. Only an exact successful search answer of
+`no matches for <the caller's query>` excludes its query echo from the privacy view;
+all other response fields, diagnostics and the original raw answer remain inspected or retained.
+The verifier self-check includes real payload, extra-content, metadata and error controls.
+Source CAPTURED is never semantic acceptance.
 
 Read the frozen source-key `PLAN.md` files and HCL `ASSUMPTIONS.md` for their independent
 expectations and limits. The separate IaC var-file counter is unadjudicated; native type

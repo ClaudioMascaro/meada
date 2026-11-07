@@ -710,6 +710,34 @@ def cmd_deploy(a):
 
 def cmd_selftest(_):
     """The comparison logic on two small exports: run after editing this script."""
+    import copy
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("source_capture", HERE / "a7-source-capture.py")
+    capture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(capture)
+    query = {"tool": "search", "arguments": {"query": "privacy-canary"}}
+    empty = {"jsonrpc": "2.0", "id": 1, "result": {"isError": False,
+             "content": [{"type": "text", "text": "no matches for `privacy-canary`\n"}]}}
+    original = copy.deepcopy(empty)
+    assert "privacy-canary" not in json.dumps(capture.privacy_response(query, empty))
+    assert empty == original  # raw evidence stays complete
+    assert capture.privacy_response({"tool": "context", "arguments": query["arguments"]}, empty) == empty
+    assert capture.privacy_response({"tool": "search", "arguments": {"query": "other"}}, empty) == empty
+    for path, value in [
+        (("result", "content", 0, "text"), "no matches for `privacy-canary`\nextra privacy-canary\n"),
+        (("result", "isError"), True),
+        (("result", "content"), [{"type": "text", "text": "source = privacy-canary\n"}]),
+        (("result", "content"), empty["result"]["content"] + [{"type": "text", "text": "privacy-canary"}]),
+        (("result", "diagnostic"), "privacy-canary"),
+        (("result", "content", 0, "unexpected"), "privacy-canary"),
+        (("unexpected",), "privacy-canary"),
+    ]:
+        changed = copy.deepcopy(empty)
+        target = changed
+        for part in path[:-1]:
+            target = target[part]
+        target[path[-1]] = value
+        assert "privacy-canary" in json.dumps(capture.privacy_response(query, changed)), (path, value)
     base = {"format": 1, "symbols": [{"id": "r::a.rs::f"}, {"id": "r::a.rs::g"}],
             "calls": [{"id": "c1", "target": None, "level": None}, {"id": "c2", "target": "r::a.rs::g", "level": "exact"},
                       {"id": "c3", "target": None, "level": "ambiguous", "candidates": ["x", "y"]}],
