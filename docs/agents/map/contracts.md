@@ -6,7 +6,7 @@ topic leaves within 24 KiB; the code wins over these entries.
 
 <a id="modules-in-brief"></a>
 
-- [Library forms and query declarations](contracts/library-forms-and-query-declarations.md)
+- [Library forms and query declarations](contracts/contract-modules-and-query-declarations.md)
 - [Contract kind interface](contracts/contract-kind-interface.md)
 - [HTTP extraction and linking](contracts/http-extraction-and-linking.md)
 - [HTTP through Services, Compose and Ingress (#665)](contracts/http-infrastructure-665.md)
