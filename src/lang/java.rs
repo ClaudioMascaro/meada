@@ -812,7 +812,15 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 .iter()
                 .flat_map(|d| d.params.iter().map(|p| (d.name.as_str(), p.name.as_str()))),
         )
+        .chain(fields.iter().flat_map(|(name, scopes)| {
+            scopes
+                .iter()
+                .map(move |scope| (scope.as_str(), name.as_str()))
+        }))
         .collect();
+    // A bare write whose binding is not known stays conservative by spelling. Dropping
+    // it would prove an initializer unchanged from incomplete assignment knowledge.
+    let mut unknown_writes = BTreeSet::new();
     let reassigned: BTreeSet<(String, String)> = reassigned
         .into_iter()
         .filter_map(|(scope, name)| {
@@ -822,6 +830,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     return Some((at.to_string(), name));
                 }
                 if at.is_empty() {
+                    unknown_writes.insert(name);
                     return None;
                 }
                 at = crate::parent(at);
@@ -835,6 +844,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         .filter(|b| {
             declared.get(&(b.scope.as_str(), b.name.as_str())) == Some(&1)
                 && !reassigned.contains(&(b.scope.clone(), b.name.clone()))
+                && !unknown_writes.contains(&b.name)
                 && !field_hides(&b.name, &b.scope)
         })
         .collect();

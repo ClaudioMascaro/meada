@@ -6911,113 +6911,190 @@ impl<'a> Code<'a> {
         fold.nested += 1;
         let folded = match value {
             Value::Await(value) => self.eval(path, scope, value, frames, depth, fold, wants),
-            Value::Str(parts) => {
-                let mut out = Vec::new();
-                for part in parts {
-                    let Part::Ref(name) = part else {
-                        out.push(part.clone());
-                        continue;
-                    };
-                    match self.name(path, scope, name, frames, depth, fold, wants) {
-                        // The parts copied are charged: a string doubled through constants grows
-                        // faster than the values visited.
-                        Value::Str(parts) => match self.charge(path, parts.len()) {
-                            true => out.extend(parts),
-                            false => out.push(Part::Hole),
-                        },
-                        Value::Ref(name) => out.push(Part::Ref(name)),
-                        _ => out.push(Part::Hole),
-                    }
-                }
-                Value::Str(out)
-            }
-            Value::Object(properties) => Value::Object(
-                properties
-                    .iter()
-                    .map(|(k, v)| {
-                        let changed = fold.selected.zip(fold.objects.last().copied()).is_some_and(
-                            |(selected, (object, pointer))| {
-                                pointer == value as *const Value as usize
-                                    && self.member_changed(object, k, selected, frames)
-                            },
-                        );
-                        let v = if changed {
-                            Value::Unknown
-                        } else {
-                            self.eval(path, scope, v, frames, depth, fold, wants)
-                        };
-                        (k.clone(), v)
-                    })
-                    .collect(),
-            ),
+            Value::Str(parts) => self.eval_string(path, scope, parts, frames, depth, fold, wants),
+            Value::Object(_) => self.eval_object(path, scope, value, frames, depth, fold, wants),
             Value::List(items) => Value::List(
                 (items.iter())
                     .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
                     .collect(),
             ),
-            Value::New(callee, args) => Value::New(
-                if let Some(known) = fold.new_types {
-                    self.outside_written(path, scope, callee)
-                        .and_then(|o| crate::names::one(&o.spellings(), known).map(str::to_string))
-                        .unwrap_or_default()
-                } else {
-                    callee.clone()
-                },
-                (args.iter())
-                    .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
-                    .collect(),
-            ),
+            Value::New(callee, args) => {
+                self.eval_new(path, scope, callee, args, frames, depth, fold, wants)
+            }
             Value::Call(call) if fold.chain => {
-                // Some packs retain only a call's range in a value. Selected-argument
-                // folding uses that exact stored call, never a method-name lookup.
-                let stored = fold
-                    .new_types
-                    .and_then(|_| self.call_index(path, &call.range))
-                    .and_then(|index| self.call(path, index));
-                let scope = stored.map_or(scope, |c| c.scope.as_str());
-                let args = stored.map_or(call.args.as_slice(), |c| c.args.as_slice());
-                let kwargs = stored.map_or(call.kwargs.as_slice(), |c| c.kwargs.as_slice());
-                let receiver = call
-                    .receiver
-                    .as_deref()
-                    .or_else(|| stored.and_then(|c| c.receiver.as_ref()));
-                let receiver = match receiver {
-                    Some(receiver) => Some(Box::new(
-                        self.eval(path, scope, receiver, frames, depth, fold, wants),
-                    )),
-                    None if stored.is_some() => call.callee.rsplit_once('.').map(|(head, _)| {
-                        Box::new(self.name(path, scope, head, frames, depth, fold, wants))
-                    }),
-                    None => None,
-                };
-                let mut eval = |v| self.eval(path, scope, v, frames, depth, fold, wants);
-                Value::Call(Invocation {
-                    callee: call.callee.clone(),
-                    receiver,
-                    args: args.iter().map(&mut eval).collect(),
-                    kwargs: (kwargs.iter()).map(|(k, v)| (k.clone(), eval(v))).collect(),
-                    range: call.range.clone(),
-                })
+                self.eval_chain(path, scope, call, frames, depth, fold, wants)
             }
             Value::Call(call) => self
                 .built(path, call, frames, depth, fold, wants)
                 .unwrap_or_else(|| value.clone()),
             Value::Ref(name) => self.name(path, scope, name, frames, depth, fold, wants),
             Value::Member(name, member) if fold.selected.is_some() => {
-                let object = self.name(path, scope, name, frames, depth, fold, wants);
-                match object {
-                    Value::Object(fields) => crate::lang::property(&fields, member)
-                        .ok()
-                        .flatten()
-                        .cloned()
-                        .unwrap_or(Value::Unknown),
-                    _ => Value::Unknown,
-                }
+                self.eval_member(path, scope, name, member, frames, depth, fold, wants)
             }
             other => other.clone(),
         };
         fold.nested -= 1;
         folded
+    }
+
+    // Keep variant-specific temporaries out of every recursive alias frame. In debug
+    // builds their combined match frame can exhaust a test thread before EVAL_DEPTH.
+    #[expect(clippy::too_many_arguments)]
+    fn eval_string(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        parts: &'a [Part],
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        let mut out = Vec::new();
+        for part in parts {
+            let Part::Ref(name) = part else {
+                out.push(part.clone());
+                continue;
+            };
+            match self.name(path, scope, name, frames, depth, fold, wants) {
+                // The parts copied are charged: a string doubled through constants grows
+                // faster than the values visited.
+                Value::Str(parts) => match self.charge(path, parts.len()) {
+                    true => out.extend(parts),
+                    false => out.push(Part::Hole),
+                },
+                Value::Ref(name) => out.push(Part::Ref(name)),
+                _ => out.push(Part::Hole),
+            }
+        }
+        Value::Str(out)
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn eval_object(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        let Value::Object(properties) = value else {
+            return Value::Unknown;
+        };
+        Value::Object(
+            properties
+                .iter()
+                .map(|(k, v)| {
+                    let changed = fold.selected.zip(fold.objects.last().copied()).is_some_and(
+                        |(selected, (object, pointer))| {
+                            pointer == value as *const Value as usize
+                                && self.member_changed(object, k, selected, frames)
+                        },
+                    );
+                    let v = if changed {
+                        Value::Unknown
+                    } else {
+                        self.eval(path, scope, v, frames, depth, fold, wants)
+                    };
+                    (k.clone(), v)
+                })
+                .collect(),
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn eval_new(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        args: &'a [Value],
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        Value::New(
+            if let Some(known) = fold.new_types {
+                self.outside_written(path, scope, callee)
+                    .and_then(|o| crate::names::one(&o.spellings(), known).map(str::to_string))
+                    .unwrap_or_default()
+            } else {
+                callee.to_string()
+            },
+            (args.iter())
+                .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
+                .collect(),
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn eval_chain(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        call: &'a Invocation,
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        // Some packs retain only a call's range in a value. Selected-argument
+        // folding uses that exact stored call, never a method-name lookup.
+        let stored = fold
+            .new_types
+            .and_then(|_| self.call_index(path, &call.range))
+            .and_then(|index| self.call(path, index));
+        let scope = stored.map_or(scope, |c| c.scope.as_str());
+        let args = stored.map_or(call.args.as_slice(), |c| c.args.as_slice());
+        let kwargs = stored.map_or(call.kwargs.as_slice(), |c| c.kwargs.as_slice());
+        let receiver = call
+            .receiver
+            .as_deref()
+            .or_else(|| stored.and_then(|c| c.receiver.as_ref()));
+        let receiver = match receiver {
+            Some(receiver) => Some(Box::new(
+                self.eval(path, scope, receiver, frames, depth, fold, wants),
+            )),
+            None if stored.is_some() => call.callee.rsplit_once('.').map(|(head, _)| {
+                Box::new(self.name(path, scope, head, frames, depth, fold, wants))
+            }),
+            None => None,
+        };
+        let mut eval = |v| self.eval(path, scope, v, frames, depth, fold, wants);
+        Value::Call(Invocation {
+            callee: call.callee.clone(),
+            receiver,
+            args: args.iter().map(&mut eval).collect(),
+            kwargs: (kwargs.iter()).map(|(k, v)| (k.clone(), eval(v))).collect(),
+            range: call.range.clone(),
+        })
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn eval_member(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        member: &'a str,
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        let object = self.name(path, scope, name, frames, depth, fold, wants);
+        match object {
+            Value::Object(fields) => crate::lang::property(&fields, member)
+                .ok()
+                .flatten()
+                .cloned()
+                .unwrap_or(Value::Unknown),
+            _ => Value::Unknown,
+        }
     }
 
     #[expect(clippy::too_many_arguments)]
