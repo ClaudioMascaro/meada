@@ -74,9 +74,18 @@ integration proof is coordinated in CI by the parent; a local smoke is explicitl
 
 ## Scope and verdict
 
-The executable minimum does not enumerate every SDK overload, every shadowing syntax or the
-adjacent C# async and Go v1 forms. A pass alone cannot claim the whole ticket: the additional
-checker probes above are required, with their own saved source and answers. Neither actual
+The driver also invokes `gcp-sdk-supplement.py`: exact factory frames and destructured
+arguments, scoped request writes/aliases/mapping operations/deletion, ordinary positive
+controls, separate exhausted-evidence repositories, typed-helper compatibility and hiding,
+C# direct/returned/late single awaits and bare/double-await refusals, adjacent C# async
+operations, Go v1, repeated operation sites, and source-keyed plain/structured/typed/wrong-kind
+Cloud Run environment phases. It preserves whole role/site inventories, source hashes,
+CLI and MCP records, complete HTTP/stdio equality and restoration. Source and oracles are
+written before invoking the candidate. A shared work ceiling can invalidate knowledge in
+the exhausted repository, so its ordinary controls live in separate bounded repositories.
+
+The executable probes do not enumerate every SDK overload or shadowing syntax. The source
+checker still judges the retained supplementary scope against the requirements above. Neither actual
 cloud delivery nor SDK runtime execution is tested. There is no Rust GCP inventory here.
 
 The checker uses the permanent receipt template and judges PROVED/BROKEN/BLOCKED/UNPROVEN.
