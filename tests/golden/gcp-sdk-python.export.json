@@ -1,0 +1,344 @@
+{
+  "format": 1,
+  "repository": "local/gcp-sdk-python",
+  "files": [
+    {
+      "path": "worker.py",
+      "hash": "c3840e8332865590c2afdbc6f71a81f20ea7e8b1d4a73b986d6ceab7bb37b30b"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/gcp-sdk-python::worker.py::handle",
+      "span": {
+        "path": "worker.py",
+        "start": 748,
+        "end": 777
+      },
+      "hash": "6824b89f3018a1c5d3ff743627d3956edb0e5457d40a6ff8e0eb67148f866ca1"
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::hidden",
+      "span": {
+        "path": "worker.py",
+        "start": 779,
+        "end": 1116
+      },
+      "hash": "7e541dfefd2894d917264072ff89332f7dbbb328985a1c7999e20779c7bcb695"
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::read",
+      "span": {
+        "path": "worker.py",
+        "start": 586,
+        "end": 626
+      },
+      "hash": "a05932de9464386c802ba358b8179f07123d4ea85f7f91bdd325e86eafd21a37"
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::receive",
+      "span": {
+        "path": "worker.py",
+        "start": 425,
+        "end": 536
+      },
+      "hash": "5fcc8a1e0d60734abfbe790886510de5a71ad2e550f7927f82217b094a775d4c"
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::send",
+      "span": {
+        "path": "worker.py",
+        "start": 337,
+        "end": 423
+      },
+      "hash": "ad4d31e37220365540a2347ccc5a0884792eb6759e4f16d54678a24c68a02dcc"
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::token",
+      "span": {
+        "path": "worker.py",
+        "start": 628,
+        "end": 746
+      },
+      "hash": "7283f1a364cd92960d1926e0e8a078a3db1ed87f4fdd271b469dcf046d3bfe30"
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::write",
+      "span": {
+        "path": "worker.py",
+        "start": 538,
+        "end": 584
+      },
+      "hash": "54d22ce5d9b37fe9d98bd5e8c7011a1edb3225158b4910ca5d31c6b2a504f404"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/gcp-sdk-python::worker.py::(call).blob#0",
+      "caller": "local/gcp-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 236,
+        "end": 289
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 146,
+        "end": 167
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::bus.SubscriberClient#0",
+      "caller": "local/gcp-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 181,
+        "end": 203
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::hidden::(call).blob#0",
+      "caller": "local/gcp-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 926,
+        "end": 972
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::hidden::(call).upload_from_string#0",
+      "caller": "local/gcp-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 926,
+        "end": 997
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::hidden::bus.PublisherClient#0",
+      "caller": "local/gcp-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 827,
+        "end": 848
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::hidden::publisher.publish#0",
+      "caller": "local/gcp-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 853,
+        "end": 892
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::hidden::secret.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1012,
+        "end": 1047
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::hidden::secrets.access_secret_version#0",
+      "caller": "local/gcp-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 1052,
+        "end": 1116
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::hidden::storage.bucket#0",
+      "caller": "local/gcp-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 926,
+        "end": 957
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::hidden::store.Client#0",
+      "caller": "local/gcp-sdk-python::worker.py::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 907,
+        "end": 921
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::read::blob.download_as_bytes#0",
+      "caller": "local/gcp-sdk-python::worker.py::read",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 602,
+        "end": 626
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::receive::subscriber.subscribe#0",
+      "caller": "local/gcp-sdk-python::worker.py::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 444,
+        "end": 536
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::receive::subscriber.subscription_path#0",
+      "caller": "local/gcp-sdk-python::worker.py::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 465,
+        "end": 518
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::secret.SecretManagerServiceClient#0",
+      "caller": "local/gcp-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 300,
+        "end": 335
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::send::publisher.publish#0",
+      "caller": "local/gcp-sdk-python::worker.py::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 353,
+        "end": 423
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::send::publisher.topic_path#0",
+      "caller": "local/gcp-sdk-python::worker.py::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 371,
+        "end": 416
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::storage.bucket#0",
+      "caller": "local/gcp-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 236,
+        "end": 268
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::store.Client#0",
+      "caller": "local/gcp-sdk-python::worker.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 214,
+        "end": 228
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::token::secrets.access_secret_version#0",
+      "caller": "local/gcp-sdk-python::worker.py::token",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 645,
+        "end": 746
+      }
+    },
+    {
+      "id": "local/gcp-sdk-python::worker.py::write::blob.upload_from_string#0",
+      "caller": "local/gcp-sdk-python::worker.py::write",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.py",
+        "start": 555,
+        "end": 584
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::pubsub::orders-python",
+      "site": "local/gcp-sdk-python::worker.py::send::publisher.publish#0"
+    },
+    {
+      "contract": "resource::gcs::uploads-python",
+      "site": "local/gcp-sdk-python::worker.py::write::blob.upload_from_string#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::gcs::uploads-python",
+      "site": "local/gcp-sdk-python::worker.py::read::blob.download_as_bytes#0",
+      "via": null
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-python",
+      "site": "local/gcp-sdk-python::worker.py::receive",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::token-python",
+      "site": "local/gcp-sdk-python::worker.py::token::secrets.access_secret_version#0",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/gcp-sdk-python::worker.py::read::blob.download_as_bytes#0",
+      "provider": "local/gcp-sdk-python::worker.py::write::blob.upload_from_string#0",
+      "contract": "resource::gcs::uploads-python",
+      "level": "exact",
+      "reason": "resource::gcs::uploads-python"
+    }
+  ]
+}

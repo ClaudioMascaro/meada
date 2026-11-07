@@ -1,6 +1,8 @@
 //! GCP physical identities, shared by contract kinds, provisioning and config uses.
 //! A subscription names its own target, never a topic guessed from its id.
 
+pub(crate) mod sdk;
+
 fn bounded(text: &str) -> bool {
     text.len() <= crate::config_values::VALUE_MAX
 }

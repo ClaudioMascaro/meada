@@ -238,7 +238,10 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
     let replacements = exports
         .iter()
         .map(|export| {
-            let resolve = |site: &str, contract: &str, via: Option<&str>| {
+            let resolve = |site: &str,
+                           contract: &str,
+                           via: Option<&str>,
+                           operation: Option<&str>| {
                 let via = via?;
                 let variable = via
                     .strip_prefix("env:")
@@ -246,18 +249,16 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
                 if !crate::contract::unresolved(contract) {
                     return None;
                 }
+                let kind = crate::contract::kind_of(contract)?;
                 let mut values =
                     std::collections::BTreeMap::<String, std::collections::BTreeSet<String>>::new();
                 for (value, reason) in environments.values(&export.repository, site, variable) {
-                    if let Some(name) = named(contract, value) {
+                    if let Some(name) = kind.environment_name(contract, value, operation) {
                         values.entry(name).or_default().insert(reason);
                     }
                 }
                 for (target, reason) in environments.targets(&export.repository, site, variable) {
-                    if target
-                        .rsplit_once("::")
-                        .is_some_and(|(prefix, _)| prefix == contract)
-                    {
+                    if kind.environment_target(contract, target, operation) {
                         values.entry(target.into()).or_default().insert(reason);
                     }
                 }
@@ -272,15 +273,15 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
             let providers = export
                 .providers
                 .iter()
-                .map(|p| resolve(&p.site, &p.contract, p.via.as_deref()))
+                .map(|p| resolve(&p.site, &p.contract, p.via.as_deref(), p.method.as_deref()))
                 .collect::<Vec<_>>();
             let consumers = export
                 .consumers
                 .iter()
                 .map(|c| {
-                    c.contract
-                        .as_deref()
-                        .and_then(|contract| resolve(&c.site, contract, c.via.as_deref()))
+                    c.contract.as_deref().and_then(|contract| {
+                        resolve(&c.site, contract, c.via.as_deref(), c.method.as_deref())
+                    })
                 })
                 .collect::<Vec<_>>();
             (providers, consumers)
@@ -338,20 +339,4 @@ fn clear_pending(exports: &mut [Export]) {
         }
         crate::index::sort_consumers(&mut export.consumers);
     }
-}
-
-fn named(prefix: &str, value: &str) -> Option<String> {
-    if !(prefix.starts_with("channel::") || prefix.starts_with("resource::")) {
-        return None;
-    }
-    if let Some(contract) = crate::iac::types::identified(value) {
-        return (contract.rsplit_once("::")?.0 == prefix).then_some(contract);
-    }
-    (!value.is_empty()
-        && value.bytes().all(|b| {
-            b.is_ascii_alphanumeric()
-                || b"._-".contains(&b)
-                || (prefix.starts_with("resource::") && b == b'/')
-        }))
-    .then(|| format!("{prefix}::{value}"))
 }

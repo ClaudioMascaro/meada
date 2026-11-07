@@ -1,0 +1,3 @@
+[serve]
+hosts = ["inventory.example.test"]
+

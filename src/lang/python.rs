@@ -58,7 +58,11 @@ impl LanguagePack for Python {
         let tree = parser
             .parse(src, None)
             .ok_or("tree-sitter returned no tree")?;
-        let mut facts = Facts::default();
+        let mut facts = Facts {
+            member_writes: Some(Vec::new()),
+            ..Facts::default()
+        };
+        let mut write_bytes = 0;
         let mut module = Module::default();
         // A name defined twice (`@property` and its setter, `try`/`except` fallbacks) is one
         // symbol: the first definition.
@@ -230,9 +234,8 @@ impl LanguagePack for Python {
                         facts.defs[at].return_values.push(Value::Unknown);
                     }
                 }
-                // ponytail: an import binds its names for the whole file, wherever it sits; a
-                // function-local one also hides an outer binding there, but other functions
-                // see it too. A star import that rebinds a name is not placed against the code
+                // A function-local import binds only its lexical scope. A star import that
+                // rebinds a name is not placed against the code
                 // that reads it either (`Resolver::rebound`): code run while the module loads
                 // gets the name unknown, a function the star import's.
                 "import_statement" | "import_from_statement" => {
@@ -252,10 +255,22 @@ impl LanguagePack for Python {
                                 );
                             }
                         }
+                        for import in &mut facts.imports[first..] {
+                            import.local = qualify(&scope, &import.local);
+                        }
                     }
                 }
                 "assignment" | "augmented_assignment" => {
                     let left = node.child_by_field_name("left");
+                    for target in left.into_iter().flat_map(targets) {
+                        if facts.member_writes.is_none() {
+                            break;
+                        }
+                        if let Some(write) = selector_write(target, src, &scope, node.byte_range())
+                        {
+                            facts.member_write(write, &mut write_bytes);
+                        }
+                    }
                     module.items(&left.map(targets).unwrap_or_default(), src);
                     if scope.is_empty() {
                         module.assign(node, src);
@@ -326,6 +341,15 @@ impl LanguagePack for Python {
                 // ponytail: `del` of a `global` name in a function hides it in that function
                 // alone.
                 "delete_statement" => {
+                    for target in named(node).flat_map(targets) {
+                        if facts.member_writes.is_none() {
+                            break;
+                        }
+                        if let Some(write) = selector_write(target, src, &scope, node.byte_range())
+                        {
+                            facts.member_write(write, &mut write_bytes);
+                        }
+                    }
                     let deleted: Vec<Node> = named(node).flat_map(targets).collect();
                     module.items(&deleted, src);
                     for name in deleted.into_iter().filter(|t| t.kind() == "identifier") {
@@ -1144,6 +1168,33 @@ fn targets(node: Node) -> Vec<Node> {
     out
 }
 
+fn selector_write(
+    node: Node,
+    src: &[u8],
+    scope: &str,
+    range: Range<usize>,
+) -> Option<super::MemberWrite> {
+    let (object, field) = match node.kind() {
+        "attribute" => (
+            node.child_by_field_name("object")?,
+            Some(text(node.child_by_field_name("attribute")?, src).to_string()),
+        ),
+        "subscript" => (
+            node.child_by_field_name("value")?,
+            node.child_by_field_name("subscript")
+                .and_then(|n| parts(n, src))
+                .and_then(|p| literal(&p)),
+        ),
+        _ => return None,
+    };
+    Some(super::MemberWrite {
+        scope: scope.into(),
+        object: callee(object, src),
+        field,
+        range,
+    })
+}
+
 /// `targets` of a node `depth` nodes inside the target it started from.
 fn targets_at<'t>(node: Node<'t>, depth: usize, out: &mut Vec<Node<'t>>) {
     match node.kind() {
@@ -1521,6 +1572,17 @@ fn value_at(node: Node, src: &[u8], depth: usize) -> Value {
             name if name.starts_with('(') => Value::Unknown,
             name => Value::Ref(name),
         },
+        "subscript" if parts(node, src).is_none() => {
+            match (
+                node.child_by_field_name("value"),
+                node.child_by_field_name("subscript")
+                    .and_then(|n| parts(n, src))
+                    .and_then(|p| literal(&p)),
+            ) {
+                (Some(object), Some(field)) => Value::Member(callee(object, src), field),
+                _ => Value::Unknown,
+            }
+        }
         "call" => parts(node, src).map_or_else(
             || {
                 Value::Call(Invocation {

@@ -598,6 +598,22 @@ secreto. Búsqueda, `context`, `trace` en ambos sentidos, huérfanos por ámbito
 los nuevos contratos y runners; las entradas de entorno y valores de configuración quedan
 fuera del export.
 
+### Uso de los SDK de GCP en cinco grupos de lenguajes
+
+Los clientes GCP con origen comprobado en el constructor crean productores Pub/Sub, consumidores de suscripciones, escritores/lectores de Cloud Storage y lectores de Secret Manager. JavaScript y TypeScript forman un grupo, con cada lenguaje de origen comprobado por separado. El inventario de operaciones es explícito; las demás sobrecargas quedan fuera de esta lista.
+
+| Grupo | Productor / consumidor Pub/Sub | Escritor / lector Cloud Storage | Lector Secret Manager |
+| --- | --- | --- | --- |
+| JavaScript + TypeScript | `new PubSub().topic(name).publishMessage(...)` / `.subscription(name).on("message", handler)` | `new Storage().bucket(name).file(object).save(...)` / `.download(...)` | `new SecretManagerServiceClient().accessSecretVersion({name})` |
+| Python | `PublisherClient().publish(topic, ...)` / `SubscriberClient().subscribe(subscription, callback=...)` | `storage.Client().bucket(name).blob(object).upload_from_string(...)` / `.download_as_bytes()` | `SecretManagerServiceClient().access_secret_version(request={"name": name})` |
+| Java | `Publisher.newBuilder(topic).build().publish(...)` / `Subscriber.newBuilder(subscription, handler).build().startAsync()` | `StorageOptions.newBuilder().build().getService().create(BlobInfo.newBuilder(BlobId.of(bucket, object)).build(), ...)` / `.readAllBytes(bucket, object)` | `SecretManagerServiceClient.create().accessSecretVersion(name)` |
+| Go | Pub/Sub v2 `NewClient`: `Publisher(topic).Publish(...)` / `Subscriber(subscription).Receive(ctx, handler)`; v1 `Topic` / `Subscription` | `storage.NewClient`: `Bucket(bucket).Object(object).NewWriter(ctx)` / `.NewReader(ctx)` | `secretmanager.NewClient`: `AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{Name: name})` |
+| C# | `client = await PublisherClient.CreateAsync(topic); client.PublishAsync(...)` / `client = await SubscriberClient.CreateAsync(subscription); client.StartAsync(handler)` | `StorageClient.Create()`: `UploadObject`, `UploadObjectAsync` / `DownloadObject`, `DownloadObjectAsync`, bucket as first argument | `SecretManagerServiceClient.Create()`: `AccessSecretVersion`, `AccessSecretVersionAsync` |
+
+Las identidades literales de temas, suscripciones, buckets y secretos usan la misma normalización que Terraform y la configuración. Una suscripción es `channel::pubsub::subscriptions/<id>` y nunca un tema adivinado. Los nombres leídos del entorno siguen sin resolver sin una carga que ejecute el código; los valores en ese ámbito se resuelven como `inferred`, conservando el subtipo de la operación. Los constructores ocultos, tipos inyectados sin construcción, fábricas encontradas solo por nombre, clientes reasignados y alternativas de retorno opacas no aportan un lado de SDK.
+
+Los campos de solicitud modificados antes del uso dejan el nombre sin resolver; las lecturas anteriores al cambio y los objetos independientes conservan su identidad. Los helpers tipados deben corresponder al recurso utilizado. En C#, espere `CreateAsync` primero y después invoque la operación sobre el cliente devuelto.
+
 ### Canales, datos, secretos y suscripciones AWS
 
 La tabla Terraform/OpenTofu también reconoce los tipos siguientes. Los ARN se reducen al
@@ -1176,6 +1192,23 @@ Una ruta une a quien la **sirve** (el proveedor, el código que la trata) con qu
 (el consumidor, una llamada de cliente HTTP). En todos los lenguajes, Meada normaliza la ruta:
 `/users/:id`, `/users/{id}` y `/users/<int:id>` pasan a ser el mismo `/users/{}`, y el método
 queda en mayúsculas. Las mayúsculas y minúsculas de la ruta y las versiones de API se mantienen.
+
+La infraestructura puede declarar rutas: API Gateway HTTP y REST en Terraform/OpenTofu,
+eventos SAM `Api` y `HttpApi`, y eventos Serverless `http` y `httpApi`. Por ejemplo, un evento
+SAM con `Method: GET` y `Path: /orders/{id}` ofrece `http::GET::/orders/{}`. Declare el host
+público en `[serve] hosts`, como para una ruta en código. El destino es el símbolo del handler
+en el mismo repositorio cuando se resuelve con certeza, incluso mediante un export con alias;
+en otro caso es el repositorio completo. Archivos ausentes o ambiguos, archivos ZIP, rutas
+remotas o absolutas, pasos `..` y symlinks nunca inventan un handler.
+
+El método público de una API REST viene de `http_method`, no del POST usado para invocar
+Lambda. La integración debe identificar una única Lambda en la misma unidad e instancia de
+evaluación; referencias incidentales, APIs incompatibles y destinos desconocidos no ofrecen
+rutas. Quick create requiere una `route_key` explícita con método y ruta. `ANY` (o
+`method: '*'` en Serverless) sirve cualquier método en esa ruta; `$default` o un catch-all sin
+una ruta finita no crea provider. Los valores sustituibles conservan evidencia `inferred`.
+La evaluación y validación de rutas ocurre durante la indexación, sin red; las consultas usan
+los hechos guardados.
 
 Cómo se elige el enlace, según lo que muestra la URL:
 

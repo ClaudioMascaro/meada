@@ -30,8 +30,7 @@ fn safe(root: &Path, path: &str) -> bool {
 }
 
 /// Only an unambiguous existing file gives a handler source. Archives are never opened.
-fn handler(root: &Path, node: &crate::iac::Node) -> Option<String> {
-    let handler = node.handler.as_ref()?.text.as_str();
+fn module(root: &Path, base: &str, handler: &str, only: Option<&str>) -> Option<String> {
     let (module, function) = handler.rsplit_once('.')?;
     if function.is_empty()
         || !function
@@ -42,16 +41,54 @@ fn handler(root: &Path, node: &crate::iac::Node) -> Option<String> {
     }
     let mut candidates = std::collections::BTreeSet::new();
     for module in [module.to_string(), module.replace('.', "/")] {
-        let module =
-            crate::iac::workload::local_path(crate::config_values::parent(&node.path), &module)?;
+        let module = crate::iac::workload::local_path(base, &module)?;
         for extension in ["ts", "js", "mjs", "cjs", "py"] {
             let path = format!("{module}.{extension}");
-            if safe(root, &path) && root.join(&path).is_file() {
+            if only.is_none_or(|only| only == path)
+                && safe(root, &path)
+                && root.join(&path).is_file()
+            {
                 candidates.insert(path);
             }
         }
     }
     (candidates.len() == 1).then(|| candidates.pop_first().unwrap())
+}
+
+fn handler(root: &Path, node: &crate::iac::Node) -> Option<String> {
+    module(
+        root,
+        crate::config_values::parent(&node.path),
+        &node.handler.as_ref()?.text,
+        None,
+    )
+}
+
+/// A safe unique handler module and its member, checked only while indexing. A ZIP is opaque.
+pub(crate) fn checked_handler(
+    root: &Path,
+    node: &crate::iac::Node,
+    room: usize,
+) -> Option<(String, String)> {
+    let code = checked(root, node, room)?;
+    let handler = node.handler.as_ref()?;
+    let (_, name) = handler.text.rsplit_once('.')?;
+    if handler.overridable || node.build.as_ref().is_some_and(|b| b.overridable) {
+        return None;
+    }
+    let path = if node.ty == "Serverless::Function" {
+        code.path
+    } else if root.join(&code.path).is_dir() {
+        module(root, &code.path, &handler.text, None)?
+    } else {
+        module(
+            root,
+            crate::config_values::parent(&code.path),
+            &handler.text,
+            Some(&code.path),
+        )?
+    };
+    (path.len() + name.len() <= room).then(|| (path, name.into()))
 }
 
 pub(super) fn checked(root: &Path, node: &crate::iac::Node, room: usize) -> Option<Code> {

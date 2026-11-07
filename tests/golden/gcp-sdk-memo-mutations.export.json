@@ -1,0 +1,670 @@
+{
+  "format": 1,
+  "repository": "local/gcp-sdk-memo-mutations",
+  "files": [
+    {
+      "path": "scene.js",
+      "hash": "6cfe3557732fae4b3bbd8317a45b4b4c30bb4410efee51a1084d9a12e87c6c55"
+    },
+    {
+      "path": "scene.ts",
+      "hash": "e042eabd1834126a054a6143f95e73bf6807e65d8af35647effbbe675e3f7567"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::after",
+      "span": {
+        "path": "scene.js",
+        "start": 290,
+        "end": 341
+      },
+      "hash": "32a2068e4b6ad379d901b30824cf04bba99e240cc083a621186a16f42a229600"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::before",
+      "span": {
+        "path": "scene.js",
+        "start": 231,
+        "end": 282
+      },
+      "hash": "0c8086e1d734b17437b797b25dd6916c802259bd03965d109e6633d91b385315"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::defaultChanged",
+      "span": {
+        "path": "scene.js",
+        "start": 939,
+        "end": 998
+      },
+      "hash": "29425b552c055d5c10f212b8995275ce51dfeae3722599b02f6546a55abef581"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::inlineBefore",
+      "span": {
+        "path": "scene.js",
+        "start": 725,
+        "end": 782
+      },
+      "hash": "41a4906752261393b3226bb583cd5eb352f6471c5af98c1ef492cbd98c35cb33"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::inlineChanged",
+      "span": {
+        "path": "scene.js",
+        "start": 494,
+        "end": 551
+      },
+      "hash": "e0b9ae0ab7d8d8abbc44bf0a87e2a9024b8992e74736684ca4777fda7a62f1ab"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::make",
+      "span": {
+        "path": "scene.js",
+        "start": 45,
+        "end": 103
+      },
+      "hash": "c3f9ebed2a5f32520a769e39c56a9c00af493cbd96351aa95c5bd02cfa12c84b"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeBefore",
+      "span": {
+        "path": "scene.js",
+        "start": 552,
+        "end": 664
+      },
+      "hash": "eb4554bae70407e927161efd71674dfd74083a9d8728a12c44c14e6d5a915ae2"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeDefault",
+      "span": {
+        "path": "scene.js",
+        "start": 783,
+        "end": 902
+      },
+      "hash": "88a53dca647d22bfeb5d4b7f2cc640bcaf30319da3f3f2af0b34c56cacf49d65"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeInline",
+      "span": {
+        "path": "scene.js",
+        "start": 343,
+        "end": 435
+      },
+      "hash": "7fd18e0f83261b75cdb2bebefacf4bb72fe4cd41d155a1fdc368697532f4f19a"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::after",
+      "span": {
+        "path": "scene.ts",
+        "start": 290,
+        "end": 341
+      },
+      "hash": "32a2068e4b6ad379d901b30824cf04bba99e240cc083a621186a16f42a229600"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::before",
+      "span": {
+        "path": "scene.ts",
+        "start": 231,
+        "end": 282
+      },
+      "hash": "0c8086e1d734b17437b797b25dd6916c802259bd03965d109e6633d91b385315"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::defaultChanged",
+      "span": {
+        "path": "scene.ts",
+        "start": 939,
+        "end": 998
+      },
+      "hash": "29425b552c055d5c10f212b8995275ce51dfeae3722599b02f6546a55abef581"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::inlineBefore",
+      "span": {
+        "path": "scene.ts",
+        "start": 725,
+        "end": 782
+      },
+      "hash": "41a4906752261393b3226bb583cd5eb352f6471c5af98c1ef492cbd98c35cb33"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::inlineChanged",
+      "span": {
+        "path": "scene.ts",
+        "start": 494,
+        "end": 551
+      },
+      "hash": "e0b9ae0ab7d8d8abbc44bf0a87e2a9024b8992e74736684ca4777fda7a62f1ab"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::make",
+      "span": {
+        "path": "scene.ts",
+        "start": 45,
+        "end": 103
+      },
+      "hash": "c3f9ebed2a5f32520a769e39c56a9c00af493cbd96351aa95c5bd02cfa12c84b"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeBefore",
+      "span": {
+        "path": "scene.ts",
+        "start": 552,
+        "end": 664
+      },
+      "hash": "eb4554bae70407e927161efd71674dfd74083a9d8728a12c44c14e6d5a915ae2"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeDefault",
+      "span": {
+        "path": "scene.ts",
+        "start": 783,
+        "end": 902
+      },
+      "hash": "815252c80b31f1b2287676b12347561790a6e573d8259233bee72affb9e3d20b"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeInline",
+      "span": {
+        "path": "scene.ts",
+        "start": 343,
+        "end": 435
+      },
+      "hash": "7fd18e0f83261b75cdb2bebefacf4bb72fe4cd41d155a1fdc368697532f4f19a"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::after::second.publishMessage#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::after",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 309,
+        "end": 338
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::before::first.publishMessage#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::before",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 251,
+        "end": 279
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::defaultChanged::omitted.publishMessage#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::defaultChanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 966,
+        "end": 996
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::inlineBefore::earlier.publishMessage#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::inlineBefore",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 750,
+        "end": 780
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::inlineChanged::inline.publishMessage#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::inlineChanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 520,
+        "end": 549
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::make#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js",
+      "target": "local/gcp-sdk-memo-mutations::scene.js::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 152,
+        "end": 165
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::make#1",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js",
+      "target": "local/gcp-sdk-memo-mutations::scene.js::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 209,
+        "end": 222
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::make::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 76,
+        "end": 100
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::make::PubSub#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 76,
+        "end": 88
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeBefore#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js",
+      "target": "local/gcp-sdk-memo-mutations::scene.js::makeBefore",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 679,
+        "end": 716
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeBefore::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::makeBefore",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 595,
+        "end": 627
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeBefore::PubSub#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::makeBefore",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 595,
+        "end": 607
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeDefault#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js",
+      "target": "local/gcp-sdk-memo-mutations::scene.js::makeDefault",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 917,
+        "end": 930
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeDefault::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::makeDefault",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 868,
+        "end": 900
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeDefault::PubSub#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::makeDefault",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 868,
+        "end": 880
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeInline#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js",
+      "target": "local/gcp-sdk-memo-mutations::scene.js::makeInline",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 449,
+        "end": 485
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeInline::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::makeInline",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 401,
+        "end": 433
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::makeInline::PubSub#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.js::makeInline",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 401,
+        "end": 413
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::after::second.publishMessage#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::after",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 309,
+        "end": 338
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::before::first.publishMessage#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::before",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 251,
+        "end": 279
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::defaultChanged::omitted.publishMessage#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::defaultChanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 966,
+        "end": 996
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::inlineBefore::earlier.publishMessage#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::inlineBefore",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 750,
+        "end": 780
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::inlineChanged::inline.publishMessage#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::inlineChanged",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 520,
+        "end": 549
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::make#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts",
+      "target": "local/gcp-sdk-memo-mutations::scene.ts::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 152,
+        "end": 165
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::make#1",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts",
+      "target": "local/gcp-sdk-memo-mutations::scene.ts::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 209,
+        "end": 222
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::make::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 76,
+        "end": 100
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::make::PubSub#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 76,
+        "end": 88
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeBefore#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts",
+      "target": "local/gcp-sdk-memo-mutations::scene.ts::makeBefore",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 679,
+        "end": 716
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeBefore::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::makeBefore",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 595,
+        "end": 627
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeBefore::PubSub#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::makeBefore",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 595,
+        "end": 607
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeDefault#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts",
+      "target": "local/gcp-sdk-memo-mutations::scene.ts::makeDefault",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 917,
+        "end": 930
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeDefault::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::makeDefault",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 868,
+        "end": 900
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeDefault::PubSub#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::makeDefault",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 868,
+        "end": 880
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeInline#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts",
+      "target": "local/gcp-sdk-memo-mutations::scene.ts::makeInline",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 449,
+        "end": 485
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeInline::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::makeInline",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 401,
+        "end": 433
+      }
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::makeInline::PubSub#0",
+      "caller": "local/gcp-sdk-memo-mutations::scene.ts::makeInline",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 401,
+        "end": 413
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-memo-mutations::scene.js::after::second.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-memo-mutations::scene.js::defaultChanged::omitted.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-memo-mutations::scene.js::inlineChanged::inline.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-memo-mutations::scene.ts::after::second.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-memo-mutations::scene.ts::defaultChanged::omitted.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub",
+      "site": "local/gcp-sdk-memo-mutations::scene.ts::inlineChanged::inline.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::inline-before-js",
+      "site": "local/gcp-sdk-memo-mutations::scene.js::inlineBefore::earlier.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::inline-before-ts",
+      "site": "local/gcp-sdk-memo-mutations::scene.ts::inlineBefore::earlier.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::snapshot-js",
+      "site": "local/gcp-sdk-memo-mutations::scene.js::before::first.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::snapshot-ts",
+      "site": "local/gcp-sdk-memo-mutations::scene.ts::before::first.publishMessage#0"
+    }
+  ],
+  "consumers": [],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/gcp-sdk-memo-mutations::scene.js::make"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/gcp-sdk-memo-mutations::scene.js::makeBefore"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "local/gcp-sdk-memo-mutations::scene.js::makeDefault"
+      ]
+    },
+    {
+      "name": ".#4",
+      "members": [
+        "local/gcp-sdk-memo-mutations::scene.js::makeInline"
+      ]
+    },
+    {
+      "name": ".#5",
+      "members": [
+        "local/gcp-sdk-memo-mutations::scene.ts::make"
+      ]
+    },
+    {
+      "name": ".#6",
+      "members": [
+        "local/gcp-sdk-memo-mutations::scene.ts::makeBefore"
+      ]
+    },
+    {
+      "name": ".#7",
+      "members": [
+        "local/gcp-sdk-memo-mutations::scene.ts::makeDefault"
+      ]
+    },
+    {
+      "name": ".#8",
+      "members": [
+        "local/gcp-sdk-memo-mutations::scene.ts::makeInline"
+      ]
+    }
+  ],
+  "links": []
+}

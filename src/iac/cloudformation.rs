@@ -422,7 +422,7 @@ impl Eval<'_> {
         ))
     }
 
-    fn function(&mut self, id: &str, doc: &Value, budget: usize) -> Node {
+    fn function(&mut self, id: &str, doc: &Value, prefix: &[Step], budget: usize) -> Node {
         let mut node = Node::default();
         if self.resources[id].ty != "AWS::Serverless::Function" {
             return node;
@@ -443,12 +443,88 @@ impl Eval<'_> {
                 });
             }
         }
-        if let Some(value) = props.get("Handler") {
+        if let Some(value) = props
+            .get("Handler")
+            .or_else(|| doc.pointer("/Globals/Function/Handler"))
+        {
             let part = self.eval(value, 0);
             node.handler = Some(super::Resolved {
                 text: part.text,
                 overridable: !part.through.is_empty(),
             });
+        }
+        if let Some(events) = props.get("Events").and_then(Value::as_object) {
+            let mut room = budget.saturating_sub(node.workload_size());
+            for (key, event) in events {
+                if !matches!(
+                    event.get("Type").and_then(Value::as_str),
+                    Some("Api" | "HttpApi")
+                ) {
+                    continue;
+                }
+                let properties = &event["Properties"];
+                let api = if event["Type"] == "Api" {
+                    "RestApiId"
+                } else {
+                    "ApiId"
+                };
+                if let Some(value) = properties.get(api) {
+                    let known = value
+                        .get("Ref")
+                        .and_then(Value::as_str)
+                        .and_then(|id| self.resources.get(id))
+                        .is_some_and(|r| match api {
+                            "RestApiId" => matches!(
+                                r.ty.as_str(),
+                                "AWS::Serverless::Api" | "AWS::ApiGateway::RestApi"
+                            ),
+                            _ => r.ty == "AWS::Serverless::HttpApi",
+                        });
+                    if !known {
+                        continue;
+                    }
+                }
+                let (Some(method), Some(path)) = (properties.get("Method"), properties.get("Path"))
+                else {
+                    continue;
+                };
+                let (method, path) = (self.eval(method, 0), self.eval(path, 0));
+                if method.pattern || path.pattern {
+                    continue;
+                }
+                let route = super::Route {
+                    method: super::Resolved {
+                        text: method.text,
+                        overridable: !method.through.is_empty(),
+                    },
+                    path: super::Resolved {
+                        text: path.text,
+                        overridable: !path.through.is_empty(),
+                    },
+                    at: format!(
+                        "{}#{}",
+                        self.path,
+                        config_values::key_path(
+                            &prefix
+                                .iter()
+                                .cloned()
+                                .chain([
+                                    Step::Key(id.into()),
+                                    Step::Key("Properties".into()),
+                                    Step::Key("Events".into()),
+                                    Step::Key(key.clone()),
+                                ])
+                                .collect::<Vec<_>>()
+                        )
+                    ),
+                };
+                let Some(left) = room.checked_sub(route.size()) else {
+                    node.routes.clear();
+                    break;
+                };
+                room = left;
+                node.routes.push(route);
+            }
         }
         if let Some(value) = props.get("ImageUri") {
             let part = self.eval(value, 0);
@@ -731,7 +807,7 @@ pub(super) fn nodes(unit: &Unit) -> (Vec<Node>, Vec<Reference>) {
     for id in ids {
         let name = eval.name_of(&id, 0);
         let base = id.len() + name.as_ref().map_or(0, |n| n.text.len());
-        let function = eval.function(&id, doc, room.saturating_sub(base));
+        let function = eval.function(&id, doc, &unit.block, room.saturating_sub(base));
         let r = &eval.resources[&id];
         let size = base + function.workload_size();
         let Some(left) = room.checked_sub(size) else {

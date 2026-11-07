@@ -207,3 +207,11 @@ and explicit unresolved projection remain distinct. Configuration/table hashes p
 `meta.configs` so a mapping change/removal or binary table change re-evaluates affected inputs.
 `Export.provision_uses` is a kind-prepared transient batch and is never persisted or exported as
 raw directed sides. See [custom IaC](../contracts/custom-iac-671.md).
+
+IaC HTTP providers (#666) retain `iac::Node::routes` in the `iac_nodes.routes` JSON column:
+resolved method/path values and their declaration location. HTTP's contract-config summary
+stores normalized contracts, an indexing-time validated handler module/member and inferred
+flags. `index::exports_of` hydrates only those handler modules' exact stored exports, through
+`ContractKind::read_declarations`, before `symbols_read` names their symbols in partial reads.
+`exports_path` indexes that lookup. Queries use the stored summaries/exports/symbols, with no
+filesystem validation or IaC evaluation. See [the HTTP map](../contracts/iac-http-routes-666.md).

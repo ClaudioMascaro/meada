@@ -143,6 +143,30 @@ fn parse(contract: &str) -> Option<(&str, Option<&str>)> {
 }
 
 impl ContractKind for Channel {
+    fn environment_name(
+        &self,
+        contract: &str,
+        value: &str,
+        operation: Option<&str>,
+    ) -> Option<String> {
+        if contract == "channel::pubsub" {
+            let name = crate::contract::gcp::sdk::environment_name(value, operation)?;
+            return Some(format!("channel::pubsub::{name}"));
+        }
+        crate::contract::environment_name(contract, value)
+    }
+
+    fn environment_target(&self, contract: &str, target: &str, operation: Option<&str>) -> bool {
+        if contract == "channel::pubsub" {
+            let Some(name) = target.strip_prefix("channel::pubsub::") else {
+                return false;
+            };
+            return crate::contract::gcp::sdk::environment_target(name, operation);
+        }
+        target
+            .rsplit_once("::")
+            .is_some_and(|(prefix, _)| prefix == contract)
+    }
     fn prefix(&self) -> &'static str {
         "channel"
     }
@@ -323,6 +347,7 @@ impl ContractKind for Channel {
             .chain(python::aws(code))
             .collect();
         found.extend(aws::extract(code, Some(indexed)));
+        found.extend(crate::contract::gcp::sdk::extract(code, true));
         found
     }
 

@@ -27,7 +27,7 @@
   none when it is by a module from outside, else the longest module path of the repository, a
   directory its module owns), and `shared` with the files of each directory and
   `Facts::package`.
-- `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
+- `resolve.rs`, `resolve/mutations.rs`: shared resolution and scoped selector effects behind the adapter. `Resolver` connects calls to definitions
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
   bound by several imports (the latest in source order decides, whatever it resolves to), a
   callee may start with a dotted import, and an `Imported::All` import counts as one binding

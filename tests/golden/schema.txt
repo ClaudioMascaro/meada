@@ -33,6 +33,7 @@ CREATE TABLE manifests (
     summary TEXT NOT NULL
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+CREATE INDEX exports_path ON exports (path);
 CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
@@ -65,7 +66,7 @@ CREATE TABLE iac_nodes (
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
     subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
-    ingress TEXT NOT NULL
+    ingress TEXT NOT NULL, routes TEXT NOT NULL
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -387,7 +388,8 @@ sample.ts
     "serve.item",
     "serve.error"
   ],
-  "receivers": []
+  "receivers": [],
+  "member_writes": []
 }
 
 sample.py
@@ -848,6 +850,26 @@ sample.py
       "name": "shape",
       "class": {
         "Named": "Circle"
+      }
+    }
+  ],
+  "member_writes": [
+    {
+      "scope": "Circle.__init__",
+      "object": "self",
+      "field": "radius",
+      "range": {
+        "start": 314,
+        "end": 334
+      }
+    },
+    {
+      "scope": "Circle.__init__",
+      "object": "self",
+      "field": "client",
+      "range": {
+        "start": 343,
+        "end": 365
       }
     }
   ]
@@ -1492,7 +1514,8 @@ sample.go
       }
     }
   ],
-  "package": "store"
+  "package": "store",
+  "member_writes": []
 }
 
 sample.java
@@ -3414,6 +3437,7 @@ Output {
             role: None,
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -3439,6 +3463,7 @@ Output {
             role: None,
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [
                 Entry {
@@ -3487,6 +3512,7 @@ Output {
             role: None,
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -3512,6 +3538,7 @@ Output {
             role: None,
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -3587,6 +3614,7 @@ Output {
             ),
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -3614,6 +3642,7 @@ Output {
             ),
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -3641,6 +3670,7 @@ Output {
             ),
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -3668,6 +3698,7 @@ Output {
             ),
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -3695,6 +3726,7 @@ Output {
             ),
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -3722,6 +3754,7 @@ Output {
             ),
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -3796,6 +3829,7 @@ sample.cloudformation.yaml
             role: None,
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -3828,6 +3862,7 @@ sample.cloudformation.yaml
             role: None,
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [
                 Entry {
@@ -3948,6 +3983,19 @@ sample.serverless.yml
                     overridable: false,
                 },
             ],
+            routes: [
+                Route {
+                    method: Resolved {
+                        text: "GET",
+                        overridable: false,
+                    },
+                    path: Resolved {
+                        text: "/hello",
+                        overridable: false,
+                    },
+                    at: "api/serverless.yml#functions.hello.events[0].http",
+                },
+            ],
             subscription: None,
             environment: [],
             images: [],
@@ -3980,6 +4028,7 @@ sample.serverless.yml
             role: None,
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -4021,6 +4070,7 @@ sample.provision.tf
             role: None,
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -4046,6 +4096,7 @@ sample.provision.tf
             role: None,
             handler: None,
             events: [],
+            routes: [],
             subscription: None,
             environment: [],
             images: [],
@@ -4160,6 +4211,7 @@ sample.alert.yaml
     ],
     "truncated": false
   },
+  "http": [],
   "image": {
     "builders": [],
     "code": [],
@@ -4259,6 +4311,7 @@ sample.incident.tf
     ],
     "truncated": false
   },
+  "http": [],
   "image": {
     "builders": [],
     "code": [],

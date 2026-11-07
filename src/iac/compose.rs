@@ -601,6 +601,7 @@ pub(super) fn evaluate(
                 role: None,
                 handler: None,
                 events: Vec::new(),
+                routes: Vec::new(),
                 subscription: None,
                 environment,
                 images: Vec::new(),

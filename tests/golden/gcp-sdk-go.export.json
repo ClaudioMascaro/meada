@@ -1,0 +1,608 @@
+{
+  "format": 1,
+  "repository": "local/gcp-sdk-go",
+  "files": [
+    {
+      "path": "worker.go",
+      "hash": "1d10941fd6f1924cc9cceca7076c261efac8e188624f500c82d20611fe78ef12"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/gcp-sdk-go::worker.go::compatible",
+      "span": {
+        "path": "worker.go",
+        "start": 581,
+        "end": 800
+      },
+      "hash": "80970513053cbfa689595677416db7364bb2255e4888156e4affdbd615acf2ba"
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden",
+      "span": {
+        "path": "worker.go",
+        "start": 1231,
+        "end": 1735
+      },
+      "hash": "2e7e9ad12532c88f017cb96fd81386f35a9797689f4677d4a63de31ccf538766"
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::objects",
+      "span": {
+        "path": "worker.go",
+        "start": 801,
+        "end": 1008
+      },
+      "hash": "ca52a22bbb6165ad04fee14291d761d09c4d99f99f9e4e1ad476d2eb0dbf99cb"
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::receive",
+      "span": {
+        "path": "worker.go",
+        "start": 437,
+        "end": 580
+      },
+      "hash": "da150386436ec22478410a942592a811f5ad74576b342d66cdd64204b389a51e"
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::send",
+      "span": {
+        "path": "worker.go",
+        "start": 296,
+        "end": 436
+      },
+      "hash": "5e37273cfa7cc1c4556ccbc4879c34d9e5d0655585d76f36656032f36e294c6f"
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::token",
+      "span": {
+        "path": "worker.go",
+        "start": 1009,
+        "end": 1230
+      },
+      "hash": "a81504a345e3bee9861ac0255c46d5edbd209bdaf3b0ea9b40a779d2cf919219"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/gcp-sdk-go::worker.go::compatible::(call_expression).Publish#0",
+      "caller": "local/gcp-sdk-go::worker.go::compatible",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 663,
+        "end": 725
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::compatible::(call_expression).Receive#0",
+      "caller": "local/gcp-sdk-go::worker.go::compatible",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 730,
+        "end": 798
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::compatible::client.Subscription#0",
+      "caller": "local/gcp-sdk-go::worker.go::compatible",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 730,
+        "end": 766
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::compatible::client.Topic#0",
+      "caller": "local/gcp-sdk-go::worker.go::compatible",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 663,
+        "end": 692
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::compatible::context.TODO#0",
+      "caller": "local/gcp-sdk-go::worker.go::compatible",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 635,
+        "end": 649
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::compatible::context.TODO#1",
+      "caller": "local/gcp-sdk-go::worker.go::compatible",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 701,
+        "end": 715
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::compatible::context.TODO#2",
+      "caller": "local/gcp-sdk-go::worker.go::compatible",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 775,
+        "end": 789
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::compatible::legacy.NewClient#0",
+      "caller": "local/gcp-sdk-go::worker.go::compatible",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 618,
+        "end": 658
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::(call_expression).NewReader#0",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1489,
+        "end": 1561
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::(call_expression).Object#0",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1489,
+        "end": 1535
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::(call_expression).Publish#0",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1372,
+        "end": 1434
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::bus.Publisher#0",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1372,
+        "end": 1401
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::context.TODO#0",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1344,
+        "end": 1358
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::context.TODO#1",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1410,
+        "end": 1424
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::context.TODO#2",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1469,
+        "end": 1483
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::context.TODO#3",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1546,
+        "end": 1560
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::context.TODO#4",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1603,
+        "end": 1617
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::context.TODO#5",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1650,
+        "end": 1664
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::pubsub.NewClient#0",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1327,
+        "end": 1367
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::secret.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1623,
+        "end": 1733
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1579,
+        "end": 1618
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::storage.NewClient#0",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1451,
+        "end": 1484
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::hidden::store.Bucket#0",
+      "caller": "local/gcp-sdk-go::worker.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1489,
+        "end": 1518
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::objects::(call_expression).Object#0",
+      "caller": "local/gcp-sdk-go::worker.go::objects",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 883,
+        "end": 932
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::objects::client.Bucket#0",
+      "caller": "local/gcp-sdk-go::worker.go::objects",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 883,
+        "end": 910
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::objects::context.TODO#0",
+      "caller": "local/gcp-sdk-go::worker.go::objects",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 853,
+        "end": 867
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::objects::context.TODO#1",
+      "caller": "local/gcp-sdk-go::worker.go::objects",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 954,
+        "end": 968
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::objects::context.TODO#2",
+      "caller": "local/gcp-sdk-go::worker.go::objects",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 991,
+        "end": 1005
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::objects::object.NewReader#0",
+      "caller": "local/gcp-sdk-go::worker.go::objects",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 974,
+        "end": 1006
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::objects::object.NewWriter#0",
+      "caller": "local/gcp-sdk-go::worker.go::objects",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 937,
+        "end": 969
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::objects::storage.NewClient#0",
+      "caller": "local/gcp-sdk-go::worker.go::objects",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 835,
+        "end": 868
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::receive::(call_expression).Receive#0",
+      "caller": "local/gcp-sdk-go::worker.go::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 516,
+        "end": 578
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::receive::client.Subscriber#0",
+      "caller": "local/gcp-sdk-go::worker.go::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 516,
+        "end": 546
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::receive::context.TODO#0",
+      "caller": "local/gcp-sdk-go::worker.go::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 488,
+        "end": 502
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::receive::context.TODO#1",
+      "caller": "local/gcp-sdk-go::worker.go::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 555,
+        "end": 569
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::receive::pubsub.NewClient#0",
+      "caller": "local/gcp-sdk-go::worker.go::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 471,
+        "end": 511
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::send::(call_expression).Publish#0",
+      "caller": "local/gcp-sdk-go::worker.go::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 372,
+        "end": 434
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::send::client.Publisher#0",
+      "caller": "local/gcp-sdk-go::worker.go::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 372,
+        "end": 401
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::send::context.TODO#0",
+      "caller": "local/gcp-sdk-go::worker.go::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 344,
+        "end": 358
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::send::context.TODO#1",
+      "caller": "local/gcp-sdk-go::worker.go::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 410,
+        "end": 424
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::send::pubsub.NewClient#0",
+      "caller": "local/gcp-sdk-go::worker.go::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 327,
+        "end": 367
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::token::client.AccessSecretVersion#0",
+      "caller": "local/gcp-sdk-go::worker.go::token",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1085,
+        "end": 1228
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::token::context.TODO#0",
+      "caller": "local/gcp-sdk-go::worker.go::token",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1065,
+        "end": 1079
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::token::context.TODO#1",
+      "caller": "local/gcp-sdk-go::worker.go::token",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1112,
+        "end": 1126
+      }
+    },
+    {
+      "id": "local/gcp-sdk-go::worker.go::token::secretmanager.NewClient#0",
+      "caller": "local/gcp-sdk-go::worker.go::token",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.go",
+        "start": 1041,
+        "end": 1080
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::pubsub::orders-go",
+      "site": "local/gcp-sdk-go::worker.go::send::(call_expression).Publish#0"
+    },
+    {
+      "contract": "channel::pubsub::orders-legacy",
+      "site": "local/gcp-sdk-go::worker.go::compatible::(call_expression).Publish#0"
+    },
+    {
+      "contract": "resource::gcs::uploads-go",
+      "site": "local/gcp-sdk-go::worker.go::objects::object.NewWriter#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "channel::pubsub::subscriptions/orders-legacy",
+      "site": "local/gcp-sdk-go::worker.go::compatible",
+      "via": null
+    },
+    {
+      "contract": "resource::gcs::uploads-go",
+      "site": "local/gcp-sdk-go::worker.go::objects::object.NewReader#0",
+      "via": null
+    },
+    {
+      "contract": "channel::pubsub::subscriptions/orders-go",
+      "site": "local/gcp-sdk-go::worker.go::receive",
+      "via": null
+    },
+    {
+      "contract": "resource::gcpsecretmanager::token-go",
+      "site": "local/gcp-sdk-go::worker.go::token::client.AccessSecretVersion#0",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/gcp-sdk-go::worker.go::objects::object.NewReader#0",
+      "provider": "local/gcp-sdk-go::worker.go::objects::object.NewWriter#0",
+      "contract": "resource::gcs::uploads-go",
+      "level": "exact",
+      "reason": "resource::gcs::uploads-go"
+    }
+  ]
+}

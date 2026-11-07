@@ -1,0 +1,12 @@
+service: inventory
+provider:
+  name: aws
+  runtime: nodejs20.x
+functions:
+  inventory:
+    handler: runtime.inventory
+    events:
+      - httpApi:
+          method: PATCH
+          path: ${env:ROUTE}
+

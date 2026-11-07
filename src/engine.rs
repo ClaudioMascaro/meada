@@ -285,6 +285,9 @@ impl Engine {
         for (n, repo) in self.workspace.repos.iter().enumerate() {
             partial.exports[n].decisions = repo.decisions.clone();
             for kind in contract::KINDS {
+                kind.read_declarations(repo, &self.dbs[n], &mut partial.exports[n])?;
+            }
+            for kind in contract::KINDS {
                 match kind.symbols_read(repo, &partial.exports[n]) {
                     None => partial.every_symbol(n)?,
                     Some(ids) => partial.symbols(Some(n), &ids)?,
@@ -295,7 +298,6 @@ impl Engine {
                 .collect();
             partial.calls(Some(n), &decided)?;
             for kind in contract::KINDS {
-                kind.read_declarations(repo, &self.dbs[n], &mut partial.exports[n])?;
                 kind.declare(repo, &mut partial.exports[n]);
             }
         }

@@ -29,6 +29,7 @@ topic leaves within 24 KiB; the code wins over these entries.
 - [AWS workloads and shared cloud facts (#664)](contracts/aws-workloads-664.md)
 
 - [GCP infrastructure and Cloud Run (#667)](contracts/gcp-infrastructure-667.md)
+- [GCP SDK use sides (#668)](contracts/gcp-sdk-668.md)
 
 <a id="workload-environment-resolution-663"></a>
 

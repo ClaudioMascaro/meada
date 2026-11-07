@@ -52,6 +52,7 @@ use crate::trace::Direction;
 use meada_core::export::Level;
 use meada_core::trace::{Chain, Row};
 
+mod attribute;
 mod azure;
 pub(crate) mod cloudformation;
 pub(crate) mod compose;
@@ -59,6 +60,7 @@ pub(crate) mod config_uses;
 pub(crate) mod environment;
 mod functions;
 mod gcp;
+mod http;
 pub(crate) mod json;
 pub(crate) mod mapping;
 pub(crate) mod orphans;
@@ -185,6 +187,20 @@ pub(crate) struct Ingress {
     pub service: String,
 }
 
+/// A complete evaluated HTTP event, retained on the function that serves it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Route {
+    pub method: Resolved,
+    pub path: Resolved,
+    pub at: String,
+}
+
+impl Route {
+    pub(crate) fn size(&self) -> usize {
+        self.method.text.len() + self.path.text.len() + self.at.len()
+    }
+}
+
 impl Projection {
     pub(crate) fn size(&self) -> usize {
         self.name.as_ref().map_or(0, String::len)
@@ -266,6 +282,7 @@ pub(crate) struct Node {
     pub handler: Option<Resolved>,
     /// The events of a Serverless function, in file order.
     pub events: Vec<Resolved>,
+    pub routes: Vec<Route>,
     pub subscription: Option<subscription::Subscription>,
     pub environment: Vec<environment::Entry>,
     pub images: Vec<WorkloadImage>,
@@ -275,7 +292,8 @@ pub(crate) struct Node {
 
 impl Node {
     pub(crate) fn workload_size(&self) -> usize {
-        self.images.iter().map(WorkloadImage::size).sum::<usize>()
+        self.routes.iter().map(Route::size).sum::<usize>()
+            + self.images.iter().map(WorkloadImage::size).sum::<usize>()
             + self
                 .environment
                 .iter()
@@ -700,6 +718,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
         let workload = types::workload("terraform", ty).is_some();
         if kind == Kind::Module
             || subscription::reads(ty)
+            || http::reads(ty)
             || workload
             || matches!(ty, "archive_file" | "google_sql_database")
         {
@@ -1041,6 +1060,7 @@ struct Eval<'m> {
     /// and its instance's `each`.
     pending: Vec<(usize, usize, &'m Block, Option<Each>)>,
     subscription_inputs: subscription::Inputs,
+    node_inputs: HashMap<String, (usize, BTreeSet<Overridable>)>,
     root: String,
     root_nodes: usize,
     root_left: usize,
@@ -1070,6 +1090,7 @@ impl<'m> Eval<'m> {
             work: 0,
             pending: Vec::new(),
             subscription_inputs: subscription::Inputs::default(),
+            node_inputs: HashMap::new(),
             root: String::new(),
             root_nodes: 0,
             root_left: 0,
@@ -1098,6 +1119,7 @@ impl<'m> Eval<'m> {
 
     /// The nodes and references of the root module at `dir`.
     fn root(&mut self, dir: &'m str) {
+        self.node_inputs.clear();
         self.instances.clear();
         self.memo.clear();
         self.open.clear();
@@ -1165,6 +1187,16 @@ impl<'m> Eval<'m> {
         }
         for &(node, instance, block, ref each) in &pending {
             self.mapped_module(node, instance, each.as_ref(), block);
+            if self.bound_instance(instance)
+                && (each.is_some() || (block.count.is_none() && block.for_each.is_none()))
+            {
+                let mut through = self.instance_through(instance);
+                if let Some(each) = each {
+                    through.extend(each.through.iter().cloned());
+                }
+                self.node_inputs
+                    .insert(self.nodes[node].address.clone(), (node, through));
+            }
         }
         self.prepare_subscriptions(&pending);
         for &(node, _, block, _) in &pending {
@@ -1181,6 +1213,7 @@ impl<'m> Eval<'m> {
             self.workload(node, instance, each.as_ref(), block);
             self.module_workload(node, instance, each.as_ref(), block);
         }
+        self.http_routes(&pending);
         for &(node, instance, block, ref each) in &pending {
             let Some(subscription) = self.subscription(node, instance, each.as_ref(), block) else {
                 continue;
@@ -1281,6 +1314,7 @@ impl<'m> Eval<'m> {
                     role: None,
                     handler: None,
                     events: Vec::new(),
+                    routes: Vec::new(),
                     subscription: None,
                     environment: Vec::new(),
                     images: Vec::new(),
@@ -2007,7 +2041,7 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
@@ -2044,6 +2078,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
                 .map(serde_json::to_string)
                 .transpose()?,
             serde_json::to_string(&n.ingress)?,
+            serde_json::to_string(&n.routes)?,
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -2056,7 +2091,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
                        block, image, image_overridable, build, build_overridable, role, \
-                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress";
+                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -2087,6 +2122,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         role: r.get(14)?,
         handler: resolved(r, 15)?,
         events: serde_json::from_str(&r.get::<_, String>(17)?).unwrap_or_default(),
+        routes: serde_json::from_str(&r.get::<_, String>(24)?).unwrap_or_default(),
         environment: serde_json::from_str(&r.get::<_, String>(20)?).unwrap_or_default(),
         images: serde_json::from_str(&r.get::<_, String>(21)?).unwrap_or_default(),
         provisioned: r

@@ -1,0 +1,9 @@
+example.com/route-oracle/consumer client.ts:4-4 readOrbit
+community: none
+processes: 1 (1 export; 1 repository): readOrbit (example.com/route-oracle/consumer)
+function readOrbit(orbitId: string) { return fetch(`https://orbits.example.test/orbits/${orbitId}`); }
+callers: none
+callees:
+example.com/route-oracle/consumer client.ts:4 (unresolved) fetch
+contracts:
+example.com/route-oracle/consumer client.ts:4 consumes http::GET::/orbits/{}

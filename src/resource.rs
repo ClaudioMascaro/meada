@@ -125,6 +125,19 @@ fn report(repo: &Repository, export: &Export, links: &[Link]) -> Vec<String> {
 }
 
 impl ContractKind for Resource {
+    fn environment_name(
+        &self,
+        contract: &str,
+        value: &str,
+        _operation: Option<&str>,
+    ) -> Option<String> {
+        let name = match contract {
+            "resource::gcs" => crate::contract::gcp::bucket(value),
+            "resource::gcpsecretmanager" => crate::contract::gcp::secret(value),
+            _ => return crate::contract::environment_name(contract, value),
+        }?;
+        Some(format!("{contract}::{name}"))
+    }
     fn prefix(&self) -> &'static str {
         "resource"
     }
@@ -142,6 +155,7 @@ impl ContractKind for Resource {
             .into_iter()
             .chain(python::sides(code))
             .chain(aws::extract(code, indexed))
+            .chain(crate::contract::gcp::sdk::extract(code, false))
             .collect()
     }
 

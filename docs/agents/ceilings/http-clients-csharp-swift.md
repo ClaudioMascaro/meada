@@ -132,7 +132,7 @@
   `Facts::statics`, as Java's `static final`). The pack binds every local to its initializer
   (`Facts::bound`, an `Unknown` bound for a loop variable, a pattern or a lambda parameter, so
   that a second binding of the name leaves none), and a field or property that holds a
-  construction or a call. A name assigned anywhere in its file (`=`, `+=`, `++`, `out`,
+  construction or a call. A binding assigned in its lexical scope (`=`, `+=`, `++`, `out`,
   `ref`, `this.x = v`) loses its bound: it holds no one value (the rule of the minimal API
   reader, spec #28, #110), so a reassigned local, request or client is unknown, and
   `Code::local` follows a local of unknown class when the pack bound it once. A base is the
@@ -151,8 +151,8 @@
   are not consumers. `a?.M()` is a call of `M` on `a` (the grammar parses `await a?.M()` with
   the `await` around `a`; `condition` reads through it). Ceilings: a field is followed only
   when it holds a construction or a call (an instance `readonly` string is not folded, only
-  `const` and `static readonly`); a name assigned anywhere in the file is unknown in all of
-  it, even in another method; `new Uri(base, relative)` with two arguments, a
+  `const` and `static readonly`); a binding assigned again is unknown in its own scope; sibling methods keep
+  independent bindings of the same spelling; `new Uri(base, relative)` with two arguments, a
   `HttpRequestMessage` built with an object initializer and a raw string of several lines are
   not read.
   A member assigned by `??=` or a compound operator, or by an assignment that may not run when

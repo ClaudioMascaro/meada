@@ -56,7 +56,6 @@ struct Rule {
 /// Root-local indexes; duplicate physical rules on the same bus remain ambiguous.
 #[derive(Default)]
 pub(super) struct Inputs {
-    nodes: HashMap<String, usize>,
     rules: HashMap<(String, String), Option<Rule>>,
     pub(super) azure_filters: HashMap<String, String>,
 }
@@ -74,12 +73,6 @@ impl<'m> Eval<'m> {
         &mut self,
         pending: &[(usize, usize, &'m Block, Option<Each>)],
     ) {
-        for &(node, _, _, _) in pending {
-            self.subscription_inputs
-                .nodes
-                .entry(self.nodes[node].address.clone())
-                .or_insert(node);
-        }
         for &(node, instance, block, ref each) in pending {
             if block.kind != Kind::Resource
                 || block.ty != "aws_cloudwatch_event_rule"
@@ -141,128 +134,33 @@ impl<'m> Eval<'m> {
                 through: found.through,
             });
         }
-        let t = match expr {
-            Expression::Parenthesis(p) => return self.endpoint(at, each, p.inner(), ty, depth + 1),
-            Expression::Traversal(t) => t,
-            _ => return None,
-        };
-        let Expression::Variable(root) = &t.expr else {
-            return None;
-        };
-        let ops: Vec<_> = t.operators.iter().map(|o| o.value()).collect();
-        let mut r = reference(root.as_str(), &ops)?;
-        let mut selected_through = BTreeSet::new();
-        if let Ref::Block {
-            key,
-            kind: Kind::Resource | Kind::Module,
-            ..
-        } = &mut r
+        let attribute = self.resource_attribute(at, each, expr, depth)?;
+        let node = &self.nodes[attribute.node];
+        if node.ty != ty
+            || !identity_attribute(ty, &attribute.name)
+            || node
+                .provisioned
+                .as_ref()
+                .map_or(node.pattern, |p| p.pattern)
         {
-            match ops.get(1) {
-                Some(TraversalOperator::Index(expr)) => {
-                    let selected = self.value(at, each, expr, depth);
-                    selected_through.extend(selected.through);
-                    *key = Some(match selected.val {
-                        Val::Known(Value::String(s)) => Key::Str(s),
-                        Val::Known(Value::Number(n)) => Key::Int(n.as_u64()?),
-                        _ => return None,
-                    });
-                }
-                Some(TraversalOperator::AttrSplat(_) | TraversalOperator::FullSplat(_)) => {
-                    return None;
-                }
-                _ => {}
-            }
+            return None;
         }
-        let modules = self.modules;
-        let mut endpoint = match r {
-            Ref::Local(n) if ops.len() == 1 => self.endpoint(
-                at,
-                each,
-                &modules[self.instances[at].dir].locals.get(&n)?.expr,
-                ty,
-                depth + 1,
-            ),
-            Ref::Var(n) if ops.len() == 1 => {
-                // Root defaults were evaluated above. Only a local module's argument may
-                // carry a resource reference, and a sensitive variable is never followed.
-                let instance = &self.instances[at];
-                if modules[instance.dir].variables.get(&n)?.sensitive {
-                    return None;
-                }
-                let (parent, call) = instance.parent?;
-                let arg = &call.args.get(&n)?.expr;
-                let call_each = instance.call.clone();
-                self.endpoint(parent, call_each.as_ref(), arg, ty, depth + 1)
-            }
-            Ref::Block {
-                kind: Kind::Module,
-                name,
-                key,
-                output: Some(out),
-                ..
-            } if ops.len() == 2 + usize::from(key.is_some()) => {
-                let children = self.instances[at].children.get(name.as_str())?;
-                let matches: Vec<_> = children.iter().filter(|(k, _)| k == &key).collect();
-                let [(_, child)] = matches[..] else {
-                    return None;
-                };
-                let child = *child;
-                self.endpoint(
-                    child,
-                    None,
-                    &modules[self.instances[child].dir].outputs.get(&out)?.expr,
-                    ty,
-                    depth + 1,
-                )
-            }
-            Ref::Block {
-                kind: Kind::Resource,
-                ty: kind,
-                name,
-                key,
-                ..
-            } if kind == ty => {
-                if ops.len() != 2 + usize::from(key.is_some())
-                    || !matches!(ops.last(), Some(TraversalOperator::GetAttr(a)) if identity_attribute(ty, a.as_str()))
-                {
-                    return None;
-                }
-                let instances =
-                    self.instances[at]
-                        .nodes
-                        .get(&(Kind::Resource, ty, name.as_str()))?;
-                let matches: Vec<_> = instances.iter().filter(|(k, _)| k == &key).collect();
-                let [(_, address)] = matches[..] else {
-                    return None;
-                };
-                let node = &self.nodes[*self.subscription_inputs.nodes.get(address)?];
-                if node
-                    .provisioned
-                    .as_ref()
-                    .map_or(node.pattern, |p| p.pattern)
-                {
-                    return None;
-                }
-                Some(Endpoint {
-                    name: node
-                        .provisioned
-                        .as_ref()
-                        .map_or(node.name.as_ref(), |p| p.name.as_ref())?
-                        .clone(),
-                    through: node
-                        .provisioned
-                        .as_ref()
-                        .map_or(&node.overridable, |p| &p.through)
-                        .iter()
-                        .cloned()
-                        .collect(),
-                })
-            }
-            _ => None,
-        }?;
-        endpoint.through.extend(selected_through);
-        Some(endpoint)
+        let mut through: BTreeSet<_> = node
+            .provisioned
+            .as_ref()
+            .map_or(&node.overridable, |p| &p.through)
+            .iter()
+            .cloned()
+            .collect();
+        through.extend(attribute.through);
+        Some(Endpoint {
+            name: node
+                .provisioned
+                .as_ref()
+                .map_or(node.name.as_ref(), |p| p.name.as_ref())?
+                .clone(),
+            through,
+        })
     }
 
     pub(super) fn endpoint_arg(
