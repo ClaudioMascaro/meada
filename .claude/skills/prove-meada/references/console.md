@@ -1,5 +1,9 @@
 # Console and its API
 
+These product execution commands are CI-only recipes under `AGENTS.md`. Locally, prepare
+inputs or read the matching run artifact; do not build or start the product.
+
+
 The console is `meada ui --listen <addr> --workspace <bootstrap manifest>` (feature `ui`, ADR
 0014), serving the built front end of `ui/` and `/api/v1/`. Without `[accounts]` or `[oidc]` it
 admits every request as a viewer that reads everything: the case of a console behind the
