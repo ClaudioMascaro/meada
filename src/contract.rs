@@ -22,7 +22,9 @@ pub use meada_core::export::{Level, Link};
 
 pub(crate) mod azure;
 pub(crate) mod gcp;
+mod receiver;
 pub(crate) mod sdk;
+pub use receiver::{EnvironmentScope, EnvironmentValue, ReceiverIdentity};
 
 /// A kind's additional, already-routed use of infrastructure, kept only for this query.
 pub struct ProvisionUse {
@@ -50,6 +52,8 @@ pub struct Found {
     /// The shape the code gives the side (spec #23): for an HTTP consumer, the fields it reads
     /// from the parsed response.
     pub shape: Option<Shape>,
+    /// Kind-owned name evidence, stored internally for scoped workload resolution.
+    pub identity: Option<ReceiverIdentity>,
 }
 
 /// Which side of a contract a site holds.
@@ -251,6 +255,17 @@ pub trait ContractKind {
         target
             .rsplit_once("::")
             .is_some_and(|(prefix, _)| prefix == contract)
+    }
+
+    /// Resolve companion receiver arguments using only certain values in the same scope.
+    /// `Some`, including an empty result, owns the identity and prevents scalar fallback.
+    fn environment_identity(
+        &self,
+        _contract: &str,
+        _identity: &ReceiverIdentity,
+        _values: &dyn Fn(&str) -> Vec<EnvironmentValue>,
+    ) -> Option<Vec<(String, String)>> {
+        None
     }
 
     /// Whether this kind reads configuration independently of a language pack.
@@ -1091,6 +1106,7 @@ mod tests {
     #[test]
     fn names_without_a_file_mark_a_question_about_its_inline_definitions() {
         let inline = |path: &str| super::Found {
+            identity: None,
             role: super::Role::Provider,
             site: super::Site::Inline {
                 path: path.into(),

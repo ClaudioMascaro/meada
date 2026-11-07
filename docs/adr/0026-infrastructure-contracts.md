@@ -494,3 +494,74 @@ Without a matching workload the side remains unresolved with its established `en
 The stored operation retains subtype evidence for this normalization; private intermediary
 provenance is never exported. The operation list is deliberately bounded: other overloads,
 streaming/polling families, delete/list/metadata operations and other SDKs are not promised.
+
+### Azure SDK forms amendment (2026-11-06, #670)
+
+The adopted five-group inventory below closes the Azure operation list left implicit in the
+original ADR. JavaScript and TypeScript share a reader and have independent source controls.
+The new forms require verified SDK construction through complete exact calls. Injected types,
+hidden constructors, reassigned clients, name-matched hops and opaque return alternatives
+supply no new client evidence. Existing C# Service Bus sends, schedules and processors keep
+both their accepted origins and their topic identity. A handle alone supplies no direction.
+
+| Group | Service Bus producer / consumer | Event Hubs producer / consumer | Blob writer / reader | Key Vault reader |
+| --- | --- | --- | --- | --- |
+| JavaScript + TypeScript | `createSender(name).sendMessages` / `createReceiver(queue)` or `(topic, subscription)`, then `receiveMessages` or `subscribe` | `EventHubProducerClient(..., hub).sendBatch` / `EventHubConsumerClient(group, ..., hub).subscribe` | service → `getContainerClient(container)` → `getBlockBlobClient(object)`: `upload`, `uploadData`, `uploadFile`, `uploadStream`; blob `download`, `downloadToBuffer`, `downloadToFile` | `SecretClient.getSecret(name)` |
+| Python | `get_queue_sender` / `get_topic_sender` → `send_messages`; `get_queue_receiver` / `get_subscription_receiver` → `receive_messages` | explicit `eventhub_name`: producer `send_batch` / consumer `receive` | service `get_blob_client(container, blob)` or `get_container_client(container).get_blob_client(blob)`: `upload_blob` / `download_blob` | `SecretClient.get_secret(name)` |
+| Java | `ServiceBusClientBuilder.sender().queueName` or `topicName` → `buildClient`: `sendMessage`, `sendMessages`; receiver `queueName` or `topicName` + `subscriptionName` → `buildClient().receiveMessages` | builder `connectionString(cs, hub)` or `credential(namespace, hub, credential)`: `buildProducerClient().send` / `consumerGroup(...).buildConsumerClient().receiveFromPartition` | `BlobServiceClientBuilder...buildClient().getBlobContainerClient(container).getBlobClient(object)`: `upload`, `uploadFromFile` / `downloadContent`, `downloadStream`, `downloadToFile` | `SecretClientBuilder...buildClient().getSecret(name)` |
+| Go | `NewSender` → `SendMessage`, `SendMessageBatch`; `NewReceiverForQueue` / `NewReceiverForSubscription` → `ReceiveMessages` | `NewProducerClient` → `SendEventDataBatch`; `NewConsumerClient` → `NewPartitionClient` → `ReceiveEvents` | `UploadBuffer`, `UploadFile`, `UploadStream` / `DownloadBuffer`, `DownloadFile`, `DownloadStream`, container after `ctx` | `GetSecret(ctx, name, version, ...)` |
+| C# | existing sends, schedules and processors retained; new `CreateReceiver(queue)` / `(topic, subscription)` → `ReceiveMessageAsync`, `ReceiveMessagesAsync` | explicit hub: producer `SendAsync` / consumer `ReadEventsAsync` | service → `GetBlobContainerClient(container)` → `GetBlobClient(object)`: `Upload`, `UploadAsync` / `DownloadTo`, `DownloadToAsync`; container `UploadBlob`, `UploadBlobAsync` | `SecretClient.GetSecret`, `GetSecretAsync` |
+
+The constructors are JS/TS's imported `@azure/service-bus`, `@azure/event-hubs`,
+`@azure/storage-blob` and `@azure/keyvault-secrets` client classes; Python's corresponding
+`azure.servicebus`, `azure.eventhub`, `azure.storage.blob`, `azure.keyvault.secrets` classes,
+including verified `aio` equivalents; Java's `com.azure` builders; Go's `sdk/messaging/azservicebus`,
+`sdk/messaging/azeventhubs`, `sdk/storage/azblob`, `sdk/security/keyvault/azsecrets` constructors;
+and .NET's `Azure.Messaging.ServiceBus`, `Azure.Messaging.EventHubs.Producer` / `.Consumer`,
+`Azure.Storage.Blobs`, `Azure.Security.KeyVault.Secrets`. JS Blob's `fromConnectionString`,
+Python's first three services' `from_connection_string`, Go messaging's `FromConnectionString`
+and Blob's `NewClientWithNoCredential`, `NewClientWithSharedKeyCredential`,
+`NewClientFromConnectionString` are included. Known Java builder setters are enumerated;
+arbitrary fluent calls do not preserve a client.
+
+Primary inventories: [Service Bus JS](https://learn.microsoft.com/en-us/javascript/api/overview/azure/service-bus-readme?view=azure-node-latest),
+[Event Hubs Python](https://learn.microsoft.com/en-us/python/api/overview/azure/eventhub-readme?view=azure-python),
+[Blob Java](https://learn.microsoft.com/en-us/java/api/overview/azure/storage-blob-readme?view=azure-java-stable),
+[Go messaging](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs),
+[Go storage](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/storage/azblob) and
+[Key Vault .NET](https://learn.microsoft.com/en-us/dotnet/api/overview/azure/security.keyvault.secrets-readme?view=azure-dotnet).
+
+Only explicit entity arguments identify resources: queue/topic, hub, blob container and secret.
+Group, partition, object and version arguments are irrelevant to identity. Pure Azure helpers
+normalize supported complete ARM identifiers and blob/vault URLs, rejecting malformed and
+wrong-service shapes. Connection strings and credentials are not parsed for names. An Event
+Hubs constructor without a separately written hub remains unresolved. Direct Blob/Container URL
+constructors, session processors, other polling/streaming families, list/delete/metadata methods
+and other async families are outside this inventory.
+
+The shared SDK walker carries exact return frames and complete receiver evidence; kind policy
+retains folded name arguments. A new subscription receiver uses
+`subscription:<topic>/<subscription>`, avoiding legal slash queue names and same-name topics.
+Literal names yield exact SDK links; provisioning and filtered delivery retain their existing
+levels and reasons. Workload resolution is inferred, with stored workload and variable evidence.
+Both topic and subscription must come from the same workload, root and selected container;
+unknown, unread, incompatible typed or cross-frame companions cannot be combined.
+
+`Found.method` and `via` remain actual operation/provenance. These fields cannot retain both
+arguments and subtype for `createReceiver` / `CreateReceiver`, which name queues as well as
+subscriptions. A neutral optional `contracts.identity` JSON therefore stores only a kind-owned
+subtype plus normalized literal/environment/unresolved name parts. It contains no constructor,
+request, namespace, connection string or credential object and never enters public export/MCP.
+Absence preserves legacy behavior. Internal Provider/Consumer summaries carry the optional
+value; the contract row key, internal sorting and declaration deduplication include it so unresolved sibling pairs cannot collapse. The
+existing schema-golden hash deterministically rebuilds source indexes from an older layout;
+read-only servers consume the rebuilt stored summaries without rereading source or environment.
+No cloud parsing enters the generic engine, index, environment collector or language packs.
+
+Queue receiver overloads distinguish options from subscription names by proven argument form,
+not positional count: JS/TS object literals or exact folded objects, and C# verified
+`ServiceBusReceiverOptions` constructions. Explicit unshadowed JS/TS `undefined` and named C#
+`options: null` select the queue form. Bare C# positional null remains ambiguous. An opaque or
+reassigned argument supplies no exact entity; strings retain the topic/subscription form.
+The C# options constructor category is retained in private memo keys, preventing a valid first
+factory call from making a later opaque actual look like options. No new walker is involved.

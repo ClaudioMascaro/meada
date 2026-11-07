@@ -3,6 +3,8 @@
 
 use std::sync::LazyLock;
 
+pub(crate) mod sdk;
+
 /// Bound splitting and validation before allocating resource-name components.
 // ponytail: ARM identifiers fit within 1 KiB; longer source strings remain unresolved.
 const AZURE_IDENTIFIER_MAX: usize = 1024;

@@ -149,6 +149,9 @@ impl ContractKind for Channel {
         value: &str,
         operation: Option<&str>,
     ) -> Option<String> {
+        if matches!(contract, "channel::servicebus" | "channel::eventhubs") {
+            return crate::contract::azure::sdk::environment_name(contract, value);
+        }
         if contract == "channel::pubsub" {
             let name = crate::contract::gcp::sdk::environment_name(value, operation)?;
             return Some(format!("channel::pubsub::{name}"));
@@ -156,7 +159,21 @@ impl ContractKind for Channel {
         crate::contract::environment_name(contract, value)
     }
 
+    fn environment_identity(
+        &self,
+        contract: &str,
+        identity: &crate::contract::ReceiverIdentity,
+        values: &dyn Fn(&str) -> Vec<crate::contract::EnvironmentValue>,
+    ) -> Option<Vec<(String, String)>> {
+        crate::contract::azure::sdk::environment_identity(contract, identity, values)
+    }
+
     fn environment_target(&self, contract: &str, target: &str, operation: Option<&str>) -> bool {
+        if contract == "channel::servicebus" {
+            return target
+                .strip_prefix("channel::servicebus::")
+                .is_some_and(|name| crate::contract::azure::servicebus(name).is_some());
+        }
         if contract == "channel::pubsub" {
             let Some(name) = target.strip_prefix("channel::pubsub::") else {
                 return false;
@@ -334,6 +351,7 @@ impl ContractKind for Channel {
                     }
                 };
                 Found {
+                    identity: None,
                     role,
                     site,
                     contract,
@@ -348,6 +366,7 @@ impl ContractKind for Channel {
             .collect();
         found.extend(aws::extract(code, Some(indexed)));
         found.extend(crate::contract::gcp::sdk::extract(code, true));
+        found.extend(crate::contract::azure::sdk::extract(code, true));
         found
     }
 
@@ -387,6 +406,7 @@ impl ContractKind for Channel {
                         ..Provider::default()
                     }),
                     document::Role::Consumer => export.consumers.push(Consumer {
+                        identity: None,
                         contract: Some(contract),
                         site,
                         via: None,
@@ -688,6 +708,7 @@ mod tests {
 
     fn consumer(contract: &str, site: &str) -> Consumer {
         Consumer {
+            identity: None,
             contract: Some(contract.into()),
             site: site.into(),
             via: None,

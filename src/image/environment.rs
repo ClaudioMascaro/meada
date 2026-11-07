@@ -1,6 +1,7 @@
 //! Resolve directed contract reads only through the container that runs their code.
 
 use crate::contract::Level;
+use crate::contract::{EnvironmentScope, EnvironmentValue, ReceiverIdentity};
 use crate::iac::environment::Entry;
 use crate::index::Export;
 use crate::workspace::Repository;
@@ -193,6 +194,28 @@ impl<'a> Environments<'a> {
             .collect()
     }
 
+    fn receiver_values(
+        &self,
+        repository: &str,
+        site: &str,
+        variable: &str,
+    ) -> Vec<EnvironmentValue> {
+        self.entries(repository, site, variable)
+            .into_iter()
+            .filter(|scope| scope.certain)
+            .map(|scope| EnvironmentValue {
+                scope: EnvironmentScope {
+                    workload: scope.workload.to_string(),
+                    root: scope.root.into(),
+                    container: scope.entry.container.clone(),
+                },
+                value: scope.entry.value.clone(),
+                target: scope.entry.contract.clone(),
+                reason: scope.reason(variable),
+            })
+            .collect()
+    }
+
     fn entries(&self, repository: &str, site: &str, variable: &str) -> Vec<&Scope<'a>> {
         let Some(path) = site
             .strip_prefix(repository)
@@ -241,7 +264,8 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
             let resolve = |site: &str,
                            contract: &str,
                            via: Option<&str>,
-                           operation: Option<&str>| {
+                           operation: Option<&str>,
+                           identity: Option<&ReceiverIdentity>| {
                 let via = via?;
                 let variable = via
                     .strip_prefix("env:")
@@ -250,6 +274,14 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
                     return None;
                 }
                 let kind = crate::contract::kind_of(contract)?;
+                if let Some(identity) = identity
+                    && let Some(values) =
+                        kind.environment_identity(contract, identity, &|variable| {
+                            environments.receiver_values(&export.repository, site, variable)
+                        })
+                {
+                    return (!values.is_empty()).then_some(values);
+                }
                 let mut values =
                     std::collections::BTreeMap::<String, std::collections::BTreeSet<String>>::new();
                 for (value, reason) in environments.values(&export.repository, site, variable) {
@@ -273,14 +305,28 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
             let providers = export
                 .providers
                 .iter()
-                .map(|p| resolve(&p.site, &p.contract, p.via.as_deref(), p.method.as_deref()))
+                .map(|p| {
+                    resolve(
+                        &p.site,
+                        &p.contract,
+                        p.via.as_deref(),
+                        p.method.as_deref(),
+                        p.identity.as_ref(),
+                    )
+                })
                 .collect::<Vec<_>>();
             let consumers = export
                 .consumers
                 .iter()
                 .map(|c| {
                     c.contract.as_deref().and_then(|contract| {
-                        resolve(&c.site, contract, c.via.as_deref(), c.method.as_deref())
+                        resolve(
+                            &c.site,
+                            contract,
+                            c.via.as_deref(),
+                            c.method.as_deref(),
+                            c.identity.as_ref(),
+                        )
                     })
                 })
                 .collect::<Vec<_>>();

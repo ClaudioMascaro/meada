@@ -10,7 +10,7 @@ use crate::lang::{Call, Facts, Kind};
 use crate::resolve::{Code, Follow, Form, Of, Outside};
 
 /// The readable part of a contract name argument, after value expansion.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub(crate) enum Argument {
     Literal(String),
     Environment(String),
