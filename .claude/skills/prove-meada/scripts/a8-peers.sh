@@ -109,6 +109,11 @@ export async function ordersString(base: string) {
   const url = new URL(`${base}/orders`);
   return fetch(String(url));
 }
+// A callback named String is opaque; it must not poison the global conversion above.
+export async function ordersStringHidden(String: (value: URL) => string) {
+  const url = new URL('https://api.example.com/orders');
+  return fetch(String(url));
+}
 export async function ordersInTemplate(base: string) {
   const url = new URL(`${base}/orders`);
   return fetch(`${url}`);

@@ -1453,6 +1453,8 @@ URLs built with `new URL(x)` or `new URL(ref, base)` are read only for the unass
 `URL` or the named `URL` export of `url` or `node:url` through an import or unshadowed
 `require`. Unknown packages, repository aliases and other exports stay opaque.
 
+`String(u)` respects local bindings of `String` and passes the URL through only when the call uses the global conversion. Assignments and increments that can replace that conversion leave the URL unresolved. A local binding preserves the global conversion outside its scope.
+
 | Role | Library |
 | --- | --- |
 | Consumer | global `fetch`, and a call to a parameter whose default is `fetch` |

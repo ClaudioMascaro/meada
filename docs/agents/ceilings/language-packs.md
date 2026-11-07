@@ -251,7 +251,9 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   written in place there is `Value::Unknown`. `VALUE_DEPTH` (64): a value nested deeper in
   arguments, objects, arrays and the receivers of method chains is `Unknown` from there.
   `FOLD_DEPTH` (256): a `+` chain or a chain of string method calls folds only that deep (the
-  rest is a hole), and a member chain in a callee is cut to the node kind. The parent of every node is read once (`Parents`, which
+  rest is a hole), and a member chain in a callee is cut to the node kind. Finding the lexical
+  scope of a runtime `String` binding uses the same bound; if it is not reached, the file's
+  runtime conversion stays opaque. The parent of every node is read once (`Parents`, which
   `lang/ts/uses.rs` and `lang/ts/types.rs` climb too), as `Node::parent` is linear in the
   tree's depth.
 - `lang/ts.rs` (`url_form`, `Parents::written`, #685): `new URL(x)` of one argument is `x`, and

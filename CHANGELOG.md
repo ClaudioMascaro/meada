@@ -327,6 +327,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- TypeScript and JavaScript URL consumers respect lexical bindings and writes of `String`
+  (#683). A callback named `String` no longer invents a route or host, and a local binding
+  leaves the global conversion in other scopes intact.
+
 - Image runners and links retain each evaluation root when Kustomize overlays reuse the same
   workload and normalized image. Repeated image evidence within one workload and root still
   collapses to one side.
