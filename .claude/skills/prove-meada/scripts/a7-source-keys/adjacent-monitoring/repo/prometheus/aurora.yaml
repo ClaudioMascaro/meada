@@ -1,0 +1,26 @@
+groups:
+  - name: cedar-checks
+    labels:
+      support: aurora
+      service: cedar-api
+      severity: warning
+      alertname: GroupAlias
+    rules:
+      - alert: AuroraCritical
+        expr: vector(1)
+        labels:
+          severity: critical
+          alertname: RuleAlias
+        annotations:
+          support: annotation-ghost
+          summary: Cedar critical path
+      - alert: AuroraPreview
+        expr: vector(1)
+      - record: cedar:requests:rate5m
+        expr: vector(1)
+        labels:
+          support: recording-ghost
+  - name: implicit-only
+    rules:
+      - alert: CedarImplicit
+        expr: vector(1)

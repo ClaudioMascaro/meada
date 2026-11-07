@@ -1,0 +1,8 @@
+services:
+  api:
+    image: ${REGISTRY:-ghcr.io}/proof-api:${TAG:-two}
+    depends_on: [cache]
+  worker:
+    image: alpine:${UNSET}
+    build: ./link
+    depends_on: [api]

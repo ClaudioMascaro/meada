@@ -10,37 +10,110 @@ remain regressions. SDK/route flows added later retain their own receipts and Sc
 this bounded mix does not claim to mutate every child flow.
 
 The existing `CI` workflow's `proof-a7-a8` job runs the untouched baseline on PRs/pushes.
-Its 16 named checks include the full AWS subscription/provision/orphan flow separately from
-the JSON SSM and generic provisioning checks. The first e6d27d0 CI baseline covered only
-15 checks and failed two; it is retained as BROKEN and cannot authorize mutations.
+Its 26 named native checks include the full AWS subscription/provision/orphan flow separately
+from JSON SSM and generic provisioning, GCP/Azure and JVM/Go/.NET AWS SDK drivers, IaC HTTP routes, custom
+mappings, declared resources, orphans, patterns and image regressions. The executable
+`commands()` inventory fixes their distinct evidence directories. The supported IaC oracle
+also covers the existing public `terraform-sqs` and `sam-rust` pins. The e6d27d0 baseline failed
+two of 15 checks; the 2669d15 baseline failed two of 16 through the later A8 product regression.
+Both remain BROKEN and cannot authorize mutations.
 Full validation policy lives in [AGENTS.md](../../../../AGENTS.md). The manual phase inputs
 reuse that workflow; there is no second environment or workflow guide. If GitHub cannot
 dispatch a phase on the branch, leave it BLOCKED, never infer a pass from a local dry run.
 
 ## Baseline and phase boundaries
 
-`a7-a8-audit.py baseline` builds immutable default-feature binaries for the exact checkout
-and its merge-base with main, copies each before releasing the compiler lock, pins every
+`a7-a8-audit.py baseline` builds immutable default-feature binaries for the exact checkout,
+its merge-base with main and the three existing drivers' historical bases below. It copies
+each before releasing the compiler lock, pins every
 skill/answer-key byte and drives the fixed source-derived checks. `baseline.json` records the
 source commit/tree, actual build commits, binary SHA256s, keys, flows and raw check results.
 The accepted clean A7 binary supplies existing A7 annotation/whole-export bytes; independent
 source/spec oracles supply new A7 semantics. A8 additionally compares the original base on
 identical generated input. HTTP parity supplements these keys. It never replaces them.
 
+| Packet binary | Purpose and immutable source |
+|---|---|
+| `bin/meada-clean` | exact frozen head, existing A7 annotation/export key |
+| `bin/meada-base` | actual merge-base with main, A8 original fields and corpus |
+| `bin/meada-pre-config` | before #661: `6a5eca5853193d205bcf756983b41e9cb16ffa9d` |
+| `bin/meada-pre-image` | before #662: `eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62` |
+| `bin/meada-pre-extensions` | compatible A7 before #666/#668/#670/#671: `e6d27d0d7c046eceb8771f17111f00511a8d6c3d` |
+
+The existing frontend job reuses its UI build, Chromium and pinned browser tools. `ui-check`
+drives the full `aws-sdk.py`, `config_uses.py` and `images.py --public` flows with their required
+bases and UI flags, beside the existing #675 graph check. `a7-a8-ui` retains its immutable
+`bin/meada-ui`, `frontend/` bytes, raw captures and a receipt bound to the actual source/tree, complete verifier
+digest, baseline manifest, UI binary and frontend bytes. This is clean final-source evidence,
+not coverage of a native mutant. None of the 13 required mutations needs a UI candidate.
+
+`scope-check` uses the existing corpus loader's seven repositories (eight language packs),
+then compares UI-feature stdio to the native captures before one-entry console API checks
+and the existing viewer pages/budgets. It retains full base/head records, queries and HTTP
+captures, every API/stdio answer, page screenshots, cleanup results and source/key/binary
+identity in `a7-a8-scope`. A corpus comparison exit 1 stays visible as a raw difference,
+including its budget/determinism evidence; it requires fresh source/spec judgment, not a
+replacement snapshot. Only this comparison can differ while the capture phase completes.
+API, viewer, feature-parity and cleanup failures fail the capture. `CAPTURED` is never PROVED.
+
+The same artifact captures nine exact source scopes from `scripts/a7-source-keys/`. Their
+frozen hashes, neutral Git identities and symlinks are verified before execution; public
+source copies are fetched at the unchanged existing pins. The independent keys supply:
+
+- native HCL: 72 whole value rows and 38 queries, with literal/sensitivity edits;
+- complete pinned monitoring: 808 queries, preserving the original 434-query preparation;
+- adjacent monitoring: 151 queries, one label edit and both role-only scopes;
+- six generic IaC/Serverless scopes: 460 nodes, 217 reference groups and 1,509 queries, with
+  the exact per-repository query files from `generic-iac/capture-plan.json`.
+
+`a7-source-capture.py` uses the existing transports for the eleven frozen source edits:
+ten same-size edits and one explicit Compose override clear. The persistent MCP reader
+queries before CLI export/status. Each phase retains warm/cold and restored warm/cold
+answers, full responses/status/export, same-scope HTTP replies and exact copy/cmp/hash/mtime
+restoration. Only JSON-RPC IDs are excluded from whole response comparisons; raw replies
+remain intact. Explicit HCL privacy constraints inspect responses and diagnostics, excluding
+request arguments and input/key files. Source CAPTURED is never semantic acceptance.
+
+Read the frozen source-key `PLAN.md` files and HCL `ASSUMPTIONS.md` for their independent
+expectations and limits. The separate IaC var-file counter is unadjudicated; native type
+subfields that cannot be observed on a documented public surface stay UNPROVEN. Complete
+source semantics, corpus deltas/budgets and supplementary SDK controls still require fresh
+source-key/receipt judgment. A YAML/JSON value oracle, curated contract mapping or transport
+pass does not supply that judgment. The old partial preparation keys remain unchanged.
+
 A script result is `CHECKS_PASSED`, `BROKEN` or `BLOCKED`, never `PROVED`. A fresh checker must
 judge the untouched named flows, source/spec keys, full captures and limits first. Retain that
 receipt and provide its exact manifest digest in the `baseline_attestation` input:
 
 ```json
-{"verdict":"PROVED","checker":"actual fresh checker identity","receipt":"actual retained receipt URL/path","baseline_manifest_sha256":"64 hexadecimal characters from baseline.json"}
+{
+  "verdict": "PROVED",
+  "checker": "actual fresh checker identity",
+  "receipt": "actual retained receipt URL/path",
+  "baseline_manifest_sha256": "actual baseline.json SHA256",
+  "ui_receipt_sha256": "actual a7-a8-ui/receipt.json SHA256",
+  "scope_receipt_sha256": "actual a7-a8-scope/receipt.json SHA256",
+  "separate_scope_receipt": {
+    "receipt": "actual independent source-scope judgment URL/path",
+    "sha256": "actual judgment SHA256",
+    "verdict": "PROVED",
+    "covers": ["corpus-api-viewer", "public-infra", "native-hcl", "serverless", "generic-iac", "supplementary-sdk"],
+    "source_commit": "actual frozen source commit",
+    "verifier_keyset_sha256": "actual canonical full verifier inventory SHA256"
+  }
+}
 ```
 
 This is an evidence gate, not cryptographic identity verification. Supplying invented approval
 does not establish a baseline. Any source or frozen-key change requires a new baseline and
 fresh judgment. Old BROKEN, unfinished and refused receipts remain intact.
+Manual native-baseline dispatch does not run the frontend. Use the baseline and UI/scope
+packets from a normal exact-head PR/push run, or a separately produced supplement bound to
+that exact manifest; `ui_run` defaults to `baseline_run`. A same-source claim without the
+actual matching receipts cannot authorize a candidate.
 
 1. Dispatch `candidate` with the frozen `baseline_run`, one `mutation` ID and the actual
-   baseline attestation. The isolated CI checkout must be clean. One exact anchor is required;
+   baseline attestation and bound UI/scope artifacts. The isolated CI checkout must be clean. One exact anchor is required;
    drift blocks the round. It copies bytes to `.prove-it/audits/.../originals/<id>/<path>`,
    plants one semantic bug, builds one binary, then restores by copy in `finally`. Actual
    `cmp`, every tracked-file SHA256 and complete git status must match before publication.
@@ -67,7 +140,8 @@ fresh judgment. Old BROKEN, unfinished and refused receipts remain intact.
    new frozen keys, and replant it. A missing product behavior is a finding, never a new key.
 5. Dispatch `final` on the same exact source/keys after all rounds. Judge the clean raw results
    afresh. `report --baseline DIR --rounds SCORE... --final checks.json --final-judgment FILE
-   --output report.json` retains chronological attempts, pending rounds, both catch counts,
+   --ui-receipt UI/receipt.json --scope-receipt SCOPE/receipt.json --output report.json`
+   retains chronological attempts, pending rounds, both catch counts,
    blind counts and final false alarms. Its COMPLETE state requires all 13 current rounds,
    fresh blind judgments and an actual final clean PROVED receipt for that manifest. It is
    still a bounded audit, not whole-app acceptance.

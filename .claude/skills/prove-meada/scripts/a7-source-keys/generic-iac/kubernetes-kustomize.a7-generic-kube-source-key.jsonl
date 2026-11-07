@@ -1,0 +1,93 @@
+{"tool": "search", "arguments": {"query": "/", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Namespace/seed", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Namespace", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "seed", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::Namespace/seed (root overlays/cedar)", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::Namespace/seed (root overlays/harbor)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Deployment.apps/cedar/cedar-mid-api-z-a", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Deployment.apps", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "cedar-mid-api-z-a", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::Deployment.apps/cedar/cedar-mid-api-z-a (root overlays/cedar)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Deployment.apps/cedar/cedar-mid-api-z-a (root overlays/cedar)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Deployment.apps/cedar/cedar-mid-api-z-a (root overlays/cedar)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Deployment.apps/harbor/harbor-mid-api-z-b", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "harbor-mid-api-z-b", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::Deployment.apps/harbor/harbor-mid-api-z-b (root overlays/harbor)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Deployment.apps/harbor/harbor-mid-api-z-b (root overlays/harbor)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Deployment.apps/harbor/harbor-mid-api-z-b (root overlays/harbor)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/cedar/cedar-mid-api-z-a", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::Service/cedar/cedar-mid-api-z-a (root overlays/cedar)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Service/cedar/cedar-mid-api-z-a (root overlays/cedar)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Service/cedar/cedar-mid-api-z-a (root overlays/cedar)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/harbor/harbor-mid-api-z-b", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::Service/harbor/harbor-mid-api-z-b (root overlays/harbor)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Service/harbor/harbor-mid-api-z-b (root overlays/harbor)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Service/harbor/harbor-mid-api-z-b (root overlays/harbor)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/cedar/cedar-mid-sa-z-a", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "cedar-mid-sa-z-a", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::ServiceAccount/cedar/cedar-mid-sa-z-a (root overlays/cedar)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::ServiceAccount/cedar/cedar-mid-sa-z-a (root overlays/cedar)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::ServiceAccount/cedar/cedar-mid-sa-z-a (root overlays/cedar)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/harbor/harbor-mid-sa-z-b", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "harbor-mid-sa-z-b", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::ServiceAccount/harbor/harbor-mid-sa-z-b (root overlays/harbor)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::ServiceAccount/harbor/harbor-mid-sa-z-b (root overlays/harbor)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::ServiceAccount/harbor/harbor-mid-sa-z-b (root overlays/harbor)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ConfigMap/cedar/cedar-mid-cfg-z-a", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ConfigMap", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "cedar-mid-cfg-z-a", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::ConfigMap/cedar/cedar-mid-cfg-z-a (root overlays/cedar)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::ConfigMap/cedar/cedar-mid-cfg-z-a (root overlays/cedar)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::ConfigMap/cedar/cedar-mid-cfg-z-a (root overlays/cedar)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ConfigMap/harbor/harbor-mid-cfg-z-b", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "harbor-mid-cfg-z-b", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::ConfigMap/harbor/harbor-mid-cfg-z-b (root overlays/harbor)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::ConfigMap/harbor/harbor-mid-cfg-z-b (root overlays/harbor)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::ConfigMap/harbor/harbor-mid-cfg-z-b (root overlays/harbor)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Secret/cedar/cedar-mid-cred-z-a", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Secret", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "cedar-mid-cred-z-a", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::Secret/cedar/cedar-mid-cred-z-a (root overlays/cedar)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Secret/cedar/cedar-mid-cred-z-a (root overlays/cedar)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Secret/cedar/cedar-mid-cred-z-a (root overlays/cedar)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Secret/harbor/harbor-mid-cred-z-b", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "harbor-mid-cred-z-b", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::Secret/harbor/harbor-mid-cred-z-b (root overlays/harbor)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Secret/harbor/harbor-mid-cred-z-b (root overlays/harbor)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Secret/harbor/harbor-mid-cred-z-b (root overlays/harbor)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Ingress.networking.k8s.io/cedar/cedar-mid-edge-z-a", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Ingress.networking.k8s.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "cedar-mid-edge-z-a", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::Ingress.networking.k8s.io/cedar/cedar-mid-edge-z-a (root overlays/cedar)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Ingress.networking.k8s.io/cedar/cedar-mid-edge-z-a (root overlays/cedar)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Ingress.networking.k8s.io/cedar/cedar-mid-edge-z-a (root overlays/cedar)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Ingress.networking.k8s.io/harbor/harbor-mid-edge-z-b", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "harbor-mid-edge-z-b", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "base/bundle.yaml::Ingress.networking.k8s.io/harbor/harbor-mid-edge-z-b (root overlays/harbor)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Ingress.networking.k8s.io/harbor/harbor-mid-edge-z-b (root overlays/harbor)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "base/bundle.yaml::Ingress.networking.k8s.io/harbor/harbor-mid-edge-z-b (root overlays/harbor)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Deployment.apps/amber/api", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "api", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "plain-a/bundle.yaml::Deployment.apps/amber/api (root plain-a)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "plain-a/bundle.yaml::Deployment.apps/amber/api (root plain-a)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "plain-a/bundle.yaml::Deployment.apps/amber/api (root plain-a)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/amber/api", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "plain-a/bundle.yaml::Service/amber/api (root plain-a)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "plain-a/bundle.yaml::Service/amber/api (root plain-a)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "plain-a/bundle.yaml::Service/amber/api (root plain-a)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ConfigMap/cobalt/cfg", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "cfg", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "plain-a/bundle.yaml::ConfigMap/cobalt/cfg (root plain-a)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Widget.proof.example.org/loose", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Widget.proof.example.org", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "loose", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "plain-a/bundle.yaml::Widget.proof.example.org/loose (root plain-a)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ConfigMap/amber/cfg", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "plain-b/config.json::ConfigMap/amber/cfg (root plain-b)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "plain-b/config.json::ConfigMap/amber/cfg (root plain-b)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "plain-b/config.json::ConfigMap/amber/cfg (root plain-b)", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "plain-b/object.json::Deployment.apps/amber/api (root plain-b)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "plain-b/object.json::Deployment.apps/amber/api (root plain-b)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "plain-b/object.json::Deployment.apps/amber/api (root plain-b)", "direction": "up", "budget": 200000}}

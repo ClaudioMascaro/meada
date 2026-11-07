@@ -1,0 +1,1086 @@
+{
+  "repository": "prometheus-operator/kube-prometheus",
+  "commit": "b6c2f62b287524652592e6e2f7ea0d3054cb8ac6",
+  "entries": [
+    {
+      "path": ".github/dependabot.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f4ae8cd2c2eb7b90ac9743df6121335c4548d63b",
+      "size": 285,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/f4ae8cd2c2eb7b90ac9743df6121335c4548d63b"
+    },
+    {
+      "path": ".github/workflows/action-lint.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bdf973a57c808164b7c0926c9d1304a0046fd077",
+      "size": 821,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/bdf973a57c808164b7c0926c9d1304a0046fd077"
+    },
+    {
+      "path": ".github/workflows/ci.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a06ad694229d348b1d9eac03da434dfc7b6e076e",
+      "size": 10256,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/a06ad694229d348b1d9eac03da434dfc7b6e076e"
+    },
+    {
+      "path": ".github/workflows/stale.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a9f943040d1318f2f763d6abd4ddf116021581ce",
+      "size": 886,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/a9f943040d1318f2f763d6abd4ddf116021581ce"
+    },
+    {
+      "path": ".github/workflows/versions.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6902ddf1de525cd46efb4b6892a2672aa6aa2165",
+      "size": 3824,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/6902ddf1de525cd46efb4b6892a2672aa6aa2165"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "65b8eb04daed559eff3db2f59d2ba54808e8c0ac",
+      "size": 312,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/65b8eb04daed559eff3db2f59d2ba54808e8c0ac"
+    },
+    {
+      "path": ".gitpod.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "47ce355ee55e71c138738d79dc990271586da92e",
+      "size": 1474,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/47ce355ee55e71c138738d79dc990271586da92e"
+    },
+    {
+      "path": ".mdox.validate.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f8273c3e1d71d8117562185423c7bdbaca5043f9",
+      "size": 993,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/f8273c3e1d71d8117562185423c7bdbaca5043f9"
+    },
+    {
+      "path": "examples/alertmanager-config-with-template.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "383332b5d15768524fed5a6ed3fc90aecb8f8af6",
+      "size": 619,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/383332b5d15768524fed5a6ed3fc90aecb8f8af6"
+    },
+    {
+      "path": "examples/alertmanager-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "87391e795f898623136cd51594468f5eaa6b35e9",
+      "size": 897,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/87391e795f898623136cd51594468f5eaa6b35e9"
+    },
+    {
+      "path": "examples/basic-auth/secrets.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fa0dd897c0d2a66c096dc33f08274fbba0197ad4",
+      "size": 128,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/fa0dd897c0d2a66c096dc33f08274fbba0197ad4"
+    },
+    {
+      "path": "examples/basic-auth/service-monitor.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "82ac0b6557d235a635d7b04b61df3019f0d78bca",
+      "size": 427,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/82ac0b6557d235a635d7b04b61df3019f0d78bca"
+    },
+    {
+      "path": "examples/continuous-delivery/argocd/application.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1bc1264e749c606f73583c995f0e10c663d6c744",
+      "size": 587,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/1bc1264e749c606f73583c995f0e10c663d6c744"
+    },
+    {
+      "path": "examples/continuous-delivery/argocd/appproject.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a571b7820c61d28926481a63250e3921ec83a6ba",
+      "size": 613,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/a571b7820c61d28926481a63250e3921ec83a6ba"
+    },
+    {
+      "path": "examples/example-app/example-app.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "71d9e5671c728d82498f42921a4e549d2e3e30d0",
+      "size": 750,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/71d9e5671c728d82498f42921a4e549d2e3e30d0"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-alertmanager-discovery-role-binding.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7a179fe0650bb8125601882a1b16c1270ce49708",
+      "size": 294,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/7a179fe0650bb8125601882a1b16c1270ce49708"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-alertmanager-discovery-role.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cb9f2886603bcb276b63ca31b9af8f2c52266f3c",
+      "size": 218,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/cb9f2886603bcb276b63ca31b9af8f2c52266f3c"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-role-binding.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e40a52ca25bb5a7f8ae8553531e7d66ac0379a1f",
+      "size": 288,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/e40a52ca25bb5a7f8ae8553531e7d66ac0379a1f"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-role.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "634ad6b9a072b087c1217411c1639709e87a8f73",
+      "size": 292,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/634ad6b9a072b087c1217411c1639709e87a8f73"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-service-account.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4dd7c26be6408de223ba3614a904cab3ac9d908c",
+      "size": 95,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/4dd7c26be6408de223ba3614a904cab3ac9d908c"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend-svc.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7002e8f18a691e4fddbd9cd29ae9ec3fcf8f0188",
+      "size": 244,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/7002e8f18a691e4fddbd9cd29ae9ec3fcf8f0188"
+    },
+    {
+      "path": "examples/example-app/prometheus-frontend.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d56515293e6db54fe99cbf91015ee596b3c04877",
+      "size": 662,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/d56515293e6db54fe99cbf91015ee596b3c04877"
+    },
+    {
+      "path": "examples/example-app/servicemonitor-frontend.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2bc935af75770096dac81820e544e29912737348",
+      "size": 316,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/2bc935af75770096dac81820e544e29912737348"
+    },
+    {
+      "path": "examples/example-grafana-dashboard.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a891040be1c044ad2fa596fdd0f95f9750df0318",
+      "size": 4768,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/a891040be1c044ad2fa596fdd0f95f9750df0318"
+    },
+    {
+      "path": "examples/existingrule.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8486eb7d721506133c2720706f48892e6190e2d4",
+      "size": 181,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/8486eb7d721506133c2720706f48892e6190e2d4"
+    },
+    {
+      "path": "examples/existingrule.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ab5de27041282bd0fe173bc8ad0e8401811c5e29",
+      "size": 183,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/ab5de27041282bd0fe173bc8ad0e8401811c5e29"
+    },
+    {
+      "path": "jsonnet/kube-prometheus/.gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "52a75ecba7d108a48c1a496227a324b28cb0fdbe",
+      "size": 30,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/52a75ecba7d108a48c1a496227a324b28cb0fdbe"
+    },
+    {
+      "path": "jsonnet/kube-prometheus/addons/weave-net/grafana-weave-net-cluster.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "102269f0b03f8cee4cbab505d1a9f9223d5d8c78",
+      "size": 75361,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/102269f0b03f8cee4cbab505d1a9f9223d5d8c78"
+    },
+    {
+      "path": "jsonnet/kube-prometheus/addons/weave-net/grafana-weave-net.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fb0e5049daacd939243d38f316f192eef5aa7953",
+      "size": 58543,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/fb0e5049daacd939243d38f316f192eef5aa7953"
+    },
+    {
+      "path": "jsonnet/kube-prometheus/jsonnetfile.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8123ccda65cec10bce07f122448cd2d0d289878b",
+      "size": 3400,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/8123ccda65cec10bce07f122448cd2d0d289878b"
+    },
+    {
+      "path": "jsonnet/kube-prometheus/versions.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e53532e63b1b3f6b0b81f4f559c489e614e5aa4a",
+      "size": 399,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/e53532e63b1b3f6b0b81f4f559c489e614e5aa4a"
+    },
+    {
+      "path": "jsonnetfile.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d48ecd629bfae90cfa6f462471658ddcd8f20ead",
+      "size": 400,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/d48ecd629bfae90cfa6f462471658ddcd8f20ead"
+    },
+    {
+      "path": "jsonnetfile.lock.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6524ae9381aa8526b0285af97f9bf80c130b09d4",
+      "size": 7226,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/6524ae9381aa8526b0285af97f9bf80c130b09d4"
+    },
+    {
+      "path": "kubescape-exceptions.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "77cdaab3a9a9923c67c60835c17a5ab7358cd8c2",
+      "size": 1807,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/77cdaab3a9a9923c67c60835c17a5ab7358cd8c2"
+    },
+    {
+      "path": "kustomization.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e0d8039ed7384d3598b1a1901aa5e3c68a461fec",
+      "size": 4902,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/e0d8039ed7384d3598b1a1901aa5e3c68a461fec"
+    },
+    {
+      "path": "manifests/alertmanager-alertmanager.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dadd0abbfa69bbeb690aff9d39e0d4889d27236a",
+      "size": 975,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/dadd0abbfa69bbeb690aff9d39e0d4889d27236a"
+    },
+    {
+      "path": "manifests/alertmanager-networkPolicy.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d4706882ad781e5312e058bcc3dd3c5795aa5e13",
+      "size": 977,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/d4706882ad781e5312e058bcc3dd3c5795aa5e13"
+    },
+    {
+      "path": "manifests/alertmanager-podDisruptionBudget.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1925659c22e4a68bcdcef1c8a0e485e6409934b1",
+      "size": 561,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/1925659c22e4a68bcdcef1c8a0e485e6409934b1"
+    },
+    {
+      "path": "manifests/alertmanager-prometheusRule.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7acb6bebc1e722c1f9738ceb7b9e97209a6d049e",
+      "size": 8114,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/7acb6bebc1e722c1f9738ceb7b9e97209a6d049e"
+    },
+    {
+      "path": "manifests/alertmanager-secret.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e8c3bac3f06fc737ed4a570835195240d16d4bb8",
+      "size": 1443,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/e8c3bac3f06fc737ed4a570835195240d16d4bb8"
+    },
+    {
+      "path": "manifests/alertmanager-service.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "35e56106287e8fcce466f1901272434c25feb4ef",
+      "size": 650,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/35e56106287e8fcce466f1901272434c25feb4ef"
+    },
+    {
+      "path": "manifests/alertmanager-serviceAccount.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d5670a59673eebe8353ad678d2cf2a57459cfc8f",
+      "size": 351,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/d5670a59673eebe8353ad678d2cf2a57459cfc8f"
+    },
+    {
+      "path": "manifests/alertmanager-serviceMonitor.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ded36f5f69aa4403ab257e58eb10fb2d0f1a0b3f",
+      "size": 637,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/ded36f5f69aa4403ab257e58eb10fb2d0f1a0b3f"
+    },
+    {
+      "path": "manifests/blackboxExporter-clusterRole.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5dedfcad8bac6110eac7c0d1c2b123d1f06c08f4",
+      "size": 470,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/5dedfcad8bac6110eac7c0d1c2b123d1f06c08f4"
+    },
+    {
+      "path": "manifests/blackboxExporter-clusterRoleBinding.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ad1de57fc6d4cba79c4ee71154a1656ba42f1bd5",
+      "size": 461,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/ad1de57fc6d4cba79c4ee71154a1656ba42f1bd5"
+    },
+    {
+      "path": "manifests/blackboxExporter-configuration.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e4c52d2c502cd2b218f1a6ac8eda84f56edcd7cf",
+      "size": 1392,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/e4c52d2c502cd2b218f1a6ac8eda84f56edcd7cf"
+    },
+    {
+      "path": "manifests/blackboxExporter-deployment.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "353467474552d0f153b9ee7ed977d391145bce00",
+      "size": 3645,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/353467474552d0f153b9ee7ed977d391145bce00"
+    },
+    {
+      "path": "manifests/blackboxExporter-networkPolicy.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5528a4fdaa8326549594ea06280a15986219742c",
+      "size": 722,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/5528a4fdaa8326549594ea06280a15986219742c"
+    },
+    {
+      "path": "manifests/blackboxExporter-service.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f742664bf5c8f1c2177216b5ae85bc682dbca0d8",
+      "size": 540,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/f742664bf5c8f1c2177216b5ae85bc682dbca0d8"
+    },
+    {
+      "path": "manifests/blackboxExporter-serviceAccount.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c777627ca9d3f263fb8c86180d816366818d48ac",
+      "size": 315,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/c777627ca9d3f263fb8c86180d816366818d48ac"
+    },
+    {
+      "path": "manifests/blackboxExporter-serviceMonitor.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8a0de5022f3331a9e31e590457251c6f741b12eb",
+      "size": 680,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/8a0de5022f3331a9e31e590457251c6f741b12eb"
+    },
+    {
+      "path": "manifests/grafana-config.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "65f6a7411f9f785b9b9d749190f3c41a7ad64d6b",
+      "size": 345,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/65f6a7411f9f785b9b9d749190f3c41a7ad64d6b"
+    },
+    {
+      "path": "manifests/grafana-dashboardDatasources.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "56318f0dd424de26c15abf7e238ceba4ca652fa8",
+      "size": 681,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/56318f0dd424de26c15abf7e238ceba4ca652fa8"
+    },
+    {
+      "path": "manifests/grafana-dashboardDefinitions.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9de2fb2a6c734280a57494694be9f5285c08bba4",
+      "size": 1053739,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/9de2fb2a6c734280a57494694be9f5285c08bba4"
+    },
+    {
+      "path": "manifests/grafana-dashboardSources.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "714a62562073a444a6a5315869217b6c9e8bd6cb",
+      "size": 659,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/714a62562073a444a6a5315869217b6c9e8bd6cb"
+    },
+    {
+      "path": "manifests/grafana-deployment.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dbf39cba7d1488d0e152704e99b42260fa480737",
+      "size": 11806,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/dbf39cba7d1488d0e152704e99b42260fa480737"
+    },
+    {
+      "path": "manifests/grafana-networkPolicy.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9ba1f11497bcd72689a9cb836d51af80dac27c40",
+      "size": 652,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/9ba1f11497bcd72689a9cb836d51af80dac27c40"
+    },
+    {
+      "path": "manifests/grafana-prometheusRule.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b9161c575e0887ef2eb5258cacc9ef0b581b50ca",
+      "size": 1423,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/b9161c575e0887ef2eb5258cacc9ef0b581b50ca"
+    },
+    {
+      "path": "manifests/grafana-service.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "461f05b5b7ba4d6017df54bbc16ab414430b673c",
+      "size": 453,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/461f05b5b7ba4d6017df54bbc16ab414430b673c"
+    },
+    {
+      "path": "manifests/grafana-serviceAccount.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b69b63f6573ec1c4e08114157a11b2e1c0e256b5",
+      "size": 294,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/b69b63f6573ec1c4e08114157a11b2e1c0e256b5"
+    },
+    {
+      "path": "manifests/grafana-serviceMonitor.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "28459014565ae1c43b860f27d2a1d9b0c6bbabc3",
+      "size": 399,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/28459014565ae1c43b860f27d2a1d9b0c6bbabc3"
+    },
+    {
+      "path": "manifests/kubePrometheus-prometheusRule.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f14be25a7417c6611422f091e80975f4def2c17a",
+      "size": 4350,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/f14be25a7417c6611422f091e80975f4def2c17a"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-clusterRole.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a6ed07b69a7c7997c2715d4b95d2e057992a0607",
+      "size": 2134,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/a6ed07b69a7c7997c2715d4b95d2e057992a0607"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-clusterRoleBinding.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aab74e153d00f1ba13751857a442dafdffb5b915",
+      "size": 465,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/aab74e153d00f1ba13751857a442dafdffb5b915"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-deployment.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f6c721169f4acf262c826a5f8a1b402c1ea266cd",
+      "size": 3617,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/f6c721169f4acf262c826a5f8a1b402c1ea266cd"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-networkPolicy.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d0d0cf629005bc4cce93a476eecc7106a3b11ad1",
+      "size": 724,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/d0d0cf629005bc4cce93a476eecc7106a3b11ad1"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-prometheusRule.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d2650af06d3d63048db3a8099de433a6c479f41",
+      "size": 3183,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/9d2650af06d3d63048db3a8099de433a6c479f41"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-service.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "118b206158c16467d62dfadfb52633faa89677a1",
+      "size": 581,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/118b206158c16467d62dfadfb52633faa89677a1"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-serviceAccount.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1acbe9efc1d11b435f7a9b505834968db0319c44",
+      "size": 317,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/1acbe9efc1d11b435f7a9b505834968db0319c44"
+    },
+    {
+      "path": "manifests/kubeStateMetrics-serviceMonitor.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7879d00376195d2155acc22447df32f2b4d1e1ca",
+      "size": 1164,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/7879d00376195d2155acc22447df32f2b4d1e1ca"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-prometheusRule.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "348469fc09a525764aee230ad107976cd65b8fd9",
+      "size": 84422,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/348469fc09a525764aee230ad107976cd65b8fd9"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-serviceMonitorApiserver.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a5189cac31e86a30f0f37a716059030563a7649c",
+      "size": 7824,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/a5189cac31e86a30f0f37a716059030563a7649c"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-serviceMonitorCoreDNS.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "78998a4e133f391ff0b5bcbb0cfa54168a4289f9",
+      "size": 635,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/78998a4e133f391ff0b5bcbb0cfa54168a4289f9"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-serviceMonitorKubeControllerManager.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f69823e4370b76450a501bfd760f4b320b886d23",
+      "size": 7005,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/f69823e4370b76450a501bfd760f4b320b886d23"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-serviceMonitorKubeScheduler.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "70d66c5cfe967ceaa270cbad5026b54a03c607dd",
+      "size": 942,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/70d66c5cfe967ceaa270cbad5026b54a03c607dd"
+    },
+    {
+      "path": "manifests/kubernetesControlPlane-serviceMonitorKubelet.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b651ca8d6645e3186eaf761fdbc28e772049b3a3",
+      "size": 8407,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/b651ca8d6645e3186eaf761fdbc28e772049b3a3"
+    },
+    {
+      "path": "manifests/nodeExporter-clusterRole.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0084fd6fba7409502ee0306bb38e77d035f71e2b",
+      "size": 462,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/0084fd6fba7409502ee0306bb38e77d035f71e2b"
+    },
+    {
+      "path": "manifests/nodeExporter-clusterRoleBinding.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1d441cfb3e1a2e9cd257c7f2097e4bc3d6bf84d5",
+      "size": 445,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/1d441cfb3e1a2e9cd257c7f2097e4bc3d6bf84d5"
+    },
+    {
+      "path": "manifests/nodeExporter-daemonset.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c61b0482219a9b9e44b1069c6cc5d4a8bcabf841",
+      "size": 3775,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/c61b0482219a9b9e44b1069c6cc5d4a8bcabf841"
+    },
+    {
+      "path": "manifests/nodeExporter-networkPolicy.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c6b3ca5611957901aaeb4704026dcf216759b0c2",
+      "size": 672,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/c6b3ca5611957901aaeb4704026dcf216759b0c2"
+    },
+    {
+      "path": "manifests/nodeExporter-prometheusRule.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f53de25b162bc41c0ff13adbd98827e7ffdf50f3",
+      "size": 21237,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/f53de25b162bc41c0ff13adbd98827e7ffdf50f3"
+    },
+    {
+      "path": "manifests/nodeExporter-service.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2736dbab41a7e2577176770e0bd28b14bd67e527",
+      "size": 493,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/2736dbab41a7e2577176770e0bd28b14bd67e527"
+    },
+    {
+      "path": "manifests/nodeExporter-serviceAccount.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9dd6d1f4f80df0a1f0f0233aa8258d3d43473e71",
+      "size": 307,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/9dd6d1f4f80df0a1f0f0233aa8258d3d43473e71"
+    },
+    {
+      "path": "manifests/nodeExporter-serviceMonitor.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5e3c46f0ace4e230d78e88f48a9f7fe72082206b",
+      "size": 851,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/5e3c46f0ace4e230d78e88f48a9f7fe72082206b"
+    },
+    {
+      "path": "manifests/prometheus-clusterRole.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "405a15816d420f7898c82f290f7c621ceca6a357",
+      "size": 448,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/405a15816d420f7898c82f290f7c621ceca6a357"
+    },
+    {
+      "path": "manifests/prometheus-clusterRoleBinding.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d5db3209967224c8cdbcd87f115c4e51e6996f1c",
+      "size": 483,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/d5db3209967224c8cdbcd87f115c4e51e6996f1c"
+    },
+    {
+      "path": "manifests/prometheus-networkPolicy.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5e7e2d0d4fa8a758444859f0da7da2dbf9a90989",
+      "size": 1073,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/5e7e2d0d4fa8a758444859f0da7da2dbf9a90989"
+    },
+    {
+      "path": "manifests/prometheus-podDisruptionBudget.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5a8778e21e382930caadbd7be9cb98106f53f637",
+      "size": 546,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/5a8778e21e382930caadbd7be9cb98106f53f637"
+    },
+    {
+      "path": "manifests/prometheus-prometheus.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7c86b55c42e9caa78906e0afb069952b1c1f9eb9",
+      "size": 1339,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/7c86b55c42e9caa78906e0afb069952b1c1f9eb9"
+    },
+    {
+      "path": "manifests/prometheus-prometheusRule.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aea8606b87f0519119c5c6e5f7bee3a2a0b98148",
+      "size": 17233,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/aea8606b87f0519119c5c6e5f7bee3a2a0b98148"
+    },
+    {
+      "path": "manifests/prometheus-roleBindingConfig.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6a76f27ce286466a59a233993ac791df695a8d17",
+      "size": 507,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/6a76f27ce286466a59a233993ac791df695a8d17"
+    },
+    {
+      "path": "manifests/prometheus-roleBindingSpecificNamespaces.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ca9fd1248b458ffecc7d9210597731365f345a56",
+      "size": 1661,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/ca9fd1248b458ffecc7d9210597731365f345a56"
+    },
+    {
+      "path": "manifests/prometheus-roleConfig.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9c1eb69448d5319464c58cf6aeec8417d82190c2",
+      "size": 402,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/9c1eb69448d5319464c58cf6aeec8417d82190c2"
+    },
+    {
+      "path": "manifests/prometheus-roleSpecificNamespaces.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ac366ed7803e269982d22988bd5718e3e74614f5",
+      "size": 2467,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/ac366ed7803e269982d22988bd5718e3e74614f5"
+    },
+    {
+      "path": "manifests/prometheus-service.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "71e41107347f1d573c4369181b26994cc1173536",
+      "size": 637,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/71e41107347f1d573c4369181b26994cc1173536"
+    },
+    {
+      "path": "manifests/prometheus-serviceAccount.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "087993a2602e74688999c19efee8f9d5cd7416de",
+      "size": 342,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/087993a2602e74688999c19efee8f9d5cd7416de"
+    },
+    {
+      "path": "manifests/prometheus-serviceMonitor.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f17760a96ddd3f112d3f9f154fb7b5e21e445cb1",
+      "size": 624,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/f17760a96ddd3f112d3f9f154fb7b5e21e445cb1"
+    },
+    {
+      "path": "manifests/prometheusAdapter-apiService.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4618e9c1b58a9cf66f8934ad9ba6e96ad3492a53",
+      "size": 483,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/4618e9c1b58a9cf66f8934ad9ba6e96ad3492a53"
+    },
+    {
+      "path": "manifests/prometheusAdapter-clusterRole.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d1af3163f0e026d259b2ca630a44a6285885e11e",
+      "size": 410,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/d1af3163f0e026d259b2ca630a44a6285885e11e"
+    },
+    {
+      "path": "manifests/prometheusAdapter-clusterRoleAggregatedMetricsReader.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "672c8c43b90fab386911ffdf73ac1af24a22625f",
+      "size": 577,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/672c8c43b90fab386911ffdf73ac1af24a22625f"
+    },
+    {
+      "path": "manifests/prometheusAdapter-clusterRoleBinding.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1c6cb3000797b98252873080d615360b454274bd",
+      "size": 472,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/1c6cb3000797b98252873080d615360b454274bd"
+    },
+    {
+      "path": "manifests/prometheusAdapter-clusterRoleBindingDelegator.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "63f7ccc7eba6a0fd5941d9c36a1d93001443b1ee",
+      "size": 495,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/63f7ccc7eba6a0fd5941d9c36a1d93001443b1ee"
+    },
+    {
+      "path": "manifests/prometheusAdapter-clusterRoleServerResources.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "22eba1d0291f5869fc7ab2fcdb5cf6a5e017e7cd",
+      "size": 379,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/22eba1d0291f5869fc7ab2fcdb5cf6a5e017e7cd"
+    },
+    {
+      "path": "manifests/prometheusAdapter-configMap.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a39a87430eed66ce83f448cdbd43a628d16b0501",
+      "size": 2205,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/a39a87430eed66ce83f448cdbd43a628d16b0501"
+    },
+    {
+      "path": "manifests/prometheusAdapter-deployment.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d97e02a582bdc04f947eaf935c0691fa924f0683",
+      "size": 3426,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/d97e02a582bdc04f947eaf935c0691fa924f0683"
+    },
+    {
+      "path": "manifests/prometheusAdapter-networkPolicy.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "df8c6644acc550e810bbcdda486418c859b0c660",
+      "size": 565,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/df8c6644acc550e810bbcdda486418c859b0c660"
+    },
+    {
+      "path": "manifests/prometheusAdapter-podDisruptionBudget.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "09348f7e95fee182292b1e9ab172a4cd3cc44c06",
+      "size": 502,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/09348f7e95fee182292b1e9ab172a4cd3cc44c06"
+    },
+    {
+      "path": "manifests/prometheusAdapter-roleBindingAuthReader.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c21491a51bc365f4d9b30a2930254c2ac7c7080d",
+      "size": 516,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/c21491a51bc365f4d9b30a2930254c2ac7c7080d"
+    },
+    {
+      "path": "manifests/prometheusAdapter-service.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "033f93eb9eb29e22236169b83720b6ee23bf8a1c",
+      "size": 502,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/033f93eb9eb29e22236169b83720b6ee23bf8a1c"
+    },
+    {
+      "path": "manifests/prometheusAdapter-serviceAccount.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "04ab178745408e6b494f8b2297100c6620acb8f3",
+      "size": 324,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/04ab178745408e6b494f8b2297100c6620acb8f3"
+    },
+    {
+      "path": "manifests/prometheusAdapter-serviceMonitor.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0fe1e8a9d6822821bcfd53a5c2769fd95db1017b",
+      "size": 907,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/0fe1e8a9d6822821bcfd53a5c2769fd95db1017b"
+    },
+    {
+      "path": "manifests/prometheusOperator-clusterRole.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f69d01e413113de2c2ab0ea01c98a5a5962afde6",
+      "size": 2613,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/f69d01e413113de2c2ab0ea01c98a5a5962afde6"
+    },
+    {
+      "path": "manifests/prometheusOperator-clusterRoleBinding.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ea1bacb401f6bdf194fb67810a11fc800a33788a",
+      "size": 471,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/ea1bacb401f6bdf194fb67810a11fc800a33788a"
+    },
+    {
+      "path": "manifests/prometheusOperator-deployment.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0d79684d0c11a0e6227e711884ed87f24b8ca824",
+      "size": 2997,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/0d79684d0c11a0e6227e711884ed87f24b8ca824"
+    },
+    {
+      "path": "manifests/prometheusOperator-networkPolicy.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9bfd462793deb57ac46d4f079eff64b20fbaa05a",
+      "size": 694,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/9bfd462793deb57ac46d4f079eff64b20fbaa05a"
+    },
+    {
+      "path": "manifests/prometheusOperator-prometheusRule.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "38acc79cec7ae7435e34dad26cc777f05aa094bc",
+      "size": 6591,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/38acc79cec7ae7435e34dad26cc777f05aa094bc"
+    },
+    {
+      "path": "manifests/prometheusOperator-service.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "32c9c11a6288b3cb8c27549019e3e6c68a8f6bae",
+      "size": 515,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/32c9c11a6288b3cb8c27549019e3e6c68a8f6bae"
+    },
+    {
+      "path": "manifests/prometheusOperator-serviceAccount.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "667f3a8e49e1acfc0a818c70bec13bd2e1ea0b65",
+      "size": 321,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/667f3a8e49e1acfc0a818c70bec13bd2e1ea0b65"
+    },
+    {
+      "path": "manifests/prometheusOperator-serviceMonitor.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4af3855e0b14351acb3907413af05678557fbe69",
+      "size": 715,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/4af3855e0b14351acb3907413af05678557fbe69"
+    },
+    {
+      "path": "manifests/setup/0alertmanagerConfigCustomResourceDefinition.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93a6287063d936dae49a437da70dba3b1b739592",
+      "size": 768244,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/93a6287063d936dae49a437da70dba3b1b739592"
+    },
+    {
+      "path": "manifests/setup/0alertmanagerCustomResourceDefinition.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a09776cb027e087380c4a0127e9b4918a1a2e6b7",
+      "size": 625321,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/a09776cb027e087380c4a0127e9b4918a1a2e6b7"
+    },
+    {
+      "path": "manifests/setup/0podmonitorCustomResourceDefinition.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "37e062bf15edd4afdd562eb0eb432bd0e6864790",
+      "size": 72364,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/37e062bf15edd4afdd562eb0eb432bd0e6864790"
+    },
+    {
+      "path": "manifests/setup/0probeCustomResourceDefinition.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c2fe9dd919474b6b4d17c75f89e0d39600ac91c9",
+      "size": 69940,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/c2fe9dd919474b6b4d17c75f89e0d39600ac91c9"
+    },
+    {
+      "path": "manifests/setup/0prometheusCustomResourceDefinition.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c5ab357cce5ac4e3060ef14fcb5dc5fa503d70b7",
+      "size": 834604,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/c5ab357cce5ac4e3060ef14fcb5dc5fa503d70b7"
+    },
+    {
+      "path": "manifests/setup/0prometheusagentCustomResourceDefinition.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "773e9ce16d8424d06be2c482c8a575a8544b16a8",
+      "size": 707657,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/773e9ce16d8424d06be2c482c8a575a8544b16a8"
+    },
+    {
+      "path": "manifests/setup/0prometheusruleCustomResourceDefinition.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1cd491d1fef3c2a06114c06d3ce89e8c2c35b498",
+      "size": 12694,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/1cd491d1fef3c2a06114c06d3ce89e8c2c35b498"
+    },
+    {
+      "path": "manifests/setup/0scrapeconfigCustomResourceDefinition.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1e27fb6b5778e039063c92bf6205b15de9013acb",
+      "size": 699007,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/1e27fb6b5778e039063c92bf6205b15de9013acb"
+    },
+    {
+      "path": "manifests/setup/0servicemonitorCustomResourceDefinition.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f0077de4143fe9fc89d54aa2282f17a47b383851",
+      "size": 73283,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/f0077de4143fe9fc89d54aa2282f17a47b383851"
+    },
+    {
+      "path": "manifests/setup/0thanosrulerCustomResourceDefinition.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "378edafef3b3379e0444677a0c11201f54aafea6",
+      "size": 604690,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/378edafef3b3379e0444677a0c11201f54aafea6"
+    },
+    {
+      "path": "manifests/setup/namespace.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5ca07c8edcb33479ad5399607e409651e093ec9d",
+      "size": 170,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/5ca07c8edcb33479ad5399607e409651e093ec9d"
+    },
+    {
+      "path": "tests/e2e/kind/config.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "be70b28fd09c19d3aff7a86c314d22381837669b",
+      "size": 568,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/be70b28fd09c19d3aff7a86c314d22381837669b"
+    },
+    {
+      "path": "tests/e2e/kind/kube-router.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b63ea7e31ab42df8c0754b38d691acee5c1d9f15",
+      "size": 4503,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/b63ea7e31ab42df8c0754b38d691acee5c1d9f15"
+    },
+    {
+      "path": "tests/e2e/kind/kubernetesControlPlane-kubeControllerManagerPrometheusDiscoveryService.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c0082adc5571a8b6ce889008d0af7ce0249363cc",
+      "size": 325,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/c0082adc5571a8b6ce889008d0af7ce0249363cc"
+    },
+    {
+      "path": "tests/e2e/kind/kubernetesControlPlane-kubeSchedulerPrometheusDiscoveryService.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "38903ab307b13d1fa771d722596db2b346bae6cb",
+      "size": 298,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/38903ab307b13d1fa771d722596db2b346bae6cb"
+    },
+    {
+      "path": "tests/e2e/kind/patches/kube-controller-manager.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fb41faf1a878a050ae5830dae30359fedeb21a9a",
+      "size": 201,
+      "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/fb41faf1a878a050ae5830dae30359fedeb21a9a"
+    }
+  ]
+}

@@ -1,0 +1,363 @@
+{"tool": "search", "arguments": {"query": "/", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Secret/basic-auth", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Secret", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "basic-auth", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/basic-auth/secrets.yaml::Secret/basic-auth (root examples/basic-auth)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/basic-auth-example", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "basic-auth-example", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/basic-auth/service-monitor.yaml::ServiceMonitor.monitoring.coreos.com/basic-auth-example (root examples/basic-auth)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Application.argoproj.io/argocd/kube-prometheus", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Application.argoproj.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kube-prometheus", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/continuous-delivery/argocd/application.yaml::Application.argoproj.io/argocd/kube-prometheus (root examples/continuous-delivery/argocd)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "AppProject.argoproj.io/argocd/monitoring", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "AppProject.argoproj.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "monitoring", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/continuous-delivery/argocd/appproject.yaml::AppProject.argoproj.io/argocd/monitoring (root examples/continuous-delivery/argocd)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/default/example-app", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "example-app", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/example-app/example-app.yaml::Service/default/example-app (root examples/example-app)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/example-app/example-app.yaml::Service/default/example-app (root examples/example-app)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/example-app/example-app.yaml::Service/default/example-app (root examples/example-app)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Deployment.apps/default/example-app", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Deployment.apps", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/example-app/example-app.yaml::Deployment.apps/default/example-app (root examples/example-app)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/example-app/example-app.yaml::Deployment.apps/default/example-app (root examples/example-app)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/example-app/example-app.yaml::Deployment.apps/default/example-app (root examples/example-app)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "RoleBinding.rbac.authorization.k8s.io/monitoring/prometheus-frontend", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "RoleBinding.rbac.authorization.k8s.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "prometheus-frontend", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/example-app/prometheus-frontend-alertmanager-discovery-role-binding.yaml::RoleBinding.rbac.authorization.k8s.io/monitoring/prometheus-frontend (root examples/example-app)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Role.rbac.authorization.k8s.io/monitoring/alertmanager-discovery", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Role.rbac.authorization.k8s.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "alertmanager-discovery", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/example-app/prometheus-frontend-alertmanager-discovery-role.yaml::Role.rbac.authorization.k8s.io/monitoring/alertmanager-discovery (root examples/example-app)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "RoleBinding.rbac.authorization.k8s.io/default/prometheus-frontend", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/example-app/prometheus-frontend-role-binding.yaml::RoleBinding.rbac.authorization.k8s.io/default/prometheus-frontend (root examples/example-app)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Role.rbac.authorization.k8s.io/default/prometheus-frontend", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/example-app/prometheus-frontend-role.yaml::Role.rbac.authorization.k8s.io/default/prometheus-frontend (root examples/example-app)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/default/prometheus-frontend", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/example-app/prometheus-frontend-service-account.yaml::ServiceAccount/default/prometheus-frontend (root examples/example-app)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/default/prometheus-frontend", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/example-app/prometheus-frontend-svc.yaml::Service/default/prometheus-frontend (root examples/example-app)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Prometheus.monitoring.coreos.com/default/frontend", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Prometheus.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "frontend", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/example-app/prometheus-frontend.yaml::Prometheus.monitoring.coreos.com/default/frontend (root examples/example-app)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/default/frontend", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/example-app/servicemonitor-frontend.yaml::ServiceMonitor.monitoring.coreos.com/default/frontend (root examples/example-app)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Alertmanager.monitoring.coreos.com/monitoring/main", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Alertmanager.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "main", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-alertmanager.yaml::Alertmanager.monitoring.coreos.com/monitoring/main (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "NetworkPolicy.networking.k8s.io/monitoring/alertmanager-main", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "NetworkPolicy.networking.k8s.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "alertmanager-main", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-networkPolicy.yaml::NetworkPolicy.networking.k8s.io/monitoring/alertmanager-main (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PodDisruptionBudget.policy/monitoring/alertmanager-main", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PodDisruptionBudget.policy", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-podDisruptionBudget.yaml::PodDisruptionBudget.policy/monitoring/alertmanager-main (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PrometheusRule.monitoring.coreos.com/monitoring/alertmanager-main-rules", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PrometheusRule.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "alertmanager-main-rules", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-prometheusRule.yaml::PrometheusRule.monitoring.coreos.com/monitoring/alertmanager-main-rules (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Secret/monitoring/alertmanager-main", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-secret.yaml::Secret/monitoring/alertmanager-main (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/monitoring/alertmanager-main", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-service.yaml::Service/monitoring/alertmanager-main (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/monitoring/alertmanager-main", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-serviceAccount.yaml::ServiceAccount/monitoring/alertmanager-main (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/alertmanager-main", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-serviceMonitor.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/alertmanager-main (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRole.rbac.authorization.k8s.io/blackbox-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRole.rbac.authorization.k8s.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "blackbox-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/blackboxExporter-clusterRole.yaml::ClusterRole.rbac.authorization.k8s.io/blackbox-exporter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRoleBinding.rbac.authorization.k8s.io/blackbox-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRoleBinding.rbac.authorization.k8s.io", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/blackboxExporter-clusterRoleBinding.yaml::ClusterRoleBinding.rbac.authorization.k8s.io/blackbox-exporter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ConfigMap/monitoring/blackbox-exporter-configuration", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ConfigMap", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "blackbox-exporter-configuration", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/blackboxExporter-configuration.yaml::ConfigMap/monitoring/blackbox-exporter-configuration (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/blackboxExporter-configuration.yaml::ConfigMap/monitoring/blackbox-exporter-configuration (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/blackboxExporter-configuration.yaml::ConfigMap/monitoring/blackbox-exporter-configuration (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Deployment.apps/monitoring/blackbox-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/blackboxExporter-deployment.yaml::Deployment.apps/monitoring/blackbox-exporter (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/blackboxExporter-deployment.yaml::Deployment.apps/monitoring/blackbox-exporter (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/blackboxExporter-deployment.yaml::Deployment.apps/monitoring/blackbox-exporter (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "NetworkPolicy.networking.k8s.io/monitoring/blackbox-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/blackboxExporter-networkPolicy.yaml::NetworkPolicy.networking.k8s.io/monitoring/blackbox-exporter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/monitoring/blackbox-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/blackboxExporter-service.yaml::Service/monitoring/blackbox-exporter (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/blackboxExporter-service.yaml::Service/monitoring/blackbox-exporter (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/blackboxExporter-service.yaml::Service/monitoring/blackbox-exporter (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/monitoring/blackbox-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/blackboxExporter-serviceAccount.yaml::ServiceAccount/monitoring/blackbox-exporter (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/blackboxExporter-serviceAccount.yaml::ServiceAccount/monitoring/blackbox-exporter (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/blackboxExporter-serviceAccount.yaml::ServiceAccount/monitoring/blackbox-exporter (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/blackbox-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/blackboxExporter-serviceMonitor.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/blackbox-exporter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Secret/monitoring/grafana-config", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "grafana-config", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/grafana-config.yaml::Secret/monitoring/grafana-config (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-config.yaml::Secret/monitoring/grafana-config (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-config.yaml::Secret/monitoring/grafana-config (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Secret/monitoring/grafana-datasources", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "grafana-datasources", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/grafana-dashboardDatasources.yaml::Secret/monitoring/grafana-datasources (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-dashboardDatasources.yaml::Secret/monitoring/grafana-datasources (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-dashboardDatasources.yaml::Secret/monitoring/grafana-datasources (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ConfigMap/monitoring/grafana-dashboards", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "grafana-dashboards", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/grafana-dashboardSources.yaml::ConfigMap/monitoring/grafana-dashboards (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-dashboardSources.yaml::ConfigMap/monitoring/grafana-dashboards (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-dashboardSources.yaml::ConfigMap/monitoring/grafana-dashboards (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Deployment.apps/monitoring/grafana", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "grafana", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/grafana-deployment.yaml::Deployment.apps/monitoring/grafana (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-deployment.yaml::Deployment.apps/monitoring/grafana (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-deployment.yaml::Deployment.apps/monitoring/grafana (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "NetworkPolicy.networking.k8s.io/monitoring/grafana", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/grafana-networkPolicy.yaml::NetworkPolicy.networking.k8s.io/monitoring/grafana (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PrometheusRule.monitoring.coreos.com/monitoring/grafana-rules", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "grafana-rules", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/grafana-prometheusRule.yaml::PrometheusRule.monitoring.coreos.com/monitoring/grafana-rules (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/monitoring/grafana", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/grafana-service.yaml::Service/monitoring/grafana (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-service.yaml::Service/monitoring/grafana (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-service.yaml::Service/monitoring/grafana (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/monitoring/grafana", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/grafana-serviceAccount.yaml::ServiceAccount/monitoring/grafana (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-serviceAccount.yaml::ServiceAccount/monitoring/grafana (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-serviceAccount.yaml::ServiceAccount/monitoring/grafana (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/grafana", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/grafana-serviceMonitor.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/grafana (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PrometheusRule.monitoring.coreos.com/monitoring/kube-prometheus-rules", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kube-prometheus-rules", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubePrometheus-prometheusRule.yaml::PrometheusRule.monitoring.coreos.com/monitoring/kube-prometheus-rules (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRole.rbac.authorization.k8s.io/kube-state-metrics", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kube-state-metrics", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-clusterRole.yaml::ClusterRole.rbac.authorization.k8s.io/kube-state-metrics (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRoleBinding.rbac.authorization.k8s.io/kube-state-metrics", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-clusterRoleBinding.yaml::ClusterRoleBinding.rbac.authorization.k8s.io/kube-state-metrics (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Deployment.apps/monitoring/kube-state-metrics", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-deployment.yaml::Deployment.apps/monitoring/kube-state-metrics (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-deployment.yaml::Deployment.apps/monitoring/kube-state-metrics (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-deployment.yaml::Deployment.apps/monitoring/kube-state-metrics (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "NetworkPolicy.networking.k8s.io/monitoring/kube-state-metrics", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-networkPolicy.yaml::NetworkPolicy.networking.k8s.io/monitoring/kube-state-metrics (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PrometheusRule.monitoring.coreos.com/monitoring/kube-state-metrics-rules", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kube-state-metrics-rules", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-prometheusRule.yaml::PrometheusRule.monitoring.coreos.com/monitoring/kube-state-metrics-rules (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/monitoring/kube-state-metrics", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-service.yaml::Service/monitoring/kube-state-metrics (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-service.yaml::Service/monitoring/kube-state-metrics (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-service.yaml::Service/monitoring/kube-state-metrics (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/monitoring/kube-state-metrics", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-serviceAccount.yaml::ServiceAccount/monitoring/kube-state-metrics (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-serviceAccount.yaml::ServiceAccount/monitoring/kube-state-metrics (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-serviceAccount.yaml::ServiceAccount/monitoring/kube-state-metrics (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/kube-state-metrics", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-serviceMonitor.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/kube-state-metrics (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PrometheusRule.monitoring.coreos.com/monitoring/kubernetes-monitoring-rules", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kubernetes-monitoring-rules", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::PrometheusRule.monitoring.coreos.com/monitoring/kubernetes-monitoring-rules (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/kube-apiserver", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kube-apiserver", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-serviceMonitorApiserver.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/kube-apiserver (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/coredns", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "coredns", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-serviceMonitorCoreDNS.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/coredns (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/kube-controller-manager", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kube-controller-manager", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-serviceMonitorKubeControllerManager.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/kube-controller-manager (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/kube-scheduler", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kube-scheduler", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-serviceMonitorKubeScheduler.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/kube-scheduler (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/kubelet", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kubelet", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-serviceMonitorKubelet.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/kubelet (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRole.rbac.authorization.k8s.io/node-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "node-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-clusterRole.yaml::ClusterRole.rbac.authorization.k8s.io/node-exporter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRoleBinding.rbac.authorization.k8s.io/node-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-clusterRoleBinding.yaml::ClusterRoleBinding.rbac.authorization.k8s.io/node-exporter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "DaemonSet.apps/monitoring/node-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "DaemonSet.apps", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-daemonset.yaml::DaemonSet.apps/monitoring/node-exporter (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-daemonset.yaml::DaemonSet.apps/monitoring/node-exporter (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-daemonset.yaml::DaemonSet.apps/monitoring/node-exporter (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "NetworkPolicy.networking.k8s.io/monitoring/node-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-networkPolicy.yaml::NetworkPolicy.networking.k8s.io/monitoring/node-exporter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PrometheusRule.monitoring.coreos.com/monitoring/node-exporter-rules", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "node-exporter-rules", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::PrometheusRule.monitoring.coreos.com/monitoring/node-exporter-rules (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/monitoring/node-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-service.yaml::Service/monitoring/node-exporter (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-service.yaml::Service/monitoring/node-exporter (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-service.yaml::Service/monitoring/node-exporter (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/monitoring/node-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-serviceAccount.yaml::ServiceAccount/monitoring/node-exporter (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-serviceAccount.yaml::ServiceAccount/monitoring/node-exporter (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-serviceAccount.yaml::ServiceAccount/monitoring/node-exporter (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/node-exporter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-serviceMonitor.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/node-exporter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRole.rbac.authorization.k8s.io/prometheus-k8s", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "prometheus-k8s", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-clusterRole.yaml::ClusterRole.rbac.authorization.k8s.io/prometheus-k8s (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRoleBinding.rbac.authorization.k8s.io/prometheus-k8s", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-clusterRoleBinding.yaml::ClusterRoleBinding.rbac.authorization.k8s.io/prometheus-k8s (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "NetworkPolicy.networking.k8s.io/monitoring/prometheus-k8s", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-networkPolicy.yaml::NetworkPolicy.networking.k8s.io/monitoring/prometheus-k8s (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PodDisruptionBudget.policy/monitoring/prometheus-k8s", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-podDisruptionBudget.yaml::PodDisruptionBudget.policy/monitoring/prometheus-k8s (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Prometheus.monitoring.coreos.com/monitoring/k8s", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "k8s", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheus.yaml::Prometheus.monitoring.coreos.com/monitoring/k8s (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PrometheusRule.monitoring.coreos.com/monitoring/prometheus-k8s-prometheus-rules", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "prometheus-k8s-prometheus-rules", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::PrometheusRule.monitoring.coreos.com/monitoring/prometheus-k8s-prometheus-rules (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "RoleBinding.rbac.authorization.k8s.io/monitoring/prometheus-k8s-config", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "prometheus-k8s-config", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-roleBindingConfig.yaml::RoleBinding.rbac.authorization.k8s.io/monitoring/prometheus-k8s-config (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Role.rbac.authorization.k8s.io/monitoring/prometheus-k8s-config", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-roleConfig.yaml::Role.rbac.authorization.k8s.io/monitoring/prometheus-k8s-config (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/monitoring/prometheus-k8s", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-service.yaml::Service/monitoring/prometheus-k8s (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/monitoring/prometheus-k8s", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-serviceAccount.yaml::ServiceAccount/monitoring/prometheus-k8s (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/prometheus-k8s", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-serviceMonitor.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/prometheus-k8s (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "APIService.apiregistration.k8s.io/v1beta1.metrics.k8s.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "APIService.apiregistration.k8s.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "v1beta1.metrics.k8s.io", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-apiService.yaml::APIService.apiregistration.k8s.io/v1beta1.metrics.k8s.io (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRole.rbac.authorization.k8s.io/prometheus-adapter", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "prometheus-adapter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-clusterRole.yaml::ClusterRole.rbac.authorization.k8s.io/prometheus-adapter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRole.rbac.authorization.k8s.io/system:aggregated-metrics-reader", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "system:aggregated-metrics-reader", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-clusterRoleAggregatedMetricsReader.yaml::ClusterRole.rbac.authorization.k8s.io/system:aggregated-metrics-reader (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRoleBinding.rbac.authorization.k8s.io/prometheus-adapter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-clusterRoleBinding.yaml::ClusterRoleBinding.rbac.authorization.k8s.io/prometheus-adapter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRoleBinding.rbac.authorization.k8s.io/resource-metrics:system:auth-delegator", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "resource-metrics:system:auth-delegator", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-clusterRoleBindingDelegator.yaml::ClusterRoleBinding.rbac.authorization.k8s.io/resource-metrics:system:auth-delegator (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRole.rbac.authorization.k8s.io/resource-metrics-server-resources", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "resource-metrics-server-resources", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-clusterRoleServerResources.yaml::ClusterRole.rbac.authorization.k8s.io/resource-metrics-server-resources (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ConfigMap/monitoring/adapter-config", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "adapter-config", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-configMap.yaml::ConfigMap/monitoring/adapter-config (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusAdapter-configMap.yaml::ConfigMap/monitoring/adapter-config (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusAdapter-configMap.yaml::ConfigMap/monitoring/adapter-config (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Deployment.apps/monitoring/prometheus-adapter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-deployment.yaml::Deployment.apps/monitoring/prometheus-adapter (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusAdapter-deployment.yaml::Deployment.apps/monitoring/prometheus-adapter (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusAdapter-deployment.yaml::Deployment.apps/monitoring/prometheus-adapter (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "NetworkPolicy.networking.k8s.io/monitoring/prometheus-adapter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-networkPolicy.yaml::NetworkPolicy.networking.k8s.io/monitoring/prometheus-adapter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PodDisruptionBudget.policy/monitoring/prometheus-adapter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-podDisruptionBudget.yaml::PodDisruptionBudget.policy/monitoring/prometheus-adapter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "RoleBinding.rbac.authorization.k8s.io/kube-system/resource-metrics-auth-reader", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "resource-metrics-auth-reader", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-roleBindingAuthReader.yaml::RoleBinding.rbac.authorization.k8s.io/kube-system/resource-metrics-auth-reader (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/monitoring/prometheus-adapter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-service.yaml::Service/monitoring/prometheus-adapter (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusAdapter-service.yaml::Service/monitoring/prometheus-adapter (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusAdapter-service.yaml::Service/monitoring/prometheus-adapter (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/monitoring/prometheus-adapter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-serviceAccount.yaml::ServiceAccount/monitoring/prometheus-adapter (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusAdapter-serviceAccount.yaml::ServiceAccount/monitoring/prometheus-adapter (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusAdapter-serviceAccount.yaml::ServiceAccount/monitoring/prometheus-adapter (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/prometheus-adapter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusAdapter-serviceMonitor.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/prometheus-adapter (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRole.rbac.authorization.k8s.io/prometheus-operator", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "prometheus-operator", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-clusterRole.yaml::ClusterRole.rbac.authorization.k8s.io/prometheus-operator (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRoleBinding.rbac.authorization.k8s.io/prometheus-operator", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-clusterRoleBinding.yaml::ClusterRoleBinding.rbac.authorization.k8s.io/prometheus-operator (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Deployment.apps/monitoring/prometheus-operator", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-deployment.yaml::Deployment.apps/monitoring/prometheus-operator (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-deployment.yaml::Deployment.apps/monitoring/prometheus-operator (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-deployment.yaml::Deployment.apps/monitoring/prometheus-operator (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "NetworkPolicy.networking.k8s.io/monitoring/prometheus-operator", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-networkPolicy.yaml::NetworkPolicy.networking.k8s.io/monitoring/prometheus-operator (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "PrometheusRule.monitoring.coreos.com/monitoring/prometheus-operator-rules", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "prometheus-operator-rules", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-prometheusRule.yaml::PrometheusRule.monitoring.coreos.com/monitoring/prometheus-operator-rules (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/monitoring/prometheus-operator", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-service.yaml::Service/monitoring/prometheus-operator (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-service.yaml::Service/monitoring/prometheus-operator (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-service.yaml::Service/monitoring/prometheus-operator (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/monitoring/prometheus-operator", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-serviceAccount.yaml::ServiceAccount/monitoring/prometheus-operator (root .)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-serviceAccount.yaml::ServiceAccount/monitoring/prometheus-operator (root .)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-serviceAccount.yaml::ServiceAccount/monitoring/prometheus-operator (root .)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceMonitor.monitoring.coreos.com/monitoring/prometheus-operator", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-serviceMonitor.yaml::ServiceMonitor.monitoring.coreos.com/monitoring/prometheus-operator (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io/alertmanagerconfigs.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "alertmanagerconfigs.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/setup/0alertmanagerConfigCustomResourceDefinition.yaml::CustomResourceDefinition.apiextensions.k8s.io/alertmanagerconfigs.monitoring.coreos.com (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io/alertmanagers.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "alertmanagers.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/setup/0alertmanagerCustomResourceDefinition.yaml::CustomResourceDefinition.apiextensions.k8s.io/alertmanagers.monitoring.coreos.com (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io/podmonitors.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "podmonitors.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/setup/0podmonitorCustomResourceDefinition.yaml::CustomResourceDefinition.apiextensions.k8s.io/podmonitors.monitoring.coreos.com (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io/probes.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "probes.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/setup/0probeCustomResourceDefinition.yaml::CustomResourceDefinition.apiextensions.k8s.io/probes.monitoring.coreos.com (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io/prometheuses.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "prometheuses.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/setup/0prometheusCustomResourceDefinition.yaml::CustomResourceDefinition.apiextensions.k8s.io/prometheuses.monitoring.coreos.com (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io/prometheusagents.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "prometheusagents.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/setup/0prometheusagentCustomResourceDefinition.yaml::CustomResourceDefinition.apiextensions.k8s.io/prometheusagents.monitoring.coreos.com (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io/prometheusrules.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "prometheusrules.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/setup/0prometheusruleCustomResourceDefinition.yaml::CustomResourceDefinition.apiextensions.k8s.io/prometheusrules.monitoring.coreos.com (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io/scrapeconfigs.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "scrapeconfigs.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/setup/0scrapeconfigCustomResourceDefinition.yaml::CustomResourceDefinition.apiextensions.k8s.io/scrapeconfigs.monitoring.coreos.com (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io/servicemonitors.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "servicemonitors.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/setup/0servicemonitorCustomResourceDefinition.yaml::CustomResourceDefinition.apiextensions.k8s.io/servicemonitors.monitoring.coreos.com (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "CustomResourceDefinition.apiextensions.k8s.io/thanosrulers.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "thanosrulers.monitoring.coreos.com", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/setup/0thanosrulerCustomResourceDefinition.yaml::CustomResourceDefinition.apiextensions.k8s.io/thanosrulers.monitoring.coreos.com (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Namespace/monitoring", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Namespace", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/setup/namespace.yaml::Namespace/monitoring (root .)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ConfigMap/kube-system/kube-router-cfg", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kube-router-cfg", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "tests/e2e/kind/kube-router.yaml::ConfigMap/kube-system/kube-router-cfg (root tests/e2e/kind)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "tests/e2e/kind/kube-router.yaml::ConfigMap/kube-system/kube-router-cfg (root tests/e2e/kind)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "tests/e2e/kind/kube-router.yaml::ConfigMap/kube-system/kube-router-cfg (root tests/e2e/kind)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "DaemonSet.apps/kube-system/kube-router", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kube-router", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "tests/e2e/kind/kube-router.yaml::DaemonSet.apps/kube-system/kube-router (root tests/e2e/kind)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "tests/e2e/kind/kube-router.yaml::DaemonSet.apps/kube-system/kube-router (root tests/e2e/kind)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "tests/e2e/kind/kube-router.yaml::DaemonSet.apps/kube-system/kube-router (root tests/e2e/kind)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ServiceAccount/kube-system/kube-router", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "tests/e2e/kind/kube-router.yaml::ServiceAccount/kube-system/kube-router (root tests/e2e/kind)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "tests/e2e/kind/kube-router.yaml::ServiceAccount/kube-system/kube-router (root tests/e2e/kind)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "tests/e2e/kind/kube-router.yaml::ServiceAccount/kube-system/kube-router (root tests/e2e/kind)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRole.rbac.authorization.k8s.io/kube-router", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "tests/e2e/kind/kube-router.yaml::ClusterRole.rbac.authorization.k8s.io/kube-router (root tests/e2e/kind)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "ClusterRoleBinding.rbac.authorization.k8s.io/kube-router", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "tests/e2e/kind/kube-router.yaml::ClusterRoleBinding.rbac.authorization.k8s.io/kube-router (root tests/e2e/kind)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/kube-system/kube-controller-manager-prometheus-discovery", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kube-controller-manager-prometheus-discovery", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "tests/e2e/kind/kubernetesControlPlane-kubeControllerManagerPrometheusDiscoveryService.yaml::Service/kube-system/kube-controller-manager-prometheus-discovery (root tests/e2e/kind)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Service/kube-system/kube-scheduler-prometheus-discovery", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "kube-scheduler-prometheus-discovery", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "tests/e2e/kind/kubernetesControlPlane-kubeSchedulerPrometheusDiscoveryService.yaml::Service/kube-system/kube-scheduler-prometheus-discovery (root tests/e2e/kind)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Pod/kube-system/kube-controller-manager", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Pod", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "tests/e2e/kind/patches/kube-controller-manager.yaml::Pod/kube-system/kube-controller-manager (root tests/e2e/kind/patches)", "budget": 200000}}

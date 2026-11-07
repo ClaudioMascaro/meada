@@ -31,6 +31,11 @@ def main():
         source.write_bytes(original)
         (root / '.gitignore').write_text('.prove-it/\n')
         (skill / 'frozen-key.txt').write_text('independent dummy answer\n')
+        for name in ('frozen-inputs-a', 'frozen-inputs-b'):
+            (skill / name).mkdir()
+            (skill / name / 'value.txt').write_text(name + '\n')
+        source_link = skill / 'source-link'
+        source_link.symlink_to('frozen-inputs-a', target_is_directory=True)
         plan = skill / 'mutations.json'
         plan.write_text(json.dumps([{'id': 'dummy', 'file': 'dummy.rs', 'before': 'correct()',
                                     'after': 'incorrect()', 'check': 'values', 'evidence': 'dummy symptom'}]))
@@ -38,16 +43,20 @@ def main():
                                                'commit', '-qm', 'dummy audit safety input']):
             subprocess.run(['git', '-C', str(root), *command], check=True, capture_output=True)
         audit.ROOT, audit.SKILL, audit.PLAN = root, skill, plan
-        commands = audit.commands(root / 'dummy-head', root / 'dummy-existing', root / 'dummy-base', root / '.prove-it/runs/commands')
+        commands = audit.commands(root / 'dummy-head', root / 'dummy-existing', root / 'dummy-base',
+                                  root / '.prove-it/runs/commands', root / 'dummy-pre-extensions')
         outputs = [command[command.index('--run') + 1] if '--run' in command else command[-1] for command in commands.values()]
         assert set(commands) == set(audit.ALL) and len(set(outputs)) == len(audit.ALL)
+        for flow in ['custom-iac', 'iac-http-routes']:
+            assert commands[flow][commands[flow].index('--base-bin') + 1] == str(root / 'dummy-pre-extensions')
         checks.append({'check': 'every named flow has a distinct evidence directory, including both AWS modes', 'passed': True})
         baseline = root / '.prove-it/runs/baseline'
         (baseline / 'bin').mkdir(parents=True)
         for name in ('meada-clean', 'meada-base'):
             (baseline / 'bin' / name).write_bytes(b'dummy immutable binary\n')
         audit.save(baseline / 'baseline.json', {
-            'source_commit': audit.git('rev-parse', 'HEAD'), 'verifier_keys': audit.keys(),
+            'source_commit': audit.git('rev-parse', 'HEAD'), 'source_tree': audit.git('rev-parse', 'HEAD^{tree}'),
+            'verifier_keys': audit.keys(),
             'binaries': {name: {'sha256': audit.digest(baseline / 'bin' / name)}
                          for name in ('meada-clean', 'meada-base')},
             'checks': {'script_result': 'CHECKS_PASSED', 'scope': list(audit.ALL)}})
@@ -77,6 +86,11 @@ def main():
         key.write_text('rewritten key\n')
         refused('changed verifier key invalidates baseline', lambda: audit.read_manifest(baseline))
         key.write_text('independent dummy answer\n')
+        source_link.unlink()
+        source_link.symlink_to('frozen-inputs-b', target_is_directory=True)
+        refused('changed directory symlink invalidates frozen source input keys', lambda: audit.read_manifest(baseline))
+        source_link.unlink()
+        source_link.symlink_to('frozen-inputs-a', target_is_directory=True)
         binary = baseline / 'bin/meada-clean'
         binary.write_bytes(b'replaced binary\n')
         refused('changed baseline binary invalidates pin', lambda: audit.read_manifest(baseline))
@@ -196,6 +210,77 @@ def main():
             assert result == 1 and unfinished['incomplete_rounds'] == ['dummy'] and unfinished['caught'] == 0
             assert unfinished['incomplete_count'] == 1 and unfinished['script_only_count'] == 1
         checks.append({'check': 'fresh BLOCKED and UNPROVEN judgments leave detected rounds incomplete', 'passed': True})
+        # Native checks alone must never authorize missing clean UI/source proof. These
+        # are disposable receipts, not actual product or independent-checker evidence.
+        original_manifest = (baseline / 'baseline.json').read_bytes()
+        manifest = json.loads(original_manifest)
+        manifest['requires_ui_receipt'] = True
+        manifest['required_separate_scope'] = list(audit.SEPARATE_SCOPE)
+        audit.save(baseline / 'baseline.json', manifest)
+        judged = json.loads(receipt)
+        judged['baseline_manifest_sha256'] = audit.digest(baseline / 'baseline.json')
+        ui_path, scope_path = baseline / 'dummy-ui.json', baseline / 'dummy-scope.json'
+        (baseline / 'bin/meada-ui').write_bytes(b'dummy UI binary, never product\n')
+        frontend = baseline / 'frontend'
+        frontend.mkdir()
+        (frontend / 'meada-ui.json').write_text('dummy frontend, never product\n')
+        ui = {'source_commit': manifest['source_commit'], 'source_tree': manifest['source_tree'],
+              'baseline_manifest_sha256': judged['baseline_manifest_sha256'],
+              'verifier_keyset_sha256': audit.keyset_hash(manifest['verifier_keys']),
+              'scope': list(audit.UI_FLOWS), 'script_result': 'CHECKS_PASSED', 'console_graph': 'success',
+              'source_and_binary_unchanged': True,
+              'checks': [{'flow': name, 'exit': 0} for name in audit.UI_FLOWS],
+              'ui_binary_sha256': audit.digest(baseline / 'bin/meada-ui'),
+              'frontend_sha256': {'meada-ui.json': audit.digest(frontend / 'meada-ui.json')}}
+        audit.save(ui_path, ui)
+        judged['ui_receipt_sha256'] = audit.digest(ui_path)
+        refused('native pass cannot authorize missing UI evidence', lambda: audit.attestation(baseline, json.dumps(judged)))
+        refused('native/UI pass cannot authorize missing scope captures',
+                lambda: audit.attestation(baseline, json.dumps(judged), ui_path))
+        from prove import corpus
+        entries = list(corpus())
+        flows = ['corpus', 'viewer-start', 'viewer-pages', 'viewer-stop', 'source-and-ui-binary-unchanged']
+        flows += [name + '-' + phase for name in entries for phase in ('ui-stdio', 'start', 'api', 'stop')]
+        captured = {key: ui[key] for key in ('source_commit', 'source_tree', 'baseline_manifest_sha256',
+                    'verifier_keyset_sha256', 'ui_binary_sha256', 'frontend_sha256')}
+        captured.update(script_result='CHECKS_PASSED', capture_result='CAPTURED', entries=entries,
+                        checks=[{'flow': name, 'exit': 0} for name in flows],
+                        source_captures=[{'flow': name, 'exit': 0} for name in audit.SOURCE_CAPTURES])
+        audit.save(scope_path, captured)
+        judged['scope_receipt_sha256'] = audit.digest(scope_path)
+        refused('script captures cannot replace missing independent source judgments',
+                lambda: audit.attestation(baseline, json.dumps(judged), ui_path, scope_path))
+        judged['separate_scope_receipt'] = {'receipt': 'dummy source judgment only', 'sha256': '2' * 64,
+            'verdict': 'PROVED', 'covers': list(audit.SEPARATE_SCOPE), 'source_commit': manifest['source_commit'],
+            'verifier_keyset_sha256': audit.keyset_hash(manifest['verifier_keys'])}
+        audit.attestation(baseline, json.dumps(judged), ui_path, scope_path)
+        checks.append({'check': 'complete same-source/key dummy UI and source receipts are the positive gate control', 'passed': True})
+        original_ui = ui_path.read_bytes()
+        ui['verifier_keyset_sha256'] = '3' * 64
+        audit.save(ui_path, ui)
+        judged['ui_receipt_sha256'] = audit.digest(ui_path)
+        refused('same-source UI from different keys cannot authorize a mutation',
+                lambda: audit.attestation(baseline, json.dumps(judged), ui_path, scope_path))
+        ui_path.write_bytes(original_ui)
+        judged['ui_receipt_sha256'] = audit.digest(ui_path)
+        captured['checks'][0]['exit'] = 1
+        captured['script_result'] = 'BROKEN'
+        audit.save(scope_path, captured)
+        judged['scope_receipt_sha256'] = audit.digest(scope_path)
+        audit.attestation(baseline, json.dumps(judged), ui_path, scope_path)
+        checks.append({'check': 'retained corpus differences need the separate source judgment; parity is not a new key', 'passed': True})
+        captured['checks'].append({'flow': 'extra-api-failure', 'exit': 1})
+        audit.save(scope_path, captured)
+        judged['scope_receipt_sha256'] = audit.digest(scope_path)
+        refused('a fresh source judgment cannot waive failed API or incomplete transport scope',
+                lambda: audit.attestation(baseline, json.dumps(judged), ui_path, scope_path))
+        captured['checks'].pop()
+        captured['checks'].pop()  # a missing real entry cleanup result cannot masquerade as complete
+        audit.save(scope_path, captured)
+        judged['scope_receipt_sha256'] = audit.digest(scope_path)
+        refused('missing actual corpus/API/viewer phase cannot count as complete',
+                lambda: audit.attestation(baseline, json.dumps(judged), ui_path, scope_path))
+        (baseline / 'baseline.json').write_bytes(original_manifest)
     audit.save(run / 'checks.json', {'checks': checks, 'scope': 'disposable dummy repository only',
                                     'product_mutations': 0, 'compiler_runs': 0})
     print(f'{len(checks)} audit safety gates passed; no product audit score.')

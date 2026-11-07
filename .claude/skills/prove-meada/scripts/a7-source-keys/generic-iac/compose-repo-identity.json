@@ -1,0 +1,73 @@
+{
+  "origin": "https://github.com/zz-prove/a7-generic-compose-source-key.git",
+  "repository": "github.com/zz-prove/a7-generic-compose-source-key",
+  "commit": "f439b7f9eebbc7e4bb64130570c716fdb424c861",
+  "commit_message": "a7 independent source key",
+  "fixed_git": {
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_AUTHOR_NAME": "prove-meada",
+    "GIT_AUTHOR_EMAIL": "prove@example.com",
+    "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
+    "GIT_COMMITTER_NAME": "prove-meada",
+    "GIT_COMMITTER_EMAIL": "prove@example.com",
+    "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z"
+  },
+  "files": {
+    "harbor/compose.override.yaml": {
+      "mode": "file",
+      "bytes": 67,
+      "sha256": "6c160cd7973436a53d3210a9663dcbdeaa28d767a3d2c6564f69a22ec6875d41"
+    },
+    "harbor/docker-compose.yml": {
+      "mode": "file",
+      "bytes": 545,
+      "sha256": "c284da50b9de6048ee9d0f17ee53f204931c251b0a8c3031d018fd2f3c9757ef"
+    },
+    "harbor/source/Dockerfile": {
+      "mode": "file",
+      "bytes": 13,
+      "sha256": "bb57c7da220a8753d7bdabac0d3afdb6efa742e4c736c5bc93ab40dfd5e23b9b"
+    },
+    "orphan/compose.override.yml": {
+      "mode": "file",
+      "bytes": 63,
+      "sha256": "06b306dfc422aee81ab52867f69584e62f6ed9bbfb256a6f9add0fad3edc797a"
+    },
+    "port/compose.override.yaml": {
+      "mode": "file",
+      "bytes": 172,
+      "sha256": "3f1c70cdd8cc7d4ba7ed6a9225e405ebe12081a0b999970743918e713703ccd9"
+    },
+    "port/compose.override.yml": {
+      "mode": "file",
+      "bytes": 65,
+      "sha256": "793d785609b0dc19bd26ef99ad98c60fd986f2b057ed3f5d73684ccc032b83ab"
+    },
+    "port/compose.yaml": {
+      "mode": "file",
+      "bytes": 352,
+      "sha256": "4932b28c5d631bb2d7275be81cc8f88e689e51a469d3c04d8f095f6169e15e4d"
+    },
+    "port/compose.yml": {
+      "mode": "file",
+      "bytes": 59,
+      "sha256": "db7727970e72a6971405c1ddcd080a89ec4813c382edf9f8e9cd4472da463e9e"
+    },
+    "port/docker-compose.yaml": {
+      "mode": "file",
+      "bytes": 59,
+      "sha256": "d4d5863e8228af7c4c433a59c8416b42ec3a4f28fb7acd38ec6f327e5413ca6f"
+    },
+    "port/link": {
+      "mode": "symlink",
+      "target": "../harbor/source",
+      "target_sha256": "c340f09a4218d5b66d7bb5b73edcb2b7e23c0096c153c71a1a6a1e0561179c5d"
+    },
+    "port/src/Dockerfile": {
+      "mode": "file",
+      "bytes": 13,
+      "sha256": "bb57c7da220a8753d7bdabac0d3afdb6efa742e4c736c5bc93ab40dfd5e23b9b"
+    }
+  }
+}

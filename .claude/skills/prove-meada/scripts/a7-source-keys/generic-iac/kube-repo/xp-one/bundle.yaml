@@ -1,0 +1,147 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xrelays.proof.example.org
+  namespace: refused-namespace
+spec:
+  group: proof.example.org
+  names:
+    kind: XRelay
+    plural: xrelays
+  claimNames:
+    kind: Relay
+    plural: relays
+  defaultCompositionRef:
+    name: proof-route
+  enforcedCompositionRef:
+    name: proof-route
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: proof-route
+  namespace: refused-namespace
+spec:
+  compositeTypeRef:
+    apiVersion: proof.example.org/v1
+    kind: XRelay
+  resources:
+    - name: literal
+      base:
+        apiVersion: relay.proof.example.org/v1
+        kind: Delivery
+        metadata:
+          name: local-route
+          annotations:
+            crossplane.io/external-name: public-route
+        spec:
+          forProvider: {}
+    - name: patched
+      base:
+        apiVersion: relay.proof.example.org/v1
+        kind: Delivery
+        metadata:
+          name: stable-written
+        spec:
+          forProvider: {}
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.route
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: proof-%s
+    - name: unnamed
+      base:
+        apiVersion: relay.proof.example.org/v1
+        kind: Delivery
+        spec:
+          forProvider: {}
+    - name: nested
+      base:
+        apiVersion: proof.example.org/v1
+        kind: XRelay
+        metadata:
+          name: nested
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: deliveries.relay.proof.example.org
+spec:
+  group: relay.proof.example.org
+  names:
+    kind: Delivery
+    plural: deliveries
+  scope: Namespaced
+---
+apiVersion: proof.example.org/v1
+kind: Relay
+metadata:
+  name: request
+  namespace: amber
+spec:
+  compositionRef:
+    name: proof-route
+---
+apiVersion: proof.example.org/v1
+kind: XRelay
+metadata:
+  name: reality
+  namespace: amber
+spec:
+  compositionRef:
+    name: proof-route
+---
+apiVersion: relay.proof.example.org/v1
+kind: Delivery
+metadata:
+  name: standalone
+  namespace: amber
+  annotations:
+    crossplane.io/external-name: external-route
+spec:
+  forProvider: {}
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: proof-pipeline
+spec:
+  compositeTypeRef:
+    apiVersion: proof.example.org/v1
+    kind: XRelay
+  mode: Pipeline
+  pipeline:
+    - step: literal-input
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          - name: pipe
+            base:
+              apiVersion: relay.proof.example.org/v1
+              kind: Delivery
+              metadata:
+                name: pipe-fixed
+                annotations:
+                  crossplane.io/external-name: pipe-external
+              spec:
+                forProvider: {}
+    - step: unsupported-input
+      functionRef:
+        name: function-ignored
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        resources:
+          - name: refused-function-resource
+            base:
+              apiVersion: relay.proof.example.org/v1
+              kind: Delivery
+              metadata:
+                name: refused-function-name

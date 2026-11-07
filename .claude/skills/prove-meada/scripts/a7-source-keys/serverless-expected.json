@@ -1,0 +1,472 @@
+{
+  "schema": 1,
+  "status": "SOURCE_KEY_READY_NOT_RUNTIME_PROOF",
+  "spec": "#642 stories 18-31; ADR0025 Serverless Framework + CloudFormation sections at fe0faf5dfd7408571bf982bc395ef10d1e456a0b",
+  "source": {
+    "entry": "a7-sls",
+    "origin": "https://github.com/zz-prove/a7-sls.git",
+    "repository": "github.com/zz-prove/a7-sls",
+    "preparation_source_commit": "fe0faf5dfd7408571bf982bc395ef10d1e456a0b",
+    "files_sha256": {
+      "README.md": "5d3d1fc402c766a4de76fa595a027bbf274d394b3475496e7a2a235668b30143",
+      "api/serverless.yml": "81da6a7e05d065077346083389f5e8af03c0cf35736d12c039a433b2d28836d5",
+      "misc/serverless.yml": "d4cc43419344076672495a18c151442f331e8ef7e348154e922550e7767cee39",
+      "worker/serverless.yml": "59be58d47077c399a659abce8d8823e039b6b2f338e1c7b4b750a04b27343934"
+    }
+  },
+  "inventory_complete": true,
+  "expected_node_count": 9,
+  "expected_reference_count": 2,
+  "expected_event_count": 7,
+  "nodes": [
+    {
+      "address": "functions.createOrder",
+      "type": "Serverless::Function",
+      "file": "api/serverless.yml",
+      "span": {
+        "first": 14,
+        "last": 23
+      },
+      "root": "api/serverless.yml",
+      "block": "functions.createOrder",
+      "name": "shop-dev-createOrder",
+      "pattern": false,
+      "overridable": [
+        {
+          "name": "opt:stage, 'dev'",
+          "file": "api/serverless.yml",
+          "line": 6
+        },
+        {
+          "name": "opt:stage",
+          "file": "api/serverless.yml",
+          "line": 6
+        }
+      ],
+      "handler": {
+        "text": "src/orders.create",
+        "line": 15,
+        "overridable": false,
+        "unresolved": false
+      },
+      "events": [
+        {
+          "text": "http POST /orders",
+          "line": 20,
+          "overridable": false
+        },
+        {
+          "text": "httpApi GET /orders/{id}",
+          "line": 23,
+          "overridable": false
+        }
+      ],
+      "references": [
+        {
+          "to": "OrdersQueue",
+          "via": "Ref",
+          "level": "exact",
+          "line": 17
+        }
+      ],
+      "referenced_by": []
+    },
+    {
+      "address": "functions.processOrder",
+      "type": "Serverless::Function",
+      "file": "api/serverless.yml",
+      "span": {
+        "first": 24,
+        "last": 31
+      },
+      "root": "api/serverless.yml",
+      "block": "functions.processOrder",
+      "name": "shop-dev-processor",
+      "pattern": false,
+      "overridable": [
+        {
+          "name": "opt:stage, 'dev'",
+          "file": "api/serverless.yml",
+          "line": 6
+        }
+      ],
+      "handler": {
+        "text": "src/orders.process",
+        "line": 26,
+        "overridable": false,
+        "unresolved": false
+      },
+      "events": [
+        {
+          "text": "sqs OrdersQueue.Arn",
+          "line": 28,
+          "overridable": false
+        },
+        {
+          "text": "schedule rate(5 minutes)",
+          "line": 31,
+          "overridable": false
+        }
+      ],
+      "references": [
+        {
+          "to": "OrdersQueue",
+          "via": "Fn::GetAtt.Arn",
+          "level": "exact",
+          "line": 29
+        }
+      ],
+      "referenced_by": []
+    },
+    {
+      "address": "functions.audit",
+      "type": "Serverless::Function",
+      "file": "api/serverless.yml",
+      "span": {
+        "first": 32,
+        "last": 35
+      },
+      "root": "api/serverless.yml",
+      "block": "functions.audit",
+      "name": "shop-dev-audit",
+      "pattern": false,
+      "overridable": [
+        {
+          "name": "opt:stage, 'dev'",
+          "file": "api/serverless.yml",
+          "line": 6
+        },
+        {
+          "name": "opt:stage",
+          "file": "api/serverless.yml",
+          "line": 6
+        }
+      ],
+      "handler": {
+        "text": "${env:AUDIT_HANDLER}",
+        "line": 33,
+        "overridable": false,
+        "unresolved": true
+      },
+      "events": [
+        {
+          "text": "sns shop-dev-alerts",
+          "line": 35,
+          "overridable": true
+        }
+      ],
+      "references": [],
+      "referenced_by": []
+    },
+    {
+      "address": "OrdersQueue",
+      "type": "AWS::SQS::Queue",
+      "file": "api/serverless.yml",
+      "span": {
+        "first": 39,
+        "last": 42
+      },
+      "root": "api/serverless.yml",
+      "block": "resources.Resources.OrdersQueue",
+      "name": "shop-dev-orders",
+      "pattern": false,
+      "overridable": [
+        {
+          "name": "opt:stage, 'dev'",
+          "file": "api/serverless.yml",
+          "line": 6
+        }
+      ],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [
+        {
+          "from": "functions.createOrder",
+          "via": "Ref",
+          "level": "exact",
+          "line": 17
+        },
+        {
+          "from": "functions.processOrder",
+          "via": "Fn::GetAtt.Arn",
+          "level": "exact",
+          "line": 29
+        }
+      ]
+    },
+    {
+      "address": "OrdersTable",
+      "type": "AWS::DynamoDB::Table",
+      "file": "api/serverless.yml",
+      "span": {
+        "first": 43,
+        "last": 46
+      },
+      "root": "api/serverless.yml",
+      "block": "resources.Resources.OrdersTable",
+      "name": "shop-dev-orders",
+      "pattern": false,
+      "overridable": [
+        {
+          "name": "opt:stage, 'dev'",
+          "file": "api/serverless.yml",
+          "line": 6
+        }
+      ],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": []
+    },
+    {
+      "address": "DeadLetter",
+      "type": "AWS::SQS::Queue",
+      "file": "api/serverless.yml",
+      "span": {
+        "first": 47,
+        "last": 50
+      },
+      "root": "api/serverless.yml",
+      "block": "resources.Resources.DeadLetter",
+      "name": "*-dead",
+      "pattern": true,
+      "overridable": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": []
+    },
+    {
+      "address": "Assets",
+      "type": "AWS::S3::Bucket",
+      "file": "api/serverless.yml",
+      "span": {
+        "first": 51,
+        "last": 54
+      },
+      "root": "api/serverless.yml",
+      "block": "resources.Resources.Assets",
+      "name": "*-shop-assets",
+      "pattern": true,
+      "overridable": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": []
+    },
+    {
+      "address": "Vault",
+      "type": "AWS::SecretsManager::Secret",
+      "file": "api/serverless.yml",
+      "span": {
+        "first": 55,
+        "last": 58
+      },
+      "root": "api/serverless.yml",
+      "block": "resources.Resources.Vault",
+      "name": "*",
+      "pattern": true,
+      "overridable": [],
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": []
+    },
+    {
+      "address": "functions.send",
+      "type": "Serverless::Function",
+      "file": "worker/serverless.yml",
+      "span": {
+        "first": 9,
+        "last": 13
+      },
+      "root": "worker/serverless.yml",
+      "block": "functions.send",
+      "name": "mailer-prod-send",
+      "pattern": false,
+      "overridable": [
+        {
+          "name": "opt:stage",
+          "file": "worker/serverless.yml",
+          "line": 6
+        }
+      ],
+      "handler": {
+        "text": "handler.send",
+        "line": 10,
+        "overridable": false,
+        "unresolved": false
+      },
+      "events": [
+        {
+          "text": "http GET /mail/send",
+          "line": 12,
+          "overridable": false
+        },
+        {
+          "text": "sqs arn:aws:sqs:us-east-1:123456789012:mail-outbox",
+          "line": 13,
+          "overridable": false
+        }
+      ],
+      "references": [],
+      "referenced_by": []
+    }
+  ],
+  "references": [
+    {
+      "root": "api/serverless.yml",
+      "from": "functions.createOrder",
+      "to": "OrdersQueue",
+      "via": "Ref",
+      "level": "exact",
+      "line": 17
+    },
+    {
+      "root": "api/serverless.yml",
+      "from": "functions.processOrder",
+      "to": "OrdersQueue",
+      "via": "Fn::GetAtt.Arn",
+      "level": "exact",
+      "line": 29
+    }
+  ],
+  "negative_nodes": [
+    {
+      "file": "misc/serverless.yml",
+      "address": "functions.ignored",
+      "reason": "no service key, so file is no Serverless unit"
+    }
+  ],
+  "name_provenance_rules": [
+    "An explicit function name follows only sources read by that name.",
+    "A default function name also records the implicit deployer stage opt:stage at provider.stage line; explicit opt:stage fallback provenance remains separately source-identifiable.",
+    "The two names shop-dev-orders do not create a reference by equality.",
+    "Handler and event unresolved or overridable state does not invent a node-name override."
+  ],
+  "reference_absence": {
+    "resources_have_no_resource_references": true,
+    "self_paths_are_not_iac_references": true,
+    "typed_or_equal_literals_do_not_create_iac_references": true,
+    "AWS::Region_is_pseudo_parameter": true,
+    "generated_function_logical_ids_are_not_nodes": true
+  },
+  "refresh": {
+    "file": "api/serverless.yml",
+    "before_sha256": "81da6a7e05d065077346083389f5e8af03c0cf35736d12c039a433b2d28836d5",
+    "replace_once": {
+      "from": "shop",
+      "to": "mall",
+      "line": 1,
+      "same_utf8_byte_count": true
+    },
+    "expected_changed_names": {
+      "functions.createOrder": "mall-dev-createOrder",
+      "functions.processOrder": "mall-dev-processor",
+      "functions.audit": "mall-dev-audit",
+      "OrdersQueue": "mall-dev-orders",
+      "OrdersTable": "mall-dev-orders",
+      "Assets": "*-mall-assets"
+    },
+    "expected_changed_events": {
+      "functions.audit": [
+        "sns mall-dev-alerts"
+      ]
+    },
+    "unchanged_names": [
+      "DeadLetter",
+      "Vault",
+      "functions.send"
+    ],
+    "references_unchanged": [
+      {
+        "root": "api/serverless.yml",
+        "from": "functions.createOrder",
+        "to": "OrdersQueue",
+        "via": "Ref",
+        "level": "exact",
+        "line": 17
+      },
+      {
+        "root": "api/serverless.yml",
+        "from": "functions.processOrder",
+        "to": "OrdersQueue",
+        "via": "Fn::GetAtt.Arn",
+        "level": "exact",
+        "line": 29
+      }
+    ],
+    "restoration": "Restore exact original bytes, require original per-file SHA256 and complete nodes/events/references in both stdio and HTTP; capture warm changed, cold changed, warm restored, cold restored."
+  },
+  "query_file": "serverless.jsonl",
+  "expected_query_count": 43,
+  "runtime_verdict": "UNPROVEN",
+  "limitations": [
+    "This is a complete source-selected generic node/event/reference key for only the three retained probe files, not all Serverless syntax.",
+    "No runtime output, product implementation, mutation plan or auditor file supplied these expectations.",
+    "Default-name stage provenance is represented by both explicit option fallback and implicit CLI stage evidence when both apply; compare semantic evidence rather than punctuation in rendering."
+  ],
+  "source_edits": [
+    {
+      "phase": "serverless-service-name",
+      "starts_from": "baseline",
+      "file": "api/serverless.yml",
+      "replace_exactly_once": {
+        "before": "service: shop\n",
+        "after": "service: mall\n"
+      },
+      "sha256_before": "81da6a7e05d065077346083389f5e8af03c0cf35736d12c039a433b2d28836d5",
+      "sha256_after": "f3070ec2320950a71e06141abe5e03246d9572afcac01107c849e59af87340c9",
+      "same_utf8_byte_count": true,
+      "expected": {
+        "file": "api/serverless.yml",
+        "before_sha256": "81da6a7e05d065077346083389f5e8af03c0cf35736d12c039a433b2d28836d5",
+        "replace_once": {
+          "from": "shop",
+          "to": "mall",
+          "line": 1,
+          "same_utf8_byte_count": true
+        },
+        "expected_changed_names": {
+          "functions.createOrder": "mall-dev-createOrder",
+          "functions.processOrder": "mall-dev-processor",
+          "functions.audit": "mall-dev-audit",
+          "OrdersQueue": "mall-dev-orders",
+          "OrdersTable": "mall-dev-orders",
+          "Assets": "*-mall-assets"
+        },
+        "expected_changed_events": {
+          "functions.audit": [
+            "sns mall-dev-alerts"
+          ]
+        },
+        "unchanged_names": [
+          "DeadLetter",
+          "Vault",
+          "functions.send"
+        ],
+        "references_unchanged": [
+          {
+            "root": "api/serverless.yml",
+            "from": "functions.createOrder",
+            "to": "OrdersQueue",
+            "via": "Ref",
+            "level": "exact",
+            "line": 17
+          },
+          {
+            "root": "api/serverless.yml",
+            "from": "functions.processOrder",
+            "to": "OrdersQueue",
+            "via": "Fn::GetAtt.Arn",
+            "level": "exact",
+            "line": 29
+          }
+        ],
+        "restoration": "Restore exact original bytes, require original per-file SHA256 and complete nodes/events/references in both stdio and HTTP; capture warm changed, cold changed, warm restored, cold restored."
+      },
+      "restoration": "Restore baseline exact bytes, then require original SHA256, complete node/reference/image/event sets, and matching warm/cold captures in both stdio/HTTP."
+    }
+  ]
+}

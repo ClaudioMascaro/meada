@@ -1,0 +1,3 @@
+# Frozen source bytes include the trailing blank used by the same-size sensitivity edit.
+native-hcl-values/repo/sensory/variables.tf whitespace=-blank-at-eol
+native-hcl-values/author-key.py whitespace=-blank-at-eol

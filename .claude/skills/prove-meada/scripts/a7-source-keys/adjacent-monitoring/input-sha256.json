@@ -1,0 +1,111 @@
+{
+  "expected_file": "expected.json",
+  "file_metadata": [
+    {
+      "bytes": 982,
+      "git_blob_sha1": "db6c33b0a55f9d269fe222c7f7cf96ae4c18473f",
+      "path": "grafana/provisioning.yaml",
+      "sha256": "c063ddc7946f7d9c19516ca5561f91083f8830f20f45b7379c03993688cd555f"
+    },
+    {
+      "bytes": 115,
+      "git_blob_sha1": "cc762221bcbf7ada7621a7c949ff73a77a81ec51",
+      "path": "helm/Chart.yaml",
+      "sha256": "7f3e2de0c2f2527e9a961de6ca3a9511672cb8548b7cc44e6fa8fd9ed88fa78a"
+    },
+    {
+      "bytes": 187,
+      "git_blob_sha1": "f28f6aedfd14f49fc29445786c273abeeb172091",
+      "path": "helm/templates/rules.yaml",
+      "sha256": "348c89cf77fd4ca7f6a8ea92dfbd50c15ea734d8fcf65fbf96c10afdc06f1b82"
+    },
+    {
+      "bytes": 216,
+      "git_blob_sha1": "7ec7798593b197354e9919536250a030e9fb3632",
+      "path": "helm/values.yaml",
+      "sha256": "321671b77bf73d6d9639ddbdd01c2e4b8c54188d11b2e00737e8b8edc4758920"
+    },
+    {
+      "bytes": 956,
+      "git_blob_sha1": "7c0963c6237421c778bfa53bd22e194e2df068ee",
+      "path": "kubernetes/bundle.yaml",
+      "sha256": "fa1d3b12d46379e0fd6efe0382e6043d8a7cde6bdda205cb807683383db30a64"
+    },
+    {
+      "bytes": 718,
+      "git_blob_sha1": "60b6c090a6d6760c63e0065ce422a585cb378598",
+      "path": "kubernetes/ledger.json",
+      "sha256": "c942454ca89ad881d8a0802c39c735d22b3c347eab02b6e1419d5b3afb877529"
+    },
+    {
+      "bytes": 413,
+      "git_blob_sha1": "b368ed7f899c417fe924009928122bc6df0c8442",
+      "path": "loki/harbor.yaml",
+      "sha256": "0143cf290a67279988e6938b544910f690094463e84a617fa8d3ba83bdfccf9d"
+    },
+    {
+      "bytes": 335,
+      "git_blob_sha1": "1cff13558f885607d18495e7cb07de623646bd06",
+      "path": "loki/quartz.json",
+      "sha256": "e17ddd8c95da305fd71da022079bea805a6772e60cd8ad7780287cf73de408e0"
+    },
+    {
+      "bytes": 633,
+      "git_blob_sha1": "32e46c1b82a51a01f1139c6dbceea4626ef74ddd",
+      "path": "prometheus/aurora.yaml",
+      "sha256": "3c6358843e8fe807b5d1f11bb6825cb66ab72b89752bfcf00ede9fa322a0320a"
+    },
+    {
+      "bytes": 540,
+      "git_blob_sha1": "0d9854461741213f88b961339e0733eabbb863c4",
+      "path": "prometheus/meridian.json",
+      "sha256": "c63c8a1e0ab7ed4ad92aa516b0048331d5c51aa19c6a00f2702331de2304bef1"
+    },
+    {
+      "bytes": 928,
+      "git_blob_sha1": "57e505d82a1f47796ce915862fa61a4e12dc928a",
+      "path": "routing/alertmanager.yaml",
+      "sha256": "8ab5919dd4dd076c63b1e4e98e8995796b051889ca58a5227d3acf2a1c5263b9"
+    },
+    {
+      "bytes": 1564,
+      "git_blob_sha1": "ecf6db953a7e5f2485bc2e35a93292bc52d8106a",
+      "path": "routing/native.json",
+      "sha256": "e2593c12d8f1b345a0572ceb02c86d4dd9dc58ea831a2a89b36c59d99dbd8d6f"
+    }
+  ],
+  "files": {
+    "grafana/provisioning.yaml": "c063ddc7946f7d9c19516ca5561f91083f8830f20f45b7379c03993688cd555f",
+    "helm/Chart.yaml": "7f3e2de0c2f2527e9a961de6ca3a9511672cb8548b7cc44e6fa8fd9ed88fa78a",
+    "helm/templates/rules.yaml": "348c89cf77fd4ca7f6a8ea92dfbd50c15ea734d8fcf65fbf96c10afdc06f1b82",
+    "helm/values.yaml": "321671b77bf73d6d9639ddbdd01c2e4b8c54188d11b2e00737e8b8edc4758920",
+    "kubernetes/bundle.yaml": "fa1d3b12d46379e0fd6efe0382e6043d8a7cde6bdda205cb807683383db30a64",
+    "kubernetes/ledger.json": "c942454ca89ad881d8a0802c39c735d22b3c347eab02b6e1419d5b3afb877529",
+    "loki/harbor.yaml": "0143cf290a67279988e6938b544910f690094463e84a617fa8d3ba83bdfccf9d",
+    "loki/quartz.json": "e17ddd8c95da305fd71da022079bea805a6772e60cd8ad7780287cf73de408e0",
+    "prometheus/aurora.yaml": "3c6358843e8fe807b5d1f11bb6825cb66ab72b89752bfcf00ede9fa322a0320a",
+    "prometheus/meridian.json": "c63c8a1e0ab7ed4ad92aa516b0048331d5c51aa19c6a00f2702331de2304bef1",
+    "routing/alertmanager.yaml": "8ab5919dd4dd076c63b1e4e98e8995796b051889ca58a5227d3acf2a1c5263b9",
+    "routing/native.json": "e2593c12d8f1b345a0572ceb02c86d4dd9dc58ea831a2a89b36c59d99dbd8d6f"
+  },
+  "fixture_git": {
+    "author_date": "2026-11-07T02:00:00Z",
+    "author_email": "source-key@example.invalid",
+    "author_name": "Independent Source Key",
+    "branch": "source-key",
+    "commit": "da43b36c4f43b70c21cef28a6cecdfa751b64318",
+    "committer_date": "2026-11-07T02:00:00Z",
+    "message": "test: freeze independent cedar harbor monitoring sources",
+    "origin": "https://github.com/independent-monitoring/cedar-harbor-lab.git",
+    "parents": [],
+    "tree": "0f90e7861ea569c873a3b6eac86825f1575b264c"
+  },
+  "origin": "https://github.com/independent-monitoring/cedar-harbor-lab.git",
+  "origin_is_synthetic": true,
+  "phase_plan": "phase-plan.json",
+  "query_file": "queries.jsonl",
+  "repository_identity": "independent-monitoring/cedar-harbor-lab",
+  "source_bytes": 7587,
+  "source_files": 12,
+  "status": "FROZEN_SOURCE_ONLY_NOT_PROVED"
+}

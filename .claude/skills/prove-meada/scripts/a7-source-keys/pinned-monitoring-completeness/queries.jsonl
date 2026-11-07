@@ -1,0 +1,808 @@
+{"arguments": {"budget": 200000, "symbol": "examples/existingrule.json::groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "examples/existingrule.json::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "examples/existingrule.json::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "examples/existingrule.yaml::groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "examples/existingrule.yaml::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "examples/existingrule.yaml::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/grafana-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/grafana-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/grafana-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[1].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[1].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[1].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[9]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[9]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[9]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[10]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[10]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[10]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[11]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[11]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[11]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[12]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[12]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[12]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[13]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[13]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[13]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[14]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[14]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[14]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[15]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[15]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[15]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[16]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[16]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[16]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[8]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[8]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[8]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[9]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[9]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[9]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[10]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[10]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[10]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[11]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[11]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[11]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[12]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[12]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[12]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[13]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[13]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[13]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[14]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[14]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[14]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[15]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[15]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[15]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[9]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[9]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[9]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[10]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[10]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[10]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[11]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[11]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[11]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[12]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[12]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[12]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[13]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[13]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[13]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[14]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[14]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[14]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[15]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[15]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[15]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[16]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[16]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[16]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[17]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[17]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[17]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[18]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[18]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[18]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[19]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[19]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[19]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[20]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[20]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[20]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[21]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[21]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[21]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[22]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[22]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[22]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[23]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[23]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[23]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[24]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[24]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[24]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[25]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[25]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[25]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[8]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[9]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[9]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[9]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[10]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[10]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[10]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[11]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[11]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[11]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[12]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[12]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[12]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[13]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[13]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[13]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[14]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[14]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[14]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[15]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[15]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[15]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[16]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[16]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[16]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[17]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[17]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[17]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[18]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[18]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[18]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[19]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[19]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[19]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[20]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[20]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[20]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[21]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[21]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[21]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[22]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[22]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[22]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[6]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[7]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[1].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[1].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[1].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "examples/alertmanager-config.yaml::route"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "examples/alertmanager-config.yaml::route"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "examples/alertmanager-config.yaml::route"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "examples/alertmanager-config.yaml::route.routes[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "examples/alertmanager-config.yaml::route.routes[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "examples/alertmanager-config.yaml::route.routes[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::AlertmanagerClusterCrashlooping"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::AlertmanagerClusterCrashlooping"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::AlertmanagerClusterDown"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::AlertmanagerClusterDown"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::AlertmanagerClusterFailedPeers"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::AlertmanagerClusterFailedPeers"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::AlertmanagerClusterFailedToSendAlerts"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::AlertmanagerClusterFailedToSendAlerts"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::AlertmanagerConfigInconsistent"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::AlertmanagerConfigInconsistent"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::AlertmanagerFailedReload"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::AlertmanagerFailedReload"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::AlertmanagerFailedToSendAlerts"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::AlertmanagerFailedToSendAlerts"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::AlertmanagerMembersInconsistent"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::AlertmanagerMembersInconsistent"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::CPUThrottlingHigh"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::CPUThrottlingHigh"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::ConfigReloaderSidecarErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::ConfigReloaderSidecarErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::ExampleAlert"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::ExampleAlert"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::GrafanaRequestsFailing"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::GrafanaRequestsFailing"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::InfoInhibitor"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::InfoInhibitor"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeAPIDown"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeAPIDown"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeAPIErrorBudgetBurn"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeAPIErrorBudgetBurn"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeAPIInstanceUnreachable"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeAPIInstanceUnreachable"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeAPITerminatedRequests"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeAPITerminatedRequests"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeAggregatedAPIDown"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeAggregatedAPIDown"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeAggregatedAPIErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeAggregatedAPIErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeCPUOvercommit"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeCPUOvercommit"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeCPUQuotaOvercommit"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeCPUQuotaOvercommit"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeClientCertificateExpiration"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeClientCertificateExpiration"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeClientErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeClientErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeContainerWaiting"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeContainerWaiting"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeControllerManagerDown"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeControllerManagerDown"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeControllerManagerInstanceUnreachable"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeControllerManagerInstanceUnreachable"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeDaemonSetMisScheduled"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeDaemonSetMisScheduled"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeDaemonSetNotScheduled"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeDaemonSetNotScheduled"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeDaemonSetRolloutStuck"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeDaemonSetRolloutStuck"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeDeploymentGenerationMismatch"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeDeploymentGenerationMismatch"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeDeploymentReplicasMismatch"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeDeploymentReplicasMismatch"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeDeploymentRolloutStuck"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeDeploymentRolloutStuck"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeHpaMaxedOut"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeHpaMaxedOut"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeHpaReplicasMismatch"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeHpaReplicasMismatch"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeJobFailed"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeJobFailed"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeJobNotCompleted"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeJobNotCompleted"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeMemoryOvercommit"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeMemoryOvercommit"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeMemoryQuotaOvercommit"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeMemoryQuotaOvercommit"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeNodeEviction"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeNodeEviction"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeNodeNotReady"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeNodeNotReady"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeNodePressure"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeNodePressure"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeNodeReadinessFlapping"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeNodeReadinessFlapping"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeNodeUnreachable"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeNodeUnreachable"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubePdbNotEnoughHealthyPods"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubePdbNotEnoughHealthyPods"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubePersistentVolumeErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubePersistentVolumeErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubePersistentVolumeFillingUp"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubePersistentVolumeFillingUp"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubePersistentVolumeInodesFillingUp"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubePersistentVolumeInodesFillingUp"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubePodCrashLooping"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubePodCrashLooping"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubePodNotReady"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubePodNotReady"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeQuotaAlmostFull"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeQuotaAlmostFull"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeQuotaExceeded"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeQuotaExceeded"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeQuotaFullyUsed"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeQuotaFullyUsed"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeSchedulerDown"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeSchedulerDown"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeSchedulerInstanceUnreachable"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeSchedulerInstanceUnreachable"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeStateMetricsListErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeStateMetricsListErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeStateMetricsShardingMismatch"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeStateMetricsShardingMismatch"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeStateMetricsShardsMissing"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeStateMetricsShardsMissing"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeStateMetricsWatchErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeStateMetricsWatchErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeStatefulSetGenerationMismatch"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeStatefulSetGenerationMismatch"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeStatefulSetReplicasMismatch"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeStatefulSetReplicasMismatch"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeStatefulSetUpdateNotRolledOut"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeStatefulSetUpdateNotRolledOut"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeVersionMismatch"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeVersionMismatch"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeletClientCertificateExpiration"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeletClientCertificateExpiration"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeletClientCertificateRenewalErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeletClientCertificateRenewalErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeletDown"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeletDown"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeletInstanceUnreachable"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeletInstanceUnreachable"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeletPlegDurationHigh"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeletPlegDurationHigh"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeletPodStartUpLatencyHigh"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeletPodStartUpLatencyHigh"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeletServerCertificateExpiration"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeletServerCertificateExpiration"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeletServerCertificateRenewalErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeletServerCertificateRenewalErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::KubeletTooManyPods"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::KubeletTooManyPods"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeBondingDegraded"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeBondingDegraded"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeCPUHighUsage"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeCPUHighUsage"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeClockNotSynchronising"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeClockNotSynchronising"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeClockSkewDetected"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeClockSkewDetected"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeDiskIOSaturation"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeDiskIOSaturation"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeFileDescriptorLimit"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeFileDescriptorLimit"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeFilesystemAlmostOutOfFiles"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeFilesystemAlmostOutOfFiles"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeFilesystemAlmostOutOfSpace"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeFilesystemAlmostOutOfSpace"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeFilesystemFilesFillingUp"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeFilesystemFilesFillingUp"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeFilesystemSpaceFillingUp"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeFilesystemSpaceFillingUp"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeHighNumberConntrackEntriesUsed"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeHighNumberConntrackEntriesUsed"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeMemoryHighUtilization"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeMemoryHighUtilization"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeMemoryMajorPagesFaults"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeMemoryMajorPagesFaults"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeNetworkInterfaceFlapping"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeNetworkInterfaceFlapping"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeNetworkReceiveErrs"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeNetworkReceiveErrs"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeNetworkTransmitErrs"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeNetworkTransmitErrs"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeRAIDDegraded"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeRAIDDegraded"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeRAIDDiskFailure"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeRAIDDiskFailure"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeSystemSaturation"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeSystemSaturation"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeSystemdServiceCrashlooping"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeSystemdServiceCrashlooping"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeSystemdServiceFailed"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeSystemdServiceFailed"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::NodeTextFileCollectorScrapeError"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::NodeTextFileCollectorScrapeError"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusBadConfig"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusBadConfig"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusDuplicateTimestamps"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusDuplicateTimestamps"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusErrorSendingAlertsToAnyAlertmanager"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusErrorSendingAlertsToAnyAlertmanager"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusErrorSendingAlertsToSomeAlertmanagers"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusErrorSendingAlertsToSomeAlertmanagers"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusHighQueryLoad"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusHighQueryLoad"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusKubernetesListWatchFailures"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusKubernetesListWatchFailures"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusLabelLimitHit"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusLabelLimitHit"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusMissingRuleEvaluations"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusMissingRuleEvaluations"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusNotConnectedToAlertmanagers"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusNotConnectedToAlertmanagers"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusNotIngestingSamples"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusNotIngestingSamples"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusNotificationQueueRunningFull"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusNotificationQueueRunningFull"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusOperatorListErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusOperatorListErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusOperatorNodeLookupErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusOperatorNodeLookupErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusOperatorNotReady"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusOperatorNotReady"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusOperatorReconcileErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusOperatorReconcileErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusOperatorRejectedResources"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusOperatorRejectedResources"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusOperatorStatusUpdateErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusOperatorStatusUpdateErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusOperatorSyncFailed"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusOperatorSyncFailed"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusOperatorWatchErrors"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusOperatorWatchErrors"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusOutOfOrderTimestamps"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusOutOfOrderTimestamps"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusRemoteStorageFailures"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusRemoteStorageFailures"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusRemoteWriteBehind"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusRemoteWriteBehind"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusRemoteWriteDesiredShards"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusRemoteWriteDesiredShards"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusRuleFailures"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusRuleFailures"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusSDRefreshFailure"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusSDRefreshFailure"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusScrapeBodySizeLimitHit"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusScrapeBodySizeLimitHit"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusScrapeSampleLimitHit"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusScrapeSampleLimitHit"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusTSDBCompactionsFailing"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusTSDBCompactionsFailing"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusTSDBReloadsFailing"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusTSDBReloadsFailing"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusTargetLimitHit"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusTargetLimitHit"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::PrometheusTargetSyncFailure"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::PrometheusTargetSyncFailure"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::TargetDown"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::TargetDown"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::Watchdog"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::Watchdog"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::long::1d"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::long::1d"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::long::1h"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::long::1h"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::long::3d"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::long::3d"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::long::6h"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::long::6h"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::severity::critical"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::severity::critical"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::severity::info"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::severity::info"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::severity::none"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::severity::none"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::severity::warning"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::severity::warning"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::short::2h"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::short::2h"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::short::30m"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::short::30m"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::short::5m"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::short::5m"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::short::6h"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::short::6h"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "Watchdog"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alertname"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "long"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "severity"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "short"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "zz_source_monitoring_missing"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "manifests/grafana-prometheusRule.yaml::spec.groups[1].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[2].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[2].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[2].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[2].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[2].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[2].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[3].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[3].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[8]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[9]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[10]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[11]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[12]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[13]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[14]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[9].rules[15]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[8]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[9]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[10]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[11]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[12]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[13]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[10].rules[14]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[11].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[11].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[12].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[12].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[13].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[14].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[15].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[16].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[17].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[17].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[18].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[18].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[19].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[19].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[20].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[20].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[21].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[21].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[21].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[21].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[21].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[21].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[21].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[21].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[22].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[22].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[22].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[22].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[22].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[22].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[22].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[22].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[22].rules[8]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[23].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[23].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[23].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[23].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[23].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[24].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[24].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[24].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[6]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[7]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[8]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[9]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[10]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[11]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[12]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[13]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[1].rules[14]"}, "tool": "context"}

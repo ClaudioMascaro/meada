@@ -1,0 +1,41 @@
+{"tool": "search", "arguments": {"query": "services.", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.api", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "service", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "port/compose.yaml::services.api (root port)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "port/compose.yaml::services.api (root port)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "port/compose.yaml::services.api (root port)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.store", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "port/compose.yaml::services.store (root port)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "port/compose.yaml::services.store (root port)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "port/compose.yaml::services.store (root port)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.cache", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "port/compose.yaml::services.cache (root port)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "port/compose.yaml::services.cache (root port)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "port/compose.yaml::services.cache (root port)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.worker", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "port/compose.override.yaml::services.worker (root port)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "port/compose.override.yaml::services.worker (root port)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "port/compose.override.yaml::services.worker (root port)", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "harbor/docker-compose.yml::services.api (root harbor)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "harbor/docker-compose.yml::services.api (root harbor)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "harbor/docker-compose.yml::services.api (root harbor)", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "harbor/docker-compose.yml::services.store (root harbor)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "harbor/docker-compose.yml::services.store (root harbor)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "harbor/docker-compose.yml::services.store (root harbor)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.observer", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "harbor/docker-compose.yml::services.observer (root harbor)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.drifter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "harbor/docker-compose.yml::services.drifter (root harbor)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "harbor/docker-compose.yml::services.drifter (root harbor)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "harbor/docker-compose.yml::services.drifter (root harbor)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.watcher", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "harbor/docker-compose.yml::services.watcher (root harbor)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "harbor/docker-compose.yml::services.watcher (root harbor)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "harbor/docker-compose.yml::services.watcher (root harbor)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.hoster", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "harbor/docker-compose.yml::services.hoster (root harbor)", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.refusedSecondBase", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.refusedOtherFamily", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.refusedSecondOverride", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.refusedWrongFamilyOverride", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "services.refusedOrphanOverride", "kind": "iac", "budget": 200000}}
