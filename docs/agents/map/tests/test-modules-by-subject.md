@@ -88,7 +88,8 @@
   not, and `context` lists them under `annotations:`), `docs` (the repository map against the code:
   `ponytail:` limits in `ceilings.md`, rejection of `shortcut:` in Rust comments under `src/` and
   `meada-core/src/`, entry point kinds and process marks in their lists, a line
-  per module naming its area file, the 64 KiB budget of every `docs/agents` Markdown file with the
+  per module naming its area file, each `docs/agents` Markdown file staying within its
+  [documented byte budget](../../ceilings/server-accounts-workspaces-and-deploy.md), with the
   splitter's command in its failure, and every relative link of those files resolving; the splitter,
   `examples/split_agents.rs`, tests itself under `cargo test`),
   `benchmark` (public fixture index/reindex times and sizes, fixed default-answer and MCP

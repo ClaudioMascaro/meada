@@ -298,7 +298,8 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
     finally:
         server.terminate()
         server.wait(timeout=30)
-    dump(run, 'checks.json', {'verdict': 'PROVED', 'answer_key': '#666/#642; ADR 0005/0025/0026',
+    dump(run, 'checks.json', {'script_result': 'CHECKS_PASSED', 'verdict': 'UNPROVEN',
+                             'answer_key': '#666/#642; ADR 0005/0025/0026',
                              'providers': 5, 'links': 5, 'base_parity': bool(args.base_bin),
                              'surfaces': ['CLI export', 'MCP stdio', 'MCP HTTP', 'IaC-source-deleted byte parity', 'handler-source-deleted graph and baseline display parity']})
     print('checks passed; evidence:', run)
