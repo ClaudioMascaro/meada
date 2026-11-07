@@ -3,8 +3,7 @@
 This extends the permanent application skill through `/create-prove-it`. The primary surface
 is MCP, with CLI export/status and HTTP-to-stdio parity. The existing console graph consumes
 these alert rows; its graph/query checks remain in the alert flow. This adds no new UI surface
-or UI performance budget. The user's minimal local validation policy leaves the full corpus,
-feature matrix and integration to GitHub CI. The parent coordinates independent final proof.
+or UI performance budget. Validation policy is in [AGENTS.md](../../../../AGENTS.md).
 
 Run from the repository root with a binary copied while holding the shared Cargo lock:
 
@@ -12,6 +11,8 @@ Run from the repository root with a binary copied while holding the shared Cargo
 python3 .claude/skills/prove-meada/scripts/incident-routing.py \
   --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" \
   --run "$RUN/incidents" --http
+python3 .claude/skills/prove-meada/scripts/incident-guards.py \
+  --head-bin "$RUN/bin/meada-head" --run "$RUN/incident-guards"
 ```
 
 The script preserves inputs and SHA256s, CLI stdout/stderr/exit status, queries, MCP answers,
@@ -25,6 +26,12 @@ provider, consumer and link sets. In #638 the unchanged routing condition tests 
 Its monitor also has `support:team-b`; trace from the shared monitor site reaches the service
 matcher. Original Helm values and nonstandard monitor YAML remain configuration only. Do not
 add a support condition to that rule or claim it demonstrates final team notification.
+
+The guard driver preserves seven independent review counterexamples: an opaque dynamic
+condition blocks AND but does not erase a satisfied OR branch; skipped count/for_each and
+unknown-team first rules remain routing barriers; a different team does not block; a literal
+first rule wins. It compares complete link tuples and consumer/node presence, retaining raw
+source/export/status even when a condition fails. Its pass is not a blind audit verdict.
 
 Independently probe these branches after the scripted drive: equality, regex, prefix and
 containment; mixed conjunctions and disjunctions; rule order; a missing tag, an unknown tag,
