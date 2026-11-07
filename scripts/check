@@ -194,7 +194,9 @@ def rust_tests(source, destination):
 
 
 def static(args, paths, tree):
-    run("git", "diff", "--check", *args, "--")
+    checked = [p for p in paths if not fixture(p)]
+    if checked:
+        run("git", "diff", "--check", *args, "--", *checked)
     markdown = [p for p in paths if p.endswith(".md")]
     if markdown:
         patch = git("diff", "--no-ext-diff", "--no-renames", "-U0", *args, "--", *markdown)
@@ -421,7 +423,8 @@ def selftest():
                       "tests/fixtures/invalid/data.json"]
             for path in inputs:
                 write(path, "{{ intentionally invalid input\n")
-            static([base, docs], inputs, docs)
+            fixture_head = save(inputs[0], "{{ intentionally invalid input  \n\n")
+            static([docs, fixture_head], inputs, fixture_head)
             for path in inputs[:2]:
                 assert scopes([path])["cli"] and scopes([path])["console"] and not scopes([path])["product"]
             assert not proof_driver(".claude/skills/prove-meada/scripts/a7-probe/README.md")
