@@ -57,9 +57,10 @@ const OBJECTS_MAX: usize = 10_000;
 // ConfigMap reached along thousands of paths.
 const OVERLAY_BYTES_MAX: usize = 16 * MAX_BYTES;
 
-/// The entries of kustomizations one overlay walks, bases that name each other included; past it
-/// the rest of the overlay is left out. Bases can reach one another along many paths (each of a
-/// few entries naming a few more), which the depth ceiling alone leaves exponential.
+/// The entries of kustomizations one overlay walks, bases that name each other included, and each
+/// object a component is handed; past it the rest of the overlay is left out. Bases and components
+/// can reach one another along many paths (each of a few entries naming a few more), which the
+/// depth ceiling alone leaves exponential.
 // ponytail: a real overlay walks tens of entries; 50,000 is past any, and cheap.
 const WALK_MAX: usize = 50_000;
 
@@ -809,7 +810,8 @@ impl<'m> Eval<'m> {
     ) -> Vec<Obj> {
         let (path, k) = self.dirs[dir];
         // The files and bases this kustomization named already: a second entry for one adds
-        // nothing (Kustomize refuses the duplicate objects).
+        // nothing (Kustomize refuses the duplicate objects). A component listed again applies
+        // again, as Kustomize's does.
         let mut listed: HashSet<&'m str> = HashSet::new();
         for (i, entry) in k.entries.iter().enumerate() {
             if self.steps == 0 {
@@ -817,7 +819,11 @@ impl<'m> Eval<'m> {
             }
             self.steps -= 1;
             let found = match self.entry(dir, entry) {
-                Entry::File(file, _) | Entry::Dir(file) if !listed.insert(file) => continue,
+                Entry::File(file, _) | Entry::Dir(file)
+                    if i < k.components && !listed.insert(file) =>
+                {
+                    continue;
+                }
                 Entry::File(file, objects) => {
                     self.reached.insert(file);
                     let take = self.fit(objects);
@@ -831,9 +837,14 @@ impl<'m> Eval<'m> {
             match found {
                 Entry::Dir(base) => {
                     stack.push(base);
-                    // Components come after the resources, and change them.
+                    // Components come after the resources, and change them. Each object a component
+                    // is handed counts as an entry walked: components reached along many paths
+                    // hand the same objects on again.
                     let given = match i >= k.components {
-                        true => std::mem::take(&mut objs),
+                        true => {
+                            self.steps = self.steps.saturating_sub(objs.len());
+                            std::mem::take(&mut objs)
+                        }
                         false => Vec::new(),
                     };
                     objs.extend(self.objects(base, depth + 1, stack, given));
@@ -1795,6 +1806,68 @@ mod tests {
                 .map(|i| i.image.as_str())
                 .collect::<Vec<_>>(),
             ["ghcr.io/acme/api-ha:1.0"]
+        );
+        // A component listed twice applies twice, as Kustomize does not merge the entries.
+        let out = evaluate(&files(&[
+            ("base/kustomization.yaml", "resources:\n  - extra.yaml\n"),
+            (
+                "base/extra.yaml",
+                "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: settings\n",
+            ),
+            (
+                "ha/kustomization.yaml",
+                "kind: Component\nnamePrefix: ha-\n",
+            ),
+            (
+                "o/kustomization.yaml",
+                "resources:\n  - ../base\ncomponents:\n  - ../ha\n  - ../ha\n",
+            ),
+        ]));
+        assert_eq!(addresses(&out), ["ConfigMap/ha-ha-settings [o]"]);
+    }
+
+    /// Components that each list the next level's three, eight levels deep, hand the overlay's
+    /// objects along 3^8 paths: each object a component is handed counts as an entry walked, so
+    /// the walk stops within `WALK_MAX` and a component listed after them is left out.
+    #[test]
+    fn components_reached_along_many_paths_are_walked_within_the_entry_ceiling() {
+        let mut list: Vec<(String, String)> = Vec::new();
+        for level in 0..8 {
+            for n in 0..3 {
+                let next = (0..3)
+                    .map(|m| format!("  - ../l{}n{m}\n", level + 1))
+                    .collect::<String>();
+                list.push((
+                    format!("l{level}n{n}/kustomization.yaml"),
+                    format!("kind: Component\ncomponents:\n{next}"),
+                ));
+            }
+        }
+        for n in 0..3 {
+            list.push((
+                format!("l8n{n}/kustomization.yaml"),
+                "kind: Component\n".into(),
+            ));
+        }
+        let objects: String = (0..100)
+            .map(|i| format!("---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: c{i}\n"))
+            .collect();
+        list.push(("top/all.yaml".into(), objects));
+        list.push((
+            "last/kustomization.yaml".into(),
+            "kind: Component\nnamePrefix: last-\n".into(),
+        ));
+        list.push((
+            "top/kustomization.yaml".into(),
+            "resources:\n  - all.yaml\ncomponents:\n  - ../l0n0\n  - ../last\n".into(),
+        ));
+        let list: Vec<(&str, &str)> = list.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
+        let named = addresses(&evaluate(&files(&list)));
+        assert_eq!(named.len(), 100);
+        assert!(
+            named.iter().all(|a| !a.contains("last-")),
+            "{:?}",
+            &named[..2]
         );
     }
 

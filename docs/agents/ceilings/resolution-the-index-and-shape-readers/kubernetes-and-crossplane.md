@@ -19,10 +19,12 @@ routing. No partial alias table may select a shorter mount.
 
 - `kube.rs` (#651, ADR 0025): `OVERLAY_DEPTH_MAX` (16 kustomizations as bases inside each other;
   past it the entry is unresolved, as a base already on the stack is, `cycle`); `WALK_MAX`
-  (50,000 kustomization entries one overlay walks, which bounds bases reaching one another
-  along many paths; past it the rest of the overlay is left out); `OBJECTS_MAX` (10,000 objects
+  (50,000 kustomization entries one overlay walks, each object a component is handed counting
+  one, which bounds bases and components reaching one another along many paths; past it the
+  rest of the overlay is left out: 1,000 objects pass through at most 50 components); `OBJECTS_MAX` (10,000 objects
   per overlay or directory, bases included, the rest left out; a file or base one kustomization
-  names twice instantiates once, one that several of its bases name, once through each);
+  names twice instantiates once, one that several of its bases name, once through each, and a
+  component listed twice applies twice);
   `OVERLAY_BYTES_MAX` (16 MiB of objects one overlay copies, each weighed by the size of what was
   read from it, so a large object reached along many paths stops the overlay there, the rest
   left out); `OBJECT_REFERENCES_MAX` (64
@@ -48,8 +50,9 @@ routing. No partial alias table may select a shorter mount.
   renamed or moved from the name as written, by their outermost prefix and suffix stages
   (Kustomize's `selectReferral`), else by that name; another kind's account, or the deprecated
   `serviceAccount`, only by that name. Only the name as written is a previous name: a reference
-  by the name a middle stage or a patch gave names the object finally called so, if any, where
-  Kustomize picks the one renamed from it. A cluster-scoped kind is known by
+  by the name a middle stage or a patch gave reaches the object written with that name, if one
+  was, else the object finally called so, if any, where Kustomize picks the one renamed from it,
+  or keeps the name when another object was also written with it. A cluster-scoped kind is known by
   the list `CLUSTER_SCOPED`; a custom resource outside it takes a Kustomize `namespace`. An
   object with no namespace is `<Kind>[.<group>]/<name>`, which reads as a cluster-scoped one.
   A document is no object when its name holds `{{` (a Helm template). A manifest no

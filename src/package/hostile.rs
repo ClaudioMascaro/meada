@@ -1759,6 +1759,40 @@ resource "aws_apigatewayv2_route" "wide" {{
             files.extend(overlays.iter().map(|(p, t)| (p.as_str(), t.clone())));
             objects(files)
         }),
+        // Components that each list the next level's ten, five deep, each adding a prefix, over
+        // 900 objects: each object a component is handed counts against `kube::WALK_MAX`.
+        (
+            "kustomize: components reaching one another along many paths",
+            || {
+                let base = count(900, |i| {
+                    format!("---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: c{i}\n")
+                });
+                let mut files = vec![
+                    ("o/all.yaml".to_string(), base),
+                    (
+                        "o/kustomization.yaml".to_string(),
+                        "resources:\n  - all.yaml\ncomponents:\n  - ../l0n0\n".to_string(),
+                    ),
+                ];
+                for level in 0..5 {
+                    for n in 0..10 {
+                        let next: String = (0..10)
+                            .map(|m| format!("  - ../l{}n{m}\n", level + 1))
+                            .collect();
+                        files.push((
+                            format!("l{level}n{n}/kustomization.yaml"),
+                            format!("kind: Component\nnamePrefix: p-\ncomponents:\n{next}"),
+                        ));
+                    }
+                }
+                for n in 0..10 {
+                    let kustomization = "kind: Component\nnamePrefix: p-\n".to_string();
+                    files.push((format!("l5n{n}/kustomization.yaml"), kustomization));
+                }
+                let files = files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect();
+                objects(files)
+            },
+        ),
         ("kubernetes: environment reference fan-out", || {
             let data = fill(2, |i| format!("  Q{i}: {}\n", "x".repeat(512)));
             let refs = fill(4, |_| "        - configMapRef: {name: values}\n".into());
