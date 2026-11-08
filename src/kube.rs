@@ -91,6 +91,10 @@ const NODE_BYTES: usize = 128;
 // ponytail: DNS limits a host to 253 bytes and Kubernetes a volume name to a 63-byte label.
 const HOST_MAX: usize = 253;
 const VOLUME_NAME_MAX: usize = 63;
+/// Kubernetes names an object with a DNS subdomain of at most 253 bytes: a longer final name is
+/// no object a cluster holds, so no reference names it so.
+// ponytail: a reference still reaches a longer final name through the name a stage renamed.
+const OBJECT_NAME_MAX: usize = 253;
 
 /// The kinds that live outside any namespace: a Kustomize `namespace` leaves them alone, and the
 /// address has no namespace.
@@ -161,7 +165,8 @@ struct Facts {
     selector: BTreeMap<String, String>,
     /// The ConfigMaps and Secrets its pods mount: kind, transformed name, and how it names it.
     mounts: Vec<(&'static str, String, String)>,
-    account: Option<String>,
+    /// Its pod spec's service account: the field that names it, and the name.
+    account: Option<(&'static str, String)>,
     /// An Ingress's backend Services: name as written and the rule that names it.
     backends: Vec<(String, String)>,
     ingress: Vec<crate::iac::Ingress>,
@@ -198,6 +203,23 @@ struct Obj {
     facts: Facts,
     /// About the bytes a copy holds (`weight`), what an overlay copying it spends.
     weight: usize,
+}
+
+/// The kinds whose `serviceAccountName` Kustomize renames with the account it names.
+const ACCOUNT_RENAMED: [&str; 7] = [
+    "Pod",
+    "StatefulSet",
+    "Deployment",
+    "ReplicationController",
+    "CronJob",
+    "Job",
+    "DaemonSet",
+];
+
+/// The namespace a name reference looks in: Kubernetes defaults none to `default`, and
+/// Kustomize takes the two as one.
+fn nameref_ns(ns: Option<&str>) -> Option<&str> {
+    ns.filter(|&n| n != "default")
 }
 
 /// Kustomize's `SameEndingSubSlice` of two lists given outermost first: whether one ends the
@@ -388,10 +410,10 @@ fn facts(value: &Value, kind: &str, group: &str) -> Facts {
         facts.labels = Some(strings(at(template, &["metadata", "labels"])));
         let spec = &template["spec"];
         facts.account = ["serviceAccountName", "serviceAccount"]
-            .iter()
-            .find_map(|k| text(spec, &[k]))
-            .filter(|n| plain(n))
-            .map(String::from);
+            .into_iter()
+            .find_map(|k| Some((k, text(spec, &[k])?)))
+            .filter(|(_, n)| plain(n))
+            .map(|(k, n)| (k, n.to_string()));
         let mut mount = |kind: &'static str, name: Option<&str>, via: String| {
             if let Some(name) = name.filter(|n| plain(n)) {
                 facts.mounts.push((kind, name.into(), via));
@@ -529,7 +551,9 @@ fn kustomization(value: &Value) -> Kustomization {
     let mut k = Kustomization {
         prefix: text(value, &["namePrefix"]).unwrap_or_default().into(),
         suffix: text(value, &["nameSuffix"]).unwrap_or_default().into(),
-        namespace: text(value, &["namespace"]).map(String::from),
+        namespace: text(value, &["namespace"])
+            .filter(|n| !n.is_empty())
+            .map(String::from),
         ..Kustomization::default()
     };
     for key in ["resources", "bases", "components"] {
@@ -893,14 +917,15 @@ impl<'m> Eval<'m> {
                 && object.group.is_empty()
                 && !duplicate_services.contains(address)
             {
-                let ns = object.ns.as_deref();
+                let ns = nameref_ns(object.ns.as_deref());
                 if object.moved {
                     (service_names.entry((ns, object.orig.as_str())).or_default()).push(j);
                 }
-                (services_named
-                    .entry((ns, object.name.as_str()))
-                    .or_default())
-                .push(j);
+                // Hashing a final name past the limit would cost every long chain of prefixes.
+                if object.name.len() <= OBJECT_NAME_MAX {
+                    let key = (ns, object.name.as_str());
+                    services_named.entry(key).or_default().push(j);
+                }
             }
         }
         let roles: Vec<Option<crossplane::Role>> =
@@ -918,7 +943,7 @@ impl<'m> Eval<'m> {
                 .ingress
                 .iter()
                 .map(|route| {
-                    let key = (o.ns.as_deref(), route.service.as_str());
+                    let key = (nameref_ns(o.ns.as_deref()), route.service.as_str());
                     let targets = o.resolve(
                         &objs,
                         service_names.get(&key).map_or(&[], Vec::as_slice),
@@ -1123,11 +1148,25 @@ impl<'m> Eval<'m> {
         for (i, o) in objs.iter().enumerate() {
             if o.group.is_empty() {
                 if o.moved && !matches!(o.kind.as_str(), "ConfigMap" | "Secret") {
-                    let key = (o.kind.as_str(), o.orig.as_str(), o.ns.as_deref());
+                    let key = (
+                        o.kind.as_str(),
+                        o.orig.as_str(),
+                        nameref_ns(o.ns.as_deref()),
+                    );
                     written.entry(key).or_default().push(i);
                 }
-                let key = (o.kind.as_str(), o.name.as_str(), o.ns.as_deref());
-                named.entry(key).or_default().push(i);
+                // A ConfigMap or a Secret is found by its final name, which its references follow
+                // at each stage, whatever its length.
+                if o.name.len() <= OBJECT_NAME_MAX
+                    || matches!(o.kind.as_str(), "ConfigMap" | "Secret")
+                {
+                    let key = (
+                        o.kind.as_str(),
+                        o.name.as_str(),
+                        nameref_ns(o.ns.as_deref()),
+                    );
+                    named.entry(key).or_default().push(i);
+                }
             }
             for (k, v) in o.facts.labels.iter().flatten() {
                 labelled.entry((o.ns.as_deref(), k, v)).or_default().push(i);
@@ -1136,11 +1175,13 @@ impl<'m> Eval<'m> {
         for (i, o) in objs.iter().enumerate() {
             let mut targets: BTreeSet<(&str, String)> = BTreeSet::new();
             let ns = o.ns.as_deref();
-            let find = |kind: &str, name: &str| {
-                let key = (kind, name, ns);
+            // `renamed`: whether Kustomize renames the reference with its target.
+            let find = |kind: &str, name: &str, renamed: bool| {
+                let key = (kind, name, nameref_ns(ns));
+                let written = written.get(&key).filter(|_| renamed);
                 o.resolve(
                     objs,
-                    written.get(&key).map_or(&[], Vec::as_slice),
+                    written.map_or(&[], Vec::as_slice),
                     named.get(&key).map_or(&[], Vec::as_slice),
                 )
             };
@@ -1167,20 +1208,20 @@ impl<'m> Eval<'m> {
                 }
             }
             for (kind, name, via) in &o.facts.mounts {
-                for j in find(kind, name) {
+                for j in find(kind, name, true) {
                     targets.insert((&addresses[j], via.clone()));
                 }
             }
-            for j in o
-                .facts
-                .account
-                .iter()
-                .flat_map(|a| find("ServiceAccount", a))
-            {
-                targets.insert((&addresses[j], "serviceAccountName".into()));
+            if let Some((field, name)) = &o.facts.account {
+                // Kustomize's name reference renames only these kinds' `serviceAccountName`.
+                let renamed =
+                    *field == "serviceAccountName" && ACCOUNT_RENAMED.contains(&o.kind.as_str());
+                for j in find("ServiceAccount", name, renamed) {
+                    targets.insert((&addresses[j], (*field).into()));
+                }
             }
             for (name, via) in &o.facts.backends {
-                for j in find("Service", name) {
+                for j in find("Service", name, true) {
                     targets.insert((&addresses[j], via.clone()));
                 }
             }
@@ -1859,6 +1900,41 @@ mod tests {
         );
     }
 
+    /// Kustomize renames only a `serviceAccountName` of the kinds its name reference lists: a
+    /// ReplicaSet's, or the deprecated `serviceAccount`, stays as written and names the account
+    /// called so.
+    #[test]
+    fn an_account_reference_kustomize_leaves_keeps_its_name_as_written() {
+        let accounts = |deploy: &str| {
+            let out = evaluate(&files(&[
+                (
+                    "app/kustomization.yaml",
+                    "resources:\n  - deploy.yaml\n  - ../accounts\n",
+                ),
+                ("app/deploy.yaml", deploy),
+                (
+                    "accounts/kustomization.yaml",
+                    "resources:\n  - rest.yaml\nnamePrefix: acct-\n",
+                ),
+                (
+                    "accounts/rest.yaml",
+                    &REST[..REST.find("---\napiVersion: networking").unwrap()],
+                ),
+            ]));
+            (shown(&out).into_iter())
+                .filter(|r| r.contains(" -> ServiceAccount/"))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            accounts(DEPLOYMENT),
+            ["Deployment.apps/shop/api -> ServiceAccount/shop/acct-runner via serviceAccountName"]
+        );
+        let replicas = DEPLOYMENT.replace("kind: Deployment", "kind: ReplicaSet");
+        assert_eq!(accounts(&replicas), Vec::<String>::new());
+        let deprecated = DEPLOYMENT.replace("serviceAccountName:", "serviceAccount:");
+        assert_eq!(accounts(&deprecated), Vec::<String>::new());
+    }
+
     /// Kustomize picks among the objects a stage renamed or moved from the name a reference
     /// uses: the only one, else those whose prefix and suffix stages end as the referrer's do
     /// (an empty list matching any, then strictly). With none left the reference stays as
@@ -1957,14 +2033,40 @@ mod tests {
         assert_eq!(routed(&sibling("b-")), none);
         // An object no stage renamed or moved is no candidate: the renamed one is the only one.
         assert_eq!(routed(&sibling("")), to("Service/a-x"));
-        // A reference by the final name stays as written and names that object.
-        let written = [
-            ("top/kustomization.yaml", kust(&["../web", "edge.yaml"], "")),
-            ("top/edge.yaml", edge("frontend-x")),
-            ("web/kustomization.yaml", kust(&["svc.yaml"], "frontend-")),
-            ("web/svc.yaml", svc.into()),
+        // A reference by the final name stays as written and names that object, unless that
+        // name is longer than Kubernetes allows one: no cluster holds it.
+        let written = |prefix: &str| {
+            [
+                ("top/kustomization.yaml", kust(&["../web", "edge.yaml"], "")),
+                ("top/edge.yaml", edge(&format!("{prefix}x"))),
+                ("web/kustomization.yaml", kust(&["svc.yaml"], prefix)),
+                ("web/svc.yaml", svc.into()),
+            ]
+        };
+        assert_eq!(routed(&written("frontend-")), to("Service/frontend-x"));
+        let long = format!("{}-", "p".repeat(OBJECT_NAME_MAX));
+        assert_eq!(routed(&written(&long)), none);
+        // A name reference holds no namespace and `default` one, as Kubernetes defaults it.
+        let defaulted = [
+            ("top/kustomization.yaml", kust(&["../r", "../a"], "")),
+            (
+                "r/kustomization.yaml",
+                kust(&["edge.yaml"], "c-") + "namespace: default\n",
+            ),
+            ("r/edge.yaml", edge("x")),
+            ("a/kustomization.yaml", kust(&["svc.yaml"], "a-")),
+            ("a/svc.yaml", svc.into()),
         ];
-        assert_eq!(routed(&written), to("Service/frontend-x"));
+        assert_eq!(routed(&defaulted), to("Service/a-x"));
+        // An empty `namespace` is no stage: the object keeps none.
+        let out = evaluate(&files(&[
+            (
+                "o/kustomization.yaml",
+                "resources:\n  - svc.yaml\nnamespace: \"\"\n",
+            ),
+            ("o/svc.yaml", svc),
+        ]));
+        assert_eq!(addresses(&out), ["Service/x [o]"]);
     }
 
     #[test]

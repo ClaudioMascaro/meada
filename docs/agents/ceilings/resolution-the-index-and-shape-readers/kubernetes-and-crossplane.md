@@ -32,7 +32,9 @@ routing. No partial alias table may select a shorter mount.
   node also counts `NODE_BYTES` (128) however short its names, which keeps a repository to about
   120,000 nodes. `HOST_MAX` (253 bytes, DNS's limit) and `VOLUME_NAME_MAX` (63, a DNS-1123
   label): an Ingress rule whose host is longer, or a volume whose name is, is invalid and gives
-  no backend or mount reference.
+  no backend or mount reference. `OBJECT_NAME_MAX` (253, a DNS subdomain): a reference by the
+  final name reaches no object whose final name is longer (a ConfigMap or a Secret excepted),
+  only one renamed from the name it writes.
   A file of more than `config_values::DOCUMENTS_MAX` documents gives no object. Only a
   `kustomization.yaml` or `kustomization.yml` is a kustomization (not `Kustomization`); only
   `resources`, `bases` and `components` are followed (a component changes and adds to what the
@@ -40,11 +42,14 @@ routing. No partial alias table may select a shorter mount.
   `patchesStrategicMerge`, `patchesJson6902`, the files they name are no objects), generators,
   `commonLabels`, `labels`, `replacements`, `helmCharts` and the object a `kind: List` holds
   are not applied or read. A ConfigMap or Secret reference is renamed with its target at each
-  stage. A ServiceAccount or Service reference resolves once the tree is built, among the
-  objects a stage renamed or moved from the name as written, by their outermost prefix and
-  suffix stages (Kustomize's `selectReferral`), else by that name, so a reference to an object a
-  generator or a patch renames resolves to nothing; the name a middle stage gave is no previous
-  name. A cluster-scoped kind is known by
+  stage, so one to a generator's resolves to nothing. A Service reference, and a
+  `serviceAccountName` of the kinds Kustomize renames (`ACCOUNT_RENAMED`), resolves once the tree
+  is built, among the objects of the referrer's namespace (none and `default` alike) a stage
+  renamed or moved from the name as written, by their outermost prefix and suffix stages
+  (Kustomize's `selectReferral`), else by that name; another kind's account, or the deprecated
+  `serviceAccount`, only by that name. Only the name as written is a previous name: a reference
+  by the name a middle stage or a patch gave names the object finally called so, if any, where
+  Kustomize picks the one renamed from it. A cluster-scoped kind is known by
   the list `CLUSTER_SCOPED`; a custom resource outside it takes a Kustomize `namespace`. An
   object with no namespace is `<Kind>[.<group>]/<name>`, which reads as a cluster-scoped one.
   A document is no object when its name holds `{{` (a Helm template). A manifest no
