@@ -143,13 +143,6 @@ impl<'i> Config<'i> {
     /// not followed.
     fn read(&self) -> &Read {
         self.keys.get_or_init(|| {
-            let mut files: Vec<_> = self
-                .files
-                .iter()
-                .filter(|(p, _)| is_app_config(p))
-                .collect();
-            // `app-config.yaml` is read first and wins: which override a deployment loads is not known.
-            files.sort_by_key(|(p, _)| (!p.ends_with("app-config.yaml"), *p));
             let by_path: BTreeMap<&str, &[u8]> = self.files.iter().copied().collect();
             // What the index gave for each path a root's includes name.
             let read = |path: &str| match by_path.get(path) {
@@ -161,11 +154,12 @@ impl<'i> Config<'i> {
             let mut contested = BTreeSet::new();
             let mut unfollowed = BTreeSet::new();
             let mut endpoints_table = false;
-            for (path, src) in files {
+            let mut spent = 0;
+            for (path, src) in roots(self.files) {
                 // An include not followed at the root, `proxy` or `proxy.endpoints` may hold the
                 // table, and Backstage reads (or refuses) whatever it gives: the legacy keys are
                 // no endpoints.
-                let grafted = includes::tree(path, src, &read, TABLE_PATHS);
+                let grafted = includes::tree(path, src, &read, TABLE_PATHS, &mut spent);
                 unfollowed.extend(grafted.unfollowed);
                 endpoints_table |= grafted.watched_unread;
                 let Some(mut tree) = grafted.tree else {
@@ -377,12 +371,22 @@ fn target(value: &str) -> Target {
 }
 
 /// The includes of the `app-config*.yaml` among `configs` (`LanguagePack::config_inputs`): each
-/// root grafted as the reader grafts it, so `read` is asked for every file the reader will look
-/// for, and nothing else.
+/// root grafted as the reader grafts it, in its order, so `read` is asked for every file the
+/// reader will look for, and nothing else.
 pub(crate) fn config_inputs<'b>(configs: &[(&str, &[u8])], read: &dyn Fn(&str) -> ConfigInput<'b>) {
-    for (path, src) in configs.iter().filter(|(p, _)| is_app_config(p)) {
-        includes::tree(path, src, read, &[]);
+    let mut spent = 0;
+    for (path, src) in roots(configs) {
+        includes::tree(path, src, read, &[], &mut spent);
     }
+}
+
+/// The `app-config*.yaml` among `files`, in the order they are read: `app-config.yaml` files
+/// first, as the first file holding a key wins and which override a deployment loads is not
+/// known, then the others, each in path order. The roots share `includes::READING_MAX` in it.
+fn roots<'a, 'f>(files: &'a [(&'f str, &'f [u8])]) -> Vec<&'a (&'f str, &'f [u8])> {
+    let mut roots: Vec<_> = files.iter().filter(|(p, _)| is_app_config(p)).collect();
+    roots.sort_by_key(|(p, _)| (!p.ends_with("app-config.yaml"), *p));
+    roots
 }
 
 /// The includes of Backstage's `app-config*.yaml` that no root followed, as rows of the TS and
@@ -449,4 +453,49 @@ pub(crate) fn probe(files: &[(&str, Vec<u8>)]) -> usize {
         .map(|u| u.file.len() + u.include.len())
         .sum();
     keys + config.endpoints().len() + missed + unfollowed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::MAX_BYTES;
+
+    /// The roots of one reading share `includes::READING_MAX`, read in one order by
+    /// `config_inputs` and the reader alike: past it, the include of the last root is refused for
+    /// its size by both, and what the first root includes is never missing to the reader.
+    #[test]
+    fn config_inputs_ask_for_what_the_reader_follows_past_the_reading_limit() {
+        let large = format!("url: u\npad: '{}'\n", "x".repeat(MAX_BYTES - 32));
+        let small = format!("url: q\npad: '{}'\n", "x".repeat(100));
+        let partials =
+            BTreeMap::from([("p.yaml", large.as_bytes()), ("z/q.yaml", small.as_bytes())]);
+        let mut roots: Vec<(String, &[u8])> = (0..4)
+            .map(|i| {
+                (
+                    format!("app-config.x{i}.yaml"),
+                    &b"a: { $include: p.yaml }\n"[..],
+                )
+            })
+            .collect();
+        roots.push(("z/app-config.yaml".into(), b"b: { $include: q.yaml }\n"));
+        let mut files: Vec<(&str, &[u8])> = (roots.iter()).map(|(p, s)| (p.as_str(), *s)).collect();
+        let asked = std::cell::RefCell::new(BTreeSet::new());
+        let read = |path: &str| {
+            asked.borrow_mut().insert(path.to_string());
+            (partials.get(path))
+                .map_or(ConfigInput::Missing, |src| ConfigInput::Read((*src).into()))
+        };
+        config_inputs(&files, &read);
+        let asked = asked.into_inner();
+        files.extend(
+            (partials.iter())
+                .filter(|(p, _)| asked.contains(**p))
+                .map(|(p, s)| (*p, *s)),
+        );
+        let config = Config::of(&files, &[]);
+        let refused: Vec<_> = (config.unfollowed().iter())
+            .map(|u| (u.file.as_str(), u.include.as_str(), u.reason))
+            .collect();
+        assert_eq!(refused, [("app-config.x3.yaml", "p.yaml", Reason::Size)]);
+    }
 }

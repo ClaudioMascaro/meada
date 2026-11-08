@@ -448,7 +448,10 @@
 - Backstage `$include` and `$env` (#689, `http/ts/config/includes.rs`): an include nests at most
   `DEPTH` (8) deep, one root follows at most `INCLUDES` (64) includes (every file it reaches
   counted, refused ones past the path checks included) and grafts at most `GRAFTED_MAX`
-  (`lang::MAX_BYTES`, 1 MiB) of included files, each include counting its file again; the include
+  (`lang::MAX_BYTES`, 1 MiB) of included files, each include counting its file again, and all the
+  roots of one reading (a repository's) graft at most `READING_MAX` (4 MiB) together, read with
+  the `app-config.yaml` files first and then in path order (`config::roots`), the order in which
+  the freshness check asks for partials too; the include
   past a bound, a cycle (a file and key path whose children are being read), an absolute path, a
   path that leaves the repository, a `${` in it, an extension other than `.json`, `.yaml` and `.yml`
   (case-sensitive, as Backstage's), a symbolic link on the way, a file the walk does not see
@@ -474,4 +477,7 @@
   sibling, not a path) are each named, as many as the root writes (linear in its bytes). The graft
   recurses, bounded by `DEPTH` + 1 documents of at most `MAX_NESTING` levels each. A partial whose
   name ends with `tsconfig.json` joins the TS pack's configs and is read as a tsconfig too. The
-  index grafts every root on each freshness check (`packs_of`), and the extraction once more.
+  index grafts every root on each freshness check (`packs_of`), and the extraction once more,
+  each within `READING_MAX`: 20 roots each including one 1 MB partial took 23 s cold and 7.4 s on
+  every refresh (debug), growing with the roots; with it, 20 or 100 such roots take 9.5 s cold and
+  5.3 s per refresh, where the same repository without the includes takes 5.0 s and 4.1 s.

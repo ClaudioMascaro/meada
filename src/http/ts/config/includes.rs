@@ -14,7 +14,8 @@
 //! leaves the repository, when the index gave no file for it (a symbolic link, or no file the walk
 //! sees), when the file is past `MAX_BYTES` or cannot be read, when its key path is missing, when
 //! the object holds another key besides, when it closes a cycle, past `DEPTH`, past `INCLUDES`
-//! from one root, or past `MAX_BYTES` grafted into one root. Its subtree is then unread, so a read
+//! from one root, or past `MAX_BYTES` grafted into one root or `READING_MAX` into the roots read
+//! together. Its subtree is then unread, so a read
 //! under it stays a hole, and `Unfollowed` says which include and why (`meada status`). A key path
 //! whose last key alone is absent is named so too, but Backstage leaves its key out rather than
 //! failing, so nothing stands there (`Grafted::watched_unread` does not count it). An object
@@ -39,6 +40,12 @@ pub(crate) const INCLUDES: usize = 64;
 /// `MAX_BYTES`, the most one config file reads.
 // ponytail: a partial is a few KB; one file's limit bounds a partial grafted from many keys.
 const GRAFTED_MAX: usize = MAX_BYTES;
+/// How many bytes of included files all the roots of one reading graft together, each include
+/// counting its file again, the roots read in the reader's order (`config::roots`).
+// ponytail: a repository's roots graft a few partials of a few KB; four files at their limit bound
+// hundreds of small roots each grafting one large partial again (20 took 23 s cold and 7.4 s on
+// every refresh, debug).
+const READING_MAX: usize = 4 * MAX_BYTES;
 
 /// Why an include is not followed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -69,7 +76,8 @@ pub enum Reason {
     Depth,
     /// Past `INCLUDES` from one root.
     Count,
-    /// A file past `MAX_BYTES`, or past `GRAFTED_MAX` grafted into one root.
+    /// A file past `MAX_BYTES`, or past `GRAFTED_MAX` grafted into one root or `READING_MAX` into
+    /// the roots read together.
     Size,
 }
 
@@ -143,17 +151,20 @@ pub(super) struct Grafted {
 
 /// The root `path` (`src`) with its includes grafted and its `$env` read. `read` gives the file at
 /// a repository path; `watched` are the key paths, from the root, whose unread values
-/// `Grafted::watched_unread` tells.
+/// `Grafted::watched_unread` tells; `grafted` counts the bytes the roots read together grafted,
+/// this one's added.
 pub(super) fn tree<'b>(
     path: &str,
     src: &[u8],
     read: &dyn Fn(&str) -> ConfigInput<'b>,
     watched: &[&[&str]],
+    grafted: &mut usize,
 ) -> Grafted {
     let mut graft = Graft {
         read,
         includes: 0,
         bytes: 0,
+        grafted,
         stack: Vec::new(),
         unfollowed: Vec::new(),
         at: Vec::new(),
@@ -187,6 +198,8 @@ struct Graft<'r, 'b> {
     read: &'r dyn Fn(&str) -> ConfigInput<'b>,
     includes: usize,
     bytes: usize,
+    /// The bytes the roots read together grafted.
+    grafted: &'r mut usize,
     /// The files and key paths whose children are being read, from the root.
     stack: Vec<(String, String)>,
     unfollowed: Vec<Unfollowed>,
@@ -292,10 +305,14 @@ impl Graft<'_, '_> {
             ConfigInput::Symlink => return Err(Reason::Symlink),
             ConfigInput::Missing => return Err(Reason::Missing),
         };
-        if src.len() > MAX_BYTES || self.bytes + src.len() > GRAFTED_MAX {
+        if src.len() > MAX_BYTES
+            || self.bytes + src.len() > GRAFTED_MAX
+            || *self.grafted + src.len() > READING_MAX
+        {
             return Err(Reason::Size);
         }
         self.bytes += src.len();
+        *self.grafted += src.len();
         let document = document(&path, &src).ok_or(Reason::Unreadable)?;
         let mut picked = match selected(document, key) {
             Ok(picked) => picked,
@@ -397,7 +414,7 @@ mod tests {
         };
         let Grafted {
             tree, unfollowed, ..
-        } = tree(root, files[root].as_bytes(), &fetch, &[]);
+        } = tree(root, files[root].as_bytes(), &fetch, &[], &mut 0);
         let keys = tree.as_ref().map(flatten).unwrap_or_default();
         let unfollowed = (unfollowed.into_iter())
             .map(|u| (u.file, u.include, u.reason.name()))
@@ -565,7 +582,7 @@ mod tests {
         let root = files["app-config.yaml"].as_bytes();
         // The include not followed sits at `proxy.endpoints`, inside the partial `proxy` grafts;
         // the `$env` beside another key at `x`; nothing at `proxy` or `ok`.
-        let told = |watched: &[&[&str]]| tree("app-config.yaml", root, &fetch, watched);
+        let told = |watched: &[&[&str]]| tree("app-config.yaml", root, &fetch, watched, &mut 0);
         assert!(told(&[&["proxy", "endpoints"]]).watched_unread);
         assert!(told(&[&["x"]]).watched_unread);
         assert!(!told(&[&["proxy"], &["ok"], &["proxy", "kept"], &["endpoints"]]).watched_unread);
@@ -610,7 +627,7 @@ mod tests {
         let files: BTreeMap<&str, &str> = files.iter().copied().collect();
         let fetch = fetcher(&files);
         let root = files["app-config.yaml"].as_bytes();
-        let told = |watched: &[&[&str]]| tree("app-config.yaml", root, &fetch, watched);
+        let told = |watched: &[&[&str]]| tree("app-config.yaml", root, &fetch, watched, &mut 0);
         // Backstage gives `undefined` for an absent last key and leaves the key out: nothing is
         // unread there. An absent key before the last one fails its loader: unread.
         assert!(!told(&[&["last"]]).watched_unread);
@@ -635,6 +652,7 @@ mod tests {
             files["app-config.yaml"].as_bytes(),
             &fetch,
             &[&[]],
+            &mut 0,
         );
         assert!(grafted.watched_unread);
     }
@@ -657,7 +675,7 @@ mod tests {
         ] {
             let files: BTreeMap<&str, &str> = [("app-config.yaml", root)].into_iter().collect();
             let fetch = fetcher(&files);
-            let grafted = tree("app-config.yaml", root.as_bytes(), &fetch, watched);
+            let grafted = tree("app-config.yaml", root.as_bytes(), &fetch, watched, &mut 0);
             let keys_read = grafted.tree.as_ref().map(flatten).unwrap_or_default();
             assert_eq!(keys_read, keys(&[kept]), "{root}");
             assert!(
@@ -669,7 +687,7 @@ mod tests {
         let root = "proxy: { $include: app-config.yaml }\n";
         let files: BTreeMap<&str, &str> = [("app-config.yaml", root)].into_iter().collect();
         let fetch = fetcher(&files);
-        let grafted = tree("app-config.yaml", root.as_bytes(), &fetch, watched);
+        let grafted = tree("app-config.yaml", root.as_bytes(), &fetch, watched, &mut 0);
         let reasons: Vec<_> = grafted.unfollowed.iter().map(|u| u.reason.name()).collect();
         assert_eq!((reasons, grafted.watched_unread), (vec!["cycle"], true));
     }

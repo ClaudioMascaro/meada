@@ -1008,6 +1008,21 @@ resource "aws_apigatewayv2_route" "wide" {{
                 crate::http::app_config_probe(&[("app-config.yaml", file(root))])
             },
         ),
+        // Hundreds of small roots each including one large partial: the roots of one reading graft
+        // `includes::READING_MAX` together, where each parsed and grafted the partial again.
+        ("app-config: many roots including one large partial", || {
+            let partial = fill(1, |i| {
+                format!("k{i}:\n  url: https://h{i}.example.com/{i}\n")
+            });
+            let mut files = vec![("p.yaml".to_string(), file(partial))];
+            for r in 0..256 {
+                let root = "shared: { $include: ../p.yaml }\n".to_string();
+                files.push((format!("r{r}/app-config.yaml"), file(root)));
+            }
+            let files: Vec<(&str, Vec<u8>)> =
+                files.iter().map(|(p, s)| (p.as_str(), s.clone())).collect();
+            crate::http::app_config_probe(&files)
+        }),
         // Spring: `application.properties`, `application.yml`
         ("spring: many properties", || {
             configured(
