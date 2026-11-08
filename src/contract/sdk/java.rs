@@ -64,23 +64,56 @@ pub(crate) fn root(value: &Value) -> Option<&str> {
     }
 }
 
-/// Whether the builder `local`, in `scope` of `path`, receives a call outside `range`: a Java
-/// builder changes in place, so the chain a call reads off it is not what it was given.
+/// Whether the request `value` reads a builder `rebuilt` outside `range`: its own chain
+/// (`b.message(..).build()`) or one a step takes (`entries(e.build())`).
+pub(super) fn changed<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    value: &'a Value,
+    range: &std::ops::Range<usize>,
+    setter: &dyn Fn(&str) -> bool,
+) -> bool {
+    let Value::Call(top) = value else {
+        return false;
+    };
+    root(value).is_some_and(|b| rebuilt(code, path, scope, b, range, setter))
+        || std::iter::successors(Some(top), |c| match c.receiver.as_deref() {
+            Some(Value::Call(next)) => Some(next),
+            _ => None,
+        })
+        .flat_map(|c| &c.args)
+        .any(|a| changed(code, path, scope, a, range, setter))
+}
+
+/// Whether the builder `local`, read in `scope` of `path`, is set again outside `range` by a
+/// call `setter` accepts, or handed to a call there: a Java builder changes in place, so the
+/// chain a call reads off it is not what it was given. A local counts in its scope, a `final`
+/// field (a constant) anywhere in its file.
 pub(crate) fn rebuilt<'a>(
     code: &Code<'a>,
     path: &'a str,
     scope: &'a str,
-    local: &str,
+    local: &'a str,
     range: &std::ops::Range<usize>,
+    setter: &dyn Fn(&str) -> bool,
 ) -> bool {
-    code.local(path, scope, local).is_some()
-        && code.files()[path].calls.iter().any(|c| {
-            c.scope == scope
-                && c.callee
-                    .rsplit_once('.')
-                    .is_some_and(|(head, _)| head == local)
-                && !(range.start <= c.range.start && c.range.end <= range.end)
-        })
+    let within = if code.local(path, scope, local).is_some() {
+        Some(scope)
+    } else if code.constant_value(path, scope, local).is_some() {
+        None
+    } else {
+        return false;
+    };
+    code.files()[path].calls.iter().enumerate().any(|(i, c)| {
+        within.is_none_or(|s| c.scope == s)
+            && !(range.start <= c.range.start && c.range.end <= range.end)
+            && (c.callee.rsplit_once('.').is_some_and(|(head, method)| {
+                (head == local || head.strip_prefix("this.") == Some(local)) && setter(method)
+            }) || code
+                .call(path, i)
+                .is_some_and(|c| (c.args.iter()).any(|a| matches!(a, Value::Ref(n) if n == local))))
+    })
 }
 
 pub(super) fn names<'v>(call: &'v Invocation, field: &str) -> Option<Vec<Option<&'v Value>>> {

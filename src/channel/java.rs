@@ -200,8 +200,9 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
                 (Client::Sqs, "sendMessage" | "receiveMessage") => {
                     use crate::contract::sdk::java::{rebuilt, root};
                     let changed = code.call(path, n).is_some_and(|c| {
-                        (c.args.first().and_then(root))
-                            .is_some_and(|b| rebuilt(code, path, &c.scope, b, &c.range))
+                        (c.args.first().and_then(root)).is_some_and(|b| {
+                            rebuilt(code, path, &c.scope, b, &c.range, &|m| m == "queueUrl")
+                        })
                     });
                     let read = |a: &[Value], k: &Keywords| match changed {
                         true => Some(vec![None]),

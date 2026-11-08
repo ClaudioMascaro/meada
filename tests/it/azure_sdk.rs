@@ -128,7 +128,9 @@ fn a_java_azure_builder_changed_after_it_is_made_names_no_entity() {
     let repo = fixture_repo("azure_sdk_java_changed", "azure-sdk-java", None);
     std::fs::write(
         repo.join("Worker.java"),
-        "import com.azure.messaging.servicebus.ServiceBusClientBuilder;\nclass Worker {\n\
+        "import com.azure.messaging.servicebus.ServiceBusClientBuilder;\nimport com.azure.messaging.eventhubs.EventHubClientBuilder;\nclass Worker {\n\
+         void topic() { var r = new ServiceBusClientBuilder().connectionString(connection).receiver().topicName(\"old-topic\").subscriptionName(\"s\"); r.topicName(\"new-topic\"); r.buildClient().receiveMessages(1); }\n\
+         void group() { var g = new EventHubClientBuilder().connectionString(connection, \"kept-hub\").consumerGroup(\"g\"); g.consumerGroup(\"g2\"); g.buildConsumerClient().receiveFromPartition(\"0\", 1, position); }\n\
          void rebuilt() { var b = new ServiceBusClientBuilder().connectionString(connection).sender().queueName(\"old\"); b.queueName(\"new\"); b.buildClient().sendMessage(message); }\n\
          void kept() { var k = new ServiceBusClientBuilder().connectionString(connection).sender().queueName(\"kept\"); k.buildClient().sendMessage(message); }\n}\n",
     )
@@ -140,6 +142,22 @@ fn a_java_azure_builder_changed_after_it_is_made_names_no_entity() {
         .collect::<Vec<_>>();
     assert!(contracts.iter().all(|c| !c.contains("old")), "{text}");
     assert!(contracts.contains(&"channel::servicebus::kept"), "{text}");
+    let consumers = (json["consumers"].as_array().unwrap().iter())
+        .map(|s| (s["contract"].as_str().unwrap(), s["site"].as_str().unwrap()))
+        .collect::<Vec<_>>();
+    assert!(consumers.iter().all(|(c, _)| !c.contains("old")), "{text}");
+    assert!(
+        consumers
+            .iter()
+            .any(|&(c, s)| c == "channel::servicebus" && s.ends_with("Worker.topic()")),
+        "{text}"
+    );
+    assert!(
+        consumers
+            .iter()
+            .any(|&(c, _)| c == "channel::eventhubs::kept-hub"),
+        "{text}"
+    );
 }
 
 #[test]

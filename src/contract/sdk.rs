@@ -252,7 +252,8 @@ pub(crate) fn extract<'a>(
     found
 }
 
-/// A named request can change after construction; inline literals cannot change before the call.
+/// A named request can change after construction, and so can a named value an inline request
+/// holds on the name's path (an EventBridge entry); inline literals cannot change before the call.
 fn changed_request<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -264,24 +265,65 @@ fn changed_request<'a>(
     let Some(call) = code.call(path, index) else {
         return false;
     };
-    let field = selector
-        .split('.')
-        .next()
-        .unwrap_or(selector)
-        .trim_end_matches("[]");
-    let (request, field) = match language {
-        Language::Go => (call.args.get(1), field),
-        Language::Csharp => (
-            call.keyword("request").or_else(|| call.args.first()),
-            csharp::field_name(field),
-        ),
+    let request = match language {
+        Language::Go => call.args.get(1),
+        Language::Csharp => call.keyword("request").or_else(|| call.args.first()),
         Language::Java => {
-            return (call.args.first().and_then(java::root))
-                .is_some_and(|b| java::rebuilt(code, path, &call.scope, b, &call.range));
+            // A step sets a member of the name's path (`topicArn`, `entries`, `eventBusName`).
+            let setter = |method: &str| {
+                selector.split('.').any(|member| {
+                    let member = member.trim_end_matches("[]");
+                    member.get(..1).is_some_and(|head| {
+                        method.len() == member.len()
+                            && method[..1] == head.to_ascii_lowercase()
+                            && method[1..] == member[1..]
+                    })
+                })
+            };
+            return (call.args.first())
+                .is_some_and(|r| java::changed(code, path, &call.scope, r, &call.range, &setter));
         }
     };
-    let Some(Value::Ref(_)) = request else {
-        return false;
+    // Follow the name's path through the request as written: a named value met on it changes
+    // when a file writes the member read off it.
+    let mut values: Vec<&Value> = request.into_iter().collect();
+    for member in selector.split('.') {
+        let field = member.trim_end_matches("[]");
+        let mut next = Vec::new();
+        for value in values {
+            if let Value::Ref(_) = value {
+                if opaque(code, field, language, written) {
+                    return true;
+                }
+                continue;
+            }
+            let inner = match language {
+                Language::Go => go::field_of(value, field),
+                _ => csharp::field_of(value, field),
+            };
+            let Some(Some(inner)) = inner else {
+                continue;
+            };
+            match member.ends_with("[]").then(|| sequence(inner)).flatten() {
+                Some(items) => next.extend(items),
+                None => next.push(inner),
+            }
+        }
+        values = next;
+    }
+    false
+}
+
+/// Whether a file writes `field` of a named request value (Go and C#).
+fn opaque<'a>(
+    code: &Code<'a>,
+    field: &str,
+    language: Language,
+    written: &std::cell::OnceCell<BTreeSet<&'a str>>,
+) -> bool {
+    let field = match language {
+        Language::Csharp => csharp::field_name(field),
+        _ => field,
     };
     code.field_written(field)
         || language == Language::Csharp

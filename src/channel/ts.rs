@@ -421,7 +421,8 @@ fn sqs<'a>(
     consumer: bool,
     handler: Option<Handler>,
 ) -> Vec<Message> {
-    code.expand(Expand::Call(path, n), &|args, _| {
+    let writes = crate::contract::sdk::mutations::writes;
+    code.expand_written(path, n, writes, &|args, _| {
         let names = queue(args, key)?;
         let value = match args.first() {
             Some(Value::Object(fields)) => property(fields, key).ok().flatten(),

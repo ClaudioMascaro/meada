@@ -12,7 +12,10 @@ compare actual read/write call order, and share selection/memo normalization. A 
 loop that also holds the read comes before it (`Facts::loops`: the outermost loop statements of
 TypeScript/JavaScript, Python and Go, a `for`/`while` comprehension or a recursive call not
 among them). A computed key or a spread names its fields once folded: a write to one of them
-changes it. Retained write
+changes it. A write Meada cannot tie to one object (through a parameter of a function it finds
+no caller for, which a function value may still receive, or a member path such as
+`cmd.input.Bucket`) changes that field of every object its scope can reach: a module-level
+object anywhere in the file, a function's own object only in that function. Retained write
 facts charge their names and scopes to `MAX_BYTES` (1 MiB); overflow removes complete write
 knowledge rather than keeping a partial list. Indexing, alias expansion and querying charge
 `EVAL_BUDGET` and `EVAL_DEPTH`. Missing facts/calls, opaque aliases, cycles or exhausted work

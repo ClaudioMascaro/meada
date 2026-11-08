@@ -19,7 +19,8 @@ Duplicate build evidence for one repository and image is collapsed to its strong
 
 `ContractKind::executions` lets the shared trace follow workloads into repository entry points
 and code back to workloads. Same-repository Compose paths are exact without an image link and
-appear in the optional `executions` export array. Paths are normalized inside the root and
+appear in the optional `executions` export array; a direct execution replaces a workload's
+image side in its own root only (`image::runs_locally`). Paths are normalized inside the root and
 cross no symlink; a changed path is rechecked even when the Compose file did not change.
 `scope_status` and `side_note` implement the two-role orphan rule in the visible workspace.
 `exports_repository_links` includes repository-level builders in their own export without

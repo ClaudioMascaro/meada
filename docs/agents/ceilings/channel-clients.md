@@ -90,11 +90,15 @@
 - AWS SDKs in Java 2.x, Go v2 and .NET (#660): operation tables live in `channel/aws.rs` and
   `resource/aws.rs`; the mechanical readers and complete constructor evidence live in
   `contract/sdk/`. A type-only injected client, a name-matched factory, an opaque return branch,
-  a reassigned local and a hidden constructor yield no side. Existing `EVAL_DEPTH` and
+  a reassigned local and a hidden constructor yield no side. A client field keeps the client its
+  class assigns when code outside the class assigns it again (`holder.client = fake`, usually a
+  test double), in Python and C# too: only the class's own writes count. Existing `EVAL_DEPTH` and
   `EVAL_BUDGET` bound the memoized walk; the SDK lattice test drives a full 1 MiB source file
   in each language. Java builder requests, Go input literals, .NET request initializers,
   lists, table-keyed maps and supported named/string overloads name sides. A named request
-  whose name field is written is opaque, with C# writes followed through receiver aliases. Operations not in
+  whose name field is written is opaque, with C# writes followed through receiver aliases, and
+  so is a named value an inline request holds on the name's path (an EventBridge entry in a
+  list literal, a Java entry builder a request step takes). Operations not in
   the documented table do not. A hierarchy query (`GetParametersByPath`) has no physical
   parameter name and stays unresolved. RDS and ElastiCache control-plane clients establish
   no data uses. Kotlin keeps the earlier typed SQS reader.

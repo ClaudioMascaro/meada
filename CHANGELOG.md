@@ -485,18 +485,20 @@ All notable changes to Meada are recorded here. The format follows
 - HTTP: overlays that repeat one Ingress or Service per environment no longer make a route to a
   single provider `ambiguous`; distinct providers, or a route as long that reaches no code,
   still do. A decision recorded for such a route is now stale; `meada decide --prune` removes it.
-- Images: a module run from a local archive in one root no longer drops the image another root
-  runs it from, with its environment and provisions; only the archive's root runs code without
-  an image.
+- Images: a module run from a local path (an archive or a directory) in one root no longer drops
+  the image another root runs it from, with its environment and provisions; only that root runs
+  code without an image.
 - SDK names (GCP and Azure, and AWS in TypeScript): a request field written through a computed
   key (`{['name']: ..}`) or a spread of another object, or written after the call inside a loop
   whose next turn calls again, leaves the name unresolved; each gave an `exact` link to the name
   first written.
 - AWS SDK: a request changed after it is made names no resource: a TypeScript command input
-  whose field is assigned again before the `send`, and a Java builder held in a local that
-  receives another call (`b.topicArn(..)` before `client.publish(b.build())`), also for SQS and
-  Azure Service Bus, Event Hubs, Blob and Key Vault builders. Each gave an `exact` link and
-  provision to the name first written.
+  (SQS's too) whose field is assigned again before the `send`; a Java builder held in a local or
+  a `final` field that is set again or handed to another call (`b.topicArn(..)` before
+  `client.publish(b.build())`), also for SQS and Azure Service Bus and Event Hubs builders; and
+  a named entry an inline request holds (an EventBridge entry in C# or Go, an entry builder in
+  Java). Each gave an `exact` link and provision to the name first written. A TypeScript field
+  read off a local object (`{Bucket: cfg.bucket}`) now names its bucket.
 - TypeScript and JavaScript: a generator (`function*` and `async function*`, declared or as an
   expression, a `*method()` of a class or an object) returns its iterator, so a `return new
   Storage()` in one no longer makes it a client factory; it gave an SDK resource (Pub/Sub, Cloud

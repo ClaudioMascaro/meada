@@ -18,9 +18,12 @@
   operation calls. Java request folding shares Spring injection with channel forms. Runtime
   environment aliases keep verified provenance. C# selector writes are indexed lazily once
   across the group to invalidate named request objects even through another receiver alias; Go
-  shares the existing field-write index. A Java builder held in a local that receives a call
-  outside the request's call (`contract/sdk/java.rs` `rebuilt`) names nothing, in SQS's channel
-  form and Azure's builder stages too. The folded Java name reader rejects a value-bound head
+  shares the existing field-write index. A Java builder held in a local or a `final` field that a
+  call outside the request's call sets again (a step setting a member of the name's path, before
+  or after the request) or takes as an argument (`contract/sdk/java.rs` `rebuilt`) names
+  nothing, as does a request a step of which takes such a builder (`entries(e.build())`), in
+  SQS's channel form and Azure's builder stages too, where a changed topic receiver keeps an
+  unresolved side. The folded Java name reader rejects a value-bound head
   before considering on-demand type candidates.
 
 
@@ -30,9 +33,10 @@
 `names/ts.rs` shares the constant-construction spelling; `names/python.rs` shares external
 constructors and one named factory level, using the pack's enclosing-call order to find an inline
 receiver without a file scan. These helpers own no SDK operation table. Name reads use
-`Code::expand`, so wrapper arguments follow exact callers only; TS commands use
-`Code::expand_written`, where a field of the input assigned or `Object.assign`ed after the
-object is made, before the call, is unknown. TS SDK commands require both
+`Code::expand`, so wrapper arguments follow exact callers only; TS commands, SQS's channel commands included,
+use `Code::expand_written`, where a field of the input assigned or `Object.assign`ed after the
+object is made, before the call, is unknown, and a field read off a local object
+(`{Bucket: cfg.bucket}`) names it while nothing writes that field. TS SDK commands require both
 a constant client from the corresponding SDK constructor and a command from that package.
 Python requires a matching literal boto3 service, including a Session's client.
 `names/python/arguments.rs` checks every return alternative with memoized constructor and

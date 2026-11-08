@@ -489,7 +489,10 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
          const s3 = new S3Client({});\nconst sns = new SNSClient({});\n\
          export function store() { const input = {Bucket: 'old', Key: 'k'}; input.Bucket = 'new'; s3.send(new PutObjectCommand(input)); }\n\
          export function publish() { const req = {TopicArn: 'old-topic', Message: 'm'}; req.TopicArn = 'new-topic'; sns.send(new PublishCommand(req)); }\n\
-         export function kept() { const input = {Bucket: 'kept', Key: 'k'}; input.Key = 'other'; s3.send(new PutObjectCommand(input)); }\n",
+         export function kept() { const input = {Bucket: 'kept', Key: 'k'}; input.Key = 'other'; s3.send(new PutObjectCommand(input)); }\n\
+         import {SQSClient, SendMessageCommand} from '@aws-sdk/client-sqs';\nconst sqs = new SQSClient({});\n\
+         export function queue() { const i = {QueueUrl: 'https://sqs.us-east-1.amazonaws.com/1/old-queue', MessageBody: 'm'}; i.QueueUrl = 'https://sqs.us-east-1.amazonaws.com/1/new-queue'; sqs.send(new SendMessageCommand(i)); }\n\
+         export function queued() { const i = {QueueUrl: 'https://sqs.us-east-1.amazonaws.com/1/kept-queue', MessageBody: 'm'}; i.MessageBody = 'n'; sqs.send(new SendMessageCommand(i)); }\n",
     )
     .unwrap();
     std::fs::write(
@@ -498,7 +501,46 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
          import software.amazon.awssdk.services.sns.model.PublishRequest;\n\
          class Builder {\n\
          void send() { var sns = SnsClient.builder().build(); var b = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old\"); b.topicArn(\"arn:aws:sns:us-east-1:123:new\"); sns.publish(b.message(\"m\").build()); }\n\
-         void kept() { var sns = SnsClient.builder().build(); var k = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:kept\"); sns.publish(k.build()); }\n}\n",
+         void kept() { var sns = SnsClient.builder().build(); var k = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:kept\"); sns.publish(k.build()); }\n\
+         void retarget(PublishRequest.Builder x) { x.topicArn(\"arn:aws:sns:us-east-1:123:other\"); }\n\
+         void helped() { var sns = SnsClient.create(); var h = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old-helped\"); retarget(h); sns.publish(h.build()); }\n\
+         private final PublishRequest.Builder field = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old-field\");\n\
+         void moved() { field.topicArn(\"arn:aws:sns:us-east-1:123:moved\"); }\n\
+         void fielded() { var sns = SnsClient.create(); sns.publish(field.build()); }\n\
+         private final PublishRequest.Builder base = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:kept-base\");\n\
+         void one() { var sns = SnsClient.create(); sns.publish(base.message(\"a\").build()); }\n\
+         void two() { var sns = SnsClient.create(); sns.publish(base.message(\"b\").build()); var t = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:kept-twice\"); sns.publish(t.build()); sns.publish(t.message(\"c\").build()); }\n}\n",
+    )
+    .unwrap();
+    // A named entry an inline request holds changes the same way.
+    std::fs::write(
+        repo.join("Entries.java"),
+        "import software.amazon.awssdk.services.eventbridge.EventBridgeClient;\n\
+         import software.amazon.awssdk.services.eventbridge.model.PutEventsRequest;\n\
+         import software.amazon.awssdk.services.eventbridge.model.PutEventsRequestEntry;\n\
+         class Entries {\n\
+         void send(boolean prod) { var events = EventBridgeClient.create(); var e = PutEventsRequestEntry.builder().eventBusName(\"old-bus-java\"); if (prod) e.eventBusName(\"new-bus-java\"); events.putEvents(PutEventsRequest.builder().entries(e.build()).build()); }\n\
+         void kept() { var events = EventBridgeClient.create(); var k = PutEventsRequestEntry.builder().eventBusName(\"kept-bus-java\"); events.putEvents(PutEventsRequest.builder().entries(k.build()).build()); }\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("Entries.cs"),
+        "using System.Collections.Generic;\nusing Amazon.EventBridge;\nusing Amazon.EventBridge.Model;\n\
+         class Entries {\n\
+         async System.Threading.Tasks.Task Send() { var events = new AmazonEventBridgeClient(); var entry = new PutEventsRequestEntry { EventBusName = \"old-bus-cs\", Source = \"app\" }; entry.EventBusName = \"new-bus-cs\"; await events.PutEventsAsync(new PutEventsRequest { Entries = new List<PutEventsRequestEntry> { entry } }); }\n\
+         async System.Threading.Tasks.Task Kept() { var events = new AmazonEventBridgeClient(); await events.PutEventsAsync(new PutEventsRequest { Entries = new List<PutEventsRequestEntry> { new PutEventsRequestEntry { EventBusName = \"kept-bus-cs\" } } }); }\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("go.mod"),
+        "module example.com/entries\n\ngo 1.22\n\nrequire github.com/aws/aws-sdk-go-v2 v1.30.0\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("entries.go"),
+        "package main\n\nimport (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/aws\"\n\t\"github.com/aws/aws-sdk-go-v2/config\"\n\t\"github.com/aws/aws-sdk-go-v2/service/eventbridge\"\n\t\"github.com/aws/aws-sdk-go-v2/service/eventbridge/types\"\n)\n\n\
+         func send(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tentry := types.PutEventsRequestEntry{EventBusName: aws.String(\"old-bus-go\")}\n\tentry.EventBusName = aws.String(\"new-bus-go\")\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: []types.PutEventsRequestEntry{entry}})\n}\n\n\
+         func kept(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: []types.PutEventsRequestEntry{types.PutEventsRequestEntry{EventBusName: aws.String(\"kept-bus-go\")}}})\n}\n",
     )
     .unwrap();
     let export: Value =
@@ -512,7 +554,16 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
         contracts.iter().all(|c| !c.contains("old")),
         "{contracts:?}"
     );
-    for kept in ["resource::s3::kept", "channel::sns::kept"] {
+    for kept in [
+        "resource::s3::kept",
+        "channel::sns::kept",
+        "channel::eventbridge::kept-bus-java",
+        "channel::eventbridge::kept-bus-cs",
+        "channel::eventbridge::kept-bus-go",
+        "channel::sqs::kept-queue",
+        "channel::sns::kept-base",
+        "channel::sns::kept-twice",
+    ] {
         assert!(contracts.contains(&kept), "{kept}: {contracts:?}");
     }
 }

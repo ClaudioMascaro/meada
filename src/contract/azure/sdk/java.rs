@@ -31,7 +31,7 @@ pub(super) fn step<'a>(
     frames: &[Frame<'a>],
 ) -> Option<Handle> {
     let call = code.call(path, index)?;
-    // A builder held in a local that receives another call changes in place.
+    // A builder held in a local that is set again changes in place: its names are unknown.
     let builder = matches!(
         parent.stage,
         Stage::BusBuilder
@@ -46,9 +46,32 @@ pub(super) fn step<'a>(
     let parent = match &call.receiver {
         Some(crate::lang::Value::Ref(b))
             if builder
-                && crate::contract::sdk::java::rebuilt(code, path, &call.scope, b, &call.range) =>
+                && crate::contract::sdk::java::rebuilt(
+                    code,
+                    path,
+                    &call.scope,
+                    b,
+                    &call.range,
+                    &|m| {
+                        matches!(
+                            m,
+                            "queueName"
+                                | "topicName"
+                                | "subscriptionName"
+                                | "eventHubName"
+                                | "connectionString"
+                                | "credential"
+                        )
+                    },
+                ) =>
         {
-            Handle::new(parent.stage)
+            Handle {
+                stage: parent.stage,
+                name: crate::names::Argument::Unresolved,
+                subscription: parent
+                    .subscription
+                    .map(|_| crate::names::Argument::Unresolved),
+            }
         }
         _ => parent,
     };
