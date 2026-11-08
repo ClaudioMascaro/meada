@@ -462,7 +462,8 @@ All notable changes to Meada are recorded here. The format follows
   which never panicked, still stop with a "Broken pipe" error and exit 1.
 - Kustomize: with two bases of their own `namePrefix` that write the same names, a Deployment no
   longer references the other base's ServiceAccount, nor an Ingress the other base's Service:
-  each kustomization renames the references to the objects it holds, as Kustomize does.
+  among the objects written with the name a reference uses, the one the same prefixes and
+  suffixes renamed is chosen, as Kustomize does.
 
 ## [1.2.0] - 2026-11-04
 

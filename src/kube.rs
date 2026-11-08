@@ -17,8 +17,8 @@
 //! A Service selects the pod template owners whose pod labels hold its selector, a pod template
 //! references the ConfigMaps and Secrets of its `env`, `envFrom` and volumes and its service
 //! account, and an Ingress its backend Services, all in the same namespace and unit; a name is
-//! matched as the kustomizations renamed the object, each renaming the references to the objects
-//! it holds, as Kustomize does.
+//! matched as the object was written and, when several objects were written with it, the one the
+//! same prefixes and suffixes renamed, as Kustomize does once the tree is built.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -161,8 +161,7 @@ struct Facts {
     /// The ConfigMaps and Secrets its pods mount: kind, transformed name, and how it names it.
     mounts: Vec<(&'static str, String, String)>,
     account: Option<String>,
-    /// An Ingress's backend Services: name, as renamed with its target, and the rule that names
-    /// it.
+    /// An Ingress's backend Services: name as written and the rule that names it.
     backends: Vec<(String, String)>,
     ingress: Vec<crate::iac::Ingress>,
     /// Its containers' images: container name and image.
@@ -180,9 +179,11 @@ struct Facts {
 struct Obj {
     group: String,
     kind: String,
-    /// The name as written, which Crossplane and custom references match.
+    /// The name as written, which the references to it use.
     orig: String,
     name: String,
+    /// The bytes of `name` the prefixes on the way added before `orig`.
+    head: usize,
     ns: Option<String>,
     path: String,
     line: usize,
@@ -208,6 +209,26 @@ fn weight(facts: &Facts) -> usize {
 }
 
 impl Obj {
+    /// The prefixes and the suffixes the kustomizations on the way added to its name.
+    fn affixes(&self) -> (&str, &str) {
+        let (prefixes, rest) = self.name.split_at(self.head);
+        (prefixes, &rest[self.orig.len()..])
+    }
+
+    /// Of `candidates`, the objects written with one name a reference from `self` names: all
+    /// when one, else those the prefixes and suffixes that renamed `self` renamed too, if any,
+    /// as Kustomize picks among several.
+    fn choose(&self, objs: &[Obj], candidates: &[usize]) -> Vec<usize> {
+        let own = (candidates.iter().copied())
+            .filter(|&j| objs[j].affixes() == self.affixes())
+            .collect::<Vec<_>>();
+        if candidates.len() > 1 && !own.is_empty() {
+            own
+        } else {
+            candidates.to_vec()
+        }
+    }
+
     fn address(&self) -> String {
         let head = match self.group.is_empty() {
             true => self.kind.clone(),
@@ -446,6 +467,7 @@ fn object(
         kind: kind.into(),
         orig: name.into(),
         name: name.into(),
+        head: 0,
         ns,
         path: path.into(),
         line,
@@ -751,6 +773,7 @@ impl<'m> Eval<'m> {
                 || UNPREFIXED.contains(&o.kind.as_str()))
             {
                 o.name = format!("{}{}{}", k.prefix, o.name, k.suffix);
+                o.head += k.prefix.len();
             }
             if let Some(ns) = &k.namespace
                 && !cluster_scoped(&o.kind, &o.group)
@@ -797,15 +820,15 @@ impl<'m> Eval<'m> {
         objs.dedup_by_key(|o| o.address());
         let addresses: Vec<String> = objs.iter().map(Obj::address).collect();
         let mut service_names = HashMap::<_, Vec<_>>::new();
-        for (object, address) in objs.iter().zip(&addresses) {
+        for (j, (object, address)) in objs.iter().zip(&addresses).enumerate() {
             if object.kind == "Service"
                 && object.group.is_empty()
                 && !duplicate_services.contains(address)
             {
                 service_names
-                    .entry((object.ns.as_deref(), object.name.as_str()))
+                    .entry((object.ns.as_deref(), object.orig.as_str()))
                     .or_default()
-                    .push(address.as_str());
+                    .push(j);
             }
         }
         let roles: Vec<Option<crossplane::Role>> =
@@ -824,10 +847,11 @@ impl<'m> Eval<'m> {
                 .iter()
                 .map(|route| {
                     let targets = service_names.get(&(o.ns.as_deref(), route.service.as_str()));
+                    let targets = o.choose(&objs, targets.map_or(&[], Vec::as_slice));
                     (
                         route,
-                        match targets.map(Vec::as_slice) {
-                            Some([service]) => *service,
+                        match targets[..] {
+                            [service] => addresses[service].as_str(),
                             _ => "",
                         },
                     )
@@ -1018,7 +1042,15 @@ impl<'m> Eval<'m> {
         for (i, o) in objs.iter().enumerate() {
             if o.group.is_empty() {
                 named
-                    .entry((&o.kind, &o.name, o.ns.as_deref()))
+                    .entry((
+                        &o.kind,
+                        if matches!(o.kind.as_str(), "ConfigMap" | "Secret") {
+                            &o.name
+                        } else {
+                            &o.orig
+                        },
+                        o.ns.as_deref(),
+                    ))
                     .or_default()
                     .push(i);
             }
@@ -1030,12 +1062,10 @@ impl<'m> Eval<'m> {
             let mut targets: BTreeSet<(&str, String)> = BTreeSet::new();
             let ns = o.ns.as_deref();
             let find = |kind: &str, name: &str| {
-                named
-                    .get(&(kind, name, ns))
-                    .into_iter()
-                    .flatten()
-                    .copied()
-                    .collect::<Vec<_>>()
+                o.choose(
+                    objs,
+                    named.get(&(kind, name, ns)).map_or(&[], Vec::as_slice),
+                )
             };
             if !duplicate_services.contains(&addresses[i])
                 && let Some((k, v)) = o.facts.selector.iter().next()
@@ -1662,6 +1692,54 @@ mod tests {
                     BTreeSet::from(["Service/shop/frontend-api"])
                 ),
             ])
+        );
+    }
+
+    /// A reference names the only object written with its name, whichever kustomization renamed
+    /// it and whatever namespace a base set before the overlay's: Kustomize renames references
+    /// once the whole tree is built.
+    #[test]
+    fn a_reference_follows_the_only_object_written_with_its_name() {
+        let out = evaluate(&files(&[
+            (
+                "app/kustomization.yaml",
+                "resources:\n  - ../web\n  - ../accounts\nnamespace: shop\n",
+            ),
+            (
+                "web/kustomization.yaml",
+                "resources:\n  - deploy.yaml\n  - edge.yaml\nnamespace: a\n",
+            ),
+            ("web/deploy.yaml", DEPLOYMENT),
+            (
+                "web/edge.yaml",
+                &REST[REST.find("apiVersion: networking").unwrap()..],
+            ),
+            (
+                "accounts/kustomization.yaml",
+                "resources:\n  - rest.yaml\nnamePrefix: acct-\nnamespace: b\n",
+            ),
+            (
+                "accounts/rest.yaml",
+                &REST[..REST.find("---\napiVersion: networking").unwrap()],
+            ),
+        ]));
+        let named = (shown(&out).into_iter())
+            .filter(|r| r.contains("serviceAccountName") || r.starts_with("Ingress"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            named,
+            [
+                "Deployment.apps/shop/api -> ServiceAccount/shop/acct-runner via serviceAccountName",
+                "Ingress.networking.k8s.io/shop/edge -> Service/shop/acct-api via backend shop.example.com/api",
+                "Ingress.networking.k8s.io/shop/edge -> Service/shop/acct-api via defaultBackend",
+            ]
+        );
+        let edge = (out.nodes.iter()).find(|n| n.ty == "Ingress").unwrap();
+        assert!(
+            !edge.ingress.is_empty()
+                && (edge.ingress.iter()).all(|route| route.service == "Service/shop/acct-api"),
+            "{:?}",
+            edge.ingress
         );
     }
 
