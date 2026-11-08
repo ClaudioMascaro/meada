@@ -1023,6 +1023,32 @@ resource "aws_apigatewayv2_route" "wide" {{
                 files.iter().map(|(p, s)| (p.as_str(), s.clone())).collect();
             crate::http::app_config_probe(&files)
         }),
+        // Hundreds of roots each including, from many keys, a partial of 335 bytes whose aliases
+        // expand it to 48 KB: an include is charged its value's size, not its file's bytes.
+        (
+            "app-config: many roots including a partial its aliases expand",
+            || {
+                let level = |name: &str, anchor: &str, item: &str| {
+                    let items: Vec<String> = (0..10).map(|i| format!("k{i}: {item}")).collect();
+                    format!("{name}: {anchor}{{{}}}\n", items.join(", "))
+                };
+                let bomb = [
+                    level("a", "&a ", "x"),
+                    level("b", "&b ", "*a"),
+                    level("c", "&c ", "*b"),
+                    level("d", "", "*c"),
+                ]
+                .concat();
+                let root = count(64, |i| format!("k{i}: {{ $include: ../bomb.yaml }}\n"));
+                let mut files = vec![("bomb.yaml".to_string(), file(bomb))];
+                for r in 0..256 {
+                    files.push((format!("r{r}/app-config.yaml"), file(root.clone())));
+                }
+                let files: Vec<(&str, Vec<u8>)> =
+                    files.iter().map(|(p, s)| (p.as_str(), s.clone())).collect();
+                crate::http::app_config_probe(&files)
+            },
+        ),
         // Spring: `application.properties`, `application.yml`
         ("spring: many properties", || {
             configured(

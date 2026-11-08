@@ -154,12 +154,12 @@ impl<'i> Config<'i> {
             let mut contested = BTreeSet::new();
             let mut unfollowed = BTreeSet::new();
             let mut endpoints_table = false;
-            let mut spent = 0;
+            let mut reading = includes::Reading::default();
             for (path, src) in roots(self.files) {
                 // An include not followed at the root, `proxy` or `proxy.endpoints` may hold the
                 // table, and Backstage reads (or refuses) whatever it gives: the legacy keys are
                 // no endpoints.
-                let grafted = includes::tree(path, src, &read, TABLE_PATHS, &mut spent);
+                let grafted = includes::tree(path, src, &read, TABLE_PATHS, &mut reading);
                 unfollowed.extend(grafted.unfollowed);
                 endpoints_table |= grafted.watched_unread;
                 let Some(mut tree) = grafted.tree else {
@@ -374,18 +374,19 @@ fn target(value: &str) -> Target {
 /// root grafted as the reader grafts it, in its order, so `read` is asked for every file the
 /// reader will look for, and nothing else.
 pub(crate) fn config_inputs<'b>(configs: &[(&str, &[u8])], read: &dyn Fn(&str) -> ConfigInput<'b>) {
-    let mut spent = 0;
+    let mut reading = includes::Reading::default();
     for (path, src) in roots(configs) {
-        includes::tree(path, src, read, &[], &mut spent);
+        includes::tree(path, src, read, &[], &mut reading);
     }
 }
 
-/// The `app-config*.yaml` among `files`, in the order they are read: `app-config.yaml` files
-/// first, as the first file holding a key wins and which override a deployment loads is not
-/// known, then the others, each in path order. The roots share `includes::READING_MAX` in it.
+/// The `app-config*.yaml` among `files`, in the order they are read: the files named
+/// `app-config.yaml` first, as the first file holding a key wins and which override a deployment
+/// loads is not known, then the others, each in path order. The roots share
+/// `includes::READING_MAX` in it.
 fn roots<'a, 'f>(files: &'a [(&'f str, &'f [u8])]) -> Vec<&'a (&'f str, &'f [u8])> {
     let mut roots: Vec<_> = files.iter().filter(|(p, _)| is_app_config(p)).collect();
-    roots.sort_by_key(|(p, _)| (!p.ends_with("app-config.yaml"), *p));
+    roots.sort_by_key(|(p, _)| (p.rsplit('/').next() != Some("app-config.yaml"), *p));
     roots
 }
 
@@ -497,5 +498,52 @@ mod tests {
             .map(|u| (u.file.as_str(), u.include.as_str(), u.reason))
             .collect();
         assert_eq!(refused, [("app-config.x3.yaml", "p.yaml", Reason::Size)]);
+    }
+
+    /// Only the roots named `app-config.yaml` are read first: `app-config.zz-app-config.yaml` is
+    /// an override like `app-config.local.yaml`, read after them in path order, so it is the root
+    /// past `includes::READING_MAX`.
+    #[test]
+    fn only_roots_named_app_config_yaml_are_read_first() {
+        let large = format!("url: u\npad: '{}'\n", "x".repeat(MAX_BYTES - 32));
+        let include = &b"a: { $include: p.yaml }\n"[..];
+        let mut files: Vec<(&str, &[u8])> = [
+            "a/app-config.yaml",
+            "b/app-config.yaml",
+            "c/app-config.yaml",
+            "app-config.local.yaml",
+            "app-config.zz-app-config.yaml",
+        ]
+        .map(|p| (p, include))
+        .to_vec();
+        for partial in ["a/p.yaml", "b/p.yaml", "c/p.yaml", "p.yaml"] {
+            files.push((partial, large.as_bytes()));
+        }
+        let config = Config::of(&files, &[]);
+        let refused: Vec<_> = (config.unfollowed().iter())
+            .map(|u| (u.file.as_str(), u.reason))
+            .collect();
+        assert_eq!(refused, [("app-config.zz-app-config.yaml", Reason::Size)]);
+    }
+
+    /// An include refused for its size reads no file the reading already read. Six roots each
+    /// include one large partial from three keys: the first key of the first four roots reads it,
+    /// and every other include is refused unread, past `MAX_BYTES` grafted into its root or
+    /// `includes::READING_MAX` into the roots.
+    #[test]
+    fn an_include_refused_for_its_size_reads_no_file_already_read() {
+        let large = format!("url: u\npad: '{}'\n", "x".repeat(MAX_BYTES - 32));
+        let root =
+            &b"a: { $include: p.yaml }\nb: { $include: p.yaml }\nc: { $include: p.yaml }\n"[..];
+        let roots: Vec<String> = (0..6).map(|i| format!("app-config.x{i}.yaml")).collect();
+        let files: Vec<(&str, &[u8])> = roots.iter().map(|p| (p.as_str(), root)).collect();
+        let reads = std::cell::Cell::new(0);
+        let read = |path: &str| {
+            assert_eq!(path, "p.yaml");
+            reads.set(reads.get() + 1);
+            ConfigInput::Read(large.as_bytes().into())
+        };
+        config_inputs(&files, &read);
+        assert_eq!(reads.get(), 4);
     }
 }

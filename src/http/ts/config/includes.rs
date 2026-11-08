@@ -15,7 +15,8 @@
 //! sees), when the file is past `MAX_BYTES` or cannot be read, when its key path is missing, when
 //! the object holds another key besides, when it closes a cycle, past `DEPTH`, past `INCLUDES`
 //! from one root, or past `MAX_BYTES` grafted into one root or `READING_MAX` into the roots read
-//! together. Its subtree is then unread, so a read
+//! together (an include counting its file's bytes, or its value's size when aliases make it
+//! larger, `Graft::follow`). Its subtree is then unread, so a read
 //! under it stays a hole, and `Unfollowed` says which include and why (`meada status`). A key path
 //! whose last key alone is absent is named so too, but Backstage leaves its key out rather than
 //! failing, so nothing stands there (`Grafted::watched_unread` does not count it). An object
@@ -23,6 +24,8 @@
 //! written, and no read reaches a value through it.
 // ponytail: a list is not read (the flattened keys leave lists out), so an include inside one is
 // neither followed nor named.
+
+use std::collections::HashMap;
 
 use serde_json::Value;
 
@@ -36,14 +39,15 @@ pub(crate) const DEPTH: usize = 8;
 /// How many includes one root follows, all files it reaches counted; the next is not followed.
 // ponytail: a root splits into a few partials; 64 bounds an include fanned out to many keys.
 pub(crate) const INCLUDES: usize = 64;
-/// How many bytes of included files one root grafts, each include counting its file again:
-/// `MAX_BYTES`, the most one config file reads.
+/// How many bytes of included files one root grafts, each include counting its file again (or its
+/// value's size, `Graft::follow`): `MAX_BYTES`, the most one config file reads.
 // ponytail: a partial is a few KB; one file's limit bounds a partial grafted from many keys.
 const GRAFTED_MAX: usize = MAX_BYTES;
 /// How many bytes of included files all the roots of one reading graft together, each include
-/// counting its file again, the roots read in the reader's order (`config::roots`).
+/// counting its file again (or its value's size, `Graft::follow`), the roots read in the reader's
+/// order (`config::roots`).
 // ponytail: a repository's roots graft a few partials of a few KB; four files at their limit bound
-// hundreds of small roots each grafting one large partial again (20 took 23 s cold and 7.4 s on
+// hundreds of small roots each grafting one large partial again (20 took 26 s cold and 10 s on
 // every refresh, debug).
 const READING_MAX: usize = 4 * MAX_BYTES;
 
@@ -77,7 +81,7 @@ pub enum Reason {
     /// Past `INCLUDES` from one root.
     Count,
     /// A file past `MAX_BYTES`, or past `GRAFTED_MAX` grafted into one root or `READING_MAX` into
-    /// the roots read together.
+    /// the roots read together, its aliases expanded.
     Size,
 }
 
@@ -149,22 +153,31 @@ pub(super) struct Grafted {
     pub(super) watched_unread: bool,
 }
 
+/// What the roots of one reading spent together: the bytes they grafted, and what each file read
+/// so far is charged (its bytes, or its value's size once parsed), so an include past a limit
+/// reads no file already read.
+#[derive(Default)]
+pub(super) struct Reading {
+    grafted: usize,
+    charges: HashMap<String, usize>,
+}
+
 /// The root `path` (`src`) with its includes grafted and its `$env` read. `read` gives the file at
 /// a repository path; `watched` are the key paths, from the root, whose unread values
-/// `Grafted::watched_unread` tells; `grafted` counts the bytes the roots read together grafted,
-/// this one's added.
+/// `Grafted::watched_unread` tells; `reading` is what the roots read together spent, this one's
+/// added.
 pub(super) fn tree<'b>(
     path: &str,
     src: &[u8],
     read: &dyn Fn(&str) -> ConfigInput<'b>,
     watched: &[&[&str]],
-    grafted: &mut usize,
+    reading: &mut Reading,
 ) -> Grafted {
     let mut graft = Graft {
         read,
         includes: 0,
         bytes: 0,
-        grafted,
+        reading,
         stack: Vec::new(),
         unfollowed: Vec::new(),
         at: Vec::new(),
@@ -198,8 +211,8 @@ struct Graft<'r, 'b> {
     read: &'r dyn Fn(&str) -> ConfigInput<'b>,
     includes: usize,
     bytes: usize,
-    /// The bytes the roots read together grafted.
-    grafted: &'r mut usize,
+    /// What the roots read together spent.
+    reading: &'r mut Reading,
     /// The files and key paths whose children are being read, from the root.
     stack: Vec<(String, String)>,
     unfollowed: Vec<Unfollowed>,
@@ -300,20 +313,31 @@ impl Graft<'_, '_> {
             return Err(Reason::Count);
         }
         self.includes += 1;
+        // A file already read whose charge is past a limit is refused unread.
+        if (self.reading.charges.get(&path)).is_some_and(|&charge| !self.fits(charge)) {
+            return Err(Reason::Size);
+        }
         let src = match (self.read)(&path) {
             ConfigInput::Read(src) => src,
             ConfigInput::Symlink => return Err(Reason::Symlink),
             ConfigInput::Missing => return Err(Reason::Missing),
         };
-        if src.len() > MAX_BYTES
-            || self.bytes + src.len() > GRAFTED_MAX
-            || *self.grafted + src.len() > READING_MAX
-        {
+        if !self.fits(src.len()) {
+            self.reading.charges.insert(path, src.len());
             return Err(Reason::Size);
         }
-        self.bytes += src.len();
-        *self.grafted += src.len();
-        let document = document(&path, &src).ok_or(Reason::Unreadable)?;
+        let Some(document) = document(&path, &src) else {
+            self.reading.charges.insert(path, src.len());
+            self.charge(src.len());
+            return Err(Reason::Unreadable);
+        };
+        // An alias repeats its anchor's node: a value may graft far more than its file holds.
+        let charge = src.len().max(size(&document));
+        self.reading.charges.insert(path.clone(), charge);
+        if !self.fits(charge) {
+            return Err(Reason::Size);
+        }
+        self.charge(charge);
         let mut picked = match selected(document, key) {
             Ok(picked) => picked,
             Err(Selection::Absent) => return Ok(None),
@@ -323,6 +347,17 @@ impl Graft<'_, '_> {
         self.children(&mut picked, &path, depth);
         self.stack.pop();
         Ok(Some(picked))
+    }
+
+    /// Whether an include charged `charge` fits in its root's `GRAFTED_MAX` (`MAX_BYTES`, the
+    /// most one file holds) and the reading's `READING_MAX`.
+    fn fits(&self, charge: usize) -> bool {
+        self.bytes + charge <= GRAFTED_MAX && self.reading.grafted + charge <= READING_MAX
+    }
+
+    fn charge(&mut self, charge: usize) {
+        self.bytes += charge;
+        self.reading.grafted += charge;
     }
 
     fn refuse(&mut self, file: &str, include: String, reason: Reason) {
@@ -360,6 +395,29 @@ fn is_transform(value: &Value) -> bool {
 fn document(path: &str, src: &[u8]) -> Option<Value> {
     let mut documents = events::read(Syntax::of(path), src, |_| {}).ok()?;
     (documents.len() <= 1).then(|| documents.pop().unwrap_or(Value::Null))
+}
+
+/// The size of `value` as grafted: one for each node, and the bytes of each key and text besides.
+/// Without aliases it stays within the bytes of the text it was read from, but for a file of a few
+/// bytes or of many `\L` and `\P` escapes.
+fn size(value: &Value) -> usize {
+    let mut size = 0;
+    let mut pending = vec![value];
+    while let Some(value) = pending.pop() {
+        size += 1;
+        match value {
+            Value::String(text) => size += text.len(),
+            Value::Array(items) => pending.extend(items),
+            Value::Object(map) => {
+                for (key, value) in map {
+                    size += key.len();
+                    pending.push(value);
+                }
+            }
+            _ => {}
+        }
+    }
+    size
 }
 
 /// Why a key path selects nothing, as Backstage's include transform walks it.
@@ -414,7 +472,13 @@ mod tests {
         };
         let Grafted {
             tree, unfollowed, ..
-        } = tree(root, files[root].as_bytes(), &fetch, &[], &mut 0);
+        } = tree(
+            root,
+            files[root].as_bytes(),
+            &fetch,
+            &[],
+            &mut Reading::default(),
+        );
         let keys = tree.as_ref().map(flatten).unwrap_or_default();
         let unfollowed = (unfollowed.into_iter())
             .map(|u| (u.file, u.include, u.reason.name()))
@@ -582,7 +646,15 @@ mod tests {
         let root = files["app-config.yaml"].as_bytes();
         // The include not followed sits at `proxy.endpoints`, inside the partial `proxy` grafts;
         // the `$env` beside another key at `x`; nothing at `proxy` or `ok`.
-        let told = |watched: &[&[&str]]| tree("app-config.yaml", root, &fetch, watched, &mut 0);
+        let told = |watched: &[&[&str]]| {
+            tree(
+                "app-config.yaml",
+                root,
+                &fetch,
+                watched,
+                &mut Reading::default(),
+            )
+        };
         assert!(told(&[&["proxy", "endpoints"]]).watched_unread);
         assert!(told(&[&["x"]]).watched_unread);
         assert!(!told(&[&["proxy"], &["ok"], &["proxy", "kept"], &["endpoints"]]).watched_unread);
@@ -627,7 +699,15 @@ mod tests {
         let files: BTreeMap<&str, &str> = files.iter().copied().collect();
         let fetch = fetcher(&files);
         let root = files["app-config.yaml"].as_bytes();
-        let told = |watched: &[&[&str]]| tree("app-config.yaml", root, &fetch, watched, &mut 0);
+        let told = |watched: &[&[&str]]| {
+            tree(
+                "app-config.yaml",
+                root,
+                &fetch,
+                watched,
+                &mut Reading::default(),
+            )
+        };
         // Backstage gives `undefined` for an absent last key and leaves the key out: nothing is
         // unread there. An absent key before the last one fails its loader: unread.
         assert!(!told(&[&["last"]]).watched_unread);
@@ -652,7 +732,7 @@ mod tests {
             files["app-config.yaml"].as_bytes(),
             &fetch,
             &[&[]],
-            &mut 0,
+            &mut Reading::default(),
         );
         assert!(grafted.watched_unread);
     }
@@ -675,7 +755,13 @@ mod tests {
         ] {
             let files: BTreeMap<&str, &str> = [("app-config.yaml", root)].into_iter().collect();
             let fetch = fetcher(&files);
-            let grafted = tree("app-config.yaml", root.as_bytes(), &fetch, watched, &mut 0);
+            let grafted = tree(
+                "app-config.yaml",
+                root.as_bytes(),
+                &fetch,
+                watched,
+                &mut Reading::default(),
+            );
             let keys_read = grafted.tree.as_ref().map(flatten).unwrap_or_default();
             assert_eq!(keys_read, keys(&[kept]), "{root}");
             assert!(
@@ -687,7 +773,13 @@ mod tests {
         let root = "proxy: { $include: app-config.yaml }\n";
         let files: BTreeMap<&str, &str> = [("app-config.yaml", root)].into_iter().collect();
         let fetch = fetcher(&files);
-        let grafted = tree("app-config.yaml", root.as_bytes(), &fetch, watched, &mut 0);
+        let grafted = tree(
+            "app-config.yaml",
+            root.as_bytes(),
+            &fetch,
+            watched,
+            &mut Reading::default(),
+        );
         let reasons: Vec<_> = grafted.unfollowed.iter().map(|u| u.reason.name()).collect();
         assert_eq!((reasons, grafted.watched_unread), (vec!["cycle"], true));
     }
@@ -785,6 +877,40 @@ mod tests {
         assert!(!keys_read.contains_key("b.url"));
         let reasons: Vec<_> = unfollowed.iter().map(|u| (u.1.as_str(), u.2)).collect();
         assert_eq!(reasons, [("big.yaml", "size"), ("huge.yaml", "size")]);
+    }
+
+    #[test]
+    fn an_include_is_charged_the_size_its_aliases_expand_it_to() {
+        // 335 bytes whose aliases expand to a value of 48,139, a node counting one and a key or
+        // a text its bytes besides: `a` is 1 + 10 × (2 + 2) = 41, `b` 1 + 10 × (2 + 41) = 431,
+        // `c` 4,331, `d` 43,331, and the document 1 + 42 + 432 + 4,332 + 43,332. `MAX_BYTES`
+        // grafted into the root holds 21 of them, where their bytes would hold all 64.
+        let level = |name: &str, anchor: &str, item: &str| {
+            let items: Vec<String> = (0..10).map(|i| format!("k{i}: {item}")).collect();
+            format!("{name}: {anchor}{{{}}}\n", items.join(", "))
+        };
+        let bomb = [
+            level("a", "&a ", "x"),
+            level("b", "&b ", "*a"),
+            level("c", "&c ", "*b"),
+            level("d", "", "*c"),
+        ]
+        .concat();
+        assert_eq!(bomb.len(), 335);
+        let root: String = (0..INCLUDES)
+            .map(|i| format!("k{i:02}: {{ $include: bomb.yaml }}\n"))
+            .collect();
+        let files = [
+            ("app-config.yaml", root.as_str()),
+            ("bomb.yaml", bomb.as_str()),
+        ];
+        let (_, unfollowed) = read("app-config.yaml", &files, &[]);
+        let size = (
+            "app-config.yaml".to_string(),
+            "bomb.yaml".to_string(),
+            "size",
+        );
+        assert_eq!(unfollowed, vec![size; INCLUDES - 21]);
     }
 
     #[test]
