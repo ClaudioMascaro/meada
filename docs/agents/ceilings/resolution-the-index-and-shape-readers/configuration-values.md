@@ -26,7 +26,10 @@
   counted) and `OBJECT_WORK_MAX` (2^24 key comparisons per file: `hcl-edit` and `hcl-rs` check
   each key of an object literal against the keys before it, so a file's objects cost the sum of
   their keys squared, counted before parsing by a scan that skips strings, heredocs, comments
-  and block bodies; past it, as one object of 4,097 keys is, the file is unreadable and counted,
+  and block bodies (a `{` after an identifier or a quoted label, the `in` or `if` of a `for`
+  aside). The count is only ever too high: every `=` or `:` that is no operator counts in the
+  object around it, a conditional's `:` too, and a block typed or labelled `in` or `if` counts
+  as an object. Past it, as one object of 4,097 keys is, the file is unreadable and counted,
   and Terraform evaluation and the alert reader skip it too). The parser's own limits (`hcl-edit` 0.10's `MAX_OPERATOR_DEPTH`, 128 chained
   operators, and `MAX_NESTING_DEPTH`, 64 levels of nested expressions, templates and blocks) make
   a file past them unreadable, counted by `meada status`; `PARSER_OPERATOR_DEPTH` and `PARSER_NESTING_DEPTH`

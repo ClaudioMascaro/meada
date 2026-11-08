@@ -212,13 +212,19 @@ fn wide_past_with(text: &str, max: usize) -> Option<usize> {
                             at = end_of_line(at) - 1;
                         }
                     }
-                    // A `{` after a word or a label opens a block, unless the word is the `in`
-                    // or `if` of a `for`, which an expression follows.
+                    // A `{` after an identifier or a label opens a block, unless the identifier
+                    // is the `in` or `if` of a `for`, which an expression follows. An identifier
+                    // starts with a letter or `_`; one ending in `-` may be a subtraction.
                     b'{' => {
                         let start = (0..=last_at).rev().take_while(|&i| word(bytes[i])).last();
-                        let keyword =
-                            start.is_some_and(|s| matches!(&bytes[s..=last_at], b"in" | b"if"));
-                        let block = !keyword && (word(last) || last == b'"');
+                        let identifier = start.filter(|&s| {
+                            word(last)
+                                && last != b'-'
+                                && (bytes[s].is_ascii_alphabetic() || bytes[s] == b'_')
+                        });
+                        let keyword = identifier
+                            .is_some_and(|s| matches!(&bytes[s..=last_at], b"in" | b"if"));
+                        let block = !keyword && (identifier.is_some() || last == b'"');
                         stack.push(Frame::Bracket((!block).then_some(0)));
                     }
                     b'[' | b'(' => stack.push(Frame::Bracket(None)),
@@ -239,7 +245,8 @@ fn wide_past_with(text: &str, max: usize) -> Option<usize> {
                     }
                     _ => {}
                 }
-                if !b.is_ascii_whitespace() && !matches!(b, b'#' | b'/') {
+                let comment = b == b'#' || (b == b'/' && matches!(next, b'/' | b'*'));
+                if !b.is_ascii_whitespace() && !comment {
                     (last, last_at) = (b, at);
                 }
             }
@@ -1062,6 +1069,13 @@ mod tests {
             format!("x = [<<EOT\nfoo\nEOT, {{ {listed} }}]\n"),
             format!("x = [<<EOT\nfoo\n\t  EOT, {{ {listed} }}]\n"),
             format!("x = [for k in [1] : k if {{ {listed} }}]\n"),
+            // A `{` after an operator, a number or a word ending in `-` is a value's.
+            format!("x = -{{ {listed} }}\n"),
+            format!("x = 1 - {{ {listed} }}\n"),
+            format!("x = 1-{{ {listed} }}\n"),
+            format!("x = a / {{ {listed} }}\n"),
+            format!("x = \"a\" / {{ {listed} }}\n"),
+            format!("x = a- {{ {listed} }}\n"),
         ];
         let missed: Vec<&String> = (past.iter())
             .filter(|text| wide_past_with(text, 100).is_none())
@@ -1079,6 +1093,8 @@ mod tests {
             format!("locals {{\n{}}}\n", keys(100)),
             format!("resource \"a\" \"in\" {{\n{}}}\n", keys(100)),
             format!("plugin {{\n{}}}\n", keys(100)),
+            format!("my-block {{\n{}}}\n", keys(100)),
+            format!("locals /* a */ {{\n{}}}\n", keys(100)),
             keys(100),
             format!("x = {{ k = [{quoted}] }}\n"),
             format!("x = {{ k = <<-EOT\n{}  EOT\n}}\n", keys(100)),

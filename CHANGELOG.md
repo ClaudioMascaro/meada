@@ -392,6 +392,11 @@ All notable changes to Meada are recorded here. The format follows
   longer takes minutes to index: the operations of one file keep the answers no limit cut and
   share a budget of 2^18 steps (each still taking 16 once it is spent), and a call passing
   thousands of clients to one function no longer copies them for every value it reads (#660).
+- Terraform: an object written after a `-`, a number or a `/` now counts toward the 2^24 key
+  comparisons a file may hold, where a file of them could take minutes to parse (#640); a JSON
+  var file of tens of thousands of keys reads in linear time, where it took over half a minute;
+  and a var file Terraform loads that does not read (broken, too wide or past 1 MiB) leaves the
+  variables it may give unresolved, where their defaults stood in (#650).
 - Backstage proxy: a `proxy.endpoints`, a whole `proxy` or a root behind an `$include` Meada
   does not follow counts as the endpoints table, as Backstage reads (or refuses) whatever the
   include gives, so the legacy `proxy['/<ep>']` keys beside it or in another file no longer link

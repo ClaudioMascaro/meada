@@ -33,6 +33,7 @@
 //! that went through a root module's variable records it as `Overridable`, by its default or by
 //! the var file that gives it.
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use hcl::eval::{Context, Evaluate};
@@ -49,7 +50,7 @@ use serde::{Deserialize, Serialize};
 use crate::Result;
 use crate::config_values;
 use crate::contract::Hit;
-use crate::document::events::Step;
+use crate::document::events::{self, Step, Syntax};
 use crate::lang::MAX_BYTES;
 use crate::render::{rank, section};
 use crate::trace::Direction;
@@ -611,6 +612,9 @@ struct Module {
     /// not read or is shadowed: merged into the others, that file may mark any variable sensitive.
     overridden: bool,
     unreadable: bool,
+    /// Where the last-loaded of its var files that do not read loads (`var_file_rank`): it may
+    /// give any variable a value.
+    unread: Option<(u8, String)>,
 }
 
 /// The directory a local module `source` names from `dir`: `./` or `../` joined and normalized,
@@ -761,33 +765,67 @@ fn text(src: &[u8]) -> Option<&str> {
 }
 
 /// Reads the values the var file at `path` gives into `module`, a value of a file Terraform loads
-/// later (`var_file_rank`) winning, whatever order the files come in. A value that is no constant
-/// (Terraform refuses it) is left out; one past `EVAL_COST_MAX`, the file's own `EVAL_WORK_MAX`
-/// or `EVAL_VALUE_MAX` is given but unresolved. A JSON var file's strings are literals, as
-/// Terraform reads them, each at the line of its key's first occurrence.
+/// later (`var_file_rank`) winning, whatever order the files come in. A file that does not read
+/// may give any variable: `module` keeps where it loads as `unread`.
 fn read_var_file(path: &str, src: &[u8], module: &mut Module) {
-    let json = path.ends_with(".json");
-    // `serde_json` reads objects in linear time: only HCL needs its objects' widths checked.
-    let read = if json { shallow } else { text };
-    let (Some(rank), Some(text)) = (var_file_rank(path), read(src)) else {
+    let Some(rank) = var_file_rank(path) else {
         return;
     };
-    let line = lines(text);
-    let mut values: Vec<(String, Option<Value>, usize)> = Vec::new();
+    let rank = (rank.0, rank.1.to_string());
+    let Some(values) = var_file_values(path, src) else {
+        module.unread = module.unread.take().max(Some(rank));
+        return;
+    };
+    for (name, value, line) in values {
+        if module.given.get(&name).is_none_or(|g| g.rank <= rank) {
+            let path = path.to_string();
+            let rank = rank.clone();
+            module.given.insert(
+                name,
+                Given {
+                    value,
+                    path,
+                    line,
+                    rank,
+                },
+            );
+        }
+    }
+}
+
+/// The values the var file at `path` gives, each with its line; `None` for a file past
+/// `MAX_BYTES`, not `shallow`, with HCL objects past their width or that does not parse. A value
+/// that is no constant (Terraform refuses it) is left out; one past `EVAL_COST_MAX`, the file's
+/// own `EVAL_WORK_MAX` or `EVAL_VALUE_MAX` is given but unresolved. A JSON var file's strings are
+/// literals, as Terraform reads them, each at the line of its key (the last one, as its value,
+/// when a key repeats).
+fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>, usize)>> {
+    if src.len() > MAX_BYTES {
+        return None;
+    }
+    let json = path.ends_with(".json");
+    // `serde_json` reads objects in linear time: only HCL needs its objects' widths checked.
+    let text = if json { shallow(src) } else { text(src) }?;
+    let mut values = Vec::new();
     if json {
-        let Ok(map) = serde_json::from_str::<Map<String, Value>>(text) else {
-            return;
+        let map = serde_json::from_str::<Map<String, Value>>(text).ok()?;
+        let keys = RefCell::new(HashMap::new());
+        let key = |path: &[Step], line| {
+            if let [Step::Key(name)] = path {
+                keys.borrow_mut().insert(name.clone(), line);
+            }
         };
+        let scalar = |s: events::Scalar<'_>| key(s.path, s.line);
+        events::read_located(Syntax::Json, src, scalar, |c, _| key(c.path, c.line)).ok()?;
+        let keys = keys.into_inner();
         for (name, value) in map {
-            let key = serde_json::to_string(&name).unwrap_or_default();
-            let at = line(text.find(&key).unwrap_or(0));
+            let at = keys.get(&name).copied().unwrap_or(1);
             let value = (size(&value) <= EVAL_VALUE_MAX).then_some(value);
             values.push((name, value, at));
         }
     } else {
-        let Ok(body) = parser::parse_body(text) else {
-            return;
-        };
+        let body = parser::parse_body(text).ok()?;
+        let line = lines(text);
         let mut work = EVAL_WORK_MAX;
         for a in body.attributes() {
             let cost = cost(&a.value, &Map::new(), &mut Vec::new()).max(1);
@@ -806,22 +844,7 @@ fn read_var_file(path: &str, src: &[u8], module: &mut Module) {
             values.push((a.key.as_str().to_string(), value, at));
         }
     }
-    let rank = (rank.0, rank.1.to_string());
-    for (name, value, line) in values {
-        if module.given.get(&name).is_none_or(|g| g.rank <= rank) {
-            let path = path.to_string();
-            let rank = rank.clone();
-            module.given.insert(
-                name,
-                Given {
-                    value,
-                    path,
-                    line,
-                    rank,
-                },
-            );
-        }
-    }
+    Some(values)
 }
 
 /// Reads the blocks, outputs, locals and variables of the Terraform file at `path` into `module`;
@@ -829,9 +852,7 @@ fn read_var_file(path: &str, src: &[u8], module: &mut Module) {
 /// parse adds nothing but marks `module` unreadable, as config values count it.
 fn read(path: &str, src: &[u8], module: &mut Module) {
     if is_var_file(path) {
-        if src.len() <= MAX_BYTES {
-            read_var_file(path, src, module);
-        }
+        read_var_file(path, src, module);
         return;
     }
     let overriding = config_values::is_override(path);
@@ -1616,7 +1637,12 @@ impl<'m> Eval<'m> {
                 (None, None) => Evaluated::unknown(),
             };
         }
-        let (mut found, path, line, tfvars) = match (module.given.get(n), &variable.default) {
+        let given = module.given.get(n);
+        // A var file that does not read, loaded after the value found, may give another.
+        let unread =
+            (module.unread.as_ref()).is_some_and(|unread| given.is_none_or(|g| g.rank < *unread));
+        let (mut found, path, line, tfvars) = match (given, &variable.default) {
+            _ if unread => (Evaluated::unknown(), &variable.path, variable.line, false),
             (Some(given), _) => {
                 let found = Evaluated {
                     val: given.value.clone().map_or(Val::Unknown, Val::Known),
@@ -3677,6 +3703,29 @@ mod tests {
         );
     }
 
+    /// A JSON var file's keys are found at their lines in one pass over its text, where a search
+    /// of the text per key was quadratic. Measured on 2026-11-08 in a debug build: 0.6 s, where
+    /// the search per key took 33.6 s.
+    #[test]
+    fn a_json_var_file_finds_the_lines_of_its_keys_in_linear_time() {
+        let n = 60_000;
+        let keys: String = (0..n).map(|i| format!("  \"k{i}\": \"v\",\n")).collect();
+        let values = format!("{{\n{keys}  \"x\": \"ok\"\n}}\n");
+        let main =
+            "variable \"x\" { default = \"\" }\nresource \"a\" \"q\" { name = \"q-${var.x}\" }\n";
+        let start = std::time::Instant::now();
+        let got = names(&[("main.tf", main), ("terraform.tfvars.json", &values)]);
+        let took = start.elapsed();
+        let line = n + 2;
+        assert_eq!(
+            got,
+            [format!(
+                "a.q = \"q-ok\" [var.x terraform.tfvars.json:{line} tfvars]"
+            )]
+        );
+        assert!(took < std::time::Duration::from_secs(20), "{took:?}");
+    }
+
     /// Converting an object literal for `hcl-rs` checks each key against those before it, so
     /// each evaluation of one spends the square of its keys from the root's `EVAL_WORK_MAX`: a
     /// module instanced many times over a wide local stops evaluating it once the work is spent.
@@ -3753,6 +3802,53 @@ mod tests {
                 "[var.b terraform.tfvars.json:2 tfvars] [var.c z.auto.tfvars.json:1 tfvars]"
             )]
         );
+    }
+
+    /// A var file Terraform loads that does not read here (broken, with objects too wide or past
+    /// `MAX_BYTES`) may give any variable: a value it could give stays unresolved, the default
+    /// not standing in, while a value of a file loaded after it still resolves.
+    #[test]
+    fn a_var_file_that_does_not_read_leaves_the_values_it_may_give_unresolved() {
+        let main = concat!(
+            "variable \"x\" {\n  default = \"def\"\n}\n",
+            "resource \"a\" \"q\" { name = \"q-${var.x}\" }\n",
+        );
+        let wide: String = (0..4097).map(|i| format!("  k{i} = {i}\n")).collect();
+        let unread = [
+            ("terraform.tfvars", "x = \"given\"\n}\n".to_string()),
+            (
+                "terraform.tfvars",
+                format!("x = \"given\"\nw = {{\n{wide}}}\n"),
+            ),
+            (
+                "terraform.tfvars",
+                format!("x = \"given\"\n#{}\n", "a".repeat(MAX_BYTES)),
+            ),
+            ("terraform.tfvars.json", "{\"x\": \"given\",}".to_string()),
+        ];
+        let unresolved = ["a.q ~ \"q-*\" [var.x main.tf:1]"];
+        for (file, text) in &unread {
+            assert_eq!(
+                names(&[("main.tf", main), (file, text)]),
+                unresolved,
+                "{file}"
+            );
+        }
+        let later = [
+            ("main.tf", main),
+            ("terraform.tfvars", "x = \"given\"\n}\n"),
+            ("z.auto.tfvars", "x = \"auto\"\n"),
+        ];
+        assert_eq!(
+            names(&later),
+            ["a.q = \"q-auto\" [var.x z.auto.tfvars:1 tfvars]"]
+        );
+        let earlier = [
+            ("main.tf", main),
+            ("terraform.tfvars", "x = \"given\"\n"),
+            ("z.auto.tfvars.json", "{"),
+        ];
+        assert_eq!(names(&earlier), unresolved);
     }
 
     /// Names built from a chain of locals as deep as `EVAL_DEPTH_MAX`, each a template naming the
