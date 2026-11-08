@@ -23,7 +23,11 @@
   Terraform and OpenTofu (#640, `config_values/hcl.rs`): `NESTING_MAX` (64 brackets open inside
   each other in one file, counted by a scan that includes the ones inside strings, so a file
   with many unbalanced brackets in strings can be unreadable; past it the file is unreadable and
-  counted). The parser's own limits (`hcl-edit` 0.10's `MAX_OPERATOR_DEPTH`, 128 chained
+  counted) and `OBJECT_WORK_MAX` (2^24 key comparisons per file: `hcl-edit` and `hcl-rs` check
+  each key of an object literal against the keys before it, so a file's objects cost the sum of
+  their keys squared, counted before parsing by a scan that skips strings, heredocs, comments
+  and block bodies; past it, as one object of 4,097 keys is, the file is unreadable and counted,
+  and Terraform evaluation and the alert reader skip it too). The parser's own limits (`hcl-edit` 0.10's `MAX_OPERATOR_DEPTH`, 128 chained
   operators, and `MAX_NESTING_DEPTH`, 64 levels of nested expressions, templates and blocks) make
   a file past them unreadable, counted by `meada status`; `PARSER_OPERATOR_DEPTH` and `PARSER_NESTING_DEPTH`
   in `hcl.rs`' tests mirror them, and a test feeds a file at and past each. An `expression` or

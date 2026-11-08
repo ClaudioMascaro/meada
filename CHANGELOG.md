@@ -380,7 +380,10 @@ All notable changes to Meada are recorded here. The format follows
   than 32 Terraform variables or CloudFormation parameters (now unresolved), YAML anchors nested
   around a large node, Kustomize files listed many times or reached through a diamond of bases,
   thousands of `images` rules, Ingress hosts past 253 bytes and volume names past 63 (now left
-  out), and an `Fn::Sub` that names its variable twice at every level (#646, #649, #651, #653).
+  out), an `Fn::Sub` that names its variable twice at every level, Terraform objects of
+  thousands of keys (a file whose objects pass 2^24 key comparisons is now unreadable), costly
+  `.tfvars` values (now given but unresolved) and long `trim` and `toset` arguments (#646, #649,
+  #651, #653).
 - Backstage proxy: a `proxy.endpoints`, a whole `proxy` or a root behind an `$include` Meada
   does not follow counts as the endpoints table, as Backstage reads (or refuses) whatever the
   include gives, so the legacy `proxy['/<ep>']` keys beside it or in another file no longer link

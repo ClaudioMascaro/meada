@@ -736,7 +736,9 @@ fn terraform(path: &str, src: &[u8]) -> Summary {
     let Ok(text) = std::str::from_utf8(src) else {
         return out;
     };
-    if crate::config_values::nested_past(text).is_some() {
+    if crate::config_values::nested_past(text).is_some()
+        || crate::config_values::wide_past(text).is_some()
+    {
         return out;
     }
     let Ok(body) = hcl_edit::parser::parse_body(text) else {

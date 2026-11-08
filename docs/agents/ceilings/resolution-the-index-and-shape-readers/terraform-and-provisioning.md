@@ -91,7 +91,12 @@
   as `iac::size` counts it; past it, the value is unresolved, and a template past it is `*`
   whole), `EVAL_COST_MAX` (1 MiB that one expression could make, `iac::cost`'s upper bound; past
   it `hcl-rs` does not evaluate the expression, only its template parts resolve) and
-  `EVAL_WORK_MAX` (64 MiB of cost per root module; past it every value left is unresolved);
+  `EVAL_WORK_MAX` (64 MiB of cost per root module; past it every value left is unresolved;
+  converting an object literal for `hcl-rs` also spends the square of its keys, so a wide local
+  evaluated in many module instances stops there). A var file's values are bounded the same way,
+  each file with an `EVAL_WORK_MAX` of its own: a value past `EVAL_COST_MAX`, that work or
+  `EVAL_VALUE_MAX` is given but unresolved (the default does not stand in for it), and one that
+  is no constant is left out, as Terraform refuses it;
   `WIDTH_MAX` (`iac/functions.rs`: a `format` width of 256; past it the call is unresolved). `cost`
   bounds a `for` by the size of what it iterates, so a `for` over a value it cannot size (a
   function's result) is costed as its square and may stay unresolved below the real ceiling.

@@ -36,6 +36,13 @@ use crate::document::events::Step;
 // debug build's test thread.
 const NESTING_MAX: usize = 64;
 
+/// The key comparisons building the objects of one file may take: `hcl-edit` and `hcl-rs` check
+/// each key of an object against the keys before it, so an object of n keys costs about n²; past
+/// it the file is unreadable, before it is parsed.
+// ponytail: an object of a few hundred keys costs a few hundred thousand; 2^24 lets one of 4,096
+// keys through and stops a file of one object of 100,000 keys, which takes minutes to parse.
+const OBJECT_WORK_MAX: usize = 1 << 24;
+
 /// The limits `hcl-edit` 0.10 puts on a file, past which the parser fails and the file is
 /// unreadable: chained operators (`MAX_OPERATOR_DEPTH`) and nested expressions, templates and
 /// blocks (`MAX_NESTING_DEPTH`). Named here for the test that feeds them; the parser enforces them.
@@ -54,9 +61,9 @@ pub(super) fn is_hcl(path: &str) -> bool {
 }
 
 /// The rows of the HCL file at `path`: `Err` with the line and the reason when it does not
-/// parse, nests past `NESTING_MAX` or stores past the budget. `sensitive` are the variables
-/// marked sensitive elsewhere (`Sensitive`): the values a `.tfvars` file gives them and the
-/// defaults a Terraform file declares for them are redacted.
+/// parse, nests past `NESTING_MAX`, holds objects past `OBJECT_WORK_MAX` or stores past the
+/// budget. `sensitive` are the variables marked sensitive elsewhere (`Sensitive`): the values a
+/// `.tfvars` file gives them and the defaults a Terraform file declares for them are redacted.
 pub(super) fn read(path: &str, src: &[u8], sensitive: &BTreeSet<String>) -> Result<Vec<Row>, Fail> {
     let text = std::str::from_utf8(src).map_err(|e| {
         let line = src[..e.valid_up_to()]
@@ -76,6 +83,9 @@ pub(super) fn read(path: &str, src: &[u8], sensitive: &BTreeSet<String>) -> Resu
             line(at),
             format!("nested deeper than {NESTING_MAX} brackets"),
         ));
+    }
+    if let Some(at) = wide_past(text) {
+        return Err((line(at), "objects too wide to read".to_string()));
     }
     let body = parser::parse_body(text).map_err(|e| {
         let reason = e.message().lines().next().unwrap_or_default();
@@ -120,6 +130,130 @@ pub(crate) fn nested_past(text: &str) -> Option<usize> {
         }
     }
     None
+}
+
+/// The byte offset of the key where the objects of `text` pass `OBJECT_WORK_MAX`.
+pub(crate) fn wide_past(text: &str) -> Option<usize> {
+    wide_past_with(text, OBJECT_WORK_MAX)
+}
+
+/// The byte offset of the key where the key comparisons of the object literals of `text` pass
+/// `max`, each key of an object compared with the keys before it. Strings, heredocs, comments and
+/// block bodies hold no key; an interpolation is read as an expression. Every `=` or `:` that is
+/// no operator counts in the object around it, a conditional's or a `for`'s too: a count that may
+/// be too high but is never too low.
+fn wide_past_with(text: &str, max: usize) -> Option<usize> {
+    /// What the scan is inside of.
+    enum Frame<'t> {
+        /// A bracket: an object literal's `{` with its keys so far, or a block body's `{`, a `[`
+        /// or a `(`, which hold none.
+        Bracket(Option<usize>),
+        /// A `${` or `%{` of a string or heredoc: an expression up to its `}`.
+        Interpolation,
+        /// A quoted string.
+        Quote,
+        /// A heredoc and its identifier.
+        Heredoc(&'t str),
+    }
+    let bytes = text.as_bytes();
+    let end_of_line = |at: usize| text[at..].find('\n').map_or(bytes.len(), |n| at + n);
+    let word = |b: u8| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-');
+    let mut stack = Vec::new();
+    // The work so far, and the last byte of code that is no space or comment, and where.
+    let (mut work, mut last, mut last_at, mut at) = (0usize, b'\n', 0, 0);
+    while let Some(&b) = bytes.get(at) {
+        let next = bytes.get(at + 1).copied().unwrap_or(0);
+        match stack.last_mut() {
+            Some(Frame::Quote) if b == b'\\' => at += 1,
+            Some(Frame::Quote) if b == b'"' => {
+                stack.pop();
+                last = b'"';
+            }
+            // As `hcl-edit` reads it, a heredoc ends at its identifier at the start of a line
+            // after spaces or tabs, when no identifier character follows; code may follow.
+            Some(Frame::Heredoc(id)) if b == b'\n' => {
+                let id: &str = id;
+                let indent = bytes[at + 1..]
+                    .iter()
+                    .take_while(|b| matches!(b, b' ' | b'\t'));
+                let start = at + 1 + indent.count();
+                let after = start + id.len();
+                if text[start..].starts_with(id)
+                    && !text[after..].chars().next().is_some_and(id_continue)
+                {
+                    stack.pop();
+                    at = after - 1;
+                }
+            }
+            Some(Frame::Quote | Frame::Heredoc(_)) => {
+                if matches!(b, b'$' | b'%') && next == b && bytes.get(at + 2) == Some(&b'{') {
+                    at += 2;
+                } else if matches!(b, b'$' | b'%') && next == b'{' {
+                    stack.push(Frame::Interpolation);
+                    at += 1;
+                    last = b'{';
+                }
+            }
+            frame => {
+                match b {
+                    b'#' => at = end_of_line(at),
+                    b'/' if next == b'/' => at = end_of_line(at),
+                    b'/' if next == b'*' => {
+                        at = text[at + 2..]
+                            .find("*/")
+                            .map_or(bytes.len(), |n| at + n + 3);
+                    }
+                    b'"' => stack.push(Frame::Quote),
+                    b'<' if next == b'<' => {
+                        let line = &text[at + 2..end_of_line(at)];
+                        let id = line.strip_prefix('-').unwrap_or(line).trim_end();
+                        if !id.is_empty() {
+                            stack.push(Frame::Heredoc(id));
+                            at = end_of_line(at) - 1;
+                        }
+                    }
+                    // A `{` after a word or a label opens a block, unless the word is the `in`
+                    // or `if` of a `for`, which an expression follows.
+                    b'{' => {
+                        let start = (0..=last_at).rev().take_while(|&i| word(bytes[i])).last();
+                        let keyword =
+                            start.is_some_and(|s| matches!(&bytes[s..=last_at], b"in" | b"if"));
+                        let block = !keyword && (word(last) || last == b'"');
+                        stack.push(Frame::Bracket((!block).then_some(0)));
+                    }
+                    b'[' | b'(' => stack.push(Frame::Bracket(None)),
+                    b'}' | b']' | b')' => {
+                        stack.pop();
+                    }
+                    b'=' | b':' => {
+                        let before = at.checked_sub(1).map_or(0, |i| bytes[i]);
+                        let operator = matches!(next, b'=' | b'>' | b':')
+                            || matches!(before, b'=' | b'!' | b'<' | b'>' | b':');
+                        if let (false, Some(Frame::Bracket(Some(keys)))) = (operator, frame) {
+                            work += 2 * *keys + 1;
+                            *keys += 1;
+                            if work > max {
+                                return Some(at);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                if !b.is_ascii_whitespace() && !matches!(b, b'#' | b'/') {
+                    (last, last_at) = (b, at);
+                }
+            }
+        }
+        at += 1;
+    }
+    None
+}
+
+/// Whether `c` may continue an HCL identifier, as `hcl-edit` reads one.
+fn id_continue(c: char) -> bool {
+    c.is_ascii_alphanumeric()
+        || matches!(c, '_' | '-')
+        || (!c.is_ascii() && hcl_edit::Ident::try_new(format!("_{c}")).is_ok())
 }
 
 /// Which attributes of a body are secret.
@@ -876,6 +1010,91 @@ mod tests {
             "{outcome:?}"
         );
         assert_eq!(found[0].key.len(), 1 + 3 * NESTING_MAX);
+    }
+
+    /// An object of n keys costs n² key comparisons to build: a file whose objects pass
+    /// `OBJECT_WORK_MAX` is unreadable at the key that passes it, and one at the ceiling reads.
+    #[test]
+    fn a_file_whose_objects_pass_the_work_ceiling_is_unreadable() {
+        let object = |n: usize| {
+            let keys: String = (0..n).map(|i| format!("  k{i} = 1\n")).collect();
+            format!("x = {{\n{keys}}}\n")
+        };
+        let side = OBJECT_WORK_MAX.isqrt();
+        let (outcome, found) = read("a.tf", object(side + 1).as_bytes());
+        assert!(
+            matches!(&outcome, Outcome::Unreadable { line, reason }
+                if *line == side + 2 && reason.contains("wide")),
+            "{outcome:?}"
+        );
+        assert!(found.is_empty());
+        let (outcome, _) = read("a.tf", object(side).as_bytes());
+        assert!(
+            matches!(outcome, Outcome::Read { values, .. } if values == side),
+            "{outcome:?}"
+        );
+    }
+
+    /// The keys counted are those of object literals, wherever they are (a value, a `for` over
+    /// one, an interpolation): a block body, a string, a heredoc, a comment and an operator hold
+    /// none.
+    #[test]
+    fn only_the_keys_of_object_literals_count_toward_the_work() {
+        let keys = |n: usize| (0..n).map(|i| format!("k{i} = {i}\n")).collect::<String>();
+        let listed = (0..11)
+            .map(|i| format!("k{i} = {i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        // Eleven keys cost 121, past a ceiling of 100; ten cost exactly 100.
+        assert_eq!(
+            wide_past_with(&format!("x = {{\n{}}}\n", keys(10)), 100),
+            None
+        );
+        let past = [
+            format!("x = {{\n{}}}\n", keys(11)),
+            format!("locals {{\n m = {{\n{}}}\n}}\n", keys(11)),
+            format!("x = [for k, v in {{ {listed} }} : k]\n"),
+            format!("x = \"%{{ for k, v in {{ {listed} }} }}${{k}}%{{ endfor }}\"\n"),
+            format!("x = \"${{ {{ {listed} }} }}\"\n"),
+            format!("x = \"${{jsonencode({{ {listed} }})}}\"\n"),
+            format!("x = <<EOT\n${{ {{ {listed} }} }}\nEOT\n"),
+            // A heredoc ends at its identifier with code after it, indented or not.
+            format!("x = [<<EOT\nfoo\nEOT, {{ {listed} }}]\n"),
+            format!("x = [<<EOT\nfoo\n\t  EOT, {{ {listed} }}]\n"),
+            format!("x = [for k in [1] : k if {{ {listed} }}]\n"),
+        ];
+        let missed: Vec<&String> = (past.iter())
+            .filter(|text| wide_past_with(text, 100).is_none())
+            .collect();
+        assert!(missed.is_empty(), "{missed:#?}");
+        let quoted = (0..100)
+            .map(|i| format!("\"a{i}=b:c\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let operators = (0..100)
+            .map(|i| format!("a{i} == b && c != d || e <= f || g >= h"))
+            .collect::<Vec<_>>()
+            .join(" && ");
+        let none = [
+            format!("locals {{\n{}}}\n", keys(100)),
+            format!("resource \"a\" \"in\" {{\n{}}}\n", keys(100)),
+            format!("plugin {{\n{}}}\n", keys(100)),
+            keys(100),
+            format!("x = {{ k = [{quoted}] }}\n"),
+            format!("x = {{ k = <<-EOT\n{}  EOT\n}}\n", keys(100)),
+            format!("x = {{ # a = 1\n // b = 2\n /* {} */ k = 1 }}\n", keys(100)),
+            format!("x = {{ k = {operators} }}\n"),
+            "x = \"$${a = 1, b = 2}\"\n".to_string(),
+            // A heredoc whose end is never seen leaves the rest unread, and its identifier
+            // followed by an identifier character is no end.
+            format!("x = <<EOT\n{}", keys(100)),
+            format!("x = <<EOT\nEOT_ = {{ {listed} }}\nEOT\n"),
+            format!("x = <<EOT\nEOT\u{e9} = {{ {listed} }}\nEOT\n"),
+        ];
+        let counted: Vec<&String> = (none.iter())
+            .filter(|text| wide_past_with(text, 2).is_some())
+            .collect();
+        assert!(counted.is_empty(), "{counted:#?}");
     }
 
     /// `hcl-edit` has two limits of its own: 128 chained operators and 64 levels of expression,

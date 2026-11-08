@@ -22,7 +22,7 @@ use crate::msg::Msg;
 pub(crate) mod hcl;
 pub(crate) mod sites;
 
-pub(crate) use hcl::nested_past;
+pub(crate) use hcl::{nested_past, wide_past};
 
 /// The lockfiles a YAML or JSON extension reaches, skipped by file name (ADR 0025).
 const LOCKFILES: [&str; 4] = [

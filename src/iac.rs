@@ -469,9 +469,10 @@ struct Variable {
     line: usize,
 }
 
-/// The value a var file gives a variable, and where.
+/// The value a var file gives a variable, and where: `None` when it is past the evaluation
+/// ceilings, which leaves the variable unresolved.
 struct Given {
-    value: Value,
+    value: Option<Value>,
     path: String,
     line: usize,
     /// Where its file loads among the directory's var files (`var_file_rank`).
@@ -747,41 +748,62 @@ fn quiet<T>(f: impl FnOnce() -> T) -> Option<T> {
     out.ok()
 }
 
-/// The text of `src` as HCL, `None` when it is not UTF-8 or nests past the HCL reader's ceiling
-/// (config values count it unreadable).
-fn text(src: &[u8]) -> Option<&str> {
+/// The text of `src`, `None` when it is not UTF-8 or nests past the HCL reader's ceiling.
+fn shallow(src: &[u8]) -> Option<&str> {
     let text = std::str::from_utf8(src).ok()?;
     config_values::nested_past(text).is_none().then_some(text)
 }
 
+/// The text of `src` as HCL, `None` when it is not `shallow` or holds objects wider than its
+/// budget (config values count it unreadable).
+fn text(src: &[u8]) -> Option<&str> {
+    shallow(src).filter(|text| config_values::wide_past(text).is_none())
+}
+
 /// Reads the values the var file at `path` gives into `module`, a value of a file Terraform loads
 /// later (`var_file_rank`) winning, whatever order the files come in. A value that is no constant
-/// (Terraform refuses it) is left out; a JSON var file's strings are literals, as Terraform reads
-/// them, each at the line of its key's first occurrence.
+/// (Terraform refuses it) is left out; one past `EVAL_COST_MAX`, the file's own `EVAL_WORK_MAX`
+/// or `EVAL_VALUE_MAX` is given but unresolved. A JSON var file's strings are literals, as
+/// Terraform reads them, each at the line of its key's first occurrence.
 fn read_var_file(path: &str, src: &[u8], module: &mut Module) {
-    let (Some(rank), Some(text)) = (var_file_rank(path), text(src)) else {
+    let json = path.ends_with(".json");
+    // `serde_json` reads objects in linear time: only HCL needs its objects' widths checked.
+    let read = if json { shallow } else { text };
+    let (Some(rank), Some(text)) = (var_file_rank(path), read(src)) else {
         return;
     };
     let line = lines(text);
-    let mut values: Vec<(String, Value, usize)> = Vec::new();
-    if path.ends_with(".json") {
+    let mut values: Vec<(String, Option<Value>, usize)> = Vec::new();
+    if json {
         let Ok(map) = serde_json::from_str::<Map<String, Value>>(text) else {
             return;
         };
         for (name, value) in map {
             let key = serde_json::to_string(&name).unwrap_or_default();
             let at = line(text.find(&key).unwrap_or(0));
+            let value = (size(&value) <= EVAL_VALUE_MAX).then_some(value);
             values.push((name, value, at));
         }
     } else {
         let Ok(body) = parser::parse_body(text) else {
             return;
         };
+        let mut work = EVAL_WORK_MAX;
         for a in body.attributes() {
-            if let Some(value) = evaluated(&a.value, &Context::new()) {
-                let at = line(a.span().map_or(0, |s| s.start));
-                values.push((a.key.as_str().to_string(), value, at));
-            }
+            let cost = cost(&a.value, &Map::new(), &mut Vec::new()).max(1);
+            let spend = cost.saturating_add(widths(&a.value));
+            let value = if cost <= EVAL_COST_MAX && spend <= work {
+                work -= spend;
+                match evaluated(&a.value, &Context::new()) {
+                    Some(v) => (size(&v) <= EVAL_VALUE_MAX).then_some(v),
+                    None => continue,
+                }
+            } else {
+                work = work.saturating_sub(EVAL_COST_MAX.min(cost));
+                None
+            };
+            let at = line(a.span().map_or(0, |s| s.start));
+            values.push((a.key.as_str().to_string(), value, at));
         }
     }
     let rank = (rank.0, rank.1.to_string());
@@ -1153,6 +1175,21 @@ impl Visit for Variables {
         }
         visit::visit_expr(self, node);
     }
+}
+
+/// The key comparisons converting the object literals of `expr` for `hcl-rs` takes, the square
+/// of each one's keys: converting checks each key of an object against those before it.
+fn widths(expr: &Expression) -> usize {
+    struct Widths(usize);
+    impl Visit for Widths {
+        fn visit_object(&mut self, node: &hcl_edit::expr::Object) {
+            self.0 = (self.0).saturating_add(node.len().saturating_mul(node.len()));
+            visit::visit_object(self, node);
+        }
+    }
+    let mut widths = Widths(0);
+    widths.visit_expr(expr);
+    widths.0
 }
 
 /// What `each` and `count` hold in one instance of a block or a module call: its key and
@@ -1582,7 +1619,7 @@ impl<'m> Eval<'m> {
         let (mut found, path, line, tfvars) = match (module.given.get(n), &variable.default) {
             (Some(given), _) => {
                 let found = Evaluated {
-                    val: Val::Known(given.value.clone()),
+                    val: given.value.clone().map_or(Val::Unknown, Val::Known),
                     through: BTreeSet::new(),
                 };
                 (found, &given.path, given.line, true)
@@ -1725,8 +1762,9 @@ impl<'m> Eval<'m> {
         .map(|(k, v)| (k.to_string(), Value::Object(v)))
         .collect();
         let cost = cost(expr, &roots, &mut Vec::new()).max(1);
-        if cost <= EVAL_COST_MAX && cost <= self.work {
-            self.work -= cost;
+        let spend = cost.saturating_add(widths(expr));
+        if cost <= EVAL_COST_MAX && spend <= self.work {
+            self.work -= spend;
             for (name, v) in roots {
                 self.ctx.declare_var(name, v);
             }
@@ -3187,6 +3225,7 @@ mod tests {
             "resource \"a\" \"lookup\" { name = lookup(merge(local.tags, { env = \"prd\" }), \"env\", \"x\") }\n",
             "resource \"a\" \"keys\" { name = coalesce(\"\", element(keys(local.tags), 0), \"z\") }\n",
             "resource \"a\" \"values\" { name = join(\"\", values(tomap(local.tags)), tolist(toset([\"b\", \"a\", \"b\"]))) }\n",
+            "resource \"a\" \"set\" { name = \"${length(toset([1, 1.0, { a = 1, b = 2 }, { b = 2, a = 1 }, \"1\"]))}\" }\n",
             "resource \"a\" \"length\" { name = \"${length(local.svc)}-${tostring(tonumber(\"2\") + 1)}\" }\n",
             "resource \"a\" \"json\" { name = jsonencode({ a = \"<b>\", n = [1, true] }) }\n",
             "resource \"a\" \"pattern\" { name = replace(local.svc, \"/o+/\", \"0\") }\n",
@@ -3207,6 +3246,7 @@ mod tests {
                 "a.lookup = \"prd\"",
                 "a.keys = \"team\"",
                 "a.values = \"shopab\"",
+                "a.set = \"3\"",
                 "a.length = \"6-3\"",
                 "a.json = \"{\\\"a\\\":\\\"\\\\u003cb\\\\u003e\\\",\\\"n\\\":[1,true]}\"",
                 "a.pattern ~ \"*\"",
@@ -3558,6 +3598,131 @@ mod tests {
                 "a.var = \"q-1\" [var.n main.tf:1]",
             ]
         );
+    }
+
+    /// A var file's value that would make more than `EVAL_COST_MAX` (a `for` in a `for` over two
+    /// lists of 300), one past `EVAL_VALUE_MAX` (in HCL or JSON) and one past its file's
+    /// `EVAL_WORK_MAX` are given but unresolved, as a costly value of a `.tf` file is: the
+    /// variable's default does not stand in for them. (A function of an unresolved value is `*`
+    /// whole, with no `through`.)
+    #[test]
+    fn a_var_file_value_past_the_evaluation_ceilings_is_given_and_unresolved() {
+        let list = (0..300).map(|i| i.to_string()).collect::<Vec<_>>();
+        let list = list.join(", ");
+        let main = concat!(
+            "variable \"x\" {\n  default = []\n}\n",
+            "resource \"a\" \"q\" { name = \"q-${length(var.x)}\" }\n",
+        );
+        let given = |path: &str, text: String| names(&[("main.tf", main), (path, &text)]);
+        let tfvars = "terraform.tfvars";
+        let long = "a".repeat(EVAL_VALUE_MAX);
+        let got = [
+            given(tfvars, format!("x = [for a in [{list}] : 1]\n")),
+            given(
+                tfvars,
+                format!("x = [for a in [{list}] : [for b in [{list}] : 1]]\n"),
+            ),
+            given(tfvars, format!("x = \"{long}\"\n")),
+            given("terraform.tfvars.json", format!("{{\"x\": \"{long}\"}}")),
+        ];
+        // A `for` in a `for` over two lists of 30 could make about 700,000 bytes (`cost`), which
+        // each such value spends before its unknown `z` leaves it out: four times as many as the
+        // work holds spend it, and the cheap value after them is given but unresolved.
+        let thirty = (0..30)
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let costly = format!("[for a in [{thirty}] : [for b in [{thirty}] : z]]");
+        let n = 4 * EVAL_WORK_MAX / EVAL_COST_MAX;
+        let values: String = (0..n).map(|i| format!("x{i} = {costly}\n")).collect();
+        let values = format!("first = \"ok\"\n{values}last = \"ok\"\n");
+        let main = concat!(
+            "variable \"first\" { default = \"\" }\nvariable \"last\" { default = \"\" }\n",
+            "resource \"a\" \"first\" { name = \"q-${var.first}\" }\n",
+            "resource \"a\" \"last\" { name = \"q-${var.last}\" }\n",
+        );
+        let spent = names(&[("main.tf", main), (tfvars, &values)]);
+        let unresolved = vec!["a.q ~ \"q-*\"".to_string()];
+        assert_eq!(
+            (got, spent),
+            (
+                [
+                    vec!["a.q = \"q-300\" [var.x terraform.tfvars:1 tfvars]".to_string()],
+                    unresolved.clone(),
+                    unresolved.clone(),
+                    unresolved,
+                ],
+                vec![
+                    "a.first = \"q-ok\" [var.first terraform.tfvars:1 tfvars]".to_string(),
+                    format!(
+                        "a.last ~ \"q-*\" [var.last terraform.tfvars:{} tfvars]",
+                        n + 2
+                    ),
+                ]
+            )
+        );
+    }
+
+    /// `serde_json` reads a JSON var file's objects in linear time, so one wider than HCL may
+    /// read still gives its values.
+    #[test]
+    fn a_json_var_file_with_a_wide_object_gives_its_values() {
+        let keys: Vec<String> = (0..5000).map(|i| format!("\"k{i}\": 1")).collect();
+        let values = format!("{{\"wide\": {{{}}}, \"x\": \"ok\"}}", keys.join(", "));
+        let main =
+            "variable \"x\" { default = \"\" }\nresource \"a\" \"q\" { name = \"q-${var.x}\" }\n";
+        assert_eq!(
+            names(&[("main.tf", main), ("terraform.tfvars.json", &values)]),
+            ["a.q = \"q-ok\" [var.x terraform.tfvars.json:1 tfvars]"]
+        );
+    }
+
+    /// Converting an object literal for `hcl-rs` checks each key against those before it, so
+    /// each evaluation of one spends the square of its keys from the root's `EVAL_WORK_MAX`: a
+    /// module instanced many times over a wide local stops evaluating it once the work is spent.
+    #[test]
+    fn a_wide_object_spends_its_keys_squared_from_the_root_work() {
+        let keys: String = (0..1500).map(|i| format!("    k{i} = \"v\"\n")).collect();
+        let module = format!(
+            "locals {{\n  m = {{\n{keys}  }}\n}}\nresource \"a\" \"q\" {{ name = local.m.k0 }}\n"
+        );
+        let main = "module \"m\" {\n  source = \"./m\"\n  count = 40\n}\n";
+        let (nodes, _) = evaluate(&files(&[("main.tf", main), ("m/main.tf", &module)]));
+        let queues: Vec<_> = nodes.iter().filter(|n| n.ty == "a").collect();
+        let resolved = (queues.iter())
+            .filter(|n| n.name.as_deref() == Some("v"))
+            .count();
+        assert_eq!(queues.len(), 40);
+        assert!(resolved > 0 && resolved < 40, "{resolved}");
+    }
+
+    /// `trim` looks each character up in a set of the ones it cuts, and `toset` sorts strings and
+    /// keys any other value once (`n log n`), where a scan per character or per element was
+    /// quadratic: sized so the quadratic forms take several seconds in a debug build. The values
+    /// are bound beforehand, so only the calls are timed.
+    #[test]
+    fn trim_and_toset_evaluate_in_linear_time() {
+        let mut ctx = Context::new();
+        functions::declare(&mut ctx);
+        ctx.declare_var("a", Value::from("b".repeat(40_000)));
+        ctx.declare_var("c", Value::from(format!("{}b", "a".repeat(20_000))));
+        let strings = (0..40_000).map(|i| Value::from(format!("s{i}")));
+        ctx.declare_var("strings", Value::Array(strings.collect()));
+        let numbers = (0..40_000).map(Value::from);
+        ctx.declare_var("numbers", Value::Array(numbers.collect()));
+        let mut took = Vec::new();
+        for (text, expected) in [
+            ("trim(a, c)", Value::from("")),
+            ("length(toset(strings))", Value::from(40_000)),
+            ("length(toset(numbers))", Value::from(40_000)),
+        ] {
+            let expr = parser::parse_expr(text).unwrap();
+            let start = std::time::Instant::now();
+            assert_eq!(evaluated(&expr, &ctx), Some(expected), "{text}");
+            took.push(start.elapsed());
+        }
+        let bound = std::time::Duration::from_secs(2);
+        assert!(took.iter().all(|t| *t < bound), "{took:?}");
     }
 
     /// Terraform loads `terraform.tfvars`, then `terraform.tfvars.json`, then each `*.auto.tfvars`

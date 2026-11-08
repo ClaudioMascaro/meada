@@ -436,6 +436,22 @@ resource "aws_apigatewayv2_route" "wide" {{
                 .to_string()
                 .len()
         }),
+        ("alert: one wide Terraform object", || {
+            use crate::contract::ContractKind;
+            let labels = fill(1, |i| format!("      k{i} = \"v\"\n"));
+            let text = format!(
+                "resource \"grafana_rule_group\" \"ops\" {{\n  rule {{\n    name = \"a\"\n    labels = {{\n{labels}    }}\n  }}\n}}\n"
+            );
+            crate::alert::Alert
+                .config_summary(
+                    "grafana.tf",
+                    &file(text),
+                    std::path::Path::new("."),
+                    &Default::default(),
+                )
+                .to_string()
+                .len()
+        }),
         ("alert: many Datadog monitor tags", || {
             use crate::contract::ContractKind;
             let tags = fill(1, |i| format!("\"key{i}:team-b\",\n"));
@@ -1133,6 +1149,14 @@ resource "aws_apigatewayv2_route" "wide" {{
         ("hcl: many tfvars", || {
             stored("a.tfvars", fill(1, |i| format!("v{i} = \"x\"\n")))
         }),
+        ("hcl: one wide object", || {
+            let keys = fill(1, |i| format!("k{i} = 1\n"));
+            stored("a.tf", format!("x = {{\n{keys}}}\n"))
+        }),
+        ("hcl: a wide object after a heredoc's end", || {
+            let keys = fill(1, |i| format!("k{i} = 1\n"));
+            stored("a.tf", format!("x = [<<EOT\nfoo\nEOT, {{\n{keys}}}]\n"))
+        }),
         // IaC nodes (#649): what the evaluation of one root module stores
         ("iac json: many repeated blocks with long labels", || {
             let label = "a".repeat(1000);
@@ -1183,7 +1207,10 @@ resource "aws_apigatewayv2_route" "wide" {{
         (
             "iac: Azure subscription rules and Function app settings",
             || {
-                let attributes = fill(2, |i| format!(" K{i} = \"literal-value\"\n"));
+                // As many settings as `OBJECT_WORK_MAX` lets one object read, values long
+                // enough to fill half the file.
+                let value = "v".repeat(110);
+                let attributes = count(4000, |i| format!(" K{i} = \"{value}\"\n"));
                 let subscriptions = fill(3, |i| {
                     format!(
                         "resource \"azurerm_servicebus_subscription\" \"s{i}\" {{\n name = \"audit-{i}\"\n topic_id = azurerm_servicebus_topic.source.id\n}}\nresource \"azurerm_servicebus_subscription_rule\" \"r{i}\" {{\n name = \"filter\"\n subscription_id = azurerm_servicebus_subscription.s{i}.id\n filter_type = \"SqlFilter\"\n sql_filter = \"x = 1\"\n}}\n"
@@ -1309,6 +1336,66 @@ resource "aws_apigatewayv2_route" "wide" {{
             nodes(fill(1, |i| {
                 format!("resource \"a\" \"r{i}\" {{ count = 1000 }}\n")
             }))
+        }),
+        ("iac: one wide object", || {
+            let keys = fill(1, |i| format!("    k{i} = 1\n"));
+            nodes(format!("locals {{\n  m = {{\n{keys}  }}\n}}\n"))
+        }),
+        ("iac: a var file of nested fors", || {
+            let fors = (1..=8).fold("1".to_string(), |body, i| {
+                format!("[for v{i} in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] : {body}]")
+            });
+            tree(vec![
+                (
+                    "main.tf".into(),
+                    "variable \"x\" {}\nresource \"a\" \"r\" { name = \"q-${length(var.x)}\" }\n"
+                        .into(),
+                ),
+                ("terraform.tfvars".into(), format!("x = {fors}\n")),
+            ])
+        }),
+        (
+            "iac eval: a wide object in every instance of a module",
+            || {
+                let keys = count(4000, |i| format!("    k{i} = \"v\"\n"));
+                tree(vec![
+                    (
+                        "main.tf".into(),
+                        "module \"m\" {\n  source = \"./m\"\n  count = 1000\n}\n".into(),
+                    ),
+                    (
+                        "m/main.tf".into(),
+                        format!(
+                            "locals {{\n  m = {{\n{keys}  }}\n}}\nresource \"a\" \"r\" {{ name = local.m.k0 }}\n"
+                        ),
+                    ),
+                ])
+            },
+        ),
+        ("iac eval: trims of a long text by a long set", || {
+            let users = count(10, |i| {
+                format!(
+                    "resource \"a\" \"r{i}\" {{ name = \"q{i}${{trim(local.a, local.c)}}\" }}\n"
+                )
+            });
+            nodes(format!(
+                "locals {{\n  a = \"{}\"\n  c = \"{}b\"\n}}\n{users}",
+                "b".repeat(60_000),
+                "a".repeat(60_000)
+            ))
+        }),
+        ("iac eval: toset of many strings", || {
+            let items = fill(1, |i| format!("\"s{i}\", "));
+            nodes(format!(
+                "resource \"a\" \"r\" {{ name = \"${{length(toset([{items}]))}}\" }}\n"
+            ))
+        }),
+        ("iac eval: toset of many numbers", || {
+            // As many numbers as `EVAL_COST_MAX` lets evaluate (8 bytes each).
+            let items = count(125_000, |i| format!("{i}, "));
+            nodes(format!(
+                "resource \"a\" \"r\" {{ name = \"${{length(toset([{items}]))}}\" }}\n"
+            ))
         }),
         ("compose: many services on one network", || {
             let services = fill(1, |i| format!("  s{i}:\n    networks: [n]\n"));

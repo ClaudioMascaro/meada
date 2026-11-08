@@ -5,6 +5,8 @@
 //! of the same name; a case it does not cover (a `replace` pattern, a `format` verb other than
 //! `%s`, `%d`, `%v`, `%q` and `%%`) is an error, which leaves the call unresolved too.
 
+use std::collections::HashSet;
+
 use hcl::eval::{Context, FuncArgs, FuncDef, ParamType};
 use hcl::{Map, Number, Value};
 
@@ -206,8 +208,10 @@ fn title(s: &str) -> String {
 }
 
 fn trim(args: FuncArgs) -> Out {
-    let cut: Vec<char> = string(&args[1]).chars().collect();
-    Ok(Value::from(string(&args[0]).trim_matches(&cut[..])))
+    let cut: HashSet<char> = string(&args[1]).chars().collect();
+    Ok(Value::from(
+        string(&args[0]).trim_matches(|c| cut.contains(&c)),
+    ))
 }
 
 fn trimprefix(args: FuncArgs) -> Out {
@@ -321,17 +325,41 @@ fn length(args: FuncArgs) -> Out {
 }
 
 /// Terraform's sets of strings are ordered lexically; any other set keeps its first order.
+/// The distinct elements of a list: strings sorted, as Terraform orders a set of strings, and
+/// any other values in their first order, each kept by `canonical` once.
 fn toset(args: FuncArgs) -> Out {
-    let mut items: Vec<Value> = Vec::new();
-    for v in args[0].as_array().into_iter().flatten() {
-        if !items.contains(v) {
-            items.push(v.clone());
+    let list = args[0].as_array().map_or(&[][..], Vec::as_slice);
+    if list.iter().all(Value::is_string) {
+        let mut items = list.to_vec();
+        items.sort_unstable_by(|a, b| string(a).cmp(string(b)));
+        items.dedup();
+        return Ok(Value::Array(items));
+    }
+    let mut seen = HashSet::new();
+    let items = list.iter().filter(|v| seen.insert(canonical(v)));
+    Ok(Value::Array(items.cloned().collect()))
+}
+
+/// A text two values share exactly when they are equal: an object's whatever the order of its
+/// keys, as `hcl-rs` compares them, and a number's in its exact digits.
+fn canonical(v: &Value) -> String {
+    match v {
+        Value::Null => "null".into(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => n.to_string(),
+        Value::String(s) => format!("{s:?}"),
+        Value::Array(items) => {
+            let items: Vec<String> = items.iter().map(canonical).collect();
+            format!("[{}]", items.join(","))
+        }
+        Value::Object(map) => {
+            let mut entries: Vec<String> = (map.iter())
+                .map(|(k, v)| format!("{k:?}:{}", canonical(v)))
+                .collect();
+            entries.sort_unstable();
+            format!("{{{}}}", entries.join(","))
         }
     }
-    if items.iter().all(Value::is_string) {
-        items.sort_by(|a, b| string(a).cmp(string(b)));
-    }
-    Ok(Value::Array(items))
 }
 
 fn tostring(args: FuncArgs) -> Out {

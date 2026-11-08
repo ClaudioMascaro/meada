@@ -5,8 +5,8 @@
   materialize, including inherited conditions, repeated labels and long route paths; reaching
   it discards that file's alert facts. Pending routes retain parent indexes rather than copying
   inherited receivers or paths across the whole child list before visiting a child.
-  The shared event reader bounds YAML/JSON nesting and alias expansion; the existing HCL
-  `NESTING_MAX` guard bounds Terraform alert and incident parsing.
+  The shared event reader bounds YAML/JSON nesting and alias expansion; the HCL `NESTING_MAX`
+  and `OBJECT_WORK_MAX` guards bound Terraform alert and incident parsing.
 - `ALERT_REGEX_MAX` (`alert.rs`): 4096 bytes per alert or incident regex;
   `ALERT_REGEX_SIZE_MAX`: 1 MiB each for compiled automata and their search caches, shared
   equally by distinct expressions in one route configuration; identical patterns share both. Larger expressions or automata
