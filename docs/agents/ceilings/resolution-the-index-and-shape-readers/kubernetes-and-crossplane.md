@@ -37,7 +37,8 @@ routing. No partial alias table may select a shorter mount.
   `resources`, `bases` and `components` are followed, and patches (`patches`,
   `patchesStrategicMerge`, `patchesJson6902`, the files they name are no objects), generators,
   `commonLabels`, `labels`, `replacements`, `helmCharts` and the object a `kind: List` holds
-  are not applied or read. A name is matched as the object was written, so a reference to an
+  are not applied or read. A name is matched as the prefixes and suffixes on the way leave it,
+  each kustomization renaming the references to the objects it holds, so a reference to an
   object a generator or a patch renames resolves to nothing. A cluster-scoped kind is known by
   the list `CLUSTER_SCOPED`; a custom resource outside it takes a Kustomize `namespace`. An
   object with no namespace is `<Kind>[.<group>]/<name>`, which reads as a cluster-scoped one.

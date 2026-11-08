@@ -82,12 +82,16 @@ pub(super) fn read(container: &Value) -> Vec<Input> {
 
 /// Follow references while the objects they name are still in the same overlay stage.
 /// Child overlays have already transformed their own references before a parent combines them.
+/// A reference to a ConfigMap or Secret two objects of the stage share is dropped; one to a
+/// ServiceAccount or Service they share keeps its name, as it did before stages renamed them.
 pub(super) fn transform(objects: &mut [Obj], prefix: &str, suffix: &str, namespace: Option<&str>) {
     let mut names = BTreeMap::new();
-    for o in objects
-        .iter()
-        .filter(|o| matches!(o.kind.as_str(), "ConfigMap" | "Secret") && o.group.is_empty())
-    {
+    for o in objects.iter().filter(|o| {
+        matches!(
+            o.kind.as_str(),
+            "ConfigMap" | "Secret" | "ServiceAccount" | "Service"
+        ) && o.group.is_empty()
+    }) {
         let key = (
             namespace.or(o.ns.as_deref()).map(str::to_string),
             o.kind.clone(),
@@ -146,6 +150,26 @@ pub(super) fn transform(objects: &mut [Obj], prefix: &str, suffix: &str, namespa
                 None => true,
             }
         });
+        let facts = &mut o.facts;
+        let services = (facts.backends.iter_mut().map(|(name, _)| name))
+            .chain(facts.ingress.iter_mut().map(|route| &mut route.service));
+        for (kind, name) in (facts
+            .account
+            .iter_mut()
+            .map(|name| ("ServiceAccount", name)))
+        .chain(services.map(|name| ("Service", name)))
+        {
+            if let Some(Some(next)) = names.get(&(ns.clone(), kind.into(), name.clone())) {
+                // Past the stage's budget the name is unknown, which names no object.
+                *name = match room.checked_sub(next.len()) {
+                    Some(left) => {
+                        room = left;
+                        next.clone()
+                    }
+                    None => String::new(),
+                };
+            }
+        }
     }
 }
 

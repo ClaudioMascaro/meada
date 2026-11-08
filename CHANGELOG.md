@@ -459,6 +459,9 @@ All notable changes to Meada are recorded here. The format follows
   of the output is dropped and the command ends as it would, where it panicked with "failed
   printing to stdout: Broken pipe (os error 32)" and exited 101. `meada decide` and `meada mcp`,
   which never panicked, still stop with a "Broken pipe" error and exit 1.
+- Kustomize: with two bases of their own `namePrefix` that write the same names, a Deployment no
+  longer references the other base's ServiceAccount, nor an Ingress the other base's Service:
+  each kustomization renames the references to the objects it holds, as Kustomize does.
 
 ## [1.2.0] - 2026-11-04
 

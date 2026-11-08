@@ -17,7 +17,8 @@
 //! A Service selects the pod template owners whose pod labels hold its selector, a pod template
 //! references the ConfigMaps and Secrets of its `env`, `envFrom` and volumes and its service
 //! account, and an Ingress its backend Services, all in the same namespace and unit; a name is
-//! matched as the object was written, before any prefix or suffix.
+//! matched as the kustomizations renamed the object, each renaming the references to the objects
+//! it holds, as Kustomize does.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -160,7 +161,8 @@ struct Facts {
     /// The ConfigMaps and Secrets its pods mount: kind, transformed name, and how it names it.
     mounts: Vec<(&'static str, String, String)>,
     account: Option<String>,
-    /// An Ingress's backend Services: name as written and the rule that names it.
+    /// An Ingress's backend Services: name, as renamed with its target, and the rule that names
+    /// it.
     backends: Vec<(String, String)>,
     ingress: Vec<crate::iac::Ingress>,
     /// Its containers' images: container name and image.
@@ -178,7 +180,7 @@ struct Facts {
 struct Obj {
     group: String,
     kind: String,
-    /// The name as written, which the references to it use.
+    /// The name as written, which Crossplane and custom references match.
     orig: String,
     name: String,
     ns: Option<String>,
@@ -801,7 +803,7 @@ impl<'m> Eval<'m> {
                 && !duplicate_services.contains(address)
             {
                 service_names
-                    .entry((object.ns.as_deref(), object.orig.as_str()))
+                    .entry((object.ns.as_deref(), object.name.as_str()))
                     .or_default()
                     .push(address.as_str());
             }
@@ -1016,15 +1018,7 @@ impl<'m> Eval<'m> {
         for (i, o) in objs.iter().enumerate() {
             if o.group.is_empty() {
                 named
-                    .entry((
-                        &o.kind,
-                        if matches!(o.kind.as_str(), "ConfigMap" | "Secret") {
-                            &o.name
-                        } else {
-                            &o.orig
-                        },
-                        o.ns.as_deref(),
-                    ))
+                    .entry((&o.kind, &o.name, o.ns.as_deref()))
                     .or_default()
                     .push(i);
             }
@@ -1607,13 +1601,67 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["registry.example.com/api:2.0"]
         );
-        // The reference matches the name as written, before any prefix.
+        // The reference is renamed with the object it names.
         assert_eq!(
             shown(&out),
             [
                 "Deployment.apps/dev/dev-b-api-x -> ConfigMap/dev/dev-b-settings-x via envFrom",
                 "Deployment.apps/dev/dev-b-api-x -> ConfigMap/dev/dev-b-settings-x via volume conf"
             ]
+        );
+    }
+
+    /// Kustomize renames a reference with the object it names: with two bases of their own
+    /// prefixes that write the same names, each Deployment uses its own base's account and
+    /// configuration and each Ingress routes to its own base's Service. A Service's selector
+    /// still selects the pods of both, whose labels no prefix changes.
+    #[test]
+    fn a_reference_follows_the_prefix_of_the_base_that_holds_its_target() {
+        let base = |prefix: &str| {
+            format!("resources:\n  - deploy.yaml\n  - rest.yaml\nnamePrefix: {prefix}-\n")
+        };
+        let out = evaluate(&files(&[
+            (
+                "app/kustomization.yaml",
+                "resources:\n  - ../frontend\n  - ../backend\n",
+            ),
+            ("frontend/kustomization.yaml", &base("frontend")),
+            ("frontend/deploy.yaml", DEPLOYMENT),
+            ("frontend/rest.yaml", REST),
+            ("backend/kustomization.yaml", &base("backend")),
+            ("backend/deploy.yaml", DEPLOYMENT),
+            ("backend/rest.yaml", REST),
+        ]));
+        let named = (shown(&out).into_iter())
+            .filter(|r| !r.ends_with("via selector app=api"))
+            .collect::<Vec<_>>();
+        assert_eq!(named.len(), 12, "{named:#?}");
+        let crossed = (named.iter())
+            .filter(|r| {
+                let (source, target) = r.split_once(" -> ").unwrap();
+                source.contains("/frontend-") != target.contains("/frontend-")
+            })
+            .collect::<Vec<_>>();
+        assert!(crossed.is_empty(), "{crossed:#?}");
+        let routes = (out.nodes.iter())
+            .filter(|n| n.ty == "Ingress")
+            .map(|n| {
+                let services = n.ingress.iter().map(|i| i.service.as_str());
+                (n.address.as_str(), services.collect::<BTreeSet<_>>())
+            })
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(
+            routes,
+            BTreeMap::from([
+                (
+                    "Ingress.networking.k8s.io/shop/backend-edge",
+                    BTreeSet::from(["Service/shop/backend-api"])
+                ),
+                (
+                    "Ingress.networking.k8s.io/shop/frontend-edge",
+                    BTreeSet::from(["Service/shop/frontend-api"])
+                ),
+            ])
         );
     }
 

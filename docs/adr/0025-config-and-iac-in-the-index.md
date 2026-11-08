@@ -270,8 +270,9 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   `spec.jobTemplate.spec.template` holds containers, or a Pod) whose pod labels hold its
   selector, a pod template to the ConfigMaps and Secrets named in `env`, `envFrom` and volumes
   (including projected ones) and to its `serviceAccountName`, and an Ingress to the Services of
-  its rules and default backend, each in the same namespace and the same unit, by the name as
-  written before any prefix or suffix (Kustomize renames the references with the object), all
+  its rules and default backend, each in the same namespace and the same unit, by the name the
+  prefixes and suffixes on the way leave, each kustomization renaming the references to the
+  objects it holds as Kustomize does, all
   `exact`, with the `via` naming how the source names the target.
 - **Images.** The images of a workload's containers once the overlay's `images` applied are
   stored with its node and shown by `context`; the image contract of ADR 0026 reads them.
