@@ -56,7 +56,8 @@ All notable changes to Meada are recorded here. The format follows
   references, evaluated names and local module instances. JSON expression and literal rules
   share the HCL evaluator, provisioners and subscriptions; declared resource `via` addresses
   resolve to JSON nodes and refresh when sources change. Sensitive defaults, tfvars and SSM
-  SecureString values also stay redacted in JSON block arrays (#642, #649).
+  SecureString values also stay redacted in JSON block arrays, a root array of bodies included,
+  and a JSON `dynamic` property merges as the types it names (#642, #649).
 - Azure Terraform/OpenTofu contracts (#669): Service Bus queues, topics and topic-qualified
   subscriptions with filter routing, Event Hubs, Storage accounts and blob containers as
   distinct kinds, and Key Vault secrets. ARM identifiers and supported blob/vault URLs give
@@ -181,8 +182,9 @@ All notable changes to Meada are recorded here. The format follows
   value a `.tfvars` file gives a variable of that name are stored as `redacted`, and so is a
   default another file of its directory marks sensitive when that directory holds an override
   file (`override.tf`, `*_override.tf`), which Terraform merges into the others; such a default
-  never reaches the index, also when only the override file changes. A file that does not
-  parse is skipped and counted by `meada status` (#640).
+  never reaches the index, also when only the override file changes. There, a `.tf` file a
+  `.tofu` one hides counts as one that does not parse, since Terraform reads it. A file that
+  does not parse is skipped and counted by `meada status` (#640).
 - A Go struct field that keeps a base URL (`c.base`) carries the environment read every
   composite literal of the repository that sets it gives it, directly or through a constructor's
   parameter whose callers in the repository all pass that read, so a method that reads the field,
@@ -301,7 +303,8 @@ All notable changes to Meada are recorded here. The format follows
   `for_each` over a variable gives one node per instance. Data sources, resource attributes,
   registry modules, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_` and sensitive variables
   (marked by any of their blocks, override files included, and every variable of a directory
-  holding an override file and a Terraform file that does not read) are never evaluated: such a
+  holding an override file and a Terraform file that does not read or a `.tofu` file hides)
+  are never evaluated: such a
   part of a
   name is a `*` and the name a pattern, shown as `pattern "orders-*"` by `search` and `(pattern)`
   by `context`, and linked by nothing yet. `context` lists

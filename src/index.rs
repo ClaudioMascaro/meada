@@ -753,8 +753,8 @@ fn refresh_keeping(
     // A `.tfvars` file is redacted for the sensitive variables of other files (they sort last,
     // so those are stored first) and is read again when they change.
     let hidden = hidden_ci(root);
-    let configs = configs_found(&all, &hidden);
-    let sensitive = config_values::Sensitive::new(&tx, &configs);
+    let (configs, shadowed) = configs_found(&all, &hidden);
+    let sensitive = config_values::Sensitive::new(&tx, &configs, &shadowed);
     // The Terraform files and var files read again: the units holding them are evaluated again.
     let terraform = std::cell::RefCell::new(BTreeSet::new());
     // Whether a Kubernetes file changed, appeared or left: its objects are evaluated again.
@@ -794,11 +794,13 @@ fn refresh_keeping(
     }
     // A Terraform file of a directory holding an override file is read above with every default
     // redacted: now that every file is stored, one read against other sensitive variables than
-    // the other files of its directory declare is read again (`Sensitive`).
+    // the other files of its directory declare is read again (`Sensitive`), and its directory is
+    // evaluated again, as a shadowed file may have come or gone with no stamp to show it.
     for (path, abs) in &configs {
         let Some(names) = sensitive.merged(path)? else {
             continue;
         };
+        (terraform.borrow_mut()).insert(config_values::parent(path).to_string());
         let Ok(src) = read_up_to(abs, lang::MAX_BYTES) else {
             continue;
         };
@@ -830,7 +832,8 @@ fn refresh_keeping(
                 files.push((path.clone(), src));
             }
         }
-        iac::refresh(&tx, &iac::Repository::read_with(&files, &mappings), &dirs)?;
+        let repository = iac::Repository::read_with(&files, &shadowed, &mappings);
+        iac::refresh(&tx, &repository, &dirs)?;
     }
     // ponytail: one changed Kubernetes file evaluates every overlay and directory of manifests of
     // the repository again, not only the units it belongs to; a repository of many overlays
@@ -859,7 +862,7 @@ fn refresh_keeping(
     for node in &configuration_nodes {
         nodes_by_path.entry(&node.path).or_default().push(node);
     }
-    let contract_configs = config_values::unshadowed(
+    let (contract_configs, _) = config_values::unshadowed(
         all.iter()
             .chain(&hidden)
             .filter(|(p, _)| contract::config_file(p))
@@ -1846,6 +1849,7 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
         read(abs).is_ok_and(|src| blake3::hash(&src).to_hex().as_str() == hash)
     };
     let all = walk(root);
+    let (config_files, shadowed) = configs_found(&all, &hidden_ci(root));
     let tables = [
         (
             "documents",
@@ -1853,11 +1857,7 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
             document::DOCUMENT_BYTES_MAX,
         ),
         ("manifests", manifests_found(&all), lang::MAX_BYTES),
-        (
-            "config_files",
-            configs_found(&all, &hidden_ci(root)),
-            lang::MAX_BYTES,
-        ),
+        ("config_files", config_files.clone(), lang::MAX_BYTES),
     ];
     for (table, found, max) in tables {
         let read = |abs: &Path| read_up_to(abs, max);
@@ -1879,6 +1879,14 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
             }
         }
         if seen != stored.len() {
+            return Ok(false);
+        }
+    }
+    // A config file read against other sensitive variables than a refresh would read it against,
+    // as a shadowed file came or went beside an override file, is read again.
+    let sensitive = config_values::Sensitive::new(db, &config_files, &shadowed);
+    for (path, _) in &config_files {
+        if sensitive.merged(path)?.is_some() || sensitive.stale(path)? {
             return Ok(false);
         }
     }
@@ -2073,17 +2081,17 @@ fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
 }
 
 /// The config files of a repository (path and absolute path): the YAML and JSON files `walk`
-/// found and those under the hidden CI paths (`hidden`, from `hidden_ci`), in path order.
+/// found and those under the hidden CI paths (`hidden`, from `hidden_ci`), in path order; and the
+/// Terraform files left out, as a `.tofu` one shadows them.
 fn configs_found(
     walked: &[(String, PathBuf)],
     hidden: &[(String, PathBuf)],
-) -> Vec<(String, PathBuf)> {
+) -> (Vec<(String, PathBuf)>, Vec<String>) {
     let mut found: Vec<_> = (walked.iter().chain(hidden))
         .filter(|(path, _)| config_values::is_config(path))
         .cloned()
         .collect();
-    // The `.tfvars` files last, for the sensitive variables of the others, and no `.tf` file
-    // a `.tofu` one shadows.
+    // The `.tfvars` files last, for the sensitive variables of the others.
     found.sort_by(|(a, _), (b, _)| {
         (config_values::is_tfvars(a), a).cmp(&(config_values::is_tfvars(b), b))
     });
@@ -4180,11 +4188,20 @@ mod tests {
         a.set_modified(later).unwrap();
         assert!(is_fresh(REPO));
 
-        let edits: [(&str, Option<&str>); 4] = [
+        let edits: [(&str, Option<&str>); 8] = [
             ("a.ts", Some("export function b() {}\n")),
             ("b.ts", Some("export const c = 1;\n")),
             ("b.ts", None),
             ("package.json", Some("{\"name\": \"site\"}\n")),
+            (
+                "main.tofu",
+                Some("variable \"x\" {\n  default = \"d\"\n}\n"),
+            ),
+            ("override.tf", Some("locals {}\n")),
+            // A `.tf` file a `.tofu` one shadows has no stamp, but beside an override file the
+            // defaults of its directory are read again when it comes or goes.
+            ("main.tf", Some("variable \"x\" {}\n")),
+            ("main.tf", None),
         ];
         for (file, content) in edits {
             match content {

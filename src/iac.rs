@@ -601,7 +601,7 @@ struct Module {
     /// Each block's index by its local address, built when the first override block arrives.
     addresses: HashMap<String, usize>,
     /// Whether the directory holds an override file, and whether one of its Terraform files does
-    /// not read: merged into the others, that file may mark any variable sensitive.
+    /// not read or is shadowed: merged into the others, that file may mark any variable sensitive.
     overridden: bool,
     unreadable: bool,
 }
@@ -1903,13 +1903,21 @@ pub(crate) struct Repository {
 }
 
 impl Repository {
-    /// Reads the Terraform files `files` (path and bytes, `is_input`) of one repository.
+    /// Reads the Terraform files `files` (path and bytes, `is_input`) of one repository, those a
+    /// `.tofu` file shadows left out as the index leaves them.
     #[cfg(test)]
     pub(crate) fn read(files: &[(String, Vec<u8>)]) -> Repository {
-        Self::read_with(files, &mapping::Config::default())
+        let (files, shadowed) = config_values::unshadowed(files.to_vec());
+        Self::read_with(&files, &shadowed, &mapping::Config::default())
     }
 
-    pub(crate) fn read_with(files: &[(String, Vec<u8>)], mappings: &mapping::Config) -> Repository {
+    /// `read` for the files `files` a `.tofu` file does not shadow, and the paths of the others,
+    /// `shadowed`: Terraform, which ignores `.tofu` files, reads them, so their blocks are unknown.
+    pub(crate) fn read_with(
+        files: &[(String, Vec<u8>)],
+        shadowed: &[String],
+        mappings: &mapping::Config,
+    ) -> Repository {
         let mut modules: BTreeMap<String, Module> = BTreeMap::new();
         let mut sorted: Vec<&(String, Vec<u8>)> = files.iter().collect();
         // Terraform merges override files into a directory once its other files are read.
@@ -1922,6 +1930,11 @@ impl Repository {
             }
             let dir = config_values::parent(path).to_string();
             read(path, src, modules.entry(dir).or_default());
+        }
+        for path in shadowed {
+            if let Some(module) = modules.get_mut(config_values::parent(path)) {
+                module.unreadable = true;
+            }
         }
         let unknown = modules
             .values_mut()
@@ -3318,6 +3331,54 @@ mod tests {
             ),
         ]));
         assert_eq!(shown(&references), ["a.x -> b.w", "a.x -> b.z"]);
+    }
+
+    /// A JSON `dynamic` property generates blocks of each type it names, as a native
+    /// `dynamic "<type>"` block does: those an override block's blocks of that type replace, and
+    /// those its own replace, references included.
+    #[test]
+    fn a_json_dynamic_block_counts_as_the_type_it_generates() {
+        let dynamic = |target: &str| {
+            format!(
+                r#"{{"dynamic": {{"rule": [{{"for_each": [1], "content": {{"from": "${{{target}}}"}}}}]}}}}"#
+            )
+        };
+        let targets = "resource \"b\" \"y\" {}\nresource \"b\" \"z\" {}\nresource \"b\" \"w\" {}\n";
+        let base = format!(
+            "{targets}resource \"a\" \"x\" {{\n  rule {{ from = b.y.id }}\n  other {{ from = b.w.id }}\n}}\n"
+        );
+        let over = format!(r#"{{"resource": {{"a": {{"x": {}}}}}}}"#, dynamic("b.z.id"));
+        let (_, references) =
+            evaluate(&files(&[("main.tf", &base), ("x_override.tf.json", &over)]));
+        assert_eq!(shown(&references), ["a.x -> b.w", "a.x -> b.z"]);
+        let base = format!(r#"{{"resource": {{"a": {{"x": {}}}}}}}"#, dynamic("b.y.id"));
+        let over = "resource \"a\" \"x\" {\n  rule { from = b.z.id }\n}\n";
+        let list = [
+            ("b.tf", targets),
+            ("main.tf.json", &base),
+            ("x_override.tf", over),
+        ];
+        assert_eq!(shown(&evaluate(&files(&list)).1), ["a.x -> b.z"]);
+    }
+
+    /// HCL JSON permits an array of bodies wherever a body goes, the root of a file included: its
+    /// blocks are read, an override file's merge, and a variable it marks sensitive never resolves.
+    #[test]
+    fn a_json_file_whose_root_is_an_array_of_bodies_is_read() {
+        let json = r#"[{"variable": {"env": {"default": "dev"}}},
+ {"resource": {"a": {"r": {"name": "q-${var.env}"}}}}]"#;
+        assert_eq!(
+            names(&[("main.tf.json", json)]),
+            ["a.r = \"q-dev\" [var.env main.tf.json:1]"]
+        );
+        let main = "resource \"a\" \"q\" { name = \"q-base\" }\n";
+        let over = r#"[{"resource": {"a": {"q": {"name": "q-over"}}}}]"#;
+        let list = [("main.tf", main), ("override.tf.json", over)];
+        assert_eq!(names(&list), ["a.q = \"q-over\""]);
+        let main = "variable \"s\" {\n  default = \"tok\"\n}\nresource \"a\" \"s\" { name = \"q-${var.s}\" }\n";
+        let marked = r#"[{"variable": {"s": {"sensitive": true}}}]"#;
+        let list = [("main.tf", main), ("override.tf.json", marked)];
+        assert_eq!(names(&list), ["a.s ~ \"q-*\""]);
     }
 
     /// Beside an override file, a Terraform file that does not read (it does not parse, or it

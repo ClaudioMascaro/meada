@@ -73,7 +73,8 @@ impl Read<'_> {
     /// Bodies are consumed as their collection closes, before a repeated JSON property can
     /// replace an earlier section in the generic value tree. All text stays transient.
     fn block(&mut self, span: events::Collection<'_>, value: &Value) {
-        let Some(Step::Key(section)) = span.path.first() else {
+        let path = from_section(span.path);
+        let Some(Step::Key(section)) = path.first() else {
             return;
         };
         let labels = match section.as_str() {
@@ -82,7 +83,7 @@ impl Read<'_> {
             "locals" => 0,
             _ => return,
         };
-        if body_path(span.path, labels) != Some(span.path) {
+        if body_path(path, labels) != Some(path) {
             return;
         }
         let Some(body) = value.as_object() else {
@@ -151,6 +152,15 @@ impl Read<'_> {
                 let mut attrs = BTreeMap::new();
                 let mut refs: BTreeMap<String, Vec<_>> = BTreeMap::new();
                 for (name, value) in body.iter().filter(|(name, _)| name.as_str() != "//") {
+                    if name == "dynamic" {
+                        // The references of the blocks it generates go by their type, as a
+                        // native `dynamic "<type>"` block's do (`nested_type`).
+                        for (ty, generated) in bodies(value).flatten() {
+                            let expr = self.expressions.read(generated, false);
+                            refs.entry(ty.clone()).or_default().extend(refs_of(&expr));
+                        }
+                        continue;
+                    }
                     let expr = if name == "depends_on" {
                         self.expressions.dependencies(value)
                     } else {
@@ -228,13 +238,17 @@ impl Read<'_> {
     ) -> Option<Vec<hcl_edit::structure::Block>> {
         let mut blocks = Vec::new();
         for (name, value) in body {
-            let objects: &[Value] = match value {
-                Value::Object(_) => std::slice::from_ref(value),
-                Value::Array(items) => items,
-                _ => continue,
+            // A `dynamic` property's keys are the types of native `dynamic "<type>"` blocks.
+            let typed: Vec<(Option<&String>, &Value)> = match name.as_str() {
+                "dynamic" => bodies(value).flatten().map(|(t, v)| (Some(t), v)).collect(),
+                _ => vec![(None, value)],
             };
-            for object in objects.iter().filter_map(Value::as_object) {
-                if !self.store(name.len() + std::mem::size_of::<hcl_edit::structure::Block>()) {
+            for (object, label) in typed
+                .into_iter()
+                .flat_map(|(label, v)| bodies(v).map(move |o| (o, label)))
+            {
+                let cost = name.len() + label.map_or(0, String::len);
+                if !self.store(cost + std::mem::size_of::<hcl_edit::structure::Block>()) {
                     return None;
                 }
                 let Ok(ident) = hcl_edit::Ident::try_new(name) else {
@@ -256,15 +270,32 @@ impl Read<'_> {
                     ));
                 }
                 let nested = self.nested(object)?;
-                blocks.push(
-                    hcl_edit::structure::Block::builder(ident)
-                        .attributes(attrs)
-                        .blocks(nested)
-                        .build(),
-                );
+                let block = hcl_edit::structure::Block::builder(ident)
+                    .labels(label.map(String::as_str))
+                    .attributes(attrs)
+                    .blocks(nested);
+                blocks.push(block.build());
             }
         }
         Some(blocks)
+    }
+}
+
+/// The bodies of a JSON value where HCL JSON expects one: an object, or each object of an array.
+fn bodies(value: &Value) -> impl Iterator<Item = &serde_json::Map<String, Value>> {
+    let items: &[Value] = match value {
+        Value::Array(items) => items,
+        _ => std::slice::from_ref(value),
+    };
+    items.iter().filter_map(Value::as_object)
+}
+
+/// `path` from its section (`resource`, `variable`, ...): HCL JSON permits an array of bodies at
+/// the root of a file as wherever a body goes, and the index into it is no part of a block's path.
+pub(crate) fn from_section(path: &[Step]) -> &[Step] {
+    match path {
+        [Step::Index(_), rest @ ..] => rest,
+        _ => path,
     }
 }
 

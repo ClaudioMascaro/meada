@@ -787,6 +787,27 @@ mod tests {
         assert_eq!(found[0].value.as_deref(), Some("abc"));
     }
 
+    /// HCL JSON permits an array of bodies at the root of a file as wherever a body goes: its
+    /// secrets stay redacted (a sensitive default, here or by another file's mark, a SecureString
+    /// parameter) and its defaults are literals.
+    #[test]
+    fn a_terraform_json_file_whose_root_is_an_array_keeps_its_secrets() {
+        let text = r#"[{"variable": {"token": {"sensitive": true, "default": "s3cret"}}},
+ {"variable": {"name": {"default": "${x}"}, "db": {"default": "hunter2"}}},
+ {"resource": {"aws_ssm_parameter": {"p": {"type": "SecureString", "value": "ssm-secret"}}}}]"#;
+        let sensitive: BTreeSet<String> = ["db".to_string()].into();
+        let (_, found) = read_with("main.tf.json", text.as_bytes(), &sensitive);
+        let by = |key: &str| found.iter().find(|r| r.key == key).unwrap();
+        assert_eq!(by("[0].variable.token.default").value, None);
+        assert_eq!(by("[1].variable.db.default").value, None);
+        assert_eq!(by("[2].resource.aws_ssm_parameter.p.value").value, None);
+        let name = by("[1].variable.name.default");
+        assert_eq!((name.kind, name.value.as_deref()), ("string", Some("${x}")));
+        for secret in ["s3cret", "hunter2", "ssm-secret"] {
+            assert!(!format!("{found:?}").contains(secret), "{secret}");
+        }
+    }
+
     #[test]
     fn a_tfvars_file_read_against_any_variable_redacts_every_value() {
         let sensitive: BTreeSet<String> = [crate::config_values::ANY_VARIABLE.to_string()].into();

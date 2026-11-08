@@ -69,6 +69,30 @@ fn terraform_lambda_runs_its_image_and_resolves_only_its_code_environment() {
     assert_golden("aws-workloads.lambda.trace.txt", &format!("{down}\n{up}"));
 }
 
+/// An override file's `dynamic "environment"` block replaces the environment blocks of the
+/// function it merges into, in JSON as in native syntax; what it generates is not read.
+#[test]
+fn a_dynamic_override_environment_replaces_the_written_one() {
+    let json = r#"{"resource": {"aws_lambda_function": {"worker": {"dynamic": {"environment": {"for_each": [1], "content": {"variables": {"QUEUE_NAME": "orders"}}}}}}}}"#;
+    let hcl = concat!(
+        "resource \"aws_lambda_function\" \"worker\" {\n",
+        "  dynamic \"environment\" {\n    for_each = [1]\n",
+        "    content { variables = { QUEUE_NAME = \"orders\" } }\n  }\n}\n",
+    );
+    for (file, text) in [("override.tf.json", json), ("override.tf", hcl)] {
+        let (_, deploy) = workspace(&format!("aws_workloads_dynamic_{}", file.replace('.', "_")));
+        std::fs::write(deploy.join(file), text).unwrap();
+        let context = Engine::open(&deploy)
+            .unwrap()
+            .context("aws_lambda_function.worker", None)
+            .unwrap();
+        assert!(
+            !context.contains("env worker QUEUE_NAME"),
+            "{file}\n{context}"
+        );
+    }
+}
+
 #[test]
 fn sam_code_uri_and_merged_environment_join_the_local_handler_and_known_queue() {
     let repo = fixture_repo(

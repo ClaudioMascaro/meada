@@ -117,7 +117,8 @@ this file, and a change to these modules updates it.
   and manifests, before the code, so an edited config file rewrites its rows and nothing else.
   Terraform and OpenTofu (#640): `is_config` also picks `*.tf`, `*.tofu` and `*.tfvars`
   (`*.auto.tfvars` included); `unshadowed` drops a `.tf` file beside a `.tofu` one of its name
-  (and `.tf.json` beside `.tofu.json`) from `configs_found`, which also sorts the `.tfvars` and
+  (and `.tf.json` beside `.tofu.json`) from `configs_found` and returns the paths it drops;
+  `configs_found` also sorts the `.tfvars` and
   `.tfvars.json` files last. `config_values/hcl.rs` reads `.tf`, `.tofu` and `.tfvars` with
   `hcl-edit` (`parse_body`, spans for the line and the text as written; `hcl-rs` evaluates the
   string a heredoc of literals holds): attributes and blocks walk to rows whose key path is the
@@ -125,7 +126,9 @@ this file, and a change to these modules updates it.
   a list or an object of literal keys element by element, anything else one row typed
   `expression` or `template` with its source text (shown on one line by `one_line`); a file nested past `NESTING_MAX` brackets
   (counted by `nested_past` before the parser runs) is unreadable. `.tf.json`, `.tofu.json`
-  and `.tfvars.json` go through the event reader (their key paths are the same), their strings
+  and `.tfvars.json` go through the event reader (their key paths are the same;
+  `iac::json::from_section` drops the index of a root array of bodies before a block path is
+  matched), their strings
   with an interpolation typed by `json_kind` and stored as the quoted JSON string.
   SSM parameter `value` scalars in HCL and Terraform/OpenTofu JSON share the type policy:
   SecureString and unresolved types are redacted; literal String and StringList remain public.
@@ -143,8 +146,10 @@ this file, and a change to these modules updates it.
   an override file (`is_override`, `Sensitive::overridden`), `of` gives a Terraform file
   `ANY_VARIABLE`, so the main pass stores every default of it redacted; after the walk `index.rs`
   reads again each Terraform file whose `Sensitive::merged` set (the names the directory's other
-  files mark, `ANY_VARIABLE` for an unreadable one) differs from its stored
-  `Outcome::Read::sensitive`, so a default another file marks never reaches the database.
+  files mark, `ANY_VARIABLE` for an unreadable one or one a `.tofu` file shadows,
+  `Sensitive::shadowed`) differs from its stored `Outcome::Read::sensitive`, so a default another
+  file marks never reaches the database, and evaluates its directory again: a shadowed file has
+  no stamp. `index::fresh` asks `merged` and `stale` the same.
   `store` keeps each key path and value lowercased beside it (`folded_key`, `folded_value`, each
   with a B-tree); `hits(identity, db, needle)` takes exact matches from the B-trees (rank 0),
   then prefixes from them (rank 1, the range from `needle` up to `successor(needle)`, the least
@@ -188,9 +193,10 @@ this file, and a change to these modules updates it.
   `Repository::read_with` reads override files (`config_values::is_override`) after all the
   others, and `Module::add`, `Module::declare` and `assign` merge each of their blocks into the
   one of its address (`Block::merge`: what it sets replaces the base's, `Block::refs` keyed by
-  argument or nested block type, `nested_type`), dropping one with no base. A directory holding
-  an override file and a Terraform file that does not read (`Module::overridden`, `unreadable`;
-  the refresh hands over files past `MAX_BYTES` for it) has every variable sensitive. A
+  argument or nested block type, `nested_type`, a JSON `dynamic` property by each of its keys),
+  dropping one with no base. A directory holding an override file and a Terraform file that does
+  not read or is shadowed (`Module::overridden`, `unreadable`; the refresh hands over files past
+  `MAX_BYTES` and `read_with`'s `shadowed` paths for it) has every variable sensitive. A
   directory no other one calls through a local `source` (`local_source`: `./` or `../`,
   normalized, never above the
   root; the files come from the walk, so a symlinked directory holds none) is a root; `Eval::root`

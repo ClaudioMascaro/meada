@@ -95,7 +95,9 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
 
 - HCL is read with `hcl-edit` (a span for every node) and `hcl-rs` (its expression evaluator),
   both MIT OR Apache-2.0. `.tf.json` and `.tofu.json` go through the JSON reader with
-  Terraform's JSON syntax rules. A file that does not parse is skipped and counted.
+  Terraform's JSON syntax rules: an array of bodies may stand wherever a body does, the root of
+  the file included, and each key of a `dynamic` property is the type of the blocks it
+  generates. A file that does not parse is skipped and counted.
 - `hcl-rs` declares no function of its own. Meada registers its own implementations of these
   pure functions, and only these:
   - strings: `format`, `formatlist`, `join`, `split`, `lower`, `upper`, `title`, `trim`,
@@ -143,6 +145,10 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   changes.
 - **Shadowing.** A `.tofu` file hides the `.tf` file of the same base name in the same
   directory, and a `.tofu.json` the `.tf.json`; the hidden file is not read and not counted.
+  Terraform, which ignores `.tofu` files, reads it, so beside an override file it counts as a
+  Terraform file that does not parse: it may mark any variable of its directory sensitive
+  (Sensitive, above; Override files, below). Elsewhere it changes nothing, as no other file
+  takes its blocks.
 - **Ceiling.** Brackets (`{`, `[`, `(`) nest at most 64 deep in one file, counted even inside
   a string; past it the file is unreadable, which `meada status` counts. The value length and
   the stored budget are the ones above.
@@ -163,7 +169,8 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   with nothing to merge into, which Terraform refuses, is left out. A variable either block
   marks sensitive stays sensitive: an override's `sensitive = false` does not lift it, which
   can only leave a name unresolved. Beside an override file, a Terraform file that does not
-  read (it does not parse, or passes a ceiling) may mark any variable sensitive once merged, so
+  read (it does not parse, passes a ceiling, or a `.tofu` file hides it) may mark any variable
+  sensitive once merged, so
   no variable of the directory is evaluated, as config values store none of their defaults.
 - **Instances.** Each call instantiates the called module's blocks under the call's address and
   a dot, recursively; a `count` of a literal number, or a `for_each` over an object of literal

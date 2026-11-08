@@ -131,9 +131,10 @@ pub(crate) fn is_override(path: &str) -> bool {
     })
 }
 
-/// `found` without the Terraform files a OpenTofu one shadows: a `.tofu` file hides the `.tf`
-/// file of the same name in its directory, and a `.tofu.json` the `.tf.json` (ADR 0025).
-pub(crate) fn unshadowed(found: Vec<(String, PathBuf)>) -> Vec<(String, PathBuf)> {
+/// `found` without the Terraform files a OpenTofu one shadows, and their paths: a `.tofu` file
+/// hides the `.tf` file of the same name in its directory, and a `.tofu.json` the `.tf.json`
+/// (ADR 0025).
+pub(crate) fn unshadowed<T>(found: Vec<(String, T)>) -> (Vec<(String, T)>, Vec<String>) {
     let paths: HashSet<String> = found.iter().map(|(p, _)| p.clone()).collect();
     let shadowed = |path: &str| {
         [(".tf", ".tofu"), (".tf.json", ".tofu.json")]
@@ -142,7 +143,8 @@ pub(crate) fn unshadowed(found: Vec<(String, PathBuf)>) -> Vec<(String, PathBuf)
                 (path.strip_suffix(tf)).is_some_and(|stem| paths.contains(&format!("{stem}{tofu}")))
             })
     };
-    found.into_iter().filter(|(p, _)| !shadowed(p)).collect()
+    let (hidden, kept): (Vec<_>, Vec<_>) = found.into_iter().partition(|(p, _)| shadowed(p));
+    (kept, hidden.into_iter().map(|(p, _)| p).collect())
 }
 
 /// The parent directory of `path`, `""` for the root.
@@ -161,6 +163,8 @@ pub(crate) const ANY_VARIABLE: &str = "*";
 /// variables it declares are unknown. A Terraform file of a directory holding an override file,
 /// whose blocks Terraform merges into the others: the names the other Terraform files of the
 /// directory declare sensitive, with `ANY_VARIABLE` when one of them is unreadable (`merged`).
+/// In such a directory a Terraform file a OpenTofu one shadows counts as unreadable: Meada does
+/// not read it, and Terraform, which ignores `.tofu` files, does.
 /// Computed once per refresh from the rows of the files found: the `.tfvars` files are refreshed
 /// after the others, and a Terraform file of such a directory is first read against
 /// `ANY_VARIABLE`, then again against `merged` once every file is refreshed, so a default no
@@ -170,6 +174,8 @@ pub(crate) struct Sensitive<'a> {
     found: HashSet<&'a str>,
     /// The directories holding an override file found.
     overridden: HashSet<&'a str>,
+    /// The Terraform files a OpenTofu one shadows (`unshadowed`).
+    shadowed: &'a [String],
     /// Each name a Terraform file found declares sensitive, with the file, and the unreadable
     /// Terraform files found.
     loaded: RefCell<Option<Marked>>,
@@ -179,7 +185,11 @@ pub(crate) struct Sensitive<'a> {
 type Marked = (Vec<(String, String)>, Vec<String>);
 
 impl<'a> Sensitive<'a> {
-    pub(crate) fn new(db: &'a Connection, found: &'a [(String, PathBuf)]) -> Self {
+    pub(crate) fn new(
+        db: &'a Connection,
+        found: &'a [(String, PathBuf)],
+        shadowed: &'a [String],
+    ) -> Self {
         Sensitive {
             db,
             found: found.iter().map(|(p, _)| p.as_str()).collect(),
@@ -187,6 +197,7 @@ impl<'a> Sensitive<'a> {
                 .filter(|(p, _)| is_override(p))
                 .map(|(p, _)| parent(p))
                 .collect(),
+            shadowed,
             loaded: RefCell::new(None),
         }
     }
@@ -282,8 +293,10 @@ impl<'a> Sensitive<'a> {
     }
 
     fn load(&self) -> Result<Marked> {
+        // A JSON file whose root is an array of bodies starts its keys with the index into it.
         let mut statement = self.db.prepare(
-            "SELECT path, key, type, value FROM config_values WHERE key LIKE 'variable%.sensitive'",
+            "SELECT path, key, type, value FROM config_values
+             WHERE key LIKE 'variable%.sensitive' OR key LIKE '[%].variable%.sensitive'",
         )?;
         let mut marked = Vec::new();
         for row in statement.query_map([], |r| {
@@ -301,7 +314,10 @@ impl<'a> Sensitive<'a> {
                 ("string", Some(v)) => Value::String(v),
                 _ => Value::Bool(true),
             };
-            if !self.found.contains(path.as_str()) || !is_sensitive(Some(&attribute)) {
+            if !is_terraform(&path)
+                || !self.found.contains(path.as_str())
+                || !is_sensitive(Some(&attribute))
+            {
                 continue;
             }
             if let Some(name) = variable(&key) {
@@ -324,6 +340,8 @@ impl<'a> Sensitive<'a> {
                 unreadable.push(path);
             }
         }
+        let beside_override = |p: &&String| self.overridden.contains(parent(p));
+        unreadable.extend(self.shadowed.iter().filter(beside_override).cloned());
         Ok((marked, unreadable))
     }
 }
@@ -332,7 +350,8 @@ impl<'a> Sensitive<'a> {
 /// (`variable.db_password.sensitive`, `variable["db-password"].sensitive`).
 fn variable(key: &str) -> Option<String> {
     let path = sites::parts_without_selectors(key)?;
-    let body = crate::iac::json::body_path(&path, 1)?;
+    let path = crate::iac::json::from_section(&path);
+    let body = crate::iac::json::body_path(path, 1)?;
     if !matches!(path.first(), Some(Step::Key(section)) if section == "variable")
         || !matches!(&path[body.len()..], [Step::Key(attr)] if attr == "sensitive")
     {
@@ -387,16 +406,18 @@ enum SecretPlace {
 impl SecretPlace {
     fn of(path: &[Step], file: &str, left: &mut usize) -> Option<SecretPlace> {
         if terraform_json(file) {
-            let section = path.first();
+            let blocks = crate::iac::json::from_section(path);
+            let section = blocks.first();
             let variable = matches!(section, Some(Step::Key(s)) if s == "variable");
             let resource = matches!(section, Some(Step::Key(s)) if s == "resource");
             if (variable || resource)
-                && let Some(body) = crate::iac::json::body_path(path, if variable { 1 } else { 2 })
-                && let Some(Step::Key(attr)) = path.get(body.len())
+                && let Some(within) =
+                    crate::iac::json::body_path(blocks, if variable { 1 } else { 2 })
+                && let Some(Step::Key(attr)) = blocks.get(within.len())
                 && ((variable && attr == "default")
                     || (resource
                         && attr == "value"
-                        && body
+                        && within
                             .iter()
                             .filter_map(|s| match s {
                                 Step::Key(k) => Some(k.as_str()),
@@ -405,6 +426,8 @@ impl SecretPlace {
                             .nth(1)
                             == Some("aws_ssm_parameter")))
             {
+                // The body as its marker names it (`markers`), from the root of the file.
+                let body = &path[..path.len() - blocks.len() + within.len()];
                 // Pending redaction metadata holds paths only, charged before cloning them.
                 let cost = crate::iac::json::path_cost(body)
                     .saturating_add(body.len().saturating_mul(std::mem::size_of::<Step>()));
@@ -447,6 +470,7 @@ fn ssm_value_is_secret(kind: Option<&str>) -> bool {
 /// A completed Terraform JSON body that marks one of its attributes private. Consumed at
 /// collection close, so repeated section properties cannot erase an earlier marker.
 fn json_secret_body(path: &[Step], body: &Value) -> bool {
+    let path = crate::iac::json::from_section(path);
     let Some(Step::Key(section)) = path.first() else {
         return false;
     };
@@ -509,6 +533,7 @@ fn json_kind(s: &str) -> &'static str {
 /// is a template (`json_kind`), stored as the quoted JSON string when it is not a plain one, and
 /// with its escapes (`$${`) undone when it is; a variable's `default` is a literal.
 fn json_string(file: &str, path: &[Step], s: &str) -> (&'static str, String) {
+    let path = crate::iac::json::from_section(path);
     let literal = matches!(path.first(), Some(Step::Key(v)) if v == "variable")
         && crate::iac::json::body_path(path, 1).is_some_and(
             |body| matches!(path.get(body.len()), Some(Step::Key(d)) if d == "default"),
@@ -1027,7 +1052,7 @@ mod tests {
                 .map(|p| (p.to_string(), PathBuf::from(p)))
                 .collect()
         };
-        let kept = unshadowed(at(&[
+        let (kept, shadowed) = unshadowed(at(&[
             "a/main.tf",
             "a/main.tofu",
             "a/other.tf",
@@ -1052,6 +1077,7 @@ mod tests {
                 "a/main.tfvars"
             ]
         );
+        assert_eq!(shadowed, ["a/main.tf", "a/x.tf.json", "a/main.tf.json"]);
     }
 
     #[test]
@@ -1068,6 +1094,9 @@ mod tests {
             variable("variable[\"a\\\"b\"].sensitive").as_deref(),
             Some("a\"b")
         );
+        // A JSON file whose root is an array of bodies.
+        assert_eq!(variable("[1].variable.db.sensitive").as_deref(), Some("db"));
+        assert_eq!(variable("[0][0].variable.db.sensitive"), None);
         assert_eq!(variable("output.x.sensitive"), None);
         assert_eq!(variable("variable.x.y.sensitive"), None);
         assert_eq!(variable("variable.x.default"), None);

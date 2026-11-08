@@ -477,3 +477,90 @@ fn a_default_another_file_of_its_directory_marks_sensitive_stays_out_of_the_inde
         "infra/a_override.tf:2 variable.token.default = redacted",
     );
 }
+
+/// Terraform ignores `.tofu` files and reads the `.tf` file one shadows, which Meada does not
+/// read: beside an override file it may mark any variable of its directory sensitive, so no
+/// default there is stored or resolves into a name, and a var file in that directory keeps every
+/// value redacted; elsewhere it changes nothing. An override file whose JSON root is an array of
+/// bodies marks a variable as an object does. Removing the shadowed file shows the default again
+/// at the next query.
+#[test]
+fn a_shadowed_terraform_file_and_a_json_root_array_keep_defaults_out_of_the_index() {
+    let repo = fixture_repo("config_values_shadowed_sensitive", "config-values", ORIGIN);
+    let default = |secret: &str| format!("variable \"db\" {{\n  default = \"{secret}\"\n}}\n");
+    let marked = "variable \"db\" {\n  sensitive = true\n}\n";
+    for (path, text) in [
+        ("array/main.tf", default("array-marked-secret")),
+        (
+            "array/override.tf.json",
+            r#"[{"variable": {"db": {"sensitive": true}}}]"#.into(),
+        ),
+        ("shadow/main.tf", default("shadow-marked-secret")),
+        ("shadow/zz_override.tf", marked.into()),
+        (
+            "shadow/zz_override.tofu",
+            "variable \"db\" {\n  description = \"x\"\n}\n".into(),
+        ),
+        ("broken/main.tf", default("broken-shadow-secret")),
+        ("broken/override.tf", "locals {}\n".into()),
+        ("broken/x.tf", format!("{marked}resource \"x\" {{\n")),
+        ("broken/x.tofu", "variable \"other\" {}\n".into()),
+        (
+            "dual/main.tf",
+            "variable \"dual_token\" {\n  sensitive = true\n}\n".into(),
+        ),
+        ("dual/main.tofu", "variable \"dual_token\" {}\n".into()),
+        ("dual/override.tf", "locals {}\n".into()),
+        (
+            "dual/terraform.tfvars",
+            "dual_token = \"dual-tfvars-secret\"\n".into(),
+        ),
+        ("twin/main.tf", "variable \"region\" {}\n".into()),
+        ("twin/main.tofu", "variable \"region\" {}\n".into()),
+        ("twin/terraform.tfvars", "region = \"eu-west-1\"\n".into()),
+    ] {
+        let path = repo.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    for dir in ["array", "shadow", "broken"] {
+        let queue = "resource \"aws_sqs_queue\" \"db\" { name = \"q-${var.db}\" }\n";
+        fs::write(repo.join(format!("{dir}/queue.tf")), queue).unwrap();
+    }
+    common::age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let shows = |q: &str, line: &str| {
+        let found = engine.search(q, Some("value"), None).unwrap();
+        assert!(found.contains(line), "{line}\n{found}");
+    };
+    for dir in ["array", "shadow", "broken"] {
+        let line = format!("{dir}/main.tf:2 variable.db.default = redacted");
+        shows("variable.db.default", &line);
+    }
+    shows(
+        "dual_token",
+        "dual/terraform.tfvars:1 dual_token = redacted",
+    );
+    shows("region", "twin/terraform.tfvars:1 region = \"eu-west-1\"");
+    let iac = engine.search("aws_sqs_queue", Some("iac"), None).unwrap();
+    assert_eq!(iac.matches("pattern \"q-*\"").count(), 3, "{iac}");
+    let index = fs::read(repo.join(".meada/index.db")).unwrap();
+    let found = |needle: &str| (index.windows(needle.len())).any(|w| w == needle.as_bytes());
+    for secret in [
+        "array-marked-secret",
+        "shadow-marked-secret",
+        "broken-shadow-secret",
+        "dual-tfvars-secret",
+    ] {
+        assert!(!found(secret), "{secret}");
+    }
+
+    fs::remove_file(repo.join("shadow/zz_override.tf")).unwrap();
+    common::age(&repo);
+    shows(
+        "variable.db.default",
+        "shadow/main.tf:2 variable.db.default = \"shadow-marked-secret\"",
+    );
+    let iac = engine.search("aws_sqs_queue", Some("iac"), None).unwrap();
+    assert!(iac.contains("name \"q-shadow-marked-secret\""), "{iac}");
+}
