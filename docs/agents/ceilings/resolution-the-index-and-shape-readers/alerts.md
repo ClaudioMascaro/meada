@@ -12,6 +12,13 @@
   equally by distinct expressions in one route configuration; identical patterns share both. Larger expressions or automata
   stay unmatched, as do invalid or unsupported RE2 expressions. Regex matching is anchored
   to the entire label, tag or event-field value.
+- `ALERT_REGEX_FOLD_MAX` (`alert.rs`): 2^22 code points that case folding may visit for the
+  expressions of one route configuration, shared equally like `ALERT_REGEX_SIZE_MAX`.
+  `regex-syntax` folds each Unicode class and bracket of a case-insensitive expression by
+  visiting every code point of each of its ranges that may hold a cased letter (1.1 million for
+  `(?i)\p{Any}`), before any automaton is built. `alert/regexp.rs` counts them first, an upper
+  bound (an `i` flag anywhere counts every class, and a range reaching `A` counts whole); an
+  expression past its share stays unmatched.
 
 - `ALERT_LINK_BYTES_MAX` (`alert.rs`): 4 MiB of retained alert link fields and String
   contents per workspace pass. Every field is charged with checked arithmetic before
@@ -40,4 +47,4 @@ receiver template once; substituted text is never reparsed. Only explicitly grou
 keys (or all labels with `...`) can establish CommonLabels/GroupLabels substitutions.
 OpsGenie conditions test complete tag strings. Tag and event-field streams cannot join
 without a known forwarding. Regex compilation uses the same validated Go/RE2 helper and
-shared automaton budget as Alertmanager.
+shared automaton and case-folding budgets as Alertmanager.

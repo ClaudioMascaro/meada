@@ -1,21 +1,110 @@
 //! Alertmanager/Go RE2 compatibility on the bounded Rust regex engine.
-use super::ALERT_REGEX_MAX;
-use regex_syntax::ast::{Ast, RepetitionKind, RepetitionRange};
+use super::{ALERT_REGEX_FOLD_MAX, ALERT_REGEX_MAX, ALERT_REGEX_SIZE_MAX};
+use regex_syntax::ast::{
+    self, Ast, ClassSetItem, Flag, GroupKind, RepetitionKind, RepetitionRange,
+};
+use regex_syntax::hir::{Class, ClassUnicode, ClassUnicodeRange, HirKind};
 
 // ponytail: Go/RE2 rejects counted repetitions, including nested products, above 1000.
 const RE2_REPEAT_MAX: u32 = 1000;
 
-pub(super) fn compile(pattern: &str, budget: usize) -> Option<regex::Regex> {
+/// `pattern` as Alertmanager reads it, anchored to the whole value, within its share of
+/// `ALERT_REGEX_SIZE_MAX` and `ALERT_REGEX_FOLD_MAX` (one of `shares` distinct expressions of a
+/// route configuration); `None` past them, past `ALERT_REGEX_MAX` or for no RE2 expression.
+pub(super) fn compile(pattern: &str, shares: usize) -> Option<regex::Regex> {
     if pattern.len() > ALERT_REGEX_MAX {
         return None;
     }
     let pattern = regex_source(pattern)?;
-    re2_ast(&pattern)?;
+    let ast = ast::parse::Parser::new().parse(&pattern).ok()?;
+    re2_ast(&ast)?;
+    let shares = shares.max(1);
+    if folds(&pattern, &ast)? > ALERT_REGEX_FOLD_MAX / shares {
+        return None;
+    }
+    let budget = ALERT_REGEX_SIZE_MAX / shares;
     regex::RegexBuilder::new(&format!("\\A(?:{pattern})\\z"))
         .size_limit(budget)
         .dfa_size_limit(budget)
         .build()
         .ok()
+}
+
+/// An upper bound on the code points `regex-syntax` 0.8 visits to fold the case of `ast`, parsed
+/// from `pattern`: when an `i` flag appears anywhere, each Unicode class and each bracket folds
+/// what it holds before its negation, visiting every code point of each of its ranges that
+/// reaches `A` (all 1.1 million of `\p{Any}`). `None` for a class it cannot read.
+fn folds(pattern: &str, ast: &Ast) -> Option<usize> {
+    struct Folds<'p> {
+        pattern: &'p str,
+        insensitive: bool,
+        visits: usize,
+    }
+    impl Folds<'_> {
+        fn class(&mut self, span: &ast::Span, negated: bool) -> Result<(), ()> {
+            let visits = visits(self.pattern, span, negated).ok_or(())?;
+            self.visits = self.visits.saturating_add(visits);
+            Ok(())
+        }
+    }
+    impl ast::Visitor for Folds<'_> {
+        type Output = usize;
+        type Err = ();
+        fn finish(self) -> Result<usize, ()> {
+            Ok(if self.insensitive { self.visits } else { 0 })
+        }
+        fn visit_pre(&mut self, ast: &Ast) -> Result<(), ()> {
+            let flags = match ast {
+                Ast::Flags(set) => &set.flags,
+                Ast::Group(group) => match &group.kind {
+                    GroupKind::NonCapturing(flags) => flags,
+                    _ => return Ok(()),
+                },
+                Ast::ClassUnicode(class) => return self.class(&class.span, class.is_negated()),
+                Ast::ClassBracketed(class) => return self.class(&class.span, class.negated),
+                _ => return Ok(()),
+            };
+            self.insensitive |= flags.flag_state(Flag::CaseInsensitive) == Some(true);
+            Ok(())
+        }
+        fn visit_class_set_item_pre(&mut self, item: &ClassSetItem) -> Result<(), ()> {
+            match item {
+                ClassSetItem::Unicode(class) => self.class(&class.span, class.is_negated()),
+                ClassSetItem::Bracketed(class) => self.class(&class.span, class.negated),
+                _ => Ok(()),
+            }
+        }
+    }
+    let folds = Folds {
+        pattern,
+        insensitive: false,
+        visits: 0,
+    };
+    ast::visit(ast, folds).ok()
+}
+
+/// The code points folding visits for the class at `span` of `pattern`: those it holds before
+/// its negation, in the ranges that reach `A`.
+fn visits(pattern: &str, span: &ast::Span, negated: bool) -> Option<usize> {
+    let text = pattern.get(span.start.offset..span.end.offset)?;
+    let mut class = match regex_syntax::parse(text).ok()?.into_kind() {
+        HirKind::Class(Class::Unicode(class)) => class,
+        HirKind::Class(Class::Bytes(class)) if class.ranges().is_empty() => ClassUnicode::empty(),
+        HirKind::Literal(literal) => {
+            let chars = std::str::from_utf8(&literal.0).ok()?.chars();
+            ClassUnicode::new(chars.map(|c| ClassUnicodeRange::new(c, c)))
+        }
+        _ => return None,
+    };
+    if negated {
+        class.negate();
+    }
+    let reach = class.ranges().iter().filter(|r| r.end() >= 'A');
+    Some(
+        reach
+            .map(|r| r.end() as usize - r.start() as usize + 1)
+            .sum(),
+    )
 }
 
 /// Alertmanager uses Go's RE2 syntax: Perl classes and word boundaries are ASCII,
@@ -218,11 +307,8 @@ fn regex_source(pattern: &str) -> Option<String> {
 }
 
 /// Go bounds each nested counted-repeat product.
-fn re2_ast(pattern: &str) -> Option<()> {
-    let ast = regex_syntax::ast::parse::Parser::new()
-        .parse(pattern)
-        .ok()?;
-    let mut pending = vec![(&ast, 1u32)];
+fn re2_ast(ast: &Ast) -> Option<()> {
+    let mut pending = vec![(ast, 1u32)];
     while let Some((ast, parent)) = pending.pop() {
         match ast {
             Ast::Repetition(repetition) => {

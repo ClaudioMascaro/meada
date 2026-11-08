@@ -19,6 +19,12 @@ pub struct Alert;
 const ALERT_REGEX_MAX: usize = 4096;
 // ponytail: repetition must not expand a short expression into an unbounded automaton.
 const ALERT_REGEX_SIZE_MAX: usize = 1 << 20;
+/// The code points case folding may visit for the expressions of one route configuration,
+/// shared like `ALERT_REGEX_SIZE_MAX`: `regex-syntax` folds a case-insensitive class by visiting
+/// every code point of its ranges, before any automaton is built.
+// ponytail: 2^22 folds a few dozen `(?i)\p{L}` (about 140,000 code points each) and stops a
+// pattern of hundreds of `(?i)\p{Any}` (1.1 million each), which took minutes to compile.
+const ALERT_REGEX_FOLD_MAX: usize = 1 << 22;
 // ponytail: repeated conjunction explanations must not amplify matched links without bound.
 const ALERT_LINK_BYTES_MAX: usize = 4 * crate::lang::MAX_BYTES;
 // ponytail: unmatched rule/tree pairs must not run without a bound just because they emit no links.
@@ -850,10 +856,10 @@ impl<'a> Routing<'a> {
             .filter(|m| m.op.regex())
             .map(|m| m.pattern())
             .collect::<BTreeSet<_>>();
-        let budget = ALERT_REGEX_SIZE_MAX / patterns.len().max(1);
+        let shares = patterns.len();
         let compiled = patterns
             .into_iter()
-            .map(|p| (p, regexp::compile(p, budget).map(std::sync::Arc::new)))
+            .map(|p| (p, regexp::compile(p, shares).map(std::sync::Arc::new)))
             .collect::<BTreeMap<_, _>>();
         let mut conditions = Vec::new();
         let mut children = vec![Vec::new(); routes.len()];
@@ -1022,7 +1028,7 @@ impl<'a> Routing<'a> {
 
 #[cfg(test)]
 fn regex(pattern: &str) -> Option<regex::Regex> {
-    regexp::compile(pattern, ALERT_REGEX_SIZE_MAX)
+    regexp::compile(pattern, 1)
 }
 
 #[cfg(test)]
@@ -1201,6 +1207,45 @@ mod tests {
         assert!(regex(&"a".repeat(ALERT_REGEX_MAX + 1)).is_none());
         assert!(regex("a{100000000}").is_none());
         assert!(regex("[").is_none());
+    }
+
+    /// Folding the case of `\p{Any}` visits each of its 1,112,064 code points: three fit
+    /// `ALERT_REGEX_FOLD_MAX`, a fourth does not, nor do two in each of two expressions sharing
+    /// it. `\P{Any}` folds `\p{Any}` before negating it; a bracket folds all it holds, here
+    /// everything but the digits (about as many), and each Unicode class in it on its own.
+    #[test]
+    fn case_folding_past_the_fold_ceiling_leaves_a_matcher_unmatched() {
+        let any = 1_112_064;
+        assert!(3 * any <= ALERT_REGEX_FOLD_MAX && 4 * any > ALERT_REGEX_FOLD_MAX);
+        let compiles = |class: &str, n: usize, shares: usize| {
+            regexp::compile(&format!("(?i){}", class.repeat(n)), shares).is_some()
+        };
+        assert_eq!(
+            [
+                compiles(r"\p{Any}", 3, 1),
+                compiles(r"\p{Any}", 4, 1),
+                compiles(r"\p{Any}", 2, 2),
+                compiles(r"\P{Any}", 4, 1),
+                compiles(r"[a\D]", 3, 1),
+                compiles(r"[a\D]", 4, 1),
+                compiles(r"[\p{Any}\p{Any}\p{Any}\p{Any}]", 1, 1),
+                regexp::compile(&r"\p{Any}".repeat(4), 1).is_some(),
+            ],
+            [true, false, false, false, true, false, false, true]
+        );
+        assert!(regex(r"(?i)\p{Lu}").unwrap().is_match("a"));
+    }
+
+    /// A pattern of hundreds of case-insensitive `\p{Any}`, whose folding took minutes, is
+    /// refused by counting what folding would visit, in linear time.
+    #[test]
+    fn hundreds_of_case_insensitive_classes_are_refused_in_linear_time() {
+        let pattern = format!("(?i){}", r"\p{Any}".repeat((ALERT_REGEX_MAX - 4) / 7));
+        let started = std::time::Instant::now();
+        assert!(regex(&pattern).is_none());
+        let took = started.elapsed();
+        eprintln!("hundreds of case-insensitive classes: {took:?}");
+        assert!(took < std::time::Duration::from_secs(2), "{took:?}");
     }
 }
 

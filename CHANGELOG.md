@@ -384,6 +384,10 @@ All notable changes to Meada are recorded here. The format follows
   thousands of keys (a file whose objects pass 2^24 key comparisons is now unreadable), costly
   `.tfvars` values (now given but unresolved) and long `trim` and `toset` arguments (#646, #649,
   #651, #653).
+- An Alertmanager route expression of case-insensitive Unicode classes (`(?i)\p{Any}` written
+  hundreds of times) no longer takes minutes to compile on every `export` and `status`: one
+  whose case folding would visit more than its share of 2^22 code points per route
+  configuration stays unmatched (#672).
 - Backstage proxy: a `proxy.endpoints`, a whole `proxy` or a root behind an `$include` Meada
   does not follow counts as the endpoints table, as Backstage reads (or refuses) whatever the
   include gives, so the legacy `proxy['/<ep>']` keys beside it or in another file no longer link
