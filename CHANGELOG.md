@@ -175,8 +175,11 @@ All notable changes to Meada are recorded here. The format follows
   repeated block `[n]`; a literal keeps its type, and an expression or a template is stored as
   written under the type `expression` or `template`. A `.tofu` file shadows the `.tf` file of
   the same name. The `default` of a `variable` with `sensitive = true` (or `"true"`) and every
-  value a `.tfvars` file gives a variable of that name are stored as `redacted`. A file that
-  does not parse is skipped and counted by `meada status` (#640).
+  value a `.tfvars` file gives a variable of that name are stored as `redacted`, and so is a
+  default another file of its directory marks sensitive when that directory holds an override
+  file (`override.tf`, `*_override.tf`), which Terraform merges into the others; such a default
+  never reaches the index, also when only the override file changes. A file that does not
+  parse is skipped and counted by `meada status` (#640).
 - A Go struct field that keeps a base URL (`c.base`) carries the environment read every
   composite literal of the repository that sets it gives it, directly or through a constructor's
   parameter whose callers in the repository all pass that read, so a method that reads the field,
@@ -292,7 +295,8 @@ All notable changes to Meada are recorded here. The format follows
   per call, `each` and `count.index`, without running Terraform or reaching the network, so a
   `for_each` over a variable gives one node per instance. Data sources, resource attributes,
   registry modules, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_` and sensitive variables
-  are never evaluated: such a part of a name is a `*` and the name a pattern, shown as `pattern
+  (also one an override file marks sensitive while another file gives its default, whichever
+  file is read first) are never evaluated: such a part of a name is a `*` and the name a pattern, shown as `pattern
   "orders-*"` by `search` and `(pattern)` by `context`, and linked by nothing yet. `context` lists
   under `overridable:` the root variables a name went through, by their default or a var file. A
   changed Terraform file or var file evaluates again only the root modules whose unit holds it. A

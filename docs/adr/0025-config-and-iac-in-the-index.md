@@ -128,13 +128,19 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
 - **Sensitive.** The `default` of a top-level `variable` is `redacted`, whatever it holds,
   unless its `sensitive` attribute is absent, null, `false` or `"false"`: Terraform converts the
   string `"true"` to the boolean and refuses other values, so reading those as sensitive can
-  only redact too much. A `.tfvars`, `*.auto.tfvars` or `*.tfvars.json` file has `redacted`
+  only redact too much. Terraform merges the blocks of an override file (`override.tf`,
+  `*_override.tf` and their OpenTofu and JSON forms) into those of the other files of its
+  directory, so in a directory holding one, a `default` is also `redacted` when another
+  Terraform file of the directory marks its variable sensitive, or does not parse. Such a file
+  is first read with every default redacted, then again once all the directory's files are
+  stored, so a marked default never reaches the index. A `.tfvars`, `*.auto.tfvars` or `*.tfvars.json` file has `redacted`
   every value it gives a variable whose name any Terraform file of the repository marks
   sensitive: a var-file can go to a module in any directory, before evaluation says which, and
   redacting too much is the safe direction. When a Terraform file in the var-file's directory or
   above is unreadable, the variables it declares are unknown and every value of the var-file is
-  redacted. The stored summary of a `.tfvars` file names what it was read against, and it is
-  read again when that changes.
+  redacted. The stored summary of a `.tfvars` file, and of a Terraform file of a directory
+  holding an override file, names what it was read against, and it is read again when that
+  changes.
 - **Shadowing.** A `.tofu` file hides the `.tf` file of the same base name in the same
   directory, and a `.tofu.json` the `.tf.json`; the hidden file is not read and not counted.
 - **Ceiling.** Brackets (`{`, `[`, `(`) nest at most 64 deep in one file, counted even inside
@@ -187,7 +193,8 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   value's line for a var file), and `context` lists them. In a local module, a variable is the
   call's argument, evaluated in the caller with the call instance's `each` (it carries what the
   argument went through), or else its default, which no deployer sets. A sensitive variable
-  is never evaluated, so its value never reaches a name.
+  is never evaluated, so its value never reaches a name, nor does one an override file marks
+  sensitive while another file gives its default, whichever file is read first.
 - **Never evaluated**: data sources, resource attributes (even an argument the configuration
   sets), registry and remote modules, `terraform.workspace`, `path.*`, `-var`, any `-var-file`
   other than the ones Terraform loads by itself, `TF_VAR_` and any function outside the list.

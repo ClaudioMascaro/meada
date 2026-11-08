@@ -12,8 +12,10 @@
 //! an interpolation or a directive). A list or an object of literal keys is read element by
 //! element, as YAML is; an object with a key that is no literal is one `expression`.
 //!
-//! A sensitive `variable` (`is_sensitive`) keeps its `default` redacted, and a `.tfvars` file
-//! every value it gives to a sensitive variable (`Sensitive`): key path, type and line, no value.
+//! A sensitive `variable` (`is_sensitive`) keeps its `default` redacted, as does one another file
+//! of its directory marks sensitive when that directory holds an override file, and a `.tfvars`
+//! file every value it gives to a sensitive variable (`Sensitive`): key path, type and line, no
+//! value.
 //! An `aws_ssm_parameter` resource with literal `type = "SecureString"` redacts its `value`.
 
 use std::collections::{BTreeSet, HashMap};
@@ -52,8 +54,9 @@ pub(super) fn is_hcl(path: &str) -> bool {
 }
 
 /// The rows of the HCL file at `path`: `Err` with the line and the reason when it does not
-/// parse, nests past `NESTING_MAX` or stores past the budget. `sensitive` are the variables a
-/// `.tfvars` file gives values to that are redacted.
+/// parse, nests past `NESTING_MAX` or stores past the budget. `sensitive` are the variables
+/// marked sensitive elsewhere (`Sensitive`): the values a `.tfvars` file gives them and the
+/// defaults a Terraform file declares for them are redacted.
 pub(super) fn read(path: &str, src: &[u8], sensitive: &BTreeSet<String>) -> Result<Vec<Row>, Fail> {
     let text = std::str::from_utf8(src).map_err(|e| {
         let line = src[..e.valid_up_to()]
@@ -88,6 +91,7 @@ pub(super) fn read(path: &str, src: &[u8], sensitive: &BTreeSet<String>) -> Resu
         left: budget,
         budget,
         rows: Vec::new(),
+        sensitive,
     };
     let tfvars = is_tfvars(path);
     let hide = if tfvars {
@@ -146,6 +150,8 @@ struct Walk<'a> {
     /// What the rows may still store.
     left: usize,
     rows: Vec<Row>,
+    /// The variables marked sensitive elsewhere (`read`).
+    sensitive: &'a BTreeSet<String>,
 }
 
 impl Walk<'_> {
@@ -225,11 +231,13 @@ impl Walk<'_> {
                         path.push(Step::Index(*n));
                         *n += 1;
                     }
-                    // A variable's `default` is secret when the variable is sensitive.
+                    // A variable's `default` is secret when the variable is sensitive, here or
+                    // in another file of the directory (`Sensitive`).
                     let sensitive = depth == 0
                         && b.ident.as_str() == "variable"
                         && b.labels.len() == 1
-                        && is_sensitive(b.body.get_attribute("sensitive").map(|a| &a.value));
+                        && (is_sensitive(b.body.get_attribute("sensitive").map(|a| &a.value))
+                            || Hide::Names(self.sensitive).hides(b.labels[0].as_str()));
                     let secure = depth == 0
                         && b.ident.as_str() == "resource"
                         && b.labels.len() == 2
@@ -691,6 +699,40 @@ mod tests {
         // A `.tf` file's top-level attribute of the same name is not a tfvars value.
         let (_, found) = read_with("main.tf", b"db_password = \"x\"\n", &sensitive);
         assert!(found[0].value.is_some());
+    }
+
+    /// A Terraform file read against the variables another file of its directory marks
+    /// sensitive (an override file) keeps their defaults redacted, in HCL and in JSON, and every
+    /// default against `ANY_VARIABLE`; the other values stay.
+    #[test]
+    fn a_terraform_file_redacts_the_defaults_of_the_variables_marked_sensitive_elsewhere() {
+        let tf = concat!(
+            "variable \"db\" {\n  default = \"hunter2\"\n}\n",
+            "variable \"region\" {\n  default = \"eu-west-1\"\n}\n",
+            "db = \"top\"\n",
+        );
+        let json =
+            r#"{"variable": {"db": {"default": "hunter2"}, "region": {"default": "eu-west-1"}}}"#;
+        let hidden = |path: &str, text: &str, names: &[&str]| {
+            let names: BTreeSet<String> = names.iter().map(|n| n.to_string()).collect();
+            let (outcome, found) = read_with(path, text.as_bytes(), &names);
+            let Outcome::Read { sensitive, .. } = outcome else {
+                panic!("{outcome:?}");
+            };
+            assert_eq!(sensitive, Vec::from_iter(names), "{path}");
+            (found.iter())
+                .filter(|r| r.value.is_none())
+                .map(|r| r.key.clone())
+                .collect::<Vec<_>>()
+        };
+        for (path, text) in [("main.tf", tf), ("main.tf.json", json)] {
+            assert_eq!(hidden(path, text, &["db"]), ["variable.db.default"]);
+            assert_eq!(
+                hidden(path, text, &[ANY_VARIABLE]),
+                ["variable.db.default", "variable.region.default"]
+            );
+            assert!(hidden(path, text, &[]).is_empty());
+        }
     }
 
     #[test]

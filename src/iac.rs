@@ -466,6 +466,18 @@ struct Given {
     rank: (u8, String),
 }
 
+impl Module {
+    /// Records the `variable` block `variable` of `name`. Terraform merges an override file's
+    /// block into the declaration, so a variable another of its blocks marks sensitive stays
+    /// sensitive, whichever file is read first.
+    fn declare(&mut self, name: &str, mut variable: Variable) {
+        if let Some(declared) = self.variables.get(name) {
+            variable.sensitive |= declared.sensitive;
+        }
+        self.variables.insert(name.to_string(), variable);
+    }
+}
+
 impl Block {
     fn local(&self) -> String {
         match self.kind {
@@ -736,7 +748,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
                     path: path.to_string(),
                     line: line(b.span().map_or(0, |s| s.start)),
                 };
-                module.variables.insert(name.to_string(), variable);
+                module.declare(name, variable);
                 continue;
             }
             _ => continue,
@@ -3085,6 +3097,33 @@ mod tests {
  "resource": {"a": {"s": {"name": "q-${var.s}"}}}}"#;
         assert_eq!(names(&[("main.tf", tf)]), ["a.s ~ \"q-*\""]);
         assert_eq!(names(&[("main.tf.json", json)]), ["a.s ~ \"q-*\""]);
+    }
+
+    /// Terraform merges an override file's `variable` block into the declaration: a variable
+    /// marked sensitive in either file never resolves, whichever of them is read first.
+    #[test]
+    fn a_variable_an_override_file_marks_sensitive_is_never_resolved() {
+        let main = concat!(
+            "variable \"s\" {\n  default = \"tok\"\n}\n",
+            "resource \"a\" \"s\" { name = \"q-${var.s}\" }\n",
+        );
+        let marked = "variable \"s\" {\n  sensitive = true\n}\n";
+        for file in ["a_override.tf", "override.tf", "z_override.tf.json"] {
+            let marked = match file.ends_with(".json") {
+                true => r#"{"variable": {"s": {"sensitive": true}}}"#,
+                false => marked,
+            };
+            let list = [("main.tf", main), (file, marked)];
+            assert_eq!(names(&list), ["a.s ~ \"q-*\""], "{file}");
+        }
+        let given = [
+            (
+                "main.tf",
+                "variable \"s\" {\n  sensitive = true\n}\nresource \"a\" \"s\" { name = \"q-${var.s}\" }\n",
+            ),
+            ("override.tf", "variable \"s\" {\n  default = \"tok\"\n}\n"),
+        ];
+        assert_eq!(names(&given), ["a.s ~ \"q-*\""]);
     }
 
     /// A template keeps its literal text and every part that resolves; what is never evaluated

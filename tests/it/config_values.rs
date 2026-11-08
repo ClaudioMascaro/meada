@@ -350,3 +350,102 @@ fn a_sensitive_variable_under_a_hidden_ci_path_redacts_a_var_file_elsewhere() {
         "{redacted}"
     );
 }
+
+/// Terraform merges an override file's blocks into those of the other files of its directory: a
+/// variable marked sensitive in one file keeps the default another file gives it out of the
+/// index, an override file or a primary one, in HCL and in JSON, and so does an override file
+/// that does not parse. Marking it so no longer, in the only file edited, shows the default at
+/// the next query, and so does removing the override file.
+#[test]
+fn a_default_another_file_of_its_directory_marks_sensitive_stays_out_of_the_index() {
+    let repo = fixture_repo("config_values_override_sensitive", "config-values", ORIGIN);
+    for (path, text) in [
+        (
+            "infra/main.tf",
+            "variable \"db\" {\n  default = \"override-marked-secret\"\n}\n",
+        ),
+        (
+            "infra/override.tf",
+            "variable \"db\" {\n  sensitive = true\n}\n",
+        ),
+        (
+            "infra/variables.tf",
+            "variable \"token\" {\n  sensitive = true\n}\nvariable \"region\" {\n  default = \"eu-west-1\"\n}\n",
+        ),
+        (
+            "infra/a_override.tf",
+            "variable \"token\" {\n  default = \"override-given-secret\"\n}\n",
+        ),
+        (
+            "json/main.tf.json",
+            r#"{"variable": {"db": {"default": "json-override-secret"}}}"#,
+        ),
+        (
+            "json/override.tf.json",
+            r#"{"variable": {"db": {"sensitive": true}}}"#,
+        ),
+        (
+            "broken/main.tf",
+            "variable \"x\" {\n  default = \"broken-override-secret\"\n}\n",
+        ),
+        ("broken/x_override.tf", "variable \"x\" {\n"),
+    ] {
+        let path = repo.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    common::age(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let value = |q: &str| engine.search(q, Some("value"), None).unwrap();
+    let shows = |q: &str, line: &str| {
+        let found = value(q);
+        assert!(found.contains(line), "{line}\n{found}");
+    };
+    shows(
+        "variable.db.default",
+        "infra/main.tf:2 variable.db.default = redacted",
+    );
+    shows(
+        "variable.db.default",
+        "json/main.tf.json:1 variable.db.default = redacted",
+    );
+    shows(
+        "variable.token.default",
+        "infra/a_override.tf:2 variable.token.default = redacted",
+    );
+    shows(
+        "variable.x.default",
+        "broken/main.tf:2 variable.x.default = redacted",
+    );
+    shows(
+        "variable.region.default",
+        "infra/variables.tf:5 variable.region.default = \"eu-west-1\"",
+    );
+    let index = fs::read(repo.join(".meada/index.db")).unwrap();
+    let found = |needle: &str| (index.windows(needle.len())).any(|w| w == needle.as_bytes());
+    for secret in [
+        "override-marked-secret",
+        "override-given-secret",
+        "json-override-secret",
+        "broken-override-secret",
+    ] {
+        assert!(!found(secret), "{secret}");
+    }
+
+    let text = "variable \"db\" {\n  sensitive = false\n}\n";
+    fs::write(repo.join("infra/override.tf"), text).unwrap();
+    fs::remove_file(repo.join("json/override.tf.json")).unwrap();
+    common::age(&repo);
+    shows(
+        "variable.db.default",
+        "infra/main.tf:2 variable.db.default = \"override-marked-secret\"",
+    );
+    shows(
+        "variable.db.default",
+        "json/main.tf.json:1 variable.db.default = \"json-override-secret\"",
+    );
+    shows(
+        "variable.token.default",
+        "infra/a_override.tf:2 variable.token.default = redacted",
+    );
+}

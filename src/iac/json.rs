@@ -102,15 +102,13 @@ impl Read<'_> {
         let section = section.as_str();
         match section {
             "variable" => {
-                self.module.variables.insert(
-                    names[0].to_string(),
-                    Variable {
-                        default: body.get("default").map(|v| self.expressions.read(v, true)),
-                        sensitive: crate::config_values::is_sensitive(body.get("sensitive")),
-                        path: self.path.into(),
-                        line,
-                    },
-                );
+                let variable = Variable {
+                    default: body.get("default").map(|v| self.expressions.read(v, true)),
+                    sensitive: crate::config_values::is_sensitive(body.get("sensitive")),
+                    path: self.path.into(),
+                    line,
+                };
+                self.module.declare(names[0], variable);
             }
             "locals" => {
                 for (name, value) in body.iter().filter(|(name, _)| name.as_str() != "//") {

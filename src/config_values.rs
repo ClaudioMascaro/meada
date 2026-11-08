@@ -68,9 +68,10 @@ const STORED_SLACK: usize = 1 << 12;
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Outcome {
-    /// Read: how many values it holds, and how many of them are `redacted`. A `.tfvars` file also
-    /// keeps the sensitive variables it was read against (`Sensitive`), since a variable
-    /// another file marks `sensitive` redacts the values this one gives it.
+    /// Read: how many values it holds, and how many of them are `redacted`. A `.tfvars` file, and
+    /// a Terraform file of a directory holding an override file, also keep the sensitive
+    /// variables they were read against (`Sensitive`), since a variable another file marks
+    /// `sensitive` redacts the values or the default this one gives it.
     Read {
         values: usize,
         redacted: usize,
@@ -111,6 +112,25 @@ pub(crate) fn is_tfvars(path: &str) -> bool {
     path.ends_with(".tfvars") || path.ends_with(".tfvars.json")
 }
 
+/// The endings of the Terraform and OpenTofu files that declare blocks.
+const TERRAFORM: [&str; 4] = [".tf", ".tofu", ".tf.json", ".tofu.json"];
+
+/// Whether the file at `path` is a Terraform or OpenTofu file that declares blocks: `*.tf`,
+/// `*.tofu`, `*.tf.json` or `*.tofu.json`.
+pub(crate) fn is_terraform(path: &str) -> bool {
+    TERRAFORM.iter().any(|e| path.ends_with(e))
+}
+
+/// Whether the Terraform file at `path` is an override file (`override.tf`, `*_override.tf` and
+/// their OpenTofu and JSON forms), whose blocks Terraform merges into those of the other files of
+/// its directory.
+fn is_override(path: &str) -> bool {
+    let file = path.rsplit('/').next().unwrap_or(path);
+    TERRAFORM.iter().any(|e| {
+        (file.strip_suffix(e)).is_some_and(|stem| stem == "override" || stem.ends_with("_override"))
+    })
+}
+
 /// `found` without the Terraform files a OpenTofu one shadows: a `.tofu` file hides the `.tf`
 /// file of the same name in its directory, and a `.tofu.json` the `.tf.json` (ADR 0025).
 pub(crate) fn unshadowed(found: Vec<(String, PathBuf)>) -> Vec<(String, PathBuf)> {
@@ -134,47 +154,60 @@ pub(crate) fn parent(path: &str) -> &str {
 /// gives. Part of `Sensitive::of` when a Terraform file that may declare variables is unreadable.
 pub(crate) const ANY_VARIABLE: &str = "*";
 
-/// The sensitive variables a `.tfvars` file is read against: the names any Terraform file found
-/// declares sensitive (`is_sensitive`), since a var-file can be given to a module in any directory
-/// and redacting too much is the safe direction, and `ANY_VARIABLE` when a Terraform file in its
-/// directory or above it is unreadable, since the variables it declares are unknown. Computed
-/// once per refresh from the rows of the files found, after every file but the `.tfvars` ones is
-/// refreshed.
+/// The sensitive variables a file is read against, beside those its own blocks mark. A `.tfvars`
+/// file: the names any Terraform file found declares sensitive (`is_sensitive`), since a var-file
+/// can be given to a module in any directory and redacting too much is the safe direction, and
+/// `ANY_VARIABLE` when a Terraform file in its directory or above it is unreadable, since the
+/// variables it declares are unknown. A Terraform file of a directory holding an override file,
+/// whose blocks Terraform merges into the others: the names the other Terraform files of the
+/// directory declare sensitive, with `ANY_VARIABLE` when one of them is unreadable (`merged`).
+/// Computed once per refresh from the rows of the files found: the `.tfvars` files are refreshed
+/// after the others, and a Terraform file of such a directory is first read against
+/// `ANY_VARIABLE`, then again against `merged` once every file is refreshed, so a default no
+/// other file marks is stored in clear and a marked one never is.
 pub(crate) struct Sensitive<'a> {
     db: &'a Connection,
     found: HashSet<&'a str>,
-    /// The names, and the directories holding an unreadable Terraform file.
-    loaded: RefCell<Option<(BTreeSet<String>, Vec<String>)>>,
+    /// The directories holding an override file found.
+    overridden: HashSet<&'a str>,
+    /// Each name a Terraform file found declares sensitive, with the file, and the unreadable
+    /// Terraform files found.
+    loaded: RefCell<Option<Marked>>,
 }
+
+/// What `Sensitive::load` reads: (file, name) pairs, and the unreadable Terraform files.
+type Marked = (Vec<(String, String)>, Vec<String>);
 
 impl<'a> Sensitive<'a> {
     pub(crate) fn new(db: &'a Connection, found: &'a [(String, PathBuf)]) -> Self {
         Sensitive {
             db,
             found: found.iter().map(|(p, _)| p.as_str()).collect(),
+            overridden: (found.iter())
+                .filter(|(p, _)| is_override(p))
+                .map(|(p, _)| parent(p))
+                .collect(),
             loaded: RefCell::new(None),
         }
     }
 
-    /// The sensitive variables the file at `path` is read against; none unless it is a
-    /// `.tfvars` file.
+    /// The sensitive variables the file at `path` is read against while the files found are
+    /// refreshed: for a `.tfvars` file, those above; for a Terraform file of a directory holding
+    /// an override file, `ANY_VARIABLE`, until `merged` reads it again; for any other file none.
     pub(crate) fn of(&self, path: &str) -> Result<BTreeSet<String>> {
+        if is_terraform(path) && self.overridden.contains(parent(path)) {
+            return Ok([ANY_VARIABLE.to_string()].into());
+        }
         if !is_tfvars(path) {
             return Ok(BTreeSet::new());
         }
-        let mut loaded = self.loaded.borrow_mut();
-        if loaded.is_none() {
-            *loaded = Some(self.load()?);
-        }
-        let (names, unreadable) = loaded.as_ref().expect("loaded above");
-        let mut names = names.clone();
+        let loaded = self.loaded()?;
+        let (marked, unreadable) = loaded.as_ref().expect("loaded");
+        let mut names: BTreeSet<String> = marked.iter().map(|(_, n)| n.clone()).collect();
         let dir = parent(path);
-        let below = |d: &String| {
-            d.is_empty()
-                || dir == d
-                || dir
-                    .strip_prefix(d.as_str())
-                    .is_some_and(|r| r.starts_with('/'))
+        let below = |file: &String| {
+            let d = parent(file);
+            d.is_empty() || dir == d || dir.strip_prefix(d).is_some_and(|r| r.starts_with('/'))
         };
         if unreadable.iter().any(below) {
             names.insert(ANY_VARIABLE.to_string());
@@ -188,6 +221,42 @@ impl<'a> Sensitive<'a> {
         if !is_tfvars(path) {
             return Ok(false);
         }
+        let now: Vec<String> = self.of(path)?.into_iter().collect();
+        Ok(self.read_against(path)?.is_some_and(|then| then != now))
+    }
+
+    /// The sensitive variables the Terraform file at `path` is read again against once every
+    /// file found is refreshed, when it was read against others: in a directory holding an
+    /// override file, the names the other Terraform files of the directory declare sensitive,
+    /// with `ANY_VARIABLE` when one of them is unreadable; elsewhere none.
+    pub(crate) fn merged(&self, path: &str) -> Result<Option<BTreeSet<String>>> {
+        if !is_terraform(path) {
+            return Ok(None);
+        }
+        let dir = parent(path);
+        let mut names = BTreeSet::new();
+        if self.overridden.contains(dir) {
+            let loaded = self.loaded()?;
+            let (marked, unreadable) = loaded.as_ref().expect("loaded");
+            let other = |file: &str| file != path && parent(file) == dir;
+            names.extend(
+                (marked.iter())
+                    .filter(|(f, _)| other(f))
+                    .map(|(_, n)| n.clone()),
+            );
+            if unreadable.iter().any(|f| other(f)) {
+                names.insert(ANY_VARIABLE.to_string());
+            }
+        }
+        let now: Vec<String> = names.iter().cloned().collect();
+        Ok((self.read_against(path)?)
+            .is_some_and(|then| then != now)
+            .then_some(names))
+    }
+
+    /// The sensitive variables the stored rows of the file at `path` were read against, when it
+    /// was read.
+    fn read_against(&self, path: &str) -> Result<Option<Vec<String>>> {
         let summary: Option<String> = self
             .db
             .query_row(
@@ -196,19 +265,27 @@ impl<'a> Sensitive<'a> {
                 |r| r.get(0),
             )
             .optional()?;
-        let Some(Outcome::Read { sensitive, .. }) =
-            summary.and_then(|s| serde_json::from_str(&s).ok())
-        else {
-            return Ok(false);
-        };
-        Ok(self.of(path)?.into_iter().collect::<Vec<_>>() != sensitive)
+        Ok(match summary.and_then(|s| serde_json::from_str(&s).ok()) {
+            Some(Outcome::Read { sensitive, .. }) => Some(sensitive),
+            _ => None,
+        })
     }
 
-    fn load(&self) -> Result<(BTreeSet<String>, Vec<String>)> {
+    /// The names and unreadable files, read on first use: only once every Terraform file found
+    /// is refreshed.
+    fn loaded(&self) -> Result<std::cell::Ref<'_, Option<Marked>>> {
+        if self.loaded.borrow().is_none() {
+            let marked = self.load()?;
+            *self.loaded.borrow_mut() = Some(marked);
+        }
+        Ok(self.loaded.borrow())
+    }
+
+    fn load(&self) -> Result<Marked> {
         let mut statement = self.db.prepare(
             "SELECT path, key, type, value FROM config_values WHERE key LIKE 'variable%.sensitive'",
         )?;
-        let mut names = BTreeSet::new();
+        let mut marked = Vec::new();
         for row in statement.query_map([], |r| {
             Ok((
                 r.get::<_, String>(0)?,
@@ -228,7 +305,7 @@ impl<'a> Sensitive<'a> {
                 continue;
             }
             if let Some(name) = variable(&key) {
-                names.insert(name);
+                marked.push((path, name));
             }
         }
         let mut statement = self.db.prepare("SELECT path, summary FROM config_files")?;
@@ -237,20 +314,17 @@ impl<'a> Sensitive<'a> {
             statement.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
         {
             let (path, summary) = row?;
-            let terraform = [".tf", ".tofu", ".tf.json", ".tofu.json"]
-                .iter()
-                .any(|e| path.ends_with(e));
-            if terraform
+            if is_terraform(&path)
                 && self.found.contains(path.as_str())
                 && matches!(
                     serde_json::from_str(&summary),
                     Ok(Outcome::Unreadable { .. })
                 )
             {
-                unreadable.push(parent(&path).to_string());
+                unreadable.push(path);
             }
         }
-        Ok((names, unreadable))
+        Ok((marked, unreadable))
     }
 }
 
@@ -264,8 +338,14 @@ fn variable(key: &str) -> Option<String> {
     {
         return None;
     }
+    named(body).map(str::to_string)
+}
+
+/// The name of the variable whose body is at `body`: its last key (`variable.<name>`, or
+/// `variable[0].<name>[0]` under the arrays HCL JSON permits).
+fn named(body: &[Step]) -> Option<&str> {
     body.iter().rev().find_map(|step| match step {
-        Step::Key(name) => Some(name.clone()),
+        Step::Key(name) => Some(name.as_str()),
         Step::Index(_) => None,
     })
 }
@@ -587,9 +667,12 @@ pub(crate) fn read_with(
                     SecretPlace::No => false,
                     SecretPlace::Root => is_secret(doc),
                     SecretPlace::Item(n) => doc["items"].get(n).is_some_and(is_secret),
-                    SecretPlace::Variable(body) | SecretPlace::SsmParameter(body) => {
+                    SecretPlace::Variable(body) => {
                         markers.contains(&key_path(&body))
+                            || named(&body).is_some_and(|n| sensitive.contains(n))
+                            || sensitive.contains(ANY_VARIABLE)
                     }
+                    SecretPlace::SsmParameter(body) => markers.contains(&key_path(&body)),
                     SecretPlace::Tfvars(name) => {
                         sensitive.contains(&name) || sensitive.contains(ANY_VARIABLE)
                     }

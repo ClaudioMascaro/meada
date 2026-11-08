@@ -792,6 +792,23 @@ fn refresh_keeping(
         }
         config_values::forget(&tx, path)?;
     }
+    // A Terraform file of a directory holding an override file is read above with every default
+    // redacted: now that every file is stored, one read against other sensitive variables than
+    // the other files of its directory declare is read again (`Sensitive`).
+    for (path, abs) in &configs {
+        let Some(names) = sensitive.merged(path)? else {
+            continue;
+        };
+        let Ok(src) = read_up_to(abs, lang::MAX_BYTES) else {
+            continue;
+        };
+        let (outcome, rows) = config_values::read_with(path, &src, &names);
+        config_values::store(&tx, path, &rows)?;
+        tx.execute(
+            "UPDATE config_files SET summary = ?2 WHERE path = ?1",
+            params![path, serde_json::to_string(&outcome)?],
+        )?;
+    }
     let mut dirs = terraform.into_inner();
     if mappings_changed {
         dirs.extend(
