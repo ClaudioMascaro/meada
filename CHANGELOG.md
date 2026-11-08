@@ -219,7 +219,9 @@ All notable changes to Meada are recorded here. The format follows
   `module.<name>`), a type, a file, its lines and the root module that roots its evaluation (a
   directory no other one calls as a local module). A local module's blocks are instantiated once
   per call under the call's address (`module.orders.aws_sqs_queue.this`), and a literal `count`
-  or `for_each` gives one node per `[key]`. The references between nodes are stored like calls,
+  or `for_each` gives one node per `[key]`. Override files (`override.tf`, `*_override.tf`) merge
+  into the blocks of their directory, as Terraform applies them. The references between nodes are
+  stored like calls,
   followed through `var`, `local` and module outputs. `search` finds the nodes with the new kind
   `iac` (by address, type or physical name; the default search leaves them out), `context` on an
   address shows the type, the physical name, the references both ways and the config values,
@@ -295,9 +297,9 @@ All notable changes to Meada are recorded here. The format follows
   per call, `each` and `count.index`, without running Terraform or reaching the network, so a
   `for_each` over a variable gives one node per instance. Data sources, resource attributes,
   registry modules, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_` and sensitive variables
-  (also one an override file marks sensitive while another file gives its default, whichever
-  file is read first) are never evaluated: such a part of a name is a `*` and the name a pattern, shown as `pattern
-  "orders-*"` by `search` and `(pattern)` by `context`, and linked by nothing yet. `context` lists
+  (marked by any of their blocks, override files included) are never evaluated: such a part of a
+  name is a `*` and the name a pattern, shown as `pattern "orders-*"` by `search` and `(pattern)`
+  by `context`, and linked by nothing yet. `context` lists
   under `overridable:` the root variables a name went through, by their default or a var file. A
   changed Terraform file or var file evaluates again only the root modules whose unit holds it. A
   value over 64 KiB, an expression that could make over 1 MiB and a root's evaluation past 64 MiB

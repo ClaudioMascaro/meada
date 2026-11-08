@@ -13,7 +13,10 @@
 //! `data.<type>.<name>`, `module.<name>`), and each call of a local module instantiates that
 //! module's blocks once, prefixed by the call's address (`module.orders.aws_sqs_queue.this`). A
 //! `count` or `for_each` over values that resolve to literals gives one node per instance,
-//! suffixed `[key]`.
+//! suffixed `[key]`. Override files (`override.tf`, `*_override.tf` and their other extensions)
+//! merge into the blocks of their directory after its other files, in name order, as Terraform
+//! applies them: what an override block sets replaces the base block's, and one with nothing to
+//! merge into is left out.
 //!
 //! A reference is a traversal in a block's expressions that names a resource, a data block or a
 //! module; one through `var.<name>`, `local.<name>` or a module's output (`module.<name>.<out>`) is
@@ -37,6 +40,7 @@ use hcl::{Map, Value};
 use hcl_edit::Span;
 use hcl_edit::expr::{Expression, ObjectKey, Traversal, TraversalOperator};
 use hcl_edit::parser;
+use hcl_edit::structure::{Body, Structure};
 use hcl_edit::template::{Directive, Element, Template};
 use hcl_edit::visit::{self, Visit};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
@@ -425,7 +429,9 @@ struct Block {
     named: Option<Expression>,
     count: Option<Expression>,
     for_each: Option<Expression>,
-    refs: Vec<Ref>,
+    /// The references of its expressions, by the argument or nested block type that makes them,
+    /// as an override block replaces them.
+    refs: BTreeMap<String, Vec<Ref>>,
     /// A module call's `source`, and each of its arguments.
     source: Option<String>,
     args: BTreeMap<String, Named>,
@@ -467,18 +473,99 @@ struct Given {
 }
 
 impl Module {
-    /// Records the `variable` block `variable` of `name`. Terraform merges an override file's
-    /// block into the declaration, so a variable another of its blocks marks sensitive stays
-    /// sensitive, whichever file is read first.
-    fn declare(&mut self, name: &str, mut variable: Variable) {
-        if let Some(declared) = self.variables.get(name) {
-            variable.sensitive |= declared.sensitive;
+    /// Records the `variable` block `variable` of `name`. An override file's (`overriding`) merges
+    /// into the declaration, its default replacing the declared one, or with none is left out, as
+    /// Terraform refuses it. A variable any of its blocks marks sensitive stays sensitive.
+    fn declare(&mut self, name: &str, mut variable: Variable, overriding: bool) {
+        let Some(declared) = self.variables.get_mut(name) else {
+            if !overriding {
+                self.variables.insert(name.to_string(), variable);
+            }
+            return;
+        };
+        variable.sensitive |= declared.sensitive;
+        // An override block without a default keeps the declared one, and where it is.
+        if overriding && variable.default.is_none() {
+            declared.sensitive = variable.sensitive;
+        } else {
+            *declared = variable;
         }
-        self.variables.insert(name.to_string(), variable);
+    }
+
+    /// Adds the resource, data or module block `block`. An override file's (`overriding`) merges
+    /// into the block of its address, which the other files of its directory, all read before
+    /// it, give, or with none is left out.
+    fn add(&mut self, block: Block, overriding: bool) {
+        if !overriding {
+            self.blocks.push(block);
+            return;
+        }
+        if self.addresses.is_empty() {
+            self.addresses = (self.blocks.iter().enumerate())
+                .map(|(i, b)| (b.local(), i))
+                .collect();
+        }
+        if let Some(&i) = self.addresses.get(&block.local()) {
+            self.blocks[i].merge(block);
+        }
     }
 }
 
+/// Records the local or output `value` of `name` in `map`. An override file's (`overriding`)
+/// replaces the one the other files of its directory give, or with none is left out.
+fn assign(map: &mut BTreeMap<String, Named>, name: &str, value: Named, overriding: bool) {
+    if !overriding || map.contains_key(name) {
+        map.insert(name.to_string(), value);
+    }
+}
+
+/// The type of the nested block `b`, all of which an override block's nested blocks of that
+/// type replace: a `dynamic` block's label, the type of the blocks it generates.
+fn nested_type(b: &hcl_edit::structure::Block) -> &str {
+    match (b.ident.as_str(), b.labels.first()) {
+        ("dynamic", Some(label)) => label.as_str(),
+        (ident, _) => ident,
+    }
+}
+
+/// The references of the block body `body`, by the argument or nested block type that makes
+/// them.
+fn keyed_refs(body: &Body) -> BTreeMap<String, Vec<Ref>> {
+    let mut keyed: BTreeMap<String, Vec<Ref>> = BTreeMap::new();
+    for structure in body.iter() {
+        let mut refs = Refs::default();
+        let key = match structure {
+            Structure::Attribute(a) => {
+                refs.visit_expr(&a.value);
+                a.key.as_str()
+            }
+            Structure::Block(b) => {
+                refs.visit_block(b);
+                nested_type(b)
+            }
+        };
+        keyed.entry(key.to_string()).or_default().extend(refs.0);
+    }
+    keyed
+}
+
 impl Block {
+    /// Merges the override block `o` into this one: each argument it sets replaces this one's,
+    /// references included, and its nested blocks of each type replace all of that type.
+    fn merge(&mut self, o: Block) {
+        self.named = o.named.or(self.named.take());
+        self.count = o.count.or(self.count.take());
+        self.for_each = o.for_each.or(self.for_each.take());
+        self.source = o.source.or(self.source.take());
+        self.args.extend(o.args);
+        self.refs.extend(o.refs);
+        let types: HashSet<String> = (o.nested.iter())
+            .map(|b| nested_type(b).to_string())
+            .collect();
+        self.nested.retain(|b| !types.contains(nested_type(b)));
+        self.nested.extend(o.nested);
+    }
+
     fn local(&self) -> String {
         match self.kind {
             Kind::Resource => format!("{}.{}", self.ty, self.name),
@@ -511,6 +598,8 @@ struct Module {
     locals: BTreeMap<String, Named>,
     variables: BTreeMap<String, Variable>,
     given: BTreeMap<String, Given>,
+    /// Each block's index by its local address, built when the first override block arrives.
+    addresses: HashMap<String, usize>,
 }
 
 /// The directory a local module `source` names from `dir`: `./` or `../` joined and normalized,
@@ -720,6 +809,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
         return;
     };
     let line = lines(text);
+    let overriding = config_values::is_override(path);
     for b in body.blocks() {
         let labels: Vec<&str> = b.labels.iter().map(|l| l.as_str()).collect();
         let attr = |name: &str| b.body.get_attribute(name).map(|a| &a.value);
@@ -729,15 +819,14 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
             ("module", [name]) => (Kind::Module, "", *name),
             ("output", [name]) => {
                 if let Some(value) = attr("value") {
-                    module.outputs.insert(name.to_string(), Named::new(value));
+                    assign(&mut module.outputs, name, Named::new(value), overriding);
                 }
                 continue;
             }
             ("locals", []) => {
                 for a in b.body.attributes() {
-                    module
-                        .locals
-                        .insert(a.key.as_str().to_string(), Named::new(&a.value));
+                    let value = Named::new(&a.value);
+                    assign(&mut module.locals, a.key.as_str(), value, overriding);
                 }
                 continue;
             }
@@ -748,14 +837,12 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
                     path: path.to_string(),
                     line: line(b.span().map_or(0, |s| s.start)),
                 };
-                module.declare(name, variable);
+                module.declare(name, variable, overriding);
                 continue;
             }
             _ => continue,
         };
         let span = b.span().unwrap_or(0..0);
-        let mut refs = Refs::default();
-        refs.visit_body(&b.body);
         let mut args = BTreeMap::new();
         let workload = types::workload("terraform", ty).is_some();
         if kind == Kind::Module
@@ -772,7 +859,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
             Some(Expression::String(s)) if kind == Kind::Module => Some(s.value().clone()),
             _ => None,
         };
-        module.blocks.push(Block {
+        let block = Block {
             kind,
             ty: ty.to_string(),
             name: name.to_string(),
@@ -787,7 +874,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
                 .flatten(),
             count: attr("count").cloned(),
             for_each: attr("for_each").cloned(),
-            refs: refs.0,
+            refs: keyed_refs(&b.body),
             source,
             args,
             nested: if workload {
@@ -795,7 +882,8 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
             } else {
                 Vec::new()
             },
-        });
+        };
+        module.add(block, overriding);
     }
 }
 
@@ -1278,7 +1366,7 @@ impl<'m> Eval<'m> {
             }
             for (block, source) in sources {
                 let mut targets: BTreeSet<(String, Option<String>)> = BTreeSet::new();
-                for r in &block.refs {
+                for r in block.refs.values().flatten() {
                     for target in self.resolve(i, r, 0) {
                         if target != source {
                             targets.insert((target, r.via()));
@@ -1810,7 +1898,8 @@ impl Repository {
     pub(crate) fn read_with(files: &[(String, Vec<u8>)], mappings: &mapping::Config) -> Repository {
         let mut modules: BTreeMap<String, Module> = BTreeMap::new();
         let mut sorted: Vec<&(String, Vec<u8>)> = files.iter().collect();
-        sorted.sort_by(|a, b| a.0.cmp(&b.0));
+        // Terraform merges override files into a directory once its other files are read.
+        sorted.sort_by_key(|(path, _)| (config_values::is_override(path), path));
         let mut compose = Vec::new();
         for (path, src) in sorted {
             if compose::is_file(path) {
@@ -3124,6 +3213,91 @@ mod tests {
             ("override.tf", "variable \"s\" {\n  default = \"tok\"\n}\n"),
         ];
         assert_eq!(names(&given), ["a.s ~ \"q-*\""]);
+        let json = [
+            (
+                "main.tf.json",
+                r#"{"variable": {"s": {"default": "tok"}}, "resource": {"a": {"s": {"name": "q-${var.s}"}}}}"#,
+            ),
+            ("a_override.tf", marked),
+        ];
+        assert_eq!(names(&json), ["a.s ~ \"q-*\""]);
+    }
+
+    /// Terraform applies override files after the other files of their directory, in name order,
+    /// and an override block merges into the block of its address: each argument it sets replaces
+    /// the block's (a default, a local, an output's value, a resource's `count`, a name from JSON),
+    /// what it leaves stays (a default under a new description), and a block with nothing to merge
+    /// into is left out, as Terraform refuses it.
+    #[test]
+    fn override_files_merge_into_the_blocks_of_their_directory() {
+        let main = concat!(
+            "variable \"env\" {\n  default = \"dev\"\n}\n",
+            "variable \"team\" {\n  default = \"shop\"\n}\n",
+            "locals {\n  suffix = \"q\"\n}\n",
+            "resource \"a\" \"q\" { name = \"${var.env}-${var.team}-${local.suffix}\" }\n",
+            "resource \"a\" \"r\" {\n  name = \"keep\"\n  count = 1\n}\n",
+            "module \"m\" {\n  source = \"./m\"\n  name = \"inner-${var.env}\"\n}\n",
+            "resource \"a\" \"out\" { name = module.m.full }\n",
+            "resource \"a\" \"j\" { name = \"hcl\" }\n",
+        );
+        let module = "variable \"name\" {}\noutput \"full\" { value = \"${var.name}-out\" }\n";
+        let list = [
+            ("main.tf", main),
+            ("m/main.tf", module),
+            (
+                "a_override.tf",
+                concat!(
+                    "variable \"env\" {\n  default = \"prd\"\n}\n",
+                    "locals {\n  suffix = \"z\"\n}\n",
+                    "resource \"a\" \"r\" { count = 2 }\n",
+                    "resource \"a\" \"ghost\" { name = \"never\" }\n",
+                ),
+            ),
+            (
+                "override.tf",
+                "variable \"team\" {\n  description = \"y\"\n}\n",
+            ),
+            (
+                "z_override.tf.json",
+                r#"{"resource": {"a": {"j": {"name": "json-${var.team}"}}}}"#,
+            ),
+            (
+                "m/override.tf",
+                "output \"full\" { value = \"${var.name}-ovr\" }\n",
+            ),
+        ];
+        assert_eq!(
+            names(&list),
+            [
+                "a.q = \"prd-shop-z\" [var.env a_override.tf:1] [var.team main.tf:4]",
+                "a.r[0] = \"keep\"",
+                "a.r[1] = \"keep\"",
+                "module.m",
+                "a.out = \"inner-prd-ovr\" [var.env a_override.tf:1]",
+                "a.j = \"json-shop\" [var.team main.tf:4]",
+            ]
+        );
+    }
+
+    /// An argument an override block sets takes the references of the base block's along with
+    /// it, and so does a nested block type it sets, all the base block's of that type at once.
+    #[test]
+    fn an_override_block_replaces_the_references_of_what_it_sets() {
+        let (_, references) = evaluate(&files(&[
+            (
+                "main.tf",
+                concat!(
+                    "resource \"b\" \"y\" {}\nresource \"b\" \"z\" {}\nresource \"b\" \"w\" {}\n",
+                    "resource \"a\" \"x\" {\n  target = b.y.id\n  keep = b.w.id\n",
+                    "  rule { from = b.y.id }\n  rule { from = b.y.arn }\n}\n",
+                ),
+            ),
+            (
+                "x_override.tf",
+                "resource \"a\" \"x\" {\n  target = b.z.id\n  rule { from = b.z.id }\n}\n",
+            ),
+        ]));
+        assert_eq!(shown(&references), ["a.x -> b.w", "a.x -> b.z"]);
     }
 
     /// A template keeps its literal text and every part that resolves; what is never evaluated

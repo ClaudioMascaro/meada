@@ -139,7 +139,12 @@ this file, and a change to these modules updates it.
   and `read_with` redacts the values a `.tfvars` file gives those names (`Sensitive::of`; all
   of them, `ANY_VARIABLE`, at or below such a directory). `Outcome::Read::sensitive`
   keeps that set for a `.tfvars` file and `Sensitive::stale` makes `refresh_stamped` read the
-  file again, though unchanged, when it differs (its `forced` argument).
+  file again, though unchanged, when it differs (its `forced` argument). In a directory holding
+  an override file (`is_override`, `Sensitive::overridden`), `of` gives a Terraform file
+  `ANY_VARIABLE`, so the main pass stores every default of it redacted; after the walk `index.rs`
+  reads again each Terraform file whose `Sensitive::merged` set (the names the directory's other
+  files mark, `ANY_VARIABLE` for an unreadable one) differs from its stored
+  `Outcome::Read::sensitive`, so a default another file marks never reaches the database.
   `store` keeps each key path and value lowercased beside it (`folded_key`, `folded_value`, each
   with a B-tree); `hits(identity, db, needle)` takes exact matches from the B-trees (rank 0),
   then prefixes from them (rank 1, the range from `needle` up to `successor(needle)`, the least
@@ -179,7 +184,11 @@ this file, and a change to these modules updates it.
   `data` and `module` blocks with their span, literal `name` expression, `count` and `for_each`, the
   `Ref`s their expressions make, found by the `Refs` visitor, a module's literal `source` and each
   argument as a `Named`; the `output` and `locals` values, the `variable` blocks, and the values a
-  root's `terraform.tfvars` and `*.auto.tfvars` give, read by `read_var_file`). A directory no other
+  root's `terraform.tfvars` and `*.auto.tfvars` give, read by `read_var_file`).
+  `Repository::read_with` reads override files (`config_values::is_override`) after all the
+  others, and `Module::add`, `Module::declare` and `assign` merge each of their blocks into the
+  one of its address (`Block::merge`: what it sets replaces the base's, `Block::refs` keyed by
+  argument or nested block type, `nested_type`), dropping one with no base. A directory no other
   one calls through a local `source` (`local_source`: `./` or `../`, normalized, never above the
   root; the files come from the walk, so a symlinked directory holds none) is a root; `Eval::root`
   instantiates it and, per module call, the called directory under `<call address>.`

@@ -124,7 +124,7 @@ pub(crate) fn is_terraform(path: &str) -> bool {
 /// Whether the Terraform file at `path` is an override file (`override.tf`, `*_override.tf` and
 /// their OpenTofu and JSON forms), whose blocks Terraform merges into those of the other files of
 /// its directory.
-fn is_override(path: &str) -> bool {
+pub(crate) fn is_override(path: &str) -> bool {
     let file = path.rsplit('/').next().unwrap_or(path);
     TERRAFORM.iter().any(|e| {
         (file.strip_suffix(e)).is_some_and(|stem| stem == "override" || stem.ends_with("_override"))

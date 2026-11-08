@@ -8,7 +8,8 @@ use hcl_edit::template::{Element, Template};
 use serde_json::Value;
 
 use super::{
-    Block, Kind, Module, Named, ROOT_STORED_MAX, Variable, name_argument, refs_of, subscription,
+    Block, Kind, Module, Named, ROOT_STORED_MAX, Variable, assign, name_argument, refs_of,
+    subscription,
 };
 use crate::config_values;
 use crate::document::events::{self, Step};
@@ -39,10 +40,19 @@ pub(super) fn read(path: &str, src: &[u8], module: &mut Module) {
     if events::json_spanned(src, |span, value| reader.block(span, value)).is_err() {
         return;
     }
-    module.blocks.extend(reader.module.blocks);
-    module.variables.extend(reader.module.variables);
-    module.locals.extend(reader.module.locals);
-    module.outputs.extend(reader.module.outputs);
+    let overriding = config_values::is_override(path);
+    for block in reader.module.blocks {
+        module.add(block, overriding);
+    }
+    for (name, variable) in reader.module.variables {
+        module.declare(&name, variable, overriding);
+    }
+    for (name, value) in reader.module.locals {
+        assign(&mut module.locals, &name, value, overriding);
+    }
+    for (name, value) in reader.module.outputs {
+        assign(&mut module.outputs, &name, value, overriding);
+    }
 }
 
 struct Read<'a> {
@@ -108,7 +118,7 @@ impl Read<'_> {
                     path: self.path.into(),
                     line,
                 };
-                self.module.declare(names[0], variable);
+                self.module.declare(names[0], variable, false);
             }
             "locals" => {
                 for (name, value) in body.iter().filter(|(name, _)| name.as_str() != "//") {
@@ -142,7 +152,7 @@ impl Read<'_> {
                     || matches!(ty, "archive_file" | "google_sql_database");
                 let named_arg = name_argument(kind, ty);
                 let mut attrs = BTreeMap::new();
-                let mut refs = Vec::new();
+                let mut refs: BTreeMap<String, Vec<_>> = BTreeMap::new();
                 for (name, value) in body.iter().filter(|(name, _)| name.as_str() != "//") {
                     let expr = if name == "depends_on" {
                         self.expressions.dependencies(value)
@@ -152,7 +162,7 @@ impl Read<'_> {
                                 && matches!(name.as_str(), "source" | "version" | "providers"));
                         self.expressions.read(value, literal)
                     };
-                    refs.extend(refs_of(&expr));
+                    refs.entry(name.clone()).or_default().extend(refs_of(&expr));
                     if all_args
                         || name == named_arg
                         || matches!(name.as_str(), "count" | "for_each")

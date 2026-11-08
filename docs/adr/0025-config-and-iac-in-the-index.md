@@ -154,6 +154,15 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   the repository calls the module of that directory. A directory no other directory calls is a
   root module, labelled by its path (`.` at the repository root); every node records it, and a
   node of a module two roots instantiate is one node per root.
+- **Override files.** Terraform reads a directory's override files (`override.tf`,
+  `*_override.tf` and their OpenTofu and JSON forms) after its other files, in name order, and
+  merges each of their blocks into the block of the same address: an argument it sets replaces
+  the base block's, with its references, and its nested blocks of a type (a `dynamic` block
+  counts as its label's type) replace all the base block's of that type. A `locals` entry or an
+  `output` replaces the one of its name, and a `variable`'s default the declared one. A block
+  with nothing to merge into, which Terraform refuses, is left out. A variable either block
+  marks sensitive stays sensitive: an override's `sensitive = false` does not lift it, which
+  can only leave a name unresolved.
 - **Instances.** Each call instantiates the called module's blocks under the call's address and
   a dot, recursively; a `count` of a literal number, or a `for_each` over an object of literal
   keys or `toset` of literal strings, gives one node per key (`[0]`, `["eu"]`, the keys sorted
@@ -193,8 +202,7 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   value's line for a var file), and `context` lists them. In a local module, a variable is the
   call's argument, evaluated in the caller with the call instance's `each` (it carries what the
   argument went through), or else its default, which no deployer sets. A sensitive variable
-  is never evaluated, so its value never reaches a name, nor does one an override file marks
-  sensitive while another file gives its default, whichever file is read first.
+  is never evaluated, so its value never reaches a name.
 - **Never evaluated**: data sources, resource attributes (even an argument the configuration
   sets), registry and remote modules, `terraform.workspace`, `path.*`, `-var`, any `-var-file`
   other than the ones Terraform loads by itself, `TF_VAR_` and any function outside the list.

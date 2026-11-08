@@ -297,7 +297,10 @@ reaching the network, from the repository's own values: variable defaults, the r
 `terraform.tfvars`, `terraform.tfvars.json`, `*.auto.tfvars` and `*.auto.tfvars.json` (in that
 order, a later file winning), locals, a local module's inputs and outputs per call, `each`,
 `count.index`, templates and the pure string, collection and conversion functions of ADR 0025 with
-`jsonencode`. Data sources, resource attributes, registry modules, `terraform.workspace`, `-var`,
+`jsonencode`. Override files (`override.tf`, `*_override.tf`) merge into the blocks of their
+directory after its other files, as Terraform applies them: what an override block sets replaces
+the base block's, references included. Data sources, resource attributes, registry modules,
+`terraform.workspace`, `-var`,
 `-var-file`, `TF_VAR_`, sensitive variables and any other function are never evaluated: such a part
 becomes a `*` and the name a pattern (`orders-*`), matching literal names under the pattern rules below. A name that went through a
 root module's variable, by its default or a var file, records it, since a deployer can override it.
