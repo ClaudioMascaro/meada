@@ -100,7 +100,15 @@
   no data uses. Kotlin keeps the earlier typed SQS reader.
 
 - Python complete factory evidence (#659/#660): `EVAL_DEPTH` (256) and `EVAL_BUDGET` (65,536)
-  bound each receiver question, including argument inventories. The memo keys constructor
+  bound each receiver question, including argument inventories, and every visit of a value is a
+  step. The questions of one file share `FACTORY_FILE_BUDGET` (2^18 steps); once it is spent,
+  each question still takes `FACTORY_QUESTION_FLOOR` (16), enough for a client constructed a few
+  names or one factory away, and a client further away stays unresolved. Answers no ceiling or
+  cycle cut are kept for the file's later questions, so a factory's returns are read once per
+  frame (its function and the constructors its arguments carry), not once per operation; what a
+  function returns and what its callers pass are listed once. A kept answer holds how deep its
+  walk went and is read again only where that still fits `EVAL_DEPTH`, so a name chain past the
+  ceiling stays unresolved whatever was asked before it. The memo keys constructor
   evidence rather than full call routes; a 1 MiB parameter-return lattice with 128 operations
   retains its whole side set. Opaque keyword/positional expansions supply no parameter evidence;
   a second await applied to already-awaited evidence remains unknown.

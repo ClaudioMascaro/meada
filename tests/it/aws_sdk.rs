@@ -1187,6 +1187,161 @@ fn python_sdk_return_lattices_remain_bounded_across_repeated_operations() {
     assert!(json["consumers"].as_array().unwrap().is_empty(), "{text}");
 }
 
+/// The contracts of the providers of the repository at `repo`, its export timed against `bound`.
+fn timed_providers(repo: &std::path::Path, label: &str, bound: u64) -> Vec<String> {
+    let started = std::time::Instant::now();
+    let text = Engine::open(repo).unwrap().export().unwrap();
+    let elapsed = started.elapsed();
+    eprintln!("{label}: {elapsed:?}");
+    assert!(
+        elapsed < std::time::Duration::from_secs(bound),
+        "{elapsed:?}"
+    );
+    let json: Value = serde_json::from_str(&text).unwrap();
+    assert!(json["consumers"].as_array().unwrap().is_empty());
+    (json["providers"].as_array().unwrap().iter())
+        .map(|p| p["contract"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Thousands of operations on a client a factory of thousands of returns gives, and thousands on
+/// a client thousands of call sites pass a parameter: the file keeps the answers no limit cut, so
+/// each operation after the first reads the returns and the call sites in a step, where reading
+/// them again took minutes and would spend the file's budget (`FACTORY_FILE_BUDGET`).
+#[test]
+fn python_sdk_factory_answers_are_read_once_per_file() {
+    let repo = fixture_repo("sdk_python_factory_answers", "aws-sdk-controls", None);
+    let n = 2000;
+    let mut source = String::from("import boto3\n\n\ndef make(c):\n");
+    for i in 0..n {
+        source += &format!("    if c == {i}: return boto3.client('sns')\n");
+    }
+    source += "    return boto3.client('sns')\n\n\ndef run():\n";
+    for i in 0..n {
+        source += &format!("    make(1).publish(TopicArn='r{}')\n", i % 10);
+    }
+    source += "\n\ndef use(client):\n";
+    for i in 0..n {
+        source += &format!("    client.publish(TopicArn='p{}')\n", i % 10);
+    }
+    source += "\n\n";
+    source += &"use(boto3.client('sns'))\n".repeat(n);
+    std::fs::write(repo.join("app.py"), source).unwrap();
+    let label = format!("Python factory of {n} returns and parameter of {n} callers");
+    let providers = timed_providers(&repo, &label, 60);
+    assert_eq!(providers.len(), 2 * n);
+    let returned = providers
+        .iter()
+        .filter(|c| c.starts_with("channel::sns::r"));
+    assert_eq!(returned.count(), n);
+    let passed = providers
+        .iter()
+        .filter(|c| c.starts_with("channel::sns::p"));
+    assert_eq!(passed.count(), n);
+}
+
+/// Factory questions share a budget per file (`FACTORY_FILE_BUDGET`), every visit of a value a
+/// step: thousands of operations, each walking thousands of call sites whose answer a cycle keeps
+/// from being kept, spend it, whether each call site is read anew or is the same default visited
+/// again. A client 22 steps from its operation resolves before them and not after them, and one 4
+/// steps away still does (`FACTORY_QUESTION_FLOOR`).
+#[test]
+fn python_sdk_factory_questions_share_a_budget_per_file() {
+    let chain = |name: &str| {
+        let mut s = format!("def {name}():\n    c0 = boto3.client('sns')\n");
+        for i in 1..=20 {
+            s += &format!("    c{i} = c{}\n", i - 1);
+        }
+        s + &format!("    c20.publish(TopicArn='{name}')\n\n\n")
+    };
+    let operations = "    x.publish(TopicArn='cycle')\n".repeat(2000) + "    return x\n\n\n";
+    // Call sites each passing a client, the last of them in a cycle; then call sites leaving out
+    // an argument whose default a cycle reaches, the last passing another client.
+    let read_anew = format!(
+        "def g(x):\n{operations}{}\n\ndef h():\n    return g(h())\n\n\n",
+        "g(boto3.client('sns'))\n".repeat(5000)
+    );
+    let visited_again = format!(
+        "def mk(y):\n    return boto3.client('sns')\n\n\ndef h():\n    return mk(h())\n\n\n\
+         def g(x=h()):\n{operations}{}g(boto3.client('sqs'))\n\n\n",
+        "g()\n".repeat(5000)
+    );
+    for (case, walked) in [("read_anew", read_anew), ("visited_again", visited_again)] {
+        let repo = fixture_repo(
+            &format!("sdk_python_factory_budget_{case}"),
+            "aws-sdk-controls",
+            None,
+        );
+        let after = "def after():\n    direct = boto3.client('sns')\n    direct.publish(TopicArn='after')\n\n\n";
+        let source = format!(
+            "import boto3\n\n\n{}{walked}{after}{}",
+            chain("first"),
+            chain("far")
+        );
+        std::fs::write(repo.join("app.py"), source).unwrap();
+        let label = format!("Python factory operations whose call sites are {case}");
+        let mut providers = timed_providers(&repo, &label, 60);
+        providers.sort();
+        assert_eq!(
+            providers,
+            ["channel::sns::after", "channel::sns::first"],
+            "{case}"
+        );
+    }
+}
+
+/// A factory answer kept for the file's later questions is read again only where its walk still
+/// fits `EVAL_DEPTH`. A chain of 300 names stays unresolved whether it is asked before or after
+/// the chains of 100 and 200 names that reach the same client; so does a chain of 150 names to a
+/// factory returning a chain of 120, after the factory and the chain's first name were asked.
+#[test]
+fn python_sdk_factory_answers_kept_for_later_questions_keep_the_depth_ceiling() {
+    let chain = |name: &str, n: usize| {
+        (1..=n)
+            .map(|i| format!("{name}{i} = {name}{}\n", i - 1))
+            .collect::<String>()
+    };
+    let names = format!("c0 = sns\n{}", chain("c", 300));
+    let names = (
+        names,
+        "c100.publish(TopicArn='near')\nc200.publish(TopicArn='middle')\n",
+        "c300.publish(TopicArn='far')\n",
+    );
+    let returns = format!(
+        "c0 = sns\n{}def make():\n    return c120\n\n\nm0 = make()\n{}",
+        chain("c", 120),
+        chain("m", 150)
+    );
+    let returns = (
+        returns,
+        "make().publish(TopicArn='near')\nm0.publish(TopicArn='middle')\n",
+        "m150.publish(TopicArn='far')\n",
+    );
+    for (layout, (chains, near, far)) in [("names", names), ("returns", returns)] {
+        for (order, operations) in [("far_last", [near, far]), ("far_first", [far, near])] {
+            let case = format!("{layout}_{order}");
+            let repo = fixture_repo(
+                &format!("sdk_python_factory_depth_{case}"),
+                "aws-sdk-controls",
+                None,
+            );
+            let source = format!(
+                "import boto3\nsns = boto3.client('sns')\n{chains}{}",
+                operations.concat()
+            );
+            std::fs::write(repo.join("app.py"), source).unwrap();
+            let label = format!("Python factory chains, {case}");
+            let mut providers = timed_providers(&repo, &label, 60);
+            providers.sort();
+            assert_eq!(
+                providers,
+                ["channel::sns::middle", "channel::sns::near"],
+                "{case}"
+            );
+        }
+    }
+}
+
 #[test]
 fn python_message_factories_preserve_awaited_aliases_without_guessing_coroutines() {
     let repo = fixture_repo("python_message_async", "aws-sdk-controls", None);

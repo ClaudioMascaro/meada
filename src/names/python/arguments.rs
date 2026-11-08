@@ -1,8 +1,19 @@
 //! Complete factory evidence: an opaque alternative invalidates a known constructor.
 use std::collections::{BTreeMap, HashMap};
+use std::rc::Rc;
 
 use crate::lang::{Call, Value, literal};
-use crate::resolve::{Code, Of, Target};
+use crate::resolve::{Code, EVAL_BUDGET, EVAL_DEPTH, Of, Target};
+
+/// The steps the factory questions of one file take together. Each question still takes at
+/// most `EVAL_BUDGET`, and at least `FACTORY_QUESTION_FLOOR` once the file's are spent.
+// ponytail: real files spend a few steps a question, a repeated walk answered from the file's
+// kept answers; 2^18 stops a file of thousands of questions each walking thousands of call
+// sites that a cycle keeps from being kept.
+const FACTORY_FILE_BUDGET: usize = 1 << 18;
+/// The steps a question takes however much of `FACTORY_FILE_BUDGET` is spent.
+// ponytail: a client constructed a few names or one factory away takes under ten steps.
+const FACTORY_QUESTION_FLOOR: usize = 16;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct Construction {
@@ -24,6 +35,10 @@ struct Frame<'a> {
     // Unknown arguments are absent. Only complete constructor evidence affects this walk.
     arguments: BTreeMap<(usize, bool), Construction>,
 }
+/// A value visited in the frame of a call, by its index in `Factories::frames`, or in none.
+type Visit<'a> = (Key<'a>, Option<usize>);
+/// The values a function returns, or those its callers pass one of its parameters.
+type Listed<'a> = Rc<[(&'a str, &'a str, &'a Value)]>;
 
 pub(crate) struct Factories<'c, 'a> {
     code: &'c Code<'a>,
@@ -31,9 +46,27 @@ pub(crate) struct Factories<'c, 'a> {
     factories: &'c [(&'c str, &'c str)],
     keyword: &'c str,
     budget: usize,
+    /// The file of the questions so far, and what is left of its `FACTORY_FILE_BUDGET`.
+    file: &'a str,
+    left: usize,
     // A visit in progress is unknown, so a cycle supplies no constructor.
-    known: HashMap<(Key<'a>, Option<Frame<'a>>), Option<Construction>>,
-    frames: Vec<Frame<'a>>,
+    known: HashMap<Visit<'a>, Option<Construction>>,
+    /// The answers no ceiling or visit in progress cut, kept for the file's later questions:
+    /// about a value, and about the returns of a function in a frame. Each holds how much deeper
+    /// than its visit its walk went, and is read again only where that still fits `EVAL_DEPTH`.
+    settled: HashMap<Visit<'a>, (Option<Construction>, usize)>,
+    returns: HashMap<(usize, bool, bool), (Option<Construction>, usize)>,
+    /// Whether the walk so far met a ceiling or a visit in progress, and the deepest it went.
+    cut: bool,
+    reached: usize,
+    /// Each frame of the file's walks once, so a visit names its frame by index, and the
+    /// indexes of the frames the walk is in.
+    frames: Vec<Rc<Frame<'a>>>,
+    framed: HashMap<Rc<Frame<'a>>, usize>,
+    stack: Vec<usize>,
+    /// What each function returns (`None`) and what its callers pass each parameter, listed
+    /// once, then read a step at a time.
+    listed: HashMap<(Target<'a>, Option<usize>), Option<Listed<'a>>>,
 }
 
 impl<'c, 'a> Factories<'c, 'a> {
@@ -48,20 +81,42 @@ impl<'c, 'a> Factories<'c, 'a> {
             constructors,
             factories,
             keyword,
-            budget: crate::resolve::EVAL_BUDGET,
+            budget: EVAL_BUDGET,
+            file: "",
+            left: FACTORY_FILE_BUDGET,
             known: HashMap::new(),
+            settled: HashMap::new(),
+            returns: HashMap::new(),
+            cut: false,
+            reached: 0,
             frames: Vec::new(),
+            framed: HashMap::new(),
+            stack: Vec::new(),
+            listed: HashMap::new(),
         }
     }
 
-    /// Complete receiver construction, with at most one external factory level. The cache
-    /// belongs to one question, so a previously checked prefix does not shorten its ceiling;
-    /// each question has its own bound, so an opaque chain cannot
-    /// starve a later direct constructor.
+    /// Complete receiver construction, with at most one external factory level. Each question
+    /// has its own bound, at most what its file has left of `FACTORY_FILE_BUDGET` and at least
+    /// `FACTORY_QUESTION_FLOOR`, so an opaque chain cannot starve a later direct constructor.
+    /// The answers no ceiling or cycle cut are kept for the file's later questions, each visit
+    /// of a value still a step; the others belong to one question, so a previously checked
+    /// prefix does not shorten its ceiling.
     pub(crate) fn read(&mut self, path: &'a str, call: &'a Call) -> Option<Construction> {
-        self.budget = crate::resolve::EVAL_BUDGET;
+        if path != self.file {
+            (self.file, self.left) = (path, FACTORY_FILE_BUDGET);
+            self.settled.clear();
+            self.returns.clear();
+            self.frames.clear();
+            self.framed.clear();
+        }
+        let budget = self.left.clamp(FACTORY_QUESTION_FLOOR, EVAL_BUDGET);
+        self.budget = budget;
         self.known.clear();
-        self.receiver(path, call, true, 0)
+        self.cut = false;
+        let made = self.receiver(path, call, true, 0);
+        self.left = self.left.saturating_sub(budget - self.budget);
+        made
     }
 
     fn receiver(
@@ -84,6 +139,17 @@ impl<'c, 'a> Factories<'c, 'a> {
         self.value(path, &call.scope, Of::Name(receiver), through, false, depth)
     }
 
+    /// Whether a step is left, spending it; past a ceiling the walk is cut.
+    fn step(&mut self, depth: usize) -> bool {
+        self.reached = self.reached.max(depth);
+        if depth >= EVAL_DEPTH || self.budget == 0 {
+            self.cut = true;
+            return false;
+        }
+        self.budget -= 1;
+        true
+    }
+
     fn value(
         &mut self,
         path: &'a str,
@@ -94,10 +160,9 @@ impl<'c, 'a> Factories<'c, 'a> {
         depth: usize,
     ) -> Option<Construction> {
         if let Of::Value(Value::Await(value)) = of {
-            if awaited || depth >= crate::resolve::EVAL_DEPTH || self.budget == 0 {
+            if awaited || !self.step(depth) {
                 return None;
             }
-            self.budget -= 1;
             return self.value(path, scope, Of::Value(value), through, true, depth + 1);
         }
         let of = match of {
@@ -109,16 +174,27 @@ impl<'c, 'a> Factories<'c, 'a> {
             Of::Value(Value::Call(call)) => Node::Call(call.range.start, call.range.end),
             _ => Node::Unknown,
         };
-        let key = (path, scope, node, through, awaited);
-        let contextual = (key, self.frames.last().cloned());
-        if let Some(made) = self.known.get(&contextual) {
-            return made.clone();
-        }
-        if depth >= crate::resolve::EVAL_DEPTH || self.budget == 0 {
+        let visit = (
+            (path, scope, node, through, awaited),
+            self.stack.last().copied(),
+        );
+        if !self.step(depth) {
             return None;
         }
-        self.budget -= 1;
-        self.known.insert(contextual.clone(), None);
+        // Visited before in this question: cut there, or in progress.
+        if let Some(made) = self.known.get(&visit) {
+            self.cut = true;
+            return made.clone();
+        }
+        if let Some((made, height)) = self.settled.get(&visit)
+            && depth + height < EVAL_DEPTH
+        {
+            self.reached = self.reached.max(depth + height);
+            return made.clone();
+        }
+        self.known.insert(visit, None);
+        let outer = std::mem::take(&mut self.cut);
+        let reached = std::mem::replace(&mut self.reached, depth);
         let made = match of {
             Of::Name(name) => {
                 if let Some((at, within, value)) = self.code.constant_value(path, scope, name) {
@@ -133,15 +209,20 @@ impl<'c, 'a> Factories<'c, 'a> {
                         depth + 1,
                     )
                 } else if let Some((function, n)) = self.code.param_of(path, scope, name) {
-                    match self.frames.last() {
+                    match self.stack.last().map(|&frame| &self.frames[frame]) {
                         Some(frame) if frame.function == function => {
                             frame.arguments.get(&(n, awaited)).cloned()
                         }
                         Some(_) => None,
-                        None => self
-                            .code
-                            .param_values(function, n, None)
-                            .and_then(|values| self.values(values, through, awaited, depth + 1)),
+                        None => {
+                            let code = self.code;
+                            let passed = self.listed((function, Some(n)), || {
+                                code.param_values(function, n, None)
+                            });
+                            passed.and_then(|values| {
+                                self.values(values.iter().copied(), through, awaited, depth + 1)
+                            })
+                        }
                     }
                 } else {
                     None
@@ -154,13 +235,21 @@ impl<'c, 'a> Factories<'c, 'a> {
                 .and_then(|call| self.called(path, call, through, awaited, depth + 1)),
             _ => None,
         };
-        self.known.insert(contextual, made.clone());
+        let height = self.reached - depth;
+        self.reached = self.reached.max(reached);
+        if self.cut {
+            self.known.insert(visit, made.clone());
+        } else {
+            self.known.remove(&visit);
+            self.settled.insert(visit, (made.clone(), height));
+        }
+        self.cut |= outer;
         made
     }
 
     fn values(
         &mut self,
-        values: Vec<(&'a str, &'a str, &'a Value)>,
+        values: impl IntoIterator<Item = (&'a str, &'a str, &'a Value)>,
         through: bool,
         awaited: bool,
         depth: usize,
@@ -176,6 +265,28 @@ impl<'c, 'a> Factories<'c, 'a> {
         first
     }
 
+    /// The values listed under `key`, made by `list` the first time they are asked.
+    fn listed(
+        &mut self,
+        key: (Target<'a>, Option<usize>),
+        list: impl FnOnce() -> Option<Vec<(&'a str, &'a str, &'a Value)>>,
+    ) -> Option<Listed<'a>> {
+        (self.listed.entry(key))
+            .or_insert_with(|| list().map(Rc::from))
+            .clone()
+    }
+
+    /// The index of `frame` in `frames`, added the first time it is met.
+    fn frame(&mut self, frame: Frame<'a>) -> usize {
+        if let Some(&at) = self.framed.get(&frame) {
+            return at;
+        }
+        let frame = Rc::new(frame);
+        self.frames.push(Rc::clone(&frame));
+        self.framed.insert(frame, self.frames.len() - 1);
+        self.frames.len() - 1
+    }
+
     fn called(
         &mut self,
         path: &'a str,
@@ -184,7 +295,9 @@ impl<'c, 'a> Factories<'c, 'a> {
         awaited: bool,
         depth: usize,
     ) -> Option<Construction> {
-        if depth >= crate::resolve::EVAL_DEPTH {
+        self.reached = self.reached.max(depth);
+        if depth >= EVAL_DEPTH {
+            self.cut = true;
             return None;
         }
         let index = self.code.call_index(path, &call.range)?;
@@ -194,14 +307,12 @@ impl<'c, 'a> Factories<'c, 'a> {
             if coroutine && !awaited {
                 return None;
             }
-            let values = self.code.returned(path, index);
             let mut arguments = BTreeMap::new();
             let mut n = 0;
             while self.code.param(function, n).is_some() {
-                if self.budget == 0 {
+                if !self.step(depth) {
                     return None;
                 }
-                self.budget -= 1;
                 for awaiting_argument in [false, true] {
                     if let Some(made) = self
                         .code
@@ -215,12 +326,31 @@ impl<'c, 'a> Factories<'c, 'a> {
                 }
                 n += 1;
             }
-            self.frames.push(Frame {
+            let frame = self.frame(Frame {
                 function,
                 arguments,
             });
-            let made = self.values(values, through, awaited && !coroutine, depth + 1);
-            self.frames.pop();
+            let awaited = awaited && !coroutine;
+            if let Some((made, height)) = self.returns.get(&(frame, through, awaited))
+                && depth + height < EVAL_DEPTH
+            {
+                self.reached = self.reached.max(depth + height);
+                return made.clone();
+            }
+            let code = self.code;
+            let values = self.listed((function, None), || Some(code.returned(path, index)))?;
+            self.stack.push(frame);
+            let outer = std::mem::take(&mut self.cut);
+            let reached = std::mem::replace(&mut self.reached, depth);
+            let made = self.values(values.iter().copied(), through, awaited, depth + 1);
+            self.stack.pop();
+            let height = self.reached - depth;
+            self.reached = self.reached.max(reached);
+            if !self.cut {
+                self.returns
+                    .insert((frame, through, awaited), (made.clone(), height));
+            }
+            self.cut |= outer;
             return made;
         }
         let name = if let Some(name) = super::imported(self.code, path, &call.scope, &call.callee) {

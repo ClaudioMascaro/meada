@@ -1917,7 +1917,43 @@ resource "aws_apigatewayv2_route" "wide" {{
             let nest = "[".repeat(NESTING) + ".target(name: \"T\")" + &"]".repeat(NESTING);
             swift_modules(format!("let package = Package(targets: {nest})"))
         }),
+        // Python: the factory reader of boto3 clients, walking the returns of a function in the
+        // frame of each call that reaches it.
+        (
+            "python factories: a frame of many clients read by many returns",
+            || {
+                let n = 2000;
+                let params: String = (0..n).map(|i| format!(", a{i}")).collect();
+                let returns: String = (0..n)
+                    .map(|i| format!("    if c == {i}: return a{i}\n"))
+                    .collect();
+                let clients = ", boto3.client('sns')".repeat(n);
+                let found = python_factories(format!(
+                    "import boto3\n\n\ndef make(c{params}):\n{returns}    return a0\n\n\n\
+                 make(1{clients}).publish(TopicArn='wide')\n"
+                ));
+                assert_eq!(found, 1, "the operation's client");
+                found
+            },
+        ),
     ]
+}
+
+/// How many calls of the Python file `text` the factory reader of boto3 clients traces to a
+/// constructor.
+fn python_factories(text: String) -> usize {
+    use crate::lang::python::Python;
+    use crate::resolve::{Code, Resolver};
+    let facts = Python.parse("app.py", text.as_bytes()).unwrap();
+    let files = BTreeMap::from([("app.py", &facts)]);
+    let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
+    let resolver = Resolver::new(&files, modules, &Python);
+    let code = Code::new(&resolver, &files, &Python);
+    let mut factories =
+        crate::names::python::Factories::new(&code, &["boto3.client"], &[], "service_name");
+    (facts.calls.iter())
+        .filter(|call| factories.read("app.py", call).is_some())
+        .count()
 }
 
 /// The size of the imports the Swift pack's `join` gives each of `IMPORTS` files under the

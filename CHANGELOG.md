@@ -388,6 +388,10 @@ All notable changes to Meada are recorded here. The format follows
   hundreds of times) no longer takes minutes to compile on every `export` and `status`: one
   whose case folding would visit more than its share of 2^22 code points per route
   configuration stays unmatched (#672).
+- A Python file of thousands of AWS SDK operations on clients a factory function returns no
+  longer takes minutes to index: the operations of one file keep the answers no limit cut and
+  share a budget of 2^18 steps (each still taking 16 once it is spent), and a call passing
+  thousands of clients to one function no longer copies them for every value it reads (#660).
 - Backstage proxy: a `proxy.endpoints`, a whole `proxy` or a root behind an `$include` Meada
   does not follow counts as the endpoints table, as Backstage reads (or refuses) whatever the
   include gives, so the legacy `proxy['/<ep>']` keys beside it or in another file no longer link
