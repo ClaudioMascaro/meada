@@ -43,9 +43,17 @@ mod topology;
 const OVERLAY_DEPTH_MAX: usize = 16;
 
 /// The objects one overlay instantiates, bases included; past it the rest of the overlay is left
-/// out. A base named twice, or by many overlays' parents, instantiates once per name.
+/// out. A file or base one kustomization names twice instantiates once; one that several of its
+/// bases name, once through each.
 // ponytail: a large overlay holds a few thousand objects; 10,000 is past real ones.
 const OBJECTS_MAX: usize = 10_000;
+
+/// The bytes of objects one overlay may copy, bases included, by their `weight`; past it the rest
+/// of the overlay is left out. A base reached along many paths is copied once along each, which
+/// `OBJECTS_MAX` alone leaves a large object's size times the count.
+// ponytail: a large overlay copies a few MiB; sixteen times the per-file ceiling stops a large
+// ConfigMap reached along thousands of paths.
+const OVERLAY_BYTES_MAX: usize = 16 * MAX_BYTES;
 
 /// The entries of kustomizations one overlay walks, bases that name each other included; past it
 /// the rest of the overlay is left out. Bases can reach one another along many paths (each of a
@@ -67,6 +75,20 @@ const UNIT_STORED_MAX: usize = 4 * MAX_BYTES;
 // ponytail: sixteen times the per-file ceiling holds a monorepo of overlays; many overlays over
 // one exploding base would pass it.
 const KUBE_STORED_MAX: usize = 16 * MAX_BYTES;
+
+/// What each node counts against those budgets besides its strings: a node holds a kilobyte or
+/// so in memory however short its names, so many overlays over one base of short names would
+/// otherwise keep a million of them.
+// ponytail: 128 bytes keeps a repository to about 120,000 nodes, a couple of hundred MiB, and
+// leaves a unit of `OBJECTS_MAX` objects within `UNIT_STORED_MAX`.
+const NODE_BYTES: usize = 128;
+
+/// The longest host an Ingress rule may name, and the longest name a volume may have; a rule or a
+/// volume past it is invalid and left out, so its paths or its projected sources do not copy it
+/// each.
+// ponytail: DNS limits a host to 253 bytes and Kubernetes a volume name to a 63-byte label.
+const HOST_MAX: usize = 253;
+const VOLUME_NAME_MAX: usize = 63;
 
 /// The kinds that live outside any namespace: a Kustomize `namespace` leaves them alone, and the
 /// address has no namespace.
@@ -165,6 +187,22 @@ struct Obj {
     end_line: usize,
     block: String,
     facts: Facts,
+    /// About the bytes a copy holds (`weight`), what an overlay copying it spends.
+    weight: usize,
+}
+
+/// The bytes `facts` writes as `Debug`, counted without keeping them.
+fn weight(facts: &Facts) -> usize {
+    struct Count(usize);
+    impl std::fmt::Write for Count {
+        fn write_str(&mut self, s: &str) -> std::fmt::Result {
+            self.0 += s.len();
+            Ok(())
+        }
+    }
+    let mut count = Count(0);
+    let _ = std::fmt::write(&mut count, format_args!("{facts:?}"));
+    count.0
 }
 
 impl Obj {
@@ -180,10 +218,9 @@ impl Obj {
     }
 }
 
-/// How a kustomization rewrites an image: the entries of its `images`.
+/// How a kustomization rewrites an image: an entry of its `images`.
 #[derive(Debug, Clone)]
 struct ImageRule {
-    name: String,
     new_name: Option<String>,
     new_tag: Option<String>,
     digest: Option<String>,
@@ -195,7 +232,8 @@ struct Kustomization {
     prefix: String,
     suffix: String,
     namespace: Option<String>,
-    images: Vec<ImageRule>,
+    /// The rule for each image name, the first that names it.
+    images: HashMap<String, ImageRule>,
     /// `resources`, `bases` and `components`, in order.
     entries: Vec<String>,
     /// The files its patches name, which are fragments and no objects.
@@ -313,7 +351,11 @@ fn facts(value: &Value, kind: &str, group: &str) -> Facts {
             }
         }
         for v in list(spec, &["volumes"]) {
-            let via = format!("volume {}", text(v, &["name"]).unwrap_or_default());
+            let name = text(v, &["name"]).unwrap_or_default();
+            if name.len() > VOLUME_NAME_MAX {
+                continue;
+            }
+            let via = format!("volume {name}");
             mount("ConfigMap", text(v, &["configMap", "name"]), via.clone());
             mount("Secret", text(v, &["secret", "secretName"]), via.clone());
             for s in list(v, &["projected", "sources"]) {
@@ -345,6 +387,9 @@ fn facts(value: &Value, kind: &str, group: &str) -> Facts {
         };
         for rule in list(value, &["spec", "rules"]) {
             let host = text(rule, &["host"]).unwrap_or_default();
+            if host.len() > HOST_MAX {
+                continue;
+            }
             for p in list(rule, &["http", "paths"]) {
                 let path = text(p, &["path"]).unwrap_or_default();
                 if let Some(name) = service(&p["backend"]) {
@@ -393,6 +438,7 @@ fn object(
     facts.xp = crossplane::facts(value, kind, group, block, span, mappings);
     facts.custom = custom::read(value, kind, group, mappings);
     facts.topology = topology::read(value, kind, group);
+    let weight = weight(&facts);
     Some(Obj {
         group: group.into(),
         kind: kind.into(),
@@ -404,6 +450,7 @@ fn object(
         end_line,
         block: block.into(),
         facts,
+        weight,
     })
 }
 
@@ -424,8 +471,7 @@ fn kustomization(value: &Value) -> Kustomization {
     for image in list(value, &["images"]) {
         let get = |key: &str| at(image, &[key]).and_then(scalar);
         if let Some(name) = get("name") {
-            k.images.push(ImageRule {
-                name,
+            k.images.entry(name).or_insert_with(|| ImageRule {
                 new_name: get("newName"),
                 new_tag: get("newTag"),
                 digest: get("digest"),
@@ -526,7 +572,7 @@ fn read(path: &str, src: &[u8], mappings: &crate::iac::mapping::Config) -> Parse
 }
 
 /// The image `image` becomes under the kustomization's rules: the first rule that names it.
-fn retag(image: &str, rules: &[ImageRule]) -> String {
+fn retag(image: &str, rules: &HashMap<String, ImageRule>) -> String {
     let (rest, digest) = match image.split_once('@') {
         Some((rest, digest)) => (rest, Some(digest)),
         None => (image, None),
@@ -536,7 +582,7 @@ fn retag(image: &str, rules: &[ImageRule]) -> String {
         Some(i) => (&rest[..i], Some(&rest[i + 1..])),
         None => (rest, None),
     };
-    let Some(rule) = rules.iter().find(|r| r.name == name) else {
+    let Some(rule) = rules.get(name) else {
         return image.to_string();
     };
     let name = rule.new_name.as_deref().unwrap_or(name);
@@ -594,8 +640,10 @@ struct Eval<'m> {
     /// The directories that hold a kustomization.
     dirs: BTreeMap<&'m str, (&'m str, &'m Kustomization)>,
     root: String,
-    /// The objects the overlay may still instantiate, and the entries it may still walk.
+    /// The objects the overlay may still instantiate, the bytes it may still copy, and the entries
+    /// it may still walk.
     room: usize,
+    bytes: usize,
     steps: usize,
     /// The files an overlay instantiated: no plain unit holds them.
     reached: HashSet<&'m str>,
@@ -656,16 +704,19 @@ impl<'m> Eval<'m> {
     fn objects(&mut self, dir: &'m str, depth: usize, stack: &mut Vec<&'m str>) -> Vec<Obj> {
         let (path, k) = self.dirs[dir];
         let mut objs: Vec<Obj> = Vec::new();
+        // The files and bases this kustomization named already: a second entry for one adds
+        // nothing (Kustomize refuses the duplicate objects).
+        let mut listed: HashSet<&'m str> = HashSet::new();
         for entry in &k.entries {
             if self.steps == 0 {
                 break;
             }
             self.steps -= 1;
             let found = match self.entry(dir, entry) {
+                Entry::File(file, _) | Entry::Dir(file) if !listed.insert(file) => continue,
                 Entry::File(file, objects) => {
                     self.reached.insert(file);
-                    let take = objects.len().min(self.room);
-                    self.room -= take;
+                    let take = self.fit(objects);
                     objs.extend(objects[..take].iter().cloned());
                     continue;
                 }
@@ -781,7 +832,8 @@ impl<'m> Eval<'m> {
                 })
                 .collect::<Vec<_>>();
             if !self.charge(
-                address.len()
+                NODE_BYTES
+                    + address.len()
                     + o.path.len()
                     + o.facts.custom.as_ref().map_or(0, |c| {
                         c.size(&o.block, &o.name) + self.root.len() + address.len()
@@ -1166,9 +1218,27 @@ impl<'m> Eval<'m> {
         }
     }
 
+    /// How many of `objects` the overlay may still instantiate, taking their room and their bytes;
+    /// once the bytes run out it instantiates nothing more.
+    fn fit(&mut self, objects: &[Obj]) -> usize {
+        let mut take = 0;
+        for o in objects.iter().take(self.room) {
+            let Some(left) = self.bytes.checked_sub(o.weight) else {
+                // No room is left once the `take` below is taken.
+                self.room = take;
+                break;
+            };
+            self.bytes = left;
+            take += 1;
+        }
+        self.room -= take;
+        take
+    }
+
     fn start(&mut self, label: &str) {
         self.root = label.to_string();
         self.room = OBJECTS_MAX;
+        self.bytes = OVERLAY_BYTES_MAX;
         self.steps = WALK_MAX;
         self.root_left = UNIT_STORED_MAX;
     }
@@ -1202,6 +1272,7 @@ pub(crate) fn evaluate_with(
         dirs,
         root: String::new(),
         room: 0,
+        bytes: 0,
         steps: 0,
         reached: HashSet::new(),
         root_left: 0,
@@ -1443,6 +1514,43 @@ mod tests {
     }
 
     #[test]
+    fn an_ingress_host_or_a_volume_name_past_its_ceiling_is_left_out() {
+        let deploy = |volume: &str| {
+            format!(
+                "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api\nspec:\n  template:\n    \
+                 spec:\n      containers: []\n      volumes:\n        - name: {volume}\n          \
+                 projected:\n            sources:\n              - configMap:\n                  \
+                 name: settings\n"
+            )
+        };
+        let ingress = |host: &str| {
+            format!(
+                "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: edge\nspec:\n  \
+                 rules:\n    - host: {host}\n      http:\n        paths:\n          - path: /api\n            \
+                 backend:\n              service:\n                name: api\n"
+            )
+        };
+        let rest = "apiVersion: v1\nkind: Service\nmetadata:\n  name: api\n---\napiVersion: v1\n\
+                    kind: ConfigMap\nmetadata:\n  name: settings\n";
+        let vias = |volume: &str, host: &str| {
+            let out = evaluate(&files(&[
+                ("k/deploy.yaml", &deploy(volume)),
+                ("k/ingress.yaml", &ingress(host)),
+                ("k/rest.yaml", rest),
+            ]));
+            let count = |head: &str| {
+                (out.references.iter())
+                    .filter(|r| r.via.as_deref().is_some_and(|v| v.starts_with(head)))
+                    .count()
+            };
+            (count("volume "), count("backend "))
+        };
+        let (volume, host) = ("v".repeat(VOLUME_NAME_MAX), "h".repeat(HOST_MAX));
+        assert_eq!(vias(&volume, &host), (1, 1));
+        assert_eq!(vias(&format!("{volume}v"), &format!("{host}h")), (0, 0));
+    }
+
+    #[test]
     fn a_selector_needs_every_one_of_its_labels_and_an_empty_one_selects_nothing() {
         let svc = |selector: &str| {
             format!(
@@ -1511,19 +1619,13 @@ mod tests {
 
     #[test]
     fn an_image_is_retagged_by_the_first_rule_that_names_it() {
-        let rule = |name: &str, new_name: Option<&str>, tag: Option<&str>, digest: Option<&str>| {
-            ImageRule {
-                name: name.into(),
-                new_name: new_name.map(Into::into),
-                new_tag: tag.map(Into::into),
-                digest: digest.map(Into::into),
-            }
-        };
-        let rules = [
-            rule("nginx", None, Some("1.25"), None),
-            rule("reg:5000/app", Some("other/app"), None, None),
-            rule("db", None, Some("9"), Some("sha256:abc")),
-        ];
+        let rules = kustomization(&serde_json::json!({"images": [
+            {"name": "nginx", "newTag": "1.25"},
+            {"name": "reg:5000/app", "newName": "other/app"},
+            {"name": "db", "newTag": 9, "digest": "sha256:abc"},
+            {"name": "nginx", "newTag": "2"},
+        ]}))
+        .images;
         assert_eq!(retag("nginx", &rules), "nginx:1.25");
         assert_eq!(retag("nginx:1.0@sha256:x", &rules), "nginx:1.25");
         assert_eq!(retag("reg:5000/app:3", &rules), "other/app:3");
@@ -1828,6 +1930,100 @@ mod tests {
             "{}",
             out.nodes.len()
         );
+    }
+
+    #[test]
+    fn many_overlays_over_many_short_names_store_within_the_repository_budget() {
+        // Each node counts `NODE_BYTES` however short its names, so the budget bounds the count.
+        let mut list = vec![(
+            "base/kustomization.yaml".to_string(),
+            "resources:\n".to_string(),
+        )];
+        for f in 0..OBJECTS_MAX / DOCUMENTS_MAX {
+            list[0].1 += &format!("  - f{f}.yaml\n");
+            let docs: String = (0..DOCUMENTS_MAX)
+                .map(|i| {
+                    format!("---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: f{f}c{i}\n")
+                })
+                .collect();
+            list.push((format!("base/f{f}.yaml"), docs));
+        }
+        let overlays = KUBE_STORED_MAX / NODE_BYTES / OBJECTS_MAX + 2;
+        for o in 0..overlays {
+            list.push((
+                format!("o{o}/kustomization.yaml"),
+                "resources:\n  - ../base\n".into(),
+            ));
+        }
+        let list: Vec<(&str, &str)> = list.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
+        let out = evaluate(&files(&list));
+        let nodes = out.nodes.len();
+        assert!(
+            (OBJECTS_MAX..=KUBE_STORED_MAX / NODE_BYTES).contains(&nodes),
+            "{nodes}"
+        );
+    }
+
+    /// A ConfigMap `name` of `entries` keys whose values are a kilobyte each.
+    fn large_map(name: &str, entries: usize) -> String {
+        let value = "v".repeat(1000);
+        let data: String = (0..entries).map(|i| format!("  k{i}: {value}\n")).collect();
+        format!("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: {name}\ndata:\n{data}")
+    }
+
+    #[test]
+    fn a_file_one_kustomization_names_twice_instantiates_once() {
+        // Copied at every listing, the map would spend the overlay's bytes before the last file.
+        let resources = "  - big.yaml\n  - ./big.yaml\n".repeat(20) + "  - small.yaml\n";
+        let out = evaluate(&files(&[
+            ("o/kustomization.yaml", &format!("resources:\n{resources}")),
+            ("o/big.yaml", &large_map("big", 600)),
+            (
+                "o/small.yaml",
+                "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: small\n",
+            ),
+        ]));
+        assert_eq!(
+            addresses(&out),
+            ["ConfigMap/big [o]", "ConfigMap/small [o]"]
+        );
+    }
+
+    /// Each level names the next through two bases with their own prefixes: the map at the bottom
+    /// is reached along 2^6 paths, each a copy with its own name.
+    #[test]
+    fn a_large_object_reached_along_many_paths_is_copied_within_the_byte_ceiling() {
+        const LEVELS: usize = 6;
+        let entries = 300;
+        let mut list = vec![
+            (format!("d{LEVELS}/map.yaml"), large_map("big", entries)),
+            (
+                format!("d{LEVELS}/kustomization.yaml"),
+                "resources:\n  - map.yaml\n".to_string(),
+            ),
+        ];
+        for level in 0..LEVELS {
+            list.push((
+                format!("d{level}/kustomization.yaml"),
+                "resources:\n  - a\n  - b\n".into(),
+            ));
+            for side in ["a", "b"] {
+                list.push((
+                    format!("d{level}/{side}/kustomization.yaml"),
+                    format!(
+                        "namePrefix: {side}-\nresources:\n  - ../../d{}\n",
+                        level + 1
+                    ),
+                ));
+            }
+        }
+        let list: Vec<(&str, &str)> = list.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
+        let out = evaluate(&files(&list));
+        // A copy holds at least its data's keys and values.
+        let data: usize = (0..entries).map(|i| format!("k{i}").len() + 1000).sum();
+        let copies = out.nodes.iter().filter(|n| n.root == "d0").count();
+        assert!(copies > 0 && copies < 1 << LEVELS, "{copies}");
+        assert!(copies * data <= OVERLAY_BYTES_MAX, "{copies}");
     }
 
     #[test]

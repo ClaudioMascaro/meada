@@ -41,8 +41,11 @@
   `INTRINSIC_DEPTH_MAX` (32 functions, or resources naming each other, inside one another; a
   deeper name is unresolved, and a name evaluated through a cycle or cut at that depth gets the
   partial result, memoized, so a resource named through one has it in logical id order: an
-  evaluation per path of a diamond of references would be exponential) and `PHYSICAL_NAME_MAX` (1
-  KiB; a name that grows past it is unresolved). Only `Ref`, `Fn::GetAtt`, `Fn::Sub` and
+  evaluation per path of a diamond of references would be exponential), `PHYSICAL_NAME_MAX` (1
+  KiB; a name that grows past it is unresolved, and so is a literal or a parameter default
+  longer than that, before it is copied) and `iac::OVERRIDABLE_MAX` (32 parameters one name goes
+  through; past it the name is unresolved). An `Fn::Sub` evaluates each variable it names once,
+  however often it names it. Only `Ref`, `Fn::GetAtt`, `Fn::Sub` and
   `Fn::Join` are evaluated: `Fn::Select`, `Fn::Split`, `Fn::FindInMap`, `Fn::If`,
   `Fn::ImportValue`, conditions, mappings and `Fn::Transform` leave an unresolved part. The name
   property per type is a short table (`NAMED`), so a type outside it has no physical name until

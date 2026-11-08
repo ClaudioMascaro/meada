@@ -2,9 +2,10 @@
 //! repository holds, each fed a file built to explode (many keys, deep nesting, wide fan-out)
 //! within `lang::MAX_BYTES`, the most any of them reads. `probes` is the table a new reader adds
 //! its row to: a row reads such a file and answers the size of what the reader returned, and the
-//! test holds every row to `BUDGET` in time and to `MAX_OUT` in size. A file past a format's own
-//! limit (`XML_NODES`, `MAX_NESTING`) is unreadable, which is what that row proves; a row just
-//! under the limit proves the reader.
+//! test holds every row to `BUDGET` in time, to `MAX_OUT` in size and to `HEAP` in memory, the
+//! most its thread held above what it held when the row started (`heap` counts it). A file past
+//! a format's own limit (`XML_NODES`, `MAX_NESTING`) is unreadable, which is what that row proves;
+//! a row just under the limit proves the reader.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, mpsc};
@@ -28,6 +29,15 @@ const BUDGET: Duration = Duration::from_secs(30);
 /// What one reader may return for a file of `MAX_BYTES`: a few times its input, since a key is
 /// joined with its parents (`YAML_KEY_BUDGET`) and a summary repeats a name.
 const MAX_OUT: usize = 4 * MAX_BYTES;
+
+/// The heap one row may hold at once: a full file's parse tree and what the reader builds from
+/// it, a few times over. A reader that copies a value per reference to it passes it by far.
+const HEAP: usize = 256 << 20;
+
+/// The heap past which the allocator refuses a row, which aborts the tests (`heap`): a reader that
+/// grows without end stops there instead of taking the machine. Run the test with
+/// `--nocapture` to see the row that started last.
+const HEAP_CEILING: usize = 1 << 30;
 
 /// How deep a row nests a file whose format puts no limit of its own on its size.
 const NESTING: usize = 100_000;
@@ -163,6 +173,19 @@ fn template(text: String) -> usize {
     nodes.chain(references).sum()
 }
 
+/// A template whose parameter `Long` defaults to half of `MAX_BYTES`, with a bucket `B` named by
+/// it, and a queue named by `name` with `REFS` replaced by `reference` repeated, joined by
+/// `between`, to fill the rest of the file.
+fn cloudformation_long(name: &str, reference: &str, between: &str) -> usize {
+    let long = "x".repeat(MAX_BYTES / 2);
+    let room = MAX_BYTES / 2 - (1 << 12);
+    let refs = vec![reference; room / (reference.len() + between.len())].join(between);
+    template(format!(
+        "Parameters:\n  Long:\n    Type: String\n    Default: {long}\nResources:\n  B:\n    Type: AWS::S3::Bucket\n    Properties:\n      BucketName: !Ref Long\n  Q:\n    Type: AWS::SQS::Queue\n    Properties:\n      QueueName: {}\n",
+        name.replace("REFS", &refs)
+    ))
+}
+
 /// The bytes of the addresses, names, handlers, events and references the IaC nodes of `text`, a
 /// lone `serverless.yml` (#654), store.
 fn service(text: String) -> usize {
@@ -209,6 +232,12 @@ fn objects(files: Vec<(&str, String)>) -> usize {
         .chain(images)
         .chain(unresolved)
         .sum()
+}
+
+/// A ConfigMap `m` whose data fills half of `MAX_BYTES`.
+fn config_map() -> String {
+    let data = fill(2, |i| format!("  k{i}: v\n"));
+    format!("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: m\ndata:\n{data}")
 }
 
 /// A large shared host must not expand once for every path before its budget is checked.
@@ -1048,6 +1077,12 @@ resource "aws_apigatewayv2_route" "wide" {{
             let nest = |c: &str| c.repeat(NESTING);
             stream(Syntax::Json, format!("{}1{}", nest("["), nest("]")))
         }),
+        ("events: anchors nested around a long list", || {
+            // Each anchor would keep its own copy of the list.
+            let open: String = (0..100).map(|i| format!("&a{i} [")).collect();
+            let list = fill(2, |_| "1,".into());
+            stream(Syntax::Yaml, format!("{open}{list}1{}", "]".repeat(100)))
+        }),
         // Config values (#639): the rows a YAML or JSON file stores
         ("config values: long keys nested deep", || {
             let key = "k".repeat(1000);
@@ -1225,6 +1260,19 @@ resource "aws_apigatewayv2_route" "wide" {{
             });
             nodes(format!("locals {{\n  l = [{items}]\n}}\n{users}"))
         }),
+        (
+            "iac eval: a name through many variables, named by every resource",
+            || {
+                let variables = fill(4, |i| format!("variable \"v{i}\" {{ default = \"\" }}\n"));
+                let parts = count(variables.lines().count(), |i| format!("${{var.v{i}}}"));
+                let users = fill(4, |i| {
+                    format!("resource \"aws_sqs_queue\" \"q{i}\" {{ name = local.n }}\n")
+                });
+                nodes(format!(
+                    "{variables}locals {{\n  n = \"{parts}\"\n}}\n{users}"
+                ))
+            },
+        ),
         ("iac eval: names through cyclic locals", || {
             let n = 2000;
             let locals = count(n, |i| {
@@ -1407,6 +1455,53 @@ resource "aws_apigatewayv2_route" "wide" {{
                 template(format!("{text}Resources: {{}}\n"))
             },
         ),
+        (
+            "cloudformation: a join of many refs to a long default",
+            || cloudformation_long("!Join ['', [REFS]]", "!Ref Long", ", "),
+        ),
+        (
+            "cloudformation: a sub naming a long default many times",
+            || cloudformation_long("!Sub 'REFS'", "${Long}", ""),
+        ),
+        (
+            "cloudformation: a join of many refs to a resource named by a long default",
+            || cloudformation_long("!Join ['', [REFS]]", "!Ref B", ", "),
+        ),
+        (
+            "cloudformation: a sub naming its variable twice at every level",
+            || {
+                let mut value = serde_json::json!("x");
+                for _ in 0..30 {
+                    value = serde_json::json!({"Fn::Sub": ["${A}${A}", {"A": value}]});
+                }
+                let doc = serde_json::json!({"AWSTemplateFormatVersion": "x", "Resources": {
+                    "Q": {"Type": "AWS::SQS::Queue", "Properties": {"QueueName": value}}}});
+                let src = file(doc.to_string());
+                let (nodes, _) = crate::iac::evaluate(&[("template.json".into(), src)]);
+                nodes
+                    .iter()
+                    .map(|n| n.name.as_ref().map_or(0, String::len))
+                    .sum()
+            },
+        ),
+        (
+            "cloudformation: a name through many parameters, named by many resources",
+            || {
+                let params = fill(4, |i| format!("  P{i}:\n    Default: ''\n"));
+                let refs = (0..params.matches("Default").count())
+                    .map(|i| format!("!Ref P{i}"))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let users = fill(4, |i| {
+                    format!(
+                        "  B{i}:\n    Type: AWS::S3::Bucket\n    Properties:\n      BucketName: !Ref A\n"
+                    )
+                });
+                template(format!(
+                    "Parameters:\n{params}Resources:\n  A:\n    Type: AWS::S3::Bucket\n    Properties:\n      BucketName: !Join ['', [{refs}]]\n{users}"
+                ))
+            },
+        ),
         // Serverless (#654): what one service file's evaluation stores
         ("serverless: functions with many events", || {
             let events = "      - sqs: arn:aws:sqs:eu:1:queue-name\n".repeat(200);
@@ -1585,6 +1680,67 @@ resource "aws_apigatewayv2_route" "wide" {{
                 .collect();
             objects(files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect())
         }),
+        ("kustomize: a large config map listed many times", || {
+            let names = fill(4, |_| "  - map.yaml\n".to_string());
+            objects(vec![
+                ("map.yaml", config_map()),
+                ("kustomization.yaml", format!("resources:\n{names}")),
+            ])
+        }),
+        (
+            "kustomize: a diamond of bases over a large config map",
+            || {
+                // Each level names the next through two bases: the map is reached along 4,096 paths.
+                let mut files = vec![
+                    ("d12/map.yaml".to_string(), config_map()),
+                    (
+                        "d12/kustomization.yaml".to_string(),
+                        "resources:\n  - map.yaml\n".to_string(),
+                    ),
+                ];
+                for level in 0..12 {
+                    let base = |side: &str| {
+                        let next = level + 1;
+                        let text = format!("namePrefix: {side}-\nresources:\n  - ../../d{next}\n");
+                        (format!("d{level}/{side}/kustomization.yaml"), text)
+                    };
+                    let both = "resources:\n  - a\n  - b\n".to_string();
+                    files.extend([
+                        (format!("d{level}/kustomization.yaml"), both),
+                        base("a"),
+                        base("b"),
+                    ]);
+                }
+                objects(files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect())
+            },
+        ),
+        ("kustomize: many image rules over many images", || {
+            let rules = fill(1, |i| format!("  - {{name: i{i}, newTag: t}}\n"));
+            let containers = fill(1, |i| format!("        - {{name: c{i}, image: i{i}}}\n"));
+            objects(vec![
+                (
+                    "kustomization.yaml",
+                    format!("resources:\n  - deploy.yaml\nimages:\n{rules}"),
+                ),
+                (
+                    "deploy.yaml",
+                    format!(
+                        "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: d\nspec:\n  template:\n    spec:\n      containers:\n{containers}"
+                    ),
+                ),
+            ])
+        }),
+        (
+            "kubernetes: long volume name repeated by projected sources",
+            || {
+                let sources = fill(2, |i| format!("            - configMap: {{name: c{i}}}\n"));
+                let text = format!(
+                    "apiVersion: v1\nkind: Pod\nmetadata: {{name: p}}\nspec:\n  containers: []\n  volumes:\n    - name: {}\n      projected:\n        sources:\n{sources}",
+                    "v".repeat(400 << 10)
+                );
+                objects(vec![("pod.yaml", text)])
+            },
+        ),
         // Crossplane (#655): compositions, their patch sets, and the kinds XRDs define
         ("crossplane: resources naming many patch sets", || {
             let sets = fill(2, |i| {
@@ -1733,8 +1889,8 @@ fn http_iac_route_reader_stays_bounded_on_a_full_file() {
     assert!(elapsed < BUDGET, "{elapsed:?}");
 }
 
-/// Every reader, given a file built to explode, returns within `BUDGET` of its start and gives
-/// back no more than `MAX_OUT`. The rows run on a pool of as many threads as the machine has
+/// Every reader, given a file built to explode, returns within `BUDGET` of its start, holds no
+/// more than `HEAP` and gives back no more than `MAX_OUT`. The rows run on a pool of as many threads as the machine has
 /// cores, so a row's time is its reader's, not the wait of a hundred rows started at once beside
 /// the rest of the suite (CI's `cloud` job missed the budget that way); the test names the rows
 /// that missed.
@@ -1750,15 +1906,18 @@ fn every_reader_stays_bounded_on_a_file_built_to_explode() {
         std::thread::spawn(move || {
             loop {
                 let next = queue.lock().unwrap().next();
-                let Some((i, (_, probe))) = next else {
+                let Some((i, (name, probe))) = next else {
                     break;
                 };
                 let start = Instant::now();
                 if tx.send(Run::Started(i, start)).is_err() {
                     break;
                 }
+                eprintln!("hostile {name}: started");
+                let held = heap::watch(HEAP_CEILING);
                 let size = std::panic::catch_unwind(probe).ok();
-                let _ = tx.send(Run::Ended(i, size, start.elapsed()));
+                let peak = heap::unwatch().saturating_sub(held);
+                let _ = tx.send(Run::Ended(i, size, start.elapsed(), peak));
             }
         });
     }
@@ -1776,7 +1935,7 @@ fn every_reader_stays_bounded_on_a_file_built_to_explode() {
             Ok(Run::Started(i, start)) => {
                 running.insert(i, start);
             }
-            Ok(Run::Ended(i, size, took)) => {
+            Ok(Run::Ended(i, size, took, peak)) => {
                 running.remove(&i);
                 late.retain(|&j| j != i);
                 if ended[i] {
@@ -1785,11 +1944,14 @@ fn every_reader_stays_bounded_on_a_file_built_to_explode() {
                 ended[i] = true;
                 match size {
                     Some(size) => {
-                        eprintln!("hostile {}: {took:?}, {size} bytes", names[i]);
+                        let mib = peak >> 20;
+                        eprintln!("hostile {}: {took:?}, {size} bytes, {mib} MiB", names[i]);
                         if took > BUDGET {
                             failed.push(format!("{}: {took:?}", names[i]));
                         } else if size > MAX_OUT {
                             failed.push(format!("{}: {size} bytes", names[i]));
+                        } else if peak > HEAP {
+                            failed.push(format!("{}: {mib} MiB held", names[i]));
                         }
                     }
                     None => failed.push(format!("{}: a panic", names[i])),
@@ -1816,10 +1978,110 @@ fn every_reader_stays_bounded_on_a_file_built_to_explode() {
 }
 
 /// What a thread of the pool says about a row: its index and when it started, then its index,
-/// the size it answered (none for a panic) and the time it took.
+/// the size it answered (none for a panic), the time it took and the most heap it held.
 enum Run {
     Started(usize, Instant),
-    Ended(usize, Option<usize>, Duration),
+    Ended(usize, Option<usize>, Duration, usize),
+}
+
+/// The heap each thread of the unit tests holds, counted by their allocator: a row of `probes` is
+/// held to `HEAP` above what its thread held when it started, and past `HEAP_CEILING` the
+/// allocator refuses it, which aborts the tests rather than exhaust the machine.
+mod heap {
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::cell::Cell;
+
+    thread_local! {
+        /// The bytes this thread holds, the most it held since `watch`, and the most it may hold.
+        static HELD: Cell<usize> = const { Cell::new(0) };
+        static PEAK: Cell<usize> = const { Cell::new(0) };
+        static LIMIT: Cell<usize> = const { Cell::new(usize::MAX) };
+    }
+
+    /// The system's allocator, counting what each thread takes and gives back. A block another
+    /// thread frees lowers that thread's count, never below zero.
+    struct Counted;
+
+    #[global_allocator]
+    static COUNTED: Counted = Counted;
+
+    /// Counts `bytes` more on this thread: false, counting nothing, past its limit.
+    fn take(bytes: usize) -> bool {
+        let taken = HELD.try_with(|held| {
+            let now = held.get().saturating_add(bytes);
+            if now > LIMIT.with(Cell::get) {
+                return false;
+            }
+            held.set(now);
+            PEAK.with(|peak| peak.set(peak.get().max(now)));
+            true
+        });
+        taken.unwrap_or(true)
+    }
+
+    fn give(bytes: usize) {
+        let _ = HELD.try_with(|held| held.set(held.get().saturating_sub(bytes)));
+    }
+
+    // SAFETY: every call goes to `System` with the caller's own arguments; the counts only decide
+    // whether to refuse, which answers null as an allocator may.
+    unsafe impl GlobalAlloc for Counted {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            if !take(layout.size()) {
+                return std::ptr::null_mut();
+            }
+            let block = unsafe { System.alloc(layout) };
+            if block.is_null() {
+                give(layout.size());
+            }
+            block
+        }
+
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            if !take(layout.size()) {
+                return std::ptr::null_mut();
+            }
+            let block = unsafe { System.alloc_zeroed(layout) };
+            if block.is_null() {
+                give(layout.size());
+            }
+            block
+        }
+
+        unsafe fn dealloc(&self, block: *mut u8, layout: Layout) {
+            unsafe { System.dealloc(block, layout) };
+            give(layout.size());
+        }
+
+        unsafe fn realloc(&self, block: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+            let grows = size.saturating_sub(layout.size());
+            if !take(grows) {
+                return std::ptr::null_mut();
+            }
+            let moved = unsafe { System.realloc(block, layout, size) };
+            if moved.is_null() {
+                give(grows);
+            } else {
+                give(layout.size().saturating_sub(size));
+            }
+            moved
+        }
+    }
+
+    /// Starts watching this thread, answering what it holds: its peak starts there, and it may
+    /// hold `ceiling` more.
+    pub(super) fn watch(ceiling: usize) -> usize {
+        let held = HELD.with(Cell::get);
+        PEAK.with(|peak| peak.set(held));
+        LIMIT.with(|limit| limit.set(held.saturating_add(ceiling)));
+        held
+    }
+
+    /// Stops watching this thread, answering the most it held since `watch`.
+    pub(super) fn unwatch() -> usize {
+        LIMIT.with(|limit| limit.set(usize::MAX));
+        PEAK.with(Cell::get)
+    }
 }
 
 #[test]

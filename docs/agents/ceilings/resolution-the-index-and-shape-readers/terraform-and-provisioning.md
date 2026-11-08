@@ -28,8 +28,10 @@
   deeper, the call keeps its node and instantiates nothing, and a directory already on the stack, a
   module calling itself, is not instantiated again); `EVAL_DEPTH_MAX` (32 `var`, `local` or output
   names one reference goes through; past it, and around a cycle, it resolves to nothing, and a
-  result cut that way is memoized for the instance); `NODES_MAX` (10,000 nodes per root module, the
-  rest left out); `REFERENCES_MAX` (64 references per node and targets per name, the first in
+  result cut that way is memoized for the instance); `OVERRIDABLE_MAX` (32 variables one name goes
+  through, which CloudFormation's parameters share; past it the name is unresolved, so a name
+  joined from thousands of them is not copied into every name built on it); `NODES_MAX` (10,000
+  nodes per root module, the rest left out); `REFERENCES_MAX` (64 references per node and targets per name, the first in
   address order); `ROOT_STORED_MAX` (4 MiB of addresses per root) and `STORED_MAX` (16 MiB for the
   repository), past which the rest is left out. Both native (`.tf`, `.tofu`) and JSON
   (`.tf.json`, `.tofu.json`) syntax give nodes, only `resource`, `data` and `module`

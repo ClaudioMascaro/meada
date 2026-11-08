@@ -396,7 +396,7 @@ impl Builder<'_> {
                 true
             }
             None => {
-                self.fail(line, "aliases expand beyond the size limit");
+                self.fail(line, "anchors and aliases expand beyond the size limit");
                 false
             }
         }
@@ -481,22 +481,24 @@ impl Builder<'_> {
         }
         self.hand_out(&value, line);
         let (value, cost, depth) = self.wrapped(value, wrap, cost, 0, line);
-        self.remember(anchor, &value, cost, depth);
+        self.remember(anchor, &value, cost, depth, line);
         self.place(value, cost, depth, line);
     }
 
+    /// An alias: its node's copy is charged before it is made.
     fn alias(&mut self, anchor: usize, line: usize) {
-        let Some(anchored) = self.anchors.get(&anchor).cloned() else {
+        let Some(&Anchored { cost, depth, .. }) = self.anchors.get(&anchor) else {
             return self.fail(line, "an alias to no anchor");
         };
-        if self.stack.len() + anchored.depth > MAX_NESTING {
+        if self.stack.len() + depth > MAX_NESTING {
             return self.too_deep(line);
         }
-        if !self.charge(anchored.cost, line) {
+        if !self.charge(cost, line) {
             return;
         }
-        self.hand_out(&anchored.value, line);
-        self.place(anchored.value, anchored.cost, anchored.depth, line);
+        let value = self.anchors[&anchor].value.clone();
+        self.hand_out(&value, line);
+        self.place(value, cost, depth, line);
     }
 
     fn open(&mut self, sequence: bool, anchor: usize, line: usize, wrap: Option<String>) {
@@ -549,7 +551,7 @@ impl Builder<'_> {
             );
         }
         let (value, cost, depth) = self.wrapped(value, open.wrap, open.cost, open.depth, line);
-        self.remember(open.anchor, &value, cost, depth);
+        self.remember(open.anchor, &value, cost, depth, line);
         self.place(value, cost, depth, line);
     }
 
@@ -623,8 +625,10 @@ impl Builder<'_> {
         }
     }
 
-    fn remember(&mut self, anchor: usize, value: &Value, cost: usize, depth: usize) {
-        if anchor != 0 {
+    /// Keeps a copy of an anchored node for its aliases, charged like an alias: anchors nested
+    /// around a large node copy it once per level.
+    fn remember(&mut self, anchor: usize, value: &Value, cost: usize, depth: usize, line: usize) {
+        if anchor != 0 && self.charge(cost, line) {
             let value = value.clone();
             self.anchors.insert(anchor, Anchored { value, cost, depth });
         }
@@ -916,7 +920,7 @@ mod tests {
         }
         let mut handed = 0;
         let (_, reason) = read(Syntax::Yaml, src.as_bytes(), |_| handed += 1).unwrap_err();
-        assert_eq!(reason, "aliases expand beyond the size limit");
+        assert_eq!(reason, "anchors and aliases expand beyond the size limit");
         // What was handed out before the budget ran out stays within it.
         assert!(
             handed < src.len() * super::EXPANSION + super::SLACK,
@@ -991,6 +995,21 @@ mod tests {
             );
         }
         let (_, reason) = tagged(Syntax::Yaml, src.as_bytes()).unwrap_err();
-        assert_eq!(reason, "aliases expand beyond the size limit");
+        assert_eq!(reason, "anchors and aliases expand beyond the size limit");
+    }
+
+    #[test]
+    fn anchors_nested_around_a_large_node_cannot_copy_it_past_the_budget() {
+        // A hundred anchors, each around the next, then a list of most of the file: each anchor
+        // would keep its own copy of the list.
+        let list = vec!["1"; 100_000].join(",");
+        let nest = |n: usize| {
+            let open: String = (0..n).map(|i| format!("&a{i} [")).collect();
+            format!("{open}{list}{}", "]".repeat(n))
+        };
+        let (_, reason) = read(Syntax::Yaml, nest(100).as_bytes(), |_| {}).unwrap_err();
+        assert_eq!(reason, "anchors and aliases expand beyond the size limit");
+        // One anchor around it reads.
+        assert!(read(Syntax::Yaml, nest(1).as_bytes(), |_| {}).is_ok());
     }
 }

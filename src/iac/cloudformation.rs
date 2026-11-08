@@ -23,7 +23,10 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use serde_json::Value;
 
-use super::{NODES_MAX, Node, Overridable, REFERENCES_MAX, ROOT_STORED_MAX, Reference, compose};
+use super::{
+    NODES_MAX, Node, OVERRIDABLE_MAX, Overridable, REFERENCES_MAX, ROOT_STORED_MAX, Reference,
+    compose,
+};
 use crate::config_values;
 use crate::document::events::{self, Step, Syntax};
 
@@ -161,21 +164,22 @@ impl Part {
         }
     }
 
-    /// `parts` joined by `between`; unresolved when it grows past `PHYSICAL_NAME_MAX`.
-    fn join(parts: Vec<Part>, between: &str) -> Part {
-        let mut out = Part::literal("");
-        for (i, p) in parts.into_iter().enumerate() {
-            if i > 0 {
-                out.text += between;
-            }
-            out.text += &p.text;
-            out.pattern |= p.pattern;
-            out.through.extend(p.through);
-            if out.text.len() > PHYSICAL_NAME_MAX {
-                return Part::unknown();
+    /// Appends `between` and `part`: false when the name would grow past `PHYSICAL_NAME_MAX` or
+    /// go through more than `OVERRIDABLE_MAX` defaults, which leaves it unresolved. The check comes
+    /// before the copy, so a join of many long parts copies none of them.
+    fn push(&mut self, between: &str, part: &Part) -> bool {
+        if self.text.len() + between.len() + part.text.len() > PHYSICAL_NAME_MAX {
+            return false;
+        }
+        self.text += between;
+        self.text += &part.text;
+        self.pattern |= part.pattern;
+        for default in &part.through {
+            if !self.through.contains(default) {
+                self.through.insert(default.clone());
             }
         }
-        out
+        self.through.len() <= OVERRIDABLE_MAX
     }
 }
 
@@ -295,6 +299,9 @@ impl Eval<'_> {
             let (Some(default), false) = (&p.default, p.list) else {
                 return Part::unknown();
             };
+            if default.len() > PHYSICAL_NAME_MAX {
+                return Part::unknown();
+            }
             let mut part = Part::literal(default.clone());
             part.through.insert(Overridable {
                 path: self.path.to_string(),
@@ -333,7 +340,10 @@ impl Eval<'_> {
             return Part::unknown();
         }
         let Value::Object(map) = v else {
-            return scalar_text(v).map_or_else(Part::unknown, Part::literal);
+            return match v {
+                Value::String(long) if long.len() > PHYSICAL_NAME_MAX => Part::unknown(),
+                v => scalar_text(v).map_or_else(Part::unknown, Part::literal),
+            };
         };
         let [(function, arg)] = map.iter().collect::<Vec<_>>()[..] else {
             return Part::unknown();
@@ -354,11 +364,14 @@ impl Eval<'_> {
                     if delimiter.pattern {
                         return Part::unknown();
                     }
-                    let parts = (items.iter())
-                        .map(|i| self.eval(i, depth + 1))
-                        .collect::<Vec<_>>();
-                    let mut joined = Part::join(parts, &delimiter.text);
-                    joined.through.extend(delimiter.through);
+                    let mut joined = Part::literal("");
+                    joined.through.clone_from(&delimiter.through);
+                    for (i, item) in items.iter().enumerate() {
+                        let between = if i == 0 { "" } else { delimiter.text.as_str() };
+                        if !joined.push(between, &self.eval(item, depth + 1)) {
+                            return Part::unknown();
+                        }
+                    }
                     joined
                 }
                 _ => Part::unknown(),
@@ -368,28 +381,37 @@ impl Eval<'_> {
     }
 
     /// `Fn::Sub text` with the variables `vars` it defines: each `${name}` is a variable it
-    /// defines, a `Ref`, or a `resource.attribute`.
+    /// defines, a `Ref`, or a `resource.attribute`. Each is evaluated once, however often the text
+    /// names it: a variable defined by a `Fn::Sub` naming its own variable twice would otherwise
+    /// cost twice per level.
     fn sub(
         &mut self,
         text: &str,
         vars: Option<&serde_json::Map<String, Value>>,
         depth: usize,
     ) -> Part {
-        let mut parts = Vec::new();
+        let mut known: HashMap<String, Part> = HashMap::new();
+        let mut out = Part::literal("");
         for (literal, variable) in sub_parts(text) {
-            parts.push(Part::literal(literal));
+            if !out.push("", &Part::literal(literal)) {
+                return Part::unknown();
+            }
             let Some(name) = variable else { continue };
-            parts.push(
-                match (vars.and_then(|v| v.get(&name)), name.split_once('.')) {
+            if !known.contains_key(&name) {
+                let part = match (vars.and_then(|v| v.get(&name)), name.split_once('.')) {
                     (Some(value), _) => self.eval(value, depth + 1),
                     (None, Some((resource, attribute))) => {
                         self.attribute(resource, attribute, depth)
                     }
                     (None, None) => self.reference(&name, depth),
-                },
-            );
+                };
+                known.insert(name.clone(), part);
+            }
+            if !out.push("", &known[&name]) {
+                return Part::unknown();
+            }
         }
-        Part::join(parts, "")
+        out
     }
 
     /// A known target is not the URL/ARN CloudFormation would return at deployment time.
@@ -1221,6 +1243,53 @@ mod tests {
         // A name built from many items stops as it passes the ceiling.
         let items = vec!["abcdefgh"; 100_000].join(", ");
         assert_eq!(queue(&format!("!Join ['-', [{items}]]")), pattern("*"));
+        // A literal, or a parameter's default, longer than a name may be is unresolved whole.
+        let long = "x".repeat(PHYSICAL_NAME_MAX + 1);
+        assert_eq!(queue(&long), pattern("*"));
+        let text = format!(
+            "AWSTemplateFormatVersion: x\nParameters:\n  Long:\n    Default: {long}\nResources:\n  N:\n    Type: AWS::SQS::Queue\n    Properties:\n      QueueName: !Ref Long\n"
+        );
+        let (nodes, _) = unit("t.yaml", &text);
+        assert_eq!((nodes[0].name.clone(), nodes[0].pattern), pattern("*"));
+    }
+
+    #[test]
+    fn a_name_through_more_defaults_than_the_ceiling_is_unresolved() {
+        let name = |n: usize| {
+            let params: String = (0..n)
+                .map(|i| format!("  P{i}:\n    Default: p\n"))
+                .collect();
+            let refs: String = (0..n).map(|i| format!("${{P{i}}}")).collect();
+            let text = format!(
+                "AWSTemplateFormatVersion: x\nParameters:\n{params}Resources:\n  N:\n    Type: AWS::SQS::Queue\n    Properties:\n      QueueName: !Sub '{refs}'\n"
+            );
+            let (nodes, _) = unit("t.yaml", &text);
+            (
+                nodes[0].name.clone(),
+                nodes[0].pattern,
+                nodes[0].overridable.len(),
+            )
+        };
+        let within = (Some("p".repeat(OVERRIDABLE_MAX)), false, OVERRIDABLE_MAX);
+        assert_eq!(name(OVERRIDABLE_MAX), within);
+        assert_eq!(name(OVERRIDABLE_MAX + 1), (Some("*".into()), true, 0));
+    }
+
+    /// Each level defines the variable its text names twice: evaluated once per level, as the
+    /// text holds it, the name costs the depth; once per mention it would cost two to the depth.
+    #[test]
+    fn a_sub_naming_its_variable_twice_at_every_level_evaluates_in_linear_time() {
+        let mut value = serde_json::json!("x");
+        for _ in 0..INTRINSIC_DEPTH_MAX - 2 {
+            value = serde_json::json!({"Fn::Sub": ["${A}${A}", {"A": value}]});
+        }
+        let doc = serde_json::json!({"AWSTemplateFormatVersion": "x", "Resources": {
+            "Q": {"Type": "AWS::SQS::Queue", "Properties": {"QueueName": value}}}});
+        let start = std::time::Instant::now();
+        let (nodes, _) = unit("t.json", &doc.to_string());
+        let took = start.elapsed();
+        assert!(took < std::time::Duration::from_secs(2), "{took:?}");
+        assert!(nodes[0].pattern);
     }
 
     #[test]

@@ -88,6 +88,12 @@ const MODULE_DEPTH_MAX: usize = 16;
 // ponytail: a name passed down a few modules goes through a handful; 32 stops a chain of locals.
 const EVAL_DEPTH_MAX: usize = 32;
 
+/// The values a deployer can override (`Overridable`) one name may go through; past it the name
+/// is unresolved.
+// ponytail: a name goes through a handful of variables or parameters; 32 stops one joined from
+// thousands of them, whose list every name built on it would copy.
+const OVERRIDABLE_MAX: usize = 32;
+
 /// The bytes one evaluated value may hold (`size`); past it the value is unresolved.
 // ponytail: a name, a `for_each` map or a list of regions holds far less; 64 KiB stops a local
 // doubled at every step.
@@ -1704,6 +1710,9 @@ impl<'m> Eval<'m> {
                     each_v.insert("key".to_string(), Value::from(s.as_str()));
                 }
             }
+        }
+        if through.len() > OVERRIDABLE_MAX {
+            return Evaluated::unknown();
         }
         let roots: Map<String, Value> = [
             ("var", vars),
@@ -3502,6 +3511,25 @@ mod tests {
             .collect();
         assert_eq!(q.name.as_deref(), Some("dev-shop-orders"));
         assert_eq!(through, [("var.env", 1, false), ("var.team", 4, false)]);
+    }
+
+    /// A name through more overridable values than `OVERRIDABLE_MAX` is unresolved: every name
+    /// built on it would copy their list.
+    #[test]
+    fn a_name_through_more_overridable_values_than_the_ceiling_is_unresolved() {
+        let name = |n: usize| {
+            let vars: String = (0..n)
+                .map(|i| format!("variable \"v{i}\" {{\n  default = \"v\"\n}}\n"))
+                .collect();
+            let parts: String = (0..n).map(|i| format!("${{var.v{i}}}")).collect();
+            let main = format!("{vars}resource \"a\" \"q\" {{ name = \"{parts}\" }}\n");
+            let (nodes, _) = evaluate(&files(&[("main.tf", main.as_str())]));
+            let q = &nodes[0];
+            (q.name.clone(), q.pattern, q.overridable.len())
+        };
+        let within = (Some("v".repeat(OVERRIDABLE_MAX)), false, OVERRIDABLE_MAX);
+        assert_eq!(name(OVERRIDABLE_MAX), within);
+        assert_eq!(name(OVERRIDABLE_MAX + 1), (Some("*".into()), true, 0));
     }
 
     /// Arithmetic `hcl-rs` cannot do (a remainder by zero, which panics in its number type) leaves

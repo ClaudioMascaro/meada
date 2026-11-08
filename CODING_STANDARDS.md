@@ -105,8 +105,9 @@ indexing carries on.
   `MAX_*`, `*_MAX`, `*_LIMIT` or `*_CAP` carries the marker, and that no two share a name), and a
   unit test feeds it an input past the limit.
 - A manifest or configuration reader reads a file of `lang::MAX_BYTES` built to explode (many
-  keys, deep nesting, wide fan-out) in bounded time, and returns a bounded size. A new reader
-  adds its row to `probes` in `src/package/hostile.rs`.
+  keys, deep nesting, wide fan-out) in bounded time and bounded memory, and returns a bounded
+  size; a value is copied after it is charged, never before. A new reader adds its row to
+  `probes` in `src/package/hostile.rs`, which also bounds the heap each row holds (`HEAP`).
 
 ## Service deadlines
 

@@ -106,7 +106,8 @@
   document is unreadable at its first line. `events.rs`, the YAML and JSON event reader:
   `MAX_NESTING` (128 nested collections, as `serde_json` has for JSON, an alias's node counted at
   the depth it lands) and the alias budget (`EXPANSION` times the source plus `SLACK`, no
-  marker), which also charges every document of a stream; the count of documents per file is
+  marker), which also charges every document of a stream and every node an anchor keeps (anchors
+  nested around one node keep a copy each), before it is copied; the count of documents per file is
   config values' (`config_values::DOCUMENTS_MAX`). `schema.rs`: `MAX_DEPTH` (128 levels per shape), `WORK` (64 MiB per document) and
   `BUDGET` (10,000 schemas per shape, no marker). `openapi.rs`: a path item reference behind
   another one that is external is dropped without a status line (no marker).
