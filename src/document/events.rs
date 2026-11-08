@@ -264,7 +264,12 @@ fn yaml(parser: &mut Parser<std::str::Chars<'_>>, b: &mut Builder) -> Result<boo
             Event::DocumentStart => {
                 b.charge(1, line);
             }
-            Event::Scalar(text, style, anchor, tag) => {
+            Event::Scalar(mut text, style, anchor, tag) => {
+                // Files joined into one stream carry their byte order marks into later documents,
+                // where the parser reads one into the first key.
+                if matches!(style, TScalarStyle::Plain) && text.starts_with('\u{feff}') {
+                    text.remove(0);
+                }
                 let cost = 1 + text.len();
                 let value = match style {
                     TScalarStyle::Plain if !b.at_key() => plain(text),

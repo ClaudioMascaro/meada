@@ -1250,7 +1250,8 @@ mod tests {
     }
 
     /// A byte order mark, which some editors write first, is no part of the first key: a `Secret`
-    /// behind one stays a `Secret`, and a JSON file behind one reads.
+    /// behind one stays a `Secret`, also in a later document of a stream, as files joined into
+    /// one carry it there, and a JSON file behind one reads.
     #[test]
     fn a_byte_order_mark_before_the_first_key_changes_nothing() {
         let secret = "\u{feff}apiVersion: v1\nkind: Secret\nstringData:\n  token: hunter2\n";
@@ -1266,6 +1267,25 @@ mod tests {
                 ("stringData.token", None)
             ]
         );
+        for joined in [
+            "a: 1\n...\n\u{feff}apiVersion: v1\nkind: Secret\nstringData:\n  token: hunter2\n",
+            "a: 1\n---\n\u{feff}apiVersion: v1\nkind: Secret\nstringData:\n  token: hunter2\n",
+        ] {
+            let (_, rows) = read("joined.yaml", joined.as_bytes());
+            let seen: Vec<_> = (rows.iter())
+                .map(|r| (r.key.as_str(), r.value.as_deref()))
+                .collect();
+            assert_eq!(
+                seen,
+                [
+                    ("[0].a", Some("1")),
+                    ("[1].apiVersion", Some("v1")),
+                    ("[1].kind", Some("Secret")),
+                    ("[1].stringData.token", None)
+                ],
+                "{joined:?}"
+            );
+        }
         let (_, rows) = read("appsettings.json", "\u{feff}{\"a\": 1}".as_bytes());
         let seen: Vec<_> = (rows.iter())
             .map(|r| (r.key.as_str(), r.value.as_deref()))
