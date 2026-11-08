@@ -5344,10 +5344,10 @@ impl<'a> Code<'a> {
     }
 
     /// The value the nearest binding of `name` around `scope` of `path` holds (`Facts::bound`,
-    /// which the Kotlin and C# packs fill), when no other binding of the name is in the same scope
-    /// (a name declared twice, a loop variable, a parameter, a constant, a property). Each scope
-    /// is looked up by name (`ByName::bound` and the resolver's maps), so a file of many locals
-    /// and calls costs each lookup its depth, never the file's width.
+    /// which the Kotlin, Java, C# and Swift packs fill), when no other binding of the name is in
+    /// the same scope (a name declared twice, a loop variable, a parameter, a constant, a
+    /// property). Each scope is looked up by name (`ByName::bound` and the resolver's maps), so a
+    /// file of many locals and calls costs each lookup its depth, never the file's width.
     pub fn local(&self, path: &'a str, scope: &'a str, name: &str) -> Option<&'a Bound> {
         let by_name = self.by_name(path)?;
         let r = self.resolver;

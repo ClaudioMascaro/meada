@@ -112,16 +112,30 @@ fn sdk_batches_keep_every_bus_table_and_parameter() {
 }
 
 #[test]
-fn sdk_clients_require_construction_and_follow_only_exact_factory_hops() {
+fn sdk_clients_require_construction_or_a_declared_sqs_type_and_follow_only_exact_factory_hops() {
     let repo = fixture_repo("sdk_origins", "aws-sdk-origins", None);
     let engine = Engine::open(&repo).unwrap();
     let text = engine.export().unwrap();
     let json: Value = serde_json::from_str(&text).unwrap();
     let writers = json["providers"].as_array().unwrap();
-    assert_eq!(writers.len(), 3, "{text}");
-    for side in writers {
-        assert_eq!(side["contract"], "channel::sns::positive", "{text}");
-    }
+    let mut contracts = writers
+        .iter()
+        .map(|w| w["contract"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    contracts.sort_unstable();
+    // A declared SNS client stays without a side; SQS keeps its earlier injected-client forms.
+    assert_eq!(
+        contracts,
+        [
+            "channel::sns::positive",
+            "channel::sns::positive",
+            "channel::sns::positive",
+            "channel::sqs::declared",
+            "channel::sqs::declared",
+            "channel::sqs::declared",
+        ],
+        "{text}"
+    );
     assert!(json["consumers"].as_array().unwrap().is_empty(), "{text}");
     assert_export_golden("aws-sdk-origins.export.json", &text);
 }

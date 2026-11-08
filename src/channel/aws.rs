@@ -132,6 +132,13 @@ const SERVICES: &[Service] = &[
             go: "github.com/aws/aws-sdk-go-v2/service/sqs",
             csharp: "Amazon.SQS.AmazonSQSClient",
         },
+        declared: &[
+            "Amazon.SQS.IAmazonSQS",
+            "Amazon.SQS.AmazonSQSClient",
+            "software.amazon.awssdk.services.sqs.SqsClient",
+            "software.amazon.awssdk.services.sqs.SqsAsyncClient",
+            "github.com/aws/aws-sdk-go-v2/service/sqs.Client",
+        ],
         kind: "sqs",
         operations: &[
             SdkOperation {
@@ -160,6 +167,7 @@ const SERVICES: &[Service] = &[
             go: "github.com/aws/aws-sdk-go-v2/service/sns",
             csharp: "Amazon.SimpleNotificationService.AmazonSimpleNotificationServiceClient",
         },
+        declared: &[],
         kind: "sns",
         operations: &[
             SdkOperation {
@@ -182,6 +190,7 @@ const SERVICES: &[Service] = &[
             go: "github.com/aws/aws-sdk-go-v2/service/eventbridge",
             csharp: "Amazon.EventBridge.AmazonEventBridgeClient",
         },
+        declared: &[],
         kind: "eventbridge",
         operations: &[SdkOperation {
             method: "PutEvents",
@@ -196,6 +205,7 @@ const SERVICES: &[Service] = &[
             go: "github.com/aws/aws-sdk-go-v2/service/kinesis",
             csharp: "Amazon.Kinesis.AmazonKinesisClient",
         },
+        declared: &[],
         kind: "kinesis",
         operations: &[
             SdkOperation {

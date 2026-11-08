@@ -1394,6 +1394,18 @@
     {
       "contract": "channel::sns::positive",
       "site": "local/aws-sdk-origins::origins.go::positive::client.Publish#0"
+    },
+    {
+      "contract": "channel::sqs::declared",
+      "site": "local/aws-sdk-origins::Origins.cs::Origins.Declared(IAmazonSQS)::client.SendMessageAsync#0"
+    },
+    {
+      "contract": "channel::sqs::declared",
+      "site": "local/aws-sdk-origins::Origins.java::Origins.declared(SqsClient)::client.sendMessage#0"
+    },
+    {
+      "contract": "channel::sqs::declared",
+      "site": "local/aws-sdk-origins::origins.go::declared::client.SendMessage#0"
     }
   ],
   "consumers": [],

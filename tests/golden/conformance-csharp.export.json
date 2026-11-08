@@ -1,7 +1,7 @@
 {
   "format": 1,
   "repository": "example.com/acme/conformance",
-  "commit": "2f107a765039d8cb2b6cee4c1c2687db705c396c",
+  "commit": "1f6ace2c73e6975f933673b0ba88172bf664ebc3",
   "dirty": false,
   "files": [
     {
@@ -22,7 +22,7 @@
     },
     {
       "path": "src/Acme.Api/Channels.cs",
-      "hash": "822370ab0c33e051180537aa47f729cd777997abaf1b7f65a032c2cb5a70da65"
+      "hash": "c18dc2d6c858adfcf6da114da56452d756c5f47174f7c2e9f21947bf4f484b55"
     },
     {
       "path": "src/Acme.Api/Checkout.cs",
@@ -490,8 +490,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4272,
-        "end": 5725
+        "start": 4254,
+        "end": 5707
       },
       "hash": "4076f237314213be924fe66c83972832a8ab6ed37b95b3eab0086a732a61229b"
     },
@@ -499,8 +499,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.BusDispatch(ServiceBusClient)",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4363,
-        "end": 4428
+        "start": 4345,
+        "end": 4410
       },
       "hash": "74a0e2d55d009ac3e41f7054652f0943342a39877f9df8338bd7323eeb5592a8"
     },
@@ -508,8 +508,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Dynamic(ServiceBusMessage)",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4726,
-        "end": 4951
+        "start": 4708,
+        "end": 4933
       },
       "hash": "fd1bca7db3e3d3b9378768a1c65357f4a446cc0a8b17b44617f57801f5632f9d"
     },
@@ -517,8 +517,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.OnDispatch(ProcessMessageEventArgs)",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 5643,
-        "end": 5719
+        "start": 5625,
+        "end": 5701
       },
       "hash": "cacec20402ccddcecc21c822327516e90086b9fe5a8fd68c05d7153a87206176"
     },
@@ -526,8 +526,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Send(ServiceBusMessage)",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4438,
-        "end": 4716
+        "start": 4420,
+        "end": 4698
       },
       "hash": "0b0cbd4ec2412978d35f5cf63bed25cce82a33ecaf4d655429ae81efc379ff7b"
     },
@@ -535,8 +535,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch()",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 5223,
-        "end": 5633
+        "start": 5205,
+        "end": 5615
       },
       "hash": "40a174c682bc223e684cd7504a11a9d0db28b2c3203a6180d8b61e87decb4184"
     },
@@ -544,8 +544,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Watch().servicebus dispatch.events",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 5510,
-        "end": 5574
+        "start": 5492,
+        "end": 5556
       },
       "hash": "ec2287f9138b331e7719d70f952b644bbc90b9b8645d3bf2a6f3e6faa359a4b9"
     },
@@ -553,8 +553,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.BusDispatch.Work()",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4961,
-        "end": 5213
+        "start": 4943,
+        "end": 5195
       },
       "hash": "5d2d024f9876302df921fc3c2593de7a21ef91148cb9690cf8c870303b16e674"
     },
@@ -697,8 +697,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3590,
-        "end": 4101
+        "start": 3572,
+        "end": 4083
       },
       "hash": "b679b60bcc581e788c2912b574bf67bb3eabf4ab94570ff02f16b3bf5bad6f51"
     },
@@ -706,8 +706,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Drain()",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3930,
-        "end": 4095
+        "start": 3912,
+        "end": 4077
       },
       "hash": "c0e794b645632a65b7e9fb9fbe174ca80c12de16ffa7f9e7ec67382520371268"
     },
@@ -715,8 +715,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.Record()",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3764,
-        "end": 3920
+        "start": 3746,
+        "end": 3902
       },
       "hash": "8cb20042abc7bb5d700d6cc37a3b41507986acb1169505e18f4b67bbe07ef8b6"
     },
@@ -724,8 +724,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.RedisAudits.RedisAudits(IConnectionMultiplexer)",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3686,
-        "end": 3754
+        "start": 3668,
+        "end": 3736
       },
       "hash": "a478ec19ca8d81f976fdc75703716e7bc1fcc7ec4250f8a4620676c4d391ec4c"
     },
@@ -734,16 +734,16 @@
       "span": {
         "path": "src/Acme.Api/Channels.cs",
         "start": 3031,
-        "end": 3536
+        "end": 3518
       },
-      "hash": "71376ee73b0a31cf9dd3f4fd666022c2a264c978f612396aa208071b2cc6bfe5"
+      "hash": "18047d53e222dc9b3508a6c87c46605303c3b7aac47fc32bb1826b20fba06998"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Poll()",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3370,
-        "end": 3530
+        "start": 3352,
+        "end": 3512
       },
       "hash": "e1f59ab787aba21e971d268ad21adf3ce1474a586c513d1cb17c1f40879af5d7"
     },
@@ -751,8 +751,8 @@
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.Ship()",
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3290,
-        "end": 3360
+        "start": 3272,
+        "end": 3342
       },
       "hash": "f8a07a90fefb247ffaaa3838abe7dd853f1b6f37393bf26423ffcff1c1e645a7"
     },
@@ -761,9 +761,9 @@
       "span": {
         "path": "src/Acme.Api/Channels.cs",
         "start": 3211,
-        "end": 3280
+        "end": 3262
       },
-      "hash": "8ab9fe2bec3b303a76e23b96adbd424108609e114299653d225e4b7420188471"
+      "hash": "45efb552424d5c2506a0a7e5a9edd7f190f00147a28d65e30f8b423e79897636"
     },
     {
       "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.Topics",
@@ -3783,8 +3783,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4835,
-        "end": 4887
+        "start": 4817,
+        "end": 4869
       }
     },
     {
@@ -3794,8 +3794,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4814,
-        "end": 4888
+        "start": 4796,
+        "end": 4870
       }
     },
     {
@@ -3805,8 +3805,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4908,
-        "end": 4940
+        "start": 4890,
+        "end": 4922
       }
     },
     {
@@ -3816,8 +3816,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4640,
-        "end": 4705
+        "start": 4622,
+        "end": 4687
       }
     },
     {
@@ -3827,8 +3827,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4536,
-        "end": 4568
+        "start": 4518,
+        "end": 4550
       }
     },
     {
@@ -3838,8 +3838,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4640,
-        "end": 4679
+        "start": 4622,
+        "end": 4661
       }
     },
     {
@@ -3849,8 +3849,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4588,
-        "end": 4620
+        "start": 4570,
+        "end": 4602
       }
     },
     {
@@ -3860,8 +3860,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 5532,
-        "end": 5571
+        "start": 5514,
+        "end": 5553
       }
     },
     {
@@ -3871,8 +3871,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 5283,
-        "end": 5334
+        "start": 5265,
+        "end": 5316
       }
     },
     {
@@ -3882,8 +3882,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 5414,
-        "end": 5466
+        "start": 5396,
+        "end": 5448
       }
     },
     {
@@ -3893,8 +3893,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 5594,
-        "end": 5622
+        "start": 5576,
+        "end": 5604
       }
     },
     {
@@ -3904,8 +3904,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 5060,
-        "end": 5092
+        "start": 5042,
+        "end": 5074
       }
     },
     {
@@ -3915,8 +3915,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 5024,
-        "end": 5093
+        "start": 5006,
+        "end": 5075
       }
     },
     {
@@ -3926,8 +3926,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 5170,
-        "end": 5202
+        "start": 5152,
+        "end": 5184
       }
     },
     {
@@ -4168,8 +4168,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3987,
-        "end": 4007
+        "start": 3969,
+        "end": 3989
       }
     },
     {
@@ -4179,8 +4179,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 4027,
-        "end": 4084
+        "start": 4009,
+        "end": 4066
       }
     },
     {
@@ -4190,8 +4190,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3822,
-        "end": 3842
+        "start": 3804,
+        "end": 3824
       }
     },
     {
@@ -4201,8 +4201,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3862,
-        "end": 3909
+        "start": 3844,
+        "end": 3891
       }
     },
     {
@@ -4212,8 +4212,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3448,
-        "end": 3518
+        "start": 3430,
+        "end": 3500
       }
     },
     {
@@ -4223,8 +4223,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3423,
-        "end": 3519
+        "start": 3405,
+        "end": 3501
       }
     },
     {
@@ -4234,19 +4234,8 @@
       "level": null,
       "span": {
         "path": "src/Acme.Api/Channels.cs",
-        "start": 3323,
-        "end": 3357
-      }
-    },
-    {
-      "id": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.SqsShipments(IAmazonSQS)::AmazonSQSClient#0",
-      "caller": "example.com/acme/conformance::src/Acme.Api/Channels.cs::Acme.Api.Channels.SqsShipments.SqsShipments(IAmazonSQS)",
-      "target": null,
-      "level": null,
-      "span": {
-        "path": "src/Acme.Api/Channels.cs",
-        "start": 3256,
-        "end": 3277
+        "start": 3305,
+        "end": 3339
       }
     },
     {

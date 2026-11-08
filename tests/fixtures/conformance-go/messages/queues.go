@@ -20,8 +20,7 @@ func SqsProduce(ctx context.Context, cfg aws.Config) {
 	client.SendMessage(ctx, &sqs.SendMessageInput{QueueUrl: aws.String(os.Getenv("QUEUE_URL"))})
 }
 
-func SqsConsume(ctx context.Context, cfg aws.Config) {
-	client := sqs.NewFromConfig(cfg)
+func SqsConsume(ctx context.Context, client *sqs.Client) {
 	input := &sqs.ReceiveMessageInput{QueueUrl: aws.String(queueHost + "tasks")}
 	client.ReceiveMessage(ctx, input)
 	client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{QueueUrl: aws.String(queueHost + "reports")})

@@ -221,6 +221,15 @@ def source(lang, service, operation, field, shape, mode, name, variable):
             + "(context.Background(), " + request + ") }\n"), marker
 
 
+def declared_sqs(lang, service, mode):
+    """SQS keeps its earlier forms: a client the source declares with the SDK's client type,
+    through the plain aliases Java and C# record. Go records none, and every Go case aliases the
+    client; C#'s hop locals are untyped (`var`), Java's declare `SqsClient`."""
+    if service != "sqs" or lang == "go":
+        return False
+    return mode in ("type_only", "hidden") or (lang == "java" and mode in ("name_hop", "opaque_hop"))
+
+
 def seed(run):
     roots, oracle = {}, []
     # Separate directories per case avoid accidental method-name collisions making an
@@ -257,7 +266,7 @@ def seed(run):
                 oracle.append(dict(language=lang, service=service, operation=operation, mode=mode,
                                    path=path, marker=marker, class_name=class_name, name=name, variable=variable, role=role,
                                    contract=prefix(service) + "::" + name,
-                                   accepted=mode in ("literal", "env", "exact_hop", "builder", "multiple"),
+                                   accepted=mode in ("literal", "env", "exact_hop", "builder", "multiple") or declared_sqs(lang, service, mode),
                                    unresolved=mode == "env" or operation == "GetParametersByPath",
                                    contracts=[prefix(service) + "::" + n for n in ([name, name + "-other"] if mode == "multiple" else [name])]))
         # A separate neutral provisioner gives each literal use one exact reference.

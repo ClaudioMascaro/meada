@@ -327,6 +327,11 @@ unresolved reader. A DynamoDB transaction's `ConditionCheck` is a reader of its 
 when the same transaction writes another table. Computed batch keys follow the same literal
 and environment rules as other name arguments.
 
+The Java 2.x, Go v2 and .NET SQS forms existed before constructor evidence, so a client the
+source declares with the SDK's SQS client type keeps them: a field, parameter or typed local,
+injected ones included. A repository type of that name hides the SDK's. Other services need
+construction.
+
 ### Image execution representation (#662, 2026-11-06)
 
 The image addition keeps export format 1. Builder locations use the optional provider `at`

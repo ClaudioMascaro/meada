@@ -408,4 +408,46 @@ impl<'c, 'a> Origins<'c, 'a> {
             .call(path, index)
             .is_some()
     }
+
+    /// Whether the receiver of the call at `index` of `path` is declared with one of `types`, as
+    /// the SQS forms read it before constructor evidence: the type the source writes for the
+    /// field, property, parameter or local (`names::declared` in Java and Go, the type as written
+    /// in C#), through the locals bound to another name (`Code::local`; Go binds none). Neither a
+    /// call nor a name match supplies the type, and a repository type of that name hides the
+    /// SDK's.
+    pub(super) fn declared(&self, path: &'a str, index: usize, types: &[&str]) -> bool {
+        let Some(call) = self.code.call(path, index).filter(|_| !types.is_empty()) else {
+            return false;
+        };
+        let receiver = match self.code.receiver(path, index) {
+            Some(Value::Ref(name)) => name.as_str(),
+            Some(_) => return false,
+            None => match call.callee.rsplit_once('.') {
+                Some((receiver, _)) if !receiver.starts_with('(') => receiver,
+                _ => return false,
+            },
+        };
+        let known = |s: &str| types.contains(&s);
+        let (mut scope, mut name) = (call.scope.as_str(), receiver);
+        for _ in 0..crate::resolve::EVAL_DEPTH {
+            let held = name.strip_prefix("this.").unwrap_or(name);
+            if self.language != Language::Csharp {
+                if let Some(typed) = crate::names::declared(self.code, path, scope, held) {
+                    return crate::names::one(&typed, known).is_some();
+                }
+            } else if let Some((at, within, ty)) = self.code.written(path, scope, held) {
+                // C# keeps outside types out of `externs`: read the type as written.
+                return crate::names::known(self.code, at, within, ty, known).is_some();
+            }
+            match self
+                .code
+                .local(path, scope, held)
+                .map(|b| (&b.within, &b.value))
+            {
+                Some((within, Value::Ref(next))) => (scope, name) = (within, next),
+                _ => return false,
+            }
+        }
+        false
+    }
 }

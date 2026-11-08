@@ -651,7 +651,10 @@ Os SDKs Java 2.x, Go v2 e .NET reconhecem SQS, SNS, EventBridge e Kinesis como c
 e S3, DynamoDB, SSM Parameter Store e Secrets Manager como recursos. O cliente precisa nascer
 num construtor do SDK: `create()` ou `builder().build()` em Java, `New` ou `NewFromConfig`
 em Go, e `new Amazon...Client(...)` em C#. Aliases e fábricas seguem apenas saltos `exact`;
-um tipo injetado sozinho, um nome oculto ou um salto por nome não comprova o cliente.
+um tipo injetado sozinho, um nome oculto ou um salto por nome não comprova o cliente. O SQS
+mantém as formas anteriores: um campo, parâmetro ou local tipado declarado com o tipo de
+cliente SQS do SDK (`SqsClient`, `SqsAsyncClient`, `*sqs.Client`, `IAmazonSQS`,
+`AmazonSQSClient`) é um cliente, inclusive injetado; um tipo do repositório com esse nome não é.
 
 Nomes literais e ARNs identificam o contrato; uma leitura do ambiente mantém o lado sem nome
 resolvido e registra a variável, inclusive em produtores. Lotes preservam todos os nomes.
@@ -1926,9 +1929,9 @@ não são lidos.
 | Redis streams | `StackExchange.Redis` |
 | Azure Service Bus | `Azure.Messaging.ServiceBus` |
 
-Os clientes AWS exigem origem em construtor, como descrito na seção de SDKs AWS. Os demais
-clientes valem pelo tipo que o código escreve ou pela construção que os criou, resolvidos
-pelos `using`s, nunca só pelo nome.
+Os clientes AWS exigem origem em construtor, exceto os `IAmazonSQS` e `AmazonSQSClient`
+declarados do SQS, como descrito na seção de SDKs AWS. Os demais clientes valem pelo tipo que o
+código escreve ou pela construção que os criou, resolvidos pelos `using`s, nunca só pelo nome.
 
 **Limites conhecidos.**
 

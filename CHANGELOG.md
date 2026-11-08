@@ -95,13 +95,14 @@ All notable changes to Meada are recorded here. The format follows
   `meada.decisions.toml`, including provisioning links and stale-choice reporting. Release
   level: minor, included in meada and meada-core 1.4.0.
 
-- Constructor-backed AWS SDK sides in Java 2.x, Go v2 and .NET: SQS, SNS, EventBridge,
-  Kinesis, S3, DynamoDB, SSM Parameter Store and Secrets Manager. Literal names and ARNs join
+- Constructor-backed AWS SDK sides in Java 2.x, Go v2 and .NET: SQS, SNS, EventBridge, Kinesis,
+  S3, DynamoDB, SSM Parameter Store and Secrets Manager. Literal names and ARNs join
   infrastructure contracts; environment reads retain their variable without a guessed name.
   Every batch name is kept. Exact factories and aliases are followed, hidden bindings and
-  incomplete origins are rejected, and injected types alone create no SDK side. .NET named
-  requests and its S3 metadata spelling are supported. SDK resource links are exact while
-  declarations remain declared; hierarchy queries stay unresolved. Release level: minor, meada and meada-core 1.4.0 (#660).
+  incomplete origins are rejected, and injected types alone create no SDK side, except SQS,
+  whose declared client types keep its earlier forms. .NET named requests and its S3 metadata
+  spelling are supported. SDK resource links are exact while declarations remain declared;
+  hierarchy queries stay unresolved. Release level: minor, meada and meada-core 1.4.0 (#660).
 - AWS SDK use sides in TypeScript, JavaScript (SDK v3) and Python (boto3): SNS publishes,
   EventBridge event entries and Kinesis record writes produce channel sides; S3 and DynamoDB
   operations write or read resource sides; SSM and Secrets Manager operations read resources.

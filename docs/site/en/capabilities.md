@@ -41,7 +41,7 @@ Analysis uses each crate's default configuration for x86_64 Linux. Items with a 
 
 ### Go
 
-AWS SDK for Go v2 clients count when made by `New` or `NewFromConfig`, including aliases and factories followed through exact calls. SQS, SNS, EventBridge, Kinesis, S3, DynamoDB, SSM and Secrets Manager use the AWS SDK forms below. A declared type alone supplies no client origin.
+AWS SDK for Go v2 clients count when made by `New` or `NewFromConfig`, including aliases and factories followed through exact calls. SQS, SNS, EventBridge, Kinesis, S3, DynamoDB, SSM and Secrets Manager use the AWS SDK forms below. A declared type alone supplies no client origin, except an SQS client declared `*sqs.Client`, which keeps the SQS forms Meada read before.
 
 The `module` path in each `go.mod` resolves imports to package directories, including `replace` to a repository directory. A nested module owns its subtree. Files in one directory with the same `package` share a scope, including `_test.go`. Meada does not run the Go toolchain.
 
@@ -353,7 +353,7 @@ link to patterns. The console graph lists provisioner sides and their separate l
 
 ### AWS SDKs in Java, Go and C#
 
-The operations below create contract sides without a `meada.toml` declaration. The client must come from an SDK constructor, with every hop used to establish that origin resolving through an exact call. Parameters, locals and type names that hide the client or its constructor do not inherit its origin. A literal name joins its provisioned physical name; an environment read without a matching workload entry stays unresolved and retains `env:NAME` in the export, including producers. Meada never reads the process environment.
+The operations below create contract sides without a `meada.toml` declaration. The client must come from an SDK constructor, with every hop used to establish that origin resolving through an exact call. Parameters, locals and type names that hide the client or its constructor do not inherit its origin. SQS keeps its earlier forms in Java, Go and C#: a field, parameter or typed local the source declares with the SDK's client type (`SqsClient` or `SqsAsyncClient`, `*sqs.Client`, `IAmazonSQS` or `AmazonSQSClient`) is a client, injected ones included; a repository type of that name is not. A literal name joins its provisioned physical name; an environment read without a matching workload entry stays unresolved and retains `env:NAME` in the export, including producers. Meada never reads the process environment.
 
 Environment reads through Go and C# import aliases retain their variable name. A named request stays unresolved when its name field is written, including through an alias.
 

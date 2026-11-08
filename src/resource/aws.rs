@@ -301,6 +301,7 @@ const SERVICES: &[Service] = &[
             go: "github.com/aws/aws-sdk-go-v2/service/s3",
             csharp: "Amazon.S3.AmazonS3Client",
         },
+        declared: &[],
         kind: "s3",
         operations: &[
             SdkOperation {
@@ -347,6 +348,7 @@ const SERVICES: &[Service] = &[
             go: "github.com/aws/aws-sdk-go-v2/service/dynamodb",
             csharp: "Amazon.DynamoDBv2.AmazonDynamoDBClient",
         },
+        declared: &[],
         kind: "dynamodb",
         operations: &[
             SdkOperation {
@@ -405,6 +407,7 @@ const SERVICES: &[Service] = &[
             go: "github.com/aws/aws-sdk-go-v2/service/ssm",
             csharp: "Amazon.SimpleSystemsManagement.AmazonSimpleSystemsManagementClient",
         },
+        declared: &[],
         kind: "ssm",
         operations: &[
             SdkOperation {
@@ -451,6 +454,7 @@ const SERVICES: &[Service] = &[
             go: "github.com/aws/aws-sdk-go-v2/service/secretsmanager",
             csharp: "Amazon.SecretsManager.AmazonSecretsManagerClient",
         },
+        declared: &[],
         kind: "secretsmanager",
         operations: &[
             SdkOperation {

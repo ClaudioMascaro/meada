@@ -489,7 +489,9 @@ mod tests {
         let modules = Go.modules(&[], &BTreeMap::new()).unwrap();
         let resolver = Resolver::new(&files, modules, &Go);
         let code = Code::new(&resolver, &files, &Go);
-        crate::channel::message::lines(messages(&code))
+        let mut messages = messages(&code);
+        messages.extend(super::super::aws::test_messages(&code, None));
+        crate::channel::message::lines(messages)
     }
 
     #[test]
@@ -518,6 +520,43 @@ func run() {
                 "nats unresolved producer".to_string(),
                 format!("nats orders.created consumer inline x.go::run.@{at}"),
             ]
+        );
+    }
+
+    /// A client declared `*sqs.Client` is the SDK's, injected as a parameter; one a factory found
+    /// by name returns is not.
+    #[test]
+    fn an_sqs_client_declared_with_the_sdk_type_sends_and_receives() {
+        let src = r#"package x
+
+import (
+	"context"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+)
+
+const host = "https://sqs.eu-west-1.amazonaws.com/123456789012/"
+
+func Send(ctx context.Context, client *sqs.Client) {
+	client.SendMessage(ctx, &sqs.SendMessageInput{QueueUrl: aws.String(host + "tasks")})
+}
+
+func Poll(ctx context.Context, client *sqs.Client) {
+	client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{QueueUrl: aws.String(host + "tasks")})
+}
+
+type knownFactory struct{}
+
+func (knownFactory) makeClient() *sqs.Client { return nil }
+
+func Guessed(ctx context.Context, opaque Unknown) {
+	made := opaque.makeClient()
+	made.SendMessage(ctx, &sqs.SendMessageInput{QueueUrl: aws.String(host + "guessed")})
+}
+"#;
+        assert_eq!(
+            lines(src),
+            ["sqs tasks producer", "sqs tasks consumer x.go::Poll"]
         );
     }
 }

@@ -649,7 +649,10 @@ The Java 2.x, Go v2 and .NET SDK forms recognize SQS, SNS, EventBridge and Kines
 and S3, DynamoDB, SSM Parameter Store and Secrets Manager as resources. The client must originate
 in an SDK constructor: Java `create()` or `builder().build()`, Go `New` or `NewFromConfig`,
 and C# `new Amazon...Client(...)`. Aliases and factories follow only `exact` hops; an injected
-type alone, a hidden name or a name-matched hop does not establish the client.
+type alone, a hidden name or a name-matched hop does not establish the client. SQS keeps its
+earlier forms: a field, parameter or typed local declared with the SDK's SQS client type
+(`SqsClient`, `SqsAsyncClient`, `*sqs.Client`, `IAmazonSQS`, `AmazonSQSClient`) is a client,
+injected ones included, while a repository type of that name is not.
 
 Literal names and ARNs identify the contract; an environment read keeps an unresolved side
 and records its variable, including for producers. Batches retain every name. Readers belong
@@ -1926,9 +1929,10 @@ secrets are not read.
 | Redis streams | `StackExchange.Redis` |
 | Azure Service Bus | `Azure.Messaging.ServiceBus` |
 
-AWS clients require constructor origin, as described in the AWS SDK section. Other clients
-count by their written type or the construction that created them, resolved through the
-`using`s, never by the name alone.
+AWS clients require constructor origin, except SQS's declared `IAmazonSQS` and
+`AmazonSQSClient`, as described in the AWS SDK section. Other clients count by their written
+type or the construction that created them, resolved through the `using`s, never by the name
+alone.
 
 **Known limits.**
 

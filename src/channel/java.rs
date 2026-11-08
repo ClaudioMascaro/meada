@@ -169,8 +169,8 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
             let Some(client) = client(code, path, stored) else {
                 continue;
             };
-            // Kotlin keeps its existing typed SQS form. Java's AWS form is constructor-backed
-            // and shared with the other services in `aws`.
+            // Kotlin keeps its existing typed SQS form. Java's AWS form is shared with the other
+            // services in `aws`, where a declared SQS client type still stands for construction.
             if client == Client::Sqs && !kotlin(path) {
                 continue;
             }
@@ -1132,7 +1132,7 @@ mod tests {
     #[test]
     fn an_sqs_client_sends_and_receives_on_the_queue_its_url_names() {
         let body = "static final String URL = \"https://sqs.us-east-1.amazonaws.com/123/orders\";\n\
-            final SqsClient sqs = SqsClient.create();\n\
+            SqsClient sqs;\n\
             @Value(\"${app.queue-url}\") String configured;\n\
             void send() {\n\
             sqs.sendMessage(SendMessageRequest.builder().queueUrl(URL).messageBody(\"b\").build());\n\
@@ -1249,10 +1249,36 @@ mod tests {
     /// A request a wrapper takes as its parameter is read at each caller.
     #[test]
     fn an_sqs_request_a_wrapper_takes_is_read_at_each_caller() {
-        let body = "final SqsClient sqs = SqsClient.create();\n\
+        let body = "SqsClient sqs;\n\
             void send(SendMessageRequest request) { sqs.sendMessage(request); }\n\
             void ship() { send(SendMessageRequest.builder().queueUrl(\"https://sqs/1/shipments\").build()); }";
         assert_eq!(read(SQS, body), ["sqs shipments producer"]);
+    }
+
+    /// A declared client is the SDK's through the imports alone: a repository type of that
+    /// name hides it.
+    #[test]
+    fn a_repository_type_named_like_the_sqs_client_hides_it() {
+        let body = "static class SqsClient { void sendMessage(Object request) {} }\n\
+            SqsClient sqs;\n\
+            void send() { sqs.sendMessage(SendMessageRequest.builder().queueUrl(\"https://sqs/1/hidden\").build()); }";
+        assert!(read(SQS, body).is_empty());
+    }
+
+    /// A parameter or a typed local declared with the SDK's SQS client type is a client
+    /// whatever made it, also through a plain alias.
+    #[test]
+    fn a_declared_sqs_client_is_read_through_an_alias() {
+        let body = "void send(SqsClient conduit, foreign.Factory opaque) {\n\
+            var alias = conduit;\n\
+            alias.sendMessage(SendMessageRequest.builder().queueUrl(\"https://sqs/1/aliased\").build());\n\
+            SqsClient made = opaque.makeClient();\n\
+            made.sendMessage(SendMessageRequest.builder().queueUrl(\"https://sqs/1/typed\").build());\n\
+            }";
+        assert_eq!(
+            read(SQS, body),
+            ["sqs aliased producer", "sqs typed producer"]
+        );
     }
 
     /// A wrapper reached only by a name match (a call on a receiver whose type the source does

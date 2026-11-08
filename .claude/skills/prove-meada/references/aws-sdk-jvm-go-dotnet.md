@@ -117,12 +117,13 @@ missing binary or unreachable surface is BLOCKED with the raw error. A mismatch 
 answer key is BROKEN; the builder fixes the app. A missing answer key is UNPROVEN. Do not
 relax an assertion to match the app; rerun the same flows after fixes, at most three rounds.
 
-Constructor hidden-name controls do not enumerate every Java/C#/Go scope form. They prove
-the seeded forms. Most positive methods use a local alias of a constructed client, and an
-exact local factory adds one value-flow hop; field/constructor injection and every possible
-chain are not covered by this neutral probe. Typed clients without a constructor are refused,
-even when older SQS forms accepted them. Kotlin and non-AWS clients answer to base parity.
-The console graph's new data check remains distinct from its generic page budget check.
+Constructor hidden-name controls do not enumerate every Java/C#/Go scope form. They prove the
+seeded forms. Most positive methods use a local alias of a constructed client, and an exact
+local factory adds one value-flow hop; field/constructor injection and every possible chain are
+not covered by this neutral probe. Typed clients without a constructor are refused, except SQS,
+whose declared SDK client type keeps the older forms' origin. Kotlin and non-AWS clients answer
+to base parity. The console graph's new data check remains distinct from its generic page budget
+check.
 
 After inspection, stop any run-owned HTTP process still named by a pid file and remove only
 this run's generated `work/` and server-index directories. Preserve oracle, raw outputs,

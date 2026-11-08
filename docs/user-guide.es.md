@@ -661,7 +661,10 @@ canales, y S3, DynamoDB, SSM Parameter Store y Secrets Manager como recursos. El
 nacer en un constructor del SDK: `create()` o `builder().build()` en Java, `New` o
 `NewFromConfig` en Go y `new Amazon...Client(...)` en C#. Los alias y las fábricas siguen solo
 saltos `exact`; un tipo inyectado por sí solo, un nombre oculto o un salto por nombre no
-comprueba el cliente.
+comprueba el cliente. SQS conserva sus formas anteriores: un campo, parámetro o local tipado
+declarado con el tipo de cliente SQS del SDK (`SqsClient`, `SqsAsyncClient`, `*sqs.Client`,
+`IAmazonSQS`, `AmazonSQSClient`) es un cliente, también inyectado; un tipo del repositorio con
+ese nombre no lo es.
 
 Los nombres literales y los ARN identifican el contrato; una lectura del entorno mantiene el
 lado sin nombre resuelto y registra su variable, también en productores. Los lotes conservan
@@ -1958,9 +1961,9 @@ opciones y los user secrets no se leen.
 | Redis streams | `StackExchange.Redis` |
 | Azure Service Bus | `Azure.Messaging.ServiceBus` |
 
-Los clientes AWS requieren origen en constructor, como explica la sección de SDK de AWS. Los
-demás clientes valen por su tipo escrito o por la construcción que los creó, resueltos por
-los `using`, nunca solo por el nombre.
+Los clientes AWS requieren origen en constructor, salvo los `IAmazonSQS` y `AmazonSQSClient`
+declarados de SQS, como explica la sección de SDK de AWS. Los demás clientes valen por su tipo
+escrito o por la construcción que los creó, resueltos por los `using`, nunca solo por el nombre.
 
 **Límites conocidos.**
 

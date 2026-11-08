@@ -4,20 +4,22 @@
   Go v2 and .NET. `contract/sdk.rs` and `contract/sdk/{java,go,csharp}.rs` share request syntax,
   field selection, name normalization and site construction; `contract/sdk/origins.rs` accepts
   constructed clients through complete exact factory/caller evidence, memoized with cycle
-  detection under the existing evaluation depth and per-file work budgets. A declared type or
-  an opaque alternative supplies no constructor evidence. `Code::constant_value` preserves a
-  final/readonly field's constructor scope. The SDK readers replace Java, Go and C#'s earlier
-  typed SQS forms; Kotlin retains its existing form. Java returns, Go maps and C# collection
-  initializers are pack syntax, with no service table in a pack. Producer `via` retains an
-  unresolved environment variable in the export, as consumer `via` already does. `contracts.method`
-  records a written SDK operation for both directions; `ContractKind::use_level` keeps SDK uses
-  exact and declarations declared when linking each other or a provisioner. Unresolved resource
-  sides never link. Readers and channel handlers belong to their enclosing symbols; writers
-  remain operation calls. Java request folding shares Spring injection with channel forms. Runtime
+  detection under the existing evaluation depth and per-file work budgets. An opaque alternative
+  supplies no constructor evidence, nor does a declared type outside a service's
+  `Service::declared` list (SQS's earlier injected clients, read by `Origins::declared`).
+  `Code::constant_value` preserves a final/readonly field's constructor scope. The SDK readers
+  replace Java, Go and C#'s earlier typed SQS forms, keeping their declared client types; Kotlin
+  retains its existing form. Java returns, Go maps and C# collection initializers are pack
+  syntax, with no service table in a pack. Producer `via` retains an unresolved environment
+  variable in the export, as consumer `via` already does. `contracts.method` records a written
+  SDK operation for both directions; `ContractKind::use_level` keeps SDK uses exact and
+  declarations declared when linking each other or a provisioner. Unresolved resource sides
+  never link. Readers and channel handlers belong to their enclosing symbols; writers remain
+  operation calls. Java request folding shares Spring injection with channel forms. Runtime
   environment aliases keep verified provenance. C# selector writes are indexed lazily once
-  across the group to invalidate named request objects even through another receiver alias;
-  Go shares the existing field-write index. The folded Java name reader rejects a value-bound
-  head before considering on-demand type candidates.
+  across the group to invalidate named request objects even through another receiver alias; Go
+  shares the existing field-write index. The folded Java name reader rejects a value-bound head
+  before considering on-demand type candidates.
 
 
 
@@ -39,9 +41,10 @@ another SDK reader's shared expansion budget. Factory parents are explicitly nam
 kind; calling a module does not construct a Session.
 
 Java 2.x, Go v2 and .NET use the second kind-owned matrix in each AWS module. Their shared
-constructor/request mechanics remain in `contract/sdk/`, with complete memoized origins;
-a type annotation alone supplies no client. Their recorded operation is `contracts.method`,
-while JavaScript/TypeScript/Python store `sdk:aws` in `contracts.via`.
+constructor/request mechanics remain in `contract/sdk/`, with complete memoized origins; a type
+annotation alone supplies no client, except SQS's declared client types. Their recorded
+operation is `contracts.method`, while JavaScript/TypeScript/Python store `sdk:aws` in
+`contracts.via`.
 
 The operation list and its argument names are in the user guide's AWS SDK section. A batch
 retains each named table, parameter or secret; an omitted EventBridge bus is `default`.

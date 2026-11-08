@@ -41,7 +41,7 @@ A análise usa a configuração padrão de cada crate para x86_64 Linux. Itens c
 
 ### Go
 
-O AWS SDK for Go v2 reconhece clientes criados por `New` ou `NewFromConfig`, inclusive aliases e fábricas seguidas por chamadas exatas. SQS, SNS, EventBridge, Kinesis, S3, DynamoDB, SSM e Secrets Manager seguem as formas da seção de SDKs AWS abaixo. Um tipo declarado sozinho não comprova a origem do cliente.
+O AWS SDK for Go v2 reconhece clientes criados por `New` ou `NewFromConfig`, inclusive aliases e fábricas seguidas por chamadas exatas. SQS, SNS, EventBridge, Kinesis, S3, DynamoDB, SSM e Secrets Manager seguem as formas da seção de SDKs AWS abaixo. Um tipo declarado sozinho não comprova a origem do cliente, exceto um cliente SQS declarado `*sqs.Client`, que mantém as formas de SQS que o Meada já lia.
 
 O caminho `module` de cada `go.mod` resolve imports para pastas de pacotes, incluindo `replace` para uma pasta do repositório. Um módulo aninhado controla sua subárvore. Arquivos na mesma pasta com o mesmo `package` compartilham escopo, inclusive `_test.go`. O Meada não executa o toolchain Go.
 
@@ -353,7 +353,7 @@ nunca se ligam a padrões. O grafo da console lista os provisionadores e suas li
 
 ### SDKs AWS em Java, Go e C#
 
-As operações abaixo criam lados de contratos sem declaração em `meada.toml`. O cliente precisa vir de um construtor do SDK, com cada salto usado para comprovar essa origem resolvido por uma chamada exata. Parâmetros, locais e nomes de tipos que escondem o cliente ou seu construtor não herdam sua origem. Um nome literal liga ao nome físico provisionado; uma leitura do ambiente fica sem resolução e conserva `env:NOME` no export, inclusive em produtores. O Meada nunca lê o ambiente do processo.
+As operações abaixo criam lados de contratos sem declaração em `meada.toml`. O cliente precisa vir de um construtor do SDK, com cada salto usado para comprovar essa origem resolvido por uma chamada exata. Parâmetros, locais e nomes de tipos que escondem o cliente ou seu construtor não herdam sua origem. O SQS mantém as formas anteriores em Java, Go e C#: um campo, parâmetro ou local tipado que o código declara com o tipo de cliente do SDK (`SqsClient` ou `SqsAsyncClient`, `*sqs.Client`, `IAmazonSQS` ou `AmazonSQSClient`) é um cliente, inclusive injetado; um tipo do repositório com esse nome não é. Um nome literal liga ao nome físico provisionado; uma leitura do ambiente fica sem resolução e conserva `env:NOME` no export, inclusive em produtores. O Meada nunca lê o ambiente do processo.
 
 Leituras do ambiente por aliases de importação em Go e C# mantêm o nome da variável. Um pedido guardado por nome fica sem resolução quando há escrita no campo que nomeia o recurso, inclusive por um alias.
 

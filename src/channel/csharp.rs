@@ -680,7 +680,7 @@ mod tests {
 
     #[test]
     fn an_sqs_client_sends_to_and_receives_from_the_queue_its_url_ends_in() {
-        let body = "IAmazonSQS _sqs = new AmazonSQSClient();\n\
+        let body = "IAmazonSQS _sqs;\n\
             const string Base = \"https://sqs.us-east-1.amazonaws.com/123/\";\n\
             async Task Send(string dynamicUrl) {\n\
               await _sqs.SendMessageAsync(\"https://sqs.us-east-1.amazonaws.com/123/orders\", \"body\");\n\
@@ -705,6 +705,22 @@ mod tests {
                 "sqs payments consumer A/C.cs::A.C.Poll()",
             ]
         );
+    }
+
+    /// A declared type is the SDK's only through the usings: a repository type of that name, or
+    /// a client read off a call, names no SQS client.
+    #[test]
+    fn an_sqs_client_is_declared_by_the_sdk_type_not_by_its_name() {
+        let body = "interface IAmazonSQS { Task SendMessageAsync(string url, string body); }\n\
+            IAmazonSQS _hidden;\n\
+            async Task Send(Amazon.SQS.IAmazonSQS injected, dynamic factory) {\n\
+              var alias = injected;\n\
+              await alias.SendMessageAsync(\"https://sqs.us-east-1.amazonaws.com/123/orders\", \"b\");\n\
+              await _hidden.SendMessageAsync(\"https://sqs.us-east-1.amazonaws.com/123/hidden\", \"b\");\n\
+              var made = factory.Make();\n\
+              await made.SendMessageAsync(\"https://sqs.us-east-1.amazonaws.com/123/guessed\", \"b\");\n\
+            }\n";
+        assert_eq!(lines(SQS, body), ["sqs orders producer"]);
     }
 
     const NATS: &str = "using NATS.Client;\n";

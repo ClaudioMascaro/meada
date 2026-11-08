@@ -99,6 +99,9 @@ pub(crate) struct Operation {
 /// A kind's SDK client and the operations it recognizes.
 pub(crate) struct Service {
     pub client: Client,
+    /// SDK client types whose declaration alone is the client's origin, in full: the injected
+    /// clients SQS forms took before constructor evidence (#660). Empty for the other services.
+    pub declared: &'static [&'static str],
     pub kind: &'static str,
     pub operations: &'static [Operation],
 }
@@ -142,7 +145,8 @@ impl Language {
     }
 }
 
-/// Extract the kind's SDK operations, without declarations standing in for construction.
+/// Extract the kind's SDK operations. Only a service's `declared` types stand in for
+/// construction.
 pub(crate) fn extract<'a>(
     code: &Code<'a>,
     prefix: &str,
@@ -185,7 +189,9 @@ pub(crate) fn extract<'a>(
                 else {
                     continue;
                 };
-                if !origins.call(path, index, &service.client) {
+                if !origins.call(path, index, &service.client)
+                    && !origins.declared(path, index, service.declared)
+                {
                     continue;
                 }
                 let changed =
