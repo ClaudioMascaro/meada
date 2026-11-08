@@ -56,19 +56,23 @@
   `ALERT_MATCH_WORK_MAX`; past them all alert links of the pass are discarded and status reports
   the same evaluation limit. Before reading a value, each condition is charged what matching it
   may take: for an expression (`regexp::Compiled::cost`), a step per automaton position (a
-  character, dot, class or assertion, once per copy its counted repetitions make) and byte offset
-  it may start at, every offset of the value and one more inside or after an unbounded
-  repetition, else one more than the characters what precedes it may vary by; for a comparison
-  or a substring search, the bytes it reads. A condition on tags is charged for all of them at
-  once. A rule is matched against a route twice when the route links it, once to select the route
-  and once for each matcher that names the link, and charged each time. Matching `.*a.{1000}a.*`
-  against a label of 300,000 bytes mixing `a` and `b` (the lazy DFA cannot hold its states and
-  gives way to the PikeVM, 84 ns a step in a debug build) took 43 s for each route; it now stops
-  before matching. The ceiling bounds steps, not time: 2^26 steps take about 5.6 s at that rate, a
-  class of many ranges runs slower (200 ns a step for one of 48 bytes) and `status` may run two
-  passes. A literal alternation costs its characters whatever the value and an ordinary
-  expression on a short value a few hundred steps: 1,000 rules tried against 400 routes of
-  `.*-apix` on an 11-byte label take 28.8 million.
+  character, dot or class, and each state that reads none: an assertion, an empty expression, each
+  end of a capture, the choice of an alternation, the loop or option of a repetition; once per
+  copy its counted repetitions make) and byte offset it may start at, every offset of the value
+  and one more inside or after an unbounded repetition, else one more than the characters what
+  precedes it may vary by; for a comparison or a substring search, the bytes it reads. A condition
+  on tags is charged for all of them at once. A rule is matched against a route twice when the
+  route links it, once to select the route and once for each matcher that names the link, and
+  charged each time. Matching `.*a.{1000}a.*` against a label of 300,000 bytes mixing `a` and `b`
+  (the lazy DFA cannot hold its states and gives way to the PikeVM, 84 ns a step in a debug build)
+  took 43 s for each route; it now stops before matching, as do twenty empty captures in each of a
+  hundred counted copies (121 s for a pass of 2^26 steps when they cost none). The ceiling bounds
+  steps, not time: 2^26 steps take about 5.6 s at that rate, a class of many single characters
+  runs slower (243 ns a step, 16.5 s a pass) and `status` may run two passes. A literal
+  alternation costs its characters and its choice whatever the value and an ordinary expression on
+  a short value a few hundred steps: 1,000 rules tried against 400 routes of `.*-apix` on an
+  11-byte label take 33.6 million, and OpsGenie monitors of ten short tags matched by such
+  expressions stop at about 5,200 a pass.
 
 - `ALERT_PCL_DEPTH_MAX` (`alert/pcl.rs`): 64 nested PCL groups or unary conditions.
   Deeper conditions remain unread as a whole. The literal reader recognizes `matches`,

@@ -399,10 +399,11 @@ All notable changes to Meada are recorded here. The format follows
 - A long label matched by an Alertmanager route expression of many automaton positions no longer
   runs the expression over it for every route: `.*a.{1000}a.*` against a label of 300,000 bytes
   took 43 s for each route (debug). Before reading a value, each condition is charged a step per
-  automaton position (an assertion included) and byte offset it may start at, or the bytes it
-  reads for a comparison, against a ceiling of 2^26 steps per pass apart from the evaluation
-  ceiling, so that label stops before matching and `status` reports the evaluation limit, while
-  route visits and evaluations count as before.
+  automaton position (a state that reads nothing, such as an assertion or an empty capture,
+  included) and byte offset it may start at, or the bytes it reads for a comparison, against a
+  ceiling of 2^26 steps per pass apart from the evaluation ceiling, so that label stops before
+  matching and `status` reports the evaluation limit, while route visits and evaluations count as
+  before.
 - A Python file of thousands of AWS SDK operations on clients a factory function returns no
   longer takes minutes to index: the operations one reader asks about in a file keep the answers
   no limit cut and share a budget of 2^18 steps, one operation taking up to all that is left

@@ -14,9 +14,10 @@ use std::sync::{Arc, LazyLock};
 const RE2_REPEAT_MAX: u32 = 1000;
 
 /// An expression compiled within its part of the ceilings, and its automaton positions (each
-/// character, dot, class or assertion, once per copy its counted repetitions make) by the byte
-/// offsets of a value each may start at: matching takes at most a step per position and offset,
-/// whichever engine runs, as the lazy DFA gives way to the PikeVM when its states do not fit.
+/// character, dot or class and each state that reads none, once per copy its counted repetitions
+/// make) by the byte offsets of a value each may start at: matching takes at most a step per
+/// position and offset, whichever engine runs, as the lazy DFA gives way to the PikeVM when its
+/// states do not fit.
 pub(super) struct Compiled {
     pub(super) regex: regex::Regex,
     /// The positions an unbounded repetition, around or before them, lets start at any offset.
@@ -46,9 +47,9 @@ impl Compiled {
             Some(starts?.saturating_add(most?.saturating_sub(fewest)))
         };
         match ast {
-            Ast::Empty(_) | Ast::Flags(_) => (0, Some(0)),
-            // An assertion reads no character but is tried at each offset it may start at.
-            Ast::Assertion(_) => {
+            Ast::Flags(_) => (0, Some(0)),
+            // A state that reads no character is still walked at each offset it may start at.
+            Ast::Empty(_) | Ast::Assertion(_) => {
                 self.step(starts);
                 (0, Some(0))
             }
@@ -60,8 +61,17 @@ impl Compiled {
                 self.step(starts);
                 (1, Some(1))
             }
-            Ast::Group(group) => self.add(&group.ast, starts),
+            Ast::Group(group) => {
+                let length = self.add(&group.ast, starts);
+                // A capture saves its start and its end, each a state.
+                if !matches!(group.kind, GroupKind::NonCapturing(_)) {
+                    self.step(starts);
+                    self.step(widen(starts, length));
+                }
+                length
+            }
             Ast::Alternation(alternation) => {
+                self.step(starts);
                 (alternation.asts.iter()).fold((usize::MAX, Some(0)), |(fewest, most), ast| {
                     let (lo, hi) = self.add(ast, starts);
                     (fewest.min(lo), most.zip(hi).map(|(a, b)| a.max(b)))
@@ -93,7 +103,12 @@ impl Compiled {
                 let (mut length, mut entry) = ((0, Some(0)), starts);
                 for copy in 1..=copies {
                     let looping = max.is_none() && copy == copies;
-                    length = self.add(&repetition.ast, entry.filter(|_| !looping));
+                    let at = entry.filter(|_| !looping);
+                    // An optional or looping copy is entered through a choice.
+                    if looping || copy > min {
+                        self.step(at);
+                    }
+                    length = self.add(&repetition.ast, at);
                     entry = widen(entry, length);
                 }
                 let most = max.zip(length.1).map(|(m, hi)| m.saturating_mul(hi));
@@ -864,8 +879,9 @@ mod tests {
     /// Matching takes a step per position and offset it may start at: inside or after an
     /// unbounded repetition, every offset of the value and one more; elsewhere, one more than the
     /// characters what precedes it may vary by. A literal alternation costs its characters,
-    /// whatever the value. An assertion is a position too, though it reads no character: each
-    /// `\b` or `\B` of `.*(?:\b|\B){100}` may be tried at every offset.
+    /// whatever the value. A state that reads no character is a position too: an assertion, an
+    /// empty expression, each end of a capture, the choice of an alternation and the loop or
+    /// option of a repetition, so each `()` of `.*w(?:()[wy]){2}` is three.
     #[test]
     fn matching_costs_a_step_per_position_and_offset_it_may_start_at() {
         let cost = |pattern: &str, len: usize| compile(pattern, 1, 1).map(|c| c.cost(len));
@@ -879,8 +895,9 @@ mod tests {
                 cost("[a-z0-9-]{1,63}", 1_000_000),
                 cost("a{0}b", 10),
                 cost(r".*(?:\b|\B){100}", 9),
+                cost(".*w(?:()[wy]){2}", 9),
             ],
-            [100_200, 12, 3, 6, 21, 63, 1, 2010].map(Some)
+            [100_300, 13, 4, 12, 31, 125, 1, 3020, 110].map(Some)
         );
     }
 }

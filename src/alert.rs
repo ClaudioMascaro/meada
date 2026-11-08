@@ -48,8 +48,8 @@ const ALERT_MATCH_WORK_MAX: usize = 1_000_000;
 /// value, what matching it may take, `regexp::Compiled::cost` for an expression and the bytes it
 /// reads for a comparison or a substring search.
 // ponytail: `.*a.{1000}a.*` ran 84 ns a step (debug) on a label of 60,000 bytes mixing `a` and
-// `b`, where four such routes took 20.5 s; 2^26 steps take about 5.6 s at that rate, slower for
-// a class of many ranges (200 ns a step for one of 48 bytes).
+// `b`, where four such routes took 20.5 s; 2^26 steps take about 5.6 s at that rate, 16.5 s for
+// a class of many single characters (243 ns a step).
 const ALERT_SCAN_MAX: usize = 1 << 26;
 
 /// What one workspace pass may still spend: route visits, matcher evaluations and template bytes
@@ -1284,9 +1284,10 @@ mod tests {
 
     /// Matching steps have their own ceiling: 1,000 rules tried against 400 continuing routes of
     /// `.*-apix`, then linked by `other-.*`, spend about 805,000 visits and evaluations, as they
-    /// did before steps were charged, and 28.8 million steps (6 positions at each of the 12
-    /// offsets of an 11-byte label), below `ALERT_SCAN_MAX`, so every rule links. Charged in units
-    /// of 64 steps against the evaluation ceiling, those 72 steps were one unit a pair, past it.
+    /// did before steps were charged, and 33.6 million steps (7 positions, the loop of `.*`
+    /// included, at each of the 12 offsets of an 11-byte label), below `ALERT_SCAN_MAX`, so every
+    /// rule links. Charged in units of 64 steps against the evaluation ceiling, those 84 steps
+    /// were one unit a pair, past it.
     #[test]
     fn matching_steps_leave_the_evaluation_ceiling_to_visits_and_evaluations() {
         let rules = (0..1000).map(|i| serde_json::json!({"alert":format!("R{i}"), "expr":"up", "labels":{"support":"other-thing"}})).collect::<Vec<_>>();
@@ -1294,7 +1295,7 @@ mod tests {
         assert!(rules.len() * (1 + routes.len() * 2) < ALERT_MATCH_WORK_MAX);
         assert!(rules.len() * routes.len() * 3 > ALERT_MATCH_WORK_MAX);
         let looped = regexp::Pass::new(1).compile(".*-apix", 1).unwrap();
-        assert_eq!(looped.cost("other-thing".len()), 72);
+        assert_eq!(looped.cost("other-thing".len()), 84);
         routes.push(serde_json::json!({"receiver":"team", "match_re":{"support":"other-.*"}}));
         let source = serde_json::json!({"groups":[{"name":"wide", "rules":rules}], "route":{"receiver":"team", "routes":routes}, "receivers":[{"name":"team"}]}).to_string();
         assert!(source.len() < crate::lang::MAX_BYTES);
@@ -1384,11 +1385,12 @@ mod tests {
     }
 
     /// A condition is charged, before it reads a value, the steps matching may take, and no unit
-    /// of `ALERT_MATCH_WORK_MAX`: `.*a{999}` may run its 1,000 positions at each of the 128 offsets
-    /// of a label of 127 bytes, 128,000 steps, which a budget of 128,000 pays and one of 127,999
-    /// does not. A substring search costs the bytes it reads and the tags of a condition are
-    /// charged together. On a short value, `[a-z]+-(?:prod|staging)` runs its 13 positions at each
-    /// of 12 offsets, and a literal alternation costs its characters.
+    /// of `ALERT_MATCH_WORK_MAX`: `.*a{999}` may run its 1,001 positions (the loop of `.*`
+    /// included) at each of the 128 offsets of a label of 127 bytes, 128,128 steps, which a budget
+    /// of 128,128 pays and one of 128,127 does not. A substring search costs the bytes it reads and
+    /// the tags of a condition are charged together. On a short value, `[a-z]+-(?:prod|staging)`
+    /// runs its 15 positions at each of 12 offsets, and a literal alternation costs its characters
+    /// and its choice.
     #[test]
     fn a_condition_is_charged_what_matching_may_cost_before_it_reads_a_value() {
         let matcher = |op, key: &str, pattern: &str| Matcher {
@@ -1420,10 +1422,10 @@ mod tests {
         let long = rule(&"b".repeat(127), Vec::new());
         let expression = matcher(Op::Regex, "support", ".*a{999}");
         assert!(matches!(
-            run(&expression, &long, 128_000),
+            run(&expression, &long, 128_128),
             Ok((Some(false), 0, 0))
         ));
-        assert!(matches!(run(&expression, &long, 127_999), Err(Limit::Work)));
+        assert!(matches!(run(&expression, &long, 128_127), Err(Limit::Work)));
         let search = matcher(Op::Contains, "support", "a");
         assert!(matches!(run(&search, &long, 127), Ok((Some(false), 0, 0))));
         assert!(matches!(run(&search, &long, 126), Err(Limit::Work)));
@@ -1432,18 +1434,18 @@ mod tests {
             (0..4).map(|i| format!("{i}{}", "b".repeat(30))).collect(),
         );
         let tags = matcher(Op::Regex, "tags", ".*");
-        assert!(matches!(run(&tags, &tagged, 128), Ok((Some(true), 0, 0))));
-        assert!(matches!(run(&tags, &tagged, 127), Err(Limit::Work)));
+        assert!(matches!(run(&tags, &tagged, 256), Ok((Some(true), 0, 0))));
+        assert!(matches!(run(&tags, &tagged, 255), Err(Limit::Work)));
         let short = rule("orders-prod", Vec::new());
         let ordinary = matcher(Op::Regex, "support", "[a-z]+-(?:prod|staging)");
         assert!(matches!(
-            run(&ordinary, &short, 156),
+            run(&ordinary, &short, 180),
             Ok((Some(true), 0, 0))
         ));
-        assert!(matches!(run(&ordinary, &short, 155), Err(Limit::Work)));
+        assert!(matches!(run(&ordinary, &short, 179), Err(Limit::Work)));
         let literal = matcher(Op::Regex, "support", "orders-prod|orders-staging");
-        assert!(matches!(run(&literal, &short, 25), Ok((Some(true), 0, 0))));
-        assert!(matches!(run(&literal, &short, 24), Err(Limit::Work)));
+        assert!(matches!(run(&literal, &short, 26), Ok((Some(true), 0, 0))));
+        assert!(matches!(run(&literal, &short, 25), Err(Limit::Work)));
     }
 
     #[test]
