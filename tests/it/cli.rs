@@ -4,7 +4,7 @@ use crate::common;
 
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use common::{
     assert_golden, chain, decisions, documented_chain, drift_chain, fixture_repo, loose_chain,
@@ -1395,6 +1395,31 @@ fn status_reports_orphans_follow_lang() {
         assert_golden(
             &format!("cli.status-orphans.{name}.txt"),
             &meada(&app, lang, "status"),
+        );
+    }
+}
+
+/// A reader that closes its end before `meada` prints (`meada export | head -1`) is no error: the
+/// rest of the output is dropped and the command ends as it would, with no panic.
+#[test]
+fn a_reader_that_closed_its_end_drops_the_output_quietly() {
+    let repo = fixture_repo("cli_closed_pipe", "ts-basic", None);
+    for command in ["export", "status"] {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_meada"))
+            .current_dir(&repo)
+            .arg(command)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("meada runs");
+        // The read end closes before the index is read, so the first write fails.
+        drop(child.stdout.take());
+        let out = child.wait_with_output().expect("meada ends");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            out.status.success() && stderr.is_empty(),
+            "{command}: {}: {stderr}",
+            out.status
         );
     }
 }
