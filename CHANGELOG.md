@@ -461,9 +461,12 @@ All notable changes to Meada are recorded here. The format follows
   printing to stdout: Broken pipe (os error 32)" and exited 101. `meada decide` and `meada mcp`,
   which never panicked, still stop with a "Broken pipe" error and exit 1.
 - Kustomize: with two bases of their own `namePrefix` that write the same names, a Deployment no
-  longer references the other base's ServiceAccount, nor an Ingress the other base's Service:
-  among the objects written with the name a reference uses, the one the same prefixes and
-  suffixes renamed is chosen, as Kustomize does.
+  longer references the other base's ServiceAccount, nor an Ingress the other base's Service. A
+  ServiceAccount or Service reference resolves as Kustomize's name reference does once the tree
+  is built: among the objects a stage renamed or moved from the name as written, the only one,
+  else those whose prefix and suffix stages end as the referrer's; with none left, the object
+  called by the name as written, a final name included, and with several (a tree Kustomize
+  refuses), none.
 - Ingress: a path Meada cannot read as a literal prefix (`/store/(.*)`, `/api/*`) no longer drops
   out of the routing table, where a shorter rule then claimed its URLs; it is an unread mount at
   its literal head cut at its last slash. A `use-regex` annotation or a missing `pathType` also

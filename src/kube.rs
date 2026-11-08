@@ -16,9 +16,9 @@
 //!
 //! A Service selects the pod template owners whose pod labels hold its selector, a pod template
 //! references the ConfigMaps and Secrets of its `env`, `envFrom` and volumes and its service
-//! account, and an Ingress its backend Services, all in the same namespace and unit; a name is
-//! matched as the object was written and, when several objects were written with it, the one the
-//! same prefixes and suffixes renamed, as Kustomize does once the tree is built.
+//! account, and an Ingress its backend Services, all in the same namespace and unit. A ConfigMap
+//! or Secret name is renamed with its target at each stage; a ServiceAccount or Service name
+//! resolves as Kustomize's name reference resolves it once the tree is built (`Obj::resolve`).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -182,8 +182,13 @@ struct Obj {
     /// The name as written, which the references to it use.
     orig: String,
     name: String,
-    /// The bytes of `name` the prefixes on the way added before `orig`.
-    head: usize,
+    /// The lengths of the non-empty prefixes and suffixes the stages on the way added to `orig`,
+    /// innermost first: Kustomize compares these lists to pick among objects of one name.
+    prefixes: Vec<usize>,
+    suffixes: Vec<usize>,
+    /// Whether a stage renamed it or set its namespace: only then is it a Kustomize candidate
+    /// for the references that use `orig`.
+    moved: bool,
     ns: Option<String>,
     path: String,
     line: usize,
@@ -192,6 +197,19 @@ struct Obj {
     facts: Facts,
     /// About the bytes a copy holds (`weight`), what an overlay copying it spends.
     weight: usize,
+}
+
+/// Kustomize's `SameEndingSubSlice` of two lists given outermost first: whether one ends the
+/// other, two empty ones included; `lax`, an empty list matches any.
+fn ends_alike<'s>(
+    a: impl ExactSizeIterator<Item = &'s str>,
+    b: impl ExactSizeIterator<Item = &'s str>,
+    lax: bool,
+) -> bool {
+    match (a.len(), b.len()) {
+        (0, n) | (n, 0) => lax || n == 0,
+        _ => a.zip(b).all(|(x, y)| x == y),
+    }
 }
 
 /// The bytes `facts` writes as `Debug`, counted without keeping them.
@@ -209,23 +227,47 @@ fn weight(facts: &Facts) -> usize {
 }
 
 impl Obj {
-    /// The prefixes and the suffixes the kustomizations on the way added to its name.
-    fn affixes(&self) -> (&str, &str) {
-        let (prefixes, rest) = self.name.split_at(self.head);
-        (prefixes, &rest[self.orig.len()..])
+    /// Its prefixes, outermost first.
+    fn outer_prefixes(&self) -> impl ExactSizeIterator<Item = &str> {
+        let mut at = 0;
+        (self.prefixes.iter().rev()).map(move |&n| {
+            at += n;
+            &self.name[at - n..at]
+        })
     }
 
-    /// Of `candidates`, the objects written with one name a reference from `self` names: all
-    /// when one, else those the prefixes and suffixes that renamed `self` renamed too, if any,
-    /// as Kustomize picks among several.
-    fn choose(&self, objs: &[Obj], candidates: &[usize]) -> Vec<usize> {
-        let own = (candidates.iter().copied())
-            .filter(|&j| objs[j].affixes() == self.affixes())
-            .collect::<Vec<_>>();
-        if candidates.len() > 1 && !own.is_empty() {
-            own
-        } else {
-            candidates.to_vec()
+    /// Its suffixes, outermost first.
+    fn outer_suffixes(&self) -> impl ExactSizeIterator<Item = &str> {
+        let mut end = self.name.len();
+        (self.suffixes.iter().rev()).map(move |&n| {
+            end -= n;
+            &self.name[end..end + n]
+        })
+    }
+
+    /// Whether `other`'s prefix and suffix stages end as `self`'s do, Kustomize's
+    /// `PrefixesSuffixesEquals`: `lax`, an empty list matches any.
+    fn renamed_alike(&self, other: &Obj, lax: bool) -> bool {
+        ends_alike(self.outer_prefixes(), other.outer_prefixes(), lax)
+            && ends_alike(self.outer_suffixes(), other.outer_suffixes(), lax)
+    }
+
+    /// The objects a reference from `self` resolves to once Kustomize has built the tree, as
+    /// its `selectReferral` picks: of those a stage renamed or moved from the name as written
+    /// (`written`), the only one, else the ones whose stages end as `self`'s do. With none left
+    /// the reference stays as written and names the object called so (`named`); several left is
+    /// a tree Kustomize refuses to build, which resolves to none.
+    fn resolve(&self, objs: &[Obj], written: &[usize], named: &[usize]) -> Vec<usize> {
+        let mut chosen = written.to_vec();
+        for lax in [true, false] {
+            if chosen.len() > 1 {
+                chosen.retain(|&j| self.renamed_alike(&objs[j], lax));
+            }
+        }
+        match chosen.len() {
+            0 => named.to_vec(),
+            1 => chosen,
+            _ => Vec::new(),
         }
     }
 
@@ -467,7 +509,9 @@ fn object(
         kind: kind.into(),
         orig: name.into(),
         name: name.into(),
-        head: 0,
+        prefixes: Vec::new(),
+        suffixes: Vec::new(),
+        moved: false,
         ns,
         path: path.into(),
         line,
@@ -773,12 +817,17 @@ impl<'m> Eval<'m> {
                 || UNPREFIXED.contains(&o.kind.as_str()))
             {
                 o.name = format!("{}{}{}", k.prefix, o.name, k.suffix);
-                o.head += k.prefix.len();
+                (o.prefixes
+                    .extend((!k.prefix.is_empty()).then_some(k.prefix.len())));
+                (o.suffixes
+                    .extend((!k.suffix.is_empty()).then_some(k.suffix.len())));
+                o.moved = true;
             }
-            if let Some(ns) = &k.namespace
-                && !cluster_scoped(&o.kind, &o.group)
-            {
-                o.ns = Some(ns.clone());
+            if let Some(ns) = &k.namespace {
+                o.moved = true;
+                if !cluster_scoped(&o.kind, &o.group) {
+                    o.ns = Some(ns.clone());
+                }
             }
             for (_, image) in &mut o.facts.images {
                 *image = retag(image, &k.images);
@@ -819,16 +868,22 @@ impl<'m> Eval<'m> {
             .collect::<HashSet<_>>();
         objs.dedup_by_key(|o| o.address());
         let addresses: Vec<String> = objs.iter().map(Obj::address).collect();
+        // The Services by namespace and the name a stage renamed them from, and by their own.
         let mut service_names = HashMap::<_, Vec<_>>::new();
+        let mut services_named = HashMap::<_, Vec<_>>::new();
         for (j, (object, address)) in objs.iter().zip(&addresses).enumerate() {
             if object.kind == "Service"
                 && object.group.is_empty()
                 && !duplicate_services.contains(address)
             {
-                service_names
-                    .entry((object.ns.as_deref(), object.orig.as_str()))
-                    .or_default()
-                    .push(j);
+                let ns = object.ns.as_deref();
+                if object.moved {
+                    (service_names.entry((ns, object.orig.as_str())).or_default()).push(j);
+                }
+                (services_named
+                    .entry((ns, object.name.as_str()))
+                    .or_default())
+                .push(j);
             }
         }
         let roles: Vec<Option<crossplane::Role>> =
@@ -846,8 +901,12 @@ impl<'m> Eval<'m> {
                 .ingress
                 .iter()
                 .map(|route| {
-                    let targets = service_names.get(&(o.ns.as_deref(), route.service.as_str()));
-                    let targets = o.choose(&objs, targets.map_or(&[], Vec::as_slice));
+                    let key = (o.ns.as_deref(), route.service.as_str());
+                    let targets = o.resolve(
+                        &objs,
+                        service_names.get(&key).map_or(&[], Vec::as_slice),
+                        services_named.get(&key).map_or(&[], Vec::as_slice),
+                    );
                     (
                         route,
                         match targets[..] {
@@ -1035,24 +1094,23 @@ impl<'m> Eval<'m> {
             }
         }
         let crossplane = crossplane::Targets::new(objs);
-        // What a reference names: kind, name as written, namespace.
+        // What a reference names, by kind, namespace and the name a stage renamed or moved it
+        // from (`written`) or its own (`named`); a ConfigMap or a Secret, renamed with its
+        // references at each stage, only by its own.
+        // ponytail: the name as written is its only previous name, so a reference by the name a
+        // middle stage gave names the object called so; keep each stage's name if overlays do.
+        let mut written: HashMap<(&str, &str, Option<&str>), Vec<usize>> = HashMap::new();
         let mut named: HashMap<(&str, &str, Option<&str>), Vec<usize>> = HashMap::new();
         // The pod template owners that carry a label, by namespace.
         let mut labelled: HashMap<(Option<&str>, &str, &str), Vec<usize>> = HashMap::new();
         for (i, o) in objs.iter().enumerate() {
             if o.group.is_empty() {
-                named
-                    .entry((
-                        &o.kind,
-                        if matches!(o.kind.as_str(), "ConfigMap" | "Secret") {
-                            &o.name
-                        } else {
-                            &o.orig
-                        },
-                        o.ns.as_deref(),
-                    ))
-                    .or_default()
-                    .push(i);
+                if o.moved && !matches!(o.kind.as_str(), "ConfigMap" | "Secret") {
+                    let key = (o.kind.as_str(), o.orig.as_str(), o.ns.as_deref());
+                    written.entry(key).or_default().push(i);
+                }
+                let key = (o.kind.as_str(), o.name.as_str(), o.ns.as_deref());
+                named.entry(key).or_default().push(i);
             }
             for (k, v) in o.facts.labels.iter().flatten() {
                 labelled.entry((o.ns.as_deref(), k, v)).or_default().push(i);
@@ -1062,9 +1120,11 @@ impl<'m> Eval<'m> {
             let mut targets: BTreeSet<(&str, String)> = BTreeSet::new();
             let ns = o.ns.as_deref();
             let find = |kind: &str, name: &str| {
-                o.choose(
+                let key = (kind, name, ns);
+                o.resolve(
                     objs,
-                    named.get(&(kind, name, ns)).map_or(&[], Vec::as_slice),
+                    written.get(&key).map_or(&[], Vec::as_slice),
+                    named.get(&key).map_or(&[], Vec::as_slice),
                 )
             };
             if !duplicate_services.contains(&addresses[i])
@@ -1741,6 +1801,114 @@ mod tests {
             "{:?}",
             edge.ingress
         );
+    }
+
+    /// Kustomize picks among the objects a stage renamed or moved from the name a reference
+    /// uses: the only one, else those whose prefix and suffix stages end as the referrer's do
+    /// (an empty list matching any, then strictly). With none left the reference stays as
+    /// written and names the object called so, if any; several left is a tree it refuses.
+    #[test]
+    fn a_reference_picks_among_renamed_objects_by_their_outermost_stages() {
+        let kust = |resources: &[&str], prefix: &str| {
+            let listed: String = resources.iter().map(|r| format!("  - {r}\n")).collect();
+            match prefix {
+                "" => format!("resources:\n{listed}"),
+                _ => format!("resources:\n{listed}namePrefix: {prefix}\n"),
+            }
+        };
+        let svc =
+            "apiVersion: v1\nkind: Service\nmetadata:\n  name: x\nspec:\n  selector:\n    app: x\n";
+        let edge = |target: &str| {
+            format!(
+                "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: edge\nspec:\n  \
+                 rules:\n    - host: shop.example.com\n      http:\n        paths:\n          - path: /api\n            \
+                 pathType: Prefix\n            backend:\n              service:\n                name: {target}\n"
+            )
+        };
+        // The Service an Ingress routes to and the ones it references.
+        let routed = |tree: &[(&str, String)]| {
+            let tree = (tree.iter())
+                .map(|(p, t)| (p.to_string(), t.as_bytes().to_vec()))
+                .collect::<Vec<_>>();
+            let out = evaluate(&tree);
+            let edge = (out.nodes.iter()).find(|n| n.ty == "Ingress").unwrap();
+            let routes = (edge.ingress.iter())
+                .map(|r| r.service.clone())
+                .collect::<BTreeSet<_>>();
+            let references = (out.references.iter())
+                .filter(|r| r.source.starts_with("Ingress"))
+                .map(|r| r.target.clone())
+                .collect::<BTreeSet<_>>();
+            (routes, references)
+        };
+        let to = |service: &str| {
+            let one = BTreeSet::from([service.to_string()]);
+            (one.clone(), one)
+        };
+        let none = (BTreeSet::from([String::new()]), BTreeSet::new());
+        // An Ingress in base b- under a-, a Service in a- and one in a sibling c-.
+        let nested = [
+            ("top/kustomization.yaml", kust(&["../mid", "../c"], "")),
+            ("mid/kustomization.yaml", kust(&["../b", "svc.yaml"], "a-")),
+            ("mid/svc.yaml", svc.into()),
+            ("b/kustomization.yaml", kust(&["edge.yaml"], "b-")),
+            ("b/edge.yaml", edge("x")),
+            ("c/kustomization.yaml", kust(&["svc.yaml"], "c-")),
+            ("c/svc.yaml", svc.into()),
+        ];
+        assert_eq!(routed(&nested), to("Service/a-x"));
+        // An Ingress in m- over its base a-, the same Service in a sibling b-.
+        let over = [
+            ("top/kustomization.yaml", kust(&["../mid", "../b"], "")),
+            ("mid/kustomization.yaml", kust(&["../a", "edge.yaml"], "m-")),
+            ("mid/edge.yaml", edge("x")),
+            ("a/kustomization.yaml", kust(&["svc.yaml"], "a-")),
+            ("a/svc.yaml", svc.into()),
+            ("b/kustomization.yaml", kust(&["svc.yaml"], "b-")),
+            ("b/svc.yaml", svc.into()),
+        ];
+        assert_eq!(routed(&over), to("Service/m-a-x"));
+        // Stages compare as lists: one `a-b-` is not `b-` then `a-`, so nothing is left.
+        let joined = [
+            (
+                "top/kustomization.yaml",
+                kust(&["../mid", "../p", "../c"], ""),
+            ),
+            ("mid/kustomization.yaml", kust(&["../r"], "a-")),
+            ("r/kustomization.yaml", kust(&["edge.yaml"], "b-")),
+            ("r/edge.yaml", edge("x")),
+            ("p/kustomization.yaml", kust(&["svc.yaml"], "a-b-")),
+            ("p/svc.yaml", svc.into()),
+            ("c/kustomization.yaml", kust(&["svc.yaml"], "c-")),
+            ("c/svc.yaml", svc.into()),
+        ];
+        assert_eq!(routed(&joined), none);
+        // Neither base's stages end as the referrer's: the reference names no object.
+        let sibling = |second: &str| {
+            [
+                (
+                    "top/kustomization.yaml",
+                    kust(&["../r", "../a", "../n"], ""),
+                ),
+                ("r/kustomization.yaml", kust(&["edge.yaml"], "c-")),
+                ("r/edge.yaml", edge("x")),
+                ("a/kustomization.yaml", kust(&["svc.yaml"], "a-")),
+                ("a/svc.yaml", svc.into()),
+                ("n/kustomization.yaml", kust(&["svc.yaml"], second)),
+                ("n/svc.yaml", svc.into()),
+            ]
+        };
+        assert_eq!(routed(&sibling("b-")), none);
+        // An object no stage renamed or moved is no candidate: the renamed one is the only one.
+        assert_eq!(routed(&sibling("")), to("Service/a-x"));
+        // A reference by the final name stays as written and names that object.
+        let written = [
+            ("top/kustomization.yaml", kust(&["../web", "edge.yaml"], "")),
+            ("top/edge.yaml", edge("frontend-x")),
+            ("web/kustomization.yaml", kust(&["svc.yaml"], "frontend-")),
+            ("web/svc.yaml", svc.into()),
+        ];
+        assert_eq!(routed(&written), to("Service/frontend-x"));
     }
 
     #[test]

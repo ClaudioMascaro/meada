@@ -38,9 +38,12 @@ routing. No partial alias table may select a shorter mount.
   `resources`, `bases` and `components` are followed, and patches (`patches`,
   `patchesStrategicMerge`, `patchesJson6902`, the files they name are no objects), generators,
   `commonLabels`, `labels`, `replacements`, `helmCharts` and the object a `kind: List` holds
-  are not applied or read. A name is matched as the object was written and, among several
-  objects written with it, the one the same prefixes and suffixes renamed, so a reference to an
-  object a generator or a patch renames resolves to nothing. A cluster-scoped kind is known by
+  are not applied or read. A ConfigMap or Secret reference is renamed with its target at each
+  stage. A ServiceAccount or Service reference resolves once the tree is built, among the
+  objects a stage renamed or moved from the name as written, by their outermost prefix and
+  suffix stages (Kustomize's `selectReferral`), else by that name, so a reference to an object a
+  generator or a patch renames resolves to nothing; the name a middle stage gave is no previous
+  name. A cluster-scoped kind is known by
   the list `CLUSTER_SCOPED`; a custom resource outside it takes a Kustomize `namespace`. An
   object with no namespace is `<Kind>[.<group>]/<name>`, which reads as a cluster-scoped one.
   A document is no object when its name holds `{{` (a Helm template). A manifest no
@@ -78,5 +81,5 @@ routing. No partial alias table may select a shorter mount.
   cluster-scoped by group: a v1 composite or managed resource takes a Kustomize `namespace` in
   its address, as Kustomize gives it one without its CRD. A `compositionRef`,
   `defaultCompositionRef` or `enforcedCompositionRef` is matched by the composition's name as
-  written, as every Kubernetes reference is, though Kustomize renames the composition under a
-  `namePrefix` and leaves those fields alone.
+  written, every composition written with it and none picked by its prefixes, though Kustomize
+  renames the composition under a `namePrefix` and leaves those fields alone.

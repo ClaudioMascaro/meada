@@ -270,11 +270,13 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   `spec.jobTemplate.spec.template` holds containers, or a Pod) whose pod labels hold its
   selector, a pod template to the ConfigMaps and Secrets named in `env`, `envFrom` and volumes
   (including projected ones) and to its `serviceAccountName`, and an Ingress to the Services of
-  its rules and default backend, each in the same namespace and the same unit, by the name as
-  written before any prefix or suffix and, among several objects written with it, the one the
-  same prefixes and suffixes renamed (Kustomize renames the references once the tree is built),
-  all
-  `exact`, with the `via` naming how the source names the target.
+  its rules and default backend, each in the same namespace and the same unit, all `exact`, with
+  the `via` naming how the source names the target. A ConfigMap or a Secret is renamed with the
+  references to it at each stage. A ServiceAccount or a Service resolves as Kustomize's name
+  reference does once the tree is built: among the objects a stage renamed or moved from the
+  name as written, the only one, else those whose prefix and suffix stages end as the
+  referrer's do (an empty list matching any, then strictly); with none left the reference names
+  the object called so, and with several it names none (Kustomize refuses that tree).
 - **Images.** The images of a workload's containers once the overlay's `images` applied are
   stored with its node and shown by `context`; the image contract of ADR 0026 reads them.
 - **Storage.** The nodes and references of Kubernetes join the Terraform ones in `iac_nodes`
