@@ -30,6 +30,16 @@
     "setup-pre-commit": "off"
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/cloud-git-check-off.sh"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
