@@ -65,8 +65,11 @@ routing. No partial alias table may select a shorter mount.
   yields its nodes under itself alone), and kustomizations that only name each other in a cycle
   are no root, so what they list is plain. An entry cut by `WALK_MAX` or a stored budget is left
   out with no unresolved row (the files of a component left out are plain units of their
-  directory, as files no overlay reaches are), and a non-object file a kustomization lists, created or deleted
-  alone, leaves the unresolved count as it was until a manifest changes. A
+  directory, as files no overlay reaches are), and a non-object file a kustomization lists,
+  created or deleted alone, leaves the unresolved count as it was until a manifest changes.
+  `kind` is not checked, where Kustomize refuses the entry: a kustomization listed under
+  `components` applies as one, a file there reads as a resource, and a component also listed
+  as a base applies as a base only. A
   Kubernetes file changed anywhere evaluates every root and overlay of the repository again
   (the `ponytail:` in `index::refresh_keeping`), reading every YAML or JSON file that says
   `apiVersion`. The Kustomize `images` transformer matches the name before the tag, as written

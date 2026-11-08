@@ -54,7 +54,8 @@ pub(crate) fn constructor_argument<'a>(
     Some((client, package, constructor))
 }
 
-/// Expands the object options of the first constructed argument, preserving wrapper sites.
+/// Expands the object options of the first constructed argument, preserving wrapper sites. A
+/// field assigned after the object is made, before the call, is unknown.
 pub(crate) fn constructor_options<'a, T>(
     code: &Code<'a>,
     path: &'a str,
@@ -62,7 +63,8 @@ pub(crate) fn constructor_options<'a, T>(
     read: &impl Fn(&[(String, crate::lang::Value)]) -> Option<T>,
 ) -> Vec<crate::resolve::Expanded<'a, T>> {
     use crate::lang::Value;
-    code.expand(crate::resolve::Expand::Call(path, index), &|args, _| {
+    let writes = crate::contract::sdk::mutations::writes;
+    code.expand_written(path, index, writes, &|args, _| {
         let Some(Value::New(_, args)) = args.first() else {
             return read(&[]);
         };

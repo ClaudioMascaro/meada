@@ -49,6 +49,40 @@ pub(super) fn made<'a>(code: &Code<'a>, path: &'a str, index: usize, client: &st
     .is_some()
 }
 
+/// The local a builder chain starts from (`b` in `b.message(..).build()`).
+pub(crate) fn root(value: &Value) -> Option<&str> {
+    let Value::Call(call) = value else {
+        return None;
+    };
+    let mut call = call;
+    loop {
+        match call.receiver.as_deref()? {
+            Value::Call(next) => call = next,
+            Value::Ref(local) => return Some(local),
+            _ => return None,
+        }
+    }
+}
+
+/// Whether the builder `local`, in `scope` of `path`, receives a call outside `range`: a Java
+/// builder changes in place, so the chain a call reads off it is not what it was given.
+pub(crate) fn rebuilt<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    local: &str,
+    range: &std::ops::Range<usize>,
+) -> bool {
+    code.local(path, scope, local).is_some()
+        && code.files()[path].calls.iter().any(|c| {
+            c.scope == scope
+                && c.callee
+                    .rsplit_once('.')
+                    .is_some_and(|(head, _)| head == local)
+                && !(range.start <= c.range.start && c.range.end <= range.end)
+        })
+}
+
 pub(super) fn names<'v>(call: &'v Invocation, field: &str) -> Option<Vec<Option<&'v Value>>> {
     let Some(request) = call.args.first() else {
         return Some(vec![None]);

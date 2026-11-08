@@ -31,6 +31,27 @@ pub(super) fn step<'a>(
     frames: &[Frame<'a>],
 ) -> Option<Handle> {
     let call = code.call(path, index)?;
+    // A builder held in a local that receives another call changes in place.
+    let builder = matches!(
+        parent.stage,
+        Stage::BusBuilder
+            | Stage::SenderBuilder
+            | Stage::ReceiverBuilder
+            | Stage::ReceiverQueueBuilder
+            | Stage::ReceiverTopicBuilder
+            | Stage::EventBuilder
+            | Stage::StorageBuilder
+            | Stage::SecretBuilder
+    );
+    let parent = match &call.receiver {
+        Some(crate::lang::Value::Ref(b))
+            if builder
+                && crate::contract::sdk::java::rebuilt(code, path, &call.scope, b, &call.range) =>
+        {
+            Handle::new(parent.stage)
+        }
+        _ => parent,
+    };
     let name = |n| {
         argument(
             code,

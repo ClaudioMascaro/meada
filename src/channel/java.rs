@@ -197,18 +197,20 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
                     let read = |a: &[Value], _: &Keywords| streams(a, map_of);
                     out.extend(consume_with(code, chain(), inject, broker, &read, None));
                 }
-                (Client::Sqs, "sendMessage") => {
-                    out.extend(produce_with(code, chain(), inject, broker, &queue_url));
-                }
-                (Client::Sqs, "receiveMessage") => {
-                    out.extend(consume_with(
-                        code,
-                        chain(),
-                        inject,
-                        broker,
-                        &queue_url,
-                        None,
-                    ));
+                (Client::Sqs, "sendMessage" | "receiveMessage") => {
+                    use crate::contract::sdk::java::{rebuilt, root};
+                    let changed = code.call(path, n).is_some_and(|c| {
+                        (c.args.first().and_then(root))
+                            .is_some_and(|b| rebuilt(code, path, &c.scope, b, &c.range))
+                    });
+                    let read = |a: &[Value], k: &Keywords| match changed {
+                        true => Some(vec![None]),
+                        false => queue_url(a, k),
+                    };
+                    out.extend(match method {
+                        "sendMessage" => produce_with(code, chain(), inject, broker, &read),
+                        _ => consume_with(code, chain(), inject, broker, &read, None),
+                    });
                 }
                 (Client::Rabbit, "convertAndSend") => {
                     let Some(written) = code.call(path, n) else {
@@ -1149,6 +1151,18 @@ mod tests {
                 "sqs unresolved producer",
                 "sqs orders consumer a.C.run()",
             ]
+        );
+        // A builder held in a local that receives another call names no queue.
+        let body = "SqsClient sqs;\n\
+            void send() {\n\
+            var b = SendMessageRequest.builder().queueUrl(\"https://sqs/1/old\");\n\
+            b.queueUrl(\"https://sqs/1/new\");\n\
+            sqs.sendMessage(b.messageBody(\"m\").build());\n\
+            var k = SendMessageRequest.builder().queueUrl(\"https://sqs/1/kept\");\n\
+            sqs.sendMessage(k.build());\n}";
+        assert_eq!(
+            read(SQS, body),
+            ["sqs unresolved producer", "sqs kept producer"]
         );
     }
 

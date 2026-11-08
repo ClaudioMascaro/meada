@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod csharp;
 mod go;
-mod java;
+pub(crate) mod java;
 pub(crate) mod mutations;
 pub(crate) mod origins;
 
@@ -275,7 +275,10 @@ fn changed_request<'a>(
             call.keyword("request").or_else(|| call.args.first()),
             csharp::field_name(field),
         ),
-        Language::Java => return false,
+        Language::Java => {
+            return (call.args.first().and_then(java::root))
+                .is_some_and(|b| java::rebuilt(code, path, &call.scope, b, &call.range));
+        }
     };
     let Some(Value::Ref(_)) = request else {
         return false;

@@ -488,11 +488,16 @@ All notable changes to Meada are recorded here. The format follows
 - Images: a module run from a local archive in one root no longer drops the image another root
   runs it from, with its environment and provisions; only the archive's root runs code without
   an image.
+- AWS SDK: a request changed after it is made names no resource: a TypeScript command input
+  whose field is assigned again before the `send`, and a Java builder held in a local that
+  receives another call (`b.topicArn(..)` before `client.publish(b.build())`), also for SQS and
+  Azure Service Bus, Event Hubs, Blob and Key Vault builders. Each gave an `exact` link and
+  provision to the name first written.
 - TypeScript and JavaScript: a generator (`function*` and `async function*`, declared or as an
   expression, a `*method()` of a class or an object) returns its iterator, so a `return new
-  Storage()` in one no longer makes it a client factory; it gave an SDK resource (S3, Pub/Sub,
-  Azure and the other factory-built clients) and an `exact` provision to code that never holds
-  the client.
+  Storage()` in one no longer makes it a client factory; it gave an SDK resource (Pub/Sub, Cloud
+  Storage, Azure Service Bus and Blob) and an `exact` provision to code that never holds the
+  client.
 
 ## [1.2.0] - 2026-11-04
 

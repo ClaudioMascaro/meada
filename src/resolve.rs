@@ -4698,6 +4698,8 @@ struct Written<'a, 'i> {
     chain: Option<&'a Call>,
     /// What the kind reads off annotated fields and parameters (`Code::expand_with`).
     inject: Option<&'i Inject<'a, 'i>>,
+    /// The calls that write a member (`Code::expand_written`).
+    writes: Option<CallWrites>,
 }
 
 /// What folding values and tracing where they come from may cost in one file, charged to the
@@ -6757,6 +6759,7 @@ impl<'a> Code<'a> {
                     at: (path, index),
                     chain: None,
                     inject,
+                    writes: None,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out);
             }
@@ -6772,6 +6775,7 @@ impl<'a> Code<'a> {
                     at: (path, index),
                     chain: Some(call),
                     inject,
+                    writes: None,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out);
             }
@@ -6790,10 +6794,39 @@ impl<'a> Code<'a> {
                     at,
                     chain: None,
                     inject,
+                    writes: None,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out);
             }
         }
+        out
+    }
+
+    /// `expand` of the call `index` of `path`, a member of an object it names read as the call
+    /// sees it: one a statement or a call (`writes`) changes after the object is made, and
+    /// before the call, is unknown.
+    pub(crate) fn expand_written<R>(
+        &self,
+        path: &'a str,
+        index: usize,
+        writes: CallWrites,
+        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
+    ) -> Vec<Expanded<'a, R>> {
+        let mut out = Vec::new();
+        let Some(call) = self.call(path, index) else {
+            return out;
+        };
+        let written = Written {
+            path,
+            scope: &call.scope,
+            args: &call.args,
+            kwargs: &call.kwargs,
+            at: (path, index),
+            chain: None,
+            inject: None,
+            writes: Some(writes),
+        };
+        self.walk(&written, &mut Vec::new(), read, &mut out);
         out
     }
 
@@ -6821,6 +6854,10 @@ impl<'a> Code<'a> {
             let fold = &mut Fold {
                 chain,
                 inject: written.inject,
+                selected: (written.writes).map(|writes| mutations::Selection {
+                    site: Some(written.at),
+                    writes,
+                }),
                 ..Fold::default()
             };
             self.eval(path, scope, v, frames, 0, fold, &mut wants)

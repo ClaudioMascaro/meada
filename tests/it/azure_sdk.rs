@@ -121,6 +121,27 @@ fn python_azure_operations_require_constructed_clients() {
     assert_golden("azure-sdk-python.export.json", &text);
 }
 
+/// A Java builder held in a local that receives another call names no entity; one nothing
+/// else calls keeps its name.
+#[test]
+fn a_java_azure_builder_changed_after_it_is_made_names_no_entity() {
+    let repo = fixture_repo("azure_sdk_java_changed", "azure-sdk-java", None);
+    std::fs::write(
+        repo.join("Worker.java"),
+        "import com.azure.messaging.servicebus.ServiceBusClientBuilder;\nclass Worker {\n\
+         void rebuilt() { var b = new ServiceBusClientBuilder().connectionString(connection).sender().queueName(\"old\"); b.queueName(\"new\"); b.buildClient().sendMessage(message); }\n\
+         void kept() { var k = new ServiceBusClientBuilder().connectionString(connection).sender().queueName(\"kept\"); k.buildClient().sendMessage(message); }\n}\n",
+    )
+    .unwrap();
+    let text = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&text).unwrap();
+    let contracts = (json["providers"].as_array().unwrap().iter())
+        .map(|s| s["contract"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert!(contracts.iter().all(|c| !c.contains("old")), "{text}");
+    assert!(contracts.contains(&"channel::servicebus::kept"), "{text}");
+}
+
 #[test]
 fn java_azure_builders_retain_only_the_explicit_entity_names() {
     let (text, json) = export("azure-sdk-java");

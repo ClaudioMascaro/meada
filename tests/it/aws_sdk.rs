@@ -472,6 +472,51 @@ fn sdk_environment_aliases_keep_provenance_and_hidden_java_collections_stay_unkn
     assert_export_golden("aws-sdk-alias-env.export.json", &text);
 }
 
+/// A request changed after it was made names no resource: a TypeScript input object whose field
+/// is assigned again, and a Java builder held in a local that receives another call. A field
+/// left alone, and a builder nothing else calls, keep their names.
+#[test]
+fn sdk_requests_changed_after_they_are_made_name_no_resource() {
+    let repo = fixture_repo(
+        "aws_sdk_changed_requests",
+        "aws-sdk",
+        Some("https://example.com/aws/app.git"),
+    );
+    std::fs::write(
+        repo.join("changed.ts"),
+        "import {S3Client, PutObjectCommand} from '@aws-sdk/client-s3';\n\
+         import {SNSClient, PublishCommand} from '@aws-sdk/client-sns';\n\
+         const s3 = new S3Client({});\nconst sns = new SNSClient({});\n\
+         export function store() { const input = {Bucket: 'old', Key: 'k'}; input.Bucket = 'new'; s3.send(new PutObjectCommand(input)); }\n\
+         export function publish() { const req = {TopicArn: 'old-topic', Message: 'm'}; req.TopicArn = 'new-topic'; sns.send(new PublishCommand(req)); }\n\
+         export function kept() { const input = {Bucket: 'kept', Key: 'k'}; input.Key = 'other'; s3.send(new PutObjectCommand(input)); }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("Builder.java"),
+        "import software.amazon.awssdk.services.sns.SnsClient;\n\
+         import software.amazon.awssdk.services.sns.model.PublishRequest;\n\
+         class Builder {\n\
+         void send() { var sns = SnsClient.builder().build(); var b = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old\"); b.topicArn(\"arn:aws:sns:us-east-1:123:new\"); sns.publish(b.message(\"m\").build()); }\n\
+         void kept() { var sns = SnsClient.builder().build(); var k = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:kept\"); sns.publish(k.build()); }\n}\n",
+    )
+    .unwrap();
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let contracts = ["providers", "consumers"]
+        .iter()
+        .flat_map(|side| export[side].as_array().unwrap())
+        .map(|s| s["contract"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert!(
+        contracts.iter().all(|c| !c.contains("old")),
+        "{contracts:?}"
+    );
+    for kept in ["resource::s3::kept", "channel::sns::kept"] {
+        assert!(contracts.contains(&kept), "{kept}: {contracts:?}");
+    }
+}
+
 #[test]
 fn typescript_aws_commands_require_the_sdk_client_origin() {
     let repo = fixture_repo(
