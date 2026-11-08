@@ -8,10 +8,11 @@
   fan-out probe runs independently through `custom_topology_reader_stays_bounded_on_a_full_file`.
 Ingress HTTP summaries (#665) share `OBJECT_REFERENCES_MAX` (64 literal host/prefix rules)
 and `UNIT_STORED_MAX` (4 MiB of borrowed route text before copying, then charged to the unit
-again with its other facts). Passing either leaves only unread host mounts, preventing a
-partial prefix table from choosing a shorter route. Rewrite annotations, unknown/duplicated
-backends, wildcard hosts, nonliteral/controller paths and a `pathType` other than `Prefix`
-produce no route; legacy rules with no `pathType` are accepted. `http/infrastructure.rs`
+again with its other facts). Passing either makes every host of the Ingress one unread mount,
+preventing a partial prefix table from choosing a shorter route. Rewrite or `use-regex`
+annotations, unknown/duplicated backends and a `pathType` other than `Prefix` (none included)
+leave a path an unread mount; a nonliteral or controller path is an unread mount at its literal
+head cut at its last slash, and a wildcard host gives no route. `http/infrastructure.rs`
 charges internal provider forms before path/reason expansion to `ALIAS_BYTES_MAX` (16 MiB per
 query); overflow makes every Ingress mount unread for that query, preserving Service/Compose
 routing. No partial alias table may select a shorter mount.

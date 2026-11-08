@@ -464,6 +464,11 @@ All notable changes to Meada are recorded here. The format follows
   longer references the other base's ServiceAccount, nor an Ingress the other base's Service:
   among the objects written with the name a reference uses, the one the same prefixes and
   suffixes renamed is chosen, as Kustomize does.
+- Ingress: a path Meada cannot read as a literal prefix (`/store/(.*)`, `/api/*`) no longer drops
+  out of the routing table, where a shorter rule then claimed its URLs; it is an unread mount at
+  its literal head cut at its last slash. A `use-regex` annotation or a missing `pathType` also
+  leaves the path unread, and a table past its ceilings leaves every host of the Ingress unread,
+  not only the hosts read before the cut.
 
 ## [1.2.0] - 2026-11-04
 

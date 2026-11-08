@@ -94,13 +94,13 @@ fn ingress_rewrites_unknown_backends_and_longer_unread_mounts_do_not_guess() {
         assert_eq!(found.len(), 2, "{name}: {found:#?}");
         assert!(found.iter().all(|l| !l["consumer"].as_str().unwrap().contains("::publicOrders::")), "{name}: {found:#?}");
     }
-    // The historical API has no pathType. A literal prefix still means the same mount.
+    // Without a pathType, each controller decides how a path matches: an unread mount too.
     std::fs::write(
         &path,
         original.replace("            pathType: Prefix\n", ""),
     )
     .unwrap();
-    assert_eq!(links(&client).len(), 3);
+    assert_eq!(links(&client).len(), 2);
 }
 
 #[test]

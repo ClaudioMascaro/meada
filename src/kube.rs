@@ -1463,7 +1463,7 @@ mod tests {
         name: creds\n  namespace: shop\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  \
         name: runner\n  namespace: shop\n---\napiVersion: networking.k8s.io/v1\nkind: Ingress\n\
         metadata:\n  name: edge\n  namespace: shop\nspec:\n  rules:\n    - host: shop.example.com\n      \
-        http:\n        paths:\n          - path: /api\n            backend:\n              \
+        http:\n        paths:\n          - path: /api\n            pathType: Prefix\n            backend:\n              \
         service:\n                name: api\n  defaultBackend:\n    service:\n      name: api\n";
 
     #[test]

@@ -8,8 +8,9 @@ exports; HTTP shares the prepared decision with rendering, without parsing a hum
 Declared `base_url_env` peer explanations retain their previous policy.
 
 `iac::Node::ingress` stores literal host/prefix rules and their transformed Service addresses.
-An empty Service address is an unread mount, including rewrites, unsupported path types and
-unresolved backends. `kube/routing.rs` reads that evidence; `kube::Eval::unit` applies the same
+An empty Service address is an unread mount, including rewrite or `use-regex` annotations, a
+missing or unsupported path type and unresolved backends; a nonliteral path mounts at its
+literal head cut at its last slash, and a table past its ceilings mounts every host. `kube/routing.rs` reads that evidence; `kube::Eval::unit` applies the same
 namespace and evaluation root as other references, charging strings before copying them.
 The existing stored `iac_references` supply selector targets. Index/Engine transport these
 facts and make no HTTP decisions. All routing is over visible exports, with no source or

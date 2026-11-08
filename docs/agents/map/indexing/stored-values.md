@@ -5,7 +5,7 @@ from ...", with the whole list. A value the index now stores joins it.
 
 Ingress routing evidence (#665) is stored as `iac_nodes.ingress`: literal hosts and path
 prefixes plus transformed Service addresses. An empty Service address retains an unread
-mount, including rewrites and unknown backends. Selectors reuse `iac_references`; no
+mount, including rewrites, regular expressions, unsupported path types and unknown backends. Selectors reuse `iac_references`; no
 additional source text or evaluated process environment enters the index. HTTP's prepared
 links and structured inference explanations are transient query values, never stored.
 
