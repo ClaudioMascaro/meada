@@ -3,10 +3,11 @@
 `alert.rs` owns `alert::<key>::<value>`, with emitter providers and matcher consumers.
 `alert/config.rs` reads monitoring configuration through the shared YAML/JSON event reader,
 then `declare` creates rule and route IaC nodes from the stored summaries. Queries never read
-the checkout. Equality conditions are exact, anchored regular expressions inferred. Matching
-checks the entire rule's labels against the route's conjunction, including ancestor conditions;
-unknown conditions cannot create links. `context_at` supplies the receiver. The kind follows
-the scope-aware two-role orphan rule of ADR 0026.
+the checkout. Equality conditions are exact, anchored regular expressions inferred; negated
+conditions only filter, with no consumer row of their own. Matching checks the entire rule's
+labels against the route's conjunction, including ancestor conditions; unknown conditions
+cannot create links. `context_at` supplies the receiver. The kind follows the scope-aware
+two-role orphan rule of ADR 0026.
 
 Matcher-free root fallbacks have no alert side: no label key/value is written. Routing
 conditions, inherited receivers and sibling `continue` are read, while the graph does not

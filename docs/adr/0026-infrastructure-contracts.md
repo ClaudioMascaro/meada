@@ -205,10 +205,11 @@ execution, context, trace, orphan and export seams and the shared 1.4.0 minor re
   orchestration conditions and Alertmanager route matchers (in an Alertmanager configuration or
   an `AlertmanagerConfig` object).
 - An equality condition links `exact`; a regular expression, prefix or containment condition
-  links `inferred`. A label reaches a matcher that tests tags only through a forwarding Meada
-  knows: Datadog monitor tags reaching OpsGenie as tags, and the tags an Alertmanager OpsGenie
-  receiver sets from labels. With no known forwarding there is no link. Alertmanager matchers
-  test labels directly.
+  links `inferred`. A negated condition only filters its route: it is no matcher side, since
+  the value it names is one the route refuses. A label reaches a matcher that tests tags only
+  through a forwarding Meada knows: Datadog monitor tags reaching OpsGenie as tags, and the
+  tags an Alertmanager OpsGenie receiver sets from labels. With no known forwarding there is
+  no link. Alertmanager matchers test labels directly.
 - Helm values that templates render into rules are not emitters, since templates are not
   rendered; a `[[resource]]` `via` to the key covers such shapes.
 

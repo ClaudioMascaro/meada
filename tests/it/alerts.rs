@@ -337,7 +337,7 @@ receivers: [{name: fallback}, {name: europe}, {name: support}]
 }
 
 #[test]
-fn grafana_exports_and_opentofu_labels_reach_negative_matchers_without_shadowed_definitions() {
+fn grafana_exports_and_opentofu_labels_reach_routes_without_shadowed_definitions() {
     let repo = fixture_repo(
         "alerts_grafana_exports",
         "alert-monitoring",
@@ -368,12 +368,15 @@ fn grafana_exports_and_opentofu_labels_reach_negative_matchers_without_shadowed_
         r#"route:
   receiver: fallback
   routes:
+    - receiver: team-d
+      continue: true
+      matchers: ['support="team-d"']
     - receiver: not-e
       continue: true
       matchers: ['support!="team-e"']
     - receiver: not-ef
       matchers: ['support!~"team-(e|f)"']
-receivers: [{name: fallback}, {name: not-e}, {name: not-ef}]
+receivers: [{name: fallback}, {name: team-d}, {name: not-e}, {name: not-ef}]
 "#,
     )
     .unwrap();
@@ -388,12 +391,13 @@ receivers: [{name: fallback}, {name: not-e}, {name: not-ef}]
             .all(|p| p["contract"] == "alert::support::team-d"),
         "{text}"
     );
-    assert_eq!(export["consumers"].as_array().unwrap().len(), 2, "{text}");
+    // The negative routes only filter: they declare no consumer and take no link.
+    assert_eq!(export["consumers"].as_array().unwrap().len(), 1, "{text}");
     let links = export["links"].as_array().unwrap();
-    assert_eq!(links.len(), 6, "{text}");
-    assert_eq!(
-        links.iter().filter(|l| l["level"] == "exact").count(),
-        3,
+    assert_eq!(links.len(), 3, "{text}");
+    assert!(
+        links.iter().all(|l| l["level"] == "exact"
+            && l["consumer"] == "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]"),
         "{text}"
     );
     let json_node = export["iac_nodes"]
@@ -455,6 +459,56 @@ fn mixed_route_conditions_keep_each_matchers_level_and_explain_the_whole_conjunc
                 "alert::support::team-b; matchers \"support\"=\"team-b\", \"severity\"=~\"crit.*\"; receiver: mixed"
             ),
         ],
+        "{text}"
+    );
+}
+
+#[test]
+fn a_negative_matcher_filters_its_route_and_takes_no_alert_of_its_own() {
+    let repo = fixture_repo(
+        "alerts_negative",
+        "alert-monitoring",
+        Some("https://example.com/acme/monitoring.git"),
+    );
+    std::fs::write(
+        repo.join("rules.yaml"),
+        "groups:\n  - name: negative\n    rules:\n      - alert: Critical\n        expr: up == 0\n        labels: {support: team-b, severity: critical}\n      - alert: Info\n        expr: up == 0\n        labels: {support: team-b, severity: info}\n",
+    ).unwrap();
+    std::fs::write(
+        repo.join("alertmanager.yaml"),
+        "route:\n  receiver: fallback\n  routes:\n    - receiver: paging\n      matchers: ['support=\"team-b\"', 'severity!=\"info\"']\nreceivers: [{name: fallback}, {name: paging}]\n",
+    ).unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    let text = engine.export().unwrap();
+    let export: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let consumers = export["consumers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["contract"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(consumers, vec!["alert::support::team-b"], "{text}");
+    let links = export["links"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| {
+            (
+                l["contract"].as_str().unwrap(),
+                l["level"].as_str().unwrap(),
+                l["provider"].as_str().unwrap(),
+                l["reason"].as_str().unwrap(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        links,
+        vec![(
+            "alert::support::team-b",
+            "exact",
+            "example.com/acme/monitoring::rules.yaml::groups[0].rules[0]",
+            "alert::support::team-b; matchers \"support\"=\"team-b\", \"severity\"!=\"info\"; receiver: paging"
+        )],
         "{text}"
     );
 }
@@ -1187,6 +1241,29 @@ resource "datadog_monitor" "unknown" {
         let v: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert!(v["links"].as_array().unwrap().is_empty(), "{text}");
     }
+    // A negated condition only filters the rule: the tag it refuses is no side of its own.
+    let source = format!(
+        "resource \"opsgenie_team_routing_rule\" \"test\" {{\n team_id = \"team\"\n criteria {{\n type = \"match-all-conditions\"\n {}conditions {{\n field = \"tags\"\n operation = \"equals\"\n expected_value = \"region:us\"\n not = true\n}}\n }}\n notify {{ type = \"none\" }}\n}}\n",
+        condition("tags", "equals", "support:team-b")
+    );
+    std::fs::write(repo.join("route.tf"), source).unwrap();
+    let text = engine.export().unwrap();
+    let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let contracts = |rows: &str| {
+        (v[rows].as_array().unwrap().iter())
+            .map(|r| r["contract"].as_str().unwrap())
+            .collect::<std::collections::BTreeSet<_>>()
+    };
+    assert_eq!(
+        contracts("consumers"),
+        ["alert::support::team-b"].into(),
+        "{text}"
+    );
+    assert_eq!(
+        contracts("links"),
+        ["alert::support::team-b"].into(),
+        "{text}"
+    );
 }
 
 #[test]
@@ -1230,16 +1307,11 @@ fn pagerduty_conditions_keep_native_field_paths_boolean_groups_and_first_match_o
             "event.custom_details.support matches 'team-a' or event.custom_details.owner matches 'team-c'",
             vec![("alert::owner::team-c", "exact")],
         ),
-        (
-            "not event.custom_details.owner matches 'team-z'",
-            vec![("alert::owner::team-z", "exact")],
-        ),
+        // A negated condition only filters the route: it names no value of its own.
+        ("not event.custom_details.owner matches 'team-z'", vec![]),
         (
             "not (event.custom_details.support matches 'team-a' or event.custom_details.owner matches 'team-z')",
-            vec![
-                ("alert::owner::team-z", "exact"),
-                ("alert::support::team-a", "exact"),
-            ],
+            vec![],
         ),
         ("not event.custom_details.absent matches 'team-b'", vec![]),
         ("event.severity matches 'team-b'", vec![]),

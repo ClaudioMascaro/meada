@@ -671,6 +671,8 @@ O contrato `alert::<chave>::<valor>` liga os rótulos de regras Prometheus e Lok
 (inclusive `PrometheusRule`) e Grafana aos matchers de rotas do Alertmanager, em arquivos
 de configuração e objetos `AlertmanagerConfig`. Igualdade gera um link `exact`; uma
 expressão regular gera `inferred`. As condições de uma rota são verificadas em conjunto.
+Uma condição negada (`!=`, `!~`) só filtra a rota: não cria lado nem link para o valor que
+ela exclui.
 
 `search` com kind `alert` encontra o contrato; `context` na rota mostra seu receiver,
 e `trace` percorre da regra à rota e de volta. `meada export` inclui emissores, matchers

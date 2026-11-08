@@ -666,6 +666,8 @@ The `alert::<key>::<value>` contract joins labels on Prometheus and Loki rules
 (including `PrometheusRule`) and Grafana rules to Alertmanager route matchers, in
 configuration files and `AlertmanagerConfig` objects. Equality creates an `exact` link;
 a regular expression creates an `inferred` link. A route's conditions are checked together.
+A negated condition (`!=`, `!~`) only filters the route: it creates no side or link for the
+value it excludes.
 
 `search` with kind `alert` finds the contract; `context` on a route shows its receiver,
 and `trace` walks from a rule to its route and back. `meada export` includes emitters,

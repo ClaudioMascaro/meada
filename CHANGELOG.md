@@ -85,9 +85,10 @@ All notable changes to Meada are recorded here. The format follows
 - Resolve environment reads through the workloads running their code, including Kubernetes ConfigMap references and Compose defaults, with inferred provenance and redacted Secret targets (#663).
 - Alert contracts join Prometheus, Loki, PrometheusRule and Grafana rule labels to Alertmanager
   route matchers, including AlertmanagerConfig. Equality is exact and regular expressions are
-  inferred; route context includes the receiver, trace walks both ways, and export and
-  scope-aware orphan reports carry the kind. Helm values are not alert emitters. Included in
-  the minor development release of meada and meada-core 1.4.0 (#672).
+  inferred; a negated condition only filters its route, without linking the value it refuses.
+  Route context includes the receiver, trace walks both ways, and export and scope-aware
+  orphan reports carry the kind. Helm values are not alert emitters. Included in the minor
+  development release of meada and meada-core 1.4.0 (#672).
 - Anchored unresolved names across channel, resource and image contracts (#674): only
   literal counterparts with sufficient anchor evidence and whole-segment wildcards link.
   Several names remain ambiguous open items; human or optional decider choices replay through

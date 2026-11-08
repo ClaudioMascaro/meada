@@ -110,7 +110,11 @@ impl ContractKind for Alert {
                     route.line,
                     route.end_line,
                 );
-                for matcher in conditions(&summary.routes, i) {
+                // A negated condition only filters the route: the value it names is refused.
+                for matcher in conditions(&summary.routes, i)
+                    .into_iter()
+                    .filter(|m| !m.op.negative())
+                {
                     export.consumers.push(Consumer {
                         identity: None,
                         contract: Some(matcher.contract()),
@@ -151,7 +155,7 @@ impl ContractKind for Alert {
         let level = if consumer
             .via
             .as_deref()
-            .is_some_and(|via| !matches!(via, "alert matcher =" | "alert matcher !="))
+            .is_some_and(|via| via != "alert matcher =")
         {
             Level::Inferred
         } else {

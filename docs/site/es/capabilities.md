@@ -678,6 +678,8 @@ El contrato `alert::<clave>::<valor>` une las etiquetas de reglas Prometheus y L
 (incluido `PrometheusRule`) y Grafana con los matchers de rutas de Alertmanager, en
 archivos de configuración y objetos `AlertmanagerConfig`. La igualdad crea un enlace
 `exact`; una expresión regular crea `inferred`. Las condiciones de una ruta se comprueban juntas.
+Una condición negada (`!=`, `!~`) solo filtra la ruta: no crea lado ni enlace para el valor
+que excluye.
 
 `search` con kind `alert` encuentra el contrato; `context` en la ruta muestra su receiver,
 y `trace` recorre de la regla a la ruta y de vuelta. `meada export` incluye emisores,
