@@ -9,16 +9,28 @@
   and `OBJECT_WORK_MAX` guards bound Terraform alert and incident parsing.
 - `ALERT_REGEX_MAX` (`alert.rs`): 4096 bytes per alert or incident regex;
   `ALERT_REGEX_SIZE_MAX`: 1 MiB each for compiled automata and their search caches, shared
-  equally by distinct expressions in one route configuration; identical patterns share both. Larger expressions or automata
-  stay unmatched, as do invalid or unsupported RE2 expressions. Regex matching is anchored
-  to the entire label, tag or event-field value.
-- `ALERT_REGEX_FOLD_MAX` (`alert.rs`): 2^22 code points that case folding may visit for the
-  expressions of one route configuration, shared equally like `ALERT_REGEX_SIZE_MAX`.
-  `regex-syntax` folds each Unicode class and bracket of a case-insensitive expression by
-  visiting every code point of each of its ranges that may hold a cased letter (1.1 million for
-  `(?i)\p{Any}`), before any automaton is built. `alert/regexp.rs` counts them first, an upper
-  bound (an `i` flag anywhere counts every class, and a range reaching `A` counts whole); an
-  expression past its share stays unmatched.
+  equally by distinct expressions in one route configuration. A linking pass compiles an
+  expression once for each share it gets (`regexp::Pass`), so the same expression in many files
+  is compiled once. Larger expressions or automata stay unmatched, as do invalid or unsupported
+  RE2 expressions. Regex matching is anchored to the entire label, tag or event-field value. An
+  automaton at its 1 MiB share compiles in under 10 ms (release), so that budget stays per
+  configuration, where an ordinary expression needs about 1.5 KiB.
+- `ALERT_REGEX_FOLD_MAX` (`alert.rs`): 2^22 code points that case folding may visit in one
+  linking pass, of which one expression spends at most its route configuration's share, divided
+  like `ALERT_REGEX_SIZE_MAX`; expressions past what the pass has left stay unmatched, first come
+  first served in the pass's order. `regex-syntax` folds each Unicode or ASCII class, and each
+  bracket holding a character or a range, of a case-insensitive expression by visiting every code
+  point of each of its ranges, before negation, that holds a cased one (1.1 million for
+  `(?i)\p{Any}`, none for `\p{Han}`), before any automaton is built; a bracket of classes alone,
+  such as the `[\S]` the ASCII Perl classes become, is folded already. `alert/regexp.rs` counts
+  them first, an upper bound: an `i` flag anywhere counts every class, a range holding a code
+  point of `\p{CWCM}` (a superset of what folding maps) counts whole, and a bracket of both
+  characters and classes counts every cased code point too.
+- `ALERT_REGEX_CLASSES_MAX` (`alert.rs`): 4096 Unicode classes in the expressions one linking
+  pass reads, case-insensitive or not: `regex-syntax` looks each up in its tables and joins it to
+  the bracket around it before any automaton is built. An expression holding more than the pass
+  has left stays unmatched. The empty-result diagnostic pass of `status` starts both budgets
+  again.
 
 - `ALERT_LINK_BYTES_MAX` (`alert.rs`): 4 MiB of retained alert link fields and String
   contents per workspace pass. Every field is charged with checked arithmetic before

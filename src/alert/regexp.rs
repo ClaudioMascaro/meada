@@ -1,26 +1,66 @@
 //! Alertmanager/Go RE2 compatibility on the bounded Rust regex engine.
-use super::{ALERT_REGEX_FOLD_MAX, ALERT_REGEX_MAX, ALERT_REGEX_SIZE_MAX};
+use super::{ALERT_REGEX_CLASSES_MAX, ALERT_REGEX_FOLD_MAX, ALERT_REGEX_MAX, ALERT_REGEX_SIZE_MAX};
 use regex_syntax::ast::{
     self, Ast, ClassSetItem, Flag, GroupKind, RepetitionKind, RepetitionRange,
 };
 use regex_syntax::hir::{Class, ClassUnicode, ClassUnicodeRange, HirKind};
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock};
 
 // ponytail: Go/RE2 rejects counted repetitions, including nested products, above 1000.
 const RE2_REPEAT_MAX: u32 = 1000;
 
-/// `pattern` as Alertmanager reads it, anchored to the whole value, within its share of
-/// `ALERT_REGEX_SIZE_MAX` and `ALERT_REGEX_FOLD_MAX` (one of `shares` distinct expressions of a
-/// route configuration); `None` past them, past `ALERT_REGEX_MAX` or for no RE2 expression.
-pub(super) fn compile(pattern: &str, shares: usize) -> Option<regex::Regex> {
+/// The expressions one linking pass compiled, each once for its share, and what compiling may
+/// still spend in the pass.
+pub(super) struct Pass<'a> {
+    left: Left,
+    compiled: HashMap<(&'a str, usize), Option<Arc<regex::Regex>>>,
+}
+/// The case folding visits and Unicode classes a linking pass may still spend.
+struct Left {
+    folds: usize,
+    classes: usize,
+}
+impl Default for Pass<'_> {
+    fn default() -> Self {
+        let left = Left {
+            folds: ALERT_REGEX_FOLD_MAX,
+            classes: ALERT_REGEX_CLASSES_MAX,
+        };
+        Self {
+            left,
+            compiled: HashMap::new(),
+        }
+    }
+}
+impl<'a> Pass<'a> {
+    /// `pattern` as Alertmanager reads it, anchored to the whole value, within its share of
+    /// `ALERT_REGEX_SIZE_MAX` and `ALERT_REGEX_FOLD_MAX` (one of `shares` distinct expressions of
+    /// a route configuration) and the folding and Unicode classes left to the pass; `None` past
+    /// them, past `ALERT_REGEX_MAX` or for no RE2 expression.
+    pub(super) fn compile(&mut self, pattern: &'a str, shares: usize) -> Option<Arc<regex::Regex>> {
+        let left = &mut self.left;
+        let compiled = self.compiled.entry((pattern, shares));
+        compiled
+            .or_insert_with(|| compile(pattern, shares, left).map(Arc::new))
+            .clone()
+    }
+}
+
+/// `Pass::compile`, spending what is `left`.
+fn compile(pattern: &str, shares: usize, left: &mut Left) -> Option<regex::Regex> {
     if pattern.len() > ALERT_REGEX_MAX {
         return None;
     }
     let pattern = regex_source(pattern)?;
     let ast = ast::parse::Parser::new().parse(&pattern).ok()?;
     re2_ast(&ast)?;
+    let (insensitive, classes) = shape(&ast);
+    left.classes = left.classes.checked_sub(classes)?;
     let shares = shares.max(1);
-    if folds(&pattern, &ast)? > ALERT_REGEX_FOLD_MAX / shares {
-        return None;
+    if insensitive {
+        let limit = (ALERT_REGEX_FOLD_MAX / shares).min(left.folds);
+        left.folds -= folds(&pattern, &ast, limit)?;
     }
     let budget = ALERT_REGEX_SIZE_MAX / shares;
     regex::RegexBuilder::new(&format!("\\A(?:{pattern})\\z"))
@@ -30,28 +70,18 @@ pub(super) fn compile(pattern: &str, shares: usize) -> Option<regex::Regex> {
         .ok()
 }
 
-/// An upper bound on the code points `regex-syntax` 0.8 visits to fold the case of `ast`, parsed
-/// from `pattern`: when an `i` flag appears anywhere, each Unicode class and each bracket folds
-/// what it holds before its negation, visiting every code point of each of its ranges that
-/// reaches `A` (all 1.1 million of `\p{Any}`). `None` for a class it cannot read.
-fn folds(pattern: &str, ast: &Ast) -> Option<usize> {
-    struct Folds<'p> {
-        pattern: &'p str,
+/// Whether an `i` flag appears anywhere in `ast`, and how many Unicode classes it holds.
+fn shape(ast: &Ast) -> (bool, usize) {
+    #[derive(Default)]
+    struct Shape {
         insensitive: bool,
-        visits: usize,
+        classes: usize,
     }
-    impl Folds<'_> {
-        fn class(&mut self, span: &ast::Span, negated: bool) -> Result<(), ()> {
-            let visits = visits(self.pattern, span, negated).ok_or(())?;
-            self.visits = self.visits.saturating_add(visits);
-            Ok(())
-        }
-    }
-    impl ast::Visitor for Folds<'_> {
-        type Output = usize;
+    impl ast::Visitor for Shape {
+        type Output = (bool, usize);
         type Err = ();
-        fn finish(self) -> Result<usize, ()> {
-            Ok(if self.insensitive { self.visits } else { 0 })
+        fn finish(self) -> Result<(bool, usize), ()> {
+            Ok((self.insensitive, self.classes))
         }
         fn visit_pre(&mut self, ast: &Ast) -> Result<(), ()> {
             let flags = match ast {
@@ -60,34 +90,187 @@ fn folds(pattern: &str, ast: &Ast) -> Option<usize> {
                     GroupKind::NonCapturing(flags) => flags,
                     _ => return Ok(()),
                 },
-                Ast::ClassUnicode(class) => return self.class(&class.span, class.is_negated()),
-                Ast::ClassBracketed(class) => return self.class(&class.span, class.negated),
+                Ast::ClassUnicode(_) => {
+                    self.classes += 1;
+                    return Ok(());
+                }
                 _ => return Ok(()),
             };
             self.insensitive |= flags.flag_state(Flag::CaseInsensitive) == Some(true);
             Ok(())
         }
         fn visit_class_set_item_pre(&mut self, item: &ClassSetItem) -> Result<(), ()> {
-            match item {
-                ClassSetItem::Unicode(class) => self.class(&class.span, class.is_negated()),
-                ClassSetItem::Bracketed(class) => self.class(&class.span, class.negated),
+            self.classes += usize::from(matches!(item, ClassSetItem::Unicode(_)));
+            Ok(())
+        }
+    }
+    ast::visit(ast, Shape::default()).unwrap_or_default()
+}
+
+/// An upper bound on the code points `regex-syntax` 0.8 visits to fold the case of `ast`, parsed
+/// from `pattern`, as if all of it were case-insensitive; `None` past `limit` or for a class it
+/// cannot read. Each Unicode or ASCII class is folded on its own, and each bracket holding a
+/// character or a range folds all it holds (its classes again, already folded): a fold visits
+/// every code point of each range, before negation, that holds one of `CASED` (all 1.1 million
+/// of `\p{Any}`, none of `\p{Han}`). A bracket of classes alone is folded already.
+fn folds(pattern: &str, ast: &Ast, limit: usize) -> Option<usize> {
+    /// An open bracket: its characters and ranges, and its classes as they are after negation.
+    struct Bracket {
+        ranges: Vec<ClassUnicodeRange>,
+        classes: ClassUnicode,
+    }
+    struct Folds<'p> {
+        pattern: &'p str,
+        limit: usize,
+        visits: usize,
+        brackets: Vec<Bracket>,
+    }
+    impl<'p> Folds<'p> {
+        fn open(&mut self) {
+            let classes = ClassUnicode::empty();
+            self.brackets.push(Bracket {
+                ranges: Vec::new(),
+                classes,
+            });
+        }
+        fn fold(&mut self, class: &ClassUnicode) -> Result<(), ()> {
+            self.visits = self.visits.saturating_add(cased(class));
+            if self.visits > self.limit {
+                Err(())
+            } else {
+                Ok(())
+            }
+        }
+        /// A class folded alone, written `text`, then added to the bracket around it.
+        fn alone(&mut self, text: Option<&str>, negated: bool) -> Result<(), ()> {
+            let mut class = text.and_then(class).ok_or(())?;
+            if negated {
+                class.negate();
+            }
+            self.fold(&class)?;
+            if negated {
+                class.negate();
+            }
+            if let Some(bracket) = self.brackets.last_mut() {
+                bracket.classes.union(&class);
+            }
+            Ok(())
+        }
+        fn close(&mut self, negated: bool) -> Result<(), ()> {
+            let bracket = self.brackets.pop().ok_or(())?;
+            let mut class = ClassUnicode::new(bracket.ranges.iter().copied());
+            class.union(&bracket.classes);
+            if !bracket.ranges.is_empty() {
+                // Folding a class adds only cased code points to what it holds.
+                let mut folded = class.clone();
+                if !bracket.classes.ranges().is_empty() {
+                    folded.union(&CASED);
+                }
+                self.fold(&folded)?;
+            }
+            if negated {
+                class.negate();
+            }
+            if let Some(outer) = self.brackets.last_mut() {
+                outer.classes.union(&class);
+            }
+            Ok(())
+        }
+        fn text(&self, span: &ast::Span) -> Option<&'p str> {
+            self.pattern.get(span.start.offset..span.end.offset)
+        }
+    }
+    impl ast::Visitor for Folds<'_> {
+        type Output = usize;
+        type Err = ();
+        fn finish(self) -> Result<usize, ()> {
+            Ok(self.visits)
+        }
+        fn visit_pre(&mut self, ast: &Ast) -> Result<(), ()> {
+            match ast {
+                Ast::ClassBracketed(_) => self.open(),
+                Ast::ClassUnicode(class) => {
+                    return self.alone(self.text(&class.span), class.is_negated());
+                }
+                _ => {}
+            }
+            Ok(())
+        }
+        fn visit_post(&mut self, ast: &Ast) -> Result<(), ()> {
+            match ast {
+                Ast::ClassBracketed(class) => self.close(class.negated),
                 _ => Ok(()),
             }
+        }
+        fn visit_class_set_item_pre(&mut self, item: &ClassSetItem) -> Result<(), ()> {
+            if let ClassSetItem::Bracketed(_) = item {
+                self.open();
+            }
+            Ok(())
+        }
+        fn visit_class_set_item_post(&mut self, item: &ClassSetItem) -> Result<(), ()> {
+            let range = match item {
+                ClassSetItem::Literal(literal) => ClassUnicodeRange::new(literal.c, literal.c),
+                ClassSetItem::Range(range) => ClassUnicodeRange::new(range.start.c, range.end.c),
+                ClassSetItem::Unicode(class) => {
+                    return self.alone(self.text(&class.span), class.is_negated());
+                }
+                ClassSetItem::Ascii(class) => {
+                    let text = self.text(&class.span).map(|text| format!("[{text}]"));
+                    return self.alone(text.as_deref(), class.negated);
+                }
+                ClassSetItem::Bracketed(class) => return self.close(class.negated),
+                ClassSetItem::Empty(_) | ClassSetItem::Union(_) => return Ok(()),
+                // `regex_source` writes Perl classes as brackets.
+                ClassSetItem::Perl(_) => return Err(()),
+            };
+            self.brackets.last_mut().ok_or(())?.ranges.push(range);
+            Ok(())
+        }
+        fn visit_class_set_binary_op_pre(&mut self, _: &ast::ClassSetBinaryOp) -> Result<(), ()> {
+            // `regex_source` escapes or refuses the class operators.
+            Err(())
         }
     }
     let folds = Folds {
         pattern,
-        insensitive: false,
+        limit,
         visits: 0,
+        brackets: Vec::new(),
     };
     ast::visit(ast, folds).ok()
 }
 
-/// The code points folding visits for the class at `span` of `pattern`: those it holds before
-/// its negation, in the ranges that reach `A`.
-fn visits(pattern: &str, span: &ast::Span, negated: bool) -> Option<usize> {
-    let text = pattern.get(span.start.offset..span.end.offset)?;
-    let mut class = match regex_syntax::parse(text).ok()?.into_kind() {
+/// The code points that change when case mapped, a superset of those simple case folding maps
+/// (the keys of `regex-syntax`'s table, whose ranges folding visits).
+static CASED: LazyLock<ClassUnicode> = LazyLock::new(|| {
+    class(r"\p{CWCM}")
+        .unwrap_or_else(|| ClassUnicode::new([ClassUnicodeRange::new('\0', char::MAX)]))
+});
+
+/// The code points of the ranges of `class` that hold one of `CASED`.
+fn cased(class: &ClassUnicode) -> usize {
+    let holds = |r: &ClassUnicodeRange| {
+        let cased = CASED.ranges().binary_search_by(|c| {
+            if c.end() < r.start() {
+                std::cmp::Ordering::Less
+            } else if c.start() > r.end() {
+                std::cmp::Ordering::Greater
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        });
+        cased.is_ok()
+    };
+    let ranges = class.ranges().iter().filter(|r| holds(r));
+    ranges
+        .map(|r| r.end() as usize - r.start() as usize + 1)
+        .sum()
+}
+
+/// The class `text` writes, read alone and case-sensitively.
+fn class(text: &str) -> Option<ClassUnicode> {
+    Some(match regex_syntax::parse(text).ok()?.into_kind() {
         HirKind::Class(Class::Unicode(class)) => class,
         HirKind::Class(Class::Bytes(class)) if class.ranges().is_empty() => ClassUnicode::empty(),
         HirKind::Literal(literal) => {
@@ -95,16 +278,7 @@ fn visits(pattern: &str, span: &ast::Span, negated: bool) -> Option<usize> {
             ClassUnicode::new(chars.map(|c| ClassUnicodeRange::new(c, c)))
         }
         _ => return None,
-    };
-    if negated {
-        class.negate();
-    }
-    let reach = class.ranges().iter().filter(|r| r.end() >= 'A');
-    Some(
-        reach
-            .map(|r| r.end() as usize - r.start() as usize + 1)
-            .sum(),
-    )
+    })
 }
 
 /// Alertmanager uses Go's RE2 syntax: Perl classes and word boundaries are ASCII,
@@ -560,3 +734,22 @@ const SCRIPTS: &[&str] = &[
     "Yi",
     "Zanabazar_Square",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `folds` counts a range only when it holds one of `CASED`, which holds every code point
+    /// simple case folding maps: folding all the others leaves them as they are.
+    #[test]
+    fn case_folding_maps_only_cased_code_points() {
+        let mut uncased = CASED.clone();
+        uncased.negate();
+        let before = uncased.clone();
+        uncased.case_fold_simple();
+        assert_eq!(uncased, before);
+        let count = |text: &str| class(text).map(|class| cased(&class));
+        let counts = [count("A"), count("[0-9]"), count("[0-9a]"), count("[0-a]")];
+        assert_eq!(counts, [Some(1), Some(0), Some(1), Some(50)]);
+    }
+}

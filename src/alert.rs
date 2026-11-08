@@ -6,6 +6,7 @@ use crate::resolve::Code;
 use crate::workspace::Repository;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 mod config;
 mod forwarding;
@@ -19,12 +20,18 @@ pub struct Alert;
 const ALERT_REGEX_MAX: usize = 4096;
 // ponytail: repetition must not expand a short expression into an unbounded automaton.
 const ALERT_REGEX_SIZE_MAX: usize = 1 << 20;
-/// The code points case folding may visit for the expressions of one route configuration,
-/// shared like `ALERT_REGEX_SIZE_MAX`: `regex-syntax` folds a case-insensitive class by visiting
-/// every code point of its ranges, before any automaton is built.
-// ponytail: 2^22 folds a few dozen `(?i)\p{L}` (about 140,000 code points each) and stops a
-// pattern of hundreds of `(?i)\p{Any}` (1.1 million each), which took minutes to compile.
+/// The code points case folding may visit for the expressions of one linking pass, of which one
+/// expression spends at most its route configuration's share, divided like
+/// `ALERT_REGEX_SIZE_MAX`: `regex-syntax` folds a case-insensitive class by visiting every code
+/// point of its ranges that hold a cased one, before any automaton is built.
+// ponytail: 2^22 folds a thousand `(?i)\p{L}` (3,739 code points in cased ranges each) and stops
+// a pattern of hundreds of `(?i)\p{Any}` (1.1 million each), which took minutes to compile.
 const ALERT_REGEX_FOLD_MAX: usize = 1 << 22;
+/// The Unicode classes the expressions of one linking pass may hold: `regex-syntax` looks each
+/// up in its tables and joins it to the bracket around it, before any automaton is built.
+// ponytail: 4096 classes read in a fraction of a second, where one route configuration of 240
+// expressions of 1,358 `\pL` each took 55 s.
+const ALERT_REGEX_CLASSES_MAX: usize = 4096;
 // ponytail: repeated conjunction explanations must not amplify matched links without bound.
 const ALERT_LINK_BYTES_MAX: usize = 4 * crate::lang::MAX_BYTES;
 // ponytail: unmatched rule/tree pairs must not run without a bound just because they emit no links.
@@ -473,6 +480,7 @@ fn linked<'a>(
     let mut out = Vec::new();
     let mut retained = 0;
     let mut work = ALERT_MATCH_WORK_MAX;
+    let mut pass = regexp::Pass::default();
     let mut forwarded = Vec::new();
     // Alertmanager selects receivers using labels directly. Those receivers alone can
     // produce known incident fields; a matching value elsewhere is no forwarding.
@@ -481,7 +489,7 @@ fn linked<'a>(
             if !summary.routes.iter().any(|r| r.stream == Stream::Labels) {
                 continue;
             }
-            let Some(routing) = Routing::new(summary.routes.iter().collect()) else {
+            let Some(routing) = Routing::new(summary.routes.iter().collect(), &mut pass) else {
                 continue;
             };
             let targets = summary
@@ -552,7 +560,7 @@ fn linked<'a>(
         if routes.is_empty() {
             continue;
         }
-        let Some(routing) = Routing::new(routes) else {
+        let Some(routing) = Routing::new(routes, &mut pass) else {
             continue;
         };
         for (site, rule) in &rules {
@@ -795,7 +803,7 @@ fn conditions(routes: &[Route], mut index: usize) -> Vec<&Matcher> {
 
 struct Condition<'a> {
     matcher: &'a Matcher,
-    regex: Option<std::sync::Arc<regex::Regex>>,
+    regex: Option<Arc<regex::Regex>>,
 }
 impl Condition<'_> {
     fn positive(&self, value: &str) -> Option<bool> {
@@ -844,12 +852,12 @@ impl Condition<'_> {
 struct Routing<'a> {
     routes: Vec<&'a Route>,
     conditions: Vec<Vec<Condition<'a>>>,
-    compiled: BTreeMap<&'a str, Option<std::sync::Arc<regex::Regex>>>,
+    compiled: BTreeMap<&'a str, Option<Arc<regex::Regex>>>,
     children: Vec<Vec<usize>>,
     roots: Vec<Vec<usize>>,
 }
 impl<'a> Routing<'a> {
-    fn new(routes: Vec<&'a Route>) -> Option<Self> {
+    fn new(routes: Vec<&'a Route>, pass: &mut regexp::Pass<'a>) -> Option<Self> {
         let patterns = routes
             .iter()
             .flat_map(|r| &r.matchers)
@@ -859,7 +867,7 @@ impl<'a> Routing<'a> {
         let shares = patterns.len();
         let compiled = patterns
             .into_iter()
-            .map(|p| (p, regexp::compile(p, shares).map(std::sync::Arc::new)))
+            .map(|p| (p, pass.compile(p, shares)))
             .collect::<BTreeMap<_, _>>();
         let mut conditions = Vec::new();
         let mut children = vec![Vec::new(); routes.len()];
@@ -1027,8 +1035,8 @@ impl<'a> Routing<'a> {
 }
 
 #[cfg(test)]
-fn regex(pattern: &str) -> Option<regex::Regex> {
-    regexp::compile(pattern, 1)
+fn regex(pattern: &str) -> Option<Arc<regex::Regex>> {
+    regexp::Pass::default().compile(pattern, 1)
 }
 
 #[cfg(test)]
@@ -1212,13 +1220,16 @@ mod tests {
     /// Folding the case of `\p{Any}` visits each of its 1,112,064 code points: three fit
     /// `ALERT_REGEX_FOLD_MAX`, a fourth does not, nor do two in each of two expressions sharing
     /// it. `\P{Any}` folds `\p{Any}` before negating it; a bracket folds all it holds, here
-    /// everything but the digits (about as many), and each Unicode class in it on its own.
+    /// everything but the digits (about as many), and each Unicode class in it on its own. The
+    /// lowercase letters folding `\p{Lu}` adds join the range written after the last of them,
+    /// almost a million uncased code points that the bracket then visits.
     #[test]
     fn case_folding_past_the_fold_ceiling_leaves_a_matcher_unmatched() {
         let any = 1_112_064;
         assert!(3 * any <= ALERT_REGEX_FOLD_MAX && 4 * any > ALERT_REGEX_FOLD_MAX);
         let compiles = |class: &str, n: usize, shares: usize| {
-            regexp::compile(&format!("(?i){}", class.repeat(n)), shares).is_some()
+            let pattern = format!("(?i){}", class.repeat(n));
+            regexp::Pass::default().compile(&pattern, shares).is_some()
         };
         assert_eq!(
             [
@@ -1229,11 +1240,83 @@ mod tests {
                 compiles(r"[a\D]", 3, 1),
                 compiles(r"[a\D]", 4, 1),
                 compiles(r"[\p{Any}\p{Any}\p{Any}\p{Any}]", 1, 1),
-                regexp::compile(&r"\p{Any}".repeat(4), 1).is_some(),
+                regex(&r"\p{Any}".repeat(4)).is_some(),
+                compiles(r"[\x{1E944}-\x{10FFFF}\p{Lu}]", 3, 1),
+                compiles(r"[\x{1E944}-\x{10FFFF}\p{Lu}]", 5, 1),
             ],
-            [true, false, false, false, true, false, false, true]
+            [
+                true, false, false, false, true, false, false, true, true, false
+            ]
         );
         assert!(regex(r"(?i)\p{Lu}").unwrap().is_match("a"));
+    }
+
+    /// Folding visits only the ranges that hold a cased code point, of classes not folded yet:
+    /// the Perl classes `regex_source` writes as brackets of uncased characters, a bracket of
+    /// only such classes and `\p{Han}` visit nothing, where they were counted whole.
+    #[test]
+    fn case_folding_counts_only_ranges_that_fold() {
+        let compiles = |class: &str, n: usize| regex(&format!("(?i){}", class.repeat(n))).is_some();
+        assert_eq!(
+            [
+                compiles(r"[\S]", 4),
+                compiles(r"[\s\S]", 4),
+                compiles(r"\p{Han}", 43),
+            ],
+            [true, true, true]
+        );
+        assert!(regex(r"(?i)[\S]+").unwrap().is_match("ÀB"));
+    }
+
+    /// The route configurations of one linking pass share the fold ceiling, and the pass compiles
+    /// an expression once for its share: the same costly expression in three files matches in
+    /// each, where three distinct ones fit only the first file's.
+    #[test]
+    fn route_configurations_share_the_fold_ceiling_and_compile_an_expression_once() {
+        let matched = |patterns: [&str; 3]| {
+            let rule = serde_json::json!({"groups":[{"name":"g", "rules":[{"alert":"A", "expr":"up", "labels":{"team":"payments"}}]}]});
+            let mut configurations = vec![(
+                "rules.yaml".to_string(),
+                serde_json::json!({"alert":config::read("rules.yaml", rule.to_string().as_bytes())}),
+            )];
+            for (i, pattern) in patterns.into_iter().enumerate() {
+                let path = format!("am{i}.yaml");
+                let source = serde_json::json!({"route":{"receiver":"default", "routes":[{"receiver":"team", "match_re":{"team":pattern}}]}, "receivers":[{"name":"default"}, {"name":"team"}]});
+                let summary = config::read(&path, source.to_string().as_bytes());
+                configurations.push((path, serde_json::json!({ "alert": summary })));
+            }
+            let repo = Repository {
+                identity: "example.com/shared".into(),
+                root: Default::default(),
+                config: Default::default(),
+                decisions: Default::default(),
+                index: Default::default(),
+            };
+            let mut export = Export {
+                repository: repo.identity.clone(),
+                configurations,
+                ..Default::default()
+            };
+            Alert.declare(&repo, &mut export);
+            let exports = [export];
+            let providers = exports[0]
+                .providers
+                .iter()
+                .map(|p| (&repo, p))
+                .collect::<Vec<_>>();
+            let links = Alert.workspace_links(&exports, &providers).unwrap();
+            links
+                .iter()
+                .filter_map(|link| Some(link.consumer.split("::").nth(1)?.to_string()))
+                .collect::<Vec<_>>()
+        };
+        let costly = r"(?i)(?:\p{Any}|\p{Any})+";
+        assert_eq!(matched([costly; 3]), ["am0.yaml", "am1.yaml", "am2.yaml"]);
+        let distinct = [0, 1, 2].map(|i| format!("{costly}|x{i}"));
+        assert_eq!(
+            matched(distinct.each_ref().map(String::as_str)),
+            ["am0.yaml"]
+        );
     }
 
     /// A pattern of hundreds of case-insensitive `\p{Any}`, whose folding took minutes, is
@@ -1246,6 +1329,42 @@ mod tests {
         let took = started.elapsed();
         eprintln!("hundreds of case-insensitive classes: {took:?}");
         assert!(took < std::time::Duration::from_secs(2), "{took:?}");
+    }
+
+    /// The expressions of one linking pass hold `ALERT_REGEX_CLASSES_MAX` Unicode classes, case
+    /// folded or not: past them an expression is unmatched, while a smaller one still fits.
+    #[test]
+    fn unicode_classes_past_the_pass_ceiling_leave_matchers_unmatched() {
+        assert_eq!(4 * 1000 + 96, ALERT_REGEX_CLASSES_MAX);
+        let patterns = [1000, 1000, 1000, 1000, 97, 96, 1]
+            .into_iter()
+            .enumerate()
+            .map(|(i, n)| format!("[{}]{i}", r"\pL".repeat(n)))
+            .collect::<Vec<_>>();
+        let mut pass = regexp::Pass::default();
+        let compiled = (patterns.iter())
+            .map(|pattern| pass.compile(pattern, 1).is_some())
+            .collect::<Vec<_>>();
+        assert_eq!(compiled, [true, true, true, true, false, true, false]);
+    }
+
+    /// 240 expressions of 1,358 `\pL` each, a 1 MB route configuration whose classes took about a
+    /// minute to read, are refused past the class ceiling in linear time. Measured on 2026-11-08
+    /// in a debug build: 0.93 s, where compiling them all took 19.4 s.
+    #[test]
+    fn hundreds_of_expressions_of_unicode_classes_are_refused_in_linear_time() {
+        let patterns = (0..240)
+            .map(|i| format!("[{}]|z{i}", r"\pL".repeat(1358)))
+            .collect::<Vec<_>>();
+        let started = std::time::Instant::now();
+        let mut pass = regexp::Pass::default();
+        let compiled = (patterns.iter())
+            .filter(|pattern| pass.compile(pattern, 1).is_some())
+            .count();
+        let took = started.elapsed();
+        eprintln!("hundreds of expressions of Unicode classes: {took:?}");
+        assert_eq!(compiled, 3);
+        assert!(took < std::time::Duration::from_secs(20), "{took:?}");
     }
 }
 
