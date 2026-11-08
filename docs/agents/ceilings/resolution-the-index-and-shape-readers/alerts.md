@@ -46,11 +46,24 @@
   aliases are refused; canonical Go categories/scripts and ASCII Perl classes are read.
 
 - `ALERT_MATCH_WORK_MAX` (`alert.rs`): 1,000,000 route visits and matcher evaluations per
-  workspace pass, including unmatched pairs, receiver inspections and scanned template bytes. Exhaustion discards all alert links and status
+  workspace pass, including unmatched pairs, receiver inspections, scanned template bytes and the
+  steps matching may take (`ALERT_SCAN_UNIT`). Exhaustion discards all alert links and status
   reports the evaluation limit instead of ordinary orphan results. Context reuses one prepared
   link pass; status reuses existing links with at most one extra empty-result diagnostic pass
   per query, independent of unrelated repository count. Roots are indexed once, so a false
   parent condition does not scan its descendants for every rule.
+- `ALERT_SCAN_UNIT` (`alert.rs`): 64 steps per unit of `ALERT_MATCH_WORK_MAX`. Before reading a
+  value, each condition is charged, past its own unit, what matching it may take: for an
+  expression (`regexp::Compiled::cost`), a step per automaton position (a character, dot or
+  class, once per copy its counted repetitions make) and byte offset it may start at, every
+  offset of the value and one more inside or after an unbounded repetition, else one more than
+  the characters what precedes it may vary by; for a comparison or a substring search, the bytes
+  it reads. A condition on tags is charged for all of them at once. Matching `.*a.{1000}a.*`
+  against a label of 300,000 bytes mixing `a` and `b` (the lazy DFA cannot hold its states and
+  gives way to the PikeVM, 84 ns a step in a debug build) took 43 s for each route; it now stops
+  at the evaluation limit before matching, and a pass runs at most 2^26 steps (5.4 s, debug;
+  `status` may run two passes). A literal alternation costs its characters whatever the value, so
+  up to 63 of them cost no unit, and an ordinary expression on a short value a few units at most.
 
 - `ALERT_PCL_DEPTH_MAX` (`alert/pcl.rs`): 64 nested PCL groups or unary conditions.
   Deeper conditions remain unread as a whole. The literal reader recognizes `matches`,

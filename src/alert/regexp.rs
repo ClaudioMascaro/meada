@@ -13,11 +13,92 @@ use std::sync::{Arc, LazyLock};
 // ponytail: Go/RE2 rejects counted repetitions, including nested products, above 1000.
 const RE2_REPEAT_MAX: u32 = 1000;
 
+/// An expression compiled within its part of the ceilings, and its automaton positions (each
+/// character, dot or class, once per copy its counted repetitions make) by the byte offsets of a
+/// value each may start at: matching takes at most a step per position and offset, whichever
+/// engine runs, as the lazy DFA gives way to the PikeVM when its states do not fit.
+pub(super) struct Compiled {
+    pub(super) regex: regex::Regex,
+    /// The positions an unbounded repetition, around or before them, lets start at any offset.
+    looped: usize,
+    /// The offsets each other position may start at, summed: one more than the characters what
+    /// precedes it may vary by.
+    spread: usize,
+}
+impl Compiled {
+    /// An upper bound on the steps matching a value of `len` bytes takes.
+    pub(super) fn cost(&self, len: usize) -> usize {
+        (len.saturating_add(1))
+            .saturating_mul(self.looped)
+            .saturating_add(self.spread)
+    }
+    /// Counts the positions of `ast`, entered at `starts` offsets (`None`: at any), and returns
+    /// the fewest and the most characters it matches (`None`: no most).
+    fn add(&mut self, ast: &Ast, starts: Option<usize>) -> (usize, Option<usize>) {
+        let widen = |starts: Option<usize>, (fewest, most): (usize, Option<usize>)| {
+            Some(starts?.saturating_add(most?.saturating_sub(fewest)))
+        };
+        match ast {
+            Ast::Empty(_) | Ast::Flags(_) | Ast::Assertion(_) => (0, Some(0)),
+            Ast::Literal(_)
+            | Ast::Dot(_)
+            | Ast::ClassUnicode(_)
+            | Ast::ClassPerl(_)
+            | Ast::ClassBracketed(_) => {
+                match starts {
+                    Some(starts) => self.spread = self.spread.saturating_add(starts),
+                    None => self.looped = self.looped.saturating_add(1),
+                }
+                (1, Some(1))
+            }
+            Ast::Group(group) => self.add(&group.ast, starts),
+            Ast::Alternation(alternation) => {
+                (alternation.asts.iter()).fold((usize::MAX, Some(0)), |(fewest, most), ast| {
+                    let (lo, hi) = self.add(ast, starts);
+                    (fewest.min(lo), most.zip(hi).map(|(a, b)| a.max(b)))
+                })
+            }
+            Ast::Concat(concat) => {
+                let (mut fewest, mut most, mut starts) = (0, Some(0_usize), starts);
+                for ast in &concat.asts {
+                    let length = self.add(ast, starts);
+                    starts = widen(starts, length);
+                    fewest = length.0.saturating_add(fewest);
+                    most = most.zip(length.1).map(|(a, b)| a.saturating_add(b));
+                }
+                (fewest, most)
+            }
+            Ast::Repetition(repetition) => {
+                let (min, max) = match &repetition.op.kind {
+                    RepetitionKind::ZeroOrOne => (0, Some(1)),
+                    RepetitionKind::ZeroOrMore => (0, None),
+                    RepetitionKind::OneOrMore => (1, None),
+                    RepetitionKind::Range(RepetitionRange::Exactly(n)) => (*n, Some(*n)),
+                    RepetitionKind::Range(RepetitionRange::AtLeast(n)) => (*n, None),
+                    RepetitionKind::Range(RepetitionRange::Bounded(n, m)) => (*n, Some(*m)),
+                };
+                let (min, max) = (min as usize, max.map(|m| m as usize));
+                // The automaton holds `max` copies, or `min` (at least one) with the last looping;
+                // a copy starts where the ones before it may end.
+                let copies = max.unwrap_or(min.max(1));
+                let (mut length, mut entry) = ((0, Some(0)), starts);
+                for copy in 1..=copies {
+                    let looping = max.is_none() && copy == copies;
+                    length = self.add(&repetition.ast, entry.filter(|_| !looping));
+                    entry = widen(entry, length);
+                }
+                let most = max.zip(length.1).map(|(m, hi)| m.saturating_mul(hi));
+                (min.saturating_mul(length.0), most)
+            }
+        }
+    }
+}
+
 /// The expressions one linking pass compiled, each once for its share, and how many routing
 /// scopes share the pass's ceilings in equal parts.
 pub(super) struct Pass<'a> {
     scopes: usize,
-    compiled: HashMap<(&'a str, usize), Option<Arc<regex::Regex>>>,
+    compiled: HashMap<(&'a str, usize), Option<Arc<Compiled>>>,
 }
 impl<'a> Pass<'a> {
     /// A pass over `scopes` routing scopes, each compiling its expressions within an equal part
@@ -33,7 +114,7 @@ impl<'a> Pass<'a> {
     /// `ALERT_REGEX_FOLD_MAX` and `ALERT_REGEX_CLASSES_MAX`: an equal share of its scope's part,
     /// one of `shares` distinct expressions. `None` past them, past `ALERT_REGEX_MAX` or for no
     /// RE2 expression.
-    pub(super) fn compile(&mut self, pattern: &'a str, shares: usize) -> Option<Arc<regex::Regex>> {
+    pub(super) fn compile(&mut self, pattern: &'a str, shares: usize) -> Option<Arc<Compiled>> {
         let scopes = self.scopes;
         let compiled = self.compiled.entry((pattern, shares));
         compiled
@@ -43,7 +124,7 @@ impl<'a> Pass<'a> {
 }
 
 /// `Pass::compile` in a pass of `scopes`.
-fn compile(pattern: &str, scopes: usize, shares: usize) -> Option<regex::Regex> {
+fn compile(pattern: &str, scopes: usize, shares: usize) -> Option<Compiled> {
     if pattern.len() > ALERT_REGEX_MAX {
         return None;
     }
@@ -60,11 +141,19 @@ fn compile(pattern: &str, scopes: usize, shares: usize) -> Option<regex::Regex> 
         folds(&pattern, &ast, ALERT_REGEX_FOLD_MAX / parts)?;
     }
     let budget = ALERT_REGEX_SIZE_MAX.min(ALERT_REGEX_POOL_MAX / scopes) / shares;
-    regex::RegexBuilder::new(&format!("\\A(?:{pattern})\\z"))
+    let regex = regex::RegexBuilder::new(&format!("\\A(?:{pattern})\\z"))
         .size_limit(budget)
         .dfa_size_limit(budget)
         .build()
-        .ok()
+        .ok()?;
+    // Counted once the automaton fits its part, which bounds the copies to count.
+    let mut compiled = Compiled {
+        regex,
+        looped: 0,
+        spread: 0,
+    };
+    compiled.add(&ast, Some(1));
+    Some(compiled)
 }
 
 /// Whether an `i` flag appears anywhere in `ast`, and how many Unicode classes it holds.
@@ -761,5 +850,26 @@ mod tests {
         let pattern = regex_source(r"(?i)[\w-]").unwrap();
         let ast = ast::parse::Parser::new().parse(&pattern).unwrap();
         assert_eq!(folds(&pattern, &ast, usize::MAX), Some(52 + 54));
+    }
+
+    /// Matching takes a step per position and offset it may start at: inside or after an
+    /// unbounded repetition, every offset of the value and one more; elsewhere, one more than the
+    /// characters what precedes it may vary by. A literal alternation costs its characters,
+    /// whatever the value.
+    #[test]
+    fn matching_costs_a_step_per_position_and_offset_it_may_start_at() {
+        let cost = |pattern: &str, len: usize| compile(pattern, 1, 1).map(|c| c.cost(len));
+        assert_eq!(
+            [
+                cost(".*a.{1000}", 99),
+                cost("team-(?:a|bb)-x", 1_000_000),
+                cost("a?b", 10),
+                cost("(?:a?){3}", 10),
+                cost("x{2,}y", 9),
+                cost("[a-z0-9-]{1,63}", 1_000_000),
+                cost("a{0}b", 10),
+            ],
+            [100_200, 12, 3, 6, 21, 63, 1].map(Some)
+        );
     }
 }

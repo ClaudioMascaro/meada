@@ -395,6 +395,12 @@ All notable changes to Meada are recorded here. The format follows
   the repository asking. Past its part an expression stays unmatched (`status` shows its matcher
   as an orphan, not a limit), and the same expression in route configurations of as many
   expressions is compiled once (#672).
+- A long label matched by an Alertmanager route expression of many automaton positions no longer
+  takes time without bound: `.*a.{1000}a.*` against a label of 300,000 bytes took 43 s for each
+  route (debug). Before reading a value, each condition is charged a step per position and byte
+  offset it may start at (the bytes it reads for a comparison), 64 steps a unit of the evaluation
+  ceiling, so `status` reports the evaluation limit; ordinary expressions on short values cost a
+  few units at most and link as before.
 - A Python file of thousands of AWS SDK operations on clients a factory function returns no
   longer takes minutes to index: the operations one reader asks about in a file keep the answers
   no limit cut and share a budget of 2^18 steps, one operation taking up to all that is left
