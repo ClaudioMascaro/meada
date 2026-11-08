@@ -14,9 +14,9 @@ use std::sync::{Arc, LazyLock};
 const RE2_REPEAT_MAX: u32 = 1000;
 
 /// An expression compiled within its part of the ceilings, and its automaton positions (each
-/// character, dot or class, once per copy its counted repetitions make) by the byte offsets of a
-/// value each may start at: matching takes at most a step per position and offset, whichever
-/// engine runs, as the lazy DFA gives way to the PikeVM when its states do not fit.
+/// character, dot, class or assertion, once per copy its counted repetitions make) by the byte
+/// offsets of a value each may start at: matching takes at most a step per position and offset,
+/// whichever engine runs, as the lazy DFA gives way to the PikeVM when its states do not fit.
 pub(super) struct Compiled {
     pub(super) regex: regex::Regex,
     /// The positions an unbounded repetition, around or before them, lets start at any offset.
@@ -32,6 +32,13 @@ impl Compiled {
             .saturating_mul(self.looped)
             .saturating_add(self.spread)
     }
+    /// A position entered at `starts` offsets (`None`: at any).
+    fn step(&mut self, starts: Option<usize>) {
+        match starts {
+            Some(starts) => self.spread = self.spread.saturating_add(starts),
+            None => self.looped = self.looped.saturating_add(1),
+        }
+    }
     /// Counts the positions of `ast`, entered at `starts` offsets (`None`: at any), and returns
     /// the fewest and the most characters it matches (`None`: no most).
     fn add(&mut self, ast: &Ast, starts: Option<usize>) -> (usize, Option<usize>) {
@@ -39,16 +46,18 @@ impl Compiled {
             Some(starts?.saturating_add(most?.saturating_sub(fewest)))
         };
         match ast {
-            Ast::Empty(_) | Ast::Flags(_) | Ast::Assertion(_) => (0, Some(0)),
+            Ast::Empty(_) | Ast::Flags(_) => (0, Some(0)),
+            // An assertion reads no character but is tried at each offset it may start at.
+            Ast::Assertion(_) => {
+                self.step(starts);
+                (0, Some(0))
+            }
             Ast::Literal(_)
             | Ast::Dot(_)
             | Ast::ClassUnicode(_)
             | Ast::ClassPerl(_)
             | Ast::ClassBracketed(_) => {
-                match starts {
-                    Some(starts) => self.spread = self.spread.saturating_add(starts),
-                    None => self.looped = self.looped.saturating_add(1),
-                }
+                self.step(starts);
                 (1, Some(1))
             }
             Ast::Group(group) => self.add(&group.ast, starts),
@@ -855,7 +864,8 @@ mod tests {
     /// Matching takes a step per position and offset it may start at: inside or after an
     /// unbounded repetition, every offset of the value and one more; elsewhere, one more than the
     /// characters what precedes it may vary by. A literal alternation costs its characters,
-    /// whatever the value.
+    /// whatever the value. An assertion is a position too, though it reads no character: each
+    /// `\b` or `\B` of `.*(?:\b|\B){100}` may be tried at every offset.
     #[test]
     fn matching_costs_a_step_per_position_and_offset_it_may_start_at() {
         let cost = |pattern: &str, len: usize| compile(pattern, 1, 1).map(|c| c.cost(len));
@@ -868,8 +878,9 @@ mod tests {
                 cost("x{2,}y", 9),
                 cost("[a-z0-9-]{1,63}", 1_000_000),
                 cost("a{0}b", 10),
+                cost(r".*(?:\b|\B){100}", 9),
             ],
-            [100_200, 12, 3, 6, 21, 63, 1].map(Some)
+            [100_200, 12, 3, 6, 21, 63, 1, 2010].map(Some)
         );
     }
 }

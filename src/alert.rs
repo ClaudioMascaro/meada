@@ -16,7 +16,7 @@ mod regexp;
 use config::{Matcher, Op, Route, Rule, Stream};
 pub struct Alert;
 
-// ponytail: regex source length bounds compilation input; `ALERT_SCAN_UNIT` charges matching.
+// ponytail: regex source length bounds compilation input; `ALERT_SCAN_MAX` bounds matching.
 const ALERT_REGEX_MAX: usize = 4096;
 /// The bytes the automata and search caches of one routing scope may take, shared equally by
 /// its distinct expressions.
@@ -44,13 +44,30 @@ const ALERT_REGEX_CLASSES_MAX: usize = 4096;
 const ALERT_LINK_BYTES_MAX: usize = 4 * crate::lang::MAX_BYTES;
 // ponytail: unmatched rule/tree pairs must not run without a bound just because they emit no links.
 const ALERT_MATCH_WORK_MAX: usize = 1_000_000;
-/// The steps one unit of `ALERT_MATCH_WORK_MAX` pays for: a condition is charged, before it reads
-/// a value, what matching it may take, `regexp::Compiled::cost` for an expression and the bytes
-/// it reads for a comparison or a substring search.
-// ponytail: `.*a.{1000}a.*` ran 84 ns a step (debug) on a label of 60,000 bytes, so the ceiling
-// runs at most 2^26 steps a pass (5.4 s), where four such routes took 20.5 s; a literal
-// alternation of up to 63 characters costs no unit.
-const ALERT_SCAN_UNIT: usize = 64;
+/// The steps matching may take in one workspace pass: a condition is charged, before it reads a
+/// value, what matching it may take, `regexp::Compiled::cost` for an expression and the bytes it
+/// reads for a comparison or a substring search.
+// ponytail: `.*a.{1000}a.*` ran 84 ns a step (debug) on a label of 60,000 bytes mixing `a` and
+// `b`, where four such routes took 20.5 s; 2^26 steps take about 5.6 s at that rate, slower for
+// a class of many ranges (200 ns a step for one of 48 bytes).
+const ALERT_SCAN_MAX: usize = 1 << 26;
+
+/// What one workspace pass may still spend: route visits, matcher evaluations and template bytes
+/// within `ALERT_MATCH_WORK_MAX`, matching steps within `ALERT_SCAN_MAX`.
+struct Work {
+    units: usize,
+    steps: usize,
+}
+impl Work {
+    fn spend(&mut self, units: usize) -> Result<(), Limit> {
+        self.units = self.units.checked_sub(units).ok_or(Limit::Work)?;
+        Ok(())
+    }
+    fn scan(&mut self, steps: usize) -> Result<(), Limit> {
+        self.steps = self.steps.checked_sub(steps).ok_or(Limit::Work)?;
+        Ok(())
+    }
+}
 
 impl ContractKind for Alert {
     fn prefix(&self) -> &'static str {
@@ -494,7 +511,10 @@ fn linked<'a>(
     }
     let mut out = Vec::new();
     let mut retained = 0;
-    let mut work = ALERT_MATCH_WORK_MAX;
+    let mut work = Work {
+        units: ALERT_MATCH_WORK_MAX,
+        steps: ALERT_SCAN_MAX,
+    };
     let scopes = (inventories.iter())
         .map(|(_, configs)| regex_scopes(configs))
         .sum();
@@ -715,10 +735,10 @@ fn emit(
     providers: &BTreeSet<(&str, &str)>,
     out: &mut Vec<Link>,
     retained: &mut usize,
-    work: &mut usize,
+    work: &mut Work,
 ) -> Result<(), Limit> {
     for (matcher, name, level) in &target.matchers {
-        *work = work.checked_sub(1).ok_or(Limit::Work)?;
+        work.spend(1)?;
         if routing.condition(matcher).matches(event, work)? != Some(true) {
             continue;
         }
@@ -860,9 +880,9 @@ impl Condition<'_> {
             _ => value.len().min(self.matcher.pattern().len()),
         }
     }
-    /// Whether `rule` meets the condition, `None` when unknown, charging `work` what matching the
-    /// values it reads may cost, in units of `ALERT_SCAN_UNIT`, before reading them.
-    fn matches(&self, rule: &Rule, work: &mut usize) -> Result<Option<bool>, Limit> {
+    /// Whether `rule` meets the condition, `None` when unknown, charging `work` the steps matching
+    /// the values it reads may take, before reading them.
+    fn matches(&self, rule: &Rule, work: &mut Work) -> Result<Option<bool>, Limit> {
         let matcher = self.matcher;
         if matcher.op.regex() && self.regex.is_none() {
             return Ok(None);
@@ -873,9 +893,7 @@ impl Condition<'_> {
             }
             let cost =
                 (rule.tags.iter()).fold(0, |cost: usize, tag| cost.saturating_add(self.cost(tag)));
-            *work = work
-                .checked_sub(cost / ALERT_SCAN_UNIT)
-                .ok_or(Limit::Work)?;
+            work.scan(cost)?;
             let mut unknown = rule.unknown_tags;
             for tag in &rule.tags {
                 match self.positive(tag) {
@@ -898,7 +916,7 @@ impl Condition<'_> {
         let Some(value) = rule.labels.get(field) else {
             return Ok(None);
         };
-        *work = (work.checked_sub(self.cost(value) / ALERT_SCAN_UNIT)).ok_or(Limit::Work)?;
+        work.scan(self.cost(value))?;
         Ok(self
             .positive(value)
             .map(|positive| positive != matcher.op.negative()))
@@ -1012,8 +1030,8 @@ impl<'a> Routing<'a> {
             regex: self.compiled.get(matcher.pattern()).cloned().flatten(),
         }
     }
-    fn matches(&self, index: usize, rule: &Rule, work: &mut usize) -> Result<Option<bool>, Limit> {
-        *work = work.checked_sub(1).ok_or(Limit::Work)?;
+    fn matches(&self, index: usize, rule: &Rule, work: &mut Work) -> Result<Option<bool>, Limit> {
+        work.spend(1)?;
         let route = self.routes[index];
         if rule.stream != route.stream {
             return Ok(Some(false));
@@ -1030,7 +1048,7 @@ impl<'a> Routing<'a> {
         let mut known = !route.opaque;
         let mut values = Vec::new();
         for condition in &self.conditions[index] {
-            *work = work.checked_sub(1).ok_or(Limit::Work)?;
+            work.spend(1)?;
             let value = condition.matches(rule, work)?;
             if !route.logic.is_empty() {
                 values.push(value);
@@ -1052,7 +1070,7 @@ impl<'a> Routing<'a> {
         &self,
         siblings: &[usize],
         rule: &Rule,
-        work: &mut usize,
+        work: &mut Work,
     ) -> Result<(Vec<usize>, bool), Limit> {
         let mut selected = Vec::new();
         let mut unknown = false;
@@ -1068,7 +1086,7 @@ impl<'a> Routing<'a> {
         }
         Ok((selected, unknown))
     }
-    fn destinations(&self, rule: &Rule, work: &mut usize) -> Result<BTreeSet<usize>, Limit> {
+    fn destinations(&self, rule: &Rule, work: &mut Work) -> Result<BTreeSet<usize>, Limit> {
         let mut out = BTreeSet::new();
         let mut pending = Vec::new();
         for roots in &self.roots {
@@ -1264,9 +1282,56 @@ mod tests {
         assert!(started.elapsed() < std::time::Duration::from_secs(30));
     }
 
+    /// Matching steps have their own ceiling: 1,000 rules tried against 400 continuing routes of
+    /// `.*-apix`, then linked by `other-.*`, spend about 805,000 visits and evaluations, as they
+    /// did before steps were charged, and 28.8 million steps (6 positions at each of the 12
+    /// offsets of an 11-byte label), below `ALERT_SCAN_MAX`, so every rule links. Charged in units
+    /// of 64 steps against the evaluation ceiling, those 72 steps were one unit a pair, past it.
+    #[test]
+    fn matching_steps_leave_the_evaluation_ceiling_to_visits_and_evaluations() {
+        let rules = (0..1000).map(|i| serde_json::json!({"alert":format!("R{i}"), "expr":"up", "labels":{"support":"other-thing"}})).collect::<Vec<_>>();
+        let mut routes = (0..400).map(|_| serde_json::json!({"receiver":"team", "match_re":{"support":".*-apix"}, "continue":true})).collect::<Vec<_>>();
+        assert!(rules.len() * (1 + routes.len() * 2) < ALERT_MATCH_WORK_MAX);
+        assert!(rules.len() * routes.len() * 3 > ALERT_MATCH_WORK_MAX);
+        let looped = regexp::Pass::new(1).compile(".*-apix", 1).unwrap();
+        assert_eq!(looped.cost("other-thing".len()), 72);
+        routes.push(serde_json::json!({"receiver":"team", "match_re":{"support":"other-.*"}}));
+        let source = serde_json::json!({"groups":[{"name":"wide", "rules":rules}], "route":{"receiver":"team", "routes":routes}, "receivers":[{"name":"team"}]}).to_string();
+        assert!(source.len() < crate::lang::MAX_BYTES);
+        let repo = Repository {
+            identity: "example.com/work".into(),
+            root: Default::default(),
+            config: Default::default(),
+            decisions: Default::default(),
+            index: Default::default(),
+        };
+        let mut export = Export {
+            repository: repo.identity.clone(),
+            configurations: vec![(
+                "alert.yaml".into(),
+                serde_json::json!({"alert":config::read("alert.yaml", source.as_bytes())}),
+            )],
+            ..Default::default()
+        };
+        Alert.declare(&repo, &mut export);
+        let exports = [export];
+        let providers = exports[0]
+            .providers
+            .iter()
+            .map(|p| (&repo, p))
+            .collect::<Vec<_>>();
+        let links = Alert.workspace_links(&exports, &providers).unwrap();
+        let status = Alert.scope_status(&repo, &exports[0], &exports, &links);
+        assert_eq!(links.len(), rules.len());
+        assert!(
+            !status.iter().any(|row| row.contains("limit")),
+            "{status:?}"
+        );
+    }
+
     /// A route expression is charged, before it runs, a step per automaton position and offset
     /// of the value it may start at: `.*a.{1000}a.*` may run its 1,003 positions at each offset
-    /// of a label of 300,000 bytes, past the evaluation ceiling, so routing stops before matching.
+    /// of a label of 300,000 bytes, past `ALERT_SCAN_MAX`, so routing stops before matching.
     /// The label mixes `a` and `b` without a period, so the lazy DFA cannot hold its states and
     /// gives way to the PikeVM. Measured on 2026-11-08 in a debug build: 0.05 s, where matching
     /// took 46 s.
@@ -1318,12 +1383,12 @@ mod tests {
         assert!(took < std::time::Duration::from_secs(5), "{took:?}");
     }
 
-    /// A condition is charged, before it reads a value, what matching may cost in units of
-    /// `ALERT_SCAN_UNIT` (64 steps): `.*a{999}` may run its 1,000 positions at each of the 128
-    /// offsets of a label of 127 bytes, 2,000 units, which a budget of 2,000 pays and one of 1,999
+    /// A condition is charged, before it reads a value, the steps matching may take, and no unit
+    /// of `ALERT_MATCH_WORK_MAX`: `.*a{999}` may run its 1,000 positions at each of the 128 offsets
+    /// of a label of 127 bytes, 128,000 steps, which a budget of 128,000 pays and one of 127,999
     /// does not. A substring search costs the bytes it reads and the tags of a condition are
     /// charged together. On a short value, `[a-z]+-(?:prod|staging)` runs its 13 positions at each
-    /// of 12 offsets (two units), and a literal alternation costs its characters (no unit).
+    /// of 12 offsets, and a literal alternation costs its characters.
     #[test]
     fn a_condition_is_charged_what_matching_may_cost_before_it_reads_a_value() {
         let matcher = |op, key: &str, pattern: &str| Matcher {
@@ -1346,34 +1411,39 @@ mod tests {
             )
             .unwrap()
         };
-        let run = |matcher: &Matcher, rule: &Rule, mut work: usize| {
+        let run = |matcher: &Matcher, rule: &Rule, steps: usize| {
             let regex = regexp::Pass::new(1).compile(matcher.pattern(), 1);
+            let mut work = Work { units: 0, steps };
             let matched = Condition { matcher, regex }.matches(rule, &mut work);
-            matched.map(|matched| (matched, work))
+            matched.map(|matched| (matched, work.units, work.steps))
         };
         let long = rule(&"b".repeat(127), Vec::new());
         let expression = matcher(Op::Regex, "support", ".*a{999}");
         assert!(matches!(
-            run(&expression, &long, 2000),
-            Ok((Some(false), 0))
+            run(&expression, &long, 128_000),
+            Ok((Some(false), 0, 0))
         ));
-        assert!(matches!(run(&expression, &long, 1999), Err(Limit::Work)));
+        assert!(matches!(run(&expression, &long, 127_999), Err(Limit::Work)));
         let search = matcher(Op::Contains, "support", "a");
-        assert!(matches!(run(&search, &long, 1), Ok((Some(false), 0))));
-        assert!(matches!(run(&search, &long, 0), Err(Limit::Work)));
+        assert!(matches!(run(&search, &long, 127), Ok((Some(false), 0, 0))));
+        assert!(matches!(run(&search, &long, 126), Err(Limit::Work)));
         let tagged = rule(
             "",
             (0..4).map(|i| format!("{i}{}", "b".repeat(30))).collect(),
         );
         let tags = matcher(Op::Regex, "tags", ".*");
-        assert!(matches!(run(&tags, &tagged, 2), Ok((Some(true), 0))));
-        assert!(matches!(run(&tags, &tagged, 1), Err(Limit::Work)));
+        assert!(matches!(run(&tags, &tagged, 128), Ok((Some(true), 0, 0))));
+        assert!(matches!(run(&tags, &tagged, 127), Err(Limit::Work)));
         let short = rule("orders-prod", Vec::new());
         let ordinary = matcher(Op::Regex, "support", "[a-z]+-(?:prod|staging)");
-        assert!(matches!(run(&ordinary, &short, 2), Ok((Some(true), 0))));
-        assert!(matches!(run(&ordinary, &short, 1), Err(Limit::Work)));
+        assert!(matches!(
+            run(&ordinary, &short, 156),
+            Ok((Some(true), 0, 0))
+        ));
+        assert!(matches!(run(&ordinary, &short, 155), Err(Limit::Work)));
         let literal = matcher(Op::Regex, "support", "orders-prod|orders-staging");
-        assert!(matches!(run(&literal, &short, 0), Ok((Some(true), 0))));
+        assert!(matches!(run(&literal, &short, 25), Ok((Some(true), 0, 0))));
+        assert!(matches!(run(&literal, &short, 24), Err(Limit::Work)));
     }
 
     #[test]

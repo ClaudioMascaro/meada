@@ -1,6 +1,6 @@
 //! Known Alertmanager receiver mappings. Templates are substituted once, never executed.
-use super::Limit;
 use super::config::{self, Route, Rule, Stream, Summary};
+use super::{Limit, Work};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -116,11 +116,11 @@ pub(super) fn events(
     rule: &Rule,
     at: &str,
     retained: &mut usize,
-    work: &mut usize,
+    work: &mut Work,
 ) -> Result<Vec<Event>, Limit> {
     let mut out = Vec::new();
     for receiver in &summary.forwardings {
-        *work = work.checked_sub(1).ok_or(Limit::Work)?;
+        work.spend(1)?;
         if !receiver.valid || receiver.name != route.receiver || receiver.document != route.document
         {
             continue;
@@ -209,11 +209,11 @@ fn render(
     route: &Route,
     rule: &Rule,
     retained: &mut usize,
-    work: &mut usize,
+    work: &mut Work,
 ) -> Result<Option<String>, Limit> {
     // Unread templates may emit nothing. Charge their scan too, before repeated rules can
     // spend unbounded time on the same long, unsupported expression.
-    *work = work.checked_sub(template.len()).ok_or(Limit::Work)?;
+    work.spend(template.len())?;
     let mut out = String::new();
     let mut remaining = template;
     while let Some(start) = remaining.find("{{") {
