@@ -473,8 +473,9 @@ All notable changes to Meada are recorded here. The format follows
 - Ingress: a path Meada cannot read as a literal prefix (`/store/(.*)`, `/api/*`) no longer drops
   out of the routing table, where a shorter rule then claimed its URLs; it is an unread mount at
   its literal head cut at its last slash. A `use-regex` annotation or a missing `pathType` also
-  leaves the path unread, and a table past its ceilings leaves every host of the Ingress unread,
-  not only the hosts read before the cut.
+  leaves the path unread, and so does a path left out (an ImplementationSpecific catch-all); a
+  table past its ceilings (64 rules, read or not) leaves every host of the Ingress unread, not
+  only the hosts read before the cut.
 - Kustomize `components` change what the kustomization that lists them holds, its bases'
   objects included, as Kustomize applies them; they were instantiated as one more base, so a
   component's `images` rule never retagged the overlay's workloads.

@@ -27,9 +27,7 @@ pub(super) fn read(value: &Value) -> Vec<Ingress> {
             continue;
         };
         for path in list(rule, &["http", "paths"]) {
-            let Some(written) = text(path, &["path"]) else {
-                continue;
-            };
+            let written = text(path, &["path"]).unwrap_or_default();
             let read = written.starts_with('/') && written.bytes().all(literal);
             // A path read as no literal prefix is an unknown mount at its literal head, cut at
             // its last slash, so the URLs it may serve fall back to no shorter route.
@@ -105,6 +103,8 @@ mod tests {
             path("/api/*", Some("ImplementationSpecific"), "api"),
             path("/v1(.*)", Some("Prefix"), "v1"),
             path("/legacy", None, "old"),
+            // An ImplementationSpecific path may be left out: the controller's catch-all.
+            json!({"pathType": "ImplementationSpecific", "backend": {"service": {"name": "any"}}}),
         ]);
         let pair = |prefix: &str, service: &str| (prefix.to_string(), service.to_string());
         assert_eq!(
@@ -115,6 +115,7 @@ mod tests {
                 pair("/api", ""),
                 pair("", ""),
                 pair("/legacy", ""),
+                pair("", ""),
             ]
         );
         let regex = json!({"nginx.ingress.kubernetes.io/use-regex": "true"});

@@ -6,13 +6,13 @@
   resolve unique endpoints; no endpoint Cartesian product is expanded. Crossplane patch sets
   are indexed once, and missing/duplicate/nested sets stay unread. The full-file custom binding
   fan-out probe runs independently through `custom_topology_reader_stays_bounded_on_a_full_file`.
-Ingress HTTP summaries (#665) share `OBJECT_REFERENCES_MAX` (64 literal host/prefix rules)
+Ingress HTTP summaries (#665) share `OBJECT_REFERENCES_MAX` (64 host/path rules, read or not)
 and `UNIT_STORED_MAX` (4 MiB of borrowed route text before copying, then charged to the unit
 again with its other facts). Passing either makes every host of the Ingress one unread mount,
 preventing a partial prefix table from choosing a shorter route. Rewrite or `use-regex`
 annotations, unknown/duplicated backends and a `pathType` other than `Prefix` (none included)
 leave a path an unread mount; a nonliteral or controller path is an unread mount at its literal
-head cut at its last slash, and a wildcard host gives no route. `http/infrastructure.rs`
+head cut at its last slash (a path left out, at the root), and a wildcard host gives no route. `http/infrastructure.rs`
 charges internal provider forms before path/reason expansion to `ALIAS_BYTES_MAX` (16 MiB per
 query); overflow makes every Ingress mount unread for that query, preserving Service/Compose
 routing. No partial alias table may select a shorter mount.

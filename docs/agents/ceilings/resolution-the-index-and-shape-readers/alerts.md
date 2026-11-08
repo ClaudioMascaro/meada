@@ -72,7 +72,7 @@
   alternation costs its characters and its choice whatever the value and an ordinary expression on
   a short value a few hundred steps: 1,000 rules tried against 400 routes of `.*-apix` on an
   11-byte label take 33.6 million, and OpsGenie monitors of ten short tags matched by such
-  expressions stop at about 5,200 a pass.
+  expressions stop at about 4,650 a pass.
 
 - `ALERT_PCL_DEPTH_MAX` (`alert/pcl.rs`): 64 nested PCL groups or unary conditions.
   Deeper conditions remain unread as a whole. The literal reader recognizes `matches`,
