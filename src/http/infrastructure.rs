@@ -393,6 +393,8 @@ impl<'a> Routing<'a> {
         candidates
     }
 
+    /// The links a call to `host` takes through an Ingress or a Service, or `None` when no route
+    /// reaches code: the host is then left to `[serve] hosts`, as before infrastructure was read.
     fn links(
         &self,
         consumer: &Consumer,
@@ -427,7 +429,7 @@ impl<'a> Routing<'a> {
             .collect::<Vec<_>>();
         if !ingresses.is_empty() {
             if !self.ingress_ready {
-                return Some(Vec::new());
+                return None;
             }
             let longest = ingresses
                 .iter()
@@ -436,64 +438,53 @@ impl<'a> Routing<'a> {
                 .unwrap_or(0);
             ingresses.retain(|(_, _, r)| r.prefix.len() == longest);
             let ambiguous = ingresses.len() > 1;
-            return Some(
-                ingresses
-                    .iter()
-                    .flat_map(|(e, n, r)| {
-                        let service = e.iac.iter().find(|s| {
-                            s.root == n.root && s.address == r.service && s.ty == "Service"
-                        });
-                        service.into_iter().flat_map(move |s| {
-                            let mut reason = format!(
-                                "Ingress {} (root {}) prefix {} through Service {} (root {})",
-                                n.identity(&e.repository),
-                                n.root,
-                                if r.prefix.is_empty() { "/" } else { &r.prefix },
-                                s.identity(&e.repository),
-                                s.root
-                            );
-                            if let Some(evidence) = evidence {
-                                reason.push_str(&format!("; {evidence}"));
-                            }
-                            self.through_service(
-                                e,
-                                s,
-                                consumer,
-                                Some(&r.prefix),
-                                &reason,
-                                ambiguous,
-                            )
-                        })
+            let found: Vec<_> = ingresses
+                .iter()
+                .flat_map(|(e, n, r)| {
+                    let service = e
+                        .iac
+                        .iter()
+                        .find(|s| s.root == n.root && s.address == r.service && s.ty == "Service");
+                    service.into_iter().flat_map(move |s| {
+                        let mut reason = format!(
+                            "Ingress {} (root {}) prefix {} through Service {} (root {})",
+                            n.identity(&e.repository),
+                            n.root,
+                            if r.prefix.is_empty() { "/" } else { &r.prefix },
+                            s.identity(&e.repository),
+                            s.root
+                        );
+                        if let Some(evidence) = evidence {
+                            reason.push_str(&format!("; {evidence}"));
+                        }
+                        self.through_service(e, s, consumer, Some(&r.prefix), &reason, ambiguous)
                     })
-                    .collect(),
-            );
+                })
+                .collect();
+            return (!found.is_empty()).then_some(found);
         }
         let services = self.services(&host, caller, from);
-        if services.is_empty() {
-            return None;
-        }
         let ambiguous = services.len() > 1;
-        Some(
-            services
-                .iter()
-                .flat_map(|(export, node)| {
-                    let kind = if node.ty == "service" {
-                        "Compose service"
-                    } else {
-                        "Service"
-                    };
-                    let mut reason = format!(
-                        "{kind} {} (root {})",
-                        node.identity(&export.repository),
-                        node.root
-                    );
-                    if let Some(evidence) = evidence {
-                        reason.push_str(&format!("; {evidence}"));
-                    }
-                    self.through_service(export, node, consumer, None, &reason, ambiguous)
-                })
-                .collect(),
-        )
+        let found: Vec<_> = services
+            .iter()
+            .flat_map(|(export, node)| {
+                let kind = if node.ty == "service" {
+                    "Compose service"
+                } else {
+                    "Service"
+                };
+                let mut reason = format!(
+                    "{kind} {} (root {})",
+                    node.identity(&export.repository),
+                    node.root
+                );
+                if let Some(evidence) = evidence {
+                    reason.push_str(&format!("; {evidence}"));
+                }
+                self.through_service(export, node, consumer, None, &reason, ambiguous)
+            })
+            .collect();
+        (!found.is_empty()).then_some(found)
     }
 }
 

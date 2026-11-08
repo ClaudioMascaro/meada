@@ -103,7 +103,9 @@ Um Ingress liga seu host e prefixo literal à rota do Service, como um prefixo d
 O prefixo mais específico prevalece. Regras com anotação de rewrite, backend desconhecido
 ou `pathType` diferente de `Prefix` ficam sem vínculo (a ausência de `pathType` nas formas
 antigas é aceita). Caminhos de controller, expressões regulares e hosts com curinga não são
-interpretados. Nenhum cluster é consultado.
+interpretados. Nenhum cluster é consultado. Quando nem o Service nem o Ingress chegam a código
+(um Service que não seleciona workload indexado, uma regra sem vínculo), o host fica com o
+`[serve] hosts`: um host declarado ali continua ligando em `exact`.
 
 O Meada liga consumidores e provedores, inclusive entre linguagens e atrás de gateways. Uma rota cujo handler está num arquivo de teste (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`, um diretório `tests` ou `src/test`) não conta como provedora, a menos que o `meada.toml` tenha `test_routes = true` (veja [Configuração](configuration.md)):
 

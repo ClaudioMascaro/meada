@@ -187,6 +187,9 @@ execution, context, trace, orphan and export seams and the shared 1.4.0 minor re
 - **Ingress.** An Ingress host and path prefix carry an external base URL to the Service of the
   matching rule, the prefix applied like a gateway prefix. An Ingress that rewrites the path (a
   rewrite annotation) links nothing, as an unread mount yields nothing.
+- **No code reached.** A Service that selects no indexed workload, or an Ingress rule left
+  unread, links nothing itself and leaves the host to `[serve] hosts`: a host a repository
+  declares there still links `exact`, as it did before Meada read infrastructure.
 - **IaC-declared routes.** API Gateway routes and integrations, SAM `Api` and `HttpApi` events,
   and Serverless `http` and `httpApi` events are HTTP providers served by the function's code:
   its handler symbol when the handler resolves to one in the same repository, otherwise the

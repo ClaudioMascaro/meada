@@ -104,7 +104,9 @@ Un Ingress une su host y prefijo literal con la ruta del Service, como un prefij
 Prevalece el prefijo más específico. Las reglas con anotación de rewrite, backend desconocido
 o `pathType` distinto de `Prefix` quedan sin enlace (se aceptan las formas antiguas sin
 `pathType`). No se interpretan rutas específicas del controller, expresiones regulares ni
-hosts con comodines. No se consulta ningún cluster.
+hosts con comodines. No se consulta ningún cluster. Cuando ni el Service ni el Ingress llegan a
+código (un Service que no selecciona ningún workload indexado, una regla sin enlace), el host
+queda en manos de `[serve] hosts`: un host declarado allí sigue enlazando en `exact`.
 
 Meada conecta consumidores y proveedores entre lenguajes, incluso detrás de gateways. Una ruta cuyo handler está en un archivo de prueba (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`, un directorio `tests` o `src/test`) no es proveedora, salvo que `meada.toml` tenga `test_routes = true` (véase [Configuración](configuration.md)):
 

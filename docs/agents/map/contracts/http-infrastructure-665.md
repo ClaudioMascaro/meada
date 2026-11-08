@@ -32,7 +32,9 @@ replay and drift agree. Alias expansion is charged before copying; an exhausted 
 Ingress mounts unread as a whole (see the
 [Kubernetes ceilings](../../ceilings/resolution-the-index-and-shape-readers/kubernetes-and-crossplane.md)).
 Several distinct providers remain ambiguous. HTTP links through Service/Compose/Ingress or a
-workload environment are inferred and retain their evidence.
+workload environment are inferred and retain their evidence. A route that reaches no code (no
+selected workload, an unread mount, an exhausted alias table) prepares no link, so the per-call
+`Http::link` still links a host a repository declares in `[serve] hosts`.
 
 Tests: `tests/it/http_iac.rs`, sibling `http-iac-*` fixtures and DNS units in the HTTP module.
 `http-iac.py` in `/prove-meada` drives neutral sources through CLI and MCP stdio/HTTP,

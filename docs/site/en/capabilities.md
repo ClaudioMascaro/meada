@@ -103,7 +103,9 @@ An Ingress joins its host and literal prefix to the Service's route, like a gate
 The most specific prefix wins. Rules with a rewrite annotation, an unknown backend or a
 `pathType` other than `Prefix` remain unlinked (older forms without `pathType` are accepted).
 Controller-specific paths, regular expressions and wildcard hosts are not interpreted.
-No cluster is queried.
+No cluster is queried. When neither the Service nor the Ingress reaches code (a Service that
+selects no indexed workload, an unlinked rule), the host is left to `[serve] hosts`: a host
+declared there still links `exact`.
 
 Meada connects consumers and providers across languages, including behind gateways. A route whose handler is in a test file (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`, a `tests` directory or `src/test`) is no provider unless `meada.toml` sets `test_routes = true` (see [Configuration](configuration.md)):
 

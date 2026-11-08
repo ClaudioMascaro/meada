@@ -453,3 +453,50 @@ fn http_routing_waits_for_the_image_kinds_builder_pattern_choice() {
     std::fs::remove_file(server.join("meada.decisions.toml")).unwrap();
     assert_eq!(links(&client), before);
 }
+
+#[test]
+fn a_declared_host_keeps_its_link_when_no_service_or_ingress_reaches_code() {
+    let (client, deploy, server) = workspace("http_iac_declared_hosts");
+    std::fs::write(
+        server.join("meada.toml"),
+        "[serve]\nhosts = [\"orders.example.com\", \"orders\"]\n",
+    )
+    .unwrap();
+    std::fs::write(
+        client.join("internal.ts"),
+        "export function internalOrders() {\n  return fetch('http://orders/orders');\n}\n",
+    )
+    .unwrap();
+    // The Service selects no workload, and the Ingress of the other declared host has a path
+    // type Meada does not read: neither reaches code, so `[serve] hosts` answers as before.
+    let source = std::fs::read_to_string(deploy.join("workloads.yaml")).unwrap();
+    std::fs::write(
+        deploy.join("workloads.yaml"),
+        source.replace("selector: {app: orders}", "selector: {app: retired}")
+            + "---\napiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata: {name: direct, namespace: shop}\nspec:\n  rules:\n    - host: orders.example.com\n      http:\n        paths:\n          - path: /\n            pathType: ImplementationSpecific\n            backend:\n              service: {name: orders, port: {number: 8080}}\n",
+    )
+    .unwrap();
+    let found = links(&client);
+    for (name, host) in [
+        ("internalOrders", "orders"),
+        ("directOrders", "orders.example.com"),
+    ] {
+        let link = found
+            .iter()
+            .find(|l| {
+                l["consumer"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("::{name}::"))
+            })
+            .unwrap_or_else(|| panic!("{name}: {found:#?}"));
+        assert_eq!(link["level"], "exact", "{link}");
+        assert!(
+            link["reason"]
+                .as_str()
+                .unwrap()
+                .starts_with(&format!("host {host} is served by")),
+            "{link}"
+        );
+    }
+}
