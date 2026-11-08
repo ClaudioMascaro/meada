@@ -141,7 +141,8 @@ pub(crate) fn wide_past(text: &str) -> Option<usize> {
 /// `max`, each key of an object compared with the keys before it. Strings, heredocs, comments and
 /// block bodies hold no key; an interpolation is read as an expression. Every `=` or `:` that is
 /// no operator counts in the object around it, a conditional's or a `for`'s too: a count that may
-/// be too high but is never too low.
+/// be too high but is never too low. A heredoc whose first line could end it is past `max` at
+/// once: `hcl-edit` ends it there only when no later line can, which the scan does not follow.
 fn wide_past_with(text: &str, max: usize) -> Option<usize> {
     /// What the scan is inside of.
     enum Frame<'t> {
@@ -154,10 +155,23 @@ fn wide_past_with(text: &str, max: usize) -> Option<usize> {
         Quote,
         /// A heredoc and its identifier.
         Heredoc(&'t str),
+        /// The body of a template directive, from its `%{ if }`, `%{ for }` or `%{ else }` to
+        /// the directive that ends it: text that no quote or heredoc end closes.
+        Body,
     }
     let bytes = text.as_bytes();
     let end_of_line = |at: usize| text[at..].find('\n').map_or(bytes.len(), |n| at + n);
     let word = |b: u8| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-');
+    // Where the heredoc of identifier `id` ends when its line starts at `start`: after `id`, past
+    // spaces or tabs, when no identifier character follows. Code may follow.
+    let ends = |start: usize, id: &str| {
+        let indent = (bytes.get(start..)?.iter()).take_while(|b| matches!(b, b' ' | b'\t'));
+        let start = start + indent.count();
+        let after = start + id.len();
+        let ends =
+            text[start..].starts_with(id) && !text[after..].chars().next().is_some_and(id_continue);
+        ends.then_some(after)
+    };
     let mut stack = Vec::new();
     // The work so far, and the last byte of code that is no space or comment, and where.
     let (mut work, mut last, mut last_at, mut at) = (0usize, b'\n', 0, 0);
@@ -169,26 +183,26 @@ fn wide_past_with(text: &str, max: usize) -> Option<usize> {
                 stack.pop();
                 last = b'"';
             }
-            // As `hcl-edit` reads it, a heredoc ends at its identifier at the start of a line
-            // after spaces or tabs, when no identifier character follows; code may follow.
             Some(Frame::Heredoc(id)) if b == b'\n' => {
-                let id: &str = id;
-                let indent = bytes[at + 1..]
-                    .iter()
-                    .take_while(|b| matches!(b, b' ' | b'\t'));
-                let start = at + 1 + indent.count();
-                let after = start + id.len();
-                if text[start..].starts_with(id)
-                    && !text[after..].chars().next().is_some_and(id_continue)
-                {
+                if let Some(after) = ends(at + 1, id) {
                     stack.pop();
                     at = after - 1;
                 }
             }
-            Some(Frame::Quote | Frame::Heredoc(_)) => {
+            Some(Frame::Quote | Frame::Heredoc(_) | Frame::Body) => {
                 if matches!(b, b'$' | b'%') && next == b && bytes.get(at + 2) == Some(&b'{') {
                     at += 2;
                 } else if matches!(b, b'$' | b'%') && next == b'{' {
+                    // As `hcl-edit` reads a directive, `if` or `for` opens a body, `else` goes
+                    // on with one and any other keyword ends it.
+                    let keyword = (b == b'%').then(|| directive(&text[at + 2..]));
+                    if keyword.is_some_and(|k| k.starts_with("if") || k.starts_with("for")) {
+                        stack.push(Frame::Body);
+                    } else if keyword.is_some_and(|k| !k.starts_with("else"))
+                        && matches!(stack.last(), Some(Frame::Body))
+                    {
+                        stack.pop();
+                    }
                     stack.push(Frame::Interpolation);
                     at += 1;
                     last = b'{';
@@ -208,8 +222,11 @@ fn wide_past_with(text: &str, max: usize) -> Option<usize> {
                         let line = &text[at + 2..end_of_line(at)];
                         let id = line.strip_prefix('-').unwrap_or(line).trim_end();
                         if !id.is_empty() {
+                            if ends(end_of_line(at) + 1, id).is_some() {
+                                return Some(at);
+                            }
                             stack.push(Frame::Heredoc(id));
-                            at = end_of_line(at) - 1;
+                            at = end_of_line(at);
                         }
                     }
                     // A `{` after an identifier or a label opens a block, unless the identifier
@@ -254,6 +271,22 @@ fn wide_past_with(text: &str, max: usize) -> Option<usize> {
         at += 1;
     }
     None
+}
+
+/// The text of a template directive after its `%{`, past the `~` and the spaces and comments
+/// `hcl-edit` skips before its keyword.
+fn directive(text: &str) -> &str {
+    let mut rest = text.strip_prefix('~').unwrap_or(text);
+    loop {
+        rest = rest.trim_start_matches([' ', '\t', '\r', '\n']);
+        if rest.starts_with('#') || rest.starts_with("//") {
+            rest = rest.find('\n').map_or("", |n| &rest[n..]);
+        } else if let Some(n) = rest.strip_prefix("/*").and_then(|c| c.find("*/")) {
+            rest = &rest[n + 4..];
+        } else {
+            return rest;
+        }
+    }
 }
 
 /// Whether `c` may continue an HCL identifier, as `hcl-edit` reads one.
@@ -1076,6 +1109,23 @@ mod tests {
             format!("x = a / {{ {listed} }}\n"),
             format!("x = \"a\" / {{ {listed} }}\n"),
             format!("x = a- {{ {listed} }}\n"),
+            // A directive's body is text up to the directive that ends it, past a quote or a
+            // heredoc's end, whatever space, comment or `~` precedes its keyword.
+            format!("x = \"%{{ if c }}A\"B%{{ endif }}\"\ny = {{ {listed} }}\n"),
+            format!("x = \"%{{~ /* a */ if c ~}}A\"B%{{~ endif ~}}\"\ny = {{ {listed} }}\n"),
+            format!("x = \"%{{ # a\n if c }}A\"B%{{ endif }}\"\ny = {{ {listed} }}\n"),
+            format!("x = \"%{{ for v in c }}\"%{{ endfor }}\"\ny = {{ {listed} }}\n"),
+            format!("x = \"%{{ if c }}A%{{ else }}\"B%{{ endif }}\"\ny = {{ {listed} }}\n"),
+            format!(
+                "x = \"%{{ if a }}%{{ if b }}\"%{{ endif }}\"%{{ endif }}\"\ny = {{ {listed} }}\n"
+            ),
+            format!("x = <<EOT\n%{{ if c }}\nEOT\n\"\n%{{ endif }}\nEOT\ny = {{ {listed} }}\n"),
+            // `hcl-edit` ends a heredoc on its first line only when no later line ends it, so a
+            // heredoc whose first line could end it is past the ceiling whatever follows.
+            format!("x = <<EOT\nEOT/*\nEOT\ny = {{ {listed} }}\n"),
+            format!("x = <<EOT\n  EOT\"\nEOT\ny = {{ {listed} }}\n\"\n"),
+            format!("x = <<-EOT\nEOT<<Z\nEOT\ny = {{ {listed} }}\nZ\n"),
+            "x = <<EOT\nEOT\n".to_string(),
         ];
         let missed: Vec<&String> = (past.iter())
             .filter(|text| wide_past_with(text, 100).is_none())
@@ -1106,11 +1156,18 @@ mod tests {
             format!("x = <<EOT\n{}", keys(100)),
             format!("x = <<EOT\nEOT_ = {{ {listed} }}\nEOT\n"),
             format!("x = <<EOT\nEOT\u{e9} = {{ {listed} }}\nEOT\n"),
+            format!("x = {{ k = \"%{{ if c }}\"{}%{{ endif }}\" }}\n", keys(100)),
         ];
         let counted: Vec<&String> = (none.iter())
             .filter(|text| wide_past_with(text, 2).is_some())
             .collect();
         assert!(counted.is_empty(), "{counted:#?}");
+        // As the parser reads a directive's body, the quote in it ends nothing: `y` is read.
+        let (outcome, _) = read("a.tf", b"x = \"%{ if c }A\"B%{ endif }\"\ny = 1\n");
+        assert!(
+            matches!(outcome, Outcome::Read { values: 2, .. }),
+            "{outcome:?}"
+        );
     }
 
     /// `hcl-edit` has two limits of its own: 128 chained operators and 64 levels of expression,
