@@ -477,6 +477,50 @@ fn direct_code_paths_need_no_image_and_never_follow_symlinks_on_refresh() {
     );
 }
 
+/// A module run from a local archive in one root and from an image in another: the archive runs
+/// code without an image in its root only, so the other root keeps its image runner.
+#[test]
+fn a_local_archive_in_one_root_leaves_the_image_another_root_runs() {
+    let repo = fixture_repo(
+        "images_archive_root",
+        "image-app",
+        Some("https://example.com/acme/app.git"),
+    );
+    std::fs::remove_file(repo.join("compose.yaml")).unwrap();
+    std::fs::create_dir_all(repo.join("modules/fn")).unwrap();
+    std::fs::write(
+        repo.join("modules/fn/main.tf"),
+        "variable \"filename\" {\n  default = null\n}\nvariable \"image_uri\" {\n  default = null\n}\n\
+         resource \"aws_lambda_function\" \"this\" {\n  function_name = \"orders\"\n  \
+         filename = var.filename\n  image_uri = var.image_uri\n  handler = \"index.handler\"\n}\n",
+    )
+    .unwrap();
+    for (env, input) in [
+        ("dev", "filename = \"lambda.zip\""),
+        ("prod", "image_uri = \"ghcr.io/acme/orders:v1\""),
+    ] {
+        std::fs::create_dir_all(repo.join("envs").join(env)).unwrap();
+        std::fs::write(
+            repo.join("envs").join(env).join("main.tf"),
+            format!("module \"fn\" {{\n  source = \"../../modules/fn\"\n  {input}\n}}\n"),
+        )
+        .unwrap();
+    }
+    std::fs::write(repo.join("envs/dev/lambda.zip"), "an opaque package").unwrap();
+    let export: serde_json::Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let links: Vec<_> = (export["links"].as_array().unwrap().iter())
+        .map(|l| {
+            (
+                l["contract"].as_str().unwrap(),
+                l["level"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(links, [("image::ghcr.io/acme/orders", "exact")], "{export}");
+    assert_eq!(export["executions"][0]["root"], "envs/dev", "{export}");
+}
+
 #[test]
 fn review_helm_runner_is_a_context_and_trace_start() {
     use meada::engine::{Direction, Start};

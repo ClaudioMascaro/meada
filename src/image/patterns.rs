@@ -89,7 +89,7 @@ pub(super) fn prepare(exports: &mut [Export]) {
                     else {
                         continue;
                     };
-                    if e.executions.iter().any(|x| x.workload == c.site) {
+                    if e.executions.iter().any(|x| super::runs_locally(x, c)) {
                         continue;
                     }
                     candidates.push(Candidate {

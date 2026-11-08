@@ -485,6 +485,9 @@ All notable changes to Meada are recorded here. The format follows
 - HTTP: overlays that repeat one Ingress or Service per environment no longer make a route to a
   single provider `ambiguous`; distinct providers, or a route as long that reaches no code,
   still do. A decision recorded for such a route is now stale; `meada decide --prune` removes it.
+- Images: a module run from a local archive in one root no longer drops the image another root
+  runs it from, with its environment and provisions; only the archive's root runs code without
+  an image.
 - TypeScript and JavaScript: a generator (`function*` and `async function*`, declared or as an
   expression, a `*method()` of a class or an object) returns its iterator, so a `return new
   Storage()` in one no longer makes it a client factory; it gave an SDK resource (S3, Pub/Sub,

@@ -221,7 +221,7 @@ impl ContractKind for Image {
         if exports
             .iter()
             .find(|e| e.repository == from.identity)
-            .is_some_and(|e| e.executions.iter().any(|x| x.workload == consumer.site))
+            .is_some_and(|e| e.executions.iter().any(|x| runs_locally(x, consumer)))
         {
             return Vec::new();
         }
@@ -494,6 +494,13 @@ impl ContractKind for Image {
         }
         lines
     }
+}
+
+/// Whether `execution` runs a local path for the workload side `consumer` in its root: a module
+/// run from an archive in one root may run an image in another.
+fn runs_locally(execution: &meada_core::export::Execution, consumer: &Consumer) -> bool {
+    execution.workload == consumer.site
+        && (consumer.root.as_ref()).is_none_or(|root| *root == execution.root)
 }
 
 fn runs(export: &Export, node: &crate::iac::Node, contract: &str) -> bool {
