@@ -12,9 +12,6 @@
     "ponytail@ponytail": true,
     "ray-amjad-skills@ray-amjad": false
   },
-  "env": {
-    "PONYTAIL_DEFAULT_MODE": "lite"
-  },
   "enabledMcpjsonServers": [
     "meada"
   ],
@@ -36,6 +33,33 @@
           {
             "type": "command",
             "command": "sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/cloud-git-check-off.sh"
+          },
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ponytail-cloud.sh ponytail-activate.js",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ponytail-cloud.sh ponytail-subagent.js",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ponytail-cloud.sh ponytail-mode-tracker.js",
+            "timeout": 15
           }
         ]
       }
