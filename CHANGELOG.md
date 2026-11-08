@@ -385,11 +385,14 @@ All notable changes to Meada are recorded here. The format follows
   `.tfvars` values (now given but unresolved) and long `trim` and `toset` arguments (#646, #649,
   #651, #653).
 - An Alertmanager route expression of case-insensitive Unicode classes (`(?i)\p{Any}` written
-  hundreds of times) no longer takes minutes to compile on every `export` and `status`: the
-  expressions of one linking pass share 2^22 code points of case folding, counted only in ranges
-  that hold a cased letter (one expression at most its route configuration's share), and 4096
-  Unicode classes; past them an expression stays unmatched, and the same expression in many
-  files is compiled once (#672).
+  hundreds of times) no longer takes minutes to compile on every `export` and `status`, nor do
+  hundreds of route configurations compile a megabyte automaton each: the expressions of one
+  linking pass share 2^22 code points of case folding (counted only in ranges that hold a cased
+  letter, a bracket's classes as folding leaves them), 4096 Unicode classes and 16 MiB of
+  automata, in equal parts per routing scope and expression, so what links does not depend on
+  the repository asking. Past its part an expression stays unmatched (`status` shows its matcher
+  as an orphan, not a limit), and the same expression in route configurations of as many
+  expressions is compiled once (#672).
 - A Python file of thousands of AWS SDK operations on clients a factory function returns no
   longer takes minutes to index: the operations one reader asks about in a file keep the answers
   no limit cut and share a budget of 2^18 steps, one operation taking up to all that is left

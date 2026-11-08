@@ -18,17 +18,25 @@ pub struct Alert;
 
 // ponytail: regex source length bounds compilation input and per-label matching work.
 const ALERT_REGEX_MAX: usize = 4096;
+/// The bytes the automata and search caches of one routing scope may take, shared equally by
+/// its distinct expressions.
 // ponytail: repetition must not expand a short expression into an unbounded automaton.
 const ALERT_REGEX_SIZE_MAX: usize = 1 << 20;
-/// The code points case folding may visit for the expressions of one linking pass, of which one
-/// expression spends at most its route configuration's share, divided like
-/// `ALERT_REGEX_SIZE_MAX`: `regex-syntax` folds a case-insensitive class by visiting every code
-/// point of its ranges that hold a cased one, before any automaton is built.
+/// The bytes the automata of one linking pass may take, in equal parts per routing scope that
+/// compiles an expression, each part at most `ALERT_REGEX_SIZE_MAX`.
+// ponytail: 400 route configurations compiled a megabyte each in 14.6 s (debug); 16 MiB holds
+// about 10,000 ordinary expressions of 1.5 KiB.
+const ALERT_REGEX_POOL_MAX: usize = 16 << 20;
+/// The code points case folding may visit for the expressions of one linking pass, in equal
+/// parts per routing scope and, within a scope, per distinct expression: `regex-syntax` folds a
+/// case-insensitive class by visiting every code point of its ranges that hold a cased one,
+/// before any automaton is built.
 // ponytail: 2^22 folds a thousand `(?i)\p{L}` (3,739 code points in cased ranges each) and stops
 // a pattern of hundreds of `(?i)\p{Any}` (1.1 million each), which took minutes to compile.
 const ALERT_REGEX_FOLD_MAX: usize = 1 << 22;
-/// The Unicode classes the expressions of one linking pass may hold: `regex-syntax` looks each
-/// up in its tables and joins it to the bracket around it, before any automaton is built.
+/// The Unicode classes the expressions of one linking pass may hold, in the same equal parts:
+/// `regex-syntax` looks each up in its tables and joins it to the bracket around it, before any
+/// automaton is built.
 // ponytail: 4096 classes read in a fraction of a second, where one route configuration of 240
 // expressions of 1,358 `\pL` each took 55 s.
 const ALERT_REGEX_CLASSES_MAX: usize = 4096;
@@ -480,7 +488,10 @@ fn linked<'a>(
     let mut out = Vec::new();
     let mut retained = 0;
     let mut work = ALERT_MATCH_WORK_MAX;
-    let mut pass = regexp::Pass::default();
+    let scopes = (inventories.iter())
+        .map(|(_, configs)| regex_scopes(configs))
+        .sum();
+    let mut pass = regexp::Pass::new(scopes);
     let mut forwarded = Vec::new();
     // Alertmanager selects receivers using labels directly. Those receivers alone can
     // produce known incident fields; a matching value elsewhere is no forwarding.
@@ -616,6 +627,22 @@ fn linked<'a>(
             && a.reason == b.reason
     });
     Ok(out)
+}
+/// The routing scopes of one repository's route configurations that compile an expression, as
+/// `linked` forms them: each configuration with a label route (all its routes together), and
+/// the incident routes of all of them.
+fn regex_scopes(configs: &[(String, config::Summary)]) -> usize {
+    let regex = |route: &Route| route.matchers.iter().any(|m| m.op.regex());
+    let labels = (configs.iter())
+        .filter(|(_, summary)| {
+            summary.routes.iter().any(|r| r.stream == Stream::Labels)
+                && summary.routes.iter().any(regex)
+        })
+        .count();
+    let incident = (configs.iter())
+        .flat_map(|(_, summary)| &summary.routes)
+        .any(|r| r.stream != Stream::Labels && regex(r));
+    labels + usize::from(incident)
 }
 struct Target<'a> {
     site: String,
@@ -1036,7 +1063,7 @@ impl<'a> Routing<'a> {
 
 #[cfg(test)]
 fn regex(pattern: &str) -> Option<Arc<regex::Regex>> {
-    regexp::Pass::default().compile(pattern, 1)
+    regexp::Pass::new(1).compile(pattern, 1)
 }
 
 #[cfg(test)]
@@ -1229,7 +1256,7 @@ mod tests {
         assert!(3 * any <= ALERT_REGEX_FOLD_MAX && 4 * any > ALERT_REGEX_FOLD_MAX);
         let compiles = |class: &str, n: usize, shares: usize| {
             let pattern = format!("(?i){}", class.repeat(n));
-            regexp::Pass::default().compile(&pattern, shares).is_some()
+            regexp::Pass::new(1).compile(&pattern, shares).is_some()
         };
         assert_eq!(
             [
@@ -1268,55 +1295,70 @@ mod tests {
         assert!(regex(r"(?i)[\S]+").unwrap().is_match("ÀB"));
     }
 
-    /// The route configurations of one linking pass share the fold ceiling, and the pass compiles
-    /// an expression once for its share: the same costly expression in three files matches in
-    /// each, where three distinct ones fit only the first file's.
-    #[test]
-    fn route_configurations_share_the_fold_ceiling_and_compile_an_expression_once() {
-        let matched = |patterns: [&str; 3]| {
-            let rule = serde_json::json!({"groups":[{"name":"g", "rules":[{"alert":"A", "expr":"up", "labels":{"team":"payments"}}]}]});
-            let mut configurations = vec![(
-                "rules.yaml".to_string(),
-                serde_json::json!({"alert":config::read("rules.yaml", rule.to_string().as_bytes())}),
-            )];
-            for (i, pattern) in patterns.into_iter().enumerate() {
-                let path = format!("am{i}.yaml");
-                let source = serde_json::json!({"route":{"receiver":"default", "routes":[{"receiver":"team", "match_re":{"team":pattern}}]}, "receivers":[{"name":"default"}, {"name":"team"}]});
-                let summary = config::read(&path, source.to_string().as_bytes());
-                configurations.push((path, serde_json::json!({ "alert": summary })));
-            }
-            let repo = Repository {
-                identity: "example.com/shared".into(),
-                root: Default::default(),
-                config: Default::default(),
-                decisions: Default::default(),
-                index: Default::default(),
-            };
-            let mut export = Export {
-                repository: repo.identity.clone(),
-                configurations,
-                ..Default::default()
-            };
-            Alert.declare(&repo, &mut export);
-            let exports = [export];
-            let providers = exports[0]
-                .providers
-                .iter()
-                .map(|p| (&repo, p))
-                .collect::<Vec<_>>();
-            let links = Alert.workspace_links(&exports, &providers).unwrap();
-            links
-                .iter()
-                .filter_map(|link| Some(link.consumer.split("::").nth(1)?.to_string()))
-                .collect::<Vec<_>>()
+    /// The export of the repository `identity`: a rule labelled `team: payments`, and a route
+    /// configuration `am{i}.yaml` routing `team` by each of `patterns`.
+    fn routed(identity: &str, patterns: &[String]) -> (Repository, Export) {
+        let rule = serde_json::json!({"groups":[{"name":"g", "rules":[{"alert":"A", "expr":"up", "labels":{"team":"payments"}}]}]});
+        let mut configurations = vec![(
+            "rules.yaml".to_string(),
+            serde_json::json!({"alert":config::read("rules.yaml", rule.to_string().as_bytes())}),
+        )];
+        for (i, pattern) in patterns.iter().enumerate() {
+            let path = format!("am{i}.yaml");
+            let source = serde_json::json!({"route":{"receiver":"default", "routes":[{"receiver":"team", "match_re":{"team":pattern}}]}, "receivers":[{"name":"default"}, {"name":"team"}]});
+            let summary = config::read(&path, source.to_string().as_bytes());
+            configurations.push((path, serde_json::json!({ "alert": summary })));
+        }
+        let repo = Repository {
+            identity: identity.into(),
+            root: Default::default(),
+            config: Default::default(),
+            decisions: Default::default(),
+            index: Default::default(),
         };
-        let costly = r"(?i)(?:\p{Any}|\p{Any})+";
-        assert_eq!(matched([costly; 3]), ["am0.yaml", "am1.yaml", "am2.yaml"]);
-        let distinct = [0, 1, 2].map(|i| format!("{costly}|x{i}"));
-        assert_eq!(
-            matched(distinct.each_ref().map(String::as_str)),
-            ["am0.yaml"]
-        );
+        let mut export = Export {
+            repository: repo.identity.clone(),
+            configurations,
+            ..Default::default()
+        };
+        Alert.declare(&repo, &mut export);
+        (repo, export)
+    }
+
+    /// The route configurations a rule of `workspace` links to, as `repository::path`.
+    fn matched(workspace: Vec<(Repository, Export)>) -> BTreeSet<String> {
+        let (repos, exports): (Vec<_>, Vec<_>) = workspace.into_iter().unzip();
+        let providers = (repos.iter().zip(&exports))
+            .flat_map(|(repo, export)| export.providers.iter().map(move |p| (repo, p)))
+            .collect::<Vec<_>>();
+        let links = Alert.workspace_links(&exports, &providers).unwrap();
+        (links.iter())
+            .filter_map(|link| {
+                let mut parts = link.consumer.split("::");
+                Some(format!("{}::{}", parts.next()?, parts.next()?))
+            })
+            .collect()
+    }
+
+    /// Each routing scope of a linking pass compiles its expressions within an equal part of the
+    /// ceilings, so what links does not depend on the repository asking, whose scopes come first:
+    /// of two route configurations, each fits one case-insensitive `\p{Any}` (1,112,064 folds) in
+    /// its half of `ALERT_REGEX_FOLD_MAX`, and neither fits two, in either order.
+    #[test]
+    fn routing_scopes_compile_within_equal_parts_in_any_order() {
+        let any = 1_112_064;
+        assert!(any <= ALERT_REGEX_FOLD_MAX / 2 && 2 * any > ALERT_REGEX_FOLD_MAX / 2);
+        let linked = |pattern: &str, order: [&str; 2]| {
+            let workspace =
+                order.map(|identity| routed(identity, &[format!("{pattern}|{identity}")]));
+            matched(workspace.into())
+        };
+        let [a, b] = ["example.com/a", "example.com/b"];
+        let both = BTreeSet::from([format!("{a}::am0.yaml"), format!("{b}::am0.yaml")]);
+        for order in [[a, b], [b, a]] {
+            assert_eq!(linked(r"(?i)\p{Any}+", order), both);
+            assert_eq!(linked(r"(?i)(?:\p{Any}|\p{Any})+", order), BTreeSet::new());
+        }
     }
 
     /// A pattern of hundreds of case-insensitive `\p{Any}`, whose folding took minutes, is
@@ -1331,39 +1373,65 @@ mod tests {
         assert!(took < std::time::Duration::from_secs(2), "{took:?}");
     }
 
-    /// The expressions of one linking pass hold `ALERT_REGEX_CLASSES_MAX` Unicode classes, case
-    /// folded or not: past them an expression is unmatched, while a smaller one still fits.
+    /// The automata of a linking pass share `ALERT_REGEX_POOL_MAX` in equal parts per routing
+    /// scope, so many route configurations no longer compile `ALERT_REGEX_SIZE_MAX` each:
+    /// `\pL{1,24}` (1,030,136 bytes) links from one route configuration, and from none of 400,
+    /// refused in linear time. Measured on 2026-11-08 in a debug build: 0.82 s, where compiling
+    /// each in its own megabyte took 14.6 s.
     #[test]
-    fn unicode_classes_past_the_pass_ceiling_leave_matchers_unmatched() {
-        assert_eq!(4 * 1000 + 96, ALERT_REGEX_CLASSES_MAX);
-        let patterns = [1000, 1000, 1000, 1000, 97, 96, 1]
-            .into_iter()
-            .enumerate()
-            .map(|(i, n)| format!("[{}]{i}", r"\pL".repeat(n)))
+    fn many_route_configurations_share_the_automaton_pool() {
+        let patterns = (0..400)
+            .map(|i| format!(r"\pL{{1,24}}|{i}"))
             .collect::<Vec<_>>();
-        let mut pass = regexp::Pass::default();
-        let compiled = (patterns.iter())
-            .map(|pattern| pass.compile(pattern, 1).is_some())
-            .collect::<Vec<_>>();
-        assert_eq!(compiled, [true, true, true, true, false, true, false]);
+        let one = matched(vec![routed("example.com/one", &patterns[..1])]);
+        assert_eq!(one, BTreeSet::from(["example.com/one::am0.yaml".into()]));
+        let started = std::time::Instant::now();
+        let many = matched(vec![routed("example.com/many", &patterns)]);
+        let took = started.elapsed();
+        eprintln!("many route configurations: {took:?}");
+        assert_eq!(many.len(), 0);
+        assert!(took < std::time::Duration::from_secs(20), "{took:?}");
+    }
+
+    /// An expression holds its part of `ALERT_REGEX_CLASSES_MAX` Unicode classes, case folded or
+    /// not: a quarter of them fits one of four expressions of a routing scope, or the expression
+    /// of one of four scopes, and one more does not.
+    #[test]
+    fn unicode_classes_past_an_expressions_part_leave_it_unmatched() {
+        let quarter = ALERT_REGEX_CLASSES_MAX / 4;
+        let compiles = |classes: usize, scopes: usize, shares: usize| {
+            let pattern = format!("[{}]", r"\pL".repeat(classes));
+            regexp::Pass::new(scopes)
+                .compile(&pattern, shares)
+                .is_some()
+        };
+        assert_eq!(
+            [
+                compiles(quarter, 1, 4),
+                compiles(quarter + 1, 1, 4),
+                compiles(quarter, 4, 1),
+                compiles(quarter + 1, 4, 1),
+            ],
+            [true, false, true, false]
+        );
     }
 
     /// 240 expressions of 1,358 `\pL` each, a 1 MB route configuration whose classes took about a
-    /// minute to read, are refused past the class ceiling in linear time. Measured on 2026-11-08
-    /// in a debug build: 0.93 s, where compiling them all took 19.4 s.
+    /// minute to read, are refused past their parts in linear time. Measured on 2026-11-08 in a
+    /// debug build: 0.72 s, where compiling them all took 19.4 s.
     #[test]
     fn hundreds_of_expressions_of_unicode_classes_are_refused_in_linear_time() {
         let patterns = (0..240)
             .map(|i| format!("[{}]|z{i}", r"\pL".repeat(1358)))
             .collect::<Vec<_>>();
         let started = std::time::Instant::now();
-        let mut pass = regexp::Pass::default();
+        let mut pass = regexp::Pass::new(1);
         let compiled = (patterns.iter())
-            .filter(|pattern| pass.compile(pattern, 1).is_some())
+            .filter(|pattern| pass.compile(pattern, patterns.len()).is_some())
             .count();
         let took = started.elapsed();
         eprintln!("hundreds of expressions of Unicode classes: {took:?}");
-        assert_eq!(compiled, 3);
+        assert_eq!(compiled, 0);
         assert!(took < std::time::Duration::from_secs(20), "{took:?}");
     }
 }

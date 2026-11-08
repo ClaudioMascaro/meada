@@ -1,5 +1,8 @@
 //! Alertmanager/Go RE2 compatibility on the bounded Rust regex engine.
-use super::{ALERT_REGEX_CLASSES_MAX, ALERT_REGEX_FOLD_MAX, ALERT_REGEX_MAX, ALERT_REGEX_SIZE_MAX};
+use super::{
+    ALERT_REGEX_CLASSES_MAX, ALERT_REGEX_FOLD_MAX, ALERT_REGEX_MAX, ALERT_REGEX_POOL_MAX,
+    ALERT_REGEX_SIZE_MAX,
+};
 use regex_syntax::ast::{
     self, Ast, ClassSetItem, Flag, GroupKind, RepetitionKind, RepetitionRange,
 };
@@ -10,59 +13,53 @@ use std::sync::{Arc, LazyLock};
 // ponytail: Go/RE2 rejects counted repetitions, including nested products, above 1000.
 const RE2_REPEAT_MAX: u32 = 1000;
 
-/// The expressions one linking pass compiled, each once for its share, and what compiling may
-/// still spend in the pass.
+/// The expressions one linking pass compiled, each once for its share, and how many routing
+/// scopes share the pass's ceilings in equal parts.
 pub(super) struct Pass<'a> {
-    left: Left,
+    scopes: usize,
     compiled: HashMap<(&'a str, usize), Option<Arc<regex::Regex>>>,
 }
-/// The case folding visits and Unicode classes a linking pass may still spend.
-struct Left {
-    folds: usize,
-    classes: usize,
-}
-impl Default for Pass<'_> {
-    fn default() -> Self {
-        let left = Left {
-            folds: ALERT_REGEX_FOLD_MAX,
-            classes: ALERT_REGEX_CLASSES_MAX,
-        };
+impl<'a> Pass<'a> {
+    /// A pass over `scopes` routing scopes, each compiling its expressions within an equal part
+    /// of the ceilings, so what one scope compiles never depends on the scopes before it.
+    pub(super) fn new(scopes: usize) -> Self {
         Self {
-            left,
+            scopes: scopes.max(1),
             compiled: HashMap::new(),
         }
     }
-}
-impl<'a> Pass<'a> {
-    /// `pattern` as Alertmanager reads it, anchored to the whole value, within its share of
-    /// `ALERT_REGEX_SIZE_MAX` and `ALERT_REGEX_FOLD_MAX` (one of `shares` distinct expressions of
-    /// a route configuration) and the folding and Unicode classes left to the pass; `None` past
-    /// them, past `ALERT_REGEX_MAX` or for no RE2 expression.
+    /// `pattern` as Alertmanager reads it, anchored to the whole value, within its part of
+    /// `ALERT_REGEX_POOL_MAX` (at most `ALERT_REGEX_SIZE_MAX` for its scope),
+    /// `ALERT_REGEX_FOLD_MAX` and `ALERT_REGEX_CLASSES_MAX`: an equal share of its scope's part,
+    /// one of `shares` distinct expressions. `None` past them, past `ALERT_REGEX_MAX` or for no
+    /// RE2 expression.
     pub(super) fn compile(&mut self, pattern: &'a str, shares: usize) -> Option<Arc<regex::Regex>> {
-        let left = &mut self.left;
+        let scopes = self.scopes;
         let compiled = self.compiled.entry((pattern, shares));
         compiled
-            .or_insert_with(|| compile(pattern, shares, left).map(Arc::new))
+            .or_insert_with(|| compile(pattern, scopes, shares).map(Arc::new))
             .clone()
     }
 }
 
-/// `Pass::compile`, spending what is `left`.
-fn compile(pattern: &str, shares: usize, left: &mut Left) -> Option<regex::Regex> {
+/// `Pass::compile` in a pass of `scopes`.
+fn compile(pattern: &str, scopes: usize, shares: usize) -> Option<regex::Regex> {
     if pattern.len() > ALERT_REGEX_MAX {
         return None;
     }
     let pattern = regex_source(pattern)?;
     let ast = ast::parse::Parser::new().parse(&pattern).ok()?;
     re2_ast(&ast)?;
-    let (insensitive, classes) = shape(&ast);
-    left.classes = left.classes.checked_sub(classes)?;
     let shares = shares.max(1);
-    if insensitive {
-        let limit = (ALERT_REGEX_FOLD_MAX / shares).min(left.folds);
-        left.folds -= folds(&pattern, &ast, limit)?;
+    let parts = scopes.saturating_mul(shares);
+    let (insensitive, classes) = shape(&ast);
+    if classes > ALERT_REGEX_CLASSES_MAX / parts {
+        return None;
     }
-    let budget = ALERT_REGEX_SIZE_MAX / shares;
+    if insensitive {
+        folds(&pattern, &ast, ALERT_REGEX_FOLD_MAX / parts)?;
+    }
+    let budget = ALERT_REGEX_SIZE_MAX.min(ALERT_REGEX_POOL_MAX / scopes) / shares;
     regex::RegexBuilder::new(&format!("\\A(?:{pattern})\\z"))
         .size_limit(budget)
         .dfa_size_limit(budget)
@@ -110,11 +107,14 @@ fn shape(ast: &Ast) -> (bool, usize) {
 /// An upper bound on the code points `regex-syntax` 0.8 visits to fold the case of `ast`, parsed
 /// from `pattern`, as if all of it were case-insensitive; `None` past `limit` or for a class it
 /// cannot read. Each Unicode or ASCII class is folded on its own, and each bracket holding a
-/// character or a range folds all it holds (its classes again, already folded): a fold visits
+/// character or a range folds all it holds, its classes as folding left them: a fold visits
 /// every code point of each range, before negation, that holds one of `CASED` (all 1.1 million
-/// of `\p{Any}`, none of `\p{Han}`). A bracket of classes alone is folded already.
+/// of `\p{Any}`, none of `\p{Han}`). A bracket of classes alone is folded already. A class in a
+/// bracket is folded here too once its count fits, so the bracket holds the ranges
+/// `regex-syntax` visits.
 fn folds(pattern: &str, ast: &Ast, limit: usize) -> Option<usize> {
-    /// An open bracket: its characters and ranges, and its classes as they are after negation.
+    /// An open bracket: its characters and ranges, and its classes as folding and negation left
+    /// them.
     struct Bracket {
         ranges: Vec<ClassUnicodeRange>,
         classes: ClassUnicode,
@@ -141,39 +141,39 @@ fn folds(pattern: &str, ast: &Ast, limit: usize) -> Option<usize> {
                 Ok(())
             }
         }
-        /// A class folded alone, written `text`, then added to the bracket around it.
+        /// A class folded alone, written `text`, then added folded to the bracket around it.
         fn alone(&mut self, text: Option<&str>, negated: bool) -> Result<(), ()> {
             let mut class = text.and_then(class).ok_or(())?;
             if negated {
                 class.negate();
             }
             self.fold(&class)?;
-            if negated {
-                class.negate();
-            }
-            if let Some(bracket) = self.brackets.last_mut() {
-                bracket.classes.union(&class);
-            }
-            Ok(())
+            self.join(class, true, negated)
         }
         fn close(&mut self, negated: bool) -> Result<(), ()> {
             let bracket = self.brackets.pop().ok_or(())?;
             let mut class = ClassUnicode::new(bracket.ranges.iter().copied());
             class.union(&bracket.classes);
-            if !bracket.ranges.is_empty() {
-                // Folding a class adds only cased code points to what it holds.
-                let mut folded = class.clone();
-                if !bracket.classes.ranges().is_empty() {
-                    folded.union(&CASED);
-                }
-                self.fold(&folded)?;
+            // A bracket of classes alone holds them folded already.
+            let unfolded = !bracket.ranges.is_empty();
+            if unfolded {
+                self.fold(&class)?;
+            }
+            self.join(class, unfolded, negated)
+        }
+        /// Adds `class` to the bracket around it, if any, as `regex-syntax` does: folded, once
+        /// counted, then negated.
+        fn join(&mut self, mut class: ClassUnicode, fold: bool, negated: bool) -> Result<(), ()> {
+            if self.brackets.is_empty() {
+                return Ok(());
+            }
+            if fold {
+                class.try_case_fold_simple().map_err(|_| ())?;
             }
             if negated {
                 class.negate();
             }
-            if let Some(outer) = self.brackets.last_mut() {
-                outer.classes.union(&class);
-            }
+            self.brackets.last_mut().ok_or(())?.classes.union(&class);
             Ok(())
         }
         fn text(&self, span: &ast::Span) -> Option<&'p str> {
@@ -751,5 +751,15 @@ mod tests {
         let count = |text: &str| class(text).map(|class| cased(&class));
         let counts = [count("A"), count("[0-9]"), count("[0-9a]"), count("[0-a]")];
         assert_eq!(counts, [Some(1), Some(0), Some(1), Some(50)]);
+    }
+
+    /// `(?i)[\w-]` is read as `[[A-Za-z0-9_]-]`: the inner bracket visits its 52 letters, and the
+    /// outer one visits them again with the Kelvin sign and long s their folding added, 54, not
+    /// every cased code point.
+    #[test]
+    fn a_bracket_of_characters_and_classes_visits_what_its_classes_fold_to() {
+        let pattern = regex_source(r"(?i)[\w-]").unwrap();
+        let ast = ast::parse::Parser::new().parse(&pattern).unwrap();
+        assert_eq!(folds(&pattern, &ast, usize::MAX), Some(52 + 54));
     }
 }
