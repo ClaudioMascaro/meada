@@ -472,6 +472,12 @@ All notable changes to Meada are recorded here. The format follows
   its literal head cut at its last slash. A `use-regex` annotation or a missing `pathType` also
   leaves the path unread, and a table past its ceilings leaves every host of the Ingress unread,
   not only the hosts read before the cut.
+- Kustomize `components` change what the kustomization that lists them holds, its bases'
+  objects included, as Kustomize applies them; they were instantiated as one more base, so a
+  component's `images` rule never retagged the overlay's workloads.
+- HTTP: overlays that repeat one Ingress or Service per environment no longer make a route to a
+  single provider `ambiguous`; distinct providers, or a route as long that reaches no code,
+  still do.
 
 ## [1.2.0] - 2026-11-04
 

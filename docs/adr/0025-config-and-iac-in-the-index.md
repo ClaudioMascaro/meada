@@ -252,7 +252,9 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
 - **Overlays.** A directory with a kustomization that no other kustomization names as a base
   (`resources`, `bases`, `components`) is an overlay, labelled by its path, and the root of its
   evaluation unit. Its entries that name a file or a kustomization directory of the repository
-  are instantiated under it, each base first, and each kustomization on the way then applies
+  are instantiated under it, each base first and each component over what the kustomization
+  that lists it holds so far (its resources' objects, which it changes and adds to), and each
+  kustomization on the way then applies
   its `namePrefix`, `nameSuffix` (not to `Namespace`, `CustomResourceDefinition` and
   `APIService`), `namespace` and `images` (the first rule that names the image; `newName`,
   `newTag`, `digest`) to everything below it, so the overlay's values come last. A base used by

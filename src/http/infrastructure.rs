@@ -302,7 +302,6 @@ impl<'a> Routing<'a> {
         consumer: &Consumer,
         prefix: Option<&str>,
         reason: &str,
-        ambiguous: bool,
     ) -> Vec<Link> {
         let Some(wanted) = consumer.contract.as_deref() else {
             return Vec::new();
@@ -359,11 +358,7 @@ impl<'a> Routing<'a> {
                         consumer.site.clone(),
                         provider.site.clone(),
                         wanted.into(),
-                        if ambiguous {
-                            Level::Ambiguous
-                        } else {
-                            Level::Inferred
-                        },
+                        Level::Inferred,
                         reason,
                         None,
                         None,
@@ -437,37 +432,38 @@ impl<'a> Routing<'a> {
                 .max()
                 .unwrap_or(0);
             ingresses.retain(|(_, _, r)| r.prefix.len() == longest);
-            let ambiguous = ingresses.len() > 1;
-            let found: Vec<_> = ingresses
+            let routes = ingresses
                 .iter()
-                .flat_map(|(e, n, r)| {
+                .map(|(e, n, r)| {
                     let service = e
                         .iac
                         .iter()
                         .find(|s| s.root == n.root && s.address == r.service && s.ty == "Service");
-                    service.into_iter().flat_map(move |s| {
-                        let mut reason = format!(
-                            "Ingress {} (root {}) prefix {} through Service {} (root {})",
-                            n.identity(&e.repository),
-                            n.root,
-                            if r.prefix.is_empty() { "/" } else { &r.prefix },
-                            s.identity(&e.repository),
-                            s.root
-                        );
-                        if let Some(evidence) = evidence {
-                            reason.push_str(&format!("; {evidence}"));
-                        }
-                        self.through_service(e, s, consumer, Some(&r.prefix), &reason, ambiguous)
-                    })
+                    service
+                        .into_iter()
+                        .flat_map(move |s| {
+                            let mut reason = format!(
+                                "Ingress {} (root {}) prefix {} through Service {} (root {})",
+                                n.identity(&e.repository),
+                                n.root,
+                                if r.prefix.is_empty() { "/" } else { &r.prefix },
+                                s.identity(&e.repository),
+                                s.root
+                            );
+                            if let Some(evidence) = evidence {
+                                reason.push_str(&format!("; {evidence}"));
+                            }
+                            self.through_service(e, s, consumer, Some(&r.prefix), &reason)
+                        })
+                        .collect::<Vec<_>>()
                 })
                 .collect();
-            return (!found.is_empty()).then_some(found);
+            return settle(routes);
         }
         let services = self.services(&host, caller, from);
-        let ambiguous = services.len() > 1;
-        let found: Vec<_> = services
+        let routes = services
             .iter()
-            .flat_map(|(export, node)| {
+            .map(|(export, node)| {
                 let kind = if node.ty == "service" {
                     "Compose service"
                 } else {
@@ -481,11 +477,27 @@ impl<'a> Routing<'a> {
                 if let Some(evidence) = evidence {
                     reason.push_str(&format!("; {evidence}"));
                 }
-                self.through_service(export, node, consumer, None, &reason, ambiguous)
+                self.through_service(export, node, consumer, None, &reason)
             })
             .collect();
-        (!found.is_empty()).then_some(found)
+        settle(routes)
     }
+}
+
+/// The links of the routes a URL may take, or `None` when none reaches code. A route that
+/// reaches no code leaves the others ambiguous; routes to distinct providers become so as links
+/// collapse, and copies of one route to one provider (an overlay per environment) are one link.
+fn settle(routes: Vec<Vec<Link>>) -> Option<Vec<Link>> {
+    let unknown = routes.iter().any(Vec::is_empty);
+    let found = (routes.into_iter().flatten())
+        .map(|mut link| {
+            if unknown {
+                link.level = Level::Ambiguous;
+            }
+            link
+        })
+        .collect::<Vec<_>>();
+    (!found.is_empty()).then_some(found)
 }
 
 fn base_url(value: &str) -> Option<(&str, &str)> {

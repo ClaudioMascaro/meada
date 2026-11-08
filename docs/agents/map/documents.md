@@ -235,10 +235,11 @@ this file, and a change to these modules updates it.
   `Kustomization`. A kustomization directory no other names (`Eval::entry` resolves each entry
   of `resources`, `bases`, `components` to a file, a directory or `Unresolved`: `remote`,
   `outside`, `missing`, `cycle`, `depth`) is an overlay: `Eval::objects` instantiates it base
-  first and applies `namePrefix`, `nameSuffix`, `namespace` and `images` (`retag`) on the way
-  out; a manifest no kustomization lists or patches with is a plain unit of its directory.
-  `Eval::unit` sorts, drops repeated addresses and resolves the references by the name as
-  written. `store` rewrites `iac_images` and `iac_unresolved`, `images` feeds `iac::context`,
+  first, hands a component what its lister holds so far, and applies `namePrefix`,
+  `nameSuffix`, `namespace` and `images` (`retag`) on the way out; a manifest no kustomization
+  lists or patches with is a plain unit of its directory. `Eval::unit` sorts, drops repeated
+  addresses and resolves the references: a ConfigMap or Secret by the name the stages gave it,
+  a ServiceAccount or Service with `Obj::resolve` (Kustomize's `selectReferral`). `store` rewrites `iac_images` and `iac_unresolved`, `images` feeds `iac::context`,
   `status` is the `Msg::KustomizeUnresolved` line, and `changed` tells `index::refresh` that a
   file read again or left holds, or held, objects.
 - `kube/crossplane.rs` (#655, ADR 0025): Crossplane among the Kubernetes nodes. `facts` reads

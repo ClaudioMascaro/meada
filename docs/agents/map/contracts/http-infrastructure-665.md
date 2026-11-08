@@ -32,7 +32,8 @@ Their prefix is also an internal provider gateway form, so `serves`, candidates,
 replay and drift agree. Alias expansion is charged before copying; an exhausted table makes
 Ingress mounts unread as a whole (see the
 [Kubernetes ceilings](../../ceilings/resolution-the-index-and-shape-readers/kubernetes-and-crossplane.md)).
-Several distinct providers remain ambiguous. HTTP links through Service/Compose/Ingress or a
+Several distinct providers remain ambiguous, as does a route when one as long reaches no
+code; copies of one route to one provider (an overlay per environment) are one link. HTTP links through Service/Compose/Ingress or a
 workload environment are inferred and retain their evidence. A route that reaches no code (no
 selected workload, an unread mount, an exhausted alias table) prepares no link, so the per-call
 `Http::link` still links a host a repository declares in `[serve] hosts`.

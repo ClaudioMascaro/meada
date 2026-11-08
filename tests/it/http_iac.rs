@@ -500,3 +500,44 @@ fn a_declared_host_keeps_its_link_when_no_service_or_ingress_reaches_code() {
         );
     }
 }
+
+/// Overlays of one base repeat its Ingress per environment: one provider behind every copy is
+/// no ambiguity, while a route as long that reaches no code still is.
+#[test]
+fn overlays_repeating_one_route_to_one_provider_leave_it_inferred() {
+    let (client, deploy, _) = workspace("http_iac_overlays");
+    std::fs::create_dir(deploy.join("base")).unwrap();
+    std::fs::rename(
+        deploy.join("workloads.yaml"),
+        deploy.join("base/workloads.yaml"),
+    )
+    .unwrap();
+    std::fs::write(
+        deploy.join("base/kustomization.yaml"),
+        "resources:\n  - workloads.yaml\n",
+    )
+    .unwrap();
+    for stage in ["dev", "prod"] {
+        let dir = deploy.join("overlays").join(stage);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("kustomization.yaml"),
+            format!("namespace: shop-{stage}\nresources:\n  - ../../base\n"),
+        )
+        .unwrap();
+    }
+    let public = |found: &[serde_json::Value]| {
+        let public = (found.iter())
+            .filter(|l| l["consumer"].as_str().unwrap().contains("::publicOrders::"))
+            .collect::<Vec<_>>();
+        assert_eq!(public.len(), 1, "{found:#?}");
+        public[0]["level"].as_str().unwrap().to_string()
+    };
+    let found = links(&client);
+    assert_eq!(found.len(), 3, "{found:#?}");
+    assert_eq!(public(&found), "inferred");
+    let path = deploy.join("base/workloads.yaml");
+    let source = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(&path, format!("{source}          - path: /store/(.*)\n            pathType: Prefix\n            backend:\n              service: {{name: orders, port: {{number: 8080}}}}\n")).unwrap();
+    assert_eq!(public(&links(&client)), "ambiguous");
+}

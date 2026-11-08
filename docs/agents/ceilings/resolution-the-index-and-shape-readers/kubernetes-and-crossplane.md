@@ -35,7 +35,8 @@ routing. No partial alias table may select a shorter mount.
   no backend or mount reference.
   A file of more than `config_values::DOCUMENTS_MAX` documents gives no object. Only a
   `kustomization.yaml` or `kustomization.yml` is a kustomization (not `Kustomization`); only
-  `resources`, `bases` and `components` are followed, and patches (`patches`,
+  `resources`, `bases` and `components` are followed (a component changes and adds to what the
+  kustomization that lists it holds), and patches (`patches`,
   `patchesStrategicMerge`, `patchesJson6902`, the files they name are no objects), generators,
   `commonLabels`, `labels`, `replacements`, `helmCharts` and the object a `kind: List` holds
   are not applied or read. A ConfigMap or Secret reference is renamed with its target at each

@@ -8,8 +8,9 @@
 //! A directory with a `kustomization.yaml` that no other kustomization names as a base is an
 //! overlay, labelled by its path, and an evaluation unit: its `resources`, `bases` and
 //! `components` that name a file or another kustomization directory inside the repository are
-//! instantiated under it, base first, with each `kustomization.yaml` on the way applying
-//! `namePrefix`, `nameSuffix`, `namespace` and `images` to what it holds. An entry that is
+//! instantiated under it, base first and a component over what the kustomization that lists it
+//! holds so far, with each `kustomization.yaml` on the way applying `namePrefix`, `nameSuffix`,
+//! `namespace` and `images` to what it holds. An entry that is
 //! remote, outside the repository or not there is not followed and is counted as unresolved. A
 //! manifest no kustomization lists (nor patches with) is a plain one: the manifests of a
 //! directory are one unit, labelled by the directory.
@@ -301,6 +302,8 @@ struct Kustomization {
     images: HashMap<String, ImageRule>,
     /// `resources`, `bases` and `components`, in order.
     entries: Vec<String>,
+    /// Where `entries` turns to `components`.
+    components: usize,
     /// The files its patches name, which are fragments and no objects.
     patches: Vec<String>,
 }
@@ -530,6 +533,9 @@ fn kustomization(value: &Value) -> Kustomization {
         ..Kustomization::default()
     };
     for key in ["resources", "bases", "components"] {
+        if key == "components" {
+            k.components = k.entries.len();
+        }
         k.entries.extend(
             list(value, &[key])
                 .filter_map(Value::as_str)
@@ -768,14 +774,20 @@ impl<'m> Eval<'m> {
     }
 
     /// The objects of the kustomization in `dir`, the bases' first, once it has changed them.
-    /// `stack` holds the directories above it.
-    fn objects(&mut self, dir: &'m str, depth: usize, stack: &mut Vec<&'m str>) -> Vec<Obj> {
+    /// `stack` holds the directories above it; `objs`, what the kustomization that lists `dir`
+    /// as a component holds so far, which a component changes and adds to.
+    fn objects(
+        &mut self,
+        dir: &'m str,
+        depth: usize,
+        stack: &mut Vec<&'m str>,
+        mut objs: Vec<Obj>,
+    ) -> Vec<Obj> {
         let (path, k) = self.dirs[dir];
-        let mut objs: Vec<Obj> = Vec::new();
         // The files and bases this kustomization named already: a second entry for one adds
         // nothing (Kustomize refuses the duplicate objects).
         let mut listed: HashSet<&'m str> = HashSet::new();
-        for entry in &k.entries {
+        for (i, entry) in k.entries.iter().enumerate() {
             if self.steps == 0 {
                 break;
             }
@@ -795,7 +807,12 @@ impl<'m> Eval<'m> {
             match found {
                 Entry::Dir(base) => {
                     stack.push(base);
-                    objs.extend(self.objects(base, depth + 1, stack));
+                    // Components come after the resources, and change them.
+                    let given = match i >= k.components {
+                        true => std::mem::take(&mut objs),
+                        false => Vec::new(),
+                    };
+                    objs.extend(self.objects(base, depth + 1, stack, given));
                     stack.pop();
                 }
                 Entry::Unresolved(reason) => {
@@ -1388,7 +1405,7 @@ pub(crate) fn evaluate_with(
         .collect();
     for dir in roots {
         eval.start(if dir.is_empty() { "." } else { dir });
-        let objs = eval.objects(dir, 0, &mut vec![dir]);
+        let objs = eval.objects(dir, 0, &mut vec![dir], Vec::new());
         eval.unit(objs);
     }
     // A file only a kustomization nobody evaluates lists (a cycle of bases) is plain.
@@ -1698,6 +1715,45 @@ mod tests {
                 "Deployment.apps/dev/dev-b-api-x -> ConfigMap/dev/dev-b-settings-x via envFrom",
                 "Deployment.apps/dev/dev-b-api-x -> ConfigMap/dev/dev-b-settings-x via volume conf"
             ]
+        );
+    }
+
+    /// A component changes what the kustomization that lists it holds, its bases' objects
+    /// included, and adds its own; that kustomization's changes then apply to all of them.
+    #[test]
+    fn a_component_changes_the_objects_of_the_kustomization_that_lists_it() {
+        let out = evaluate(&files(&[
+            ("base/kustomization.yaml", "resources:\n  - deploy.yaml\n"),
+            (
+                "base/deploy.yaml",
+                &DEPLOYMENT.replace("  namespace: shop\n", ""),
+            ),
+            (
+                "components/ha/kustomization.yaml",
+                "apiVersion: kustomize.config.k8s.io/v1alpha1\nkind: Component\nresources:\n  \
+                 - extra.yaml\nimages:\n  - name: ghcr.io/acme/api\n    newName: ghcr.io/acme/api-ha\n",
+            ),
+            (
+                "components/ha/extra.yaml",
+                "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: settings\n",
+            ),
+            (
+                "overlays/prod/kustomization.yaml",
+                "components:\n  - ../../components/ha\nresources:\n  - ../../base\nnamespace: prod\nnamePrefix: p-\n",
+            ),
+        ]));
+        assert_eq!(
+            addresses(&out),
+            [
+                "ConfigMap/prod/p-settings [overlays/prod]",
+                "Deployment.apps/prod/p-api [overlays/prod]",
+            ]
+        );
+        assert_eq!(
+            (out.images.iter())
+                .map(|i| i.image.as_str())
+                .collect::<Vec<_>>(),
+            ["ghcr.io/acme/api-ha:1.0"]
         );
     }
 
