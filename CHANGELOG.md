@@ -481,13 +481,15 @@ All notable changes to Meada are recorded here. The format follows
   objects included, as Kustomize applies them; they were instantiated as one more base, so a
   component's `images` rule never retagged the overlay's workloads. Each object a component is
   handed counts against the 50,000 entries one overlay walks, so components reaching one another
-  along many paths stop there.
+  along many paths, or many objects through a long list of them, stop there.
 - HTTP: overlays that repeat one Ingress or Service per environment no longer make a route to a
   single provider `ambiguous`; distinct providers, or a route as long that reaches no code,
   still do. A decision recorded for such a route is now stale; `meada decide --prune` removes it.
-- TypeScript: a generator (`function*`, a `*method()`) returns its iterator, so a `return new
-  Storage()` in one no longer makes it a client factory; it gave an SDK resource and an `exact`
-  provision to code that never holds the client.
+- TypeScript and JavaScript: a generator (`function*` and `async function*`, declared or as an
+  expression, a `*method()` of a class or an object) returns its iterator, so a `return new
+  Storage()` in one no longer makes it a client factory; it gave an SDK resource (S3, Pub/Sub,
+  Azure and the other factory-built clients) and an `exact` provision to code that never holds
+  the client.
 
 ## [1.2.0] - 2026-11-04
 

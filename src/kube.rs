@@ -811,7 +811,7 @@ impl<'m> Eval<'m> {
         let (path, k) = self.dirs[dir];
         // The files and bases this kustomization named already: a second entry for one adds
         // nothing (Kustomize refuses the duplicate objects). A component listed again applies
-        // again, as Kustomize's does.
+        // again, as Kustomize's does, unless it was listed as a base too.
         let mut listed: HashSet<&'m str> = HashSet::new();
         for (i, entry) in k.entries.iter().enumerate() {
             if self.steps == 0 {
@@ -819,8 +819,9 @@ impl<'m> Eval<'m> {
             }
             self.steps -= 1;
             let found = match self.entry(dir, entry) {
-                Entry::File(file, _) | Entry::Dir(file)
-                    if i < k.components && !listed.insert(file) =>
+                Entry::File(file, _) if !listed.insert(file) => continue,
+                Entry::Dir(base)
+                    if listed.contains(base) || i < k.components && !listed.insert(base) =>
                 {
                     continue;
                 }
@@ -1824,6 +1825,26 @@ mod tests {
             ),
         ]));
         assert_eq!(addresses(&out), ["ConfigMap/ha-ha-settings [o]"]);
+        // A file or a component named both as a resource and as a component adds its objects
+        // once, as a resource (Kustomize refuses both).
+        let config =
+            |name: &str| format!("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: {name}\n");
+        let out = evaluate(&files(&[
+            (
+                "ha/kustomization.yaml",
+                "kind: Component\nresources:\n  - own.yaml\nnamePrefix: ha-\n",
+            ),
+            ("ha/own.yaml", &config("own")),
+            (
+                "o/kustomization.yaml",
+                "resources:\n  - cm.yaml\n  - ../ha\ncomponents:\n  - cm.yaml\n  - ../ha\n",
+            ),
+            ("o/cm.yaml", &config("mine")),
+        ]));
+        assert_eq!(
+            addresses(&out),
+            ["ConfigMap/ha-own [o]", "ConfigMap/mine [o]"]
+        );
     }
 
     /// Components that each list the next level's three, eight levels deep, hand the overlay's

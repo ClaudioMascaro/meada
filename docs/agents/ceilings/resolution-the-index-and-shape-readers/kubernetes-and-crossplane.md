@@ -20,11 +20,14 @@ routing. No partial alias table may select a shorter mount.
 - `kube.rs` (#651, ADR 0025): `OVERLAY_DEPTH_MAX` (16 kustomizations as bases inside each other;
   past it the entry is unresolved, as a base already on the stack is, `cycle`); `WALK_MAX`
   (50,000 kustomization entries one overlay walks, each object a component is handed counting
-  one, which bounds bases and components reaching one another along many paths; past it the
-  rest of the overlay is left out: 1,000 objects pass through at most 50 components); `OBJECTS_MAX` (10,000 objects
-  per overlay or directory, bases included, the rest left out; a file or base one kustomization
-  names twice instantiates once, one that several of its bases name, once through each, and a
-  component listed twice applies twice);
+  one, which bounds bases and components reaching one another along many paths, and many
+  objects through a long list; past it the rest of the overlay is left out: 1,000 objects pass
+  through at most 50 components, and the component during which it is crossed still applies its
+  names, namespace and images to what it was handed, without its own objects or components);
+  `OBJECTS_MAX` (10,000 objects per overlay or directory, bases included, the rest left out; a
+  file or base one kustomization names twice instantiates once, also when one entry lists it as
+  a component, one that several of its bases name, once through each, and a component listed
+  twice applies twice);
   `OVERLAY_BYTES_MAX` (16 MiB of objects one overlay copies, each weighed by the size of what was
   read from it, so a large object reached along many paths stops the overlay there, the rest
   left out); `OBJECT_REFERENCES_MAX` (64
@@ -61,7 +64,8 @@ routing. No partial alias table may select a shorter mount.
   kustomization another names as a base is no overlay of its own (an overlay built on another
   yields its nodes under itself alone), and kustomizations that only name each other in a cycle
   are no root, so what they list is plain. An entry cut by `WALK_MAX` or a stored budget is left
-  out with no unresolved row, and a non-object file a kustomization lists, created or deleted
+  out with no unresolved row (the files of a component left out are plain units of their
+  directory, as files no overlay reaches are), and a non-object file a kustomization lists, created or deleted
   alone, leaves the unresolved count as it was until a manifest changes. A
   Kubernetes file changed anywhere evaluates every root and overlay of the repository again
   (the `ponytail:` in `index::refresh_keeping`), reading every YAML or JSON file that says
