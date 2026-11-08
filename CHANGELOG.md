@@ -482,6 +482,9 @@ All notable changes to Meada are recorded here. The format follows
 - HTTP: overlays that repeat one Ingress or Service per environment no longer make a route to a
   single provider `ambiguous`; distinct providers, or a route as long that reaches no code,
   still do.
+- TypeScript: a generator (`function*`, a `*method()`) returns its iterator, so a `return new
+  Storage()` in one no longer makes it a client factory; it gave an SDK resource and an `exact`
+  provision to code that never holds the client.
 
 ## [1.2.0] - 2026-11-04
 

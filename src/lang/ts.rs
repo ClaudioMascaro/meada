@@ -244,7 +244,13 @@ impl LanguagePack for TsJs {
                     if let (Some(&at), Some(returned)) =
                         (functions.get(&body.id()), named(node).next())
                     {
-                        let returned = value(returned, src, &scope, &parents);
+                        // A generator's call returns its iterator, not what it returns.
+                        let generator = body.kind().starts_with("generator_function")
+                            || children(body).any(|n| n.kind() == "*");
+                        let returned = match generator {
+                            true => Value::Unknown,
+                            false => value(returned, src, &scope, &parents),
+                        };
                         facts.defs[at].return_values.push(returned);
                     }
                 }
@@ -2663,6 +2669,18 @@ mod tests {
         };
         assert_eq!(returned("make"), ["r", "?"]);
         assert_eq!(returned("make.inner"), ["scalar"]);
+        // A generator's call returns its iterator, whatever its `return`s hold.
+        let facts = parse(
+            "function* make() {\n  return new Storage();\n}\nclass A {\n  *each() { return 1; }\n}\n",
+        );
+        let generators = (facts.defs.iter())
+            .filter(|d| d.name == "make" || d.name == "A.each")
+            .map(|d| {
+                let unknown = |v: &Value| matches!(v, Value::Unknown);
+                !d.return_values.is_empty() && d.return_values.iter().all(unknown)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(generators, [true, true]);
         // A callback written in place, and an arrow's expression body.
         let facts = parse("const f = () => Router();\nxs.map((x) => { return x; });\n");
         let values = |d: &Def| d.return_values.len();
