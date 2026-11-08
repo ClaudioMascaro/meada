@@ -25,7 +25,7 @@
 // ponytail: a list is not read (the flattened keys leave lists out), so an include inside one is
 // neither followed nor named.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
 
@@ -43,9 +43,9 @@ pub(crate) const INCLUDES: usize = 64;
 /// value's size, `Graft::follow`): `MAX_BYTES`, the most one config file reads.
 // ponytail: a partial is a few KB; one file's limit bounds a partial grafted from many keys.
 const GRAFTED_MAX: usize = MAX_BYTES;
-/// How many bytes of included files all the roots of one reading graft together, each include
-/// counting its file again (or its value's size, `Graft::follow`), the roots read in the reader's
-/// order (`config::roots`).
+/// How many bytes of included files all the roots of one reading parse together, each include
+/// counting its file again (or its value's size, `Graft::follow`), grafted or refused past its
+/// root's limit, the roots read in the reader's order (`config::roots`).
 // ponytail: a repository's roots graft a few partials of a few KB; four files at their limit bound
 // hundreds of small roots each grafting one large partial again (20 took 26 s cold and 10 s on
 // every refresh, debug).
@@ -153,13 +153,14 @@ pub(super) struct Grafted {
     pub(super) watched_unread: bool,
 }
 
-/// What the roots of one reading spent together: the bytes they grafted, and what each file read
-/// so far is charged (its bytes, or its value's size once parsed), so an include past a limit
-/// reads no file already read.
+/// What the roots of one reading spent together: the bytes they parsed, what each file read so
+/// far is charged (its bytes, or its value's size once parsed) and the files that did not parse,
+/// so an include past a limit, or of a file that does not parse, parses no file already read.
 #[derive(Default)]
 pub(super) struct Reading {
     grafted: usize,
     charges: HashMap<String, usize>,
+    unreadable: HashSet<String>,
 }
 
 /// The root `path` (`src`) with its includes grafted and its `$env` read. `read` gives the file at
@@ -313,9 +314,15 @@ impl Graft<'_, '_> {
             return Err(Reason::Count);
         }
         self.includes += 1;
-        // A file already read whose charge is past a limit is refused unread.
-        if (self.reading.charges.get(&path)).is_some_and(|&charge| !self.fits(charge)) {
+        // A file already read whose charge is past a limit, or any once the reading is spent, is
+        // refused unread; one that did not parse is not parsed again.
+        let charge = self.reading.charges.get(&path).copied();
+        if !self.fits(charge.unwrap_or(0)) {
             return Err(Reason::Size);
+        }
+        if self.reading.unreadable.contains(&path) {
+            self.charge(charge.unwrap_or(0));
+            return Err(Reason::Unreadable);
         }
         let src = match (self.read)(&path) {
             ConfigInput::Read(src) => src,
@@ -327,7 +334,8 @@ impl Graft<'_, '_> {
             return Err(Reason::Size);
         }
         let Some(document) = document(&path, &src) else {
-            self.reading.charges.insert(path, src.len());
+            self.reading.charges.insert(path.clone(), src.len());
+            self.reading.unreadable.insert(path);
             self.charge(src.len());
             return Err(Reason::Unreadable);
         };
@@ -335,6 +343,8 @@ impl Graft<'_, '_> {
         let charge = src.len().max(size(&document));
         self.reading.charges.insert(path.clone(), charge);
         if !self.fits(charge) {
+            // Parsing it was spent: the roots parse no more than `READING_MAX`, grafted or not.
+            self.reading.grafted += charge;
             return Err(Reason::Size);
         }
         self.charge(charge);
@@ -879,23 +889,27 @@ mod tests {
         assert_eq!(reasons, [("big.yaml", "size"), ("huge.yaml", "size")]);
     }
 
-    #[test]
-    fn an_include_is_charged_the_size_its_aliases_expand_it_to() {
-        // 335 bytes whose aliases expand to a value of 48,139, a node counting one and a key or
-        // a text its bytes besides: `a` is 1 + 10 × (2 + 2) = 41, `b` 1 + 10 × (2 + 41) = 431,
-        // `c` 4,331, `d` 43,331, and the document 1 + 42 + 432 + 4,332 + 43,332. `MAX_BYTES`
-        // grafted into the root holds 21 of them, where their bytes would hold all 64.
+    /// 335 bytes whose aliases expand to a value of 48,139, a node counting one and a key or a
+    /// text its bytes besides: `a` is 1 + 10 × (2 + 2) = 41, `b` 1 + 10 × (2 + 41) = 431, `c`
+    /// 4,331, `d` 43,331, and the document 1 + 42 + 432 + 4,332 + 43,332.
+    fn bomb() -> String {
         let level = |name: &str, anchor: &str, item: &str| {
             let items: Vec<String> = (0..10).map(|i| format!("k{i}: {item}")).collect();
             format!("{name}: {anchor}{{{}}}\n", items.join(", "))
         };
-        let bomb = [
+        [
             level("a", "&a ", "x"),
             level("b", "&b ", "*a"),
             level("c", "&c ", "*b"),
             level("d", "", "*c"),
         ]
-        .concat();
+        .concat()
+    }
+
+    #[test]
+    fn an_include_is_charged_the_size_its_aliases_expand_it_to() {
+        // `MAX_BYTES` grafted into the root holds 21 bombs, where their bytes would hold all 64.
+        let bomb = bomb();
         assert_eq!(bomb.len(), 335);
         let root: String = (0..INCLUDES)
             .map(|i| format!("k{i:02}: {{ $include: bomb.yaml }}\n"))
@@ -911,6 +925,66 @@ mod tests {
             "size",
         );
         assert_eq!(unfollowed, vec![size; INCLUDES - 21]);
+    }
+
+    #[test]
+    fn a_reading_parses_a_file_that_does_not_parse_once_and_parses_no_more_than_its_limit() {
+        let reads = std::cell::Cell::new(0);
+        // A partial that does not parse, named from every key of a root, is read once.
+        let root: String = (0..INCLUDES)
+            .map(|i| format!("k{i:02}: {{ $include: bad.yaml }}\n"))
+            .collect();
+        let files = BTreeMap::from([("app-config.yaml", root.as_str()), ("bad.yaml", "a: [\n")]);
+        let grafted = tree(
+            "app-config.yaml",
+            root.as_bytes(),
+            &|path| {
+                reads.set(reads.get() + 1);
+                fetcher(&files)(path)
+            },
+            &[],
+            &mut Reading::default(),
+        );
+        assert_eq!(reads.get(), 1);
+        let reasons = grafted.unfollowed.iter().map(|u| u.reason);
+        assert_eq!(reasons.collect::<Vec<_>>(), [Reason::Unreadable; INCLUDES]);
+
+        // Four roots each naming 64 distinct bombs of 48,139: a root grafts 21 within
+        // `MAX_BYTES`, and the reading parses those past it too, so the first root spends
+        // 64 × 48,139 = 3,080,896 of `READING_MAX` (4,194,304). The second parses 24 more
+        // (grafting 21) before the rest is spent, and the last two read nothing.
+        let bomb = bomb();
+        let roots: Vec<(String, String)> = (0..4)
+            .map(|r| {
+                let root = (0..INCLUDES)
+                    .map(|i| format!("k{i:02}: {{ $include: p{i:02}.yaml }}\n"))
+                    .collect();
+                (format!("r{r}/app-config.yaml"), root)
+            })
+            .collect();
+        let partials: Vec<String> = (0..4)
+            .flat_map(|r| (0..INCLUDES).map(move |i| format!("r{r}/p{i:02}.yaml")))
+            .collect();
+        let files: BTreeMap<&str, &str> = (partials.iter())
+            .map(|p| (p.as_str(), bomb.as_str()))
+            .collect();
+        let mut reading = Reading::default();
+        reads.set(0);
+        let grafts: Vec<usize> = (roots.iter())
+            .map(|(path, root)| {
+                let fetch = |p: &str| {
+                    reads.set(reads.get() + 1);
+                    fetcher(&files)(p)
+                };
+                let grafted = tree(path, root.as_bytes(), &fetch, &[], &mut reading);
+                let tree = grafted.tree.unwrap();
+                (tree.as_object().unwrap().values())
+                    .filter(|v| !v.is_null())
+                    .count()
+            })
+            .collect();
+        assert_eq!(grafts, [21, 21, 0, 0]);
+        assert_eq!(reads.get(), INCLUDES + 24);
     }
 
     #[test]

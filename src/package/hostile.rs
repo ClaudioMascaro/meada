@@ -1049,6 +1049,63 @@ resource "aws_apigatewayv2_route" "wide" {{
                 crate::http::app_config_probe(&files)
             },
         ),
+        // Hundreds of roots each naming 64 distinct partials of 335 bytes whose aliases expand
+        // them to 48 KB: what a root has no room for is parsed too, so it counts against
+        // `includes::READING_MAX`, past which no file is read.
+        (
+            "app-config: many roots including distinct partials their aliases expand",
+            || {
+                let level = |name: &str, anchor: &str, item: &str| {
+                    let items: Vec<String> = (0..10).map(|i| format!("k{i}: {item}")).collect();
+                    format!("{name}: {anchor}{{{}}}\n", items.join(", "))
+                };
+                let bomb = [
+                    level("a", "&a ", "x"),
+                    level("b", "&b ", "*a"),
+                    level("c", "&c ", "*b"),
+                    level("d", "", "*c"),
+                ]
+                .concat();
+                let root = count(64, |i| format!("k{i}: {{ $include: p{i}.yaml }}\n"));
+                let mut files = Vec::new();
+                for r in 0..256 {
+                    files.push((format!("r{r}/app-config.yaml"), file(root.clone())));
+                    for i in 0..64 {
+                        files.push((format!("r{r}/p{i}.yaml"), file(bomb.clone())));
+                    }
+                }
+                let files: Vec<(&str, Vec<u8>)> =
+                    files.iter().map(|(p, s)| (p.as_str(), s.clone())).collect();
+                crate::http::app_config_probe(&files)
+            },
+        ),
+        // Hundreds of roots each naming, from 64 keys, a partial whose aliases expand past the
+        // YAML reader's budget: a file that does not parse is parsed once a reading.
+        (
+            "app-config: many roots including a partial that does not parse",
+            || {
+                let level = |name: &str, anchor: &str, item: &str, n: usize| {
+                    let items: Vec<String> = (0..n).map(|i| format!("k{i}: {item}")).collect();
+                    format!("{name}: {anchor}{{{}}}\n", items.join(", "))
+                };
+                let bomb = [
+                    level("a", "&a ", "x", 10),
+                    level("b", "&b ", "*a", 10),
+                    level("c", "&c ", "*b", 10),
+                    level("d", "&d ", "*c", 10),
+                    level("e", "", "*d", 4),
+                ]
+                .concat();
+                let root = count(64, |i| format!("k{i}: {{ $include: ../bomb.yaml }}\n"));
+                let mut files = vec![("bomb.yaml".to_string(), file(bomb))];
+                for r in 0..256 {
+                    files.push((format!("r{r}/app-config.yaml"), file(root.clone())));
+                }
+                let files: Vec<(&str, Vec<u8>)> =
+                    files.iter().map(|(p, s)| (p.as_str(), s.clone())).collect();
+                crate::http::app_config_probe(&files)
+            },
+        ),
         // Spring: `application.properties`, `application.yml`
         ("spring: many properties", || {
             configured(

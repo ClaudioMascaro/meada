@@ -206,10 +206,11 @@ All notable changes to Meada are recorded here. The format follows
   partial is a config input of the index, so editing it alone changes the answer on the next
   refresh. An absolute path, one that leaves the repository, a symbolic link, a `${` in the path,
   another extension, a missing file or key path, a sibling key, a cycle, a depth past 8, more
-  than 64 includes from one root, more than 1 MiB grafted into one root and more than 4 MiB into
-  all the roots of a repository (its files named `app-config.yaml` first, then the others in path
-  order; an include counting its file's bytes, or its value's size when YAML aliases make it
-  larger) are not followed:
+  than 64 includes from one root, more than 1 MiB grafted into one root and more than 4 MiB parsed
+  for all the roots of a repository (its files named `app-config.yaml` first, then the others in
+  path order; an include counting its file's bytes, or its value's size when YAML aliases make it
+  larger, an include past its root's limit included) are not followed, and a partial that does
+  not parse is parsed once:
   their keys stay unread and `meada status` names each include with its reason. `$file` stays
   unread, and a config file past 1 MiB is dropped, not parsed by half. The index schema golden
   changes (it now lists the stored roles), so existing indexes are rebuilt (#689).
