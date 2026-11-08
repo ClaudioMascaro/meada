@@ -299,7 +299,9 @@ order, a later file winning), locals, a local module's inputs and outputs per ca
 `count.index`, templates and the pure string, collection and conversion functions of ADR 0025 with
 `jsonencode`. Override files (`override.tf`, `*_override.tf`) merge into the blocks of their
 directory after its other files, as Terraform applies them: what an override block sets replaces
-the base block's, references included. Data sources, resource attributes, registry modules,
+the base block's, references included, and beside one, a Terraform file that does not read
+leaves no variable of the directory evaluated, as it may mark any of them sensitive. Data
+sources, resource attributes, registry modules,
 `terraform.workspace`, `-var`,
 `-var-file`, `TF_VAR_`, sensitive variables and any other function are never evaluated: such a part
 becomes a `*` and the name a pattern (`orders-*`), matching literal names under the pattern rules below. A name that went through a

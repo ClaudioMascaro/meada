@@ -301,7 +301,9 @@ entradas y salidas de un módulo local por llamada, `each`, `count.index`, plant
 puras de texto, colección y conversión del ADR 0025 con `jsonencode`. Los archivos de override
 (`override.tf`, `*_override.tf`) se fusionan con los bloques de su carpeta después de los demás
 archivos de ella, como Terraform los aplica: lo que un bloque de override define reemplaza lo del
-bloque base, referencias incluidas. Data sources, atributos de
+bloque base, referencias incluidas, y junto a uno, un archivo Terraform que no se lee deja sin
+evaluar todas las variables de la carpeta, porque puede marcar cualquiera como sensible. Data
+sources, atributos de
 resources, módulos del registro, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`, variables
 sensibles y cualquier otra función nunca se evalúan: esa parte es un `*` y el nombre un patrón
 (`orders-*`), que enlaza nombres literales según las reglas de patrones de abajo. Un nombre que pasó por una variable del módulo raíz, por

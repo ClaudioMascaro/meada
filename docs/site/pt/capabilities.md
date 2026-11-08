@@ -299,7 +299,9 @@ acessar a rede, a partir dos valores do próprio repositório: os defaults das v
 chamada, `each`, `count.index`, templates e as funções puras de texto, coleção e conversão do ADR
 0025 com `jsonencode`. Arquivos de override (`override.tf`, `*_override.tf`) se mesclam aos blocos
 da sua pasta depois dos outros arquivos dela, como o Terraform os aplica: o que um bloco de override
-define substitui o do bloco base, referências incluídas. Data sources, atributos de resources,
+define substitui o do bloco base, referências incluídas, e ao lado de um, um arquivo Terraform
+que não é lido deixa sem avaliar todas as variáveis da pasta, porque pode marcar qualquer uma
+como sensível. Data sources, atributos de resources,
 módulos do registro,
 `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`, variáveis sensíveis e qualquer outra função
 nunca são avaliados: essa parte vira um `*` e o nome um padrão (`orders-*`), que liga nomes

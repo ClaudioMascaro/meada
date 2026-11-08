@@ -188,8 +188,11 @@ this file, and a change to these modules updates it.
   `Repository::read_with` reads override files (`config_values::is_override`) after all the
   others, and `Module::add`, `Module::declare` and `assign` merge each of their blocks into the
   one of its address (`Block::merge`: what it sets replaces the base's, `Block::refs` keyed by
-  argument or nested block type, `nested_type`), dropping one with no base. A directory no other
-  one calls through a local `source` (`local_source`: `./` or `../`, normalized, never above the
+  argument or nested block type, `nested_type`), dropping one with no base. A directory holding
+  an override file and a Terraform file that does not read (`Module::overridden`, `unreadable`;
+  the refresh hands over files past `MAX_BYTES` for it) has every variable sensitive. A
+  directory no other one calls through a local `source` (`local_source`: `./` or `../`,
+  normalized, never above the
   root; the files come from the walk, so a symlinked directory holds none) is a root; `Eval::root`
   instantiates it and, per module call, the called directory under `<call address>.`
   (`Eval::instantiate`, a stack against cycles), then resolves each block's `Ref`s in its instance

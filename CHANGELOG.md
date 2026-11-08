@@ -297,7 +297,9 @@ All notable changes to Meada are recorded here. The format follows
   per call, `each` and `count.index`, without running Terraform or reaching the network, so a
   `for_each` over a variable gives one node per instance. Data sources, resource attributes,
   registry modules, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_` and sensitive variables
-  (marked by any of their blocks, override files included) are never evaluated: such a part of a
+  (marked by any of their blocks, override files included, and every variable of a directory
+  holding an override file and a Terraform file that does not read) are never evaluated: such a
+  part of a
   name is a `*` and the name a pattern, shown as `pattern "orders-*"` by `search` and `(pattern)`
   by `context`, and linked by nothing yet. `context` lists
   under `overridable:` the root variables a name went through, by their default or a var file. A

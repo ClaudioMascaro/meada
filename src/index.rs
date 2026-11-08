@@ -825,9 +825,8 @@ fn refresh_keeping(
     if !dirs.is_empty() {
         let mut files = Vec::new();
         for (path, abs) in configs.iter().filter(|(p, _)| iac::is_input(p)) {
-            if let Ok(src) = read_up_to(abs, lang::MAX_BYTES)
-                && src.len() <= lang::MAX_BYTES
-            {
+            // A file past the ceiling still counts, as unreadable (`iac::read`).
+            if let Ok(src) = read_up_to(abs, lang::MAX_BYTES) {
                 files.push((path.clone(), src));
             }
         }

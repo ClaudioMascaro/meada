@@ -162,7 +162,9 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   `output` replaces the one of its name, and a `variable`'s default the declared one. A block
   with nothing to merge into, which Terraform refuses, is left out. A variable either block
   marks sensitive stays sensitive: an override's `sensitive = false` does not lift it, which
-  can only leave a name unresolved.
+  can only leave a name unresolved. Beside an override file, a Terraform file that does not
+  read (it does not parse, or passes a ceiling) may mark any variable sensitive once merged, so
+  no variable of the directory is evaluated, as config values store none of their defaults.
 - **Instances.** Each call instantiates the called module's blocks under the call's address and
   a dot, recursively; a `count` of a literal number, or a `for_each` over an object of literal
   keys or `toset` of literal strings, gives one node per key (`[0]`, `["eu"]`, the keys sorted

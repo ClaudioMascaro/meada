@@ -359,6 +359,10 @@ fn a_sensitive_variable_under_a_hidden_ci_path_redacts_a_var_file_elsewhere() {
 #[test]
 fn a_default_another_file_of_its_directory_marks_sensitive_stays_out_of_the_index() {
     let repo = fixture_repo("config_values_override_sensitive", "config-values", ORIGIN);
+    let big = format!(
+        "variable \"y\" {{\n  sensitive = true\n}}\n# {}\n",
+        "x".repeat(1 << 20)
+    );
     for (path, text) in [
         (
             "infra/main.tf",
@@ -389,10 +393,27 @@ fn a_default_another_file_of_its_directory_marks_sensitive_stays_out_of_the_inde
             "variable \"x\" {\n  default = \"broken-override-secret\"\n}\n",
         ),
         ("broken/x_override.tf", "variable \"x\" {\n"),
+        (
+            "big/main.tf",
+            "variable \"y\" {\n  default = \"big-override-secret\"\n}\n",
+        ),
+        ("big/big_override.tf", &big),
     ] {
         let path = repo.join(path);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, text).unwrap();
+    }
+    // Static evaluation never puts one of them in a name either.
+    for (dir, var) in [
+        ("infra", "db"),
+        ("infra", "token"),
+        ("json", "db"),
+        ("broken", "x"),
+        ("big", "y"),
+    ] {
+        let queue =
+            format!("resource \"aws_sqs_queue\" \"{var}\" {{ name = \"q-${{var.{var}}}\" }}\n");
+        fs::write(repo.join(format!("{dir}/queue_{var}.tf")), queue).unwrap();
     }
     common::age(&repo);
     let engine = Engine::open(&repo).unwrap();
@@ -418,6 +439,12 @@ fn a_default_another_file_of_its_directory_marks_sensitive_stays_out_of_the_inde
         "broken/main.tf:2 variable.x.default = redacted",
     );
     shows(
+        "variable.y.default",
+        "big/main.tf:2 variable.y.default = redacted",
+    );
+    let iac = engine.search("aws_sqs_queue", Some("iac"), None).unwrap();
+    assert_eq!(iac.matches("pattern \"q-*\"").count(), 5, "{iac}");
+    shows(
         "variable.region.default",
         "infra/variables.tf:5 variable.region.default = \"eu-west-1\"",
     );
@@ -428,6 +455,7 @@ fn a_default_another_file_of_its_directory_marks_sensitive_stays_out_of_the_inde
         "override-given-secret",
         "json-override-secret",
         "broken-override-secret",
+        "big-override-secret",
     ] {
         assert!(!found(secret), "{secret}");
     }

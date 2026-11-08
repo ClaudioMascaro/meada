@@ -13,7 +13,6 @@ use super::{
 };
 use crate::config_values;
 use crate::document::events::{self, Step};
-use crate::lang::MAX_BYTES;
 
 /// Work spent constructing expressions from one JSON file, before allocating their ASTs.
 // ponytail: HCL's object AST inserts keys linearly; charging the square of a collection's width
@@ -25,9 +24,6 @@ pub(super) fn is_file(path: &str) -> bool {
 }
 
 pub(super) fn read(path: &str, src: &[u8], module: &mut Module) {
-    if src.len() > MAX_BYTES {
-        return;
-    }
     let mut reader = Read {
         module: Module::default(),
         path,
@@ -38,6 +34,7 @@ pub(super) fn read(path: &str, src: &[u8], module: &mut Module) {
         },
     };
     if events::json_spanned(src, |span, value| reader.block(span, value)).is_err() {
+        module.unreadable = true;
         return;
     }
     let overriding = config_values::is_override(path);

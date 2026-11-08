@@ -600,6 +600,10 @@ struct Module {
     given: BTreeMap<String, Given>,
     /// Each block's index by its local address, built when the first override block arrives.
     addresses: HashMap<String, usize>,
+    /// Whether the directory holds an override file, and whether one of its Terraform files does
+    /// not read: merged into the others, that file may mark any variable sensitive.
+    overridden: bool,
+    unreadable: bool,
 }
 
 /// The directory a local module `source` names from `dir`: `./` or `../` joined and normalized,
@@ -793,23 +797,33 @@ fn read_var_file(path: &str, src: &[u8], module: &mut Module) {
 }
 
 /// Reads the blocks, outputs, locals and variables of the Terraform file at `path` into `module`;
-/// a file that is not UTF-8, nests past the HCL reader's ceiling or does not parse adds nothing
-/// (config values count it unreadable).
+/// a file past `MAX_BYTES`, not UTF-8, nesting past the HCL reader's ceiling or that does not
+/// parse adds nothing but marks `module` unreadable, as config values count it.
 fn read(path: &str, src: &[u8], module: &mut Module) {
     if is_var_file(path) {
-        return read_var_file(path, src, module);
+        if src.len() <= MAX_BYTES {
+            read_var_file(path, src, module);
+        }
+        return;
+    }
+    let overriding = config_values::is_override(path);
+    module.overridden |= overriding;
+    if src.len() > MAX_BYTES {
+        module.unreadable = true;
+        return;
     }
     if json::is_file(path) {
         return json::read(path, src, module);
     }
     let Some(text) = text(src) else {
+        module.unreadable = true;
         return;
     };
     let Ok(body) = parser::parse_body(text) else {
+        module.unreadable = true;
         return;
     };
     let line = lines(text);
-    let overriding = config_values::is_override(path);
     for b in body.blocks() {
         let labels: Vec<&str> = b.labels.iter().map(|l| l.as_str()).collect();
         let attr = |name: &str| b.body.get_attribute(name).map(|a| &a.value);
@@ -1908,6 +1922,12 @@ impl Repository {
             }
             let dir = config_values::parent(path).to_string();
             read(path, src, modules.entry(dir).or_default());
+        }
+        let unknown = modules
+            .values_mut()
+            .filter(|m| m.overridden && m.unreadable);
+        for variable in unknown.flat_map(|m| m.variables.values_mut()) {
+            variable.sensitive = true;
         }
         Repository {
             modules,
@@ -3298,6 +3318,34 @@ mod tests {
             ),
         ]));
         assert_eq!(shown(&references), ["a.x -> b.w", "a.x -> b.z"]);
+    }
+
+    /// Beside an override file, a Terraform file that does not read (it does not parse, or it
+    /// passes a ceiling) may mark any variable of its directory sensitive once merged: none of
+    /// them resolves, as config values store none of their defaults. Without an override file,
+    /// such a file changes nothing.
+    #[test]
+    fn no_variable_resolves_beside_an_override_file_and_a_file_that_does_not_read() {
+        let main = concat!(
+            "variable \"s\" {\n  default = \"tok\"\n}\n",
+            "resource \"a\" \"s\" { name = \"q-${var.s}\" }\n",
+        );
+        let big = format!("# {}\n", "x".repeat(MAX_BYTES));
+        let cases: [&[(&str, &str)]; 4] = [
+            &[("main.tf", main), ("x_override.tf", "variable {{{")],
+            &[("main.tf", main), ("a_override.tf.json", "{")],
+            &[
+                ("main.tf", main),
+                ("broken.tf.json", "{"),
+                ("override.tf", "locals {}\n"),
+            ],
+            &[("main.tf", main), ("big_override.tf", big.as_str())],
+        ];
+        for list in cases {
+            assert_eq!(names(list), ["a.s ~ \"q-*\""], "{}", list[1].0);
+        }
+        let alone = [("main.tf", main), ("broken.tf", "variable {{{")];
+        assert_eq!(names(&alone), ["a.s = \"q-tok\" [var.s main.tf:1]"]);
     }
 
     /// A template keeps its literal text and every part that resolves; what is never evaluated
