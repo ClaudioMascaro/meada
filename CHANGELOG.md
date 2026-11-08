@@ -454,10 +454,11 @@ All notable changes to Meada are recorded here. The format follows
   and fail the route that stays there, the Helm overlays `values-identity.yaml` and
   `values-workspaces.yaml` render in their stack (as `scripts/helm-check` does) instead of failing
   alone, and `console.py start --bin` resolves a relative path against the caller's directory.
-- `meada export`, `meada status` and every other command that prints on stdout no longer panic
-  when the reader closes its end early (`meada export | head -1`, `| true`): the rest of the output
-  is dropped and the command ends as it would, where it printed "failed printing to stdout: Broken
-  pipe" with a backtrace and exited 101.
+- `meada export`, `meada status` and the other commands that print their result once done no
+  longer panic when the reader closes its end early (`meada export | head -1`, `| true`): the rest
+  of the output is dropped and the command ends as it would, where it panicked with "failed
+  printing to stdout: Broken pipe (os error 32)" and exited 101. `meada decide` and `meada mcp`,
+  which never panicked, still stop with a "Broken pipe" error and exit 1.
 
 ## [1.2.0] - 2026-11-04
 
