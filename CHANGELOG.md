@@ -391,9 +391,12 @@ All notable changes to Meada are recorded here. The format follows
   Unicode classes; past them an expression stays unmatched, and the same expression in many
   files is compiled once (#672).
 - A Python file of thousands of AWS SDK operations on clients a factory function returns no
-  longer takes minutes to index: the operations of one file keep the answers no limit cut and
-  share a budget of 2^18 steps (each still taking 16 once it is spent), and a call passing
-  thousands of clients to one function no longer copies them for every value it reads (#660).
+  longer takes minutes to index: the operations one reader asks about in a file keep the answers
+  no limit cut and share a budget of 2^18 steps, one operation taking up to all that is left
+  (each still taking 16 once it is spent, so five factories of 2,000 returns resolve on their
+  first operation), and a call passing thousands of clients to one function, or forwarding them
+  through a wrapper to the Google Cloud and Azure readers, no longer copies them for every value
+  it reads (#660, #668, #669).
 - Terraform: an object written after a `-`, a number or a `/`, or after a quote or heredoc end
   inside a template directive's body, now counts toward the 2^24 key comparisons a file may
   hold, where a file of them could take minutes to parse; a file with a heredoc whose first

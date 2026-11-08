@@ -2,6 +2,7 @@
 //! kind policies retain receiver-carried names without a second value-resolution walk.
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::rc::Rc;
 
 use super::{Client, Language, go, java};
 use crate::lang::{Invocation, Value};
@@ -74,16 +75,22 @@ struct Context<'a, E, A> {
     arguments: Vec<Argument<E, A>>,
 }
 
-type Key<'a, E, A> = (&'a str, &'a str, Node<'a>, bool, Option<Context<'a, E, A>>);
-type Known<'a, E, A> = HashMap<Key<'a, E, A>, Option<E>>;
+/// A value visited in a context, by its index in `Evidence::contexts`, or in none.
+type Key<'a> = (&'a str, &'a str, Node<'a>, bool, Option<usize>);
+type Shared<'a, P> = Rc<Context<'a, <P as Policy<'a>>::Evidence, <P as Policy<'a>>::Argument>>;
 
 pub(crate) struct Evidence<'c, 'a, P: Policy<'a>> {
     code: &'c Code<'a>,
     policy: P,
     budget: usize,
-    known: Known<'a, P::Evidence, P::Argument>,
+    known: HashMap<Key<'a>, Option<P::Evidence>>,
     frames: Vec<Frame<'a>>,
-    contexts: Vec<Context<'a, P::Evidence, P::Argument>>,
+    /// Each context of the file's walks once, so a key names its context by index and a call
+    /// forwarding thousands of arguments is not copied into the key of every value it reads, and
+    /// the indexes of the contexts the walk is in.
+    contexts: Vec<Shared<'a, P>>,
+    interned: HashMap<Shared<'a, P>, usize>,
+    stack: Vec<usize>,
 }
 
 impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
@@ -95,7 +102,20 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
             known: HashMap::new(),
             frames: Vec::new(),
             contexts: Vec::new(),
+            interned: HashMap::new(),
+            stack: Vec::new(),
         }
+    }
+
+    /// The index of `context` in `contexts`, added the first time it is met.
+    fn context(&mut self, context: Context<'a, P::Evidence, P::Argument>) -> usize {
+        if let Some(&at) = self.interned.get(&context) {
+            return at;
+        }
+        let context = Rc::new(context);
+        self.contexts.push(Rc::clone(&context));
+        self.interned.insert(context, self.contexts.len() - 1);
+        self.contexts.len() - 1
     }
 
     pub(crate) fn call(&mut self, path: &'a str, index: usize) -> Option<P::Evidence> {
@@ -158,7 +178,7 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
             }
             _ => Node::Unknown,
         };
-        let key = (path, scope, node, awaited, self.contexts.last().cloned());
+        let key = (path, scope, node, awaited, self.stack.last().copied());
         if let Some(known) = self.known.get(&key) {
             return known.clone();
         }
@@ -166,7 +186,7 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
             return None;
         }
         self.budget -= 1;
-        self.known.insert(key.clone(), None);
+        self.known.insert(key, None);
         let answer = self.read(path, scope, of, awaited, depth + 1);
         self.known.insert(key, answer.clone());
         answer
@@ -204,9 +224,10 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
                     return self.called(at, index, None, awaited, depth);
                 }
                 let (function, n) = self.code.param_of(path, scope, name)?;
-                if let Some(frame) = self.contexts.last() {
-                    return (frame.function == function)
-                        .then(|| frame.arguments.get(n)?.client.clone())
+                if let Some(&context) = self.stack.last() {
+                    let context = &self.contexts[context];
+                    return (context.function == function)
+                        .then(|| context.arguments.get(n)?.client.clone())
                         .flatten();
                 }
                 let selected = self
@@ -302,10 +323,11 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
                     path,
                     index,
                 });
-                self.contexts.push(Context {
+                let context = self.context(Context {
                     function,
                     arguments,
                 });
+                self.stack.push(context);
             }
             let answer = self.values(
                 self.code.returned(path, index),
@@ -314,7 +336,7 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
             );
             if contextual {
                 self.frames.pop();
-                self.contexts.pop();
+                self.stack.pop();
             }
             return answer;
         }

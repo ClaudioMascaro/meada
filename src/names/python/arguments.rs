@@ -5,8 +5,8 @@ use std::rc::Rc;
 use crate::lang::{Call, Value, literal};
 use crate::resolve::{Code, EVAL_BUDGET, EVAL_DEPTH, Of, Target};
 
-/// The steps the factory questions of one file take together. Each question still takes at
-/// most `EVAL_BUDGET`, and at least `FACTORY_QUESTION_FLOOR` once the file's are spent.
+/// The steps the factory questions one reader asks of one file take together, a question taking
+/// up to all that is left, and still `FACTORY_QUESTION_FLOOR` once they are spent.
 // ponytail: real files spend a few steps a question, a repeated walk answered from the file's
 // kept answers; 2^18 stops a file of thousands of questions each walking thousands of call
 // sites that a cycle keeps from being kept.
@@ -110,7 +110,7 @@ impl<'c, 'a> Factories<'c, 'a> {
             self.frames.clear();
             self.framed.clear();
         }
-        let budget = self.left.clamp(FACTORY_QUESTION_FLOOR, EVAL_BUDGET);
+        let budget = self.left.max(FACTORY_QUESTION_FLOOR);
         self.budget = budget;
         self.known.clear();
         self.cut = false;

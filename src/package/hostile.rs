@@ -1936,24 +1936,54 @@ resource "aws_apigatewayv2_route" "wide" {{
                 found
             },
         ),
+        // Google Cloud: the constructor walk of `contract/sdk/origins.rs`, reading a call through
+        // a wrapper that forwards thousands of clients to a function returning each of them.
+        (
+            "gcp origins: a frame of many clients forwarded through a wrapper",
+            || {
+                let n = 2000;
+                let params: String = (0..n).map(|i| format!(", a{i}")).collect();
+                let returns: String = (0..n)
+                    .map(|i| format!("    if c == {i}: return a{i}\n"))
+                    .collect();
+                let clients = ", pubsub_v1.PublisherClient()".repeat(n);
+                let found = python(
+                    format!(
+                        "from google.cloud import pubsub_v1\n\n\n\
+                         def make(c{params}):\n{returns}    return a0\n\n\n\
+                         def forward(c{params}):\n    return make(c{params})\n\n\n\
+                         forward(1{clients}).publish('projects/p/topics/wide', b'x')\n"
+                    ),
+                    |code| crate::contract::gcp::sdk::extract(code, true).len(),
+                );
+                assert_eq!(found, 1, "the operation's topic");
+                found
+            },
+        ),
     ]
 }
 
-/// How many calls of the Python file `text` the factory reader of boto3 clients traces to a
-/// constructor.
-fn python_factories(text: String) -> usize {
+/// What `read` answers of the Python file `text`, alone in its repository.
+fn python<T>(text: String, read: impl FnOnce(&crate::resolve::Code<'_>) -> T) -> T {
     use crate::lang::python::Python;
     use crate::resolve::{Code, Resolver};
     let facts = Python.parse("app.py", text.as_bytes()).unwrap();
     let files = BTreeMap::from([("app.py", &facts)]);
     let modules = Python.modules(&[], &BTreeMap::new()).unwrap();
     let resolver = Resolver::new(&files, modules, &Python);
-    let code = Code::new(&resolver, &files, &Python);
-    let mut factories =
-        crate::names::python::Factories::new(&code, &["boto3.client"], &[], "service_name");
-    (facts.calls.iter())
-        .filter(|call| factories.read("app.py", call).is_some())
-        .count()
+    read(&Code::new(&resolver, &files, &Python))
+}
+
+/// How many calls of the Python file `text` the factory reader of boto3 clients traces to a
+/// constructor.
+fn python_factories(text: String) -> usize {
+    python(text, |code| {
+        let mut factories =
+            crate::names::python::Factories::new(code, &["boto3.client"], &[], "service_name");
+        (code.files()["app.py"].calls.iter())
+            .filter(|call| factories.read("app.py", call).is_some())
+            .count()
+    })
 }
 
 /// The size of the imports the Swift pack's `join` gives each of `IMPORTS` files under the

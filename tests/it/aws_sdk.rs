@@ -1240,6 +1240,38 @@ fn python_sdk_factory_answers_are_read_once_per_file() {
     assert_eq!(passed.count(), n);
 }
 
+/// One factory question may spend all its file has left of `FACTORY_FILE_BUDGET`: five factories
+/// of 2,000 returns, each return calling the factory below it, resolve on the file's only
+/// operation, where a question held to `EVAL_BUDGET` stopped short and only a second operation,
+/// reading what the first one kept, resolved.
+#[test]
+fn python_sdk_factory_question_may_spend_what_its_file_has_left() {
+    let repo = fixture_repo("sdk_python_factory_lattice", "aws-sdk-controls", None);
+    let n = 2000;
+    let mut source = String::from("import boto3\n\n\ndef f0(c):\n");
+    for i in 0..n {
+        source += &format!("    if c == {i}: return boto3.client('sns')\n");
+    }
+    source += "    return boto3.client('sns')\n\n\n";
+    for k in 1..5 {
+        source += &format!("def f{k}(c, a=None):\n");
+        for i in 0..n {
+            source += &format!(
+                "    if c == {i}: return f{}({i}, boto3.client('sns'))\n",
+                k - 1
+            );
+        }
+        source += &format!("    return f{}(0)\n\n\n", k - 1);
+    }
+    source += "f4(1).publish(TopicArn='lattice')\n";
+    std::fs::write(repo.join("app.py"), source).unwrap();
+    let label = format!("Python lattice of five factories of {n} returns");
+    assert_eq!(
+        timed_providers(&repo, &label, 60),
+        ["channel::sns::lattice"]
+    );
+}
+
 /// Factory questions share a budget per file (`FACTORY_FILE_BUDGET`), every visit of a value a
 /// step: thousands of operations, each walking thousands of call sites whose answer a cycle keeps
 /// from being kept, spend it, whether each call site is read anew or is the same default visited

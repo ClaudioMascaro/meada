@@ -99,11 +99,16 @@
   parameter name and stays unresolved. RDS and ElastiCache control-plane clients establish
   no data uses. Kotlin keeps the earlier typed SQS reader.
 
-- Python complete factory evidence (#659/#660): `EVAL_DEPTH` (256) and `EVAL_BUDGET` (65,536)
-  bound each receiver question, including argument inventories, and every visit of a value is a
-  step. The questions of one file share `FACTORY_FILE_BUDGET` (2^18 steps); once it is spent,
-  each question still takes `FACTORY_QUESTION_FLOOR` (16), enough for a client constructed a few
-  names or one factory away, and a client further away stays unresolved. Answers no ceiling or
+- Python complete factory evidence (#659/#660): `EVAL_DEPTH` (256) bounds each receiver question,
+  including argument inventories, and every visit of a value is a step. The questions one reader
+  asks of one file share `FACTORY_FILE_BUDGET` (2^18 steps), a question taking up to all that is
+  left, so five factories of 2,000 returns calling each other resolve on their first operation.
+  The message clients, the AWS channel operations and the AWS resource operations each have a
+  reader, and an operation two of them know is asked of both. Once it is spent, each question
+  still takes `FACTORY_QUESTION_FLOOR` (16), enough for a client constructed a few
+  names or one factory away, and a client further away stays unresolved. A factory of another
+  module is walked again for each file asking about it, under that file's budget: a 440 KB
+  module of 10,000 returns costs each of 50 files calling it about 0.6 s in a debug build. Answers no ceiling or
   cycle cut are kept for the file's later questions, so a factory's returns are read once per
   frame (its function and the constructors its arguments carry), not once per operation; what a
   function returns and what its callers pass are listed once. A kept answer holds how deep its
@@ -115,7 +120,9 @@
 
 - GCP SDKs (#668) share the complete, memoized constructor walk in `contract/sdk/origins.rs`.
   `EVAL_DEPTH` (256) and `EVAL_BUDGET` (65,536) bound each file's walk and exact-frame argument
-  inventory; equivalent normalized frames share memo entries. Only ADR 0026's five-group
+  inventory; equivalent normalized frames share memo entries. Each frame's arguments are kept once
+  and a memo key names them by index, so a call forwarding 2,000 clients through a wrapper holds
+  5 MiB, where a copy in the key of every value it read held 371 MiB. Only ADR 0026's five-group
   constructor/operation inventory is recognized. Injected types, unknown factories, opaque
   return branches, reassigned clients and hidden constructors supply no side. Unsupported
   overloads and builders are not implied by a supported operation name. A subscription never
