@@ -40,6 +40,8 @@ pub(super) struct Index<'a> {
     // A default object can survive more than one invocation. Source order in one
     // invocation alone cannot prove its initial fields are still present.
     defaults: HashSet<Object<'a>>,
+    /// Each file's outermost loops (`Facts::loops`).
+    loops: HashMap<&'a str, &'a [std::ops::Range<usize>]>,
     cut: bool,
 }
 
@@ -64,6 +66,7 @@ impl<'a> Index<'a> {
             if facts.budget.is_some() {
                 out.cut = true;
             }
+            out.loops.insert(path, &facts.loops);
             for write in writes {
                 out.add(
                     code,
@@ -340,6 +343,17 @@ impl<'a> Index<'a> {
         }
     }
 
+    /// Whether one loop of `path` holds both positions: a write after a read in it comes before
+    /// the read of the next turn.
+    fn looped(&self, path: &str, a: usize, b: usize) -> bool {
+        let (low, high) = (a.min(b), a.max(b));
+        self.loops.get(path).is_some_and(|loops| {
+            let at = loops.partition_point(|l| l.end <= low);
+            // A write's moment is where it ends, which may be where its loop ends.
+            (loops.get(at)).is_some_and(|l| l.start <= low && high <= l.end)
+        })
+    }
+
     fn changed(
         &self,
         object: Object<'a>,
@@ -396,7 +410,8 @@ impl<'a> Index<'a> {
                         .find(|m| m.path == before.path && m.scope == before.scope)
                         && before.start != after.start
                     {
-                        return before.start < after.start;
+                        return before.start < after.start
+                            || self.looped(before.path, before.start, after.start);
                     }
                 }
                 // A call's arguments are read before that callee can mutate them. Sharing

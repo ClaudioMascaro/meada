@@ -1381,6 +1381,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
             local: name,
         })
         .collect();
+    facts.loops = super::outermost(tree.root_node(), &["for_statement"]);
     Ok(facts)
 }
 

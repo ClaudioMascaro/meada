@@ -400,6 +400,7 @@ impl LanguagePack for Python {
             .consts
             .retain(|c| !settings.iter().any(|s| s.name == c.name));
         facts.consts.extend(settings);
+        facts.loops = super::outermost(tree.root_node(), &["for_statement", "while_statement"]);
         Ok(facts)
     }
 

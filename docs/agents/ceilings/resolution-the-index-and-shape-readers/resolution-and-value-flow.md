@@ -8,7 +8,11 @@ records only guarded first-result call ranges for the shared SDK evidence walk; 
 scalar folding and error/other result bindings remain unknown. These facts follow the full
 value cache, not the lean index, and reuse the nearest lexical binding query.
 Scoped selector effects (`resolve/mutations.rs`) follow exact aliases and argument frames,
-compare actual read/write call order, and share selection/memo normalization. Retained write
+compare actual read/write call order, and share selection/memo normalization. A write inside a
+loop that also holds the read comes before it (`Facts::loops`: the outermost loop statements of
+TypeScript/JavaScript, Python and Go, a `for`/`while` comprehension or a recursive call not
+among them). A computed key or a spread names its fields once folded: a write to one of them
+changes it. Retained write
 facts charge their names and scopes to `MAX_BYTES` (1 MiB); overflow removes complete write
 knowledge rather than keeping a partial list. Indexing, alias expansion and querying charge
 `EVAL_BUDGET` and `EVAL_DEPTH`. Missing facts/calls, opaque aliases, cycles or exhausted work

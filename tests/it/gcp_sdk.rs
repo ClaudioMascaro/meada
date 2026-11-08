@@ -604,6 +604,81 @@ fn named_requests_reject_prior_mutations_but_keep_other_objects_fields_and_later
     assert_golden("gcp-sdk-mutations.export.json", &text);
 }
 
+/// A named request read again after a write: through a computed key or a spread of another
+/// object, and in a loop whose later turns read what an earlier turn wrote after the call.
+#[test]
+fn named_requests_written_through_computed_keys_spreads_or_later_loop_turns_name_nothing() {
+    let repo = fixture_repo("gcp_sdk_more_mutations", "gcp-sdk-mutations", None);
+    for (file, text) in [
+        (
+            "scene.ts",
+            r#"import {SecretManagerServiceClient} from '@google-cloud/secret-manager';
+export function Computed() { const client=new SecretManagerServiceClient();const request={['name']:'projects/review/secrets/stale-computed/versions/latest'};request.name='after';client.accessSecretVersion(request); }
+export function ComputedVar(k: string) { const client=new SecretManagerServiceClient();const request={name:'projects/review/secrets/stale-computedvar/versions/latest'};request[k]='after';client.accessSecretVersion(request); }
+export function Spread() { const client=new SecretManagerServiceClient();const base={name:'projects/review/secrets/stale-spread/versions/latest'};const request={...base};request.name='after';client.accessSecretVersion(request); }
+export function SpreadAfter() { const client=new SecretManagerServiceClient();const base={timeout:1};const request={name:'projects/review/secrets/stale-spreadafter/versions/latest', ...base};request.name='after';client.accessSecretVersion(request); }
+export function Loop(ns: string[]) { const client=new SecretManagerServiceClient();const request={name:'projects/review/secrets/stale-loop/versions/latest'};for (const n of ns) { client.accessSecretVersion(request); request.name=n; } }
+export function While(ns: string[]) { const client=new SecretManagerServiceClient();const request={name:'projects/review/secrets/stale-while/versions/latest'};let i=0;while (i<ns.length) { client.accessSecretVersion(request); request.name=ns[i]; i++; } }
+export function Kept() { const client=new SecretManagerServiceClient();const request={name:'projects/review/secrets/kept/versions/latest'};client.accessSecretVersion(request); }
+"#,
+        ),
+        (
+            "scene.py",
+            r#"from google.cloud import secretmanager
+
+def Loop(ns):
+    client=secretmanager.SecretManagerServiceClient()
+    request={'name':'projects/review/secrets/stale-pyloop/versions/latest'}
+    for n in ns:
+        client.access_secret_version(request=request)
+        request['name']=n
+def Kept():
+    client=secretmanager.SecretManagerServiceClient()
+    request={'name':'projects/review/secrets/pykept/versions/latest'}
+    for n in ns:
+        client.access_secret_version(request=request)
+"#,
+        ),
+        (
+            "scene.go",
+            r#"package review
+import (
+ secretmanager "cloud.google.com/go/secretmanager/apiv1"
+ secretpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
+)
+func Loop(ns []string) { client,err:=secretmanager.NewClient(ctx);request:=&secretpb.AccessSecretVersionRequest{Name:"projects/review/secrets/stale-goloop/versions/latest"};for _, n := range ns { client.AccessSecretVersion(ctx,request); request.Name = n } }
+func Kept(ns []string) { client,err:=secretmanager.NewClient(ctx);request:=&secretpb.AccessSecretVersionRequest{Name:"projects/review/secrets/gokept/versions/latest"};for _, n := range ns { client.AccessSecretVersion(ctx,request) } }
+"#,
+        ),
+    ] {
+        std::fs::write(repo.join(file), text).unwrap();
+    }
+    std::fs::remove_file(repo.join("scene.js")).unwrap();
+    let text = Engine::open(&repo).unwrap().export().unwrap();
+    let json: Value = serde_json::from_str(&text).unwrap();
+    let mut contracts = (json["consumers"].as_array().unwrap().iter())
+        .map(|c| c["contract"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    contracts.sort();
+    assert_eq!(
+        contracts,
+        [
+            "resource::gcpsecretmanager",
+            "resource::gcpsecretmanager",
+            "resource::gcpsecretmanager",
+            "resource::gcpsecretmanager",
+            "resource::gcpsecretmanager",
+            "resource::gcpsecretmanager",
+            "resource::gcpsecretmanager",
+            "resource::gcpsecretmanager",
+            "resource::gcpsecretmanager::gokept",
+            "resource::gcpsecretmanager::kept",
+            "resource::gcpsecretmanager::pykept",
+        ],
+        "{text}"
+    );
+}
+
 #[test]
 fn typed_name_helpers_retain_their_kind_through_factories_and_final_projection() {
     let (text, json) = export("gcp-sdk-helper-kinds");

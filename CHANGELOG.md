@@ -488,6 +488,10 @@ All notable changes to Meada are recorded here. The format follows
 - Images: a module run from a local archive in one root no longer drops the image another root
   runs it from, with its environment and provisions; only the archive's root runs code without
   an image.
+- SDK names (GCP and Azure, and AWS in TypeScript): a request field written through a computed
+  key (`{['name']: ..}`) or a spread of another object, or written after the call inside a loop
+  whose next turn calls again, leaves the name unresolved; each gave an `exact` link to the name
+  first written.
 - AWS SDK: a request changed after it is made names no resource: a TypeScript command input
   whose field is assigned again before the `send`, and a Java builder held in a local that
   receives another call (`b.topicArn(..)` before `client.publish(b.build())`), also for SQS and

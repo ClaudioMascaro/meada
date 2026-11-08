@@ -7050,20 +7050,43 @@ impl<'a> Code<'a> {
         let Value::Object(properties) = value else {
             return Value::Unknown;
         };
+        let tracked = (fold.selected.zip(fold.objects.last().copied()))
+            .filter(|(_, (_, pointer))| *pointer == value as *const Value as usize);
+        let changed = |field: &str| {
+            tracked.is_some_and(|(selected, (object, _))| {
+                self.member_changed(object, field, selected, frames)
+            })
+        };
         Value::Object(
             properties
                 .iter()
                 .map(|(k, v)| {
-                    let changed = fold.selected.zip(fold.objects.last().copied()).is_some_and(
-                        |(selected, (object, pointer))| {
-                            pointer == value as *const Value as usize
-                                && self.member_changed(object, k, selected, frames)
-                        },
-                    );
-                    let v = if changed {
-                        Value::Unknown
-                    } else {
-                        self.eval(path, scope, v, frames, depth, fold, wants)
+                    if changed(k) {
+                        return (k.clone(), Value::Unknown);
+                    }
+                    // A computed key or a spread names its fields once folded: a write to one
+                    // of them changes it too.
+                    let v = match (
+                        k.as_str(),
+                        self.eval(path, scope, v, frames, depth, fold, wants),
+                    ) {
+                        ("[]", Value::List(mut pair)) => {
+                            let written = matches!(pair.as_slice(), [Value::Str(key), _]
+                                if crate::lang::literal(key).is_some_and(|key| changed(&key)));
+                            if written && let Some(value) = pair.get_mut(1) {
+                                *value = Value::Unknown;
+                            }
+                            Value::List(pair)
+                        }
+                        ("...", Value::Object(fields)) => Value::Object(
+                            (fields.into_iter())
+                                .map(|(f, v)| match changed(&f) {
+                                    true => (f, Value::Unknown),
+                                    false => (f, v),
+                                })
+                                .collect(),
+                        ),
+                        (_, v) => v,
                     };
                     (k.clone(), v)
                 })

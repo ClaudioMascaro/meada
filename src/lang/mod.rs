@@ -584,6 +584,10 @@ pub struct Facts {
     /// parse does not establish complete write knowledge; no literal values are retained.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub member_writes: Option<Vec<MemberWrite>>,
+    /// The byte ranges of the outermost loops, in source order: a member write inside one may
+    /// come before a read it follows in the source (`resolve/mutations.rs`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub loops: Vec<Range<usize>>,
     /// What the file gives every file of its project, in the pack's spelling, which
     /// `LanguagePack::join` applies to each: C#'s `global using` directives (`A.B`, `static
     /// A.B`, `X = A.B`).
@@ -675,6 +679,23 @@ pub struct FirstResult {
     pub scope: String,
     pub name: String,
     pub call: Range<usize>,
+}
+
+/// The byte ranges of the statements of `kinds` under `root` that no other one holds, in source
+/// order (`Facts::loops`).
+pub(crate) fn outermost(root: Node, kinds: &[&str]) -> Vec<Range<usize>> {
+    let mut out = Vec::new();
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if kinds.contains(&node.kind()) {
+            out.push(node.byte_range());
+            continue;
+        }
+        let mut cursor = node.walk();
+        let children: Vec<Node> = node.children(&mut cursor).collect();
+        stack.extend(children.into_iter().rev());
+    }
+    out
 }
 
 #[derive(Clone, Serialize, Deserialize)]

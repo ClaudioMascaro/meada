@@ -375,6 +375,15 @@ impl LanguagePack for TsJs {
                 });
             }
         }
+        facts.loops = super::outermost(
+            root,
+            &[
+                "for_statement",
+                "for_in_statement",
+                "while_statement",
+                "do_statement",
+            ],
+        );
         Ok(facts)
     }
 
