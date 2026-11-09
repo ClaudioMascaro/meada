@@ -71,8 +71,9 @@
   steps, not time: 2^26 steps take about 5.6 s at that rate, a class of many single characters
   runs slower (243 ns a step, 16.5 s a pass) and `status` may run two passes. Translating and
   compiling an expression before a ceiling refuses it costs about 3 to 30 ms for 4 KB (debug), so
-  time grows linearly with the regex text a workspace holds: 4,000 configurations of one 4 KB
-  `(?i)[\w-]` expression each took 44 s to export; no budget bounds it. A literal
+  time grows linearly with the distinct regex text a workspace holds (an expression repeated in
+  many configurations is compiled once): 4,000 configurations of one distinct 4 KB `(?i)[\w-]`
+  expression each took 38 to 44 s to export; no budget bounds it. A literal
   alternation costs its characters and its choice whatever the value and an ordinary expression on
   a short value a few hundred steps: 1,000 rules tried against 400 routes of `.*-apix` on an
   11-byte label take 33.6 million, and OpsGenie monitors of ten short tags matched by such

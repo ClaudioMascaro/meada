@@ -785,6 +785,12 @@ impl VisitMut for Exact<'_, '_> {
         let left = self.left;
         visit_mut::visit_expr_mut(self, expr);
         let (operator, operands) = match expr {
+            // The visitor never visits a call it writes, so this one is the file's: no Terraform
+            // function.
+            Expression::FuncCall(f) if f.name.name.as_str() == "meada_exact" => {
+                *expr = Expression::from(hcl_edit::Ident::new("meada_inexact"));
+                return;
+            }
             Expression::Object(object) => {
                 let mut entries: Vec<_> = std::mem::take(object).into_iter().collect();
                 let keys: Option<Vec<String>> = (entries.iter())
@@ -3479,6 +3485,8 @@ mod tests {
             "resource \"a\" \"overcomp\" { name = join(\"-\", [for k, v in { for s in [\"b\", \"a\"] : s => s } : k]) }\n",
             "resource \"a\" \"computed\" { name = join(\"-\", [for k, v in { (local.svc) = 1, alpha = 2 } : k]) }\n",
             "resource \"a\" \"inner\" { name = [for s in [\"x\"] : [for k, v in { zeta = s, alpha = 1 } : k][0]][0] }\n",
+            // Meada's own helper is no Terraform function.
+            "resource \"a\" \"inject\" { name = \"inj-${meada_exact(\"+\", 1, 2)}\" }\n",
         );
         assert_eq!(
             names(&[("main.tf", text)]),
@@ -3512,6 +3520,7 @@ mod tests {
                 "a.overcomp ~ \"*\"",
                 "a.computed ~ \"*\"",
                 "a.inner = \"alpha\"",
+                "a.inject ~ \"inj-*\"",
             ]
         );
     }

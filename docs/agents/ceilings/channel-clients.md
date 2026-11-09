@@ -133,8 +133,9 @@
   inventory; equivalent normalized frames share memo entries. Each frame's arguments are kept once
   and a memo key names them by index, so a call forwarding 2,000 clients through a wrapper holds
   5 MiB, where a copy in the key of every value it read held 371 MiB. An argument inventory
-  charges the file's budget once per argument of each frame it reads, so a file of wide calls
-  (`N(W+1)(W+2)/2` past about 30,000 for `N` calls of `W` arguments) spends it, and other sides
+  charges the file's budget once per argument of each frame it reads, so a Python file of wide
+  calls forwarding Pub/Sub clients through wrappers (`N(W+1)(W+2)/2` past about 30,000 for `N`
+  calls of `W` arguments; two Java shapes did not reach it) spends it, and other sides
   of the file, unrelated ones and ones written before included, may lose their name: a missing
   name, never a wrong one. Only ADR 0026's five-group
   constructor/operation inventory is recognized. Injected types, unknown factories, opaque

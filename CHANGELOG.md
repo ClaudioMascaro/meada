@@ -540,10 +540,10 @@ All notable changes to Meada are recorded here. The format follows
 - Terraform: `split(",", "")` gives one empty element (a `count` over its length made no node),
   an object walks its keys in lexical order, whether a variable or local binds it or the
   expression builds it (a literal, a `merge`): a `for` over it or a `jsonencode` of it gave an
-  `exact` name in written order, and a `for` over an object whose keys are known only once
-  evaluated (a computed key, a comprehension) is now `*`; an IaC name pattern needs three
-  letters or digits besides its wildcards (`*.*.*.*` matched any dotted name), and integer
-  arithmetic is exact, as Terraform's: a result past `u64` or below `i64`
+  `exact` name in written order, and a `for` whose collection contains an object whose keys are
+  known only once evaluated (a computed key, a comprehension) is now `*`; an IaC name pattern
+  needs three letters or digits besides its wildcards (`*.*.*.*` matched any dotted name), and
+  integer arithmetic is exact, as Terraform's: a result past `u64` or below `i64`
   (`0 - 18446744073709551615`), a division by zero or with a remainder (`7 / 2`) and arithmetic
   on a fraction leave that part of the name `*`, also on a `for` variable, where the evaluator
   printed a cast, wrapped or floating-point value as an `exact` name; such a value in a var file

@@ -118,9 +118,11 @@
   (`toset` gives a list too, so a list Terraform refuses cannot be told apart), and `toset` over
   mixed types keeps their first order. An object walks its keys in lexical order, as Terraform
   does: a value a name binds, a literal whose keys are written as names or strings, a `merge`,
-  anything `jsonencode` writes. A `for` over a collection that holds an object whose keys are
-  known only once evaluated (a computed key, a comprehension) is unresolved, even where the order
-  does not show (a `length` of it), and a template `%{ for }` directive is not evaluated (a `*`).
+  anything `jsonencode` writes. A `for` whose collection expression contains, anywhere, an object
+  whose keys are known only once evaluated (a computed key, a comprehension) is unresolved, even
+  where the order does not show (a `length` of the `for`, or a `values`, `lookup` or `jsonencode`
+  of that object inside the collection), and a template `%{ for }` directive is not evaluated (a
+  `*`). A file's own call of `meada_exact` is no function.
   A function over an unresolved argument is `*` whole, even
   `format` or `join`, which keep no literal part. A literal
   `*` in a name reads as a wildcard. A child module's variable default its call leaves is not
