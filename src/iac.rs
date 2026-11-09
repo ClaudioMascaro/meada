@@ -774,7 +774,12 @@ struct Exact<'a, 'c> {
 /// A `for` binding a key over `toset(...)`: Terraform's key is the element, Meada's set a list
 /// keyed by index.
 fn keyed_set(key: bool, collection: &Expression) -> bool {
-    key && matches!(collection, Expression::FuncCall(f) if f.name.name.as_str() == "toset")
+    key && match collection {
+        Expression::FuncCall(f) => f.name.name.as_str() == "toset",
+        Expression::Parenthesis(p) => keyed_set(key, p.inner()),
+        Expression::Conditional(c) => keyed_set(key, &c.true_expr) || keyed_set(key, &c.false_expr),
+        _ => false,
+    }
 }
 
 impl VisitMut for Exact<'_, '_> {
@@ -4301,9 +4306,20 @@ mod tests {
             "  name = \"q-${each.key}\"\n}\n",
             "resource \"a\" \"t\" { name = \"t-%{for k, v in toset([\"x\"])}${k}%{endfor}\" }\n",
             "resource \"a\" \"v\" { name = \"v-${[for v in toset([\"y\", \"x\"]) : v][0]}\" }\n",
+            "resource \"a\" \"p\" { name = \"p-%{for k, v in (toset([\"x\"]))}${k}%{endfor}\" }\n",
+            "resource \"a\" \"c\" {\n",
+            "  for_each = {for k, v in (true ? toset([\"x\"]) : []) : k => v}\n",
+            "  name = \"c-${each.key}\"\n}\n",
         );
         let got = names(&[("main.tf", main)]);
-        assert_eq!(got, ["a.q ~ \"q-*\"", "a.t ~ \"t-*\"", "a.v = \"v-x\""]);
+        let want = [
+            "a.q ~ \"q-*\"",
+            "a.t ~ \"t-*\"",
+            "a.v = \"v-x\"",
+            "a.p ~ \"p-*\"",
+            "a.c ~ \"c-*\"",
+        ];
+        assert_eq!(got, want);
     }
 
     /// A `for` over a conversion of an expanded argument (`var.l...`) costs as before: the list it
