@@ -75,6 +75,10 @@ a review finding.
   or `ambiguous`), never `exact`: #435 typed `?` and `.await` apart, and `f()?.await.port()` with
   `fn f() -> Result<Cfg>` linked `exact` to `Cfg.port`. This is review guidance, not a mechanical
   check.
+- **Same-route negatives.** A check that decides its answer by following routes (a name through
+  locals, a module argument, a declared type, an override) tests the negative case on each
+  route it follows: #720 kept a list exact only in a local, and a typed variable and an override
+  turned a set into a list unseen.
 
 ## Equivalence tests
 
