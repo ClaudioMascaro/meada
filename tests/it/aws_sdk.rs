@@ -843,6 +843,11 @@ fn dynamodb_transaction_entries_changed_after_they_are_made_name_no_table() {
         } else {
             ("", "", "")
         };
+        let java_held = if changed {
+            " if (prod) b.put(Put.builder().tableName(\"other\").build());"
+        } else {
+            ""
+        };
         let (java_check, go_check, cs_check) = if changed {
             (
                 " if (prod) c.tableName(\"new\");",
@@ -861,7 +866,8 @@ fn dynamodb_transaction_entries_changed_after_they_are_made_name_no_table() {
              import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;\n\
              class Changed {{\n\
              void put(boolean prod) {{ var db = DynamoDbClient.create(); var p = Put.builder().tableName(\"put-java\");{java} db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p.build()).build()).build()); }}\n\
-             void check(boolean prod) {{ var db = DynamoDbClient.create(); var c = ConditionCheck.builder().tableName(\"check-java\");{java_check} db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().conditionCheck(c.build()).build()).build()); }}\n}}\n"),
+             void check(boolean prod) {{ var db = DynamoDbClient.create(); var c = ConditionCheck.builder().tableName(\"check-java\");{java_check} db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().conditionCheck(c.build()).build()).build()); }}\n\
+             void held(boolean prod) {{ var db = DynamoDbClient.create(); var b = TransactWriteItem.builder().put(Put.builder().tableName(\"held-java\").build());{java_held} db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(b.build()).build()); }}\n}}\n"),
         )
         .unwrap();
         std::fs::write(
@@ -900,6 +906,7 @@ fn dynamodb_transaction_entries_changed_after_they_are_made_name_no_table() {
             "reader resource::dynamodb::check-cs",
             "reader resource::dynamodb::check-go",
             "reader resource::dynamodb::check-java",
+            "writer resource::dynamodb::held-java",
             "writer resource::dynamodb::put-cs",
             "writer resource::dynamodb::put-go",
             "writer resource::dynamodb::put-java",
@@ -911,6 +918,7 @@ fn dynamodb_transaction_entries_changed_after_they_are_made_name_no_table() {
             "reader resource::dynamodb",
             "reader resource::dynamodb",
             "reader resource::dynamodb",
+            "writer resource::dynamodb",
             "writer resource::dynamodb",
             "writer resource::dynamodb",
             "writer resource::dynamodb",
