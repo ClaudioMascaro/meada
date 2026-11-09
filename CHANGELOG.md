@@ -371,6 +371,10 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Terraform static evaluation charges the template text `hcl-rs` parses again at each
+  evaluation, not only the bytes an expression makes: a template in a `for` over thousands of
+  elements is unresolved (`*`) before it runs, where one 24 KB root took seconds per resource
+  and minutes in all. A template in a `for` over a few hundred elements still resolves (#714).
 - AWS SDK forms in Java, Go and C# follow the ADR 0026 rule TypeScript and Python already
   followed: an EventBridge entry without `EventBusName` produces to `default`, and an SNS
   publish to a phone number or endpoint names no topic. A request Meada cannot see whole (a

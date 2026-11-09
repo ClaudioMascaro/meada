@@ -228,8 +228,9 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
   `EXPANSION_MAX`; a `count` or `for_each` that reads a module output is evaluated before the
   module has instances, so it does not resolve.
 - **Ceilings.** Besides the ones above, `EVAL_VALUE_MAX` (64 KiB of one value), `EVAL_COST_MAX`
-  (1 MiB that one expression could make, an upper bound computed from the sizes of the values it
-  reads, products for a `for`, `formatlist`, `join` and `replace`) and `EVAL_WORK_MAX` (64 MiB of
+  (1 MiB of steps one expression could take, an upper bound computed from the sizes of the values
+  it reads, products for a `for`, `formatlist`, `join` and `replace`, and the template text
+  `hcl-rs` parses again at each evaluation) and `EVAL_WORK_MAX` (64 MiB of
   that cost per root module); past each, the value is unresolved. A `format` width past
   `WIDTH_MAX` (256) leaves the call unresolved.
 - **Evaluation unit.** A root module with the directories of the local modules it calls, however

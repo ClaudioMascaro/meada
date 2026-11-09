@@ -101,11 +101,19 @@ const OVERRIDABLE_MAX: usize = 32;
 // doubled at every step.
 const EVAL_VALUE_MAX: usize = 64 << 10;
 
-/// The bytes one expression may make at most (`cost`, an upper bound) for `hcl-rs` to evaluate
-/// it; past it the expression is unresolved, but for its template parts.
+/// The cost one expression may have at most (`cost`, an upper bound of its evaluation steps: a
+/// byte made or `TEMPLATE_PARSE_COST` of a template's text parsed) for `hcl-rs` to evaluate it;
+/// past it the expression is unresolved, but for its template parts.
 // ponytail: a `for` over a map of a few hundred entries costs a few hundred KiB; 1 MiB stops a
-// `for` inside a `for` over wide lists.
+// `for` inside a `for` over wide lists, and a template in a `for` before it takes a second.
 const EVAL_COST_MAX: usize = 1 << 20;
+
+/// The cost of one byte of a template's text at each evaluation: `hcl-rs` keeps a template as
+/// text and parses it again every time it evaluates it, so a template in a `for` is parsed once
+/// per element.
+// ponytail: measured on 2026-11-09 in a debug build, parsing takes 3 to 7 µs a byte of template
+// text, where the other steps take about 0.3 µs a unit of cost; 32 covers the slowest form.
+const TEMPLATE_PARSE_COST: usize = 32;
 
 /// The cost (`cost`) the evaluations of one root module may spend together; past it every value
 /// left is unresolved.
@@ -1390,11 +1398,12 @@ fn bound<'v>(t: &Traversal, roots: &'v Map<String, Value>) -> Option<&'v Value> 
     Some(v)
 }
 
-/// An upper bound of the bytes evaluating `expr` makes, its variables bound to `roots` and the
-/// iterator variables of the `for` around it to `iters` (a name and the most one element holds).
-/// A product (a `for`, `formatlist`, `join`, `replace`) multiplies, a function that may grow its
-/// input (a `format` width, `jsonencode`'s escapes, `split`'s quotes, a case change) grows it, and
-/// anything else adds up.
+/// An upper bound of the steps evaluating `expr` takes, its variables bound to `roots` and the
+/// iterator variables of the `for` around it to `iters` (a name and the most one element holds):
+/// the bytes it makes, and `TEMPLATE_PARSE_COST` a byte of each template's text each time it is
+/// evaluated. A product (a `for`, `formatlist`, `join`, `replace`) multiplies, a function that
+/// may grow its input (a `format` width, `jsonencode`'s escapes, `split`'s quotes, a case change)
+/// grows it, and anything else adds up.
 fn cost(expr: &Expression, roots: &Map<String, Value>, iters: &mut Vec<(String, usize)>) -> usize {
     let add = |a: usize, b: usize| a.saturating_add(b);
     match expr {
@@ -1410,8 +1419,13 @@ fn cost(expr: &Expression, roots: &Map<String, Value>, iters: &mut Vec<(String, 
                 add(key, cost(v.expr(), roots, iters))
             })
             .fold(2, add),
-        Expression::StringTemplate(t) => template_cost(t, roots, iters),
-        Expression::HeredocTemplate(h) => template_cost(&h.template, roots, iters),
+        Expression::StringTemplate(t) => {
+            add(parse_cost(t.span(), t), template_cost(t, roots, iters))
+        }
+        Expression::HeredocTemplate(h) => add(
+            parse_cost(h.span(), &h.template),
+            template_cost(&h.template, roots, iters),
+        ),
         Expression::Parenthesis(p) => cost(p.inner(), roots, iters),
         Expression::Variable(v) => match iters.iter().rev().find(|(n, _)| n == v.as_str()) {
             Some((_, n)) => *n,
@@ -1470,6 +1484,13 @@ fn cost(expr: &Expression, roots: &Map<String, Value>, iters: &mut Vec<(String, 
             n.saturating_mul(body)
         }
     }
+}
+
+/// What parsing the template `t` again costs at one evaluation, its text spanning `span` (a
+/// template built rather than read has none, so its text is written out).
+fn parse_cost(span: Option<std::ops::Range<usize>>, t: &Template) -> usize {
+    let len = span.map_or_else(|| t.to_string().len(), |s| s.len());
+    len.saturating_mul(TEMPLATE_PARSE_COST)
 }
 
 fn template_cost(
@@ -4436,6 +4457,50 @@ mod tests {
             )]
         );
         assert!(took < std::time::Duration::from_secs(20), "{took:?}");
+    }
+
+    /// `hcl-rs` parses a template again at each evaluation, so a template of `k` interpolations
+    /// in a `for` over `m` elements takes time in `m * k` however few bytes it makes: its steps
+    /// are charged too, so at `m = 8000, k = 40` (9 s in a debug build before) it is unresolved
+    /// before it runs, alone or 64 times in a root, with no resource left out; over 100 elements
+    /// it still resolves.
+    #[test]
+    fn a_template_in_a_wide_for_is_bounded_by_its_steps() {
+        let body = "${a}".repeat(40);
+        let root = |m: usize, n: usize| {
+            let items = vec!["\"a\""; m].join(", ");
+            let tfvars = format!("items = [{items}]\n");
+            let resources: String = (0..n)
+                .map(|i| {
+                    format!(
+                        "resource \"aws_sqs_queue\" \"r{i}\" {{\n  name = \"q-${{length([for a in var.items : \"{body}\"])}}\"\n}}\n"
+                    )
+                })
+                .collect();
+            let main = format!("variable \"items\" {{}}\n{resources}");
+            let start = std::time::Instant::now();
+            let got = names(&[("main.tf", &main), ("terraform.tfvars", &tfvars)]);
+            (got, start.elapsed())
+        };
+        let (fast, _) = root(100, 1);
+        assert_eq!(
+            fast,
+            ["aws_sqs_queue.r0 = \"q-100\" [var.items terraform.tfvars:1 tfvars]"]
+        );
+        for (n, bound) in [(1, 1), (64, 4)] {
+            let (got, took) = root(8000, n);
+            assert_eq!(got.len(), n);
+            let fine = |s: &String| {
+                s.ends_with(" = \"q-8000\" [var.items terraform.tfvars:1 tfvars]")
+                    || s.ends_with(" ~ \"q-*\"")
+                    || s.ends_with(" ~ \"*\"")
+            };
+            assert!(got.iter().all(fine), "{got:?}");
+            assert!(
+                took < std::time::Duration::from_secs(bound),
+                "{n}: {took:?}"
+            );
+        }
     }
 
     /// Converting an object literal for `hcl-rs` checks each key against those before it, so
