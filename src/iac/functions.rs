@@ -59,8 +59,8 @@ pub(super) fn declare(ctx: &mut Context) {
         ("merge", variadic(vec![], ParamType::nullable(map()), merge)),
         ("length", fixed(vec![Any], length)),
         ("toset", fixed(vec![list()], toset)),
-        ("tolist", fixed(vec![list()], |a| Ok(a[0].clone()))),
-        ("tomap", fixed(vec![map()], |a| Ok(a[0].clone()))),
+        ("tolist", fixed(vec![list()], tolist)),
+        ("tomap", fixed(vec![map()], tomap)),
         ("tostring", fixed(vec![Any], tostring)),
         ("tonumber", fixed(vec![Any], tonumber)),
         ("jsonencode", fixed(vec![Any], jsonencode)),
@@ -334,27 +334,72 @@ fn length(args: FuncArgs) -> Out {
 }
 
 /// The distinct elements of a list in the order of cty's sets: strings bytewise, numbers by value,
-/// `false` before `true`, a null last. Strings with numbers or bools make a set of strings. A
-/// number with a bool has no common type, and a set of collections is in hash order: both are
+/// `false` before `true`, a null last, after `unified`. A set of collections is in hash order:
 /// unresolved.
 fn toset(args: FuncArgs) -> Out {
     let list = args[0].as_array().map_or(&[][..], Vec::as_slice);
-    let (nulls, mut items): (Vec<_>, Vec<_>) = list.iter().cloned().partition(Value::is_null);
+    let (nulls, mut items): (Vec<_>, Vec<_>) = unified(list)?.into_iter().partition(Value::is_null);
     if items.iter().any(|v| v.is_array() || v.is_object()) {
         return Err("the order of a set of collections".into());
-    }
-    if items.iter().any(Value::is_string) {
-        items = items
-            .iter()
-            .map(|v| Value::String(shown(v).unwrap_or_default()))
-            .collect();
-    } else if items.iter().any(|v| v.as_bool().is_some()) && items.iter().any(Value::is_number) {
-        return Err("a set of numbers and bools".into());
     }
     items.sort_unstable_by(order);
     items.dedup_by(|a, b| order(a, b).is_eq());
     items.extend(nulls.into_iter().take(1));
     Ok(Value::Array(items))
+}
+
+fn tolist(args: FuncArgs) -> Out {
+    unified(args[0].as_array().map_or(&[][..], Vec::as_slice)).map(Value::Array)
+}
+
+fn tomap(args: FuncArgs) -> Out {
+    let Some(map) = args[0].as_object() else {
+        return Ok(args[0].clone());
+    };
+    let values = unified(&map.values().cloned().collect::<Vec<_>>())?;
+    Ok(Value::Object(map.keys().cloned().zip(values).collect()))
+}
+
+/// Elements converted to one type, as cty does for a list, set or map: of one type (a null aside)
+/// they stay as they are, and scalars with a string become strings. A number with a bool has no
+/// common type (Terraform refuses it), and collections of differing types are unresolved.
+fn unified(items: &[Value]) -> Result<Vec<Value>, String> {
+    let given: Vec<&Value> = items.iter().filter(|v| !v.is_null()).collect();
+    let scalars = given.iter().all(|v| !(v.is_array() || v.is_object()));
+    if scalars && given.iter().any(|v| v.is_string()) {
+        let text = |v: &Value| shown(v).map_or(Value::Null, Value::String);
+        return Ok(items.iter().map(text).collect());
+    }
+    let first = given.first().map(|v| type_of(v));
+    if given.iter().any(|v| Some(type_of(v)) != first) {
+        return Err("elements of no one type".into());
+    }
+    Ok(items.to_vec())
+}
+
+/// A value's type as a text two values share exactly when cty gives them one type: a list whose
+/// elements share a type is a list of it, whatever its length.
+fn type_of(v: &Value) -> String {
+    match v {
+        Value::Null => "null".into(),
+        Value::Bool(_) => "bool".into(),
+        Value::Number(_) => "number".into(),
+        Value::String(_) => "string".into(),
+        Value::Array(items) => {
+            let types: Vec<String> = items.iter().map(type_of).collect();
+            match &types[..] {
+                [first, rest @ ..] if rest.iter().all(|t| t == first) => format!("list({first})"),
+                _ => format!("tuple({})", types.join(",")),
+            }
+        }
+        Value::Object(map) => {
+            let mut entries: Vec<String> = (map.iter())
+                .map(|(k, v)| format!("{k:?}:{}", type_of(v)))
+                .collect();
+            entries.sort_unstable();
+            format!("object({})", entries.join(","))
+        }
+    }
 }
 
 /// Two scalars of one type as cty orders them in a set.
