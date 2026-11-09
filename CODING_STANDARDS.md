@@ -86,6 +86,13 @@ that changes only part of the path leaves the rest comparing the code with itsel
 `community` and `duplicate`, the contract-site spans, the `context` community line and the trace
 starts could not fail. No tool checks this; a PR without the mutation is a review finding.
 
+Code that skips, caches or narrows work (a kept group, a fast path, a cache hit) also carries
+one test that goes red when the path is forced off (it keeps nothing, caches nothing), because
+equivalence tests pass with the optimization disabled: the answer is right, only slow. In #391
+a refresh that kept no group passed every test until `a_refresh_does_not_parse_a_kept_group_again`
+went red with `kept_groups` forced empty. The PR names that mutation and the test it turned red,
+and a PR without them is a review finding, not a mechanical check.
+
 ## Hostile input
 
 A reader of a file the repository holds (a provider document, a config, a source file) treats
