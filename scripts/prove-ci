@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Capture the selected prove-meada surfaces in Actions; --selftest runs no product code."""
+
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+from unittest.mock import patch
+
+
+SCRIPTS = Path('.claude/skills/prove-meada/scripts')
+SURFACES = ('cli', 'console', 'accounts', 'deploy', 'container', 'goldens')
+
+
+def scope_from_env():
+    if os.environ.get('GITHUB_ACTIONS') != 'true':
+        raise ValueError('E2E runs only in GitHub Actions; use scripts/check locally')
+    scope = {}
+    for name in SURFACES:
+        value = os.environ.get('PROVE_' + name.upper(), 'false')
+        if value not in ('true', 'false'):
+            raise ValueError(f'invalid surface: {name}')
+        scope[name] = value == 'true'
+    if scope['accounts'] and not scope['console'] or scope['console'] and not scope['cli']:
+        raise ValueError('accounts requires console, and console requires CLI parity data')
+    for name in ('BASE', 'HEAD'):
+        if not re.fullmatch(r'[0-9a-f]{40}', os.environ.get('PROVE_' + name, '')):
+            raise ValueError(f'PROVE_{name} must be a commit SHA')
+    if not any(scope.values()):
+        raise ValueError('no E2E surface selected')
+    return scope
+
+
+def capture(run, scope, base, head, repos):
+    run.mkdir(parents=True, exist_ok=False)
+    (run / 'logs').mkdir()
+    steps = []
+    blocked = None
+    python = sys.executable
+
+    def command(name, args, required=False):
+        with (run / 'logs' / (name + '.log')).open('w') as log:
+            result = subprocess.run([str(arg) for arg in args], stdout=log, stderr=subprocess.STDOUT)
+        steps.append({'name': name, 'exit_code': result.returncode})
+        print(f'{name}: exit {result.returncode}', flush=True)
+        if required and result.returncode:
+            raise RuntimeError(f'{name} failed; see logs/{name}.log')
+
+    try:
+        if scope['cli']:
+            command('build-head', [SCRIPTS / 'build.sh', 'head', '.', run], required=True)
+            command('build-base', [SCRIPTS / 'build.sh', 'base', base, run], required=True)
+            command('cli-mcp', [python, SCRIPTS / 'prove.py', 'run', '--base-bin', run / 'bin/meada-base',
+                               '--head-bin', run / 'bin/meada-head', '--repos', repos, '--run', run, '--http'])
+        if scope['console']:
+            # The base can leave same-version core artifacts in the shared Cargo target.
+            command('clean-console-core', ['cargo', 'clean', '-p', 'meada-core', '--target-dir',
+                                          os.environ.get('CARGO_TARGET_DIR', str(Path.cwd() / 'target'))], required=True)
+            command('build-console', [SCRIPTS / 'build.sh', 'head-ui', '.', run,
+                                     'ui,accounts' if scope['accounts'] else 'ui'], required=True)
+            command('console-start', [python, SCRIPTS / 'console.py', 'start', '--bin', run / 'bin/meada-head-ui',
+                                      '--run', run, '--ui-dir', 'ui/dist',
+                                      *(['--accounts'] if scope['accounts'] else [])], required=True)
+            command('console-api', [python, SCRIPTS / 'console.py', 'api', '--run', run])
+            command('console-pages', ['node', SCRIPTS / 'console-pages.mjs', run])
+        if scope['goldens']:
+            command('goldens', [python, SCRIPTS / 'prove.py', 'rebless', '--base', base, '--run', run])
+        if scope['deploy']:
+            command('deploy-diff', [python, SCRIPTS / 'prove.py', 'deploy', '--base', base, '--run', run])
+            command('compose-contract', [python, 'scripts/compose-check'])
+            command('helm-contract', [python, 'scripts/helm-check'])
+        if scope['container']:
+            command('container-build', ['docker', 'build', '-t', 'meada:zz-prove', '.'], required=True)
+            command('container-smoke', [python, 'scripts/container-smoke', 'meada:zz-prove'])
+    except (OSError, RuntimeError) as error:
+        blocked = str(error)
+    finally:
+        # These clean only this run's processes, indexes and signing key. Evidence stays.
+        try:
+            if scope['console']:
+                command('console-stop', [python, SCRIPTS / 'console.py', 'stop', '--run', run])
+            command('clean', [python, SCRIPTS / 'prove.py', 'clean', run])
+        except OSError as error:
+            blocked = blocked or str(error)
+        (run / 'console/private.pem').unlink(missing_ok=True)
+        blocked = blocked or next((f"{step['name']} reported BLOCKED" for step in steps
+                                   if step['exit_code'] == 2), None)
+        failed = blocked is not None or any(step['exit_code'] for step in steps)
+        receipt = {
+            'base': base, 'head': head, 'surfaces': [name for name in SURFACES if scope[name]],
+            'repos': repos, 'run_url': os.environ.get('PROVE_RUN_URL'), 'steps': steps,
+            'capture': 'BLOCKED' if blocked else 'FAILED' if failed else 'CAPTURED',
+            'verdict': 'UNPROVEN', 'blocked': blocked,
+            'not_covered': ['Semantic judgment of new flows and expected differences requires the spec and source.',
+                            'Mutation audits run only through an explicitly requested audit phase.'],
+        }
+        (run / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+        summary = f"E2E capture: {receipt['capture']}; semantic verdict: UNPROVEN.\nBase: {base}\nHead: {head}\n"
+        (run / 'summary.md').write_text(summary)
+        if os.environ.get('GITHUB_STEP_SUMMARY'):
+            with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+                output.write(summary)
+    return 2 if blocked else int(failed)
+
+
+def selftest():
+    with patch.dict(os.environ, {}, clear=True):
+        try:
+            scope_from_env()
+        except ValueError as error:
+            assert 'GitHub Actions' in str(error)
+        else:
+            raise AssertionError('local E2E must be refused')
+    scope = dict.fromkeys(SURFACES, False)
+    scope['cli'] = True
+    for code, expected in ((0, 'CAPTURED'), (1, 'FAILED'), (2, 'BLOCKED')):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
+            def fake(args, **kwargs):
+                return subprocess.CompletedProcess(args, code if 'run' in args else 0)
+            with patch('subprocess.run', side_effect=fake):
+                run = Path(temp) / 'proof'
+                result = capture(run, scope, 'a' * 40, 'b' * 40, 'meada')
+            receipt = json.loads((run / 'receipt.json').read_text())
+            assert bool(result) == bool(code) and receipt['capture'] == expected
+            assert receipt['verdict'] == 'UNPROVEN' and receipt['head'] == 'b' * 40
+            assert receipt['steps'][-1]['name'] == 'clean'
+    with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
+        with patch('subprocess.run', return_value=subprocess.CompletedProcess([], 1)):
+            run = Path(temp) / 'proof'
+            assert capture(run, scope, 'a' * 40, 'b' * 40, 'meada') == 2
+        assert json.loads((run / 'receipt.json').read_text())['capture'] == 'BLOCKED'
+    with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
+        scope['console'] = True
+        with patch('subprocess.run', return_value=subprocess.CompletedProcess([], 0)):
+            run = Path(temp) / 'proof'
+            assert capture(run, scope, 'a' * 40, 'b' * 40, 'meada') == 0
+        names = [step['name'] for step in json.loads((run / 'receipt.json').read_text())['steps']]
+        assert names.index('build-base') < names.index('clean-console-core') < names.index('build-console')
+        assert names[-2:] == ['console-stop', 'clean']
+    print('prove-ci selftest: local guard, capture status, failure retention and cleanup passed')
+
+
+def main():
+    if sys.argv[1:] == ['--selftest']:
+        selftest()
+        return 0
+    if sys.argv[1:]:
+        raise ValueError('usage: scripts/prove-ci [--selftest]')
+    scope = scope_from_env()
+    head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+    if head != os.environ['PROVE_HEAD']:
+        raise ValueError('checkout differs from the selected head')
+    if subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], text=True).strip():
+        raise ValueError('E2E requires an unchanged checkout')
+    return capture(Path(os.environ['PROVE_RUN']).resolve(), scope, os.environ['PROVE_BASE'], head,
+                   os.environ.get('PROVE_REPOS', 'all'))
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except (ValueError, OSError) as error:
+        sys.exit(str(error))

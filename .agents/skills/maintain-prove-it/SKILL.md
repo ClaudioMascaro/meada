@@ -1,6 +1,6 @@
 ---
 name: maintain-prove-it
-description: Improve a repo's generated verification skill from what its past runs learned. Works on both kinds made by /create-prove-it, the permanent prove-<app> and a temporary prove-<migration>. Reads the receipts in .prove-it/runs/ (failed and blocked steps, retries, the commands that finally worked, steps that failed for reasons unrelated to the change, how each change was sorted into checks) and any bug that slipped past prove, then fixes drifted steps, writes in the working commands, adds the check that would have caught a slipped bug and a section for any new surface. For a temporary skill it checks whether the migration is done and, if so, suggests the end step. Never rewrites an answer key (spec, snapshot, old system) to match the app. Proves every edit live and reports product bugs without touching product code. Use for /maintain-prove-it, "update the verify skill", "the verifier is out of date", "prove missed this bug", "prove keeps failing on unrelated steps", or after a big merge or migration milestone.
+description: Maintain verification steps from prior receipts and reported misses while preserving independent answer keys and the AGENTS.md execution policy. Use when explicitly asked to update a stale verifier or investigate a verifier miss. Validate documentation and harness changes with static and self-checks; product E2E stays on its permitted CI path.
 ---
 
 # Maintain Prove It
@@ -12,8 +12,8 @@ A verification skill goes stale the day the app changes: a route moves, a button
 - **Only edit the skill's own folder** (SKILL.md, scripts/). Never change product code here.
 - **When the app and the skill disagree, work out which one is wrong.** The skill describing something the app no longer does is either *drift* (the app changed on purpose: fix the skill) or a *product bug* (the app broke: report it, don't rewrite the skill to match the bug). Read the commit that changed it. If you still can't tell, ask.
 - **Answer keys are not the skill's steps.** The user's spec, the snapshots in `.prove-it/snapshots/` and the old system a flow is compared with say what right looks like. A drifted step can be fixed, but an answer key that disagrees with the app is reported to the user, never rewritten to match. Only the user changes one.
-- **Every edit you make to the skill gets proved live before you finish.** An unproven edit is just more drift.
-- **Old verdicts are leads, not evidence.** Earlier receipts, closed tickets and status docs tell you where to look. Only this pass's live runs count.
+- **Validation follows `AGENTS.md`.** Skill and harness edits get pertinent static and self-checks locally, E2E `N/A` in the normal validation summary and no proof receipt. Product E2E runs only through the selected CI path, never because a skill changed.
+- **Evidence retains its identity.** Earlier receipts and artifacts keep their tested SHA and scope. They are leads for new behavior, not proof of HEAD. Pending product evidence remains pending; `CAPTURED` is never `PROVED`.
 - **Never loosen a check to make a flaky step pass.** Record the failing run, then decide whether the app has a race or the check is ambiguous.
 
 ## 1. Find the skill
@@ -32,7 +32,7 @@ List the receipts in `.prove-it/runs/`, newest first. Start from the runs since 
 - **What the change touches**: each flow the run listed as new or existing, its answer key, and any smoke test. A run that checked the whole app, skipped an existing flow behind shared code the change touched, or checked a new flow on parity alone when the change edited both sides, means the Sort checklist or the Scope map's shared-code rows need fixing.
 - **Answer keys used**: new flows marked `no answer key` again and again means specs aren't reaching the skill. Say so, and suggest where the user could put them (the PR body, a file in the diff).
 
-If there are no receipts, say so. Then the only inputs are reported bugs (step 4) and a fresh run on the current change.
+If there are no receipts, say so. Then use reported bugs (step 4), source history and static/self-checks. Report absent product evidence as pending.
 
 ## 3. For a temporary skill, check whether the migration is done
 
@@ -58,28 +58,30 @@ Turn the notes into a list of edits, each tied to the receipt or bug that shows 
 - **Answer key disagrees with the app**: a spec line, a snapshot or the old system no longer matches what the app does. Don't touch it. Report it with the evidence, and the commit that changed the behaviour, so the user can decide whether the app or the answer key is wrong.
 - **Product bug**: the app is really broken. Record it with the evidence. It is for the user, not this pass.
 
-## 6. Edit and prove live
+## 6. Edit and validate under the repository policy
 
-Make the edits. Then use the skill exactly as written: start, health check, and drive every step you touched, plus at least one break-it probe for each slipped-bug check you added. Where you can, also re-run the Scope step on the diff of a recent receipt and confirm it now names the surfaces that run needed. Save receipts in `.prove-it/runs/` as usual.
+Make the edits, then run pertinent static and harness self-checks. Re-run Scope on a recent
+receipt's diff and confirm it names the intended surfaces and answer keys. Check that local
+invocation prepares CI inputs or reads artifacts, and that docs-only edits do not activate E2E.
+Report E2E `N/A` in the ordinary validation summary; do not create a proof receipt for this edit.
 
-When a step fails:
+For a slipped-bug check, prepare the failing-version case for the selected CI runner and retain
+the independent oracle. It counts as product proof only when CI evidence shows it fails on the
+broken version and passes on the fixed version, with their original SHAs. Until then, say the
+new check is statically validated and product evidence pending. Missing prerequisites are
+`BLOCKED`; a product disagreement is `BROKEN`. Report product bugs without changing product code
+or answer keys. Keep cleanup and evidence-retention steps in the CI recipe.
 
-1. Run the health check. If the instance itself is broken, fix the Start or Health section first, restart, and try again.
-2. If the app works but the skill's step is wrong (a selector, a route, a command), that's drift: fix the step and re-drive it.
-3. If the app is really broken, that's a product bug: record it with the evidence and move on.
-4. If you can't reach a surface (missing account, missing service), record the exact prerequisite and the route you tried. If the skill didn't mention that prerequisite, that's drift too. Retry previously blocked surfaces whenever the tooling has changed (new seed data, a new driver, a sandbox).
-
-A new check for a slipped bug counts only if it fails on the broken code. If the broken version is still in history, check it out in a scratch worktree under `/tmp` and run the check there. Otherwise suggest `/audit-prove-it` plant that bug next time.
-
-Clean up after the last drive, including after failed attempts. Then check the evidence is still there and nothing you started is still running.
+A manual mutation audit is a separate explicit `workflow_dispatch` request. Do not plant a bug
+locally or start an audit merely to validate a skill text edit.
 
 ## 7. Report
 
-- **Outcome:** `current` (nothing needed changing), `updated` (the skill changed, and every change was proved live) or `blocked` (say exactly what stopped you).
+- **Outcome:** `current` (nothing needed changing), `updated` (the skill changed and its pertinent static/self-checks passed; name pending product evidence) or `blocked` (say exactly what stopped you).
 - What changed in the skill, one line each, with the receipt or bug that called for it.
 - Product bugs found, with evidence. These are for the user to fix, not this pass.
 - Answer keys that disagree with the app, and answer keys you propose, for the user to approve.
 - For a temporary skill: whether the migration looks done, the evidence, and whether you suggested the end step.
 - Surfaces left unproven and why.
 
-If the repo uses git, leave the skill changes uncommitted unless the user asks you to commit.
+Follow the repository's commit policy after the applicable gate passes.

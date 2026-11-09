@@ -30,23 +30,34 @@ write tools; one index per repository; determinism) live in
 ## Workflow
 
 - Conventional Commits.
-- Gate before every commit: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo test`; for a change under a cloud module's feature `<f>` (ADR 0012), also
-  `cargo clippy --all-targets --features <f> -- -D warnings` and `cargo test --features <f>` (CI's
-  `clippy-features` matrix runs the clippy half for every feature alone and for the pairs the code
-  gates on).
-- Before a change is called done, `/prove-meada` runs on it and the PR body's Evidence section
-  names its receipt (`.prove-it/runs/`, kept out of git); a change whose diff reaches a surface of
-  the skill's Scope table is not done on a BROKEN verdict.
+- Local gate before every commit: `gate --staged` delegates to `scripts/check`, selecting checks
+  from the staged diff or, on a clean tree, the last commit. Docs, agent instructions and harness
+  configuration get pertinent static checks and harness self-checks, without rebuilding the
+  product, running its full suite or producing a `.prove-it` receipt. Unknown or product paths
+  conservatively run the full applicable gate: fmt, clippy and tests, plus the relevant cloud
+  feature checks (ADR 0012). Heavy commands run through `bounded`; see the local workflow policy.
+- Product E2E runs only in GitHub Actions, for a relevant large implementation marked with the
+  `e2e` label on a non-draft PR. Locally, `/prove-meada` prepares the scope and answer keys or
+  reads CI evidence; it does not build or start the product. Docs-only follow-up commits also
+  skip E2E. Existing artifacts retain their original SHA; pending evidence stays pending.
+- For E2E, the PR Evidence section identifies the workflow run, tested SHA and artifact or
+  receipt. Capture is not judgment: `CAPTURED` is never `PROVED`, and a relevant surface is not
+  done on a `BROKEN` verdict. Without the required CI evidence, report what remains pending.
+  For docs, instructions or harness-only validation, report E2E `N/A` in the ordinary validation
+  summary, without creating a `.prove-it` receipt.
+- Mutation audits are explicit manual GitHub Actions `workflow_dispatch` runs, never an
+  automatic task-completion step or a consequence of editing a skill.
 - `.githooks/` runs part of the gate locally: `cargo fmt --check` and no em dash in staged
   Markdown on commit; on push, a check against the maintainer's private-term list. Enable it
   once per clone with `git config core.hooksPath .githooks`.
 - Prose separates clauses with commas, colons or parentheses rather than em dashes.
 - Decisions are recorded as ADRs in `docs/adr/`.
 - Domain terms are defined in `GLOSSARY.md`. Use them in code, docs and issues.
-- Repository map in `docs/agents/architecture.md`: read it before exploring or changing code, then
-  the area file in `docs/agents/map/` that the map names for the area being changed. The
-  limits of the code are in `docs/agents/ceilings.md`: read it when a limit is touched. A
+- Repository routing index in `docs/agents/architecture.md`: read it before exploring or changing
+  code, then follow its area index and read the topics relevant to the change. A split index is
+  navigation, not a request to read every leaf. Read the relevant extension and invariant details
+  it names when changing a seam. The limits of the code are in `docs/agents/ceilings.md`: follow
+  it to the relevant limit topic when a limit is touched. A
   `docs/agents` file past its size budget (`tests/it/docs.rs` names it) is split in the same PR
   with `cargo run --example split_agents -- <file>`, never trimmed by dropping entries.
 - Coding standards in `CODING_STANDARDS.md`: read them before writing or reviewing resolution, a

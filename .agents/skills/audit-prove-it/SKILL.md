@@ -1,17 +1,30 @@
 ---
 name: audit-prove-it
-description: Try to fool a repo's verification skill, either kind made by /create-prove-it (the permanent prove-<app> or a temporary prove-<migration>). Plants one deliberate bug at a time in the files the current change touched (or along a flow the user names), and for a migration only in the new system, never the old one it is compared with. A fresh agent then checks that change or flow with the skill and its answer keys, without knowing what was planted. Records whether it caught the bug, reverts exactly, and reports every miss with a suggested fix to the skill and to the flow's answer key. Use for /audit-prove-it, "can the verifier be fooled", "test the verify skill", "is our verification any good", "mutation test the verifier", or after creating or heavily editing a prove-* skill.
+description: Prepare or review an explicitly requested mutation audit of a verification skill. Product mutation audits run only through the manual GitHub Actions workflow_dispatch path in AGENTS.md, with one bug at a time, independent blind judgment and exact restoration. Never activate because a task ended or a skill changed.
 ---
 
 # Audit Prove It
 
 A verification skill that says PROVED on a broken app is worse than none: it gives false confidence. The only way to know it works is to break the app on purpose and see if it notices. This skill does that, safely, and reports every bug that slipped past.
 
-## Safety first
+## Activation and execution
+
+Read `AGENTS.md` first. Locally, prepare the target, baseline evidence, mutation plan and blind
+checker brief, or review a named CI artifact at its tested SHA. Product execution and mutation
+steps below are recipes for an explicitly requested manual GitHub Actions `workflow_dispatch`
+run, isolated from shared instances. Do not plant bugs or start products locally, and do not
+launch an audit as a consequence of a skill edit or task completion. An audit request does not
+authorize external writes beyond the user's explicit authorization.
+
+Skill or harness edits receive static/self-checks, E2E `N/A` in the ordinary validation summary
+and no proof receipt. Existing captures retain their original SHA; pending baseline, mutation
+or independent-judge evidence stays pending. `CAPTURED` is never `PROVED` or a successful audit.
+
+## Safety first (CI runner)
 
 You are about to edit product code on purpose. These rules keep that from hurting anyone:
 
-- **Only in a git repo, only on local files.** Never against a shared, staging or production instance.
+- **Only in the isolated CI git checkout.** Never against a shared, staging or production instance.
 - **Back up before you plant.** The files a change touched usually have uncommitted work in them, and `git checkout` would throw it away. Before planting, copy the file byte for byte to `.prove-it/audits/<UTC timestamp>/originals/<path>`. Revert by copying it back. This is what makes the revert exact.
 - **One planted bug at a time.** Plant, check, revert, confirm the revert, then the next.
 - **Confirm every revert** with `cmp <backup> <file>` (exit 0) before moving on. If it doesn't match, stop everything and restore from the backup. Never use `git checkout` on a file that had uncommitted changes.
@@ -27,7 +40,7 @@ Work out the target. By default it is the current change: the files touched by u
 
 Record `git status --porcelain` so you can compare at the end.
 
-Run the skill once on the untouched target. **It must come back PROVED.** If the clean change already fails, any "catch" later means nothing. Fix that first, or suggest `/maintain-prove-it`, and leave the failing surface out of the audit. Note the surfaces and flows the baseline receipt drove, and how it sorted each one (new or existing flow, and the answer key): that is the scope you hand the blind checker.
+Use the explicitly dispatched CI run to execute the skill once on the untouched target. **It must come back PROVED.** If the clean change already fails, any "catch" later means nothing. Fix that first, or suggest `/maintain-prove-it`, and leave the failing surface out of the audit. Note the surfaces and flows the baseline receipt drove, and how it sorted each one (new or existing flow, and the answer key): that is the scope you hand the blind checker.
 
 ## 2. Plan the bugs
 
@@ -41,7 +54,7 @@ Each bug must be:
 
 Write the plan as a table before you touch anything: id, flow, layer, file, the change, what a user would see.
 
-## 3. Plant, check blind, revert
+## 3. Plant, check blind, revert (manual CI runner)
 
 For each bug:
 
@@ -51,6 +64,10 @@ For each bug:
 4. **Revert** by copying the backup over the file, confirm with `cmp`, run the skill's clean-up so no planted-bug instance stays alive.
 
 ## 4. Report
+
+Local preparation reports the planned scope and missing CI evidence, without manufacturing an
+audit receipt or score. Review only captures with a matching target SHA and an independent
+blind judgment; a pending judgment keeps the audit pending.
 
 Restore check first: `git status --porcelain` matches the start. Then run the skill once more on the clean target. Any BROKEN verdict now is a false alarm, and it goes in the report too: a verifier that cries wolf gets ignored.
 
@@ -77,6 +94,6 @@ For each miss, the fix is about the skill, never the app. Typical fixes: check s
 
 ## 5. Offer to close the gaps
 
-Ask the user whether to apply the fixes. If yes, edit only the skill's folder, then re-plant just the missed bugs and run the blind check again. A fix counts only when the re-run catches the bug. Revert and confirm as before. Add the bug that used to slip through to the skill's "Could fool you" notes for that surface, along with what now catches it.
+Ask the user whether to apply the fixes. If yes, edit only the skill's folder and run its static/self-checks. Prepare just the missed bugs for a separately authorized manual CI re-run of the blind check. A fix counts only when the re-run catches the bug. Revert and confirm as before. Add the bug that used to slip through to the skill's "Could fool you" notes for that surface, along with what now catches it.
 
 A miss often means the answer key never named the behaviour, so fixing the check alone leaves the next agent free to miss it again. With the user's OK, also add the missed behaviour to the flow's answer key: a line the user adds to their spec, a new snapshot in `.prove-it/snapshots/` taken from the clean code, or, for a migration, a new case run through the old system. If the flow had no answer key, propose one. Never change an answer key without that OK.

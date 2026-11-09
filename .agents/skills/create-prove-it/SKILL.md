@@ -1,11 +1,11 @@
 ---
 name: create-prove-it
-description: Generate a project-local verification skill that an agent runs at the end of a change, before it says done. It asks first whether the skill is for the app or for a migration. For the app it writes or extends one permanent prove-<app> skill with a section per surface (web, API, MCP, CLI), and a new surface adds a section, not a new skill. For a migration (Python to Rust, Next.js to React Router) it writes a temporary prove-<migration> skill that runs old and new side by side, then hands its cases to prove-<app> as snapshots when the old system is deleted. It checks what the change touches (the new flows it adds and the existing flows it touched), each against an answer key the builder did not write, such as an old system, a snapshot, a test suite or the user's spec. Use for /create-prove-it, "set up verification", "make a verify skill for this repo", "I'm adding an MCP server" or any new surface, "verify this migration", or "the agent keeps saying done without testing".
+description: Create or extend an app or migration verification skill with independent answer keys, scoped checks and evidence review that follow the repository's AGENTS.md execution policy. Use when explicitly asked to set up verification or add a verification surface.
 ---
 
 # Create Prove It
 
-You are about to give this repo a skill that makes every future agent prove its work in the running app, instead of saying "done" because the code looks right or the tests pass.
+Create a verification skill whose activation and execution follow the repository's `AGENTS.md` policy, with independent answer keys and explicit evidence limits.
 
 The output is a project-local skill, read cold by a future agent in the middle of some other task. Write it for that reader: exact commands, real selectors, no placeholders, nothing it has to work out.
 
@@ -17,10 +17,15 @@ The steps, in order:
 3. Find the answer keys
 4. Brainstorm methods, then let the user pick
 5. Generate the skill
-6. Run it once for real
+6. Validate through the permitted execution path
 7. Hand over
 
-Don't skip step 6. A verification skill nobody has run is a guess.
+Read `AGENTS.md` before step 1. It owns validation scope and where product execution is allowed.
+In this repository, product E2E runs only in GitHub Actions for selected large implementations:
+locally prepare inputs or review artifacts. Skill, documentation and harness-only edits get static
+and self-checks, E2E `N/A` in the normal validation summary and no proof receipt. Keep existing
+pending evidence pending. Manual mutation audits require explicit `workflow_dispatch`; never
+schedule one because this generator ran or its output changed.
 
 Every check has three parts: a **surface** (where a real user or program meets the change), an **answer key** (what right looks like, written by someone other than the agent that made the change) and a **comparison** (does what happened match the answer key).
 
@@ -31,7 +36,7 @@ The generated skill checks what the change touches: every flow the change touche
 - **A new flow**: the change adds it. If it copies something that exists (an MCP server that must behave like the web app), the answer key is parity with that thing: the same action through both, then compare the data. Otherwise the answer key is the user's spec. If the same change edits both the new flow and the thing it copies, use the spec AND parity, because both can be wrong the same way and parity still passes.
 - **An existing flow** the change touched, directly or through shared code (schema, auth, nav, a shared component or function). The answer key is the app before the change: a snapshot, or the old version run beside the new one.
 
-A change made only of new files still gets a quick smoke test of the existing app: it starts and its main flow works.
+A selected product E2E change made only of new files gets a smoke test of the existing app through the permitted execution path. Documentation or harness files do not activate product checks.
 
 Never "check the whole app". The diff decides what gets driven.
 
@@ -72,13 +77,15 @@ For a migration, map what it covers: every route, command or output the old syst
 
 ## 2. Check you can reach them
 
-For each surface, find out whether *you*, from this machine and this session, can actually drive it. Do it, don't guess: start the app with its own dev command, hit the health route, look for a browser tool (Playwright MCP, Claude in Chrome, a Playwright install), check Docker, check whether the needed env vars and accounts exist. For a migration, start the old system and the new one side by side, on separate ports.
-
-If the checkout does not start as-is, fix it if the fix is small and obviously scaffolding (a missing sample config, an empty data dir), and say so. If it is a real break, report it precisely before going further: a skill written against a broken app teaches the wrong steps.
+For each surface, inspect the permitted runner, commands and required services. Under CI-only
+policy, prepare the launch, health and comparison recipes for GitHub Actions and read existing
+artifacts with their original SHAs. Do not start either product locally. Missing CI evidence is
+pending, not a failed local reachability test. For a migration, keep old/new inputs and ports
+isolated in the CI recipe.
 
 When a surface is out of reach, don't quietly drop it. Suggest the unlock that would make it reachable. See [references/unreachable-surfaces.md](references/unreachable-surfaces.md) for the common blockers and their fixes. The user decides whether the unlock is worth it; your job is to make sure they know it exists.
 
-**Presence is not access.** For every key, env var or account the verifier will need, make one cheap authenticated call now (a whoami, a list, a login) and note the result. A variable that is set but empty, a secret that reads back blank or an expired token should surface here, not as a 401 forty minutes into a run. If the app behaves differently by role or plan, check one account per role. Then tell the user, in one message, exactly what is missing and what they would need to supply or sign in to. Stop before anything that takes their card, password or 2FA.
+**Presence is not access.** For every key, env var or account the verifier will need, validate access through the permitted runner (a whoami, list or login) and note its evidence and SHA; without that run, mark access pending. A variable that is set but empty, a secret that reads back blank or an expired token should surface here, not as a 401 forty minutes into a run. If the app behaves differently by role or plan, check one account per role. Then tell the user, in one message, exactly what is missing and what they would need to supply or sign in to. Stop before anything that takes their card, password or 2FA.
 
 ## 3. Find the answer keys
 
@@ -133,13 +140,13 @@ Then ask the user to pick, as a multi-select question with the recommended combo
 **What goes in it.** Follow [references/skill-template.md](references/skill-template.md): the permanent template for the app, the temporary one for a migration. Every section must be filled from what you actually saw in steps 1 to 4. The parts that matter most:
 
 - **Scope**: how to work out the diff (the base branch, the exact git commands) and a map from the repo's folders to the surfaces and flows they reach. Mark shared code (schema, auth, nav, shared components and functions) and what it reaches, since that decides which existing flows the change touched. A migration's Scope is everything it covers, not the diff.
-- **Description**: write it so an agent runs the skill on its own, without being asked. Name the surfaces and the folders it covers, and say "Use on your own after any change to <those>, before saying it is done." A skill an agent has to be reminded of is only half a verifier.
+- **Description**: activate on explicit preparation or evidence-review requests and on the E2E selection policy in `AGENTS.md`. Source edits, task completion and bug reproduction alone do not activate E2E. State whether local use only prepares inputs or reads CI evidence.
 - **Sort the change** (permanent only): the first step after Scope. A short checklist that sorts each flow the change touches (new or existing, copies something or not, did the change also edit the thing it copies) and picks its answer key. It is the flow chart in the README, as text.
 - **Find the spec** (permanent only): where to look for a new flow's spec, and what to do when there is none.
 - **One section per surface**: how to drive it, what it copies (its parity answer key, or "nothing"), what done looks like there, and how a check there could fool you.
-- **Check in a fresh agent**: the agent that made the change works out the scope and sorts it, then, if it can start a sub-agent, hands the proof to a fresh one with only the flows, the surfaces and the answer keys. Not its plan or its reasoning: a checker that knows what was meant sees what it expects. If it can't start one, it runs the proof itself and marks the receipt "not independent".
+- **Check in a fresh agent**: the agent that made the change works out the scope and sorts it, then, if it can start a sub-agent, hands the evidence review to a fresh one with only the flows, surfaces, answer keys, CI artifact and tested SHA. Not its plan or its reasoning: a checker that knows what was meant sees what it expects. If it can't start one, it reviews evidence itself and marks the judgment "not independent", preserving any requirement for an independent judge as pending.
 - **If it is BROKEN**: the findings (failing steps, the answer key each was compared with, the evidence) go back to the agent that made the change. It fixes the app, never the answer key or the check, and the check runs again on the same flows. Cap it at 3 rounds, then report what is still broken.
-- **Start**: the exact command, an isolated port and data location, and how to tell it is *usable*, not just listening. The start script must fully detach the app (redirect its stdin, stdout and stderr) so a caller doing `RUN=$(start.sh)` gets control back. A start script that hangs its caller is the most common first bug.
+- **Start**: a recipe for the permitted runner with the exact command, an isolated port and data location, and how to tell it is *usable*, not just listening. The start script must fully detach the app (redirect its stdin, stdout and stderr) so a caller doing `RUN=$(start.sh)` gets control back. A start script that hangs its caller is the most common first bug.
 - **Health check**: one read-only command that answers "is this instance worth driving?" It also prints identity: which target (local, staging or prod, host, database) and which build (commit or version), so a check never runs against the wrong copy or a stale build. Don't trust "no rows found" until the store has shown a row you know exists.
 - **Bug fix recipe**: run the probe on the unchanged code first to see the failure and record the value that shows it (status, row count, text), then after the fix to see that value change. If the failure doesn't reproduce first, say so and stop.
 - **Deploy check** (only if the user ships by deploying): wait until the new build is actually serving, then drive the public entry point with no insider shortcuts, and label each receipt line with the environment it came from.
@@ -154,7 +161,7 @@ Then ask the user to pick, as a multi-select question with the recommended combo
 - **Check every action in reverse too**: untick, undo, remove the thing you added.
 - **Let stand-ins fail.** A fake email or payment provider that always says yes can't show you the error path. Give it a switch that makes it fail, and check the app reports the failure instead of claiming success.
 - **Assert everything the answer key and "Done looks like" name for that surface**, not just the field the change is about.
-- **A script pass is not the verdict.** Scripted checks report "checks passed"; only the agent, having looked at the evidence, writes PROVED.
+- **A script pass is not the verdict.** Scripted checks report "checks passed" or `CAPTURED`; only the judge, having compared the evidence to independent answer keys, writes PROVED.
 
 **Scripts.** Put repeatable mechanics in `scripts/` (start, health, stop, and a scripted check per method where possible; for a migration, a compare script that runs one case through old and new and diffs the results). Make each one executable and show its exact invocation in SKILL.md. A scripted check is worth a lot here: `/audit-prove-it` can run it blind, and the next agent can rerun it in seconds. Select elements by stable attributes (a form field `name`, `data-*`, role plus route), not by visible text, unless the text is what is under test. Renaming one button must not break a script.
 
@@ -162,15 +169,18 @@ Then ask the user to pick, as a multi-select question with the recommended combo
 
 **Evidence location.** Runs save to `.prove-it/runs/<UTC timestamp>-<slug>/` at the repo root. Add `.prove-it/runs/` and `.prove-it/audits/` to `.gitignore`. Snapshots are answer keys, so they live in `.prove-it/snapshots/` and get committed. Write evidence as it is produced, not at the end, so an interrupted run keeps what it proved. The receipt records what was proved, how the change was sorted, who checked it, the surfaces driven, each step's verdict, evidence and the answer key it was compared with, failed and retried steps, and the commands that finally worked. `/maintain-prove-it` reads these receipts later to improve the skill, so don't trim that detail.
 
-## 6. Run it once for real
+## 6. Validate through the permitted execution path
 
-Follow the generated skill exactly as written, as if you had never seen this repo: start, health check, sort a change, prove ONE named flow (the main thing the primary surface is for, or one migration case) with every method the user picked, in a fresh sub-agent if you can start one, run at least one break-it probe, write the receipt, clean up. Then confirm:
+For a skill or harness edit, run pertinent static checks and harness self-checks locally. Check
+Scope and Sort on a real diff and confirm the generated activation follows `AGENTS.md`.
+Record E2E `N/A` in the validation summary, without a `.prove-it` receipt.
 
-- the receipt and screenshots still exist after cleanup,
-- no process or port you started is still alive,
-- the repo has no new untracked files except `.prove-it/` and the skill itself.
-
-Anything that fails is a bug in the skill. Fix it, run cleanup, run again. Keep going until a clean run passes. For a migration, a clean run means the compare ran end to end and gave a verdict you trust. BROKEN is a valid result while the new system is not finished. Then check Scope and Sort on a real diff: run them against the last commit that changed product code and confirm they name the flows, checks and answer keys you would have picked by hand.
+When a product E2E is selected, prepare the generated recipes for the GitHub Actions runner:
+start, health, one named flow with every selected method, a break-it probe, captures and cleanup.
+Review that CI artifact against independent answer keys; until it exists, say validation is
+pending. Fix broken recipe mechanics without weakening the answer keys. Verify cleanup and
+retained evidence from the artifact. A migration may be BROKEN while the new system is unfinished.
+Product E2E and manual mutation audits are separate: no mutation run is implied here.
 
 Then check the core blocks survived. Each of these must be in the generated SKILL.md; put back any that is missing, word for word from the template:
 
@@ -182,20 +192,20 @@ done
 
 A migration skill has no Find the spec or Sort the change, so it skips "is not a spec", "not changed" and "What the change touches".
 
-Then check it runs on its own: give a fresh agent a small change to the main flow without mentioning the skill, and confirm it runs `prove-<app>` before it says done. If it doesn't, sharpen the description (name the folders and surfaces it covers) and try again. Say in the hand over whether it triggered.
-
-If the new surface isn't built yet, prove the side that exists (the surface it copies, the snapshots) and list the new section's flows as pending in the receipt.
+Check activation statically: a docs-only edit, a source edit or a bug report by itself must not
+start product execution. A selected E2E prepares CI inputs or reads evidence. If a planned surface
+has no capture, list it as pending; do not produce a receipt that implies it ran.
 
 If you had to prove it in a stand-in (a container instead of the user's real setup, a local stack instead of staging), list every step the stand-in did for you that the real target will not.
 
 ## 7. Hand over
 
-Start with one line: the verdict of the proving run (PROVED, BROKEN, BLOCKED or UNPROVEN) and what it proved. Then report, briefly:
+Start with the actual outcome: static/self-check validation with E2E `N/A`, preparation with evidence pending, or the reviewed CI verdict (PROVED, BROKEN, BLOCKED or UNPROVEN), with its tested SHA. Then report, briefly:
 
 - which kind of skill you made or extended, and why,
 - the surfaces found and which ones are unreachable, with the unlock for each,
 - the answer keys per surface and check, and every flow left on "nothing",
 - the methods the user picked (or that you picked for them, and why),
 - where the skill lives and how to invoke it,
-- the receipt from the proving run, with the key evidence inline (command output, response body, a screenshot path),
-- what is next: run `/prove-<app>` (or `/prove-<migration>`) at the end of every change, `/maintain-prove-it` after it has run a few times (or a bug slipped past it), `/audit-prove-it` to see whether the skill can be fooled. For a migration, run the end step when the old system is about to be deleted.
+- the CI run/artifact and reviewed receipt when available, with its original tested SHA and key evidence; otherwise the static/self-check results and what is pending,
+- what is next under `AGENTS.md`: prepare or review selected CI E2E, maintain drift when requested, and run mutation audits only by explicit manual workflow dispatch. For a migration, propose the end step before deleting the old system.
