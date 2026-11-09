@@ -45,7 +45,7 @@ Give each ticket its **blocking edges**: the other tickets that must complete be
 
 **Small edits to one section**: two or more docs or rules edits to the same section of one file, each at most a paragraph, are one ticket, with one acceptance criterion per edit. Edits to different sections of one file stay separate tickets with no blocking edge between them.
 
-**Stored shape**: a ticket that changes what the index stores (a new form in a stored field such as `Entry::via` or a `Summary` field, a table, a column) lists, in its acceptance criteria, "a sample of the new form under `tests/fixtures/schema/` and the re-blessed `tests/golden/schema.txt`" as an expected golden change, because the schema version derives from that golden (`docs/agents/map/seams.md`). A criterion "every other golden unchanged" says "except `schema.txt`".
+**Stored shape**: a ticket that changes what the index stores (a new form in a stored field such as `Entry::via` or a `Summary` field, a table, a column) lists, in its acceptance criteria, "a sample of the new form under `tests/fixtures/schema/` and the re-blessed `tests/golden/schema.txt`" as an expected golden change, because the schema version is a hash of that golden (`src/index.rs`, `schema_version`) and `docs/agents/map/seams.md` requires the re-bless. A criterion "every other golden unchanged" says "except `schema.txt`".
 
 **Doc pointers**: a ticket points at a doc by its file and heading text, never by a section number: numbers shift, a heading greps.
 
