@@ -126,8 +126,9 @@
   and `tomap` convert their elements to one type as cty unifies them (scalars with a string
   become strings, objects of one set of attributes attribute by attribute and others to a map,
   tuples of one length element by element and others to a list, a number with a bool refused). A
-  list value is read as a tuple and a map as an object, so a `tolist` or `tomap` result beside a
-  literal of the same length or attributes may unify where Terraform converts more to strings. A
+  list value is read as a tuple, a set as a tuple and a map as an object, so a `tolist`, `toset`
+  or `tomap` result beside a literal inside another conversion may be exact where Terraform
+  converts more to strings, keeps the set's element type or refuses the call. A
   null beside a collection is unresolved, but for a `tomap` whose other values share one type.
   `toset` orders as cty
   does (strings bytewise, numbers by value, `false` before `true`, a null last); a set of
