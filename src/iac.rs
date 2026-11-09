@@ -1505,6 +1505,13 @@ fn elements(
     roots: &Map<String, Value>,
     iters: &mut Vec<(String, usize)>,
 ) -> (usize, usize) {
+    if let Expression::FuncCall(f) = expr
+        && matches!(f.name.name.as_str(), "tolist" | "toset" | "tomap")
+        && let Some(arg) = f.args.iter().next()
+    {
+        // A conversion keeps its argument's elements (a number made a string adds its quotes).
+        return elements(arg, roots, iters);
+    }
     let found = match expr {
         Expression::Traversal(t) if iters.is_empty() => bound(t, roots),
         Expression::Variable(v) if iters.is_empty() => roots.get(v.as_str()),
@@ -4247,6 +4254,29 @@ mod tests {
             .collect();
         assert_eq!(found.len(), cases.len());
         assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// A `for` over a conversion (`tolist`) costs as a `for` over its argument: forty objects from
+    /// a var file expand, where their size squared passed `EVAL_COST_MAX`.
+    #[test]
+    fn a_for_over_a_converted_list_of_objects_expands() {
+        let main = concat!(
+            "variable \"items\" {}\n",
+            "resource \"a\" \"q\" {\n",
+            "  for_each = {for o in tolist(var.items) : o.name => o}\n",
+            "  name = \"q-${each.key}\"\n}\n",
+        );
+        let items: String = (0..40)
+            .map(|i| {
+                format!(
+                    "  {{ name = \"s{i:02}\", port = {i}, tier = \"backend-tier\", d = null }},\n"
+                )
+            })
+            .collect();
+        let tfvars = format!("items = [\n{items}]\n");
+        let got = names(&[("main.tf", main), ("terraform.tfvars", &tfvars)]);
+        assert_eq!(got.len(), 40, "{got:?}");
+        assert!(got.iter().all(|n| n.contains(" = \"q-s")), "{got:?}");
     }
 
     /// A var file's value that would make more than `EVAL_COST_MAX` (a `for` in a `for` over two
