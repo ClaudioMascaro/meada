@@ -164,7 +164,7 @@ def ci_selection(event, payload):
     return out, [head, head], []
 
 
-def local_selection():
+def local_selection(unpushed=False):
     if git("diff", "--name-only", "--no-renames", "-z", "--"):
         raise RuntimeError("unstaged changes: stage the complete candidate before running scripts/check")
     if git("ls-files", "--others", "--exclude-standard", "-z"):
@@ -177,6 +177,12 @@ def local_selection():
         if ref.returncode != 1:
             raise RuntimeError("HEAD is invalid rather than an unborn branch")
     head = commit(exists.stdout.decode().strip()) if exists.returncode == 0 else empty_tree()
+    if unpushed:
+        # Every commit the branch has not pushed: the push gate covers what per-commit scopes skipped.
+        if git("diff", "--cached", "--name-only", "-z"):
+            raise RuntimeError("staged changes: commit them before checking the unpushed commits")
+        args = [commit(git("merge-base", "HEAD", "@{upstream}")), head]
+        return args, names(args), head
     args = ["--cached", head]
     paths = names(args)
     if paths:
@@ -323,6 +329,14 @@ def cloud_features(paths):
     if any(p in {"Cargo.toml", "Cargo.lock", "build.rs", "src/main.rs", "src/lib.rs", "src/config.rs", "src/modules.rs"} for p in paths):
         features.update(CLOUD)
     return sorted(features)
+
+
+def scoped_commands(scopes):
+    """A commit's product checks between pushes: fmt, clippy and the unit and `tests/it` tests
+    whose path holds one of `scopes` (a module name such as `iac`)."""
+    return [("cargo", "fmt", "--check"),
+            ("cargo", "clippy", "--locked", "--all-targets", "--", "-D", "warnings"),
+            ("cargo", "test", "--locked", "-p", "meada", "--lib", "--test", "it", "--", *scopes)]
 
 
 def product_gate(paths):
@@ -500,6 +514,28 @@ def selftest():
             assert "Selected checks" in Path("summary").read_text()
         finally:
             os.chdir(old)
+    assert scoped_commands(["iac", "alert"])[-1][-3:] == ("--", "iac", "alert")
+    with tempfile.TemporaryDirectory(prefix="meada-check-unpushed-") as tmp:
+        os.chdir(tmp)
+        try:
+            git("init", "-q", "-b", "work")
+            for key, value in (("user.name", "Check selftest"), ("user.email", "check@example.invalid"),
+                               ("commit.gpgsign", "false")):
+                git("config", key, value)
+            def commit_file(name):
+                Path(name).parent.mkdir(parents=True, exist_ok=True)
+                Path(name).write_text(name + "\n")
+                git("add", "--", name)
+                git("-c", "core.hooksPath=/dev/null", "commit", "-qm", name)
+            commit_file("README.md")
+            git("branch", "-q", "pushed")
+            git("branch", "-q", "--set-upstream-to=pushed")
+            commit_file("src/main.rs")
+            commit_file("docs/notes.md")
+            assert local_selection()[1] == ["docs/notes.md"]  # a clean tree alone checks the last commit
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]
+        finally:
+            os.chdir(old)
     print("scripts/check selftest: path policy and disposable Git/event cases passed.")
 
 
@@ -509,6 +545,10 @@ def main():
     mode.add_argument("--selftest", action="store_true")
     mode.add_argument("--ci", action="store_true")
     mode.add_argument("--static", action="store_true")
+    parser.add_argument("--unpushed", action="store_true",
+                        help="check every commit not yet on the branch's upstream (the push gate)")
+    parser.add_argument("--scope", action="append", metavar="NAME",
+                        help="run only the product tests whose path holds NAME (repeatable)")
     options = parser.parse_args()
     if options.selftest:
         selftest()
@@ -519,7 +559,7 @@ def main():
         selected, args, paths = ci_selection(os.environ["GITHUB_EVENT_NAME"], payload)
         tree = commit(git("rev-parse", "HEAD"))
     else:
-        args, paths, tree = local_selection()
+        args, paths, tree = local_selection(options.unpushed)
         selected = scopes(paths)
     if options.ci:
         lines = [f"{key}={str(value).lower() if isinstance(value, bool) else value}" for key, value in selected.items()]
@@ -534,7 +574,10 @@ def main():
         print("\n".join(lines))
         return
     static(args, paths, tree)
-    if not options.static and selected["product"]:
+    if not options.static and selected["product"] and options.scope:
+        for command in scoped_commands(options.scope):
+            bounded(*command)
+    elif not options.static and selected["product"]:
         product_gate(paths)
     elif not options.static:
         print("Documentation/harness candidate: product builds and E2E are not selected.")
