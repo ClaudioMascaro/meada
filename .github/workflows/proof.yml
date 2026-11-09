@@ -117,6 +117,11 @@ jobs:
         working-directory: ui
       - run: npm run build
         working-directory: ui
+      # A manual baseline gets no CI run, so the frontend it binds passes its own checks here.
+      - run: npm run check:version
+        working-directory: ui
+      - run: npm test
+        working-directory: ui
       - name: Retain the frontend for selected E2E or the manual baseline
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -125,8 +130,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # The explicit baseline binds native, UI and source captures to one source and manifest.
-
+  # No product mutation is automatic. The baseline produces raw checks for a fresh checker;
+  # only a manual candidate phase with that checker's PROVED receipt may plant one bug.
   proof-a7-a8:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
@@ -287,6 +292,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+  # The explicit baseline binds native, UI and source captures to one source and manifest.
   proof-a7-a8-ui:
     needs: [proof-a7-a8, e2e-frontend]
     if: github.event_name == 'workflow_dispatch' && inputs.proof_phase == 'baseline'

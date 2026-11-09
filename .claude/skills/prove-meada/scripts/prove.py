@@ -29,8 +29,10 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
+import traceback
 import urllib.request
 from pathlib import Path
 
@@ -394,6 +396,23 @@ def rows(section, values):
     return out
 
 
+def unpaired(values, other):
+    """`values` less the rows `other` holds identical, one for one: identical rows pair first,
+    so rows sharing a key pair only what changed."""
+    left = {}
+    for v in other:
+        k = json.dumps(v, sort_keys=True)
+        left[k] = left.get(k, 0) + 1
+    out = []
+    for v in values:
+        k = json.dumps(v, sort_keys=True)
+        if left.get(k):
+            left[k] -= 1
+        else:
+            out.append(v)
+    return out
+
+
 def short(field, value):
     """golden_diff's short form: a target is `set`, a list is counted, so moves group."""
     if field == "target" and isinstance(value, str):
@@ -424,7 +443,8 @@ def export_diff(base, head, repo=None, cap=20):
             lines.append(f"  {field}: {base.get(field)} -> {head.get(field)}")
     symbols = {s["id"]: s for s in head.get("symbols", [])}
     for section, _ in KEYED.items():
-        b, h = rows(section, base.get(section, [])), rows(section, head.get(section, []))
+        bl, hl = base.get(section, []), head.get(section, [])
+        b, h = rows(section, unpaired(bl, hl)), rows(section, unpaired(hl, bl))
         added = sorted(set(h) - set(b))
         removed = sorted(set(b) - set(h))
         changed = sorted(k for k in set(b) & set(h) if b[k] != h[k])
@@ -813,6 +833,18 @@ def cmd_selftest(_):
     link = {"consumer": "d::k.yaml::Deployment/api", "provider": "app", "contract": "image::docker.io/a/b"}
     lines, _ = export_diff({}, {"links": [dict(link, root=r) for r in ("overlays/dev", "overlays/prod")]})
     assert "links: +2 -0 ~0" in "\n".join(lines), lines
+    # Rows sharing a key pair identical rows first: one added row is no change to another.
+    use = {"contract": "channel::sqs::q", "site": "a.ts", "root": ""}
+    lines, _ = export_diff({"consumers": [dict(use, via="b")]},
+                           {"consumers": [dict(use, via="a"), dict(use, via="b")]})
+    assert "consumers: +1 -0 ~0" in "\n".join(lines), lines
+    # A crash or a refusal is BLOCKED (exit 2): prove-ci reads exit 1 as a difference.
+    with tempfile.TemporaryDirectory() as temp:
+        for args in (["run", "--base-bin", "x", "--head-bin", "y", "--repos", "no-such-entry"],
+                     ["rebless", "--base", "0" * 40]):
+            done = subprocess.run([sys.executable, __file__, *args, "--run", temp],
+                                  capture_output=True, text=True, cwd=ROOT)
+            assert done.returncode == 2, (args, done.returncode, done.stderr[-400:])
     vias = [{"contract": "c", "site": "s", "via": v} for v in ("a", "b")]
     lines, _ = export_diff({"consumers": vias[:1]}, {"consumers": vias})
     assert "consumers: +1 -0 ~0" in "\n".join(lines), lines
@@ -827,7 +859,7 @@ def cmd_selftest(_):
     assert q[-2]["arguments"]["kind"] == "zz_prove_kind" and q[3]["arguments"]["budget"] == 300, q
     assert {"tool": "context", "arguments": {"symbol": "r::k.kt::p.Flow.test(Duration?,String?)", "budget": 300}} in q
     assert auto_queries({"calls": [], "providers": []})[-1]["arguments"] == {"symbol": "zz_prove_missing"}
-    import tempfile
+
     with tempfile.TemporaryDirectory() as d:
         f = Path(d) / "a.rs"
         f.write_bytes(b"fn foo() {}\nfn fooBar() { foo() }\n")
@@ -1747,4 +1779,15 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Exit 1 is a difference from the base (prove-ci reads it so): a crash or a refusal is
+    # BLOCKED, never evidence.
+    try:
+        main()
+    except SystemExit as stop:
+        if isinstance(stop.code, str):
+            print(stop.code, file=sys.stderr)
+            sys.exit(2)
+        raise
+    except Exception:
+        traceback.print_exc()
+        sys.exit(2)

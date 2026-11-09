@@ -112,7 +112,8 @@ def build(source, output, logs):
     source, output, logs = Path(source), Path(output), Path(logs)
     output.parent.mkdir(parents=True, exist_ok=True)
     logs.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ, CARGO_INCREMENTAL='0', CARGO_PROFILE_DEV_DEBUG='0')
+    # The optimization level of build.sh, so every binary of a run is built alike.
+    env = dict(os.environ, CARGO_INCREMENTAL='0', CARGO_PROFILE_DEV_DEBUG='0', CARGO_PROFILE_DEV_OPT_LEVEL='1')
     env.setdefault('CARGO_BUILD_JOBS', '2')
     target = Path(env.get('CARGO_TARGET_DIR', str(ROOT / 'target'))).resolve()
     with compiler_lock(logs):

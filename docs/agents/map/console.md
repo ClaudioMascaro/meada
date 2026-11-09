@@ -523,7 +523,7 @@ and turns the editor read-only. Every role sees owners in the versions page and 
 The frontend container stage copies the one shared validation fixture because TypeScript also
 checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
-seams. The frontend CI job also drives the built console through
+seams. The Proof workflow (`prove-meada`, `proof-a7-a8-ui`) also drives the built console through
 `console-graph.py`/`console-graph.mjs` in the prove skill: neutral source inputs, complete
 same-mode CLI/API exports, keyboard graph navigation, named tables, orphan sides and search
 filters, with screenshots, load/CLS budgets, axe findings and console-error captures retained.

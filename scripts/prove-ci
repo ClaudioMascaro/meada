@@ -89,7 +89,7 @@ def capture(run, scope, base, head, repos):
                                       *(['--accounts'] if scope['accounts'] else [])], required=True)
             command('console-pages', ['node', SCRIPTS / 'console-pages.mjs', run])
         if scope['goldens']:
-            command('goldens', [python, SCRIPTS / 'prove.py', 'rebless', '--base', base, '--run', run], compares=True)
+            command('goldens', [python, SCRIPTS / 'prove.py', 'rebless', '--base', base, '--run', run])
         if scope['deploy']:
             command('deploy-diff', [python, SCRIPTS / 'prove.py', 'deploy', '--base', base, '--run', run],
                     compares=True)
@@ -153,6 +153,16 @@ def selftest():
             assert bool(receipt['steps'][2].get('differences')) == (code == 1), receipt['steps']
             assert receipt['verdict'] == 'UNPROVEN' and receipt['head'] == 'b' * 40
             assert receipt['steps'][-1]['name'] == 'clean'
+    # `rebless` reports no difference by its exit: its exit 1 is a crash, a failed capture.
+    goldens = dict.fromkeys(SURFACES, False)
+    goldens['goldens'] = True
+    with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
+        def crashed(args, **kwargs):
+            return subprocess.CompletedProcess(args, 1 if 'rebless' in args else 0)
+        with patch('subprocess.run', side_effect=crashed):
+            run = Path(temp) / 'proof'
+            assert capture(run, goldens, 'a' * 40, 'b' * 40, 'meada') == 1
+        assert json.loads((run / 'receipt.json').read_text())['capture'] == 'FAILED'
     with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
         with patch('subprocess.run', return_value=subprocess.CompletedProcess([], 1)):
             run = Path(temp) / 'proof'

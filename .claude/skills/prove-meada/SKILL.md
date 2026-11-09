@@ -253,7 +253,7 @@ One section per surface. `/create-prove-it` adds a section when the app gains a 
 
 ### A7: config values and IaC (spec #642)
 
-For #675's console graph, run `python3 $S/console-graph.py --head-bin "$RUN/bin/meada-head-ui" --ui-dir ui/dist --run "$RUN/console-graph"`. Inspect the screenshots, whole role/link tables, roots, reasons, native keyboard focus, unpaired sides and `value`/`iac`/`alert` playground answers; retain the receipt and CI artifact. [references/console-graph.md](references/console-graph.md) defines inputs, answer keys, budgets, controls and cleanup. The existing frontend CI job runs this executable flow against a real UI binary; unavailable browser tooling leaves it BLOCKED.
+For #675's console graph, run `python3 $S/console-graph.py --head-bin "$RUN/bin/meada-head-ui" --ui-dir ui/dist --run "$RUN/console-graph"`. Inspect the screenshots, whole role/link tables, roots, reasons, native keyboard focus, unpaired sides and `value`/`iac`/`alert` playground answers; retain the receipt and CI artifact. [references/console-graph.md](references/console-graph.md) defines inputs, answer keys, budgets, controls and cleanup. The Proof workflow's `prove-meada` and `proof-a7-a8-ui` jobs run this executable flow against a real UI binary; unavailable browser tooling leaves it BLOCKED.
 
 For #665 HTTP routing, run `python3 $S/http-iac.py --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/http-iac"`. Inspect the complete source-derived link set, namespace/path/rewrite controls, raw transport replies and source-deleted read-only parity ([references/http-iac.md](references/http-iac.md)). Existing gateway and A8 controls remain required for shared HTTP changes.
 

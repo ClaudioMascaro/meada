@@ -29,26 +29,17 @@ permissions:
 jobs:
   changes:
     runs-on: ubuntu-24.04
+    # E2E selection is the Proof workflow's (`proof.yml`): only the routine flags leave this job.
     outputs:
       routine: ${{ steps.scope.outputs.routine }}
       product: ${{ steps.scope.outputs.product }}
-      e2e: ${{ steps.scope.outputs.e2e }}
-      cli: ${{ steps.scope.outputs.cli }}
-      console: ${{ steps.scope.outputs.console }}
-      accounts: ${{ steps.scope.outputs.accounts }}
-      deploy: ${{ steps.scope.outputs.deploy }}
-      container: ${{ steps.scope.outputs.container }}
-      goldens: ${{ steps.scope.outputs.goldens }}
-      base: ${{ steps.scope.outputs.base }}
-      head: ${{ steps.scope.outputs.head }}
-      repos: ${{ steps.scope.outputs.repos }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Select routine gates and milestone E2E
+      - name: Select routine gates
         id: scope
         run: python3 scripts/check --ci
       - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
@@ -72,8 +63,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: cargo fmt --check
 
-  # No product mutation is automatic. The baseline produces raw checks for a fresh checker;
-  # only a manual candidate phase with that checker's PROVED receipt may plant one bug.
   clippy:
     needs: changes
     if: needs.changes.outputs.routine == 'true' && needs.changes.outputs.product == 'true'

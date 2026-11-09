@@ -33,14 +33,15 @@ and dispatched branch, validates its base SHA and computes that merge-base. Miss
 ambiguous PRs block the baseline. It copies each binary before releasing the compiler lock,
 pins every skill/answer-key byte and drives the fixed source-derived checks. `baseline.json` records the
 source commit/tree, actual build commits, binary SHA256s, keys, flows and raw check results.
-The accepted clean A7 binary supplies existing A7 annotation/whole-export bytes; independent
-source/spec oracles supply new A7 semantics. A8 additionally compares the original base on
+At the baseline the PR merge-base binary is the key of the existing flows, so the clean head is
+checked against the base; later phases take existing A7 annotation/whole-export bytes from the
+accepted clean A7 binary. Independent source/spec oracles supply new A7 semantics. A8 additionally compares the original base on
 identical generated input. HTTP parity supplements these keys. It never replaces them.
 
 | Packet binary | Purpose and immutable source |
 |---|---|
 | `bin/meada-clean` | exact frozen head, existing A7 annotation/export key |
-| `bin/meada-base` | actual PR merge-base, A8 original fields and corpus |
+| `bin/meada-base` | actual PR merge-base, existing-flow key at the baseline, A8 original fields and corpus |
 | `bin/meada-pre-config` | before #661: `6a5eca5853193d205bcf756983b41e9cb16ffa9d` |
 | `bin/meada-pre-image` | before #662: `eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62` |
 | `bin/meada-pre-extensions` | compatible A7 before #666/#668/#670/#671: `e6d27d0d7c046eceb8771f17111f00511a8d6c3d` |
