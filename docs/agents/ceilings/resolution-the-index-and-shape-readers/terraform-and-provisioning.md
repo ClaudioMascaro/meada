@@ -106,9 +106,9 @@
   evaluation time (in a var file, which declares no function, given but unresolved). A number
   `hcl-rs` would print otherwise than Terraform (past `i64::MIN..=u64::MAX`, more digits than a
   64-bit float holds, or a float it writes with an exponent, past 1e16 or below 1e-5) is
-  unresolved too, as a literal or a `tonumber`; a JSON number read as a float (any fraction, in a
-  `.tf.json` or a var file) is, since `serde_json` keeps no digits, but a JSON integer past 2^53
-  written with a fraction or an exponent (`9007199254740993.0`) reads as the nearest float. `cost`
+  unresolved too, as a literal or a `tonumber`, and so is a JSON number written with a fraction or
+  an exponent or past that range, even `1.0`, in a `.tf.json` or a var file (`serde_json` keeps no
+  digits). `cost`
   bounds a `for` by the size of what it iterates, so a `for` over a value it cannot size (a
   function's result) is costed as its square and may stay unresolved below the real ceiling.
   The type table selects `bucket` for S3 and `name` for SQS; unlisted types still read

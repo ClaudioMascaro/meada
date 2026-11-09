@@ -1007,8 +1007,8 @@ fn read_var_file(path: &str, src: &[u8], module: &mut Module) {
 /// The values the var file at `path` gives, each with its line; `None` for a file past
 /// `MAX_BYTES`, not `shallow`, with HCL objects past their width or that does not parse. A value
 /// that is no constant (Terraform refuses it) is left out; one past `EVAL_COST_MAX`, the file's
-/// own `EVAL_WORK_MAX` or `EVAL_VALUE_MAX`, or whose arithmetic is inexact (`Exact`), is given
-/// but unresolved. A JSON var file's strings are
+/// own `EVAL_WORK_MAX` or `EVAL_VALUE_MAX`, whose arithmetic is inexact (`Exact`) or a JSON
+/// number read as a float (`float`), is given but unresolved. A JSON var file's strings are
 /// literals, as Terraform reads them, each at the line of its key (the last one, as its value,
 /// when a key repeats).
 fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>, usize)>> {
@@ -1020,7 +1020,7 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
     let text = if json { shallow(src) } else { text(src) }?;
     let mut values = Vec::new();
     if json {
-        let map = serde_json::from_str::<Map<String, Value>>(text).ok()?;
+        let map = serde_json::from_str::<Map<String, serde_json::Value>>(text).ok()?;
         let keys = RefCell::new(HashMap::new());
         let key = |path: &[Step], line| {
             if let [Step::Key(name)] = path {
@@ -1032,7 +1032,10 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
         let keys = keys.into_inner();
         for (name, value) in map {
             let at = keys.get(&name).copied().unwrap_or(1);
-            let value = (size(&value) <= EVAL_VALUE_MAX && !float(&value)).then_some(value);
+            let value = (!float(&value))
+                .then(|| serde_json::from_value::<Value>(value).ok())
+                .flatten()
+                .filter(|v| size(v) <= EVAL_VALUE_MAX);
             values.push((name, value, at));
         }
     } else {
@@ -1243,8 +1246,12 @@ fn printed_as_written(n: &hcl::Number, written: &str) -> bool {
 /// trailing zero and the power of ten they are multiplied by.
 fn decimal(text: &str) -> Option<(bool, String, i64)> {
     let (negative, text) = match text.strip_prefix('-') {
-        // `hcl-edit` reads `- 1` as one literal.
-        Some(t) => (true, t.trim_start()),
+        // `hcl-edit` reads `- 1` and `-/* c */1` as one literal: the digits follow the last space
+        // or `/`.
+        Some(t) => (
+            true,
+            t.rsplit(|c: char| c.is_whitespace() || c == '/').next()?,
+        ),
         None => (false, text.strip_prefix('+').unwrap_or(text)),
     };
     let (mantissa, power) = text.split_once(['e', 'E']).unwrap_or((text, "0"));
@@ -1264,13 +1271,14 @@ fn decimal(text: &str) -> Option<(bool, String, i64)> {
     })
 }
 
-/// Whether a JSON value holds a number `serde_json` read as a float (a fraction, or past
-/// `i64::MIN..=u64::MAX`): its digits are gone, so it may not be the number Terraform reads.
-fn float(v: &Value) -> bool {
+/// Whether a JSON value holds a number `serde_json` read as a float (written with a fraction or
+/// an exponent, or past `i64::MIN..=u64::MAX`): its digits are gone, so it may not be the number
+/// Terraform reads. (`hcl-rs` would make a whole one an integer, `i64::MIN` for one just below.)
+fn float(v: &serde_json::Value) -> bool {
     match v {
-        Value::Number(n) => n.is_f64(),
-        Value::Array(items) => items.iter().any(float),
-        Value::Object(map) => map.values().any(float),
+        serde_json::Value::Number(n) => n.is_f64(),
+        serde_json::Value::Array(items) => items.iter().any(float),
+        serde_json::Value::Object(map) => map.values().any(float),
         _ => false,
     }
 }
@@ -4014,14 +4022,20 @@ mod tests {
             ("sci", "${1.5e2}"),
             ("max", "${18446744073709551615}"),
             ("min", "${-9223372036854775808}"),
+            ("comment", "${-/*c*/7}"),
             ("numhalf", "${tonumber(\"0.5\")}"),
             ("nummax", "${tonumber(\"18446744073709551615\")}"),
             ("vj", "${var.j}"),
             ("vk", "${var.k}"),
             ("vl", "${var.l}"),
+            ("vm", "${var.m}"),
+            ("vn", "${var.n}"),
             ("lj", "${local.j}"),
         ];
-        let mut tf = String::from("variable \"j\" {}\nvariable \"k\" {}\nvariable \"l\" {}\n");
+        let mut tf = String::new();
+        for v in ["j", "k", "l", "m", "n"] {
+            tf += &format!("variable \"{v}\" {{}}\n");
+        }
         for (name, value) in main {
             tf += &format!("resource \"a\" \"{name}\" {{ name = \"q-{value}\" }}\n");
         }
@@ -4030,7 +4044,7 @@ mod tests {
             ("locals.tf.json", "{\"locals\": {\"j\": 0.5}}"),
             (
                 "terraform.tfvars.json",
-                "{\"j\": 0.5, \"k\": 18446744073709551616, \"l\": 7}",
+                "{\"j\": 0.5, \"k\": 18446744073709551616, \"l\": 7, \"m\": -9223372036854775809, \"n\": 1.0}",
             ),
         ];
         assert_eq!(
@@ -4051,11 +4065,14 @@ mod tests {
                 "a.sci = \"q-150\"",
                 "a.max = \"q-18446744073709551615\"",
                 "a.min = \"q--9223372036854775808\"",
+                "a.comment = \"q--7\"",
                 "a.numhalf = \"q-0.5\"",
                 "a.nummax = \"q-18446744073709551615\"",
                 "a.vj ~ \"q-*\" [var.j terraform.tfvars.json:1 tfvars]",
                 "a.vk ~ \"q-*\" [var.k terraform.tfvars.json:1 tfvars]",
                 "a.vl = \"q-7\" [var.l terraform.tfvars.json:1 tfvars]",
+                "a.vm ~ \"q-*\" [var.m terraform.tfvars.json:1 tfvars]",
+                "a.vn ~ \"q-*\" [var.n terraform.tfvars.json:1 tfvars]",
                 "a.lj ~ \"q-*\"",
             ]
         );
