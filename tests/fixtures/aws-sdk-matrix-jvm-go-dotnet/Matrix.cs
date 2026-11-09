@@ -192,4 +192,21 @@ class Matrix {
         var client = new AmazonSecretsManagerClient();
         await client.DeleteSecretAsync(new DeleteSecretRequest { SecretId = "orders/old" });
     }
+
+    async Task TransactWriteItems() {
+        var client = new AmazonDynamoDBClient();
+        await client.TransactWriteItemsAsync(new TransactWriteItemsRequest {
+            TransactItems = new List<TransactWriteItem> {
+                new TransactWriteItem { Put = new Put { TableName = "orders" } },
+                new TransactWriteItem { ConditionCheck = new ConditionCheck { TableName = "customers" } }
+            }
+        });
+    }
+
+    async Task TransactGetItems() {
+        var client = new AmazonDynamoDBClient();
+        await client.TransactGetItemsAsync(new TransactGetItemsRequest {
+            TransactItems = new List<TransactGetItem> { new TransactGetItem { Get = new Get { TableName = "orders" } } }
+        });
+    }
 }

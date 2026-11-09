@@ -91,9 +91,9 @@ pub(crate) struct Client {
 pub(crate) struct Operation {
     pub method: &'static str,
     /// The path to the name: `.` descends, `[]` takes every element, `.*` every key of a map.
-    /// Before the last member, `A|B` names the variants an element may set (a transaction entry's
-    /// `Put|Update|Delete`): an element setting none of them has no use for this row. A method
-    /// can have several rows, one per direction.
+    /// A path of three members, `Items[].Put|Update.TableName`, has its middle member name the
+    /// variants an element may set (one member, or `A|B` for either): an element setting none of
+    /// them has no use for this row. A method can have several rows, one per direction.
     pub field: &'static str,
     pub role: Role,
     /// A hierarchy query does not identify one physical resource.
@@ -356,8 +356,8 @@ fn opaque<'a>(
                 .contains(field)
 }
 
-/// Read scalar fields, name lists, event entries and table-keyed batch requests. Each value is
-/// visited once; every path here is a short constant supplied by the kind, never source text.
+/// Read scalar fields, name lists, event entries, table-keyed batch requests and transaction
+/// entries. Each value is visited once; every path here is a short constant supplied by the kind, never source text.
 /// `None` is a field a request Meada sees whole leaves out.
 fn request<'v>(
     call: &'v crate::lang::Invocation,

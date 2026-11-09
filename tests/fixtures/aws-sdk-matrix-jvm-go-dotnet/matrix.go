@@ -184,3 +184,18 @@ func deleteSecret(ctx context.Context) {
 	client := secretsmanager.NewFromConfig(cfg)
 	client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{SecretId: aws.String("orders/old")})
 }
+
+func transactWriteItems(ctx context.Context) {
+	client := dynamodb.NewFromConfig(cfg)
+	client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: []types.TransactWriteItem{
+		{Put: &types.Put{TableName: aws.String("orders")}},
+		{ConditionCheck: &types.ConditionCheck{TableName: aws.String("customers")}},
+	}})
+}
+
+func transactGetItems(ctx context.Context) {
+	client := dynamodb.NewFromConfig(cfg)
+	client.TransactGetItems(ctx, &dynamodb.TransactGetItemsInput{TransactItems: []types.TransactGetItem{
+		{Get: &types.Get{TableName: aws.String("orders")}},
+	}})
+}

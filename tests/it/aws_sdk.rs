@@ -727,9 +727,9 @@ fn aws_sdk_operation_matrix_covers_java_go_and_dotnet() {
     let export: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
     let providers = export["providers"].as_array().unwrap();
     let consumers = export["consumers"].as_array().unwrap();
-    // Per language: 21 writers and 14 readers, and .NET's blocking `GetObjectMetadata` reader.
-    assert_eq!(providers.len(), 63, "{export}");
-    assert_eq!(consumers.len(), 43, "{export}");
+    // Per language: 22 writers and 16 readers, and .NET's blocking `GetObjectMetadata` reader.
+    assert_eq!(providers.len(), 66, "{export}");
+    assert_eq!(consumers.len(), 49, "{export}");
     let mut actual = Vec::new();
     let mut by_language: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
         Default::default();
@@ -828,60 +828,93 @@ fn dynamodb_transactions_keep_every_entry_table_and_direction_in_java_go_and_dot
 }
 
 /// A transaction entry held in a named value and changed after it is made names no table, as
-/// the other named values on a name's path do (a Java builder is read per builder).
+/// the other named values on a name's path do (a Java builder is read per builder). The same
+/// entries left alone keep their tables, so the change is what unnamed them.
 #[test]
 fn dynamodb_transaction_entries_changed_after_they_are_made_name_no_table() {
-    let repo = fixture_repo("aws_sdk_transactions_changed", "aws-sdk-controls", None);
-    std::fs::write(
-        repo.join("Changed.java"),
-        "import software.amazon.awssdk.services.dynamodb.DynamoDbClient;\n\
-         import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;\n\
-         import software.amazon.awssdk.services.dynamodb.model.Put;\n\
-         import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;\n\
-         import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;\n\
-         class Changed {\n\
-         void put(boolean prod) { var db = DynamoDbClient.create(); var p = Put.builder().tableName(\"old-put\"); if (prod) p.tableName(\"new-put\"); db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p.build()).build()).build()); }\n\
-         void check(boolean prod) { var db = DynamoDbClient.create(); var c = ConditionCheck.builder().tableName(\"old-check\"); if (prod) c.tableName(\"new-check\"); db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().conditionCheck(c.build()).build()).build()); }\n\
-         void kept() { var db = DynamoDbClient.create(); var k = Put.builder().tableName(\"kept-put\"); db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(k.build()).build()).build()); }\n}\n",
-    )
-    .unwrap();
-    std::fs::write(
-        repo.join("changed.go"),
-        "package application\n\nimport (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/aws\"\n\t\"github.com/aws/aws-sdk-go-v2/service/dynamodb\"\n\t\"github.com/aws/aws-sdk-go-v2/service/dynamodb/types\"\n)\n\n\
-         func put(ctx context.Context) {\n\tclient := dynamodb.NewFromConfig(cfg)\n\tp := types.Put{TableName: aws.String(\"old-put-go\")}\n\tp.TableName = aws.String(\"new-put-go\")\n\tclient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: []types.TransactWriteItem{{Put: &p}}})\n}\n\n\
-         func check(ctx context.Context) {\n\tclient := dynamodb.NewFromConfig(cfg)\n\tc := types.ConditionCheck{TableName: aws.String(\"old-check-go\")}\n\tc.TableName = aws.String(\"new-check-go\")\n\tclient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: []types.TransactWriteItem{{ConditionCheck: &c}}})\n}\n",
-    )
-    .unwrap();
-    std::fs::write(
-        repo.join("Changed.cs"),
-        "using System.Collections.Generic;\nusing Amazon.DynamoDBv2;\nusing Amazon.DynamoDBv2.Model;\n\
-         class Changed {\n\
-         async System.Threading.Tasks.Task Put() { var db = new AmazonDynamoDBClient(); var put = new Put { TableName = \"old-put-cs\" }; put.TableName = \"new-put-cs\"; await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { Put = put } } }); }\n\
-         async System.Threading.Tasks.Task Check() { var db = new AmazonDynamoDBClient(); var check = new ConditionCheck { TableName = \"old-check-cs\" }; check.TableName = \"new-check-cs\"; await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { ConditionCheck = check } } }); }\n}\n",
-    )
-    .unwrap();
-    let export: Value =
-        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
-    let mut contracts: Vec<_> = ["providers", "consumers"]
-        .iter()
-        .flat_map(|side| export[side].as_array().unwrap())
-        .map(|s| s["contract"].as_str().unwrap())
-        .collect();
-    contracts.sort();
-    // A changed entry keeps an unresolved side in its own direction (three writers and three
-    // readers); only the Java builder nothing sets again keeps its table.
+    let sides = |changed: bool| {
+        let repo = fixture_repo("aws_sdk_transactions_changed", "aws-sdk-controls", None);
+        let (java, go, cs) = if changed {
+            (
+                " if (prod) p.tableName(\"new\");",
+                " p.TableName = aws.String(\"new\")\n",
+                " put.TableName = \"new\";",
+            )
+        } else {
+            ("", "", "")
+        };
+        let (java_check, go_check, cs_check) = if changed {
+            (
+                " if (prod) c.tableName(\"new\");",
+                " c.TableName = aws.String(\"new\")\n",
+                " check.TableName = \"new\";",
+            )
+        } else {
+            ("", "", "")
+        };
+        std::fs::write(
+            repo.join("Changed.java"),
+            format!("import software.amazon.awssdk.services.dynamodb.DynamoDbClient;\n\
+             import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;\n\
+             import software.amazon.awssdk.services.dynamodb.model.Put;\n\
+             import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;\n\
+             import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;\n\
+             class Changed {{\n\
+             void put(boolean prod) {{ var db = DynamoDbClient.create(); var p = Put.builder().tableName(\"put-java\");{java} db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p.build()).build()).build()); }}\n\
+             void check(boolean prod) {{ var db = DynamoDbClient.create(); var c = ConditionCheck.builder().tableName(\"check-java\");{java_check} db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().conditionCheck(c.build()).build()).build()); }}\n}}\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            repo.join("changed.go"),
+            format!("package application\n\nimport (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/aws\"\n\t\"github.com/aws/aws-sdk-go-v2/service/dynamodb\"\n\t\"github.com/aws/aws-sdk-go-v2/service/dynamodb/types\"\n)\n\n\
+             func put(ctx context.Context) {{\n\tclient := dynamodb.NewFromConfig(cfg)\n\tp := &types.Put{{TableName: aws.String(\"put-go\")}}\n\t{go}client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{{TransactItems: []types.TransactWriteItem{{{{Put: p}}}}}})\n}}\n\n\
+             func check(ctx context.Context) {{\n\tclient := dynamodb.NewFromConfig(cfg)\n\tc := &types.ConditionCheck{{TableName: aws.String(\"check-go\")}}\n\t{go_check}client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{{TransactItems: []types.TransactWriteItem{{{{ConditionCheck: c}}}}}})\n}}\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            repo.join("Changed.cs"),
+            format!("using System.Collections.Generic;\nusing Amazon.DynamoDBv2;\nusing Amazon.DynamoDBv2.Model;\n\
+             class Changed {{\n\
+             async System.Threading.Tasks.Task Put() {{ var db = new AmazonDynamoDBClient(); var put = new Put {{ TableName = \"put-cs\" }};{cs} await db.TransactWriteItemsAsync(new TransactWriteItemsRequest {{ TransactItems = new List<TransactWriteItem> {{ new TransactWriteItem {{ Put = put }} }} }}); }}\n\
+             async System.Threading.Tasks.Task Check() {{ var db = new AmazonDynamoDBClient(); var check = new ConditionCheck {{ TableName = \"check-cs\" }};{cs_check} await db.TransactWriteItemsAsync(new TransactWriteItemsRequest {{ TransactItems = new List<TransactWriteItem> {{ new TransactWriteItem {{ ConditionCheck = check }} }} }}); }}\n}}\n"),
+        )
+        .unwrap();
+        let export: Value =
+            serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+        let mut sides: Vec<_> = [("writer", "providers"), ("reader", "consumers")]
+            .iter()
+            .flat_map(|(role, sides)| {
+                export[sides]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(move |s| format!("{role} {}", s["contract"].as_str().unwrap()))
+            })
+            .collect();
+        sides.sort();
+        sides
+    };
     assert_eq!(
-        contracts,
+        sides(false),
         [
-            "resource::dynamodb",
-            "resource::dynamodb",
-            "resource::dynamodb",
-            "resource::dynamodb",
-            "resource::dynamodb",
-            "resource::dynamodb",
-            "resource::dynamodb::kept-put",
-        ],
-        "{export}"
+            "reader resource::dynamodb::check-cs",
+            "reader resource::dynamodb::check-go",
+            "reader resource::dynamodb::check-java",
+            "writer resource::dynamodb::put-cs",
+            "writer resource::dynamodb::put-go",
+            "writer resource::dynamodb::put-java",
+        ]
+    );
+    assert_eq!(
+        sides(true),
+        [
+            "reader resource::dynamodb",
+            "reader resource::dynamodb",
+            "reader resource::dynamodb",
+            "writer resource::dynamodb",
+            "writer resource::dynamodb",
+            "writer resource::dynamodb",
+        ]
     );
 }
 

@@ -45,6 +45,13 @@ import software.amazon.awssdk.services.secretsmanager.model.PutSecretValueReques
 import software.amazon.awssdk.services.secretsmanager.model.UpdateSecretRequest;
 import software.amazon.awssdk.services.secretsmanager.model.CreateSecretRequest;
 import software.amazon.awssdk.services.secretsmanager.model.DeleteSecretRequest;
+import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
+import software.amazon.awssdk.services.dynamodb.model.Get;
+import software.amazon.awssdk.services.dynamodb.model.Put;
+import software.amazon.awssdk.services.dynamodb.model.TransactGetItem;
+import software.amazon.awssdk.services.dynamodb.model.TransactGetItemsRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 
 class Matrix {
     void sendMessage() {
@@ -215,5 +222,20 @@ class Matrix {
     void deleteSecret() {
         var client = SecretsManagerClient.create();
         client.deleteSecret(DeleteSecretRequest.builder().secretId("orders/old").build());
+    }
+
+    void transactWriteItems() {
+        var client = DynamoDbClient.create();
+        client.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(
+            TransactWriteItem.builder().put(Put.builder().tableName("orders").build()).build(),
+            TransactWriteItem.builder().conditionCheck(ConditionCheck.builder().tableName("customers").build()).build()
+        ).build());
+    }
+
+    void transactGetItems() {
+        var client = DynamoDbClient.create();
+        client.transactGetItems(TransactGetItemsRequest.builder().transactItems(
+            TransactGetItem.builder().get(Get.builder().tableName("orders").build()).build()
+        ).build());
     }
 }
