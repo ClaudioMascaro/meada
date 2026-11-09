@@ -4393,14 +4393,18 @@ mod tests {
         let main = format!(
             concat!(
                 "resource \"a\" \"q\" {{\n",
-                "  for_each = {{ for o in [{}] : o.name => o }}\n",
+                "  for_each = {{ for o in [{0}] : o.name => o }}\n",
                 "  name = \"q-${{each.key}}\"\n}}\n",
+                "resource \"a\" \"p\" {{\n",
+                "  for_each = {{ for o in ([{0}]) : o.name => o }}\n",
+                "  name = \"p-${{each.key}}\"\n}}\n",
             ),
             items.join(", ")
         );
         let got = names(&[("main.tf", &main)]);
-        let want: Vec<String> = (0..40)
-            .map(|i| format!("a.q[\"s{i:02}\"] = \"q-s{i:02}\""))
+        let want: Vec<String> = ["q", "p"]
+            .iter()
+            .flat_map(|r| (0..40).map(move |i| format!("a.{r}[\"s{i:02}\"] = \"{r}-s{i:02}\"")))
             .collect();
         assert_eq!(got, want);
     }
@@ -4416,14 +4420,17 @@ mod tests {
         let main = format!(
             concat!(
                 "locals {{ x = [for a in [{0}] : [for b in [{0}] : a]] }}\n",
+                "locals {{ y = [for a in [{0}] : length([for b in [{0}] : a])] }}\n",
                 "resource \"a\" \"q\" {{ name = \"q-${{length(local.x)}}\" }}\n",
+                "resource \"a\" \"r\" {{ name = \"r-${{length(local.y)}}\" }}\n",
             ),
             list
         );
         let start = std::time::Instant::now();
         let got = names(&[("main.tf", &main)]);
         let took = start.elapsed();
-        assert_eq!(got, ["a.q ~ \"q-*\""]);
+        // The second costs as much but makes little: only the cost ceiling leaves it out.
+        assert_eq!(got, ["a.q ~ \"q-*\"", "a.r ~ \"r-*\""]);
         assert!(took < std::time::Duration::from_secs(20), "{took:?}");
     }
 
@@ -4522,10 +4529,10 @@ mod tests {
             given(tfvars, format!("x = \"{long}\"\n")),
             given("terraform.tfvars.json", format!("{{\"x\": \"{long}\"}}")),
         ];
-        // A `for` in a `for` over two lists of 240 could make about 700,000 bytes (`cost`), which
+        // A `for` in a `for` over two lists of 200 could make about 800,000 bytes (`cost`), which
         // each such value spends before its unknown `z` leaves it out: four times as many as the
         // work holds spend it, and the cheap value after them is given but unresolved.
-        let many = (0..240)
+        let many = (0..200)
             .map(|i| i.to_string())
             .collect::<Vec<_>>()
             .join(", ");
