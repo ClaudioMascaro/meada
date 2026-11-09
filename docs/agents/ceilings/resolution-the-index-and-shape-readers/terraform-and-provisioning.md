@@ -90,9 +90,11 @@
   as `iac::size` counts it; past it, the value is unresolved, and a template past it is `*`
   whole), `EVAL_COST_MAX` (1 MiB of evaluation steps one expression could take, `iac::cost`'s
   upper bound: a step is a byte made or, as `hcl-rs` parses a template again at each evaluation,
-  `TEMPLATE_PARSE_COST` (32) per byte of template text each time it runs, #714; past it `hcl-rs`
-  does not evaluate the expression, only its template parts resolve; measured in a debug build,
-  an expression at the ceiling takes about 0.2 s) and `EVAL_WORK_MAX` (64 MiB of cost per root
+  `TEMPLATE_PARSE_COST` (32) per byte of template text each time it runs in a `for`, whatever the
+  text holds, so a long literal template repeated a few times is refused; one outside every `for`
+  is parsed once and not charged, #714; past it `hcl-rs` does not evaluate the expression, only
+  its template parts resolve, and the refusal spends no work; measured in a debug build, an
+  expression at the ceiling takes about 0.2 s) and `EVAL_WORK_MAX` (64 MiB of cost per root
   module, about 15 s of a debug build at worst; past it every value left is unresolved;
   converting an object literal for `hcl-rs` also spends the square of its keys, so a wide local
   evaluated in many module instances stops there; their nodes stay, named `*`). A var file's

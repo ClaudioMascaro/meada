@@ -103,15 +103,16 @@ const OVERRIDABLE_MAX: usize = 32;
 const EVAL_VALUE_MAX: usize = 64 << 10;
 
 /// The cost one expression may have at most (`cost`, an upper bound of its evaluation steps: a
-/// byte made or `TEMPLATE_PARSE_COST` of a template's text parsed) for `hcl-rs` to evaluate it;
-/// past it the expression is unresolved, but for its template parts.
+/// byte made or `TEMPLATE_PARSE_COST` of a template's text parsed again in a `for`) for `hcl-rs`
+/// to evaluate it; past it the expression is unresolved, but for its template parts, and spends
+/// none of the work.
 // ponytail: a `for` over a map of a few hundred entries costs a few hundred KiB; 1 MiB stops a
 // `for` inside a `for` over wide lists, and a template in a `for` before it takes a second.
 const EVAL_COST_MAX: usize = 1 << 20;
 
-/// The cost of one byte of a template's source text at each evaluation: `hcl-rs` keeps a template
-/// as text and parses it again every time it evaluates it, so a template in a `for` is parsed
-/// once per element.
+/// The cost of one byte of a template's source text at each evaluation in a `for`, whatever the
+/// text holds: `hcl-rs` keeps a template as text and parses it again every time it evaluates it,
+/// so a template in a `for` is parsed once per element.
 // ponytail: measured end to end on 2026-11-09 in a debug build (the text `hcl-rs` parses is the
 // `Exact` rewrite, longer than the source), a template takes 3 to 7 µs a byte of its source, where
 // the other steps take about 0.3 µs a unit of cost; 32 covers the slowest form.
@@ -1136,7 +1137,7 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
                     (None, false) => continue,
                 }
             } else {
-                work = work.saturating_sub(EVAL_COST_MAX.min(cost));
+                // Refused, it evaluates nothing: it spends nothing either.
                 None
             };
             let at = line(a.span().map_or(0, |s| s.start));
@@ -1400,6 +1401,23 @@ fn bound<'v>(t: &Traversal, roots: &'v Map<String, Value>) -> Option<&'v Value> 
     Some(v)
 }
 
+/// Whether `name` is the variable of a `for` around (`iters`), which hides a root of that name.
+fn shadowed(name: &str, iters: &[(String, usize)]) -> bool {
+    iters.iter().any(|(n, _)| n == name)
+}
+
+/// The value `t` reads from `roots` (`bound`), unless a `for` variable hides its root.
+fn unshadowed<'v>(
+    t: &Traversal,
+    roots: &'v Map<String, Value>,
+    iters: &[(String, usize)],
+) -> Option<&'v Value> {
+    match &t.expr {
+        Expression::Variable(v) if shadowed(v.as_str(), iters) => None,
+        _ => bound(t, roots),
+    }
+}
+
 /// The steps evaluating `expr` takes at most (`cost`), its variables bound to `roots`: the bytes
 /// it makes and the template text `hcl-rs` parses on the way.
 fn steps(expr: &Expression, roots: &Map<String, Value>) -> usize {
@@ -1411,7 +1429,7 @@ fn steps(expr: &Expression, roots: &Map<String, Value>) -> usize {
 /// An upper bound of the bytes evaluating `expr` makes, its variables bound to `roots` and the
 /// iterator variables of the `for` around it to `iters` (a name and the most one element holds);
 /// `parsed` grows by `TEMPLATE_PARSE_COST` a byte of each template's text each time it is
-/// evaluated, kept apart so an element count estimated from the bytes does not multiply it. A
+/// evaluated in a `for`, kept apart so an element count estimated from the bytes does not multiply it. A
 /// product (a `for`, `formatlist`, `join`, `replace`) multiplies, a function that may grow its
 /// input (a `format` width, `jsonencode`'s escapes, `split`'s quotes, a case change) grows it, and
 /// anything else adds up.
@@ -1438,11 +1456,11 @@ fn cost(
             })
             .fold(2, add),
         Expression::StringTemplate(t) => {
-            *parsed = add(*parsed, parse_cost(t.span(), t));
+            *parsed = add(*parsed, parse_cost(t.span(), t, iters));
             template_cost(t, roots, iters, parsed)
         }
         Expression::HeredocTemplate(h) => {
-            *parsed = add(*parsed, parse_cost(h.span(), &h.template));
+            *parsed = add(*parsed, parse_cost(h.span(), &h.template, iters));
             template_cost(&h.template, roots, iters, parsed)
         }
         Expression::Parenthesis(p) => cost(p.inner(), roots, iters, parsed),
@@ -1456,9 +1474,9 @@ fn cost(
                 _ => None,
             });
             let indices = indices.collect::<Vec<_>>().into_iter().fold(0, add);
-            let base = match bound(t, roots) {
-                Some(v) if iters.is_empty() => size(v),
-                _ => cost(&t.expr, roots, iters, parsed),
+            let base = match unshadowed(t, roots, iters) {
+                Some(v) => size(v),
+                None => cost(&t.expr, roots, iters, parsed),
             };
             add(base, indices)
         }
@@ -1511,9 +1529,13 @@ fn cost(
     }
 }
 
-/// What parsing the template `t` again costs at one evaluation, its text spanning `span` (a
-/// template built rather than read has none, so its text is written out).
-fn parse_cost(span: Option<Range<usize>>, t: &Template) -> usize {
+/// What parsing the template `t` again costs at one evaluation in a `for` (`iters`), its text
+/// spanning `span` (a template built rather than read has none, so its text is written out).
+/// Outside every `for` it is parsed once, in time its file's size already bounds: nothing.
+fn parse_cost(span: Option<Range<usize>>, t: &Template, iters: &[(String, usize)]) -> usize {
+    if iters.is_empty() {
+        return 0;
+    }
     let len = span.map_or_else(|| t.to_string().len(), |s| s.len());
     len.saturating_mul(TEMPLATE_PARSE_COST)
 }
@@ -1581,8 +1603,8 @@ fn elements(
         return elements(arg, roots, iters, parsed);
     }
     let found = match expr {
-        Expression::Traversal(t) if iters.is_empty() => bound(t, roots),
-        Expression::Variable(v) if iters.is_empty() => roots.get(v.as_str()),
+        Expression::Traversal(t) => unshadowed(t, roots, iters),
+        Expression::Variable(v) if !shadowed(v.as_str(), iters) => roots.get(v.as_str()),
         _ => None,
     };
     let most = |sizes: &mut dyn Iterator<Item = usize>| sizes.max().unwrap_or(0);
@@ -2219,9 +2241,8 @@ impl<'m> Eval<'m> {
                 }
                 _ => {}
             }
-        } else {
-            self.work = self.work.saturating_sub(EVAL_COST_MAX.min(cost));
         }
+        // A refused expression spends nothing: the parts `partial` evaluates pass this gate.
         self.partial(at, each, expr, depth)
     }
 
@@ -4416,7 +4437,8 @@ mod tests {
         ];
         // A `for` in a `for` over two lists of 30 could make about 700,000 bytes (`cost`), which
         // each such value spends before its unknown `z` leaves it out: four times as many as the
-        // work holds spend it, and the cheap value after them is given but unresolved.
+        // work holds spend it (those refused spend nothing), and a value after them costing more
+        // than the work left is given but unresolved.
         let thirty = (0..30)
             .map(|i| i.to_string())
             .collect::<Vec<_>>()
@@ -4424,7 +4446,8 @@ mod tests {
         let costly = format!("[for a in [{thirty}] : [for b in [{thirty}] : z]]");
         let n = 4 * EVAL_WORK_MAX / EVAL_COST_MAX;
         let values: String = (0..n).map(|i| format!("x{i} = {costly}\n")).collect();
-        let values = format!("first = \"ok\"\n{values}last = \"ok\"\n");
+        let last = format!("[for a in [{thirty}] : [for b in [{thirty}] : \"ok-ok-ok\"]][0][0]");
+        let values = format!("first = \"ok\"\n{values}last = {last}\n");
         let main = concat!(
             "variable \"first\" { default = \"\" }\nvariable \"last\" { default = \"\" }\n",
             "resource \"a\" \"first\" { name = \"q-${var.first}\" }\n",
@@ -4494,6 +4517,7 @@ mod tests {
     /// are charged too, so at `m = 8000, k = 40` (9.6 s in a debug build before) it is unresolved
     /// before it runs, alone or 64 times in a root, with no resource left out; over 100 elements
     /// it still resolves. Measured on 2026-11-09 in a debug build: 0.35 s for the whole test.
+    /// (The literal `q-` of each stays: a refused expression spends none of the root's work.)
     #[test]
     fn a_template_in_a_wide_for_is_bounded_by_its_steps() {
         let body = "${a}".repeat(40);
@@ -4520,9 +4544,8 @@ mod tests {
         for (n, secs) in [(1, 1), (64, 4)] {
             let (got, took) = root(8000, n);
             assert_eq!(got.len(), n);
-            // Past `EVAL_COST_MAX`, then past the root's `EVAL_WORK_MAX`, which the first spend.
-            let unresolved = |s: &String| s.ends_with(" ~ \"q-*\"") || s.ends_with(" ~ \"*\"");
-            assert!(got.iter().all(unresolved), "{got:?}");
+            // Each past `EVAL_COST_MAX`, refused without spending the root's `EVAL_WORK_MAX`.
+            assert!(got.iter().all(|s| s.ends_with(" ~ \"q-*\"")), "{got:?}");
             assert!(took < std::time::Duration::from_secs(secs), "{n}: {took:?}");
         }
     }
@@ -4546,6 +4569,79 @@ mod tests {
                 "a.t = \"q-30\" [var.l main.tf:1]",
             ]
         );
+    }
+
+    /// A root variable read in a `for` body is bound there too, unless a `for` variable hides it:
+    /// a `for` over `var.l` inside a `for` counts its elements, not the bytes of all of `var`, so
+    /// the product of two lists (625 evaluations of a template) or of three resolves.
+    #[test]
+    fn a_for_in_a_for_body_counts_the_elements_it_reads() {
+        let list = |n: usize| {
+            (0..n)
+                .map(|i| format!("\"{i}\""))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let root = |n: usize, name: &str| {
+            let main = format!(
+                "variable \"l\" {{ default = [{}] }}\nresource \"a\" \"p\" {{ name = \"{name}\" }}\n",
+                list(n)
+            );
+            names(&[("main.tf", &main)])
+        };
+        let two = "q-${length([for a in var.l : [for b in var.l : \"${a}${b}\"]])}";
+        let three = "q-${length([for a in var.l : [for b in var.l : [for c in var.l : \"${a}${b}${c}\"]]])}";
+        // A `for` variable named as a root hides it: `var.l` is then the element's, not bound.
+        let hidden = "q-${length([for var in [{l = [1]}] : [for b in var.l : \"${b}\"]])}";
+        assert_eq!(
+            [root(25, two), root(5, three), root(2, hidden)],
+            [
+                vec!["a.p = \"q-25\" [var.l main.tf:1]".to_string()],
+                vec!["a.p = \"q-5\" [var.l main.tf:1]".to_string()],
+                vec!["a.p = \"q-1\" [var.l main.tf:1]".to_string()],
+            ]
+        );
+    }
+
+    /// A template outside every `for` is parsed once, in time its file's size bounds: it is not
+    /// charged per byte of its text, so one of 33 KB resolves.
+    #[test]
+    fn a_long_template_evaluated_once_resolves() {
+        let long = "a".repeat(33_000);
+        let main = format!(
+            "variable \"x\" {{ default = \"x\" }}\nresource \"a\" \"q\" {{ name = \"q-%{{ if var.x == \"x\" }}${{var.x}}%{{ endif }}{long}\" }}\n"
+        );
+        assert_eq!(
+            names(&[("main.tf", &main)]),
+            [format!("a.q = \"q-x{long}\" [var.x main.tf:1]")]
+        );
+    }
+
+    /// A refused expression evaluates nothing, so it spends none of the root's `EVAL_WORK_MAX`:
+    /// after 32 refusals, which each spent `EVAL_COST_MAX` before, a constant name still
+    /// resolves.
+    #[test]
+    fn a_refused_expression_spends_none_of_the_root_work() {
+        let items = vec!["\"a\""; 8000].join(", ");
+        let body = "${a}".repeat(40);
+        let refused: String = (0..32)
+            .map(|i| {
+                format!(
+                    "resource \"a\" \"r{i}\" {{ name = \"q-${{length([for a in var.items : \"{body}\"])}}\" }}\n"
+                )
+            })
+            .collect();
+        let main = format!(
+            "variable \"items\" {{}}\n{refused}resource \"a\" \"z\" {{ name = \"constant\" }}\n"
+        );
+        let tfvars = format!("items = [{items}]\n");
+        let got = names(&[("main.tf", &main), ("terraform.tfvars", &tfvars)]);
+        assert_eq!(got.len(), 33);
+        assert!(
+            got[..32].iter().all(|s| s.ends_with(" ~ \"q-*\"")),
+            "{got:?}"
+        );
+        assert!(got.contains(&"a.z = \"constant\"".to_string()), "{got:?}");
     }
 
     /// Converting an object literal for `hcl-rs` checks each key against those before it, so
