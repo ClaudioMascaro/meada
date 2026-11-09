@@ -13,20 +13,22 @@ The kind declares repository-level providers with `at`, workload consumers from 
 and Kubernetes images, and Helm `image.repository` consumers. `iac/types.toml` marks workload
 types. Image normalization expands Docker Hub names, removes tags/digests and lowercases names.
 Unknown interpolations remain patterns; the IaC pattern matcher enforces the existing literal
-and segment ceilings. A literal name is exact, defaults and Helm values inferred (a Helm `image.registry` prefixes
-`image.repository`), and distinct matching image candidates ambiguous, including two images
-built by the same repository. Duplicate build evidence for one repository and image is collapsed
+and segment ceilings. A literal name is exact, defaults and Helm values inferred (a Helm
+`image.registry` prefixes `image.repository` unless it already starts with it, a templated
+registry a `*`), and distinct matching image candidates ambiguous, including two images built by
+the same repository. Duplicate build evidence for one repository and image is collapsed
 to its strongest evidence, and a repository's literal name covers its own pattern matching the
 same runner.
 
 `ContractKind::executions` lets the shared trace follow workloads into repository entry points
-and code back to workloads. Same-repository direct paths are exact without an image link (inferred when the path went
-through a value a deployer can override, such as `${CTX:-./app}`) and
+and code back to workloads. Same-repository direct paths are exact without an image link
+(inferred when the path went through a value a deployer can override, such as `${CTX:-./app}`) and
 appear in the optional `executions` export array; a direct execution replaces a workload's
 image side in its own root only (`image::runs_locally`). Paths are normalized inside the root and
 cross no symlink; a changed path is rechecked even when the Compose file did not change.
 `scope_status` and `side_note` implement the two-role orphan rule in the visible workspace; an
-unresolved image name (`image::*`, a `docker/metadata-action` output) is neither role nor orphan.
+unresolved image name (`image::*`, a `docker/metadata-action` output) is neither role nor orphan,
+so a scope whose only builder or runner it is reports no image orphan at all.
 `exports_repository_links` includes repository-level builders in their own export without
 changing the export scope of earlier kinds. IaC spans also let ambiguous workload consumers
 be open items with the provider's own image identities as decision candidates.

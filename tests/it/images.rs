@@ -892,6 +892,38 @@ fn image_levels_and_names_follow_defaults_registries_and_unresolved_names() {
             .any(|c| c["contract"] == "image::docker.io/acme/orders"),
         "{export}"
     );
+    // A registry with a trailing slash, one a template sets, and a repository that already
+    // names it.
+    for (values, expected) in [
+        (
+            "registry: ghcr.io/\n  repository: acme/orders",
+            "image::ghcr.io/acme/orders",
+        ),
+        (
+            "registry: \"{{ .Values.r }}\"\n  repository: acme/orders",
+            "image::*/acme/orders",
+        ),
+        (
+            "registry: ghcr.io\n  repository: ghcr.io/acme/orders",
+            "image::ghcr.io/acme/orders",
+        ),
+    ] {
+        std::fs::write(deploy.join("values.yaml"), format!("image:\n  {values}\n")).unwrap();
+        let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+        let helm = (export["consumers"].as_array().unwrap().iter())
+            .find(|c| {
+                c["site"]
+                    .as_str()
+                    .is_some_and(|s| s.contains("values.yaml"))
+            })
+            .map(|c| c["contract"].clone());
+        assert_eq!(helm, Some(expected.into()), "{values}: {export}");
+    }
+    std::fs::write(
+        deploy.join("values.yaml"),
+        "image:\n  registry: ghcr.io\n  repository: acme/orders\n  tag: v3\n",
+    )
+    .unwrap();
     // One link per runner, the Helm one inferred from its value.
     let links = export["links"].as_array().unwrap();
     assert_eq!(links.len(), 2, "{export}");

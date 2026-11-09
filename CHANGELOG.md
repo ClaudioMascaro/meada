@@ -210,7 +210,8 @@ All notable changes to Meada are recorded here. The format follows
   for all the roots of a repository (its files named `app-config.yaml` first, then the others in
   path order; an include counting its file's bytes, or its value's size when YAML aliases make it
   larger, an include past its root's limit included) are not followed, and a partial that does
-  not parse is parsed once per reading, charged what reading it built:
+  not parse is parsed once per reading, charged its bytes or, holding several documents, what
+  reading them built:
   their keys stay unread and `meada status` names each include with its reason. `$file` stays
   unread, and a config file past 1 MiB is dropped, not parsed by half. The index schema golden
   changes (it now lists the stored roles), so existing indexes are rebuilt (#689).
@@ -323,8 +324,9 @@ All notable changes to Meada are recorded here. The format follows
   `via`. A change through `u.searchParams`, `u.search` or `u.hash` keeps the path; a write to any
   other member of a `new URL` constant, written in parentheses or a type assertion too, leaves it
   unresolved, also through a destructuring or `for (.. of ..)` target, `++`, `Object.assign` or
-  another name holding it, as does such a write to a sealed field (`this.url.pathname = ..`)
-  (#685).
+  another name holding it, or with the target in parentheses or an assertion, as does such a
+  write to a sealed field set where it is declared or in its constructor
+  (`this.url.pathname = ..`) (#685).
 - TypeScript consumers through `new URL(reference, base)`: the two arguments read as the join the
   WHATWG URL Standard defines (RFC 3986 section 5.2 for these references), so an absolute
   reference is itself, `//host/x` takes its host, `/orders` replaces the base's path and `orders`
@@ -408,6 +410,14 @@ All notable changes to Meada are recorded here. The format follows
   ceiling of 2^26 steps per pass apart from the evaluation ceiling, so that label stops before
   matching and `status` reports the evaluation limit, while route visits and evaluations count as
   before.
+- Alerts: an AlertmanagerConfig route links `inferred`, since prometheus-operator also matches
+  the alert's namespace, which Meada does not read (its consumers say `(AlertmanagerConfig
+  namespace)`); a Grafana rule group repeated with `count` or `for_each` declares no rule (it may
+  be made zero times); a file with a `values` word in its name (`prod-values.yaml`,
+  `values.prod.yaml`) is Helm input, not just one starting with `values`; a quoted matcher value
+  reads Alertmanager's escapes (`\n`, `\"`, `\\`), so `"a\.b"` keeps its backslash instead of
+  invalidating the route and its siblings; and the 4 MiB file ceiling charges the text a rule or
+  route stores, so 2,000 small rules (187 KB) are no longer dropped (#672).
 - A Python file of thousands of AWS SDK operations on clients a factory function returns no
   longer takes minutes to index: the operations one reader asks about in a file keep the answers
   no limit cut and share a budget of 2^18 steps, one operation taking up to all that is left
@@ -491,11 +501,16 @@ All notable changes to Meada are recorded here. The format follows
 - Images: a module run from a local path (an archive or a directory) in one root no longer drops
   the image another root runs it from, with its environment and provisions; only that root runs
   code without an image.
+- Terraform: `split(",", "")` gives one empty element (a `count` over its length made no node),
+  a value a variable or local binds walks its object keys in lexical order (a `for` over it or a
+  `jsonencode` of it gave an `exact` name in written order), and an IaC name pattern needs three
+  letters or digits besides its wildcards (`*.*.*.*` matched any dotted name).
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes
-  `image.repository`, where the runner named a Docker Hub image; and an unresolved image name
-  (`image::*`, from `docker/metadata-action`) is no `status` orphan.
+  `image.repository` (a templated one as an unresolved segment), where the runner named a Docker
+  Hub image; and an unresolved image name (`image::*`, from `docker/metadata-action`) is no
+  `status` orphan.
 - Compose: an override file's `build` with no `context` keeps the base service's context, where
   it built from the override's directory, and the `!reset` and `!override` tags clear or replace a
   base value. SAM: a function with no `CodeUri` of its own takes `Globals.Function.CodeUri`.

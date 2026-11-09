@@ -41,9 +41,9 @@ receiver without a file scan. These helpers own no SDK operation table. Name rea
 `Code::expand`, so wrapper arguments follow exact callers only; TS commands, SQS's channel commands included,
 use `Code::expand_written`, where a field of the input assigned or `Object.assign`ed after the
 object is made, before the call, is unknown, and a field read off a local object
-(`{Bucket: cfg.bucket}`) names it unless that field is written before the call. A command held
-in a variable reads its input where it is made: a write between `new PutObjectCommand(input)`
-and `send(cmd)` is not seen. TS SDK commands require both
+(`{Bucket: cfg.bucket}`) names it unless that field is written before the call. An SQS command
+held in a variable reads its input where it is made: a write between
+`new SendMessageCommand(input)` and `send(cmd)` is not seen (an S3 or SNS command sees it). TS SDK commands require both
 a constant client from the corresponding SDK constructor and a command from that package.
 Python requires a matching literal boto3 service, including a Session's client.
 `names/python/arguments.rs` checks every return alternative with memoized constructor and

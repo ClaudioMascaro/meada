@@ -117,9 +117,13 @@ pub(crate) fn rebuilt<'a>(
                         || unbuilt(&b.value) && root(&b.value) == Some(local)
                 })
     };
-    // A step that still returns the builder; `build()` makes the request, which cannot change.
+    // A step that still returns the builder: `build()` makes the request, which cannot change,
+    // and `Object`'s methods return a value of their own.
     fn unbuilt(value: &Value) -> bool {
-        matches!(value, Value::Call(c) if crate::resolve::method(&c.callee) != "build")
+        matches!(value, Value::Call(c) if !matches!(
+            crate::resolve::method(&c.callee),
+            "build" | "toString" | "hashCode" | "equals" | "getClass"
+        ))
     }
     let holds = |value: &Value| match value {
         Value::Ref(name) => named(name),

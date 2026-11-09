@@ -1,6 +1,6 @@
 //! Bounded matching of unresolved IaC names against literal names (ADR 0026).
 
-// ponytail: below three literal characters a pattern gives too little evidence of a name.
+// ponytail: below three letters or digits a pattern gives too little evidence of a name.
 const PATTERN_LITERAL_MIN: usize = 3;
 // ponytail: a wildcard replaces whole segments, never part of a word.
 const PATTERN_SEGMENTS: &str = "-_./";
@@ -9,7 +9,7 @@ const PATTERN_TEXT_MAX: usize = 1024;
 
 pub(crate) fn supported(pattern: &str) -> bool {
     if pattern.len() > PATTERN_TEXT_MAX
-        || pattern.chars().filter(|&c| c != '*').count() < PATTERN_LITERAL_MIN
+        || pattern.chars().filter(|c| c.is_alphanumeric()).count() < PATTERN_LITERAL_MIN
     {
         return false;
     }
@@ -56,8 +56,10 @@ mod tests {
     #[test]
     fn patterns_require_literal_evidence_and_whole_segments() {
         for (pattern, name, expected) in [
-            ("ab-*", "ab-prod", true),
+            ("abc-*", "abc-prod", true),
+            ("ab-*", "ab-prod", false),
             ("a-*", "a-prod", false),
+            ("*.*.*.*", "a.b.c.d", false),
             ("orders*", "ordersprod", false),
             ("ord*rs", "orders", false),
             ("*-orders", "prod-orders", true),
@@ -86,10 +88,11 @@ mod tests {
 
     #[test]
     fn literal_and_segment_ceilings_reject_inputs_beyond_their_allowed_values() {
-        // Below the three-character anchor: a separator is literal too.
-        assert!(!supported("*-a"));
-        assert!(supported("*-ab"));
-        assert!(matches("*-ab", "prod-ab"));
+        // Below the three-character anchor: separators are no evidence.
+        assert!(!supported("*-ab"));
+        assert!(!supported("*.*.*.*"));
+        assert!(supported("*-abc"));
+        assert!(matches("*-abc", "prod-abc"));
         // Colon and letter boundaries are outside the four accepted separators.
         for pattern in ["orders:*", "*:orders", "orders*", "*orders", "orders-**"] {
             assert!(!supported(pattern), "{pattern}");

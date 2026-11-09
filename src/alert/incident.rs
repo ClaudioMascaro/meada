@@ -389,6 +389,7 @@ fn read(
     let route = Route {
         key,
         unknown_scope: receiver.is_none(),
+        namespaced: false,
         receiver: receiver.unwrap_or_else(|| "unresolved incident scope".into()),
         line,
         end_line,
@@ -532,6 +533,7 @@ fn pagerduty(
                 opaque: false,
                 barrier: false,
                 unknown_scope: false,
+                namespaced: false,
             };
             if config::charge(&item, bytes) && config::charge_route(&item, path, &out.routes, bytes)
             {

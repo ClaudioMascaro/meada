@@ -1081,8 +1081,11 @@ fn members_written(node: Node, src: &[u8], out: &mut HashSet<String>) {
     let mut targets = Vec::new();
     match node.kind() {
         "assignment_expression" | "augmented_assignment_expression" => {
-            targets.extend(node.child_by_field_name("left"));
-            if node.kind() == "assignment_expression" {
+            let left = node.child_by_field_name("left");
+            targets.extend(left);
+            if node.kind() == "assignment_expression"
+                && left.is_some_and(|l| l.kind() == "identifier")
+            {
                 out.extend((node.child_by_field_name("right")).and_then(|r| object(unwrapped(r))));
             }
         }
@@ -1090,7 +1093,9 @@ fn members_written(node: Node, src: &[u8], out: &mut HashSet<String>) {
         "for_in_statement" if node.child_by_field_name("kind").is_none() => {
             targets.extend(node.child_by_field_name("left"));
         }
-        "variable_declarator" => {
+        "variable_declarator"
+            if (node.child_by_field_name("name")).is_some_and(|n| n.kind() == "identifier") =>
+        {
             out.extend((node.child_by_field_name("value")).and_then(|v| object(unwrapped(v))));
         }
         "call_expression"
@@ -1117,7 +1122,8 @@ fn members_written(node: Node, src: &[u8], out: &mut HashSet<String>) {
                     _ => String::new(),
                 });
                 if member != "search" && member != "hash" {
-                    out.extend(target.child_by_field_name("object").and_then(object));
+                    let written = target.child_by_field_name("object").map(unwrapped);
+                    out.extend(written.and_then(object));
                 }
             }
             "pair_pattern" => targets.extend(target.child_by_field_name("value")),
@@ -2085,7 +2091,14 @@ fn member_writes(
         .then(|| node.child_by_field_name("right"))
         .flatten()
         .filter(|v| !FUNCTIONS.contains(&v.kind()) && v.kind() != "class")
-        .map(|v| value(v, src, scope, up));
+        .map(|v| {
+            let rewritten = is_url_new(unwrapped(v), src, up)
+                && name.is_some_and(|n| up.written.contains(&format!("this.{n}")));
+            match rewritten {
+                true => Value::Unknown,
+                false => value(v, src, scope, up),
+            }
+        });
         out.push((name.map(str::to_string), plain));
     }
     out
@@ -2604,8 +2617,16 @@ mod tests {
             "Object.assign(u, { pathname: '/b' });",
             "const v = u; v.pathname = '/b';",
             "let v; v = u; v.pathname = '/b';",
+            // A target in parentheses or an assertion is the name.
+            "(u).pathname = '/b';",
+            "u!.pathname = '/b';",
+            "(u as URL).port++;",
         ] {
             assert!(unknown(&format!("{url}{write}")), "{write}");
+        }
+        // Reading its members into other names leaves it as it was.
+        for read in ["const { pathname } = u;", "({ pathname: p } = u);"] {
+            assert!(!unknown(&format!("{url}{read}")), "{read}");
         }
         // The initializer may be wrapped in parentheses or a type assertion.
         for made in [
@@ -2634,6 +2655,20 @@ mod tests {
         assert!(field("this.url.search = '?k';"));
         assert!(!field("this.url.pathname = '/b';"));
         assert!(!field("Object.assign(this.url, { pathname: '/b' });"));
+        assert!(!field("(this.url).pathname = '/b';"));
+        // So does one its constructor builds.
+        let built = |write: &str| {
+            let facts = parse(&format!(
+                "class C {{\n  private readonly url: URL;\n  constructor() {{ this.url = \
+                 new URL('https://h.example.com/a'); }}\n  go() {{ {write} fetch(this.url.href); \
+                 }}\n}}\n"
+            ));
+            (facts.consts.iter())
+                .find(|c| c.name == "C.url")
+                .is_some_and(|c| !matches!(c.value, Value::Unknown))
+        };
+        assert!(built(""));
+        assert!(!built("this.url.pathname = '/b';"));
         // The pass-through forms of a written name stay calls and members, as they were.
         let facts = parse(&format!(
             "{url}u.pathname = '/b'; fetch(u.toString()); fetch(u.href);"

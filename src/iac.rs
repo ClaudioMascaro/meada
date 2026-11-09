@@ -1001,6 +1001,23 @@ impl Evaluated {
     }
 }
 
+/// `v` with every object's keys in lexical order, the order Terraform walks them in.
+// ponytail: an object literal written inside the expression keeps its written order; sort
+// `hcl-rs`'s object results if one is ever iterated in place.
+fn lexical(v: Value) -> Value {
+    match v {
+        Value::Object(map) => {
+            let mut entries = (map.into_iter())
+                .map(|(k, v)| (k, lexical(v)))
+                .collect::<Vec<_>>();
+            entries.sort_by(|a, b| a.0.cmp(&b.0));
+            Value::Object(entries.into_iter().collect())
+        }
+        Value::Array(items) => Value::Array(items.into_iter().map(lexical).collect()),
+        v => v,
+    }
+}
+
 /// The bytes `v` holds as JSON, about: what the value ceilings count.
 fn size(v: &Value) -> usize {
     match v {
@@ -1785,7 +1802,7 @@ impl<'m> Eval<'m> {
             ("count", count_v),
         ]
         .into_iter()
-        .map(|(k, v)| (k.to_string(), Value::Object(v)))
+        .map(|(k, v)| (k.to_string(), lexical(Value::Object(v))))
         .collect();
         let cost = cost(expr, &roots, &mut Vec::new()).max(1);
         let spend = cost.saturating_add(widths(expr));
@@ -3240,7 +3257,7 @@ mod tests {
     #[test]
     fn the_pure_functions_resolve_names_and_any_other_call_stays_unresolved() {
         let text = concat!(
-            "locals {\n  svc = \"orders\"\n  tags = { team = \"shop\" }\n}\n",
+            "locals {\n  svc = \"orders\"\n  tags = { team = \"shop\" }\n  m = { zeta = \"zz\", alpha = \"aa\" }\n}\n",
             "resource \"a\" \"format\" { name = format(\"%s-%03d-%%-%v\", local.svc, 7, true) }\n",
             "resource \"a\" \"formatlist\" { name = join(\",\", formatlist(\"q-%s\", [\"a\", \"b\"])) }\n",
             "resource \"a\" \"split\" { name = join(\"-\", concat([\"a\"], split(\",\", \"b,c\"))) }\n",
@@ -3258,6 +3275,13 @@ mod tests {
             "resource \"a\" \"file\" { name = \"q-${file(\"name.txt\")}\" }\n",
             "resource \"a\" \"verb\" { name = format(\"%x\", 10) }\n",
             "resource \"a\" \"wide\" { name = format(\"%257d\", 1) }\n",
+            // Terraform splits an empty string into one empty element and walks an object's
+            // keys in lexical order.
+            "resource \"a\" \"empty\" { name = \"q-${length(split(\",\", \"\"))}\" }\n",
+            "resource \"a\" \"forobj\" { name = join(\"-\", [for k, v in local.m : v]) }\n",
+            "resource \"a\" \"directive\" { name = \"%{ for k, v in local.m }${v}%{ endfor }-q\" }\n",
+            "resource \"a\" \"first\" { name = \"first-${[for k, v in local.m : k][0]}\" }\n",
+            "resource \"a\" \"ordered\" { name = jsonencode(local.m) }\n",
         );
         assert_eq!(
             names(&[("main.tf", text)]),
@@ -3279,6 +3303,11 @@ mod tests {
                 "a.file ~ \"q-*\"",
                 "a.verb ~ \"*\"",
                 "a.wide ~ \"*\"",
+                "a.empty = \"q-1\"",
+                "a.forobj = \"aa-zz\"",
+                "a.directive ~ \"*-q\"",
+                "a.first = \"first-alpha\"",
+                "a.ordered = \"{\\\"alpha\\\":\\\"aa\\\",\\\"zeta\\\":\\\"zz\\\"}\"",
             ]
         );
     }

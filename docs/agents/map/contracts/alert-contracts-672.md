@@ -13,7 +13,13 @@ Matcher-free root fallbacks have no alert side: no label key/value is written. R
 conditions, inherited receivers and sibling `continue` are read, while the graph does not
 predict final notifications, inhibition or time intervals. Unknown label values do not select
 a later non-continuing sibling by guess. Literal Grafana `grafana_rule_group.rule` labels
-also come from HCL/OpenTofu and Terraform JSON; dynamic blocks and expressions are not emitters.
+also come from HCL/OpenTofu and Terraform JSON; dynamic blocks, expressions and a group
+repeated with `count` or `for_each` (made any number of times, zero included) are not emitters.
+A file with a `values` word in its name (`values.yaml`, `prod-values.yaml`, `values.prod.yaml`)
+or under `templates/` is Helm input, not monitoring configuration. A quoted matcher reads
+Alertmanager's escapes (`\n`, `\"`, `\\`); any other backslash stays in the value. An
+AlertmanagerConfig route also matches its own namespace, which is not read: its conditions are
+`inferred`, their consumers' `via` ending in `(AlertmanagerConfig namespace)`.
 
 `ContractKind::workspace_links` optionally replaces the per-consumer hook for a kind;
 alert uses it to compile each route tree once and evaluate each rule once per tree. Optional

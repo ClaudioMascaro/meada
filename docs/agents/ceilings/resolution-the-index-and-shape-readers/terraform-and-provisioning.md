@@ -79,7 +79,7 @@
   text as the name, bounding the form matcher. The table covers SQS queues and S3 buckets in
   `.tf`, `.tf.json`, `.tofu` and `.tofu.json` resource blocks. Data blocks and unlisted types
   make no provisioner.
-  `iac/pattern.rs`: `PATTERN_LITERAL_MIN` (3 literal characters), `PATTERN_SEGMENTS` (`-_./`)
+  `iac/pattern.rs`: `PATTERN_LITERAL_MIN` (3 letters or digits; separators are no evidence), `PATTERN_SEGMENTS` (`-_./`)
   and `PATTERN_TEXT_MAX` (1,024 bytes for either name): a pattern outside these bounds matches
   nothing. Literal characters include written separators. Tests reject anchors below three
   characters, wildcard boundaries outside those four separators, and text above the byte
@@ -112,7 +112,10 @@
   A value cut at `EVAL_DEPTH_MAX` or around a cycle is memoized for its instance, so a shallower
   reader of the same local gets the cut value. A `for_each` over a list of strings expands
   (`toset` gives a list too, so a list Terraform refuses cannot be told apart), and `toset` over
-  mixed types keeps their first order. A function over an unresolved argument is `*` whole, even
+  mixed types keeps their first order. A value a name binds walks its object keys in lexical
+  order, as Terraform does, but an object literal written inside the expression that iterates
+  it keeps its written order, and a template `%{ for }` directive is not evaluated (a `*`).
+  A function over an unresolved argument is `*` whole, even
   `format` or `join`, which keep no literal part. A literal
   `*` in a name reads as a wildcard. A child module's variable default its call leaves is not
   overridable. Names through a cycle of locals are partly resolved, the member met again a `*`.

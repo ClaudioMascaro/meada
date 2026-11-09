@@ -1,9 +1,9 @@
 # Alert monitoring readers and routing
 
-- `ALERT_STORED_MAX` (`alert/config.rs`): 4 MiB per monitoring file, charging stored
-  facts, every projected rule/route IaC node field and the provider/consumer fields they
-  materialize, including inherited conditions, repeated labels and long route paths; reaching
-  it discards that file's alert facts. Pending routes retain parent indexes rather than copying
+- `ALERT_STORED_MAX` (`alert/config.rs`): 4 MiB per monitoring file, charging the text of
+  stored facts, every projected rule/route IaC node field and the provider/consumer fields they
+  materialize, including inherited conditions, repeated labels and long route paths (a file of
+  2,000 small rules, 187 KB, fits); reaching it discards that file's alert facts. Pending routes retain parent indexes rather than copying
   inherited receivers or paths across the whole child list before visiting a child.
   The shared event reader bounds YAML/JSON nesting and alias expansion; the HCL `NESTING_MAX`
   and `OBJECT_WORK_MAX` guards bound Terraform alert and incident parsing.

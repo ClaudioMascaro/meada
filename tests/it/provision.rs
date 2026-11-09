@@ -200,6 +200,7 @@ fn patterns_link_only_literal_names_at_segment_boundaries() {
     for name in [
         "archive-prod",
         "archive-stage",
+        "abc-prod",
         "ab-prod",
         "a-prod",
         "archive",
@@ -214,7 +215,8 @@ fn patterns_link_only_literal_names_at_segment_boundaries() {
         dir.join("main.tf"),
         r#"
 resource "aws_s3_bucket" "several" { bucket = "archive-${terraform.workspace}" }
-resource "aws_s3_bucket" "minimum" { bucket = "ab-${terraform.workspace}" }
+resource "aws_s3_bucket" "minimum" { bucket = "abc-${terraform.workspace}" }
+resource "aws_s3_bucket" "separator" { bucket = "ab-${terraform.workspace}" }
 resource "aws_s3_bucket" "short" { bucket = "a-${terraform.workspace}" }
 resource "aws_s3_bucket" "inside" { bucket = "arch${terraform.workspace}ive" }
 "#,
@@ -231,7 +233,8 @@ resource "aws_s3_bucket" "inside" { bucket = "arch${terraform.workspace}ive" }
                 assert_eq!(l["level"], "ambiguous");
                 assert!(l["reason"].as_str().unwrap().contains("archive-*"));
             }
-            "resource::s3::ab-prod" => assert_eq!(l["level"], "inferred"),
+            // Three letters or digits are the minimum; a separator is no evidence.
+            "resource::s3::abc-prod" => assert_eq!(l["level"], "inferred"),
             other => panic!("unexpected pattern target {other}"),
         }
     }
@@ -254,7 +257,7 @@ resource "aws_s3_bucket" "inside" { bucket = "arch${terraform.workspace}ive" }
         )
         .unwrap();
     assert!(
-        trace.contains("provisions resource::s3::ab-prod [inferred:"),
+        trace.contains("provisions resource::s3::abc-prod [inferred:"),
         "{trace}"
     );
 }

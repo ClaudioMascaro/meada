@@ -164,7 +164,7 @@ impl ContractKind for Alert {
                         identity: None,
                         contract: Some(matcher.contract()),
                         site: node.identity(&repo.identity),
-                        via: Some(matcher.via()),
+                        via: Some(route.via(matcher)),
                         shape: None,
                         method: None,
                         fragments: Vec::new(),
@@ -698,7 +698,7 @@ fn target<'a>(
         .into_iter()
         .filter_map(|m| {
             let contract = m.contract();
-            let via = m.via();
+            let via = route.via(m);
             if !consumers.contains(&(site.as_str(), contract.as_str(), via.as_str()))
                 || !seen.insert((contract.clone(), via))
             {
@@ -707,7 +707,7 @@ fn target<'a>(
             Some((
                 m,
                 contract,
-                if m.op.inferred() {
+                if m.op.inferred() || route.namespaced {
                     Level::Inferred
                 } else {
                     Level::Exact

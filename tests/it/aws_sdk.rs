@@ -511,6 +511,8 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
          void aliased() { var sns = SnsClient.create(); var a = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old-aliased\"); var o = a; o.topicArn(\"arn:aws:sns:us-east-1:123:x\"); sns.publish(a.build()); }\n\
          void passed() { var sns = SnsClient.create(); var p = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old-passed\"); retarget(p.message(\"m\")); sns.publish(p.build()); }\n\
          void fielded() { var sns = SnsClient.create(); sns.publish(field.build()); }\n\
+         void logged() { var sns = SnsClient.create(); var l = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:kept-logged\"); System.out.println(l.toString()); log(l.hashCode()); sns.publish(l.build()); }\n\
+         void log(int h) {}\n\
          private final PublishRequest.Builder base = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:kept-base\");\n\
          void one() { var sns = SnsClient.create(); sns.publish(base.message(\"a\").build()); }\n\
          void two() { var sns = SnsClient.create(); sns.publish(base.message(\"b\").build()); var t = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:kept-twice\"); sns.publish(t.build()); sns.publish(t.message(\"c\").build()); }\n}\n",
@@ -567,6 +569,7 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
         "channel::sqs::kept-queue",
         "channel::sns::kept-base",
         "channel::sns::kept-twice",
+        "channel::sns::kept-logged",
     ] {
         assert!(contracts.contains(&kept), "{kept}: {contracts:?}");
     }

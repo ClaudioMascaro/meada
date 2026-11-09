@@ -202,13 +202,27 @@ pub(super) struct Route {
     pub barrier: bool,
     #[serde(default)]
     pub unknown_scope: bool,
+    /// An AlertmanagerConfig route: prometheus-operator also matches its own namespace, which
+    /// Meada does not read, so its links are `inferred`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub namespaced: bool,
+}
+const NAMESPACED: &str = " (AlertmanagerConfig namespace)";
+impl Route {
+    pub fn via(&self, matcher: &Matcher) -> String {
+        if self.namespaced {
+            format!("{}{NAMESPACED}", matcher.via())
+        } else {
+            matcher.via()
+        }
+    }
 }
 
 pub(super) type Spans = BTreeMap<(usize, String), (usize, usize)>;
 
 pub(super) fn is_file(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
-    !name.starts_with("values")
+    !name.split(['.', '-', '_']).any(|word| word == "values")
         && !path.split('/').any(|part| part == "templates")
         && !crate::config_values::lockfile(path)
         && [".yaml", ".yml", ".json", ".tf", ".tofu"]
@@ -490,6 +504,7 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
                     opaque: false,
                     barrier: false,
                     unknown_scope: false,
+                    namespaced: !base.is_empty(),
                 };
                 if !charge(&item, &mut bytes) || !charge_route(&item, path, &out.routes, &mut bytes)
                 {
@@ -566,7 +581,8 @@ fn matchers(route: &Value) -> Option<Vec<Matcher>> {
         .then_some(out)
 }
 
-// A quoted key or value uses the same escapes as JSON. Commas inside strings are literal.
+// A quoted key or value uses Alertmanager's escapes (see `token`). Commas inside strings are
+// literal.
 fn expressions(text: &str) -> Option<Vec<Matcher>> {
     let text = text.trim();
     let text = if text.starts_with('{') {
@@ -635,8 +651,22 @@ fn expression(text: &str) -> Option<Matcher> {
     None
 }
 fn token(text: &str) -> Option<String> {
-    if text.starts_with('"') {
-        serde_json::from_str(text).ok()
+    if let Some(quoted) = text.strip_prefix('"') {
+        // Alertmanager's escapes: `\n`, `\"` and `\\`; any other keeps its backslash.
+        let mut out = String::with_capacity(quoted.len());
+        let mut chars = quoted.strip_suffix('"')?.chars();
+        while let Some(c) = chars.next() {
+            match c {
+                '"' => return None,
+                '\\' => match chars.next()? {
+                    'n' => out.push('\n'),
+                    c @ ('"' | '\\') => out.push(c),
+                    c => out.extend(['\\', c]),
+                },
+                c => out.push(c),
+            }
+        }
+        Some(out)
     } else {
         (!text.is_empty()
             && !text.contains(['"', '=', '!', '{', '}'])
@@ -665,7 +695,6 @@ pub(super) fn charge_rule(rule: &Rule, path: &str, bytes: &mut usize) -> bool {
             fields(
                 bytes,
                 &[
-                    std::mem::size_of::<crate::index::Provider>(),
                     path.len(),
                     rule.key.len(),
                     key.len(),
@@ -685,12 +714,12 @@ pub(super) fn charge_route(item: &Route, path: &str, routes: &[Route], bytes: &m
             if !fields(
                 bytes,
                 &[
-                    std::mem::size_of::<crate::index::Consumer>(),
                     path.len(),
                     item.key.len(),
                     matcher.key.len(),
                     matcher.value.len(),
                     "::::alert::::alert matcher !~".len(),
+                    if item.namespaced { NAMESPACED.len() } else { 0 },
                 ],
             ) {
                 return false;
@@ -707,7 +736,6 @@ fn charge_node(path: &str, key: &str, ty: &str, name: &str, bytes: &mut usize) -
     fields(
         bytes,
         &[
-            std::mem::size_of::<crate::iac::Node>(),
             path.len(),
             path.len(),
             key.len(),
@@ -760,6 +788,9 @@ fn terraform(path: &str, src: &[u8]) -> Summary {
         b.ident.as_str() == "resource"
             && b.labels.len() == 2
             && b.labels[0].as_str() == "grafana_rule_group"
+            && ["count", "for_each"]
+                .iter()
+                .all(|m| b.body.get_attribute(m).is_none())
     }) {
         let rules = group
             .body
@@ -847,6 +878,7 @@ fn terraform_json(
         .and_then(Value::as_object)
         .into_iter()
         .flatten()
+        .filter(|(_, group)| group.get("count").is_none() && group.get("for_each").is_none())
     {
         for (i, rule) in array(group.get("rule")).iter().enumerate() {
             let Some(title) = rule.get("name").and_then(Value::as_str) else {
@@ -930,6 +962,67 @@ mod tests {
         assert!(summary.truncated);
         assert!(summary.rules.is_empty() && summary.routes.is_empty());
         assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    }
+
+    #[test]
+    fn repeated_grafana_groups_helm_values_and_matcher_escapes_read_as_their_tools_do() {
+        // A rule group Terraform makes any number of times, zero included, declares no rule.
+        let group = |meta: &str| {
+            format!(
+                "resource \"grafana_rule_group\" \"g\" {{\n{meta}  rule {{\n    name = \"A\"\n    \
+                 labels = {{ support = \"team-b\" }}\n  }}\n}}\n"
+            )
+        };
+        assert_eq!(read("alerts.tf", group("").as_bytes()).rules.len(), 1);
+        for meta in ["  count = 0\n", "  for_each = {}\n"] {
+            assert!(
+                read("alerts.tf", group(meta).as_bytes()).rules.is_empty(),
+                "{meta}"
+            );
+        }
+        let json = |meta: &str| {
+            format!(
+                "{{\"resource\":{{\"grafana_rule_group\":{{\"g\":{{{meta}\"rule\":[{{\"name\":\"A\",\
+                 \"labels\":{{\"support\":\"team-b\"}}}}]}}}}}}}}"
+            )
+        };
+        assert_eq!(read("alerts.tf.json", json("").as_bytes()).rules.len(), 1);
+        assert!(
+            read("alerts.tf.json", json("\"count\":0,").as_bytes())
+                .rules
+                .is_empty()
+        );
+        // Helm values go by a `values` word anywhere in the file name.
+        for helm in [
+            "values.yaml",
+            "values-prod.yaml",
+            "prod.values.yaml",
+            "ops/alert_values.yml",
+        ] {
+            assert!(!is_file(helm), "{helm}");
+        }
+        assert!(is_file("rules.yaml") && is_file("alert-valuesets.yaml"));
+        // Alertmanager's escapes: `\n`, `\"` and `\\`; any other keeps its backslash.
+        let read = expressions(r#"{a=~"db\.prod", b="say \"hi\"", c="x\\y", d="l\nm"}"#).unwrap();
+        assert_eq!(
+            read.iter().map(|m| m.value.as_str()).collect::<Vec<_>>(),
+            [r"db\.prod", "say \"hi\"", r"x\y", "l\nm"]
+        );
+        assert!(expressions(r#"a="open"#).is_none());
+    }
+
+    #[test]
+    fn a_file_of_thousands_of_small_rules_fits_the_storage_ceiling() {
+        let rules = (0..2000)
+            .map(|i| {
+                format!("      - {{alert: Alert{i}, expr: up == 0, labels: {{severity: page, team: shop}}}}\n")
+            })
+            .collect::<String>();
+        let text = format!("groups:\n  - name: many\n    rules:\n{rules}");
+        assert!((150_000..200_000).contains(&text.len()), "{}", text.len());
+        let summary = read("rules.yaml", text.as_bytes());
+        assert!(!summary.truncated);
+        assert_eq!(summary.rules.len(), 2000);
     }
 
     #[test]

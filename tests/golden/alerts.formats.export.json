@@ -88,22 +88,22 @@
     {
       "contract": "alert::support::team-c",
       "site": "example.com/acme/monitoring::alertmanager.yaml::[1].spec.route",
-      "via": "alert matcher ="
+      "via": "alert matcher = (AlertmanagerConfig namespace)"
     },
     {
       "contract": "alert::severity::urgent",
       "site": "example.com/acme/monitoring::alertmanager.yaml::[1].spec.route.routes[0]",
-      "via": "alert matcher ="
+      "via": "alert matcher = (AlertmanagerConfig namespace)"
     },
     {
       "contract": "alert::support::team-c",
       "site": "example.com/acme/monitoring::alertmanager.yaml::[1].spec.route.routes[0]",
-      "via": "alert matcher ="
+      "via": "alert matcher = (AlertmanagerConfig namespace)"
     },
     {
       "contract": "alert::support::team-b",
       "site": "example.com/acme/monitoring::alertmanager.yaml::[2].spec.route",
-      "via": "alert matcher =~"
+      "via": "alert matcher =~ (AlertmanagerConfig namespace)"
     }
   ],
   "iac_nodes": [
@@ -277,14 +277,14 @@
       "consumer": "example.com/acme/monitoring::alertmanager.yaml::[1].spec.route",
       "provider": "example.com/acme/monitoring::grafana.tf::resource.grafana_rule_group.infra.rule",
       "contract": "alert::support::team-c",
-      "level": "exact",
+      "level": "inferred",
       "reason": "alert::support::team-c; matchers \"support\"=\"team-c\"; receiver: grafana-team"
     },
     {
       "consumer": "example.com/acme/monitoring::alertmanager.yaml::[1].spec.route",
       "provider": "example.com/acme/monitoring::rules.yaml::[2].groups[0].rules[0]",
       "contract": "alert::support::team-c",
-      "level": "exact",
+      "level": "inferred",
       "reason": "alert::support::team-c; matchers \"support\"=\"team-c\"; receiver: grafana-team"
     },
     {

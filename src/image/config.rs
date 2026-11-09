@@ -159,8 +159,20 @@ pub(super) fn read(
     if name.starts_with("values")
         && let Some(written) = doc.get("image")
         && let Some(repository) = written.get("repository").and_then(Value::as_str)
-        && let Some(image) = evaluated(&match written.get("registry").and_then(Value::as_str) {
-            Some(registry) if !registry.is_empty() => format!("{registry}/{repository}"),
+        && let Some(image) = evaluated(&match (written.get("registry").and_then(Value::as_str))
+            .map(|registry| registry.trim_end_matches('/'))
+        {
+            Some(registry)
+                if !registry.is_empty() && !repository.starts_with(&format!("{registry}/")) =>
+            {
+                // A templated registry is an unresolved segment, as `${REGISTRY}` is.
+                let registry = if registry.contains("{{") {
+                    "${registry}"
+                } else {
+                    registry
+                };
+                format!("{registry}/{repository}")
+            }
             _ => repository.into(),
         })
     {

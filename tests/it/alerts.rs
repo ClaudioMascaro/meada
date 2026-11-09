@@ -149,9 +149,16 @@ spec:
     assert_eq!(export["consumers"].as_array().unwrap().len(), 8, "{text}");
     let links = export["links"].as_array().unwrap();
     assert_eq!(links.len(), 13, "{text}");
+    // An AlertmanagerConfig route also matches its own namespace, which Meada does not read.
     assert_eq!(
         links.iter().filter(|l| l["level"] == "exact").count(),
-        5,
+        3,
+        "{text}"
+    );
+    assert!(
+        (links.iter())
+            .filter(|l| l["consumer"].as_str().unwrap().contains(".spec.route"))
+            .all(|l| l["level"] == "inferred"),
         "{text}"
     );
     assert!(

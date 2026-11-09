@@ -184,9 +184,6 @@ fn split(args: FuncArgs) -> Out {
     if sep.is_empty() {
         return Err("an empty separator".into());
     }
-    if s.is_empty() {
-        return Ok(Value::Array(Vec::new()));
-    }
     Ok(Value::Array(s.split(sep).map(Value::from).collect()))
 }
 
