@@ -1507,9 +1507,13 @@ fn elements(
 ) -> (usize, usize) {
     if let Expression::FuncCall(f) = expr
         && matches!(f.name.name.as_str(), "tolist" | "toset" | "tomap")
+        && f.args.len() == 1
+        && !f.args.expand_final()
         && let Some(arg) = f.args.iter().next()
     {
         // A conversion keeps its argument's elements (a number made a string adds its quotes).
+        // Another argument or an expanded one (`x...`), which `hcl-rs` evaluates before it
+        // refuses the call, is costed as any call.
         return elements(arg, roots, iters);
     }
     let found = match expr {
@@ -4277,6 +4281,22 @@ mod tests {
         let got = names(&[("main.tf", main), ("terraform.tfvars", &tfvars)]);
         assert_eq!(got.len(), 40, "{got:?}");
         assert!(got.iter().all(|n| n.contains(" = \"q-s")), "{got:?}");
+    }
+
+    /// A `for` over a conversion of an expanded argument (`var.l...`) costs as before: the list it
+    /// expands is no element count, and a costly body over its 200 strings stays unresolved.
+    #[test]
+    fn a_for_over_a_conversion_of_an_expanded_argument_keeps_its_cost() {
+        let main = concat!(
+            "variable \"l\" {}\nvariable \"y\" {}\n",
+            "resource \"a\" \"q\" {\n",
+            "  for_each = {for a in tolist(var.l...) : a => a if length(jsonencode(var.y)) > 0 && a == \"a1\"}\n",
+            "  name = \"q-${each.key}\"\n}\n",
+        );
+        let l: Vec<String> = (0..200).map(|i| format!("\"a{i}\"")).collect();
+        let tfvars = format!("l = [[{}]]\ny = \"{}\"\n", l.join(", "), "y".repeat(60_000));
+        let got = names(&[("main.tf", main), ("terraform.tfvars", &tfvars)]);
+        assert_eq!(got, ["a.q ~ \"q-*\""]);
     }
 
     /// A var file's value that would make more than `EVAL_COST_MAX` (a `for` in a `for` over two
