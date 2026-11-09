@@ -65,17 +65,23 @@ pub(super) fn refusal(pattern: &str) -> Option<&'static str> {
         ClassUnclosed => MISSING_BRACKET,
         // Go reads `(?` as a group of flags, which repeats nothing and lets a repetition after
         // it repeat what came before, and `{` as text unless it forms a count: only `*`, `+`
-        // and `?` opening a group or an alternative lack an operand for certain.
+        // and `?` right after the start of a group or an alternative, past any groups of flags,
+        // lack an operand for certain.
         RepetitionMissing => {
             let at = error.span().start.offset;
-            let before = source.get(..at)?.chars().next_back();
+            let mut before = source.get(..at)?;
+            while let Some(flags) = before.strip_suffix(')') {
+                let Some(open) = flags.trim_end_matches(FLAGS).strip_suffix("(?") else {
+                    break;
+                };
+                before = open;
+            }
             let operator = source.get(at..)?.chars().next();
-            let lacks = match before {
+            let lacks = match before.chars().next_back() {
                 Some('(') => matches!(operator, Some('*' | '+')),
-                Some('|' | ':') => matches!(operator, Some('*' | '+' | '?')),
-                _ => false,
+                _ => matches!(operator, Some('*' | '+' | '?')),
             };
-            if !lacks {
+            if !lacks || !opens(before) {
                 return None;
             }
             MISSING_REPEAT
@@ -86,6 +92,36 @@ pub(super) fn refusal(pattern: &str) -> Option<&'static str> {
         FlagDanglingNegation | FlagRepeatedNegation { .. } => PERL_OP,
         _ => return None,
     })
+}
+
+/// The flags of a group of flags.
+const FLAGS: [char; 5] = ['i', 'm', 's', 'U', '-'];
+
+/// Whether `text` ends where a group or an alternative starts: a `|`, or a `(`, `(?flags:`,
+/// `(?P<name>` or `(?<name>`, none escaped. Where a literal could end instead (`>`, `:`), the
+/// whole opener is required.
+fn opens(text: &str) -> bool {
+    let unescaped = |head: &str| (head.len() - head.trim_end_matches('\\').len()).is_multiple_of(2);
+    let head = if let Some(head) = text.strip_suffix(['|', '(']) {
+        head
+    } else if let Some(head) = text.strip_suffix(':') {
+        match head.trim_end_matches(FLAGS).strip_suffix("(?") {
+            Some(head) => head,
+            None => return false,
+        }
+    } else if let Some(name) = text.strip_suffix('>') {
+        let name = name.trim_end_matches(|c: char| c.is_ascii_alphanumeric() || c == '_');
+        match name
+            .strip_suffix("(?P<")
+            .or_else(|| name.strip_suffix("(?<"))
+        {
+            Some(head) => head,
+            None => return false,
+        }
+    } else {
+        return false;
+    };
+    unescaped(head)
 }
 
 /// An expression compiled within its part of the ceilings, and its automaton positions (each
@@ -1000,7 +1036,22 @@ mod tests {
             (MISSING_BRACKET, &["[", "team-[a-z"]),
             (
                 MISSING_REPEAT,
-                &["*prod*", "+x", "a|*", "(?:*)", "(+)", "(?i:?)"],
+                &[
+                    "*prod*",
+                    "+x",
+                    "a|*",
+                    "(?:*)",
+                    "(+)",
+                    "(?i:?)",
+                    // Right after a group name, or after groups of flags.
+                    "(?P<n>*a)",
+                    "(?<n>+a)",
+                    "(?P<n>?a)",
+                    "(?i)+a",
+                    "a|(?i)*b",
+                    "((?i)+a)",
+                    "(?i)(?s)*a",
+                ],
             ),
             (CHAR_RANGE, &["[z-a]", "(?i)[a-Z]", r"\p{Han"]),
             (
@@ -1058,6 +1109,18 @@ mod tests {
             ("class in class", "[t[e]]eam-b".into()),
             ("empty flags", "(?)".into()),
             ("flags then repeat", "a(?i)*".into()),
+            ("flags after an operand", "(a)(?i)+".into()),
+            ("flags after an anchor", "^(?i)+".into()),
+            ("flags after an escape", r"\\(?i)+a".into()),
+            ("a bracket of flags", "(?i)[(?i)]+".into()),
+            ("an operand named like a group end", ">*".into()),
+            ("an escaped angle", r"a|\>*".into()),
+            ("an empty named group", "(?P<n>)*".into()),
+            // A literal that looks like the start of a group, before a group of flags.
+            ("flags after a literal", ">(?i)*".into()),
+            ("flags after a colon", "a:(?i)*".into()),
+            ("flags after an escaped paren", r"\((?i)+".into()),
+            ("flags after an escaped bar", r"\|(?i)*".into()),
             ("brace text", "{x".into()),
             // The wrapper's `)` closes a group this one opens, and its own `)` is left over.
             ("closing the wrapper", "a)(b".into()),

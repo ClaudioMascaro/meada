@@ -27,12 +27,12 @@
   values of the file stay searchable. Only a syntax error that is established as a `regexp/syntax`
   error code counts, in the expression as Alertmanager hands it to Go (`^(?:expression)$`, so a
   `)` that closes the wrapper stands for itself): a group not closed or not opened (`(a`,
-  `a)`), a class not closed (`[a`), `*`, `+` or `?` opening a group or an alternative with no
-  operand (`*prod`), a backward class range (`[z-a]`), a repetition stacked on another (`a**`),
-  a count above 1000, a backward one or a nested product above it (`a{1001}`, `a{2,1}`), an
-  escape Go does not read (`\y`, `\1` to `\9` as a backreference, `\u`), Perl syntax Go lacks
-  (`(?=`, `(?!`, a flag other than `imsU`, `(?P=`) and an invalid group name (`(?P<a.b>`,
-  `(?<=`). Any other
+  `a)`), a class not closed (`[a`), `*`, `+` or `?` with no operand, opening a group or an
+  alternative or right after a group name or a group of flags (`*prod`, `(?P<n>*a)`, `(?i)+a`),
+  a backward class range (`[z-a]`), a repetition stacked on another (`a**`), a count above 1000,
+  a backward one or a nested product above it (`a{1001}`, `a{2,1}`), an escape Go does not read
+  (`\y`, `\1` to `\9` as a backreference, `\u`), Perl syntax Go lacks (`(?=`, `(?!`, a flag
+  other than `imsU`, `(?P=`) and an invalid group name (`(?P<a.b>`, `(?<=`). Any other
   failure to compile keeps its old answer, a matcher left unmatched and the rest linked, as Go
   may read it: an expression past `ALERT_REGEX_MAX` (never judged, valid or not) or a budget
   below, a Unicode property name outside the list (the tables follow Go's version), an
@@ -42,10 +42,13 @@
   `match_re`, a matcher string or object of an Alertmanager document or `AlertmanagerConfig`
   object, routes and inhibit rules alike (`source_match_re`, `target_matchers`, `sourceMatch`),
   not on incident routes (OpsGenie, PagerDuty); other reasons Alertmanager refuses a file (an
-  unknown receiver, a bad duration) are not read. An unquoted matcher string value holding
-  two backslashes is not read at all (the classic parser unescapes them, which this does not),
-  so its route is uninterpretable and the value can refuse nothing. In a manifest bundle only
-  the document that holds the expression is refused, though the file counts as unreadable.
+  unknown receiver, a bad duration) are not read. A regex inside a matcher Meada cannot read is
+  not judged: an unquoted matcher string value holding two backslashes (the classic parser
+  unescapes them, which this does not) and the spellings Alertmanager parses but this reader
+  does not (a trailing comma, unbalanced braces, an unquoted `other=~(a,`) make the route
+  uninterpretable, so a configuration whose only refused regex sits in such a matcher keeps its
+  other links, though Alertmanager refuses it. In a manifest bundle only the document that holds
+  the expression is refused, though the file counts as unreadable.
 - `ALERT_REGEX_SIZE_MAX` (`alert.rs`): 1 MiB per scope for compiled automata and their search
   caches; `ALERT_REGEX_POOL_MAX`: 16 MiB per linking pass, a scope's part being the smaller of
   the two. An automaton of 1 MiB compiles in under 10 ms (release), where an ordinary expression
