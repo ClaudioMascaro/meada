@@ -107,22 +107,20 @@ fn classify(relative: &[Part]) -> Option<Reference> {
 pub(super) fn resolve(base: &[Part], relative: &[Part]) -> Option<Vec<Part>> {
     let kind = classify(relative)?;
     if let Reference::Absolute = kind {
-        return Some(relative.to_vec());
+        return match scheme_end(relative) {
+            Some(colon) => dots_after(relative, (0, colon + 3)),
+            None => Some(relative.to_vec()),
+        };
     }
     let end = (base.len(), 0);
-    // The scheme (up to its `:`), the authority and the path of the base.
-    let scheme = base
-        .iter()
-        .position(|p| matches!(p, Part::Text(t) if t.contains("://")))?;
-    let Part::Text(t) = &base[scheme] else {
-        return None;
-    };
-    let colon = t.find("://")?;
+    // The scheme (up to its `:`), the authority and the path of the base, which its scheme
+    // leads: `${x}/fetch/https://h/` holds a URL in its path and is no base this places.
+    let (scheme, colon) = (0, scheme_end(base)?);
     let path = find(base, (scheme, colon + 3), &['/', '?', '#']).unwrap_or(end);
     let stop = find(base, path, &['?', '#']).unwrap_or(end);
     if let Reference::NetworkPath = kind {
         let mut out = slice(base, (0, 0), (scheme, colon + 1));
-        out.extend(relative.iter().cloned());
+        out.extend(dots_after(relative, (0, 2))?);
         return Some(merged(out));
     }
     let mut route = match kind {
@@ -149,6 +147,35 @@ pub(super) fn resolve(base: &[Part], relative: &[Part]) -> Option<Vec<Part>> {
     let mut out = slice(base, (0, 0), path);
     out.extend(without_dots(&route)?);
     Some(merged(out))
+}
+
+/// Where the scheme of `url` ends, at the `:` of a `://` its first text starts with after a
+/// scheme's letters, digits, `+`, `-` and `.` from a letter.
+fn scheme_end(url: &[Part]) -> Option<usize> {
+    let Some(Part::Text(t)) = url.first() else {
+        return None;
+    };
+    let colon = t.find("://")?;
+    let scheme = &t[..colon];
+    (scheme.starts_with(|c: char| c.is_ascii_alphabetic())
+        && scheme
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c)))
+    .then_some(colon)
+}
+
+/// `url` with the dot segments of the path after its authority, which starts at `authority`,
+/// removed (RFC 3986 5.2.2 removes them from every reference's path).
+fn dots_after(url: &[Part], authority: At) -> Option<Vec<Part>> {
+    let end = (url.len(), 0);
+    match find(url, authority, &['/', '?', '#']) {
+        Some(path) if matches!(&url[path.0], Part::Text(t) if t[path.1..].starts_with('/')) => {
+            let mut out = slice(url, (0, 0), path);
+            out.extend(without_dots(&slice(url, path, end))?);
+            Some(merged(out))
+        }
+        _ => Some(url.to_vec()),
+    }
 }
 
 /// The path `path` (which starts with `/`, and may end in a query or a fragment) without its `.`
@@ -340,6 +367,49 @@ mod tests {
         // A query or a fragment alone, and a base with no scheme, are not read.
         assert_eq!(joined("https://h.example.com", "?q=1"), None);
         assert_eq!(joined("/api", "status"), None);
+        // An absolute or network-path reference loses its dot segments too (RFC 3986 5.2.2).
+        for (base, relative, url) in [
+            (
+                "https://h.example.com/api/",
+                "https://b.example.com/a/../y",
+                "https://b.example.com/y",
+            ),
+            (
+                "https://h.example.com/api/",
+                "//cdn.example.com/a/./x/../b?q=../c",
+                "https://cdn.example.com/a/b?q=../c",
+            ),
+            ("https://h.example.com", "mailto:a/../b", "mailto:a/../b"),
+        ] {
+            assert_eq!(
+                joined(base, relative).as_deref(),
+                Some(url),
+                "{base} + {relative}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_base_whose_scheme_does_not_lead_it_is_not_placed() {
+        // A URL inside a path (a proxy's `/fetch/https://..`) is no scheme of the base.
+        assert_eq!(joined("prefix/https://api.example.com/", "x"), None);
+        let base = [
+            Part::Env("X".into()),
+            Part::Text("/fetch/https://api.example.com/".into()),
+        ];
+        for reference in ["orders", "/orders", "//h/orders"] {
+            assert!(
+                resolve(&base, &[Part::Text(reference.into())]).is_none(),
+                "{reference}"
+            );
+        }
+        // Over that opaque base an absolute path keeps the lead, as any other path of it does.
+        let orders = [Part::Text("/orders".into())];
+        assert_eq!(
+            written(&opaque_lead(&base, &orders).unwrap()),
+            "${X}/orders"
+        );
+        assert!(opaque_lead(&base, &[Part::Text("orders".into())]).is_none());
     }
 
     #[test]

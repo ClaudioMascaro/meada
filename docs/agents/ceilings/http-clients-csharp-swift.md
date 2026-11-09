@@ -106,7 +106,8 @@
   URL, the method or the request a parameter) is a consumer, with cycle detection. The URL is
   `URL(string:)`, `URL(string:relativeTo:)` (RFC 3986 resolution by `http/join.rs`, the resolver
   TypeScript's `new URL(reference, base)` shares (#686): the scheme before any `/?#`,
-  network paths, dot segments, the base's query dropped), `appendingPathComponent` (before the
+  network paths, dot segments of every reference, the base's query dropped; a base whose own
+  scheme does not lead it is not placed), `appendingPathComponent` (before the
   query), a literal, an interpolation, a `+` or a `let` constant (`static let` too, from other files and
   imported modules); a hole the evaluation cannot fold stays a parameter marker, a reference or a
   base that is a wrapper's parameter is resolved at its call sites, and a URL left unknown is an

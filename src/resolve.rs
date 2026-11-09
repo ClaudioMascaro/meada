@@ -3063,7 +3063,15 @@ impl<'a> Resolver<'a> {
             name = next;
         }
         let (head, rest) = name.split_at(name.find('.').unwrap_or(name.len()));
-        let latest = self.by_local[path].of(head).last();
+        // The innermost scope's import of the head: a function's own hides the module's.
+        let mut at = Some(scope);
+        let latest = loop {
+            let Some(s) = at else { break None };
+            if let Some(found) = self.by_local[path].of(&crate::qualify(s, head)).last() {
+                break Some(found);
+            }
+            at = (!s.is_empty()).then(|| crate::parent(s));
+        };
         match latest.map(|&at| (&imports[at], &imports[at].name)) {
             Some((i, Imported::Namespace | Imported::Qualified)) => format!("{}{rest}", i.source),
             Some((i, Imported::Name(n) | Imported::Member { name: n, .. })) => {
@@ -4878,6 +4886,9 @@ pub struct Code<'a> {
     /// The last segment of every callee of the repository (`save` of `repo.save`, `C` of
     /// `(opaque).C`), built the first time a parameter is injected (`Code::may_be_called`).
     callees: OnceCell<HashSet<&'a str>>,
+    /// The definitions a call that is no exact caller may reach, and how many definitions have
+    /// each last name segment (`Code::name_matched`).
+    matched: OnceCell<(HashSet<Target<'a>>, HashMap<&'a str, usize>)>,
     mutations: RefCell<HashMap<usize, mutations::Index<'a>>>,
     pack: &'static dyn LanguagePack,
 }
@@ -5047,6 +5058,7 @@ impl<'a> Code<'a> {
             literals: OnceCell::new(),
             field_reads: RefCell::new(HashMap::new()),
             callees: OnceCell::new(),
+            matched: OnceCell::new(),
             mutations: RefCell::new(HashMap::new()),
             pack,
         }
@@ -5843,8 +5855,12 @@ impl<'a> Code<'a> {
     /// once, or once per exact caller of the function whose parameter it leaves unbound, climbed
     /// as `Code::expand` climbs a wrapper. Its own `wants`: the function climbed is no wrapper of
     /// the walk that reads the field. `false` as soon as one is no single environment read, or a
-    /// function to climb has no exact caller (a name match may reach another function), is met
-    /// again, is `WRAPPER_DEPTH` calls up or its caller's file has spent its `EVAL_BUDGET`.
+    /// function to climb has no exact caller or a call reaches it by a name match (which may pass
+    /// anything), is met again, is `WRAPPER_DEPTH` calls up or its caller's file has spent its
+    /// `EVAL_BUDGET`.
+    // ponytail: a constructor read as a value (`mk := New; mk(x)`) is not seen, so its exact
+    // callers alone give the field; reading every value of the repository for its name would
+    // see it.
     fn literal_reads(
         &self,
         path: &'a str,
@@ -5871,7 +5887,10 @@ impl<'a> Code<'a> {
         let Some(function) = wants else {
             return false;
         };
-        if frames.iter().any(|f| f.def == function) || frames.len() >= WRAPPER_DEPTH {
+        if frames.iter().any(|f| f.def == function)
+            || frames.len() >= WRAPPER_DEPTH
+            || self.name_matched(function)
+        {
             return false;
         }
         let callers: Vec<Caller> = (self.resolver.callers.get(&function).into_iter().flatten())
@@ -6924,6 +6943,32 @@ impl<'a> Code<'a> {
             self.walk(written, frames, read, out);
             frames.pop();
         }
+    }
+
+    /// Whether a call that is no exact caller may reach `function`: a name match (`Inferred`,
+    /// `Narrowed`), one of the definitions an ambiguous call fits or, for a method, a call of
+    /// another definition of its name (an interface's method, whose calls dispatch to it).
+    // ponytail: any other definition of a method's name counts, an interface's or not, since no
+    // pack marks interfaces: two types with a constructor method of one name leave it unknown.
+    fn name_matched(&self, function: Target<'a>) -> bool {
+        let own = |name: &'a str| name[crate::parent(name).len()..].trim_start_matches('.');
+        let (matched, names) = self.matched.get_or_init(|| {
+            let matched = (self.resolver.built.values().flatten())
+                .flat_map(|r| match r {
+                    Resolution::Inferred(t) | Resolution::Narrowed(t) => std::slice::from_ref(t),
+                    Resolution::Ambiguous(targets) => targets.as_slice(),
+                    _ => &[],
+                })
+                .copied()
+                .collect();
+            let mut names = HashMap::new();
+            for name in self.resolver.defs.values().flat_map(|d| d.keys()) {
+                *names.entry(own(name)).or_insert(0) += 1;
+            }
+            (matched, names)
+        });
+        let method = self.resolver.defs[function.path][function.name].kind == Kind::Method;
+        matched.contains(&function) || (method && names.get(own(function.name)) > Some(&1))
     }
 
     /// Whether a call of the repository may reach `function`, at any level: an exact caller, or

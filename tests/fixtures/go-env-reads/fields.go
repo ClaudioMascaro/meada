@@ -90,6 +90,19 @@ type uncalled struct{ uncalledBase string }
 func newUncalled(u string) *uncalled { return &uncalled{uncalledBase: u} }
 func (u *uncalled) get()             { http.Get(u.uncalledBase + "/a") }
 
+// A constructor method a call reaches by its name alone (on an interface value) may be given
+// another read.
+type matched struct{ matchedBase string }
+
+type matcher struct{}
+
+type makesMatched interface{ newMatched(u string) *matched }
+
+func (matcher) newMatched(u string) *matched { return &matched{matchedBase: u} }
+func matchedA() *matched                     { var m matcher; return m.newMatched(os.Getenv("MATCHED_URL")) }
+func matchedB(i makesMatched) *matched        { return i.newMatched(os.Getenv("OTHER_MATCHED_URL")) }
+func (m *matched) get()                       { http.Get(m.matchedBase + "/a") }
+
 // A literal string, not a read.
 type literal struct{ literalBase string }
 

@@ -130,15 +130,18 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
 - `resolve.rs` (`Code::field_read`, #687): a Go struct field holds an environment read only when
   every composite literal that sets it gives one and the same read (`Env` or `EnvOr`, nothing
   around it), a constructor's parameter through every exact caller; a literal string, a read
-  with a suffix (`os.Getenv("X") + "/v1"`), a constructor reached only by a name match or with
-  no caller, and a field some file writes through a selector of any type (`x.base = ..`, matched
-  by the field's name alone) leave it unknown, as do the literals `Code::field_values` cannot
-  read (by position, an alias's, a conversion). `FIELD_DEPTH` (16): a field folded through more
-  fields than that (`&T{base: o.base}`, each from the next) is unknown, and the values folded on
-  the way share one `EVAL_DEPTH`; the first depth a field
-  is folded at is the one kept for it, so a field first met deep in a chain stays unknown for
-  every later read. The constructors climbed are bound by `WRAPPER_DEPTH` and a constructor met
-  again leaves the field unknown.
+  with a suffix (`os.Getenv("X") + "/v1"`), a constructor with no caller or that any call
+  reaches by a name match, a constructor method another definition shares the name of (an
+  interface's, whose calls dispatch to it; no pack marks interfaces, so any other counts), and a
+  field some file writes through a selector of any type (`x.base = ..`, matched by the field's
+  name alone) leave it unknown, as do the literals `Code::field_values` cannot read (by
+  position, an alias's, a conversion). `FIELD_DEPTH` (16): a field folded through more fields
+  than that (`&T{base: o.base}`, each from the next) is unknown, and the values folded on the
+  way share one `EVAL_DEPTH`; the first depth a field is folded at is the one kept for it, so a
+  field first met deep in a chain stays unknown for every later read. The constructors climbed
+  are bound by `WRAPPER_DEPTH` and a constructor met again leaves the field unknown. A
+  constructor read as a value (`mk := New; mk(x)`) is not seen: its exact callers alone give the
+  field.
 
 - `resolve.rs`, `lang/ts.rs` (#536): a call folds to the string its function returns
   (`Code::built`, `Def::lone_string`) only for TypeScript and JavaScript (the other packs leave

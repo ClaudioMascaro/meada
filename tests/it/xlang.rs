@@ -335,6 +335,7 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         "unset.get",
         "assigned.get",
         "uncalled.get",
+        "matched.get",
         "literal.get",
     ];
     for function in unread {

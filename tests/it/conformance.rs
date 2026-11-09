@@ -10813,6 +10813,42 @@ fn python_requests_and_httpx_functions_are_consumers_with_their_evaluated_path()
 }
 
 #[test]
+fn a_python_import_inside_a_function_names_its_library_there_alone() {
+    let repo = fixture_repo("python_local_imports", "conformance-python", Some(ORIGIN));
+    std::fs::write(
+        repo.join("clients/local.py"),
+        "import requests\n\n\ndef top():\n    return requests.get(\"https://top.example.com/a\")\n\n\n\
+         def from_import():\n    from requests import get\n    return get(\"https://from.example.com/b\")\n\n\n\
+         def aliased():\n    import requests as r\n    return r.get(\"https://alias.example.com/c\")\n\n\n\
+         def shadowed():\n    import json as requests\n    return requests.get(\"https://shadow.example.com/d\")\n",
+    )
+    .unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json = serde_json::from_str(&export).unwrap();
+    let site = |function: &str, call: &str| format!("clients/local.py::{function}::{call}");
+    // `from requests import get` and `import requests as r` name the library in their function;
+    // `import json as requests` hides the module's `requests` there.
+    let expected = triples(&[
+        (
+            "http::GET::/a",
+            "host:top.example.com",
+            &site("top", "requests.get#0"),
+        ),
+        (
+            "http::GET::/b",
+            "host:from.example.com",
+            &site("from_import", "get#0"),
+        ),
+        (
+            "http::GET::/c",
+            "host:alias.example.com",
+            &site("aliased", "r.get#0"),
+        ),
+    ]);
+    assert_eq!(consumers(&json, "clients/local.py"), expected, "{export}");
+}
+
+#[test]
 fn python_client_methods_take_the_base_url_of_the_client_they_trace_back_to() {
     let host = "host:api.example.com";
     let site = |function: &str, call: &str| format!("clients/sessions.py::{function}::{call}");

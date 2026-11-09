@@ -190,7 +190,9 @@ All notable changes to Meada are recorded here. The format follows
   parameter whose callers in the repository all pass that read, so a method that reads the field,
   directly or through a request wrapper, links through `base_url_env` like the same read written
   inline. Two different reads, a literal by position or of an alias, no literal, a write through
-  a selector (`c.base = x`), a constructor with no caller and a literal string leave the field
+  a selector (`c.base = x`), a constructor with no caller or that a call may reach by a name
+  match or through an interface (a method another definition shares the name of), and a literal
+  string leave the field
   unknown, as before (#687).
 - A TypeScript class field that is `readonly`, `private` or `#x` and written once, by its
   initializer or by one plain `this.f = v` in the constructor body, is a constant of the class:
@@ -327,15 +329,17 @@ All notable changes to Meada are recorded here. The format follows
   another name holding it, or with the target in parentheses or an assertion, as does such a
   write to a sealed field set where it is declared or in its constructor
   (`this.url.pathname = ..`) (#685).
-- TypeScript consumers through `new URL(reference, base)`: the two arguments read as the join the
-  WHATWG URL Standard defines (RFC 3986 section 5.2 for these references), so an absolute
-  reference is itself, `//host/x` takes its host, `/orders` replaces the base's path and `orders`
-  joins the base's directory (`https://h/api/` keeps `api`, `https://h/api` does not). Over a base
-  read from the environment (or a hole) an absolute path keeps the base as its lead, so `/orders`
-  is `http::GET::/orders` with `via env:API_URL`; a relative reference, one that starts with a
-  read, and a query or a fragment alone stay unresolved, and a parameter on either side is
-  resolved at the call sites. Swift's `URL(string:relativeTo:)` goes through the same resolver,
-  with its answers unchanged (#686).
+- TypeScript consumers through `new URL(reference, base)`: the two arguments read as the join
+  the WHATWG URL Standard defines (RFC 3986 section 5.2 for these references), so an absolute
+  reference is itself, `//host/x` takes its host, `/orders` replaces the base's path and
+  `orders` joins the base's directory (`https://h/api/` keeps `api`, `https://h/api` does not).
+  Over a base read from the environment (or a hole) an absolute path keeps the base as its lead,
+  so `/orders` is `http::GET::/orders` with `via env:API_URL`; a relative reference, one that
+  starts with a read, and a query or a fragment alone stay unresolved, and a parameter on either
+  side is resolved at the call sites. A base is placed only when its scheme leads it, so a
+  proxy's `${X}/fetch/https://api.example.com/` is an opaque base, not a link to that host, and
+  every reference loses its dot segments. Swift's `URL(string:relativeTo:)` goes through the
+  same resolver, with its answers unchanged (#686).
 
 ### Changed
 
@@ -353,6 +357,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Python: an import inside a function names its library in that function again, so
+  `from requests import get` and `import requests as r` there are HTTP consumers, and
+  `import json as requests` there hides the module's `requests` (#668).
 - Python framework and Go router tables retain stable identities in optimized builds, so
   Flask blueprints keep their mounted routes and standard Go mux matching stays consistent.
 
