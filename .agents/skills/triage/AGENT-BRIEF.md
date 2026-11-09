@@ -25,6 +25,8 @@ Describe **what** the system should do, not **how** to implement it. The agent w
 - **Good:** "When a user runs `/triage` with no arguments, they should see a summary of issues needing attention"
 - **Bad:** "Add a switch statement in the main handler function"
 
+A brief that adds a rule states the action that satisfies it, not only the trigger, and leaves the rule's wording to the agent.
+
 ### Complete acceptance criteria
 
 The agent needs to know when it's done. Every agent brief must have concrete, testable acceptance criteria. Each criterion should be independently verifiable.
