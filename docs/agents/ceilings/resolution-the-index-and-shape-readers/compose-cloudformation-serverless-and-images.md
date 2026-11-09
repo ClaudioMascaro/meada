@@ -92,6 +92,9 @@
   builder and direct-code facts are left out. Direct-code summaries charge node identity, root,
   path and reason before copying them. The reader shares the event/XML/Gradle depth and file ceilings;
   unresolved image patterns share `PATTERN_LITERAL_MIN`, `PATTERN_SEGMENTS` and `PATTERN_TEXT_MAX`.
+  The orphan rows of `status` (`scope_status`) and the workspace's pattern pass
+  (`patterns::prepare`) compare every image builder with every runner, with no index: 4,000
+  patterns took 54.6 s for a `status` in a debug build.
 
 - `ENVIRONMENT_BYTES_MAX` (`iac/environment.rs`, #663): one `lang::MAX_BYTES` (1 MiB) of
   environment expansion per workload, charging overwritten entries too so repeated `envFrom`

@@ -222,7 +222,15 @@ impl LanguagePack for TsJs {
                 "public_field_definition" if typescript => {
                     if let Some(name) = sealed_field(node, src) {
                         let initial = node.child_by_field_name("value");
-                        let initial = initial.map(|v| value(v, src, &scope, &parents));
+                        // A URL whose members `this.f` writes is no longer what it was built
+                        // from.
+                        let rewritten = (initial)
+                            .is_some_and(|v| is_url_new(unwrapped(v), src, &parents))
+                            && parents.written.contains(&format!("this.{name}"));
+                        let initial = initial.map(|v| match rewritten {
+                            true => Value::Unknown,
+                            false => value(v, src, &scope, &parents),
+                        });
                         sealed.push((scope.clone(), name, initial));
                     }
                 }
@@ -310,7 +318,7 @@ impl LanguagePack for TsJs {
                 );
                 // A `new URL` whose path or host the file writes through its name is no longer
                 // the string it was built from.
-                let rewritten = is_url_new(*value_node, src, &parents)
+                let rewritten = is_url_new(unwrapped(*value_node), src, &parents)
                     && parents.written.contains(name.as_str());
                 facts.consts.push(Const {
                     name: qualify(&scope, name),
@@ -794,7 +802,7 @@ impl<'t> Parents<'t> {
             {
                 string_bindings.push(node);
             }
-            written.extend(member_written(node, src));
+            members_written(node, src, &mut written);
             let target = match node.kind() {
                 "assignment_expression" | "augmented_assignment_expression" => {
                     node.child_by_field_name("left")
@@ -1041,31 +1049,91 @@ fn is_url_new(node: Node, src: &[u8], up: &Parents) -> bool {
             .is_some_and(|c| c.kind() == "identifier" && text(c, src) == "URL")
 }
 
-/// The name `node` writes a member of, when it is `u.p = ..` or `u.p += ..` (or `u["p"]`) and
-/// `p` is neither `search` nor `hash`.
-fn member_written(node: Node, src: &[u8]) -> Option<String> {
-    if !matches!(
-        node.kind(),
-        "assignment_expression" | "augmented_assignment_expression"
-    ) {
-        return None;
+/// `node` inside the parentheses and type assertions around it, which keep its value.
+fn unwrapped(mut node: Node) -> Node {
+    while let Some(inner) = match node.kind() {
+        "parenthesized_expression"
+        | "non_null_expression"
+        | "as_expression"
+        | "satisfies_expression" => named(node).next(),
+        "type_assertion" => named(node).last(),
+        _ => None,
+    } {
+        node = inner;
     }
-    let left = node.child_by_field_name("left")?;
-    let object = left.child_by_field_name("object")?;
-    let member = match left.kind() {
-        "member_expression" => text(left.child_by_field_name("property")?, src).to_string(),
-        "subscript_expression" => {
-            let index = left.child_by_field_name("index")?;
-            if index.kind() == "string" {
-                unquote(index, src)
-            } else {
-                String::new()
+    node
+}
+
+/// Adds to `out` the names `node` writes a member of, other than `search` and `hash`: `u` for
+/// `u.p = ..`, `u.p += ..`, `u.p++` and `u["p"] = ..`, a member as a destructuring or a
+/// `for (.. of ..)` target, `Object.assign(u, ..)`, and a name another takes (`v = u`), whose
+/// writes are not followed; `this.f` for the same writes of `this.f.p`.
+fn members_written(node: Node, src: &[u8], out: &mut HashSet<String>) {
+    let object = |n: Node| match n.kind() {
+        "identifier" => Some(text(n, src).to_string()),
+        "member_expression" => {
+            let this = n.child_by_field_name("object")?;
+            let field = n.child_by_field_name("property")?;
+            (this.kind() == "this").then(|| format!("this.{}", text(field, src)))
+        }
+        _ => None,
+    };
+    let mut targets = Vec::new();
+    match node.kind() {
+        "assignment_expression" | "augmented_assignment_expression" => {
+            targets.extend(node.child_by_field_name("left"));
+            if node.kind() == "assignment_expression" {
+                out.extend((node.child_by_field_name("right")).and_then(|r| object(unwrapped(r))));
             }
         }
-        _ => return None,
-    };
-    (object.kind() == "identifier" && member != "search" && member != "hash")
-        .then(|| text(object, src).to_string())
+        "update_expression" => targets.extend(node.child_by_field_name("argument")),
+        "for_in_statement" if node.child_by_field_name("kind").is_none() => {
+            targets.extend(node.child_by_field_name("left"));
+        }
+        "variable_declarator" => {
+            out.extend((node.child_by_field_name("value")).and_then(|v| object(unwrapped(v))));
+        }
+        "call_expression"
+            if (node.child_by_field_name("function"))
+                .is_some_and(|f| text(f, src) == "Object.assign") =>
+        {
+            let first = (node.child_by_field_name("arguments")).and_then(|a| named(a).next());
+            out.extend(first.and_then(|a| object(unwrapped(a))));
+        }
+        _ => {}
+    }
+    while let Some(target) = targets.pop() {
+        match target.kind() {
+            "member_expression" | "subscript_expression" => {
+                let member = match target.kind() {
+                    "member_expression" => target.child_by_field_name("property"),
+                    _ => target.child_by_field_name("index"),
+                };
+                let member = member.map_or(String::new(), |m| match m.kind() {
+                    "string" => unquote(m, src),
+                    "property_identifier" | "private_property_identifier" => {
+                        text(m, src).to_string()
+                    }
+                    _ => String::new(),
+                });
+                if member != "search" && member != "hash" {
+                    out.extend(target.child_by_field_name("object").and_then(object));
+                }
+            }
+            "pair_pattern" => targets.extend(target.child_by_field_name("value")),
+            "assignment_pattern" | "object_assignment_pattern" => {
+                targets.extend(target.child_by_field_name("left"));
+            }
+            "array_pattern"
+            | "object_pattern"
+            | "rest_pattern"
+            | "parenthesized_expression"
+            | "non_null_expression"
+            | "as_expression"
+            | "satisfies_expression" => targets.extend(named(target)),
+            _ => {}
+        }
+    }
 }
 
 fn selector_writes(node: Node, src: &[u8], scope: &str, facts: &mut Facts, spent: &mut usize) {
@@ -2526,9 +2594,46 @@ mod tests {
             "u.href = 'https://o.example.com/';",
             "u['pathname'] = '/b';",
             "u[key] = '/b';",
+            // Written through a pattern, a loop target or an increment.
+            "[u.pathname] = ['/b'];",
+            "({ p: u.pathname } = o);",
+            "({ p: u.pathname = '/b' } = o);",
+            "for (u.pathname of paths) {}",
+            "u.port++;",
+            // Handed to `Object.assign`, or held by another name that writes it.
+            "Object.assign(u, { pathname: '/b' });",
+            "const v = u; v.pathname = '/b';",
+            "let v; v = u; v.pathname = '/b';",
         ] {
             assert!(unknown(&format!("{url}{write}")), "{write}");
         }
+        // The initializer may be wrapped in parentheses or a type assertion.
+        for made in [
+            "(new URL('https://h.example.com/a'))",
+            "new URL('https://h.example.com/a') as URL",
+            "new URL('https://h.example.com/a')!",
+            "new URL('https://h.example.com/a') satisfies URL",
+            "<URL>new URL('https://h.example.com/a')",
+        ] {
+            assert!(
+                unknown(&format!("const u = {made};\nu.pathname = '/b';")),
+                "{made}"
+            );
+        }
+        // A sealed field holding a URL whose members its class writes holds none.
+        let field = |write: &str| {
+            let facts = parse(&format!(
+                "class C {{\n  private readonly url = new URL('https://h.example.com/a');\n  \
+                 go() {{ {write} fetch(this.url.href); }}\n}}\n"
+            ));
+            (facts.consts.iter())
+                .find(|c| c.name == "C.url")
+                .is_some_and(|c| !matches!(c.value, Value::Unknown))
+        };
+        assert!(field(""));
+        assert!(field("this.url.search = '?k';"));
+        assert!(!field("this.url.pathname = '/b';"));
+        assert!(!field("Object.assign(this.url, { pathname: '/b' });"));
         // The pass-through forms of a written name stay calls and members, as they were.
         let facts = parse(&format!(
             "{url}u.pathname = '/b'; fetch(u.toString()); fetch(u.href);"

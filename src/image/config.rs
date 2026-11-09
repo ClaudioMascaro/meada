@@ -157,11 +157,12 @@ pub(super) fn read(
         }
     }
     if name.starts_with("values")
-        && let Some(image) = doc
-            .get("image")
-            .and_then(|v| v.get("repository"))
-            .and_then(Value::as_str)
-        && let Some(image) = evaluated(image)
+        && let Some(written) = doc.get("image")
+        && let Some(repository) = written.get("repository").and_then(Value::as_str)
+        && let Some(image) = evaluated(&match written.get("registry").and_then(Value::as_str) {
+            Some(registry) if !registry.is_empty() => format!("{registry}/{repository}"),
+            _ => repository.into(),
+        })
     {
         out.runners.push(Runner {
             image,

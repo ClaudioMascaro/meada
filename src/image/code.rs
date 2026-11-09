@@ -10,6 +10,9 @@ pub(super) struct Code {
     pub root: String,
     pub path: String,
     pub reason: String,
+    /// Whether the path went through a value a deployer can override.
+    #[serde(default)]
+    pub overridable: bool,
 }
 
 fn safe(root: &Path, path: &str) -> bool {
@@ -137,5 +140,8 @@ pub(super) fn checked(root: &Path, node: &crate::iac::Node, room: usize) -> Opti
         root: node.root.clone(),
         path: path.into_owned(),
         reason: format!("{source} {}#{}{suffix}", node.path, node.block),
+        overridable: [&node.build, &node.handler]
+            .iter()
+            .any(|r| r.as_ref().is_some_and(|r| r.overridable)),
     })
 }

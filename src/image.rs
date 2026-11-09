@@ -170,7 +170,10 @@ impl ContractKind for Image {
                     root: n.root.clone(),
                     repository: repo.identity.clone(),
                     path: path.into(),
-                    level: Level::Exact,
+                    level: match n.build.as_ref().is_some_and(|b| b.overridable) {
+                        true => Level::Inferred,
+                        false => Level::Exact,
+                    },
                     reason: format!("Compose build {}#{}.build", n.path, n.block),
                 });
             }
@@ -182,7 +185,10 @@ impl ContractKind for Image {
                     root: code.root,
                     repository: repo.identity.clone(),
                     path: code.path,
-                    level: Level::Exact,
+                    level: match code.overridable {
+                        true => Level::Inferred,
+                        false => Level::Exact,
+                    },
                     reason: code.reason,
                 });
             }
@@ -288,6 +294,12 @@ impl ContractKind for Image {
                 *prior = link;
             }
         }
+        // A builder repository's literal name covers its pattern that matches the same runner.
+        let literal = (candidates.keys())
+            .filter(|(_, c)| !c.contains('*'))
+            .map(|(site, _)| site.clone())
+            .collect::<std::collections::BTreeSet<_>>();
+        candidates.retain(|(site, c), _| !c.contains('*') || !literal.contains(site));
         let mut links = candidates.into_values().collect::<Vec<_>>();
         if links.len() > 1 {
             for l in &mut links {
@@ -348,7 +360,7 @@ impl ContractKind for Image {
         for p in export
             .providers
             .iter()
-            .filter(|p| p.contract.starts_with("image::"))
+            .filter(|p| p.contract.starts_with("image::") && !self.unresolved(&p.contract))
         {
             if !exports.iter().flat_map(|e| &e.consumers).any(|c| {
                 c.contract
@@ -368,7 +380,7 @@ impl ContractKind for Image {
         for c in export.consumers.iter().filter(|c| {
             c.contract
                 .as_deref()
-                .is_some_and(|c| c.starts_with("image::"))
+                .is_some_and(|c| c.starts_with("image::") && !self.unresolved(c))
         }) {
             let contract = c.contract.as_deref().unwrap_or_default();
             if !exports
@@ -569,17 +581,13 @@ fn images(export: &Export) -> Vec<(&crate::iac::Node, &str, Option<String>)> {
     out
 }
 
+/// Whether the scope holds a builder and a runner of a resolved image name.
 fn roles(exports: &[Export]) -> (bool, bool) {
+    let side = |c: &str| c.starts_with("image::") && !crate::contract::unresolved(c);
     (
-        exports
-            .iter()
-            .flat_map(|e| &e.providers)
-            .any(|p| p.contract.starts_with("image::")),
-        exports.iter().flat_map(|e| &e.consumers).any(|c| {
-            c.contract
-                .as_deref()
-                .is_some_and(|c| c.starts_with("image::"))
-        }),
+        (exports.iter().flat_map(|e| &e.providers)).any(|p| side(&p.contract)),
+        (exports.iter().flat_map(|e| &e.consumers))
+            .any(|c| c.contract.as_deref().is_some_and(side)),
     )
 }
 

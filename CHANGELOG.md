@@ -321,7 +321,10 @@ All notable changes to Meada are recorded here. The format follows
   and `` `${u}` `` pass the URL through, in a constant or built in place, so a `fetch` or a client
   wrapper called with one links to its route and a base URL read from the environment shows its
   `via`. A change through `u.searchParams`, `u.search` or `u.hash` keeps the path; a write to any
-  other member of a `new URL` constant leaves it unresolved (#685).
+  other member of a `new URL` constant, written in parentheses or a type assertion too, leaves it
+  unresolved, also through a destructuring or `for (.. of ..)` target, `++`, `Object.assign` or
+  another name holding it, as does such a write to a sealed field (`this.url.pathname = ..`)
+  (#685).
 - TypeScript consumers through `new URL(reference, base)`: the two arguments read as the join the
   WHATWG URL Standard defines (RFC 3986 section 5.2 for these references), so an absolute
   reference is itself, `//host/x` takes its host, `/orders` replaces the base's path and `orders`
@@ -488,6 +491,11 @@ All notable changes to Meada are recorded here. The format follows
 - Images: a module run from a local path (an archive or a directory) in one root no longer drops
   the image another root runs it from, with its environment and provisions; only that root runs
   code without an image.
+- Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
+  runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
+  the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes
+  `image.repository`, where the runner named a Docker Hub image; and an unresolved image name
+  (`image::*`, from `docker/metadata-action`) is no `status` orphan.
 - Compose: an override file's `build` with no `context` keeps the base service's context, where
   it built from the override's directory, and the `!reset` and `!override` tags clear or replace a
   base value. SAM: a function with no `CodeUri` of its own takes `Globals.Function.CodeUri`.

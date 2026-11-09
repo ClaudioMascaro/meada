@@ -833,3 +833,86 @@ fn image_queries_match_full_reads_of_the_same_workspace() {
     };
     assert_eq!(query(), with_every_row(query));
 }
+
+/// A build context a deployer can override runs code `inferred`; a literal and a pattern one
+/// builder repository publishes are one candidate; a Helm `image.registry` prefixes its
+/// repository; and an unresolved image name is no orphan.
+#[test]
+fn image_levels_and_names_follow_defaults_registries_and_unresolved_names() {
+    let app = fixture_repo(
+        "images_levels",
+        "image-app",
+        Some("https://example.com/acme/app.git"),
+    );
+    let deploy = fixture_repo(
+        "images_levels",
+        "image-deploy",
+        Some("https://example.com/acme/deploy.git"),
+    );
+    std::fs::remove_file(deploy.join("overlays/prod/kustomization.yaml")).unwrap();
+    std::fs::write(
+        deploy.join("values.yaml"),
+        "image:\n  registry: ghcr.io\n  repository: acme/orders\n  tag: v3\n",
+    )
+    .unwrap();
+    std::fs::create_dir(app.join("code")).unwrap();
+    std::fs::write(app.join("code/api.py"), "def handle():\n    return 1\n").unwrap();
+    std::fs::write(
+        app.join("compose.yaml"),
+        "services:\n  api:\n    build: ${CTX:-./code}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        app.join(".github/workflows/build.yml"),
+        "jobs:\n  image:\n    steps:\n      - uses: docker/build-push-action@v6\n        with:\n          tags: ghcr.io/acme/orders:v1\n  \
+         pattern:\n    steps:\n      - uses: docker/build-push-action@v6\n        with:\n          tags: ghcr.io/acme/${IMAGE}:v1\n  \
+         meta:\n    steps:\n      - id: meta\n        uses: docker/metadata-action@v5\n      - uses: docker/build-push-action@v6\n        with:\n          tags: ${{ steps.meta.outputs.tags }}\n",
+    )
+    .unwrap();
+    let built: serde_json::Value =
+        serde_json::from_str(&Engine::open(&app).unwrap().export().unwrap()).unwrap();
+    let executions = built["executions"].as_array().unwrap();
+    assert_eq!(executions.len(), 1, "{built}");
+    assert_eq!(executions[0]["path"], "code");
+    assert_eq!(executions[0]["level"], "inferred", "{built}");
+
+    let engine = Engine::open(&deploy).unwrap();
+    let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let consumers = export["consumers"].as_array().unwrap();
+    assert!(
+        consumers.iter().any(|c| c["site"]
+            .as_str()
+            .is_some_and(|s| s.contains("values.yaml"))
+            && c["contract"] == "image::ghcr.io/acme/orders"),
+        "{export}"
+    );
+    assert!(
+        !consumers
+            .iter()
+            .any(|c| c["contract"] == "image::docker.io/acme/orders"),
+        "{export}"
+    );
+    // One link per runner, the Helm one inferred from its value.
+    let links = export["links"].as_array().unwrap();
+    assert_eq!(links.len(), 2, "{export}");
+    for link in links {
+        assert_eq!(link["provider"], "example.com/acme/app", "{export}");
+        let helm = link["consumer"].as_str().unwrap().contains("values.yaml");
+        assert_eq!(
+            link["level"],
+            if helm { "inferred" } else { "exact" },
+            "{export}"
+        );
+    }
+    let status = Engine::open(&app)
+        .unwrap()
+        .status_report()
+        .unwrap()
+        .1
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(!status.contains("orphan image::*"), "{status}");
+    assert!(!status.contains("unresolved"), "{status}");
+}

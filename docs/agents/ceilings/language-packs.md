@@ -269,10 +269,13 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   `url` or `node:url` through an import or a destructured, unshadowed `require`. Unknown packages,
   repository aliases, default and namespace imports and other exports stay opaque. The guard
   applies across the whole file, so a local binding can suppress unrelated global uses too.
-  Member writes (`u.p = ..`, `u.p += ..`, `u["p"] = ..` for any `p` but `search` and
-  `hash`) are tracked per name across the whole file, whichever function writes them: a `const`
-  built by `new URL` whose name is written holds an unknown value, and the pass-through forms of
-  that name are not read, so two functions that use the same name for different URLs lose both.
+  Member writes (`u.p = ..`, `u.p += ..`, `u.p++`, `u["p"] = ..` for any `p` but `search` and
+  `hash`, a member as a destructuring or `for (.. of ..)` target, and `Object.assign(u, ..)`)
+  are tracked per name across the whole file, whichever function writes them, and a name another
+  takes (`v = u`, `const v = u`) counts as written, its writes not followed: a `const` built by
+  `new URL` (in parentheses or a type assertion too) whose name is written holds an unknown
+  value, as does a sealed field whose `this.f` is written so, and the pass-through forms of that
+  name are not read, so two functions that use the same name for different URLs lose both.
   A mutation inside a function the URL is passed to is not seen, so a wrapper called with the
   URL folds to the string it was built from. A parameter, a `catch` binding or a variable named
   `URL` also stops the fold. A shadowed or reassigned `require` stops folding its destructured
