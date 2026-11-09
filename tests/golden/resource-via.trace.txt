@@ -1,0 +1,6 @@
+example.com/resource-via/app values.yaml#groups[1].rules[0].labels.support (line 11)
+  →[declared: resource::routing::team-b] example.com/resource-via/infra main.tf:1 opsgenie_team_routing_rule.team_b
+chain: declared · 1 hops · 2 repos · 64 tokens
+example.com/resource-via/infra main.tf:1 opsgenie_team_routing_rule.team_b
+  →[declared: resource::routing::team-b] example.com/resource-via/app values.yaml#groups[1].rules[0].labels.support (line 11)
+chain: declared · 1 hops · 2 repos · 64 tokens

@@ -1,0 +1,434 @@
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[3]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[4]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[4]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[4]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[5]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[5]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[5]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[6]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[6]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[6]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[7]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[7]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[7]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[8]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[8]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/alertmanager-prometheusRule.yaml::spec.groups[0].rules[8]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/grafana-prometheusRule.yaml::spec.groups[0].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/grafana-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[1].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[1].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubePrometheus-prometheusRule.yaml::spec.groups[1].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[3]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubeStateMetrics-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[3]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[4]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[4]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[4]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[5]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[5]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[5]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[6]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[6]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[6]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[7]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[7]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[7]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[8]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[8]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[8]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[9]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[9]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[9]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[10]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[10]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[10]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[11]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[11]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[11]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[12]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[12]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[12]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[13]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[13]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[13]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[14]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[14]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[14]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[15]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[15]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[15]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[16]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[16]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[0].rules[16]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[3]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[3]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[3]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[4]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[4]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[4]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[5]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[5]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[5]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[6]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[6]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[6]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[7]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[7]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[1].rules[7]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[3]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[3]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[3]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[4]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[4]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[2].rules[4]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[3].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[3]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[3]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[4].rules[3]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[3]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[3]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[3]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[4]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[4]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[4]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[5]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[5]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[5]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[6]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[6]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[5].rules[6]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[3]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[3]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[3]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[4]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[4]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[4]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[5]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[5]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[5]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[6]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[6]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[6]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[7]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[7]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[7]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[8]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[8]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[8]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[9]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[9]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[9]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[10]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[10]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[10]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[11]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[11]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[11]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[12]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[12]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[12]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[13]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[13]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[13]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[14]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[14]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[14]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[15]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[15]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[6].rules[15]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[7].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/kubernetesControlPlane-prometheusRule.yaml::spec.groups[8].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[3]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[4]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[4]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[4]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[5]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[5]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[5]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[6]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[6]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[6]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[7]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[7]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[7]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[8]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[8]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[8]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[9]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[9]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[9]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[10]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[10]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[10]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[11]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[11]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[11]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[12]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[12]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[12]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[13]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[13]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[13]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[14]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[14]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[14]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[15]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[15]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[15]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[16]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[16]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[16]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[17]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[17]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[17]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[18]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[18]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[18]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[19]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[19]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[19]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[20]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[20]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[20]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[21]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[21]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[21]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[22]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[22]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[22]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[23]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[23]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[23]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[24]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[24]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[24]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[25]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[25]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/nodeExporter-prometheusRule.yaml::spec.groups[0].rules[25]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[3]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[4]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[4]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[4]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[5]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[5]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[5]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[6]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[6]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[6]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[7]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[7]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[7]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[8]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[8]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[8]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[9]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[9]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[9]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[10]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[10]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[10]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[11]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[11]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[11]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[12]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[12]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[12]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[13]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[13]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[13]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[14]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[14]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[14]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[15]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[15]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[15]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[16]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[16]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[16]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[17]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[17]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[17]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[18]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[18]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[18]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[19]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[19]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[19]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[20]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[20]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[20]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[21]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[21]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[21]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[22]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[22]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheus-prometheusRule.yaml::spec.groups[0].rules[22]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[1]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[1]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[2]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[2]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[3]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[3]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[4]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[4]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[4]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[5]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[5]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[5]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[6]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[6]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[6]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[7]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[7]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[0].rules[7]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[1].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[1].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "manifests/prometheusOperator-prometheusRule.yaml::spec.groups[1].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/existingrule.json::groups[0].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/existingrule.json::groups[0].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/existingrule.json::groups[0].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/existingrule.yaml::groups[0].rules[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/existingrule.yaml::groups[0].rules[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/existingrule.yaml::groups[0].rules[0]", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/alertmanager-config.yaml::route", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/alertmanager-config.yaml::route", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/alertmanager-config.yaml::route", "direction": "up", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "examples/alertmanager-config.yaml::route.routes[0]", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/alertmanager-config.yaml::route.routes[0]", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "examples/alertmanager-config.yaml::route.routes[0]", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "alertname", "kind": "alert", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "long", "kind": "alert", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "severity", "kind": "alert", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "short", "kind": "alert", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "zz_source_monitoring_missing", "kind": "alert", "budget": 200000}}

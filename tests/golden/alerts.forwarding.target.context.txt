@@ -1,0 +1,3 @@
+alert::target::team-c
+  example.com/acme/forwarding emitter rules.yaml:4 groups[0].rules[0] [exact: alert::target::team-c; matchers "tags"="target:team-c"; receiver: team-c-id; forwarding: Alertmanager example.com/acme/forwarding::alertmanager.yaml::route.routes[0]; receiver: incidents; tags]
+  example.com/acme/forwarding matcher main.tf:1 opsgenie_team_routing_rule.transformed

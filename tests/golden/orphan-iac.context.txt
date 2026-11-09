@@ -1,0 +1,14 @@
+channel::sqs::orders
+  example.com/orphan/infra provisioner main.tf:1 aws_sqs_queue.orders (root .) (no use in the workspace)
+
+example.com/orphan/infra main.tf:1-1 aws_sqs_queue.orders
+type: aws_sqs_queue
+name: "orders"
+root: .
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/orphan/infra main.tf:1 resource.aws_sqs_queue.orders.name = "orders"
+channel::sqs::orders
+  example.com/orphan/infra provisioner main.tf:1 aws_sqs_queue.orders (root .) (no use in the workspace)

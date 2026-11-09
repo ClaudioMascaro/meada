@@ -1,0 +1,14 @@
+service: finite-fields
+provider: {name: aws}
+custom:
+  method: '*'
+functions:
+  inventory:
+    handler: runtime.inventory
+    events:
+      - httpApi:
+          method: '*'
+          path: /known-one/{sku}
+      - http:
+          method: '${self:custom.method}'
+          path: /known-two/{sku}

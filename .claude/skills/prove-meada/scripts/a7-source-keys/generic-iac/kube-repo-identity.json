@@ -1,0 +1,88 @@
+{
+  "origin": "https://github.com/zz-prove/a7-generic-kube-source-key.git",
+  "repository": "github.com/zz-prove/a7-generic-kube-source-key",
+  "commit": "d2e4d2f3ec01da8b7e0866000fe68cd6a9380f41",
+  "commit_message": "a7 independent source key",
+  "fixed_git": {
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_AUTHOR_NAME": "prove-meada",
+    "GIT_AUTHOR_EMAIL": "prove@example.com",
+    "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
+    "GIT_COMMITTER_NAME": "prove-meada",
+    "GIT_COMMITTER_EMAIL": "prove@example.com",
+    "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z"
+  },
+  "files": {
+    "base/bundle.yaml": {
+      "mode": "file",
+      "bytes": 1391,
+      "sha256": "39ee9d18b1cb1e41d5a2a7e6fee6f6cacea0f007cf52b77d0fceb0b80bb57645"
+    },
+    "cycle-a/kustomization.yaml": {
+      "mode": "file",
+      "bytes": 24,
+      "sha256": "1e38ad5bf792f4a696ebee21de92137bf7dc05f067fe21ac817b97ca263b848c"
+    },
+    "cycle-b/kustomization.yaml": {
+      "mode": "file",
+      "bytes": 24,
+      "sha256": "8c04ff4c7869c833f82807ead2c6a88853a38820a1375b9ddc0ec47b35039254"
+    },
+    "helm/templated.yaml": {
+      "mode": "file",
+      "bytes": 101,
+      "sha256": "7b17b842a588b80560a769797755453d08429e98bc3b9e23a662582868ea49e7"
+    },
+    "linked-base": {
+      "mode": "symlink",
+      "target": "base",
+      "target_sha256": "cae662172fd450bb0cd710a769079c05bfc5d8e35efa6576edc7d0377afdd4a2"
+    },
+    "middle/kustomization.yaml": {
+      "mode": "file",
+      "bytes": 238,
+      "sha256": "e2ef34b569fdf770dd317350d1a1dbfbfc52fb9afe7ec5b0e6085f8789f8d1e4"
+    },
+    "overlays/cedar/kustomization.yaml": {
+      "mode": "file",
+      "bytes": 623,
+      "sha256": "2822b20573f8908fe2f7725a248b42993e311ceaebbaf9d035f2d921f7979d7d"
+    },
+    "overlays/harbor/kustomization.yaml": {
+      "mode": "file",
+      "bytes": 253,
+      "sha256": "90a87730690dc02d23a5deb93182fd069292ed5c0aee1c3aa772ea5897f116e3"
+    },
+    "patch.yaml": {
+      "mode": "file",
+      "bytes": 93,
+      "sha256": "27d531432efc1eb0ffecca5cf06a7b3e9910b432b20895a5113c89a905d8034a"
+    },
+    "plain-a/bundle.yaml": {
+      "mode": "file",
+      "bytes": 611,
+      "sha256": "4f8b8c7b372e5062aab5dde183bc72c79ec353f6a3e9f14a8294414ae20a0090"
+    },
+    "plain-b/config.json": {
+      "mode": "file",
+      "bytes": 117,
+      "sha256": "3e7b4812cfbda8792c726bcdc8b67cddb56a32b754d9a24447a3bb4a1af63ba0"
+    },
+    "plain-b/object.json": {
+      "mode": "file",
+      "bytes": 264,
+      "sha256": "aec9ecbe9a6bd986c75a654cbcc3ae990001145bd385cd9c416b7e2e70cbf675"
+    },
+    "xp-one/bundle.yaml": {
+      "mode": "file",
+      "bytes": 3419,
+      "sha256": "9a5a3626053e83955c33a56b09b95588b0777bf112bbc244eec4bbca3d0d72be"
+    },
+    "xp-two/bundle.yaml": {
+      "mode": "file",
+      "bytes": 262,
+      "sha256": "163e3eba3d2fde0d66bbfc29784041bb6ac5673dcddd924732ac0aba0cf3012a"
+    }
+  }
+}

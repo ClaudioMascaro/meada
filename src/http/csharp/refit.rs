@@ -264,6 +264,7 @@ mod tests {
             exported: &[],
             files: &[],
             configs,
+            symlinks: &[],
         };
         let mut found: Vec<Sent> = (consumers(&code, &indexed).into_iter())
             .map(|f| {

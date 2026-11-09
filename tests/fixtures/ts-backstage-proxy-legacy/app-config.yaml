@@ -1,0 +1,28 @@
+# Backstage's legacy proxy shape (before 1.17): the keys of `proxy` that start with `/` are the
+# endpoints, read when no file has a `proxy.endpoints`.
+proxy:
+  skipInvalidProxies: true
+  '/inventory':
+    target: ${INVENTORY_URL}
+  '/stock': https://stock.example.com/
+  '/stockenv': ${INVENTORY_URL}
+  '/rewritten':
+    target: https://stock.example.com
+    pathRewrite:
+      '^/api/proxy/rewritten': '/v1'
+  '/stripped':
+    target: https://stock.example.com
+    pathRewrite:
+      '^/api/proxy/stripped': ''
+  '/ignored':
+    target: https://stock.example.com
+    ignorePath: true
+  '/prepended':
+    target: https://stock.example.com
+    prependPath: false
+  # A string in this file, an object with an option in `app-config.local.yaml`.
+  '/shortignored': https://stock.example.com
+  '/shortrewritten': https://stock.example.com
+  '/shortprepended': https://stock.example.com
+  '/included':
+    $include: ./partials/inventory.yaml

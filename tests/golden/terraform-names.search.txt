@@ -1,0 +1,21 @@
+example.com/acme/infra envs/prod/main.tf:23 aws_sns_topic.events (aws_sns_topic, name "ORDERS", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/prod/main.tf:27 aws_sqs_queue.regional["eu"] (aws_sqs_queue, name "orders-eu", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/prod/main.tf:27 aws_sqs_queue.regional["us"] (aws_sqs_queue, name "orders-us", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/prod/main.tf:32 aws_sqs_queue.replica["eu"] (aws_sqs_queue, name "orders-replica-eu", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/prod/main.tf:32 aws_sqs_queue.replica["us"] (aws_sqs_queue, name "orders-replica-us", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/prod/main.tf:37 aws_sqs_queue.workspace (aws_sqs_queue, pattern "orders-*", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/prod/main.tf:19 aws_sqs_queue.orders (aws_sqs_queue, name "shop-prod-orders", root envs/prod) (no use in the workspace)
+
+example.com/acme/infra envs/prod/main.tf:47 module.billing (module, root envs/prod)
+example.com/acme/infra envs/prod/main.tf:52 aws_sqs_queue.billing_dlq (aws_sqs_queue, name "shop-prod-billing-queue-dlq", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/stage/main.tf:5 module.billing (module, root envs/stage)
+example.com/acme/infra modules/queue/main.tf:9 module.billing.aws_sqs_queue.this (aws_sqs_queue, name "shop-prod-billing-queue", root envs/prod) (no use in the workspace)
+example.com/acme/infra modules/queue/main.tf:9 module.billing.aws_sqs_queue.this (aws_sqs_queue, name "shop-stage-billing-queue", root envs/stage) (no use in the workspace)
+
+example.com/acme/infra envs/prod/main.tf:43 aws_sns_topic.account (aws_sns_topic, pattern "alerts-*", root envs/prod) (no use in the workspace)
+
+example.com/acme/infra envs/prod/main.tf:52 aws_sqs_queue.billing_dlq (aws_sqs_queue, name "shop-prod-billing-queue-dlq", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/prod/main.tf:61 aws_sqs_queue.audit_dlq (aws_sqs_queue, pattern "*-dlq", root envs/prod) (no use in the workspace)
+
+example.com/acme/infra envs/prod/main.tf:32 aws_sqs_queue.replica["eu"] (aws_sqs_queue, name "orders-replica-eu", root envs/prod) (no use in the workspace)
+example.com/acme/infra envs/prod/main.tf:32 aws_sqs_queue.replica["us"] (aws_sqs_queue, name "orders-replica-us", root envs/prod) (no use in the workspace)

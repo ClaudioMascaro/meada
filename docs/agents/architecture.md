@@ -28,12 +28,14 @@ Each line names modules and the area that owns their detail. Split area indexes 
 relevant topic. The [full catalogue](map/overview/modules-src.md) retains each module's description.
 
 - `engine.rs`, `items.rs`, `trace.rs`, `partial.rs`, `drift_view.rs`, `render.rs`, `mcp.rs`, `main.rs`, `msg.rs`, `lib.rs`: queries, rendering, MCP and CLI. [queries](map/queries.md).
-- `workspace.rs`, `config.rs`, `repo.rs`, `index.rs`, `lang/`, `resolve.rs`, `community.rs`, `entry.rs`: workspace discovery, storage, packs and resolution. [indexing](map/indexing.md).
-- `contract.rs`, `http.rs`, `http/`, `resource.rs`, `channel.rs`, `channel/`, `package.rs`, `package/`: contract kinds, HTTP, resources, channels and packages. [contracts](map/contracts.md).
-- `names.rs`: external names and shared language readers. [languages](map/languages.md).
+- `workspace.rs`, `config.rs`, `repo.rs`, `index.rs`, `lang/`, `resolve.rs`, `resolve/`, `community.rs`, `entry.rs`: workspace discovery, storage, packs and resolution. [indexing](map/indexing.md).
+- `contract.rs`, `contract/`, `http.rs`, `http/`, `resource.rs`, `resource/`, `resource/via.rs`, `image.rs`, `image/config.rs`, `image/code.rs`, `image/patterns.rs`, `image/environment.rs`, `alert.rs`, `alert/` (labels, incident routing and explicit receiver forwarding), `channel.rs`, `channel/`, `package.rs`, `package/`: contract kinds, library forms and SDK extraction. [contracts](map/contracts.md).
+- `names.rs`, `names/`: external names and shared language readers. [languages](map/languages.md).
+- `contract/gcp/`, `contract/sdk/`: GCP SDK policy and shared constructor evidence. [GCP SDK use sides](map/contracts/gcp-sdk-668.md).
+- `contract/azure/`, `contract/receiver.rs`: Azure SDK policy and private receiver identity. [Azure SDK use sides](map/contracts/azure-sdk-670.md).
 - `jvm/`: external names and shared language readers. [languages](map/languages.md), [seams](map/seams.md).
 - `dotnet/`, `xml.rs`: shared build readers and extension rules. [seams](map/seams.md).
-- `document/`, `literals.rs`, `zod.rs`, `declared.rs`: provider documents, config values, IaC and shapes. [documents](map/documents.md).
+- `document/`, `config_values.rs`, `config_values/hcl.rs`, `config_values/sites.rs`, `iac.rs`, `iac/`, `kube.rs`, `literals.rs`, `zod.rs`, `declared.rs`: provider documents, config values, IaC and shapes. [documents](map/documents.md).
 - `decisions.rs`, `decide.rs`, `decider/`: decision replay and opt-in decider. [decisions](map/decisions.md).
 - `modules.rs`, `valkey.rs`, `postgres.rs`, `audit.rs`, `directory.rs`, `directory/`, `oidc.rs`, `oidc/`, `grant.rs`, `grant/`, `accounts.rs`, `accounts/`, `github_app.rs`, `github_app/`: cloud configuration, services, identity and grants. [cloud](map/cloud.md).
 - `snapshot.rs`, `snapshot/`: snapshot store and generations. [snapshot](map/snapshot.md).
@@ -53,6 +55,9 @@ relevant topic. The [full catalogue](map/overview/modules-src.md) retains each m
 [Repository, symbol, call, contract and export identities](map/overview/identities-and-formats.md).
 
 ## Seams and what extends them
+
+HTTP routing through evaluated Services, Compose and Ingress:
+[prepared routing and presentation](map/contracts/http-infrastructure-665.md).
 
 [Extension steps](map/overview/seams-and-what-extends-them.md) for kinds, packs, ecosystems,
 documents, shapes, entry points, levels, config, MCP and CLI; [library and shared-reader
@@ -77,6 +82,6 @@ boundaries and use `cargo run --example split_agents -- <file>`; retain every en
 
 ## Known ceilings
 
-[Limits by area](ceilings.md), each with its value and reason, and
-[ceiling maintenance](map/overview/known-ceilings.md). Read the relevant topic when a
-limit is touched; every `ponytail:` limit remains checked by `tests/it/docs.rs`.
+[Limits by area](ceilings.md) and [how ceilings are recorded](map/overview/known-ceilings.md).
+Read the relevant topic when a limit is touched; every `ponytail:` limit remains checked by
+`tests/it/docs.rs`.

@@ -1,0 +1,10 @@
+{
+  "apiVersion": "review.invalid/v1",
+  "kind": "Store",
+  "metadata": {
+    "name": "store"
+  },
+  "spec": {
+    "bucket": "custom-assets"
+  }
+}

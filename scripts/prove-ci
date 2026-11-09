@@ -41,10 +41,13 @@ def capture(run, scope, base, head, repos):
     blocked = None
     python = sys.executable
 
-    def command(name, args, required=False):
+    def command(name, args, required=False, compares=False):
         with (run / 'logs' / (name + '.log')).open('w') as log:
             result = subprocess.run([str(arg) for arg in args], stdout=log, stderr=subprocess.STDOUT)
         steps.append({'name': name, 'exit_code': result.returncode})
+        # A comparison's exit 1 is a difference from the base: evidence, not a failed capture.
+        if compares and result.returncode == 1:
+            steps[-1]['differences'] = True
         print(f'{name}: exit {result.returncode}', flush=True)
         if required and result.returncode:
             raise RuntimeError(f'{name} failed; see logs/{name}.log')
@@ -54,22 +57,42 @@ def capture(run, scope, base, head, repos):
             command('build-head', [SCRIPTS / 'build.sh', 'head', '.', run], required=True)
             command('build-base', [SCRIPTS / 'build.sh', 'base', base, run], required=True)
             command('cli-mcp', [python, SCRIPTS / 'prove.py', 'run', '--base-bin', run / 'bin/meada-base',
-                               '--head-bin', run / 'bin/meada-head', '--repos', repos, '--run', run, '--http'])
+                               '--head-bin', run / 'bin/meada-head', '--repos', repos, '--run', run, '--http'],
+                    compares=True)
         if scope['console']:
             # The base can leave same-version core artifacts in the shared Cargo target.
             command('clean-console-core', ['cargo', 'clean', '-p', 'meada-core', '--target-dir',
                                           os.environ.get('CARGO_TARGET_DIR', str(Path.cwd() / 'target'))], required=True)
             command('build-console', [SCRIPTS / 'build.sh', 'head-ui', '.', run,
                                      'ui,accounts' if scope['accounts'] else 'ui'], required=True)
+            entries = sorted((run / 'head').glob('*/export1.json'))
+            if not entries:
+                raise RuntimeError('console parity requires captured corpus entries')
+            for export in entries:
+                name = export.parent.name
+                api_run = run / 'console-api' / name
+                api_run.mkdir(parents=True)
+                for data in ('head', 'work'):
+                    (api_run / data).symlink_to(run / data, target_is_directory=True)
+                try:
+                    command(f'console-{name}-start', [python, SCRIPTS / 'console.py', 'start',
+                            '--bin', run / 'bin/meada-head-ui', '--run', api_run, '--ui-dir', 'ui/dist',
+                            '--repos', name, *(['--accounts'] if scope['accounts'] else [])], required=True)
+                    command(f'console-{name}-api', [python, SCRIPTS / 'console.py', 'api', '--run', api_run])
+                finally:
+                    try:
+                        command(f'console-{name}-stop', [python, SCRIPTS / 'console.py', 'stop', '--run', api_run])
+                    finally:
+                        (api_run / 'console/private.pem').unlink(missing_ok=True)
             command('console-start', [python, SCRIPTS / 'console.py', 'start', '--bin', run / 'bin/meada-head-ui',
                                       '--run', run, '--ui-dir', 'ui/dist',
                                       *(['--accounts'] if scope['accounts'] else [])], required=True)
-            command('console-api', [python, SCRIPTS / 'console.py', 'api', '--run', run])
             command('console-pages', ['node', SCRIPTS / 'console-pages.mjs', run])
         if scope['goldens']:
             command('goldens', [python, SCRIPTS / 'prove.py', 'rebless', '--base', base, '--run', run])
         if scope['deploy']:
-            command('deploy-diff', [python, SCRIPTS / 'prove.py', 'deploy', '--base', base, '--run', run])
+            command('deploy-diff', [python, SCRIPTS / 'prove.py', 'deploy', '--base', base, '--run', run],
+                    compares=True)
             command('compose-contract', [python, 'scripts/compose-check'])
             command('helm-contract', [python, 'scripts/helm-check'])
         if scope['container']:
@@ -88,7 +111,7 @@ def capture(run, scope, base, head, repos):
         (run / 'console/private.pem').unlink(missing_ok=True)
         blocked = blocked or next((f"{step['name']} reported BLOCKED" for step in steps
                                    if step['exit_code'] == 2), None)
-        failed = blocked is not None or any(step['exit_code'] for step in steps)
+        failed = blocked is not None or any(step['exit_code'] and not step.get('differences') for step in steps)
         receipt = {
             'base': base, 'head': head, 'surfaces': [name for name in SURFACES if scope[name]],
             'repos': repos, 'run_url': os.environ.get('PROVE_RUN_URL'), 'steps': steps,
@@ -116,7 +139,9 @@ def selftest():
             raise AssertionError('local E2E must be refused')
     scope = dict.fromkeys(SURFACES, False)
     scope['cli'] = True
-    for code, expected in ((0, 'CAPTURED'), (1, 'FAILED'), (2, 'BLOCKED')):
+    # A difference from the base is evidence for the checker (exit 1); a budget overrun or a
+    # nondeterministic index fails the capture (exit 3).
+    for code, expected in ((0, 'CAPTURED'), (1, 'CAPTURED'), (3, 'FAILED'), (2, 'BLOCKED')):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
             def fake(args, **kwargs):
                 return subprocess.CompletedProcess(args, code if 'run' in args else 0)
@@ -124,22 +149,50 @@ def selftest():
                 run = Path(temp) / 'proof'
                 result = capture(run, scope, 'a' * 40, 'b' * 40, 'meada')
             receipt = json.loads((run / 'receipt.json').read_text())
-            assert bool(result) == bool(code) and receipt['capture'] == expected
+            assert bool(result) == (expected != 'CAPTURED') and receipt['capture'] == expected
+            assert bool(receipt['steps'][2].get('differences')) == (code == 1), receipt['steps']
             assert receipt['verdict'] == 'UNPROVEN' and receipt['head'] == 'b' * 40
             assert receipt['steps'][-1]['name'] == 'clean'
+    # `rebless` reports no difference by its exit: its exit 1 is a crash, a failed capture.
+    goldens = dict.fromkeys(SURFACES, False)
+    goldens['goldens'] = True
+    with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
+        def crashed(args, **kwargs):
+            return subprocess.CompletedProcess(args, 1 if 'rebless' in args else 0)
+        with patch('subprocess.run', side_effect=crashed):
+            run = Path(temp) / 'proof'
+            assert capture(run, goldens, 'a' * 40, 'b' * 40, 'meada') == 1
+        assert json.loads((run / 'receipt.json').read_text())['capture'] == 'FAILED'
     with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
         with patch('subprocess.run', return_value=subprocess.CompletedProcess([], 1)):
             run = Path(temp) / 'proof'
             assert capture(run, scope, 'a' * 40, 'b' * 40, 'meada') == 2
         assert json.loads((run / 'receipt.json').read_text())['capture'] == 'BLOCKED'
-    with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
-        scope['console'] = True
-        with patch('subprocess.run', return_value=subprocess.CompletedProcess([], 0)):
+    scope['console'] = scope['accounts'] = True
+    for api_exit in (0, 1):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
             run = Path(temp) / 'proof'
-            assert capture(run, scope, 'a' * 40, 'b' * 40, 'meada') == 0
-        names = [step['name'] for step in json.loads((run / 'receipt.json').read_text())['steps']]
-        assert names.index('build-base') < names.index('clean-console-core') < names.index('build-console')
-        assert names[-2:] == ['console-stop', 'clean']
+            def fake_console(args, **kwargs):
+                if 'run' in args:
+                    for entry in ('meada', 'click'):
+                        directory = run / 'head' / entry
+                        directory.mkdir(parents=True)
+                        (directory / 'export1.json').write_text('{}')
+                if 'start' in args:
+                    assert '--accounts' in args
+                    if '--repos' in args:
+                        assert Path(args[args.index('--run') + 1]).name == args[args.index('--repos') + 1]
+                return subprocess.CompletedProcess(args, api_exit if 'api' in args else 0)
+            with patch('subprocess.run', side_effect=fake_console):
+                assert capture(run, scope, 'a' * 40, 'b' * 40, 'all') == api_exit
+            receipt = json.loads((run / 'receipt.json').read_text())
+            names = [step['name'] for step in receipt['steps']]
+            assert names.index('build-base') < names.index('clean-console-core') < names.index('build-console')
+            for entry in ('meada', 'click'):
+                assert names.index(f'console-{entry}-start') < names.index(f'console-{entry}-api') < names.index(f'console-{entry}-stop')
+                assert (run / 'console-api' / entry / 'head').resolve() == run / 'head'
+            assert names.index('console-click-stop') < names.index('console-start')
+            assert names[-2:] == ['console-stop', 'clean'] and receipt['verdict'] == 'UNPROVEN'
     print('prove-ci selftest: local guard, capture status, failure retention and cleanup passed')
 
 

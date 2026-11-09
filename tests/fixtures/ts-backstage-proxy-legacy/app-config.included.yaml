@@ -1,0 +1,3 @@
+# The whole legacy table of this file is an included partial.
+proxy:
+  $include: ./partials/proxy.yaml

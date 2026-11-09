@@ -1,0 +1,423 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/app",
+  "commit": "7477e263a55b7a80be2a4dabe9c3c3066d30512d",
+  "dirty": true,
+  "files": [
+    {
+      "path": "code/parameter.ts",
+      "hash": "7b05c62662dbe0df46140c0af36837625ebe2e9fb7daffa5b94f322ec88e510e"
+    },
+    {
+      "path": "code/queue.py",
+      "hash": "7e39245fb75161bdb8aa0a780b3cd0e7913f24a6249adc45461d7379044af7f5"
+    },
+    {
+      "path": "code/send.ts",
+      "hash": "51af36f714398ec2d7990b394c5665ce8e384335cd17b1d502b240911f665287"
+    },
+    {
+      "path": "send.ts",
+      "hash": "51af36f714398ec2d7990b394c5665ce8e384335cd17b1d502b240911f665287"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/app::code/parameter.ts::parameter",
+      "span": {
+        "path": "code/parameter.ts",
+        "start": 111,
+        "end": 213
+      },
+      "hash": "54a9255866ddafd7cef60179fa278a3c5eecb9f03f70b2b26f4d35a1ee412b7c"
+    },
+    {
+      "id": "example.com/acme/app::code/queue.py::publish",
+      "span": {
+        "path": "code/queue.py",
+        "start": 51,
+        "end": 138
+      },
+      "hash": "1b40574cc4729fc0b012e6881f74abc1ec37afec0a46a558cee6ad13bbaeefe4"
+    },
+    {
+      "id": "example.com/acme/app::code/queue.py::receive",
+      "span": {
+        "path": "code/queue.py",
+        "start": 139,
+        "end": 219
+      },
+      "hash": "b34632730d0d3d15c12d96c07cd69482f071605273c576f9aff552e37d72fa76"
+    },
+    {
+      "id": "example.com/acme/app::code/send.ts::send",
+      "span": {
+        "path": "code/send.ts",
+        "start": 107,
+        "end": 233
+      },
+      "hash": "5bc6e300481596247d7c357c3c45aa4e1438295a2a513faeb4874072fa7c3576"
+    },
+    {
+      "id": "example.com/acme/app::send.ts::send",
+      "span": {
+        "path": "send.ts",
+        "start": 107,
+        "end": 233
+      },
+      "hash": "5bc6e300481596247d7c357c3c45aa4e1438295a2a513faeb4874072fa7c3576"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/app::code/parameter.ts::SSMClient#0",
+      "caller": "example.com/acme/app::code/parameter.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "code/parameter.ts",
+        "start": 85,
+        "end": 102
+      }
+    },
+    {
+      "id": "example.com/acme/app::code/parameter.ts::parameter::GetParameterCommand#0",
+      "caller": "example.com/acme/app::code/parameter.ts::parameter",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "code/parameter.ts",
+        "start": 153,
+        "end": 209
+      }
+    },
+    {
+      "id": "example.com/acme/app::code/parameter.ts::parameter::client.send#0",
+      "caller": "example.com/acme/app::code/parameter.ts::parameter",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "code/parameter.ts",
+        "start": 141,
+        "end": 210
+      }
+    },
+    {
+      "id": "example.com/acme/app::code/queue.py::boto3.client#0",
+      "caller": "example.com/acme/app::code/queue.py",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "code/queue.py",
+        "start": 31,
+        "end": 50
+      }
+    },
+    {
+      "id": "example.com/acme/app::code/queue.py::publish::os.getenv#0",
+      "caller": "example.com/acme/app::code/queue.py::publish",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "code/queue.py",
+        "start": 98,
+        "end": 120
+      }
+    },
+    {
+      "id": "example.com/acme/app::code/queue.py::publish::queue.send_message#0",
+      "caller": "example.com/acme/app::code/queue.py::publish",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "code/queue.py",
+        "start": 70,
+        "end": 138
+      }
+    },
+    {
+      "id": "example.com/acme/app::code/queue.py::receive::os.getenv#0",
+      "caller": "example.com/acme/app::code/queue.py::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "code/queue.py",
+        "start": 196,
+        "end": 218
+      }
+    },
+    {
+      "id": "example.com/acme/app::code/queue.py::receive::queue.receive_message#0",
+      "caller": "example.com/acme/app::code/queue.py::receive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "code/queue.py",
+        "start": 165,
+        "end": 219
+      }
+    },
+    {
+      "id": "example.com/acme/app::code/send.ts::SQSClient#0",
+      "caller": "example.com/acme/app::code/send.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "code/send.ts",
+        "start": 81,
+        "end": 98
+      }
+    },
+    {
+      "id": "example.com/acme/app::code/send.ts::send::SendMessageCommand#0",
+      "caller": "example.com/acme/app::code/send.ts::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "code/send.ts",
+        "start": 148,
+        "end": 229
+      }
+    },
+    {
+      "id": "example.com/acme/app::code/send.ts::send::sqs.send#0",
+      "caller": "example.com/acme/app::code/send.ts::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "code/send.ts",
+        "start": 139,
+        "end": 230
+      }
+    },
+    {
+      "id": "example.com/acme/app::send.ts::SQSClient#0",
+      "caller": "example.com/acme/app::send.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "send.ts",
+        "start": 81,
+        "end": 98
+      }
+    },
+    {
+      "id": "example.com/acme/app::send.ts::send::SendMessageCommand#0",
+      "caller": "example.com/acme/app::send.ts::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "send.ts",
+        "start": 148,
+        "end": 229
+      }
+    },
+    {
+      "id": "example.com/acme/app::send.ts::send::sqs.send#0",
+      "caller": "example.com/acme/app::send.ts::send",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "send.ts",
+        "start": 139,
+        "end": 230
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::sqs",
+      "site": "example.com/acme/app::send.ts::send::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs::jobs",
+      "site": "example.com/acme/app::code/queue.py::publish::queue.send_message#0",
+      "via": "workload:example.com/acme/app::compose.yaml::services.worker (root .), env:QUEUE_URL"
+    },
+    {
+      "contract": "channel::sqs::jobs",
+      "site": "example.com/acme/app::code/send.ts::send::SendMessageCommand#0",
+      "via": "workload:example.com/acme/app::compose.yaml::services.worker (root .), env:QUEUE_URL"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::ssm::/app/key",
+      "site": "example.com/acme/app::code/parameter.ts::parameter::client.send#0",
+      "via": "workload:example.com/acme/app::compose.yaml::services.worker (root .), env:PARAMETER"
+    },
+    {
+      "contract": "channel::sqs::jobs",
+      "site": "example.com/acme/app::code/queue.py::receive",
+      "via": "workload:example.com/acme/app::compose.yaml::services.worker (root .), env:QUEUE_URL"
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/app::compose.yaml::services.worker",
+      "address": "services.worker",
+      "type": "service",
+      "root": ".",
+      "path": "compose.yaml",
+      "line": 2,
+      "end_line": 6
+    }
+  ],
+  "executions": [
+    {
+      "workload": "example.com/acme/app::compose.yaml::services.worker",
+      "root": ".",
+      "repository": "example.com/acme/app",
+      "path": "code",
+      "level": "exact",
+      "reason": "Compose build compose.yaml#services.worker.build"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/app::code/queue.py::receive",
+      "provider": "example.com/acme/app::code/queue.py::publish::queue.send_message#0",
+      "contract": "channel::sqs::jobs",
+      "level": "inferred",
+      "reason": "channel::sqs::jobs; workload:example.com/acme/app::compose.yaml::services.worker (root .), env:QUEUE_URL"
+    },
+    {
+      "consumer": "example.com/acme/app::code/queue.py::receive",
+      "provider": "example.com/acme/app::code/send.ts::send::SendMessageCommand#0",
+      "contract": "channel::sqs::jobs",
+      "level": "inferred",
+      "reason": "channel::sqs::jobs; workload:example.com/acme/app::compose.yaml::services.worker (root .), env:QUEUE_URL"
+    }
+  ],
+  "provisions": [
+    {
+      "side": "example.com/acme/app::code/parameter.ts::parameter::client.send#0",
+      "provisioner": "example.com/acme/deploy::queue.tf::aws_ssm_parameter.key",
+      "root": ".",
+      "contract": "resource::ssm::/app/key",
+      "level": "inferred",
+      "reason": "resource::ssm::/app/key; workload:example.com/acme/app::compose.yaml::services.worker (root .), env:PARAMETER"
+    },
+    {
+      "side": "example.com/acme/app::code/queue.py::publish::queue.send_message#0",
+      "provisioner": "example.com/acme/deploy::queue.tf::aws_sqs_queue.jobs",
+      "root": ".",
+      "contract": "channel::sqs::jobs",
+      "level": "inferred",
+      "reason": "channel::sqs::jobs; workload:example.com/acme/app::compose.yaml::services.worker (root .), env:QUEUE_URL"
+    },
+    {
+      "side": "example.com/acme/app::code/queue.py::receive",
+      "provisioner": "example.com/acme/deploy::queue.tf::aws_sqs_queue.jobs",
+      "root": ".",
+      "contract": "channel::sqs::jobs",
+      "level": "inferred",
+      "reason": "channel::sqs::jobs; workload:example.com/acme/app::compose.yaml::services.worker (root .), env:QUEUE_URL"
+    },
+    {
+      "side": "example.com/acme/app::code/send.ts::send::SendMessageCommand#0",
+      "provisioner": "example.com/acme/deploy::queue.tf::aws_sqs_queue.jobs",
+      "root": ".",
+      "contract": "channel::sqs::jobs",
+      "level": "inferred",
+      "reason": "channel::sqs::jobs; workload:example.com/acme/app::compose.yaml::services.worker (root .), env:QUEUE_URL"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/app::code/parameter.ts::parameter",
+      "kind": "export",
+      "label": "parameter",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/app::code/parameter.ts::parameter"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/app::code/queue.py::publish",
+      "kind": "export",
+      "label": "publish",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/app::code/queue.py::publish"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/app",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/app::code/queue.py::receive",
+          "reason": "channel::sqs::jobs; workload:example.com/acme/app::compose.yaml::services.worker (root .), env:QUEUE_URL"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/app::code/queue.py::receive::channel::sqs",
+      "kind": "channel",
+      "label": "channel::sqs (unresolved)",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/app::code/queue.py::receive"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/app::code/send.ts::send",
+      "kind": "export",
+      "label": "send",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/app::code/send.ts::send"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/app",
+          "level": "inferred",
+          "via": "link",
+          "node": "example.com/acme/app::code/queue.py::receive",
+          "reason": "channel::sqs::jobs; workload:example.com/acme/app::compose.yaml::services.worker (root .), env:QUEUE_URL"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/app::send.ts::send",
+      "kind": "export",
+      "label": "send",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/app::send.ts::send"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/app",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/app::send.ts::send::SendMessageCommand#0",
+          "mark": "produces",
+          "contract": "channel::sqs"
+        }
+      ]
+    }
+  ]
+}

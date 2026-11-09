@@ -303,6 +303,7 @@ mod tests {
             exported: &[],
             files: &[],
             configs: &[],
+            symlinks: &[],
         };
         let runs = (0..3).map(|_| {
             let at = std::time::Instant::now();

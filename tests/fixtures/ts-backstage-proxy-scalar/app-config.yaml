@@ -1,0 +1,4 @@
+# A `proxy.endpoints` that is no object (an invalid config) still exists, so the legacy keys of
+# the other file are no endpoints.
+proxy:
+  endpoints: none

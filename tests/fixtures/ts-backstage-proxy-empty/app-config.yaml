@@ -1,0 +1,4 @@
+# An empty `proxy.endpoints` still exists, so Backstage reads it and ignores the legacy keys of
+# the other file.
+proxy:
+  endpoints: {}

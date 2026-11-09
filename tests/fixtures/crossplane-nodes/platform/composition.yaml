@@ -1,0 +1,61 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xpostgresqlinstances.aws
+  labels:
+    provider: aws
+spec:
+  compositeTypeRef:
+    apiVersion: database.acme.io/v1alpha1
+    kind: XPostgreSQLInstance
+  patchSets:
+    - name: named
+      patches:
+        - fromFieldPath: metadata.labels[crossplane.io/claim-name]
+          toFieldPath: metadata.annotations[crossplane.io/external-name]
+  resources:
+    - name: subnets
+      base:
+        apiVersion: rds.aws.upbound.io/v1beta1
+        kind: SubnetGroup
+        metadata:
+          annotations:
+            crossplane.io/external-name: orders-db-subnets
+        spec:
+          forProvider:
+            region: us-east-1
+    - name: instance
+      base:
+        apiVersion: rds.aws.upbound.io/v1beta1
+        kind: Instance
+        spec:
+          forProvider:
+            region: us-east-1
+            engine: postgres
+      patches:
+        - fromFieldPath: spec.storageGB
+          toFieldPath: spec.forProvider.allocatedStorage
+        - type: PatchSet
+          patchSetName: named
+    - name: backups
+      base:
+        apiVersion: s3.aws.upbound.io/v1beta1
+        kind: Bucket
+        metadata:
+          name: orders-db-backups
+        spec:
+          forProvider:
+            region: us-east-1
+      patches:
+        - type: ToCompositeFieldPath
+          fromFieldPath: metadata.name
+          toFieldPath: status.backupBucket
+    - name: network
+      base:
+        apiVersion: network.acme.io/v1alpha1
+        kind: XNetwork
+        metadata:
+          name: orders-network
+      patches:
+        - fromFieldPath: metadata.uid
+          toFieldPath: metadata.name

@@ -1,0 +1,20 @@
+example.com/acme/infra cfn/queues.yaml:3 JobsQueue (AWS::SQS::Queue, name "legacy-jobs", root cfn/queues.yaml) (no use in the workspace)
+example.com/acme/infra cfn/stack.yaml:15 JobsQueue (AWS::SQS::Queue, name "prod-jobs", root cfn/stack.yaml) (no use in the workspace)
+example.com/acme/infra cfn/stack.yaml:23 JobsDeadLetter (AWS::SQS::Queue, name "prod-jobs-dead", root cfn/stack.yaml) (no use in the workspace)
+example.com/acme/infra sam/template.yaml:44 OrdersQueue (AWS::SQS::Queue, name "shop-orders-dev", root sam/template.yaml) (no use in the workspace)
+
+example.com/acme/infra sam/template.yaml:23 OrdersFunction (AWS::Serverless::Function, name "shop-orders-dev", root sam/template.yaml)
+example.com/acme/infra sam/template.yaml:44 OrdersQueue (AWS::SQS::Queue, name "shop-orders-dev", root sam/template.yaml) (no use in the workspace)
+
+example.com/acme/infra cfn/stack.yaml:34 AssetsBucket (AWS::S3::Bucket, pattern "assets-prod-*", root cfn/stack.yaml) (no use in the workspace)
+example.com/acme/infra cfn/stack.yaml:59 BucketAlias (AWS::SSM::Parameter, pattern "assets-prod-*", root cfn/stack.yaml) (no use in the workspace)
+
+example.com/acme/infra sam/template.yaml:23 OrdersFunction (AWS::Serverless::Function, name "shop-orders-dev", root sam/template.yaml)
+
+example.com/acme/infra sam/template.yaml:19 OrdersApi (AWS::Serverless::Api, root sam/template.yaml)
+example.com/acme/infra sam/template.yaml:23 OrdersFunction (AWS::Serverless::Function, name "shop-orders-dev", root sam/template.yaml)
+example.com/acme/infra sam/template.yaml:48 OrdersTable (AWS::Serverless::SimpleTable, name "shop-orders", root sam/template.yaml) (no use in the workspace)
+
+no matches for `ignored`
+
+no matches for `nothing-here`

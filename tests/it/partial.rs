@@ -16,7 +16,7 @@ use serde_json::Value;
 const BUDGET: Option<usize> = Some(1_000_000);
 
 /// The `search` kinds, `None` being every kind but the early ones.
-const KINDS: [Option<&str>; 14] = [
+const KINDS: [Option<&str>; 16] = [
     None,
     Some("symbol"),
     Some("contract"),
@@ -31,6 +31,8 @@ const KINDS: [Option<&str>; 14] = [
     Some("duplicate"),
     Some("ambiguous"),
     Some("unresolved"),
+    Some("value"),
+    Some("iac"),
 ];
 
 /// At most this many symbols, call sites and contracts of a repository are queried, spread
@@ -62,6 +64,20 @@ fn answers_alike(repo: &Path) {
     contracts.sort();
     contracts.dedup();
     let contracts = sample(contracts);
+    let infrastructure = sample(
+        export["iac_nodes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|node| {
+                format!(
+                    "{} (root {})",
+                    node["identity"].as_str().unwrap(),
+                    node["root"].as_str().unwrap()
+                )
+            })
+            .collect(),
+    );
     let processes: Vec<String> = (each(&export, "entry_points", "identity").into_iter())
         .map(|e| format!("process::{e}"))
         .collect();
@@ -93,7 +109,12 @@ fn answers_alike(repo: &Path) {
         let ask = || format!("{:?}", engine.context(symbol, BUDGET));
         alike(&format!("context {symbol}"), &ask);
     };
-    for symbol in symbols.iter().chain(&names).chain(&contracts) {
+    for symbol in symbols
+        .iter()
+        .chain(&names)
+        .chain(&contracts)
+        .chain(&infrastructure)
+    {
         context(symbol);
     }
     let trace = |start: Start, direction: Direction| {
@@ -106,6 +127,7 @@ fn answers_alike(repo: &Path) {
         .chain(&names)
         .chain(&calls)
         .chain(&contracts)
+        .chain(&infrastructure)
         .chain(&processes))
     .map(|from| Start::From(from));
     for start in starts.chain([Start::Uncommitted]) {
@@ -210,6 +232,50 @@ fn channels_packages_and_documents_answer_alike() {
     fixture_repo(case, "asyncapi-events", Some(events));
     let services = "https://example.com/asyncapi/services.git";
     answers_alike(&fixture_repo(case, "asyncapi-services", Some(services)));
+}
+
+#[test]
+fn contract_trace_call_owners_answer_alike() {
+    for (fixture, contract, owner) in [
+        ("aws-sdk", "channel::sns::orders", "publish"),
+        ("aws-sdk-python", "channel::sns::orders", "publish"),
+        ("aws-sdk-matrix", "channel::eventbridge::default", "run"),
+        (
+            "aws-sdk-batches",
+            "channel::eventbridge::orders",
+            "Batches.send()",
+        ),
+    ] {
+        let repo = fixture_repo("partial_provider_owners", fixture, None);
+        let engine = Engine::open(&repo).unwrap();
+        let ask = || {
+            engine
+                .trace(Start::From(contract), Direction::Down, BUDGET)
+                .unwrap()
+        };
+        let answer = ask();
+        let whole = with_every_row(ask);
+        assert!(
+            whole.lines().any(|line| line.ends_with(owner)),
+            "{fixture}: {whole}"
+        );
+        assert_eq!(answer, whole, "{fixture}: contract-side call owners");
+    }
+}
+
+/// Terraform JSON nodes must survive the partial path, including their references and
+/// root-specific context and trace starts. The mutation named in PR #711 drops only
+/// JSON nodes from partial exports and makes this equivalence fail.
+#[test]
+fn terraform_json_infrastructure_queries_answer_alike() {
+    for fixture in [
+        "terraform-json",
+        "terraform-json-contracts",
+        "terraform-json-repeated",
+    ] {
+        let repo = fixture_repo("partial_terraform_json", fixture, None);
+        answers_alike(&repo);
+    }
 }
 
 /// Every fixture alone, in four shards so they run side by side.

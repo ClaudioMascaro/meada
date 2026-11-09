@@ -16,14 +16,19 @@ use crate::workspace::Repository;
 
 mod csharp;
 mod go;
+mod iac;
+mod infrastructure;
 mod java;
+mod join;
 mod kotlin;
 mod python;
 mod rust;
 mod swift;
 mod ts;
+pub(crate) use infrastructure::Prepared;
 #[cfg(test)]
 pub(crate) use ts::app_config_probe;
+pub(crate) use ts::{INCLUDE_DEPTH, INCLUDES, IncludeReason, config_inputs};
 
 pub use meada_core::http::{PARAM, normalize_path};
 
@@ -420,6 +425,7 @@ fn methods(list: Value) -> Vec<String> {
 /// A provider of `contract` at `site`.
 fn provider(site: Site, contract: String) -> Found {
     Found {
+        identity: None,
         role: Role::Provider,
         site,
         contract: Some(contract),
@@ -444,6 +450,7 @@ fn consumer(path: &str, index: usize, read: Read, shape: Option<Shape>) -> Found
 /// client, which has no call of its own).
 fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
     Found {
+        identity: None,
         role: Role::Consumer,
         site,
         contract: read.contract,
@@ -620,6 +627,37 @@ impl ContractKind for Http {
         Search::Filter("route")
     }
 
+    fn config_file(&self, path: &str) -> bool {
+        iac::is_file(path)
+    }
+
+    fn config_summary(
+        &self,
+        path: &str,
+        src: &[u8],
+        root: &std::path::Path,
+        facts: &crate::contract::ConfigFacts<'_>,
+    ) -> serde_json::Value {
+        iac::summary(path, src, root, facts)
+    }
+
+    fn symbols_read(&self, repo: &Repository, export: &IndexExport) -> Option<Vec<String>> {
+        Some(iac::symbols(repo, export))
+    }
+
+    fn read_declarations(
+        &self,
+        _: &Repository,
+        db: &rusqlite::Connection,
+        export: &mut IndexExport,
+    ) -> crate::Result<()> {
+        iac::read(db, export)
+    }
+
+    fn exports_repository_links(&self) -> bool {
+        true
+    }
+
     /// A route is listed by its providers alone: its consumers are calls. Its shape is a
     /// `response`.
     fn view(&self, contract: &str) -> Option<View> {
@@ -630,15 +668,35 @@ impl ContractKind for Http {
         })
     }
 
+    fn explain_inferred(
+        &self,
+        consumer: &Consumer,
+        from: &Repository,
+        link: &Link,
+        exports: &[IndexExport],
+    ) -> bool {
+        let via = consumer.via.as_deref().unwrap_or_default();
+        let via = via.split_once(PROXY_VIA).map_or(via, |(via, _)| via);
+        via.strip_prefix("env:")
+            .is_some_and(|var| from.config.peers_reading(var).next().is_some())
+            || exports
+                .iter()
+                .filter_map(|e| e.http.as_ref())
+                .any(|p| p.explains(link))
+    }
+
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
         let mut found = Vec::new();
         // One reader of each shape source for the whole extraction: each budget per file once.
         let mut literals = Literals::default();
-        let mut consumers = ts::consumers(code, indexed, &mut literals);
+        // One reader of Backstage's `app-config*.yaml` for the extraction (`ts::Config`).
+        let config = ts::Config::new(indexed);
+        let mut consumers = ts::consumers(code, &config, &mut literals);
         let (providers, mounted) = ts::providers(code, &mut literals);
         ts::name(&mut consumers, &mounted);
         found.extend(consumers);
         found.extend(providers);
+        found.extend(ts::unfollowed(code, &config));
         found.extend(python::consumers(code));
         found.extend(rust::providers(code));
         found.extend(go::providers(code));
@@ -658,8 +716,26 @@ impl ContractKind for Http {
 
     /// Keeps, of the two readings of a `${X:default}` base, the one that applies
     /// (`keep_applicable`), once every repository declared its hosts.
-    fn workspace_step(&self, exports: &mut [IndexExport]) {
+    fn workspace_step(&self, exports: &mut [IndexExport], _: &[Repository]) {
         keep_applicable(exports);
+    }
+
+    fn workspace_ready(&self, exports: &mut [IndexExport], repositories: &[Repository]) {
+        infrastructure::prepare(exports, repositories);
+    }
+
+    fn workspace_links(
+        &self,
+        exports: &[IndexExport],
+        _: &[(&Repository, &Provider)],
+    ) -> Option<Vec<Link>> {
+        exports.iter().any(|e| e.http.is_some()).then(|| {
+            exports
+                .iter()
+                .filter_map(|e| e.http.as_ref())
+                .flat_map(|p| p.links.iter().cloned())
+                .collect()
+        })
     }
 
     /// Adds the routes of the repository's documents (spec #21), then the gateway paths and
@@ -677,6 +753,8 @@ impl ContractKind for Http {
         if !repo.config.test_routes {
             drop_test_providers(repo, export);
         }
+        // IaC is an explicit serving declaration, including a handler in a test-named file.
+        iac::declare(repo, export);
         let serve = &repo.config.serve;
         let code: HashSet<String> = (export.providers.iter())
             .map(|p| p.contract.clone())
@@ -846,9 +924,14 @@ impl ContractKind for Http {
                 if route(&provider.contract).is_some_and(|(method, _)| method == ANY) {
                     reason.push_str("; any method");
                 }
+                if let Some(evidence) = &provider.evidence {
+                    reason.push_str("; ");
+                    reason.push_str(evidence);
+                }
                 let level = match (ambiguous, gateway) {
                     (true, _) => Level::Ambiguous,
                     (_, Some(_)) => Level::Inferred,
+                    _ if provider.evidence.is_some() => Level::Inferred,
                     _ => level,
                 };
                 Link::new(
@@ -872,7 +955,8 @@ impl ContractKind for Http {
     }
 
     /// The Backstage plugins whose routers stay at the root for want of a literal `pluginId`
-    /// (#615), and the proxy endpoints whose target is not read (#616), with their calls.
+    /// (#615), the proxy endpoints whose target is not read (#616), with their calls, and the
+    /// `$include`s of `app-config*.yaml` not followed, with their reason (#689).
     fn status(&self, repo: &Repository, export: &IndexExport, _links: &[Link]) -> Vec<String> {
         let prefix = format!("{}::", repo.identity);
         let mut lines: Vec<String> = (export.unmounted.iter())
@@ -893,6 +977,14 @@ impl ContractKind for Http {
             (unread.into_iter())
                 .map(|(endpoint, calls)| Msg::BackstageProxyTarget { endpoint, calls }.text()),
         );
+        lines.extend(ts::unfollowed_of(&export.unfollowed).iter().map(|u| {
+            Msg::BackstageInclude {
+                file: &u.file,
+                include: &u.include,
+                reason: u.reason,
+            }
+            .text()
+        }));
         lines
     }
 
@@ -1058,6 +1150,7 @@ mod tests {
     #[test]
     fn a_route_is_a_candidate_for_a_dynamic_url_through_its_gateway_path() {
         let consumer = Consumer {
+            identity: None,
             contract: None,
             site: "r::a.ts::f::g#0".into(),
             via: None,
@@ -1065,6 +1158,7 @@ mod tests {
             method: Some("GET".into()),
             fragments: vec!["/shop/".into()],
             hops: Vec::new(),
+            root: None,
         };
         let direct = provider("http::GET::/shop/users");
         let gateway = Provider {

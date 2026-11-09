@@ -1,0 +1,9 @@
+apiVersion: eventhub.azure.upbound.io/v1beta1
+kind: EventHub
+metadata:
+  name: operator-39
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: /subscriptions/proof/resourceGroups/r/providers/Microsoft.EventHub/namespaces/hubs/eventhubs/xp-events
+spec:
+  forProvider: {}

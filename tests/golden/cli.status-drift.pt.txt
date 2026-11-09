@@ -1,4 +1,5 @@
 example.com/chain/web (.) indexado, 17 arquivos
+  arquivos de configuração: 2 lidos, 0 ignorados (lockfiles: 0, ilegíveis: 0); valores: 6, ocultados: 0
   drift de formato, leituras ausentes: 39
   conclusão errada? relate: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
 example.com/chain/gateway (../chain-gateway) indexado, 12 arquivos
@@ -10,5 +11,7 @@ example.com/chain/gateway (../chain-gateway) indexado, 12 arquivos
   orders.openapi.json: openapi 3.0.3, rotas: 1
   GET /api/shipments/{} em orders.openapi.json também está em openapi.yaml: uma rota só
   docs/missing.yaml: listado em `serve.documents`, não encontrado
+  arquivos de configuração: 5 lidos, 1 ignorados (lockfiles: 0, ilegíveis: 1); valores: 36, ocultados: 0
 example.com/chain/catalog (../chain-catalog) indexado, 25 arquivos
+  arquivos de configuração: 2 lidos, 0 ignorados (lockfiles: 0, ilegíveis: 0); valores: 5, ocultados: 0
 example.com/chain/worker (../chain-worker) indexado, 3 arquivos

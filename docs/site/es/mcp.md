@@ -50,10 +50,15 @@ Son tres herramientas, siempre en inglés, y ninguna escribe:
 - `search` encuentra un símbolo, una ruta o un contrato por el nombre; con el tipo `resource`,
   un recurso por su tipo o su id; con el tipo `channel`, un canal (cola o tópico) por el broker
   o el nombre; con el tipo `duplicate`, grupos de símbolos con texto idéntico en dos o más lugares;
+  con el tipo `value`, valores de configuración cuyo valor o ruta de clave es igual a la búsqueda,
+  empieza por ella o la contiene; con el tipo `iac`, nodos de IaC por dirección, tipo o nombre
+  físico (ver Capacidades y límites);
   con el tipo `ambiguous` o `unresolved`, lista los ítems
   abiertos (ver Decisiones);
 - `context` describe un símbolo: su código leído del disco, quién lo llama, a quién llama y los
-  contratos que toca; las anotaciones, atributos y decoradores escritos sobre una definición
+  contratos que toca; un vínculo `inferred` o `decided` de una llamada muestra el nivel,
+  el motivo y el proveedor, incluida la variable de la URL base y el par elegido;
+  las anotaciones, atributos y decoradores escritos sobre una definición
   (`@Override`, `[Fact]`, `@app.get("/x")`) son llamadas del ámbito que la envuelve, por eso
   `context` las lista aparte, en la sección `annotations:`, cada una con la definición que
   decora (el sitio de llamada del export lo trae en `decorates`); en un recurso (`resource::postgres::orders`), lista quién lo escribe y

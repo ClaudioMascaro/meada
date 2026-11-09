@@ -4,27 +4,39 @@
   prove.py run --base-bin B --head-bin H --repos meada,click --run DIR [--queries F] [--http] [--overlay D]
   prove.py rebless --base SHA --run DIR
   prove.py deploy --base SHA --run DIR
+  prove.py values --base-bin B --head-bin H --repos a7-probe,meada --run DIR [--http]
+  prove.py iac --base-bin B --head-bin H --repos a7-iac,a7-names,a7-cfn,terraform-sqs,sam-rust --run DIR [--http]   (python-hcl2, PyYAML)
   prove.py clean DIR
 
 `run` indexes each corpus repository twice from cold with each binary (determinism and the
 budget), exports it, refreshes after an mtime touch, drives `meada mcp` over stdio with the same
 queries, and with `--http` serves the head's indexes over streamable HTTP for a parity check. It
 prints "checks passed" or the differences found: the verdict is the checker's, never this script's.
-Exit 0: no difference, 1: differences or budget overruns, 2: a run failed (BLOCKED).
+`values` (A7) reads every config file of each entry with its own YAML and JSON oracle, then asks
+the head for `meada status` and `search` with the kind `value` and compares each answer, line by
+line and in order, with the oracle's; the base binary answers the default search and the export.
+Exit 0: no difference, 1: differences for the checker, 2: a run failed (BLOCKED), 3: a budget
+overrun or a nondeterministic index (`run`), which no expected difference explains.
 """
 
 import argparse
 import difflib
 import json
 import os
+import queue
 import re
 import shutil
 import socket
 import subprocess
 import sys
+import tempfile
+import threading
 import time
+import traceback
 import urllib.request
 from pathlib import Path
+
+import yaml  # PyYAML: the A7 oracle's own YAML reader
 
 HERE = Path(__file__).resolve().parent
 ROOT = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"], cwd=HERE, text=True).strip())
@@ -37,12 +49,18 @@ KEYED = {
     "symbols": ("id",),
     "calls": ("id",),
     "packages": ("ecosystem", "directory", "name"),
-    "links": ("consumer", "provider", "contract"),
-    "providers": ("contract", "site"),
-    "consumers": ("contract", "site"),
+    "links": ("consumer", "provider", "contract", "root"),
+    "iac_nodes": ("identity", "root"),
+    "provisioners": ("contract", "node", "root"),
+    "provisions": ("side", "provisioner", "root", "contract", "at"),
+    "uses": ("contract", "site", "at"),
+    "subscriptions": ("source", "target", "node", "root"),
+    "providers": ("contract", "site", "at"),
+    "consumers": ("contract", "site", "root"),
 }
-WATCHED = {"calls": ("level", "target", "candidates"), "links": ("level",), "packages": ("version",), "consumers": ("via",)}
-OTHER = ("files", "imports", "documents", "bindings", "publishes", "dependencies", "communities", "processes")
+WATCHED = {"calls": ("level", "target", "candidates"), "links": ("level",), "provisions": ("level", "reason"), "packages": ("version",), "consumers": ("via",)}
+OTHER = ("files", "imports", "documents", "bindings", "publishes", "dependencies", "communities", "processes",
+         "executions", "stale_decisions")
 FIXED_GIT = {
     "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
     "GIT_AUTHOR_NAME": "prove-meada", "GIT_AUTHOR_EMAIL": "prove@example.com", "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
@@ -55,18 +73,32 @@ def git(*args, cwd, **kw):
                           capture_output=True, text=True, **kw).stdout
 
 
-def corpus():
+def corpus(table="corpus.tsv"):
+    """name -> (packs or A7 flows, url, sha); `infra.tsv` adds a license column, kept for people."""
     rows = {}
-    for line in (HERE / "corpus.tsv").read_text().splitlines():
+    for line in (HERE / table).read_text().splitlines():
         if line and not line.startswith("#"):
-            name, packs, url, sha = line.split("\t")
+            name, packs, url, sha = line.split("\t")[:4]
             rows[name] = (packs.split(","), url, sha)
     return rows
 
 
+def infra():
+    return corpus("infra.tsv")
+
+
 def fetch(name, into):
-    """A clean git checkout of corpus entry `name` at `into`."""
-    _, url, sha = corpus()[name]
+    """A clean git checkout of corpus or infra entry `name` at `into`."""
+    _, url, sha = {**infra(), **corpus()}[name]
+    if url.startswith("probe:"):  # an A7 probe of this skill, a repository of its own
+        shutil.copytree(HERE / url[len("probe:"):], into, symlinks=True)
+        if (into / ".gitignore").is_file():  # one file stays on disk, ignored by .gitignore
+            (into / "zz-gitignored.yaml").write_text("ignored: gitignored-zzprove\n")
+        git("-c", "init.defaultBranch=main", "init", "-q", cwd=into)
+        git("remote", "add", "origin", f"https://github.com/zz-prove/{name}.git", cwd=into)
+        git("add", "-A", cwd=into)
+        git("commit", "-q", "-m", "a7 probe", cwd=into)
+        return
     if url == "self":
         into.mkdir(parents=True)
         archive = subprocess.run(["git", "archive", "HEAD"], cwd=ROOT, check=True, capture_output=True).stdout
@@ -114,24 +146,52 @@ class Stdio:
         self.p = subprocess.Popen([bin, "mcp"], cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                   stderr=open(log, "wb"), text=True, bufsize=1)
         self.id = 0
+        self.wire = open(Path(log).with_suffix('.wire.jsonl'), 'w')
+        self.responses = queue.Queue()
+        def read_lines():
+            for line in self.p.stdout:
+                self.responses.put(line)
+            self.responses.put(None)
+        threading.Thread(target=read_lines, daemon=True).start()
         self.info = self.call("initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
                                              "clientInfo": {"name": "prove-meada", "version": "1"}})
         self.p.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
+        self.p.stdin.flush()
 
     def call(self, method, params):
         self.id += 1
-        self.p.stdin.write(json.dumps({"jsonrpc": "2.0", "id": self.id, "method": method, "params": params}) + "\n")
+        request = {"jsonrpc": "2.0", "id": self.id, "method": method, "params": params}
+        self.wire.write(json.dumps({'direction': 'send', 'message': request}) + '\n')
+        self.wire.flush()
+        self.p.stdin.write(json.dumps(request) + "\n")
+        self.p.stdin.flush()
+        deadline = time.monotonic() + 120
+        def timeout():
+            self.wire.write(json.dumps({'timeout': method, 'id': self.id}) + '\n')
+            self.wire.flush()
+            self.p.kill()
+            self.p.wait(timeout=10)
+            raise TimeoutError(f'MCP {method} id {self.id} exceeded 120 seconds; see {self.wire.name}')
         while True:
-            line = self.p.stdout.readline()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                timeout()
+            try:
+                line = self.responses.get(timeout=remaining)
+            except queue.Empty:
+                timeout()
             if not line:
                 raise RuntimeError(f"meada mcp closed stdout during {method}")
             msg = json.loads(line)
+            self.wire.write(json.dumps({'direction': 'receive', 'message': msg}) + '\n')
+            self.wire.flush()
             if msg.get("id") == self.id and "method" not in msg:
                 return msg
 
     def close(self):
         self.p.stdin.close()
         self.p.wait(timeout=30)
+        self.wire.close()
 
 
 class Http:
@@ -291,20 +351,66 @@ def drive(bin, repo, out, queries_file):
     if not queries_file.exists():
         queries_file.write_text("".join(json.dumps(q) + "\n" for q in auto_queries(export)))
     queries = [json.loads(line) for line in queries_file.read_text().splitlines() if line.strip()]
+    rec['phase'] = 'mcp'
+    (out / 'record.json').write_text(json.dumps(rec, indent=1, sort_keys=True))
+    return drive_queries(bin, repo, out, queries, rec)
+
+
+def drive_queries(bin, repo, out, queries, rec):
+    """Checkpoint before MCP, so an interrupted client need not repeat completed indexing."""
+    if (out / 'mcp.err').exists() or (out / 'mcp.wire.jsonl').exists():
+        previous = out / 'mcp-attempts' / str(time.time_ns())
+        previous.mkdir(parents=True)
+        for path in [out / 'mcp.err', out / 'mcp.wire.jsonl']:
+            if path.exists():
+                shutil.copy2(path, previous / path.name)
+        (previous / 'record.json').write_text(json.dumps(rec, indent=1, sort_keys=True))
     try:
         mcp = Stdio(bin, repo, out / "mcp.err")
         rec["tools"] = mcp.call("tools/list", {}).get("result", {}).get("tools")
-        rec["answers"] = [answer(mcp.call("tools/call", {"name": q["tool"], "arguments": q["arguments"]})) for q in queries]
+        rec['answers'] = []
+        for q in queries:
+            rec['answers'].append(answer(mcp.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})))
+            (out / 'record.json').write_text(json.dumps(rec, indent=1, sort_keys=True))
         mcp.close()
     except Exception as e:  # a crashed server is BLOCKED, never an empty answer
         rec["failed"] = f"mcp stdio: {e!r}, see {out}/mcp.err"
     rec["queries"] = queries
+    rec['phase'] = 'complete'
     (out / "record.json").write_text(json.dumps(rec, indent=1, sort_keys=True))
     return rec
 
 
 def keyed(section, v):
     return " | ".join(str(v.get(p)) for p in KEYED[section])
+
+
+def rows(section, values):
+    """`values` by their key; rows that share a key stay apart as `key #2`, `key #3`, in the
+    order of their JSON."""
+    out, seen = {}, {}
+    for v in sorted(values, key=lambda v: json.dumps(v, sort_keys=True)):
+        k = keyed(section, v)
+        seen[k] = seen.get(k, 0) + 1
+        out[k if seen[k] == 1 else f"{k} #{seen[k]}"] = v
+    return out
+
+
+def unpaired(values, other):
+    """`values` less the rows `other` holds identical, one for one: identical rows pair first,
+    so rows sharing a key pair only what changed."""
+    left = {}
+    for v in other:
+        k = json.dumps(v, sort_keys=True)
+        left[k] = left.get(k, 0) + 1
+    out = []
+    for v in values:
+        k = json.dumps(v, sort_keys=True)
+        if left.get(k):
+            left[k] -= 1
+        else:
+            out.append(v)
+    return out
 
 
 def short(field, value):
@@ -337,8 +443,8 @@ def export_diff(base, head, repo=None, cap=20):
             lines.append(f"  {field}: {base.get(field)} -> {head.get(field)}")
     symbols = {s["id"]: s for s in head.get("symbols", [])}
     for section, _ in KEYED.items():
-        b = {keyed(section, v): v for v in base.get(section, [])}
-        h = {keyed(section, v): v for v in head.get(section, [])}
+        bl, hl = base.get(section, []), head.get(section, [])
+        b, h = rows(section, unpaired(bl, hl)), rows(section, unpaired(hl, bl))
         added = sorted(set(h) - set(b))
         removed = sorted(set(b) - set(h))
         changed = sorted(k for k in set(b) & set(h) if b[k] != h[k])
@@ -384,6 +490,8 @@ def export_diff(base, head, repo=None, cap=20):
 
 def spread(items, n):
     """At most `n` items spread evenly over the sorted list, so the pick is the same every run."""
+    if n <= 0:
+        return []
     if len(items) <= n:
         return items
     step = len(items) / n
@@ -440,7 +548,7 @@ def cmd_run(a):
     if unknown:
         sys.exit(f"unknown corpus entries {unknown}; see {HERE}/corpus.tsv")
     run.mkdir(parents=True, exist_ok=True)
-    report, differences, blocked = [], 0, False
+    report, differences, hard, blocked = [], 0, 0, False
     records = {"base": {}, "head": {}}
     for name in names:
         src = run / "work" / "src" / name
@@ -469,6 +577,7 @@ def cmd_run(a):
                  "restore_equal", "restore_original")
         det = [r["deterministic"] and all(r.get(k, True) for k in flags) for r in (b, h)]
         differences += det.count(False)
+        hard += det.count(False)
         report.append(f"Determinism: cold twice equal base {b['deterministic']}, head {h['deterministic']}; "
                       f"refresh equal base {b.get('refresh_equal')}, head {h.get('refresh_equal')}; "
                       f"content refresh equal base {b.get('content_refresh_equal')}, head {h.get('content_refresh_equal')} "
@@ -496,6 +605,7 @@ def cmd_run(a):
                                               ("export bytes", b["export_bytes"], h["export_bytes"], SIZE, True)):
             over = applies and hv > bv * limit
             differences += over
+            hard += over
             budget.append(f"  {label}: {bv} -> {hv} (limit x{limit}{'' if applies else ', not applied under 2 s'})"
                           + (" OVER BUDGET" if over else ""))
         report.append("Budget:\n" + "\n".join(budget))
@@ -528,7 +638,7 @@ def cmd_run(a):
     (run / "compare.md").write_text(f"# prove.py run\n\n{verdict}\n\n" + "\n".join(report) + "\n")
     print(verdict)
     print(f"full report: {run}/compare.md")
-    sys.exit(2 if blocked else 1 if differences else 0)
+    sys.exit(2 if blocked else 3 if hard else 1 if differences else 0)
 
 
 def cmd_rebless(a):
@@ -634,6 +744,34 @@ def cmd_deploy(a):
 
 def cmd_selftest(_):
     """The comparison logic on two small exports: run after editing this script."""
+    import copy
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("source_capture", HERE / "a7-source-capture.py")
+    capture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(capture)
+    query = {"tool": "search", "arguments": {"query": "privacy-canary"}}
+    empty = {"jsonrpc": "2.0", "id": 1, "result": {"isError": False,
+             "content": [{"type": "text", "text": "no matches for `privacy-canary`\n"}]}}
+    original = copy.deepcopy(empty)
+    assert "privacy-canary" not in json.dumps(capture.privacy_response(query, empty))
+    assert empty == original  # raw evidence stays complete
+    assert capture.privacy_response({"tool": "context", "arguments": query["arguments"]}, empty) == empty
+    assert capture.privacy_response({"tool": "search", "arguments": {"query": "other"}}, empty) == empty
+    for path, value in [
+        (("result", "content", 0, "text"), "no matches for `privacy-canary`\nextra privacy-canary\n"),
+        (("result", "isError"), True),
+        (("result", "content"), [{"type": "text", "text": "source = privacy-canary\n"}]),
+        (("result", "content"), empty["result"]["content"] + [{"type": "text", "text": "privacy-canary"}]),
+        (("result", "diagnostic"), "privacy-canary"),
+        (("result", "content", 0, "unexpected"), "privacy-canary"),
+        (("unexpected",), "privacy-canary"),
+    ]:
+        changed = copy.deepcopy(empty)
+        target = changed
+        for part in path[:-1]:
+            target = target[part]
+        target[path[-1]] = value
+        assert "privacy-canary" in json.dumps(capture.privacy_response(query, changed)), (path, value)
     base = {"format": 1, "symbols": [{"id": "r::a.rs::f"}, {"id": "r::a.rs::g"}],
             "calls": [{"id": "c1", "target": None, "level": None}, {"id": "c2", "target": "r::a.rs::g", "level": "exact"},
                       {"id": "c3", "target": None, "level": "ambiguous", "candidates": ["x", "y"]}],
@@ -651,6 +789,68 @@ def cmd_selftest(_):
     assert "candidates: [2 items] -> [3 items]: 1" in text, text
     assert "communities" not in text and len(sample) == 0, (text, sample)  # no repo: nothing rendered
     assert export_diff(base, json.loads(json.dumps(base))) == ([], [])
+    subscription = {"source": "channel::sns::events", "target": "channel::sqs::jobs",
+                    "node": "infra::main.tf::aws_sns_topic_subscription.jobs", "root": "dev"}
+    subscription_key = "channel::sns::events | channel::sqs::jobs | infra::main.tf::aws_sns_topic_subscription.jobs | dev"
+    assert export_diff({}, {"subscriptions": [subscription]}) == ([
+        "  subscriptions: +1 -0 ~0", f"    + {subscription_key}"], [])
+    assert export_diff({"subscriptions": [subscription]}, {}) == ([
+        "  subscriptions: +0 -1 ~0", f"    - {subscription_key}"], [])
+    # #661: repository-level sites need their at locator in both keys. Otherwise
+    # two references to one contract silently collapse in the comparison dictionary.
+    uses = [{"contract": "channel::sqs::parcel", "site": "app", "at": f"values.yaml#worker.{key}"}
+            for key in ["queue", "secondary.queue"]]
+    provisions = [{"side": "app", "provisioner": "infra::main.tf::aws_sqs_queue.parcel", "root": ".",
+                   "contract": "channel::sqs::parcel", "at": use["at"], "level": "inferred", "reason": "typed key"}
+                  for use in uses]
+    pair = {"uses": uses, "provisions": provisions}
+    lines, _ = export_diff({}, pair)
+    text = "\n".join(lines)
+    assert "uses: +2 -0 ~0" in text and "provisions: +2 -0 ~0" in text, text
+    lines, _ = export_diff(pair, {"uses": uses[1:], "provisions": provisions[1:]})
+    text = "\n".join(lines)
+    assert "uses: +0 -1 ~0" in text and "provisions: +0 -1 ~0" in text, text
+    assert uses[0]["at"] in text and uses[1]["at"] not in text, text
+    changed = json.loads(json.dumps(pair))
+    changed["provisions"][0]["level"] = "exact"
+    lines, _ = export_diff(pair, changed)
+    text = "\n".join(lines)
+    assert "provisions: +0 -0 ~1" in text and "level: inferred -> exact: 1" in text, text
+    assert uses[0]["at"] in text and uses[1]["at"] not in text, text
+    # Retain the failure mechanism: removing at from the feature's identity key leaves the two
+    # rows apart only as a shared key's `#2`, without the locator each one needs.
+    fields = KEYED["provisions"]
+    try:
+        KEYED["provisions"] = tuple(f for f in fields if f != "at")
+        mutant, _ = export_diff({}, pair)
+        assert "channel::sqs::parcel #2" in "\n".join(mutant), mutant
+        assert uses[0]["at"] not in "\n".join(m for m in mutant if "provisions" in m or "aws_sqs" in m), mutant
+    finally:
+        KEYED["provisions"] = fields
+    # #648 (P14): an image link keeps its evaluation root, rows sharing one key stay apart, and
+    # executions and stale decisions are compared too, so a goldens rebless cannot call them
+    # formatting.
+    link = {"consumer": "d::k.yaml::Deployment/api", "provider": "app", "contract": "image::docker.io/a/b"}
+    lines, _ = export_diff({}, {"links": [dict(link, root=r) for r in ("overlays/dev", "overlays/prod")]})
+    assert "links: +2 -0 ~0" in "\n".join(lines), lines
+    # Rows sharing a key pair identical rows first: one added row is no change to another.
+    use = {"contract": "channel::sqs::q", "site": "a.ts", "root": ""}
+    lines, _ = export_diff({"consumers": [dict(use, via="b")]},
+                           {"consumers": [dict(use, via="a"), dict(use, via="b")]})
+    assert "consumers: +1 -0 ~0" in "\n".join(lines), lines
+    # A crash or a refusal is BLOCKED (exit 2): prove-ci reads exit 1 as a difference.
+    with tempfile.TemporaryDirectory() as temp:
+        for args in (["run", "--base-bin", "x", "--head-bin", "y", "--repos", "no-such-entry"],
+                     ["rebless", "--base", "0" * 40]):
+            done = subprocess.run([sys.executable, __file__, *args, "--run", temp],
+                                  capture_output=True, text=True, cwd=ROOT)
+            assert done.returncode == 2, (args, done.returncode, done.stderr[-400:])
+    vias = [{"contract": "c", "site": "s", "via": v} for v in ("a", "b")]
+    lines, _ = export_diff({"consumers": vias[:1]}, {"consumers": vias})
+    assert "consumers: +1 -0 ~0" in "\n".join(lines), lines
+    for section in ("executions", "stale_decisions"):
+        lines, _ = export_diff({}, {section: [{"path": "x"}]})
+        assert f"{section}: +1 -0" in "\n".join(lines), (section, lines)
     assert spread(list(range(100)), 4) == [0, 25, 50, 75] and spread([1, 2], 10) == [1, 2]
     assert short("target", "r::x") == "set" and short("candidates", [1]) == "[1 items]"
     q = auto_queries({"calls": [{"target": "r::k.kt::p.Flow.test(Duration?,String?)"}], "providers": []})
@@ -659,7 +859,7 @@ def cmd_selftest(_):
     assert q[-2]["arguments"]["kind"] == "zz_prove_kind" and q[3]["arguments"]["budget"] == 300, q
     assert {"tool": "context", "arguments": {"symbol": "r::k.kt::p.Flow.test(Duration?,String?)", "budget": 300}} in q
     assert auto_queries({"calls": [], "providers": []})[-1]["arguments"] == {"symbol": "zz_prove_missing"}
-    import tempfile
+
     with tempfile.TemporaryDirectory() as d:
         f = Path(d) / "a.rs"
         f.write_bytes(b"fn foo() {}\nfn fooBar() { foo() }\n")
@@ -670,10 +870,860 @@ def cmd_selftest(_):
         assert f.read_bytes() == b"fn foQ() {}\nfn fooBar() { foQ() }\n", f.read_bytes()
         assert rename_in_place(Path(d), {"symbols": [{"id": "r::a.rs::ab", "span": {"path": "a.rs"}}]}) is None
         assert rename_in_place(Path(d), {"symbols": [{"id": "r::other::fooBar", "span": {"path": "a.rs"}}]}) is None
+        # NoEcho applies only to recognized CFN/SAM templates. AliasLoader deliberately
+        # preserves use-site lines, so the privacy scanner must unwrap aliases without
+        # changing the value walk's location. These are source controls, not product keys.
+        header = 'AWSTemplateFormatVersion: "2010-09-09"\n'
+        params = 'Parameters:\n  Example:\n    NoEcho: true\n    Default: neutral-default\n'
+        cases = [
+            (header + params, False),
+            (header + params + 'Resources: []\n', False),
+            (header + params + 'Resources: not-a-map\n', False),
+            (header + params + 'Resources: {}\n', True),
+            ('Transform: AWS::Serverless-2016-10-31\n' + params + 'Resources: {}\n', True),
+            (header + 'Public: &default neutral-default\n' + params.replace('Default: neutral-default', 'Default: *default') + 'Resources: {}\n', True),
+            (header + 'Flag: &flag true\n' + params.replace('NoEcho: true', 'NoEcho: *flag') + 'Resources: {}\n', True),
+            (header + 'Source: &params\n  Example: {NoEcho: true, Default: neutral-default}\nParameters: *params\nResources: {}\n', True),
+            (header + params + 'Source: &resources {}\nResources: *resources\n', True),
+        ]
+        for i, (source, private) in enumerate(cases):
+            (Path(d) / 'config.yaml').write_text(source)
+            outcome = read_config(Path(d), 'config.yaml')
+            assert outcome[0] == 'read', (i, outcome)
+            row = next(r for r in outcome[1] if r['key'] == 'Parameters.Example.Default')
+            assert row['value'] == (None if private else 'neutral-default'), (i, row)
+            if 'Default: *default' in source:
+                assert row['line'] == next(n for n, line in enumerate(source.splitlines(), 1) if 'Default: *default' in line), row
+        # YAML test suite L24T/01 and JEF9/02 treat the EOF of a block
+        # content line as its final break. PyYAML omits it without this shim.
+        for source, value in [
+            ('foo: |\n  x\n   ', 'x\n \n'),
+            ('- |+\n   ', '\n'),
+            ('foo: |\n  x', 'x\n'),
+            ('foo: >\n  x\n  y', 'x y\n'),
+            ('foo: |-\n  x', 'x'),
+            ('foo: |+', ''),
+            ('foo: "x"', 'x'),
+            ('foo: x', 'x'),
+        ]:
+            (Path(d) / 'eof.yaml').write_text(source)
+            outcome = read_config(Path(d), 'eof.yaml')
+            assert outcome[0] == 'read' and len(outcome[1]) == 1, outcome
+            assert outcome[1][0]['value'] == value, (source, outcome)
     e = b'{\n  "format": 1,\n  "repository": "r",\n  "commit": "abc",\n  "dirty": false,\n  "files": []\n}\n'
     assert body(e) == b'{\n  "format": 1,\n  "repository": "r",\n  "files": []\n}\n', body(e)
     assert body(e) == body(e.replace(b'  "commit": "abc",\n  "dirty": false,\n', b"")) and quoted("r::a") == b'"r::a"'
+    rows = [{"path": "config.yaml", "line": i + 1, "key": f"labels[{i}]", "value": "team-b", "kind": "string", "cut": False}
+            for i in range(5)]
+    identity = 'example.com/budget'
+    full_lines = [f"{identity} {r['path']}:{r['line']} {r['key']} = {shown(r)}\n" for r in rows]
+    full = ''.join(full_lines)
+    assert len(full.encode('utf-8')) <= 120 * 4
+    assert not check_value_answer(identity, rows, 'team-b', full, budget=120)
+    budget = value_cut_budget(identity, rows, 'team-b')
+    assert len(full.encode('utf-8')) > budget * 4
+    assert check_value_answer(identity, rows, 'team-b', full, budget_cut=True, budget=budget)
+    note = '… cut after 2 of 5 lines (budget 50 tokens); raise budget for more\n'
+    cut = ''.join(full_lines[:2]) + note
+    assert not check_value_answer(identity, rows, 'team-b', cut, budget_cut=True, budget=50)
+    for bad in (cut.replace('after 2', 'after 3'), cut.replace('of 5', 'of 6'),
+                cut.replace('budget 50', 'budget 49'), ''.join(full_lines[:2]),
+                ''.join(reversed(full_lines[:2])) + note, full + note):
+        assert check_value_answer(identity, rows, 'team-b', bad, budget_cut=True, budget=50), bad
+    tiny = '… cut after 0 of 5 lines (budget 1 tokens); raise budget for more\n'
+    assert not check_value_answer(identity, rows, 'team-b', tiny, budget_cut=True, budget=1)
+    # The public SAM template supplies CodeUri on the function and Handler in Globals.
+    # Validate those fields without shifting the references or swallowing the value tail.
+    import cfn_oracle as cfn
+    source = yaml.load('''Transform: AWS::Serverless-2016-10-31
+Globals:
+  Function: {Handler: bootstrap}
+Resources:
+  Worker:
+    Type: AWS::Serverless::Function
+    Properties: {CodeUri: target/lambda/worker/}
+''', Loader=cfn.Loader)
+    worker = source['Resources']['Worker']
+    metadata = cfn.sam_code_fields('template.yaml', source, worker)
+    assert metadata == {'build': 'target/lambda/worker', 'handler': 'bootstrap'}, metadata
+    header = [f'{identity} template.yaml:5-7 Worker', 'type: AWS::Serverless::Function',
+              'name: none', 'root: template.yaml', 'build: "target/lambda/worker"',
+              'handler: "bootstrap"', 'overridable: none', 'references: none', 'referenced by: none']
+    complete = '\n'.join(header + ['values:', f'{identity} template.yaml:7 Resources.Worker.Type = "AWS::Serverless::Function"']) + '\n'
+    assert not check_iac_context(identity, 'template.yaml', header, complete, complete)
+    for changed in (complete.replace('build: "target/lambda/worker"\n', ''),
+                    complete.replace('handler: "bootstrap"', 'handler: "other"'),
+                    complete.replace('references: none\n', ''),
+                    complete.replace('values:\n', '')):
+        assert check_iac_context(identity, 'template.yaml', header, changed, complete), changed
+    worker['Properties']['Handler'] = {'Ref': 'RuntimeHandler'}
+    assert cfn.sam_code_fields('template.yaml', source, worker) == {'build': 'target/lambda/worker'}
     print("selftest passed")
+
+
+# A7 config values: the oracle reads what ADR 0025 and #642's user stories 6 to 13 say Meada
+# reads, on its own (PyYAML's composer and Python's json), and never looks at Meada's tables.
+LOCKFILES = {"package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "packages.lock.json"}
+HIDDEN_CI = {".github", ".gitlab-ci.yml", ".gitlab", ".circleci", ".buildkite", ".drone.yml"}
+CONFIG_MAX_BYTES, VALUE_MAX, DOCUMENTS_MAX = 1 << 20, 1024, 1000
+PLAIN_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+CORE_NULL = re.compile(r"(~|null|Null|NULL|)\Z")
+CORE_BOOL = re.compile(r"(true|True|TRUE|false|False|FALSE)\Z")
+CORE_NUMBER = re.compile(r"([-+]?[0-9]+|0o[0-7]+|0x[0-9a-fA-F]+|[-+]?(\.[0-9]+|[0-9]+(\.[0-9]*)?)([eE][-+]?[0-9]+)?"
+                         r"|[-+]?\.(inf|Inf|INF)|\.(nan|NaN|NAN))\Z")
+STATUS_LINE = re.compile(r"config files: (\d+) read, (\d+) skipped \(lockfiles: (\d+), unreadable: (\d+)\); "
+                         r"values: (\d+), redacted: (\d+)")
+
+
+def rooted_patterns(repo, names=(".meadaignore", ".ignore")):
+    """Every `.meadaignore` and `.ignore` of the tree as one excludes file of root-relative
+    patterns, under gitignore's rules: a pattern with a slash before its end is anchored at its
+    file's directory, one without matches at any depth below it."""
+    out = []
+    for f in sorted(x for n in names for x in repo.rglob(n) if ".git" not in x.parts and ".meada" not in x.parts):
+        d = f.parent.relative_to(repo).as_posix()
+        for line in f.read_text(errors="replace").splitlines():
+            neg, pat = ("!", line[1:]) if line.startswith("!") else ("", line)
+            if not pat.strip() or pat.startswith("#"):
+                continue
+            anchored = "/" in pat.rstrip("/")
+            pat = pat.lstrip("/")
+            out.append(neg + ("/" + (d + "/" if d != "." else "") + pat if anchored else
+                              ("/" + d + "/**/" + pat if d != "." else pat)))
+    return out
+
+
+def config_candidates(repo):
+    """The YAML and JSON files the walk visits (story 6), the hidden CI paths (story 9), minus
+    `.gitignore`, `.ignore` and `.meadaignore` at any depth (story 8)."""
+    listed = git("ls-files", "-co", "--exclude-standard", "-z", cwd=repo).split("\0")
+    excludes = repo.parent / f".{repo.name}.zz-prove-excludes"
+    excludes.write_text("\n".join(rooted_patterns(repo)) + "\n")
+    r = subprocess.run(["git", "-c", f"core.excludesFile={excludes}", "check-ignore", "--no-index", "--stdin", "-z"], cwd=repo,
+                       input="\0".join(listed), capture_output=True, text=True)
+    excludes.unlink()
+    if r.returncode not in (0, 1):  # 1: nothing ignored; anything else is a broken oracle, never "nothing ignored"
+        raise RuntimeError(f"git check-ignore failed in {repo}: {r.stderr.strip()}")
+    ignored = set(r.stdout.split("\0"))
+    out, hidden = [], []
+    for rel in sorted(p for p in listed if p and p not in ignored):
+        parts = rel.split("/")
+        if not parts[-1].endswith((".yaml", ".yml", ".json")):
+            continue
+        if any(p.startswith(".") for p in parts) and parts[0] not in HIDDEN_CI:
+            hidden.append(rel)
+            continue
+        if any(p in ("node_modules", "Pods") for p in parts[:-1]) or "Carthage/Checkouts/" in rel:
+            continue
+        if any(p in ("bin", "obj") and any((repo.joinpath(*parts[:i])).glob("*.csproj"))
+               for i, p in enumerate(parts[:-1])):
+            continue
+        if any((repo.joinpath(*parts[:i + 1])).is_symlink() for i in range(len(parts))):
+            continue
+        out.append(rel)
+    untracked_ignored = git("ls-files", "-o", "-i", "--exclude-standard", "-z", cwd=repo).split("\0")
+    left_out = hidden + sorted(p for p in ignored | set(untracked_ignored) if p.endswith((".yaml", ".yml", ".json")))
+    return out, [p for p in left_out if ".meada/" not in p]
+
+
+class AliasRef:
+    """An alias where it is used: its line is where the key paths through it sit (story 3)."""
+
+    def __init__(self, node, line):
+        self.node, self.line = node, line
+
+
+class AliasLoader(yaml.SafeLoader):
+    def compose_scalar_node(self, anchor):
+        explicit = self.peek_event().tag not in (None, "!")  # `!!str 123`, `!Ref x`: written, not resolved
+        node = super().compose_scalar_node(anchor)
+        node.explicit = explicit
+        return node
+
+    def compose_node(self, parent, index):
+        if self.check_event(yaml.AliasEvent):
+            line = self.peek_event().start_mark.line + 1
+            return AliasRef(super().compose_node(parent, index), line)
+        return super().compose_node(parent, index)
+
+
+def key_step(key):
+    return "." + key if PLAIN_KEY.match(key) else "[" + json.dumps(key, ensure_ascii=False) + "]"
+
+
+def scalar_kind(node):
+    """YAML 1.2 core schema on a plain scalar; quoted and block scalars are strings. A block
+    scalar's line is its first line of text, one past its `|` or `>`."""
+    if node.style is not None:
+        return "string"
+    if getattr(node, "explicit", False):  # `!!str`, `!!int`, `!!bool`, `!!null`; a custom tag (`!Ref`) keeps its text
+        tag = node.tag.rsplit(":", 1)[-1]
+        return {"int": "number", "float": "number", "bool": "boolean", "null": None}.get(tag, "string")
+    v = node.value
+    return None if CORE_NULL.match(v) else "boolean" if CORE_BOOL.match(v) else "number" if CORE_NUMBER.match(v) else "string"
+
+
+def is_secret(node):
+    node = node.node if isinstance(node, AliasRef) else node
+    if not isinstance(node, yaml.MappingNode):
+        return False
+    keys = {k.value: v for k, v in node.value if isinstance(k, yaml.ScalarNode)}
+    return "apiVersion" in keys and isinstance(keys.get("kind"), yaml.ScalarNode) and keys["kind"].value == "Secret"
+
+
+def walk_values(node, path, rows, secret=False, depth=0, root=True, line=None):
+    """Every non-null scalar under `node`. A Kubernetes `Secret` (a document, or an item of a
+    List's `items`) redacts what its `data` and `stringData` hold (story 13)."""
+    if depth > 200:
+        raise ValueError("nesting past 200")
+    if isinstance(node, AliasRef):
+        walk_values(node.node, path, rows, secret, depth + 1, root, line or node.line)
+    elif isinstance(node, yaml.ScalarNode):
+        kind = scalar_kind(node)
+        if kind:
+            # PyYAML leaves an escaped pair (`\ud83d\ude00`) as two surrogates; a lone one is no text
+            value = node.value.encode("utf-16", "surrogatepass").decode("utf-16")
+            rows.append({"key": path or ".", "value": None if secret else value, "kind": kind,
+                         "line": line or node.start_mark.line + 1 + (node.style in ("|", ">"))})
+    elif isinstance(node, yaml.SequenceNode):
+        for i, item in enumerate(node.value):
+            walk_values(item, f"{path}[{i}]", rows, secret, depth + 1, root=root == "items", line=line)
+    elif isinstance(node, yaml.MappingNode):
+        holder = root is True and is_secret(node)
+        for k, v in node.value:
+            k = k.node if isinstance(k, AliasRef) else k
+            key = k.value if isinstance(k, yaml.ScalarNode) else str(k.value)
+            step = (path + key_step(key)) if path or not PLAIN_KEY.match(key) else key
+            walk_values(v, step, rows, secret or (holder and key in ("data", "stringData")), depth + 1,
+                        root="items" if root is True and key == "items" else False, line=line)
+
+
+def read_config(repo, rel, lockfiles=True):
+    """One file's outcome: ("lockfile"), ("unreadable", why) or ("read", rows)."""
+    path = repo / rel
+    if lockfiles and path.name in LOCKFILES:
+        return ("lockfile",)
+    data = path.read_bytes()
+    if len(data) > CONFIG_MAX_BYTES:
+        return ("unreadable", f"larger than {CONFIG_MAX_BYTES} bytes")
+    try:
+        text = data.decode("utf-8")
+        if rel.endswith(".json"):
+            json.loads(text)  # JSON's own rules: a JSONC file with comments is unreadable
+        docs = config_documents(text.replace("\t", " ") if rel.endswith(".json") else text)
+        if len(docs) > DOCUMENTS_MAX:
+            return ("unreadable", f"more than {DOCUMENTS_MAX} documents")
+        rows = []
+        for i, doc in enumerate(docs):
+            prefix = f"[{i}]" if len(docs) > 1 else ""
+            walk_values(doc, prefix, rows)
+            private = cfn_private_keys(doc, prefix)
+            for row in rows:
+                if row["key"] in private:
+                    row["value"] = None
+    except (UnicodeError, ValueError, yaml.YAMLError) as e:
+        return ("unreadable", str(e).splitlines()[0][:120])
+    for r in rows:
+        r["path"] = rel
+        r["cut"] = r["value"] is not None and len(r["value"].encode()) > VALUE_MAX
+        if r["cut"]:
+            r["value"] = r["value"].encode()[:VALUE_MAX].decode("utf-8", "ignore")
+    return ("read", rows)
+
+
+def config_documents(text):
+    """Source-only EOF normalization from the official YAML test suite.
+
+    yaml/yaml-test-suite@6ad3d2c62885d82fc349026c136ef560838fdf3d,
+    L24T/01 and JEF9/02, supply the expected final break independently.
+    A header without a content line stays empty; quoted/plain scalars are untouched.
+    """
+    docs = list(yaml.compose_all(text, Loader=AliasLoader))
+    if not text or text.endswith(('\n', '\r')):
+        return docs
+    pending, seen = list(docs), set()
+    while pending:
+        node = pending.pop()
+        if node is None or id(node) in seen:
+            continue
+        seen.add(id(node))
+        if isinstance(node, AliasRef):
+            pending.append(node.node)
+        elif isinstance(node, yaml.ScalarNode):
+            if node.style in ('|', '>') and not text[node.end_mark.index:].strip() \
+                    and node.end_mark.line > node.start_mark.line:
+                return list(yaml.compose_all(text+'\n', Loader=AliasLoader))
+        elif isinstance(node, yaml.MappingNode):
+            pending.extend(child for pair in node.value for child in pair)
+        elif isinstance(node, yaml.SequenceNode):
+            pending.extend(node.value)
+    return docs
+
+
+def cfn_private_keys(node, prefix=""):
+    """#653: source-derived scalar NoEcho defaults, independent of the product reader."""
+    def unalias(value):
+        seen = set()
+        while isinstance(value, AliasRef):
+            if id(value) in seen:
+                raise ValueError('recursive YAML alias')
+            seen.add(id(value))
+            value = value.node
+        return value
+
+    def fields(mapping):
+        return {key.value: unalias(value) for k, value in mapping.value
+                if isinstance(key := unalias(k), yaml.ScalarNode)}
+
+    node = unalias(node)
+    if not isinstance(node, yaml.MappingNode):
+        return set()
+    root = fields(node)
+    transform = root.get("Transform")
+    sam = isinstance(transform, yaml.ScalarNode) and transform.value == "AWS::Serverless-2016-10-31"
+    sam |= isinstance(transform, yaml.SequenceNode) and any(
+        isinstance(value := unalias(v), yaml.ScalarNode) and value.value == "AWS::Serverless-2016-10-31" for v in transform.value)
+    params = root.get("Parameters")
+    if not ("AWSTemplateFormatVersion" in root or sam) or not isinstance(root.get("Resources"), yaml.MappingNode) \
+            or not isinstance(params, yaml.MappingNode):
+        return set()
+    private = set()
+    for name, body in params.value:
+        name, body = unalias(name), unalias(body)
+        if not isinstance(name, yaml.ScalarNode) or not isinstance(body, yaml.MappingNode):
+            continue
+        parameter = fields(body)
+        flag, default = parameter.get("NoEcho"), parameter.get("Default")
+        if isinstance(flag, yaml.ScalarNode) and flag.value.lower() in ("true", "yes", "on", "y") \
+                and isinstance(default, yaml.ScalarNode) and scalar_kind(default) is not None:
+            private.add(prefix + (".Parameters" if prefix else "Parameters") + key_step(name.value) + ".Default")
+    return private
+
+
+def iac_existing_suffixes(lines, baseline):
+    """Keep the independent node identity/name oracle, preserving existing annotation bytes.
+
+    Orphans and contract roles were added after the original IaC oracle. A trusted A7 base
+    answers those existing fields; a pre-A7 base supplies no extension key and cannot approve
+    a new extension. The dedicated provision/orphan flows independently check their semantics.
+    """
+    old = baseline.splitlines()
+    result = []
+    for line in lines:
+        # An explicitly unsupported physical-name expression is already a documented
+        # gap. Its trusted existing answer still fixes the name and optional annotation;
+        # do not accidentally reject that annotation when the independent name is unknown.
+        pattern = re.escape(line).replace(re.escape("\x00"), r'(, (?:name|pattern) "(?:[^"\\]|\\.)*")?')
+        result.append(next((b for b in old if b == line or b.startswith(line + " ")
+                            or "\x00" in line and re.fullmatch(pattern + r'(?: .*)?', b)), line))
+    return result
+
+
+def check_iac_context(identity, path, want, got, baseline):
+    """Judge the independent node header and all existing contract-role extension bytes."""
+    problems, got_lines = [], got.splitlines()
+    if got_lines[:len(want)] != want:
+        problems.append("differs from the oracle:\n" + "\n".join(difflib.unified_diff(
+            want, got_lines[:len(want)], "oracle", "head", lineterm="", n=1)))
+    try:
+        _, extensions = iac_context_tail(identity, path, got_lines[len(want):])
+        base_lines = baseline.splitlines()
+        _, base_extensions = iac_context_tail(identity, path, base_lines[len(want):]) \
+            if base_lines[:len(want)] == want else ([], [])
+        if extensions != base_extensions:
+            problems.append("contract-role extension differs from its base key:\n" + "\n".join(
+                difflib.unified_diff(base_extensions, extensions, "base", "head", lineterm="")))
+    except ValueError as error:
+        problems.append(f"invalid values/contract section: {error}; {got_lines[len(want):][:3]}")
+    return problems
+
+
+def iac_context_tail(identity, path, lines):
+    """Separate the source-file values from subsequent contract roles, without dropping either."""
+    if lines[:1] == ["values: none"]:
+        return [], lines[1:]
+    if lines[:1] != ["values:"]:
+        raise ValueError("missing values section")
+    values, at = [], 1
+    while at < len(lines) and lines[at].startswith(f"{identity} {path}:"):
+        parse_hit(lines[at])  # malformed value lines must not become accepted extension text
+        values.append(lines[at])
+        at += 1
+    if not values:
+        raise ValueError("empty values section")
+    return values, lines[at:]
+
+
+def shown(r):
+    if r["value"] is None:
+        return "redacted"
+    if r["kind"] == "string":
+        return json.dumps(r["value"], ensure_ascii=False) + (" (cut)" if r["cut"] else "")
+    return r["value"]
+
+
+def same_shown(expected_row, got):
+    """Numbers and booleans compare by value: Meada keeps a number as parsed (`1e3` is `1000.0`)."""
+    want = shown(expected_row)
+    if want == got or expected_row["kind"] == "string" or expected_row["value"] is None:
+        return want == got
+    if expected_row["kind"] == "boolean":
+        return want.lower() == got.lower()
+    v = expected_row["value"].lower()
+    if re.fullmatch(r"[-+]?\.(inf|nan)", v):
+        return got.lower().lstrip("+") in (v.lstrip("+"), v.lstrip("+").lstrip(".")) or got.lower() in ("inf", "-inf", "nan", "infinity", "-infinity")
+    try:
+        exact = int(v, 0) if v.lstrip("+-").startswith(("0x", "0o")) else int(v) if re.fullmatch(r"[-+]?[0-9]+", v) else None
+        if exact is not None and re.fullmatch(r"-?[0-9]+", got):
+            return int(got) == exact  # no float: an integer past 2^53 must not pass by rounding
+        return float(got) == float(exact if exact is not None else v)
+    except ValueError:
+        return want == got
+
+
+def value_rank(r, q):
+    k, v = r["key"].lower(), (r["value"] or "").lower() if r["value"] is not None else None
+    if k == q or v == q:
+        return 0
+    if k.startswith(q) or (v is not None and v.startswith(q)):
+        return 1
+    if q in k or (v is not None and q in v):
+        return 2
+    return None  # a redacted value never matches by its text (story 13)
+
+
+def expected_hits(rows, query):
+    q = query.lower()
+    hits = [(value_rank(r, q), r) for r in rows]
+    return [r for rank, r in sorted(((k, r) for k, r in hits if k is not None),
+                                     key=lambda t: (t[0], t[1]["path"], t[1]["line"], t[1]["key"]))]
+
+
+def parse_hit(line):
+    repo, rest = line.split(" ", 1)
+    place, rest = rest.split(" ", 1)
+    key, got = rest.split(" = ", 1)
+    path, _, num = place.rpartition(":")
+    return repo, path, int(num), key, got
+
+
+def value_cut_budget(identity, rows, query):
+    """Exercise a real cut: source-derived UTF-8 lines, four bytes/token (output grammar).
+
+    A hit count alone does not ensure a fixed budget cuts: CI's five team-b rows total
+    455 bytes and legitimately fit 120 tokens. Half the source answer's size gives room
+    away from numeric spelling boundaries and never needs more than the old 120 cap.
+    """
+    full = "".join(f"{identity} {r['path']}:{r['line']} {r['key']} = {shown(r)}\n"
+                   for r in expected_hits(rows, query))
+    return max(1, min(120, len(full.encode('utf-8')) // 8))
+
+
+def check_value_answer(identity, rows, query, text, budget_cut=False, budget=None):
+    """Problems of one `search kind: value` answer against the oracle: the same hits, in order."""
+    want = expected_hits(rows, query)
+    lines = [l for l in text.splitlines() if l.strip()]
+    note = re.fullmatch(r"… cut after (\d+) of (\d+) lines \(budget (\d+) tokens\); raise budget for more", lines[-1]) if lines else None
+    if note:
+        lines = lines[:-1]
+    if not want:
+        ok = len(lines) == 1 and lines[0].lower() == f"no matches for `{query}`".lower()
+        return [] if ok else [f"expected no matches, got {lines[:3]}"]
+    problems = []
+    if budget_cut:
+        if not note or int(note.group(2)) != len(want):
+            actual = note.group(0) if note else f"{len(lines)} response lines/{len(text.encode('utf-8'))} UTF-8 bytes without a cut note"
+            problems.append(f"budget: expected a cut note over {len(want)} lines, got {actual}")
+        if note and (int(note.group(1)) != len(lines) or len(lines) >= len(want)):
+            problems.append(f"budget: cut note's shown count does not match its proper prefix: {note.group(0)}")
+    elif note:
+        problems.append(f"cut at the default budget: {note.group(0)}; raise the query's budget")
+    if not budget_cut and len(lines) != len(want):
+        problems.append(f"{len(lines)} hits, oracle {len(want)}")
+    if budget is not None:
+        if note and int(note.group(3)) != budget:
+            problems.append(f"budget: cut note names {note.group(3)}, request used {budget}")
+        # The documented exception is only a cut note that cannot itself fit. Ordinary
+        # answers and any retained hit must fit the requested four-byte token estimate.
+        note_only_overflow = note and not lines and len((note.group(0) + '\n').encode('utf-8')) > 4 * budget
+        if len(text.encode('utf-8')) > 4 * budget and not note_only_overflow:
+            problems.append(f"budget: {len(text.encode('utf-8'))} UTF-8 bytes exceed {budget} tokens")
+    for i, line in enumerate(lines):
+        try:
+            repo, path, num, key, got = parse_hit(line)
+        except ValueError:
+            problems.append(f"line {i}: not a value line: {line[:160]}")
+            continue
+        if i >= len(want):
+            problems.append(f"line {i}: extra hit {line[:160]}")
+            continue
+        w = want[i]
+        if (repo, path, num, key) != (identity, w["path"], w["line"], w["key"]) or not same_shown(w, got):
+            problems.append(f"line {i}: got {line[:200]!r}, oracle {identity} {w['path']}:{w['line']} {w['key']} = {shown(w)[:120]}")
+        if len(problems) > 6:
+            problems.append("...")
+            break
+    return problems
+
+
+def value_queries(rows, outside_rows, n):
+    """Exact values, key paths, prefixes, an upper-cased query, redacted and cut rows, values only
+    files left out hold, and one query nothing holds; spread over the files."""
+    def askable(r):
+        v = r["value"]
+        return v is not None and r["kind"] == "string" and not r.get("cut") and 3 <= len(v) <= 120 and v == v.strip() and "\n" not in v
+
+    plain = [r for r in rows if askable(r)]
+    by_file = {}
+    for r in plain:
+        by_file.setdefault(r["path"], []).append(r)
+    picked = spread([rs[len(rs) // 2] for _, rs in sorted(by_file.items())], n)
+    qs = []
+    for r in picked:
+        v = r["value"]
+        qs += [("exact", v), ("key path", r["key"]), ("prefix", v[:max(3, len(v) // 2)])]
+        if len(v) >= 6:
+            qs.append(("substring", v[1:-1]))
+        parent = re.sub(r"(\.[^.\[]+|\[[^]]*\])$", "", r["key"])
+        if parent and parent != r["key"]:
+            qs.append(("parent key path", parent))
+    if picked:
+        qs.append(("case", picked[0]["value"].upper()))
+    qs += [("redacted", r["key"]) for r in [r for r in rows if r["value"] is None][:3]]
+    qs += [("cut", r["key"]) for r in [r for r in rows if r["cut"]][:2]]
+    seen = {r["value"].lower() for r in rows if r["value"] is not None}
+    qs += [("left out", r["value"]) for r in outside_rows if askable(r) and r["value"].lower() not in seen][:4]
+    qs.append(("nothing", "zz_prove_no_value_here"))
+    return list(dict.fromkeys(qs))
+
+
+def mcp_answers(bin, repo, queries, log):
+    mcp = Stdio(bin, repo, log)
+    tools = mcp.call("tools/list", {}).get("result", {}).get("tools")
+    answers, seconds = [], []
+    for q in queries:
+        t = time.monotonic()
+        answers.append(answer(mcp.call("tools/call", {"name": q["tool"], "arguments": q["arguments"]})))
+        seconds.append(round(time.monotonic() - t, 3))
+    mcp.close()
+    return tools, answers, seconds
+
+
+def cmd_values(a):
+    os.environ["LANG"] = "C.UTF-8"  # every answer below is read as English: status, `no matches`, refusals
+    run = Path(a.run).resolve()
+    run.mkdir(parents=True, exist_ok=True)
+    report, differences, blocked = [], 0, False
+    for name in a.repos.split(","):
+        src = run / "work" / "src" / name
+        if not src.exists():
+            fetch(name, src)
+        rows, outside_rows, outcomes = [], [], {}
+        files, outside = config_candidates(src)
+        for rel in files:
+            outcomes[rel] = read_config(src, rel)
+            if outcomes[rel][0] == "read":
+                rows += outcomes[rel][1]
+        for rel in outside + [f for f, o in outcomes.items() if o[0] == "lockfile"]:  # values that must stay out
+            o = read_config(src, rel, lockfiles=False) if (src / rel).is_file() else ("gone",)
+            outside_rows += o[1] if o[0] == "read" else []
+        read = [f for f, o in outcomes.items() if o[0] == "read"]
+        lock = [f for f, o in outcomes.items() if o[0] == "lockfile"]
+        bad = {f: o[1] for f, o in outcomes.items() if o[0] == "unreadable"}
+        want_status = (len(read), len(lock) + len(bad), len(lock), len(bad), len(rows),
+                       sum(r["value"] is None for r in rows))
+        recs = {}
+        for side, bin in (("head", a.head_bin), ("base", a.base_bin)):
+            repo = run / "work" / side / name
+            out = run / side / name
+            shutil.rmtree(repo, ignore_errors=True)
+            shutil.copytree(src, repo, symlinks=True)
+            out.mkdir(parents=True, exist_ok=True)
+            bin = Path(bin).resolve()
+            env = os.environ
+            rec = {"version": subprocess.check_output([bin, "--version"], text=True).strip()}
+            rec["index"] = timed([bin, "index"], repo, out / "index.out", out / "index.err")
+            rec["export"] = timed([bin, "export"], repo, out / "export1.json", out / "export.err")
+            st = subprocess.run([bin, "status"], cwd=repo, capture_output=True, text=True, env=env)
+            (out / "status.txt").write_text(st.stdout + st.stderr)
+            rec["status"], rec["status_exit"] = st.stdout, st.returncode
+            if rec["index"]["exit"] or rec["export"]["exit"]:
+                rec["failed"] = f"index or export exited non-zero, see {out}"
+            recs[side] = rec
+        h, b = recs["head"], recs["base"]
+        report.append(f"## {name}\n\n{b['version']} (base) vs {h['version']} (head)\n")
+        if h.get("failed") or b.get("failed"):
+            blocked = True
+            report.append(f"BLOCKED: base {b.get('failed')}; head {h.get('failed')}\n")
+            continue
+        identity = json.loads((run / "head" / name / "export1.json").read_text())["repository"]
+        report.append(f"Oracle: {len(files)} config files ({len(read)} read, {len(lock)} lockfiles, {len(bad)} unreadable), "
+                      f"{len(rows)} values, {want_status[5]} redacted, {sum(r['cut'] for r in rows)} cut; "
+                      f"{len(outside)} YAML or JSON files left out (hidden or ignored)")
+        if bad:
+            report.append("  unreadable by the oracle:\n" + "\n".join(f"    {f}: {why}" for f, why in list(bad.items())[:15]))
+        m = STATUS_LINE.search(h["status"])
+        got_status = tuple(int(x) for x in m.groups()) if m else None
+        if got_status != (want_status if files else None):
+            differences += 1
+            report.append(f"meada status: DIFFERS: head {m.group(0) if m else 'no config line'}; oracle "
+                          f"{'%d read, %d skipped (lockfiles: %d, unreadable: %d); values: %d, redacted: %d' % want_status if files else 'no config line'}")
+        else:
+            report.append(f"meada status: config line {'equal to the oracle' if files else 'absent, as the oracle (no config file)'}")
+        others = [[l for l in r["status"].splitlines() if not STATUS_LINE.search(l)] for r in (h, b)]
+        if others[0] != others[1] or h["status_exit"] != b["status_exit"]:
+            differences += 1
+            diff = difflib.unified_diff(b["status"].splitlines(), h["status"].splitlines(), "base", "head", lineterm="", n=1)
+            report.append("meada status without the config line: DIFFERS from base\n```\n" + "\n".join(diff) + "\n```")
+        else:
+            report.append("meada status without the config line: equal to base")
+        same_export = body((run / "base" / name / "export1.json").read_bytes()) == body((run / "head" / name / "export1.json").read_bytes())
+        differences += not same_export
+        report.append(f"meada export: {'byte-equal to base (no config value in it, story 17)' if same_export else 'DIFFERS from base'}")
+        picked = value_queries(rows, outside_rows, a.sample)
+        queries = [{"tool": "search", "label": label, "arguments": {"query": q, "kind": "value", "budget": 200000}} for label, q in picked]
+        big = max(range(len(picked)), key=lambda i: len(expected_hits(rows, picked[i][1])), default=None)
+        if big is not None and len(expected_hits(rows, picked[big][1])) > 3:
+            query = picked[big][1]
+            queries.append({"tool": "search", "label": "budget", "arguments": {
+                "query": query, "kind": "value", "budget": value_cut_budget(identity, rows, query)}})
+        fallback = [q for label, q in picked if label in ("exact", "nothing")][:3]
+        # Symbol names too: values added to a default search a symbol answers show only there
+        # (audit 2026-11-04, M6: caught on one entry by luck of a value equal to a symbol name).
+        symbols = json.loads((run / "head" / name / "export1.json").read_text()).get("symbols", [])
+        fallback += sorted({short_name(x["id"]) for x in symbols if len(short_name(x["id"])) >= 3})[:3]
+        queries += [{"tool": "search", "label": "default search", "arguments": {"query": q, "budget": 200000}} for q in fallback]
+        queries.append({"tool": "search", "label": "unknown kind", "arguments": {"query": picked[0][1] if picked else "x", "kind": "values"}})
+        try:
+            h["tools"], h["answers"], secs = mcp_answers(Path(a.head_bin).resolve(), run / "work" / "head" / name, queries, run / "head" / name / "mcp.err")
+            _, b["answers"], _ = mcp_answers(Path(a.base_bin).resolve(), run / "work" / "base" / name, queries, run / "base" / name / "mcp.err")
+        except Exception as e:
+            blocked = True
+            report.append(f"BLOCKED: mcp stdio {e!r}")
+            continue
+        h["queries"] = queries
+        (run / "head" / name / "values.json").write_text(json.dumps({"queries": queries, "answers": h["answers"], "seconds": secs}, indent=1, ensure_ascii=False))
+        lines, fails = [], 0
+        for i, q in enumerate(queries):
+            args, ans = q["arguments"], h["answers"][i]
+            label = q["label"]
+            if args.get("kind") == "value":
+                problems = check_value_answer(identity, rows, args["query"], ans, budget_cut=label == "budget", budget=args["budget"])
+            elif "kind" not in args:  # story 5: as base when a symbol or contract matches, else the value hits
+                base_ans = b["answers"][i]
+                if not base_ans.startswith("no matches"):
+                    problems = [] if ans == base_ans else ["differs from base, which found a symbol or contract"]
+                else:
+                    problems = check_value_answer(identity, rows, args["query"], ans)
+            else:
+                listed = ans.rsplit(", not `", 1)[0]  # the refusal echoes the unknown kind (`values`) after the list
+                problems = [] if ans.startswith(("TOOL ERROR", "ERROR")) and "`value`" in listed else [f"not refused or `value` not listed: {ans[:200]}"]
+            fails += bool(problems)
+            lines.append(f"  [{'FAIL' if problems else 'PASS'}] {label} {json.dumps(args, ensure_ascii=False)[:160]} ({secs[i]} s)"
+                         + "".join(f"\n      {p}" for p in problems))
+        differences += fails
+        report.append(f"Value queries over stdio: {len(queries) - fails}/{len(queries)} equal to the oracle; slowest "
+                      f"{max(secs)} s (story 16 has no number: the checker judges)\n" + "\n".join(lines))
+        if a.http:
+            line, failed = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
+            differences += failed
+            report.append("MCP HTTP vs stdio (head):\n" + line)
+        report.append("")
+    verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}")
+    (run / "values.md").write_text(f"# prove.py values\n\n{verdict}\n\n" + "\n".join(report) + "\n")
+    print(verdict)
+    print(f"full report: {run}/values.md")
+    sys.exit(2 if blocked else 1 if differences else 0)
+
+
+def cmd_iac(a):
+    """A7 IaC nodes (#649, and #653 for CloudFormation): the oracle's nodes and references against `search` kind `iac`,
+    `context` and `trace` both ways over stdio (and HTTP with `--http`); the base answers the
+    default search, existing annotations/contract roles, `meada status` and every export field.
+    Provision/orphan flows separately assert new semantics against their source/spec keys."""
+    sys.dont_write_bytecode = True  # no __pycache__ left in the skill's folder
+    import cfn_oracle as cfn  # needs PyYAML: see SKILL.md's Gotchas
+    import tf_oracle as tf  # needs python-hcl2: see SKILL.md's Gotchas
+    os.environ["LANG"] = "C.UTF-8"
+    run = Path(a.run).resolve()
+    run.mkdir(parents=True, exist_ok=True)
+    report, differences, blocked = [], 0, False
+    footer = re.compile(r"chain: (exact|none) \u00b7 0 hops \u00b7 1 repos \u00b7 \d+ tokens\Z")
+    for name in a.repos.split(","):
+        src = run / "work" / "src" / name
+        if not src.exists():
+            fetch(name, src)
+        nodes, references, unreadable = tf.evaluate(src)
+        # #653: the CloudFormation and SAM templates join the Terraform nodes, in the same shape.
+        cf_nodes, cf_references, cf_unreadable = cfn.evaluate(src)
+        nodes, references, unreadable = nodes + cf_nodes, sorted(references + cf_references), unreadable + cf_unreadable
+        recs = {}
+        for side, bin in (("head", a.head_bin), ("base", a.base_bin)):
+            repo, out = run / "work" / side / name, run / side / name
+            shutil.rmtree(repo, ignore_errors=True)
+            shutil.copytree(src, repo, symlinks=True)
+            out.mkdir(parents=True, exist_ok=True)
+            bin = Path(bin).resolve()
+            rec = {"version": subprocess.check_output([bin, "--version"], text=True).strip()}
+            rec["index"] = timed([bin, "index"], repo, out / "index.out", out / "index.err")
+            rec["export"] = timed([bin, "export"], repo, out / "export1.json", out / "export.err")
+            st = subprocess.run([bin, "status"], cwd=repo, capture_output=True, text=True)
+            rec["status"] = st.stdout + st.stderr
+            if rec["index"]["exit"] or rec["export"]["exit"]:
+                rec["failed"] = f"index or export exited non-zero, see {out}"
+            recs[side] = rec
+        h, b = recs["head"], recs["base"]
+        report.append(f"## {name}\n\n{b['version']} (base) vs {h['version']} (head)\n")
+        if h.get("failed") or b.get("failed"):
+            blocked = True
+            report.append(f"BLOCKED: base {b.get('failed')}; head {h.get('failed')}\n")
+            continue
+        identity = json.loads((run / "head" / name / "export1.json").read_text())["repository"]
+        roots = sorted({n["root"] for n in nodes})
+        # #650: a root with a `count` or `for_each` the oracle cannot evaluate is left out of the
+        # comparison (its lines dropped on both sides), a node whose name it cannot evaluate
+        # matches any name; both are counted, never hidden.
+        unsure = sorted({n["root"] for n in nodes if n.get("root_unchecked")})
+        names_unchecked = sum(1 for n in nodes if n.get("unchecked"))
+        report.append(f"Oracle (#650 names): {names_unchecked} names unchecked, roots left out: {unsure}")
+        drop = lambda text: "".join(l + "\n" for l in text.splitlines() if not any(l.endswith(f"root {r})") for r in unsure))
+        nodes = [n for n in nodes if n["root"] not in unsure]
+        report.append(f"Oracle: {len(nodes)} nodes in {len(roots)} roots ({', '.join(roots[:8])}{', ...' if len(roots) > 8 else ''}), "
+                      f"{len(references)} references; unreadable: {[f for f, _ in unreadable]}")
+        same = body((run / "base" / name / "export1.json").read_bytes()) == body((run / "head" / name / "export1.json").read_bytes())
+        differences += not same
+        report.append(f"meada export: {'byte-equal to base, every optional field retained' if same else 'DIFFERS from base'}")
+        # The sample: nodes with references both ways first, then the rest, spread over the list.
+        linked = {r[1] for r in references} & {r[2] for r in references}
+        ordered = sorted(nodes, key=lambda n: (n["address"] not in linked, n["path"], n["line"], n["address"], n["root"]))
+        ordered = [n for n in ordered if not n.get("unchecked")]
+        sample = spread([n for n in ordered if n["address"] in linked], a.sample // 2) + spread(ordered, a.sample - a.sample // 2)
+        sample = list({(n["root"], n["address"]): n for n in sample}.values())
+        counts = {}
+        for n in nodes:
+            counts[n["address"]] = counts.get(n["address"], 0) + 1
+        queries = []
+        search = lambda label, q, **kw: queries.append({"tool": "search", "label": label, "arguments": {"query": q, **kw}})
+        for n in sample:
+            search("address", n["address"], kind="iac", budget=200000)
+            search("prefix", n["address"][:5], kind="iac", budget=200000)
+            if n["name"]:
+                search("physical name", n["name"], kind="iac", budget=200000)
+            passed = f"{n['address']} (root {n['root']})"
+            queries.append({"tool": "context", "label": "context", "node": n, "arguments": {"symbol": passed, "budget": 200000}})
+            for d in ("down", "up"):
+                queries.append({"tool": "trace", "label": f"trace {d}", "node": n, "arguments": {"from": passed, "direction": d, "budget": 200000}})
+        for t in sorted({n["type"] for n in nodes})[:3]:
+            search("type", t, kind="iac", budget=200000)
+        # A base may already implement #653. Probe each actual private key rather than adding
+        # its defaults to the redacted count a second time. The head must independently redact.
+        config_rows, private_rows = [], []
+        for rel, _, source in cfn.templates(src, []):
+            outcome = read_config(src, rel)
+            if outcome[0] == "read":
+                config_rows.extend(outcome[1])
+                private = cfn_private_keys(source)
+                private_rows.extend(r for r in outcome[1] if r["key"] in private)
+        for row in private_rows:
+            queries.append({"tool": "search", "label": "NoEcho default", "private": row,
+                            "arguments": {"query": row["key"], "kind": "value", "budget": 200000}})
+        shared = sorted(k for k, c in counts.items() if c > 1)[:2]
+        for addr in shared:
+            queries.append({"tool": "context", "label": "several", "arguments": {"symbol": addr, "budget": 200000}})
+        search("nothing", "zz_prove_no_node", kind="iac", budget=200000)
+        for n in sample[:3]:
+            search("default search", n["address"], budget=200000)
+        search("unknown kind", "x", kind="iacs")
+        # The code keeps its answers: a symbol named like a node (`a7-iac`'s `zz_code.py`) answers
+        # `context` and `trace` as on the base (the prover's finding on 09f2aae, 2026-11-04).
+        symbols = json.loads((run / "head" / name / "export1.json").read_text()).get("symbols", [])
+        for sym in sorted({x["id"].rsplit("::", 1)[-1] for x in symbols}, key=lambda n: ("." not in n, n))[:3]:
+            queries.append({"tool": "context", "label": "code answer", "arguments": {"symbol": sym, "budget": 200000}})
+            queries.append({"tool": "trace", "label": "code answer", "arguments": {"from": sym, "direction": "up", "budget": 200000}})
+        wire = [{k: v for k, v in q.items() if k != "node"} for q in queries]
+        try:
+            h["tools"], h["answers"], secs = mcp_answers(Path(a.head_bin).resolve(), run / "work" / "head" / name, wire, run / "head" / name / "mcp.err")
+            _, b["answers"], _ = mcp_answers(Path(a.base_bin).resolve(), run / "work" / "base" / name, wire, run / "base" / name / "mcp.err")
+        except Exception as e:
+            blocked = True
+            report.append(f"BLOCKED: mcp stdio {e!r}")
+            continue
+        h["queries"] = wire
+        (run / "head" / name / "iac.json").write_text(json.dumps({"queries": wire, "answers": h["answers"], "seconds": secs}, indent=1, ensure_ascii=False))
+        extra = 0
+        for q, base_answer in zip(queries, b["answers"]):
+            if q["label"] != "NoEcho default":
+                continue
+            row, redacted = q["private"], False
+            for line in base_answer.splitlines():
+                try:
+                    repo, path, _, key, value = parse_hit(line)
+                except ValueError:
+                    continue
+                redacted |= (repo, path, key, value) == (identity, row["path"], row["key"], "redacted")
+            extra += not redacted
+        want_status = re.sub(r"redacted: (\d+)", lambda m: f"redacted: {int(m[1]) + extra}", b["status"]) if extra else b["status"]
+        status_same = h["status"] == want_status
+        differences += not status_same
+        report.append(f"meada status: {'equal to base' if status_same and not extra else 'equal to base plus ' + str(extra) + ' source-verified NoEcho defaults' if status_same else 'DIFFERS from base/source NoEcho key'}")
+        lines, fails = [], 0
+        for i, q in enumerate(queries):
+            got, args, label = h["answers"][i], q["arguments"], q["label"]
+            problems = []
+            if label == "NoEcho default":
+                problems = check_value_answer(identity, config_rows, args["query"], got)
+            elif q["tool"] == "search" and args.get("kind") == "iac":
+                hits = tf.search_hits(identity, nodes, args["query"])
+                hits = iac_existing_suffixes(hits, b["answers"][i])
+                want = "".join(l + "\n" for l in hits) if hits else f"no matches for `{args['query']}`\n"
+                if unsure:
+                    got = drop(got) or f"no matches for `{args['query']}`\n"
+                if tf.UNCHECKED_NAME in want:
+                    any_name = r'(, (?:name|pattern) "(?:[^"\\]|\\.)*")?'
+                    pattern = "".join(re.escape(l).replace(re.escape(tf.UNCHECKED_NAME), any_name) + "\n" for l in hits)
+                    if re.fullmatch(pattern, got):
+                        got = want
+                if got != want:
+                    problems.append("differs from the oracle:\n" + "\n".join(difflib.unified_diff(want.splitlines(), got.splitlines(), "oracle", "head", lineterm="", n=1)))
+            elif label == "code answer":
+                if got != b["answers"][i]:
+                    problems.append("differs from base: a symbol's answer must not change")
+            elif q["tool"] == "context" and label == "several":
+                if not got.startswith(f"`{args['symbol']}` fits {counts[args['symbol']]} IaC nodes; pass one of:\n"):
+                    problems.append(f"not a list of {counts[args['symbol']]} nodes: {got[:200]}")
+            elif q["tool"] == "context":
+                want = tf.context_lines(identity, nodes, references, q["node"])
+                problems = check_iac_context(identity, q["node"]["path"], want, got, b["answers"][i])
+            elif q["tool"] == "trace":
+                want = tf.trace_lines(identity, nodes, references, q["node"], args["direction"] == "down")
+                got_lines = got.splitlines()
+                if got_lines[:-1] != want:
+                    problems.append("differs from the oracle:\n" + "\n".join(difflib.unified_diff(want, got_lines[:-1], "oracle", "head", lineterm="", n=1)))
+                m = footer.match(got_lines[-1] if got_lines else "")
+                if not m or (m.group(1) == "none") != (len(want) == 1):
+                    problems.append(f"footer: {got_lines[-1:] }")
+            elif "kind" not in args:
+                if got != b["answers"][i]:
+                    problems.append("differs from base: the default search must leave IaC nodes out")
+            else:
+                listed = got.rsplit(", not `", 1)[0]
+                if not (got.startswith(("TOOL ERROR", "ERROR")) and "`iac`" in listed):
+                    problems.append(f"not refused or `iac` not listed: {got[:200]}")
+            fails += bool(problems)
+            lines.append(f"  [{'FAIL' if problems else 'PASS'}] {label} {json.dumps(args, ensure_ascii=False)[:150]} ({secs[i]} s)"
+                         + "".join("\n      " + p.replace("\n", "\n      ") for p in problems))
+        differences += fails
+        report.append(f"IaC queries over stdio: {len(queries) - fails}/{len(queries)} equal to the oracle (or base); slowest {max(secs)} s\n" + "\n".join(lines))
+        if a.http:
+            line, failed = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
+            differences += failed
+            report.append("MCP HTTP vs stdio (head):\n" + line)
+        report.append("")
+    verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}")
+    (run / "iac.md").write_text(f"# prove.py iac\n\n{verdict}\n\n" + "\n".join(report) + "\n")
+    print(verdict)
+    print(f"full report: {run}/iac.md")
+    sys.exit(2 if blocked else 1 if differences else 0)
 
 
 def cmd_clean(a):
@@ -707,12 +1757,37 @@ def main():
     d = sub.add_parser("deploy")
     d.add_argument("--base", required=True)
     d.add_argument("--run", required=True)
+    v = sub.add_parser("values")
+    v.add_argument("--base-bin", required=True)
+    v.add_argument("--head-bin", required=True)
+    v.add_argument("--repos", required=True, help="comma-separated corpus.tsv or infra.tsv names")
+    v.add_argument("--run", required=True)
+    v.add_argument("--sample", type=int, default=8, help="files sampled for value queries per entry")
+    v.add_argument("--http", action="store_true")
+    i = sub.add_parser("iac")
+    i.add_argument("--base-bin", required=True)
+    i.add_argument("--head-bin", required=True)
+    i.add_argument("--repos", required=True, help="comma-separated infra.tsv names")
+    i.add_argument("--run", required=True)
+    i.add_argument("--sample", type=int, default=8, help="nodes sampled for context and trace per entry")
+    i.add_argument("--http", action="store_true")
     c = sub.add_parser("clean")
     c.add_argument("run")
     sub.add_parser("selftest")
     a = p.parse_args()
-    {"run": cmd_run, "rebless": cmd_rebless, "deploy": cmd_deploy, "clean": cmd_clean, "selftest": cmd_selftest}[a.cmd](a)
+    {"run": cmd_run, "rebless": cmd_rebless, "deploy": cmd_deploy, "clean": cmd_clean, "values": cmd_values, "iac": cmd_iac, "selftest": cmd_selftest}[a.cmd](a)
 
 
 if __name__ == "__main__":
-    main()
+    # Exit 1 is a difference from the base (prove-ci reads it so): a crash or a refusal is
+    # BLOCKED, never evidence.
+    try:
+        main()
+    except SystemExit as stop:
+        if isinstance(stop.code, str):
+            print(stop.code, file=sys.stderr)
+            sys.exit(2)
+        raise
+    except Exception:
+        traceback.print_exc()
+        sys.exit(2)

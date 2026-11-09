@@ -1,0 +1,8 @@
+[[peer]]
+repo = "example.com/resource-via/app"
+
+[[resource]]
+kind = "routing"
+id = "team-b"
+role = "read"
+via = ["opsgenie_team_routing_rule.team_b"]

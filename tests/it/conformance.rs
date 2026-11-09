@@ -3425,9 +3425,9 @@ fn kotlin_context_lists_callers_by_receiver_type() {
 fn kotlin_hostile_scope_function_nesting_remains_bounded() {
     let repo = fixture_repo("kotlin_scopes_depth", "conformance-kotlin", Some(ORIGIN));
     let mut nested = String::from("package hostile\nclass Box { fun size() = 0 }\n");
-    nested.push_str("fun deep(box: Box) {\n");
+    nested.push_str("fun other() = 0\nfun deep(box: Box) {\n");
     for _ in 0..300 {
-        nested.push_str("box.apply {\n");
+        nested.push_str("box.apply {\nother()\n");
     }
     nested.push_str("size()\n");
     nested.push_str(&"}\n".repeat(300));
@@ -3437,14 +3437,21 @@ fn kotlin_hostile_scope_function_nesting_remains_bounded() {
         ".apply { }".repeat(300)
     );
     std::fs::write(repo.join("Nested.kt"), nested + &chain).unwrap();
-    let json: Value =
-        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let started = std::time::Instant::now();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let took = started.elapsed();
+    let json: Value = serde_json::from_str(&export).unwrap();
     let size: Vec<&Value> = (json["calls"].as_array().unwrap().iter())
         .filter(|c| c["span"]["path"] == "Nested.kt")
         .filter(|c| c["id"].as_str().unwrap().contains("::(anonymous).size#"))
         .collect();
     // The innermost call is past the depth where lambdas are scopes: a name match.
     assert!(size.iter().any(|c| c["level"] == "inferred"), "{size:?}");
+    // A name read or called in each lambda looked for a local or local function around it at
+    // every level, from every level: cubic in the depth, over 100 s here in debug; about 12 s
+    // with one climb per lookup.
+    eprintln!("kotlin scope functions, 300 deep: {took:?}");
+    assert!(took < std::time::Duration::from_secs(30), "{took:?}");
 }
 
 /// Thousands of `apply` lambdas on one class index in time linear in their number: a lambda's
@@ -10810,6 +10817,42 @@ fn python_requests_and_httpx_functions_are_consumers_with_their_evaluated_path()
         python_clients("python_http_modules", "modules.py"),
         expected
     );
+}
+
+#[test]
+fn a_python_import_inside_a_function_names_its_library_there_alone() {
+    let repo = fixture_repo("python_local_imports", "conformance-python", Some(ORIGIN));
+    std::fs::write(
+        repo.join("clients/local.py"),
+        "import requests\n\n\ndef top():\n    return requests.get(\"https://top.example.com/a\")\n\n\n\
+         def from_import():\n    from requests import get\n    return get(\"https://from.example.com/b\")\n\n\n\
+         def aliased():\n    import requests as r\n    return r.get(\"https://alias.example.com/c\")\n\n\n\
+         def shadowed():\n    import json as requests\n    return requests.get(\"https://shadow.example.com/d\")\n",
+    )
+    .unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json = serde_json::from_str(&export).unwrap();
+    let site = |function: &str, call: &str| format!("clients/local.py::{function}::{call}");
+    // `from requests import get` and `import requests as r` name the library in their function;
+    // `import json as requests` hides the module's `requests` there.
+    let expected = triples(&[
+        (
+            "http::GET::/a",
+            "host:top.example.com",
+            &site("top", "requests.get#0"),
+        ),
+        (
+            "http::GET::/b",
+            "host:from.example.com",
+            &site("from_import", "get#0"),
+        ),
+        (
+            "http::GET::/c",
+            "host:alias.example.com",
+            &site("aliased", "r.get#0"),
+        ),
+    ]);
+    assert_eq!(consumers(&json, "clients/local.py"), expected, "{export}");
 }
 
 #[test]

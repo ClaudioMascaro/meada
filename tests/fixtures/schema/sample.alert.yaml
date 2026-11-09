@@ -1,0 +1,23 @@
+groups:
+  - name: availability
+    labels: {region: eu}
+    rules:
+      - alert: ApiDown
+        expr: up == 0
+        labels: {support: team-b}
+---
+route:
+  receiver: fallback
+  group_by: [support]
+  routes:
+    - receiver: team-b
+      matchers: ['support=~"team-.*"']
+receivers:
+  - name: fallback
+  - name: team-b
+    opsgenie_configs:
+      - tags: 'support:{{ .CommonLabels.support }}'
+    pagerduty_configs:
+      - routing_key: schema-placeholder
+        details:
+          support: '{{ .GroupLabels.support }}'

@@ -1,0 +1,3 @@
+services:
+  refusedSecondBase:
+    image: proof/second:one

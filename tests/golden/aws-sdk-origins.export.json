@@ -1,0 +1,1478 @@
+{
+  "format": 1,
+  "repository": "local/aws-sdk-origins",
+  "files": [
+    {
+      "path": "Conflicts.cs",
+      "hash": "227f41bb7c7377e82ab5c46f17fa53840b33879fb2e0fbfdf8b6bc7278ea4f86"
+    },
+    {
+      "path": "ConstructorScope.cs",
+      "hash": "e9e70cb1f938ae765c29fc7c199a3442d281ba362c879daaf4f60b67163f717c"
+    },
+    {
+      "path": "ConstructorScope.java",
+      "hash": "efe28458c23129ba96a25b18a3ebd3d03d93dfbf4121e08e2dcb30e25f4431b0"
+    },
+    {
+      "path": "HiddenConstructor.cs",
+      "hash": "e4c2ea52c8ec091d96364adf19f7b7746b26efd7dec2f61277aeff5ff5456d89"
+    },
+    {
+      "path": "HiddenConstructor.java",
+      "hash": "da36337f14a4a6372cc9065bc983f72b0be846efc15e1c5e61349239f56abef2"
+    },
+    {
+      "path": "Mixed.java",
+      "hash": "f4f8df5d40d84c539e1b445c1b9b0e28f6873c788d9d6bbacfadca1629272b15"
+    },
+    {
+      "path": "Origins.cs",
+      "hash": "b654e6e7f15d66d0d96f8e638512d7077b0b0fbfc7557f6cd675d62e6021f458"
+    },
+    {
+      "path": "Origins.java",
+      "hash": "f5b54b9ac9b092f30634292efb311df48d7127ecc212eea8055a9114f80b649c"
+    },
+    {
+      "path": "hidden_constructor.go",
+      "hash": "c628735a2f67dac5fcda316fae5f5dcc7b34acabc1a6339c6a8a46f4e51cdcce"
+    },
+    {
+      "path": "mixed.go",
+      "hash": "8d9c23cad241c5006e6c3f507d3c846e6d7f55edbbe00e0906391e45adb1a31c"
+    },
+    {
+      "path": "origins.go",
+      "hash": "e00399511e3ffc3d3e7afde59c335643fc4d859a1a2681fb3521a4fbe49f078b"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/aws-sdk-origins::Conflicts.cs::Conflicts",
+      "span": {
+        "path": "Conflicts.cs",
+        "start": 87,
+        "end": 784
+      },
+      "hash": "f2b8f5157d867c9e813983dc1d99ec77576e176c1c32218868716d23c15259a3"
+    },
+    {
+      "id": "local/aws-sdk-origins::Conflicts.cs::Conflicts.HiddenField()",
+      "span": {
+        "path": "Conflicts.cs",
+        "start": 159,
+        "end": 347
+      },
+      "hash": "b6edc0d282d10ae0b21653aea91b4856f7610c9849e32f63e31060ac3a26f947"
+    },
+    {
+      "id": "local/aws-sdk-origins::Conflicts.cs::Conflicts.Mixed(bool,AmazonSimpleNotificationServiceClient)",
+      "span": {
+        "path": "Conflicts.cs",
+        "start": 352,
+        "end": 557
+      },
+      "hash": "60e790e4ac1a8387bac0bf17f774c890135499791cb6b89527089c9fd4eb454f"
+    },
+    {
+      "id": "local/aws-sdk-origins::Conflicts.cs::Conflicts.UnknownReturn(bool,AmazonSimpleNotificationServiceClient)",
+      "span": {
+        "path": "Conflicts.cs",
+        "start": 562,
+        "end": 782
+      },
+      "hash": "c41f0ba6e85d5adb8465471f035dc3044796050e3df01ec5061b3c867c996129"
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.cs::ConstructorScope",
+      "span": {
+        "path": "ConstructorScope.cs",
+        "start": 87,
+        "end": 492
+      },
+      "hash": "2b3945e4aef34f05a331fea01bdc7d5affd348ea528b1d55cda176c9257fe670"
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.cs::ConstructorScope.ConstructorScope(AmazonSimpleNotificationServiceClient)",
+      "span": {
+        "path": "ConstructorScope.cs",
+        "start": 279,
+        "end": 360
+      },
+      "hash": "e4ef7e63c38ad59431965a5b9081ee887efbeb5d71c8ad56b64dfea222ee525f"
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.cs::ConstructorScope.Use()",
+      "span": {
+        "path": "ConstructorScope.cs",
+        "start": 365,
+        "end": 490
+      },
+      "hash": "99fdc083d087139df7ca345c61b5a00f097bdc843de0959dad049942abd67651"
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope",
+      "span": {
+        "path": "ConstructorScope.java",
+        "start": 120,
+        "end": 402
+      },
+      "hash": "822d56e19f2a22da50f6c58e999e289b5ae446e228a67351b50ba30c5690cbb4"
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope.ConstructorScope(SnsClient)",
+      "span": {
+        "path": "ConstructorScope.java",
+        "start": 225,
+        "end": 278
+      },
+      "hash": "85a9558ed122628abdacff532005faef9f2c919760978131f597ca480cb6a48d"
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope.use()",
+      "span": {
+        "path": "ConstructorScope.java",
+        "start": 283,
+        "end": 400
+      },
+      "hash": "52e9f394ca6ce887810e99c2c929e3a4993ea819fd7eee975465ee1b419d7ed5"
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor",
+      "span": {
+        "path": "HiddenConstructor.cs",
+        "start": 87,
+        "end": 431
+      },
+      "hash": "dba143b845c736d3ebde30cb68399f19e694196ce1d9f5a7e948b341a3b42b37"
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.AmazonSimpleNotificationServiceClient",
+      "span": {
+        "path": "HiddenConstructor.cs",
+        "start": 117,
+        "end": 242
+      },
+      "hash": "5ee1760e3bfe34c3e028a67d01d93f961901e3d2eada652d9c704d266276fdd6"
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.AmazonSimpleNotificationServiceClient.PublishAsync(PublishRequest)",
+      "span": {
+        "path": "HiddenConstructor.cs",
+        "start": 171,
+        "end": 236
+      },
+      "hash": "5c73cff624b7d79717919a7c95b592793364e3e38b6864d623d25735d6ade5ed"
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.Send()",
+      "span": {
+        "path": "HiddenConstructor.cs",
+        "start": 247,
+        "end": 429
+      },
+      "hash": "3c1993e4516f874f6037a7a48c111c24a7919e8e8694e2d77a8ba688bbe10bac"
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor",
+      "span": {
+        "path": "HiddenConstructor.java",
+        "start": 120,
+        "end": 446
+      },
+      "hash": "4b2df69f5af9eb49c6d443e5ec516e92ccce05570da22e76976dee84cf42e1cc"
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient",
+      "span": {
+        "path": "HiddenConstructor.java",
+        "start": 150,
+        "end": 290
+      },
+      "hash": "b5e9b83b264b3855c6e6da41b7c2c74414c9fb72532c75888b0ec2d4e6a8d1d4"
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient.create()",
+      "span": {
+        "path": "HiddenConstructor.java",
+        "start": 183,
+        "end": 236
+      },
+      "hash": "21f84018f3d59af9299666adc5a1a19322b07d94c714f01823c27242902b4d4d"
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient.publish(PublishRequest)",
+      "span": {
+        "path": "HiddenConstructor.java",
+        "start": 245,
+        "end": 284
+      },
+      "hash": "98abe5dc1515eb27d2e38d25db6846835b01a221bc0c8fc6891140d9ea46e76d"
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()",
+      "span": {
+        "path": "HiddenConstructor.java",
+        "start": 295,
+        "end": 444
+      },
+      "hash": "2e3c7f6ad99282c117ccae5a4f7ff65568712f330d6fdafa9dc29702f42d9f41"
+    },
+    {
+      "id": "local/aws-sdk-origins::Mixed.java::Mixed",
+      "span": {
+        "path": "Mixed.java",
+        "start": 120,
+        "end": 450
+      },
+      "hash": "f9f28a5c6e6d51b0741cc9ff734da34b4a50652ebad5dc2a48a371761626e0d9"
+    },
+    {
+      "id": "local/aws-sdk-origins::Mixed.java::Mixed.mixed(boolean,SnsClient)",
+      "span": {
+        "path": "Mixed.java",
+        "start": 138,
+        "end": 265
+      },
+      "hash": "ce4b3967618d24c95c047dc9c3bd7716328720f8a348dfd6d1ba7ccda7f52374"
+    },
+    {
+      "id": "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)",
+      "span": {
+        "path": "Mixed.java",
+        "start": 270,
+        "end": 448
+      },
+      "hash": "faa30de12b258b3c5089f63a18f54a92b95144bcfcbc3a593644cf7493d745b2"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins",
+      "span": {
+        "path": "Origins.cs",
+        "start": 129,
+        "end": 894
+      },
+      "hash": "d027113c035889a53d4587ce5639e1c7506d576bfcad325d8c60f70244c9bb0d"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Declared(IAmazonSQS)",
+      "span": {
+        "path": "Origins.cs",
+        "start": 717,
+        "end": 892
+      },
+      "hash": "16e81259ba4d88ed0bbb92d7d3ed71681fc2c174bd48fe7e190e6756980107c8"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Guessed(object)",
+      "span": {
+        "path": "Origins.cs",
+        "start": 553,
+        "end": 712
+      },
+      "hash": "9fcf028c54ef8b2890aec51e307c250921d95f2ab173fedaac2a0e7da4f2a0a1"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Hidden(AmazonSimpleNotificationServiceClient)",
+      "span": {
+        "path": "Origins.cs",
+        "start": 398,
+        "end": 548
+      },
+      "hash": "651a679627da28ec55dafc0debfcfc0e836debba2201247bf251870f3b48fb9a"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Make()",
+      "span": {
+        "path": "Origins.cs",
+        "start": 149,
+        "end": 249
+      },
+      "hash": "ee827807d674545941b447b1412efc6e921ea56140d9e808d28a51d598c890ff"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Positive()",
+      "span": {
+        "path": "Origins.cs",
+        "start": 254,
+        "end": 393
+      },
+      "hash": "b415abe90e20dc963a2471618965f00887dda3d6e8a8a57be5a069d734f4d415"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins",
+      "span": {
+        "path": "Origins.java",
+        "start": 243,
+        "end": 920
+      },
+      "hash": "5a349c80d640a914db7abfedfecb6c3f91d8fa5348ac5a4002648ae25e5577ab"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.declared(SqsClient)",
+      "span": {
+        "path": "Origins.java",
+        "start": 752,
+        "end": 918
+      },
+      "hash": "6fcf8c4d77558735928f4154544570a431169555e3c67c0655c6773b94196eb8"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)",
+      "span": {
+        "path": "Origins.java",
+        "start": 596,
+        "end": 747
+      },
+      "hash": "8f08b3d9dd219407c51ce1504aeceef319cda2b9bf8fa570922d3a0f80e659db"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.hidden(SnsClient)",
+      "span": {
+        "path": "Origins.java",
+        "start": 477,
+        "end": 591
+      },
+      "hash": "1b61fa787406ffb6da9158521f8eb5376015363bbcaee320d16a36c5003c2733"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.make()",
+      "span": {
+        "path": "Origins.java",
+        "start": 263,
+        "end": 310
+      },
+      "hash": "9b3d410817ace7db95b1604ef00df3137d2c96583eec23435800f818967b57f9"
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.positive()",
+      "span": {
+        "path": "Origins.java",
+        "start": 315,
+        "end": 472
+      },
+      "hash": "8141d6d5ca820f8698d4fbf847afd55f23a3a5629a60cdff25595addbba4caf0"
+    },
+    {
+      "id": "local/aws-sdk-origins::hidden_constructor.go::hiddenConstructor",
+      "span": {
+        "path": "hidden_constructor.go",
+        "start": 131,
+        "end": 309
+      },
+      "hash": "3a4082ff50bd8bb5f390999565d9438ecb4b00021cfc949a196e3c7ccefc78d4"
+    },
+    {
+      "id": "local/aws-sdk-origins::mixed.go::mixed",
+      "span": {
+        "path": "mixed.go",
+        "start": 131,
+        "end": 256
+      },
+      "hash": "b08be15746c4b0e3f4047709409696896a40ba1e03e81aa204b3740daac62439"
+    },
+    {
+      "id": "local/aws-sdk-origins::mixed.go::mixedSend",
+      "span": {
+        "path": "mixed.go",
+        "start": 257,
+        "end": 436
+      },
+      "hash": "6ce274752a948837270ce80799287af586cbaa4bae3b6ef349e52b5f88adcb2d"
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::LocalFactory",
+      "span": {
+        "path": "origins.go",
+        "start": 506,
+        "end": 527
+      },
+      "hash": "488b8e2591b8bce10644bca37f660c19372f721b225c187d49cd4a8d89512960"
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::LocalFactory.makeClient",
+      "span": {
+        "path": "origins.go",
+        "start": 528,
+        "end": 608
+      },
+      "hash": "55ffef7ce8326fafe76af35975fdf878bf0cddfe54896ac0b62f79fd83ec5d68"
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::declared",
+      "span": {
+        "path": "origins.go",
+        "start": 769,
+        "end": 942
+      },
+      "hash": "9d313120522c71578aab3de931969f8ebded07a8e35ee24511b90b7c3783ce23"
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::guessed",
+      "span": {
+        "path": "origins.go",
+        "start": 609,
+        "end": 768
+      },
+      "hash": "ec25eb1fdf7dee23a77a78f7e5a4c898e9bc1862434fe1ff915f7ef04b65bf4d"
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::hidden",
+      "span": {
+        "path": "origins.go",
+        "start": 379,
+        "end": 500
+      },
+      "hash": "6c16393ade8378bbc33425c4933adc822fbec45bc5c96d0df7a23d06218ca111"
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::makeClient",
+      "span": {
+        "path": "origins.go",
+        "start": 180,
+        "end": 243
+      },
+      "hash": "2eaab814cf2fecab29f357a5bbfaba38ba16094d0cdb7dafc51bb4b37b2d5246"
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::positive",
+      "span": {
+        "path": "origins.go",
+        "start": 244,
+        "end": 378
+      },
+      "hash": "ea8ed1104e1637a7ca5014aa8d61f88191bb2f5d8103f40d6c81c3ab3688a435"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/aws-sdk-origins::Conflicts.cs::Conflicts.HiddenField()::AmazonSimpleNotificationServiceClient#0",
+      "caller": "local/aws-sdk-origins::Conflicts.cs::Conflicts.HiddenField()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Conflicts.cs",
+        "start": 207,
+        "end": 250
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Conflicts.cs::Conflicts.HiddenField()::PublishRequest#0",
+      "caller": "local/aws-sdk-origins::Conflicts.cs::Conflicts.HiddenField()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Conflicts.cs",
+        "start": 291,
+        "end": 339
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Conflicts.cs::Conflicts.HiddenField()::this.client.PublishAsync#0",
+      "caller": "local/aws-sdk-origins::Conflicts.cs::Conflicts.HiddenField()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Conflicts.cs",
+        "start": 266,
+        "end": 340
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Conflicts.cs::Conflicts.Mixed(bool,AmazonSimpleNotificationServiceClient)::AmazonSimpleNotificationServiceClient#0",
+      "caller": "local/aws-sdk-origins::Conflicts.cs::Conflicts.Mixed(bool,AmazonSimpleNotificationServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Conflicts.cs",
+        "start": 484,
+        "end": 527
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Conflicts.cs::Conflicts.UnknownReturn(bool,AmazonSimpleNotificationServiceClient)::Mixed#0",
+      "caller": "local/aws-sdk-origins::Conflicts.cs::Conflicts.UnknownReturn(bool,AmazonSimpleNotificationServiceClient)",
+      "target": "local/aws-sdk-origins::Conflicts.cs::Conflicts.Mixed(bool,AmazonSimpleNotificationServiceClient)",
+      "level": "exact",
+      "span": {
+        "path": "Conflicts.cs",
+        "start": 669,
+        "end": 690
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Conflicts.cs::Conflicts.UnknownReturn(bool,AmazonSimpleNotificationServiceClient)::PublishRequest#0",
+      "caller": "local/aws-sdk-origins::Conflicts.cs::Conflicts.UnknownReturn(bool,AmazonSimpleNotificationServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Conflicts.cs",
+        "start": 726,
+        "end": 774
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Conflicts.cs::Conflicts.UnknownReturn(bool,AmazonSimpleNotificationServiceClient)::client.PublishAsync#0",
+      "caller": "local/aws-sdk-origins::Conflicts.cs::Conflicts.UnknownReturn(bool,AmazonSimpleNotificationServiceClient)",
+      "target": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.AmazonSimpleNotificationServiceClient.PublishAsync(PublishRequest)",
+      "level": "inferred",
+      "span": {
+        "path": "Conflicts.cs",
+        "start": 706,
+        "end": 775
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.cs::ConstructorScope.Use()::PublishRequest#0",
+      "caller": "local/aws-sdk-origins::ConstructorScope.cs::ConstructorScope.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ConstructorScope.cs",
+        "start": 418,
+        "end": 482
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.cs::ConstructorScope.Use()::client.PublishAsync#0",
+      "caller": "local/aws-sdk-origins::ConstructorScope.cs::ConstructorScope.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ConstructorScope.cs",
+        "start": 398,
+        "end": 483
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.cs::ConstructorScope::AmazonSimpleNotificationServiceClient#0",
+      "caller": "local/aws-sdk-origins::ConstructorScope.cs::ConstructorScope",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ConstructorScope.cs",
+        "start": 171,
+        "end": 214
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope.use()::(method_invocation).build#0",
+      "caller": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope.use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ConstructorScope.java",
+        "start": 319,
+        "end": 392
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope.use()::(method_invocation).topicArn#0",
+      "caller": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope.use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ConstructorScope.java",
+        "start": 319,
+        "end": 384
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope.use()::PublishRequest.builder#0",
+      "caller": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope.use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ConstructorScope.java",
+        "start": 319,
+        "end": 343
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope.use()::client.publish#0",
+      "caller": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope.use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ConstructorScope.java",
+        "start": 304,
+        "end": 393
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope::SnsClient.create#0",
+      "caller": "local/aws-sdk-origins::ConstructorScope.java::ConstructorScope",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "ConstructorScope.java",
+        "start": 173,
+        "end": 191
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.Send()::AmazonSimpleNotificationServiceClient#0",
+      "caller": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.Send()",
+      "target": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.AmazonSimpleNotificationServiceClient",
+      "level": "exact",
+      "span": {
+        "path": "HiddenConstructor.cs",
+        "start": 288,
+        "end": 331
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.Send()::PublishRequest#0",
+      "caller": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.Send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "HiddenConstructor.cs",
+        "start": 367,
+        "end": 421
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.Send()::client.PublishAsync#0",
+      "caller": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.Send()",
+      "target": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.AmazonSimpleNotificationServiceClient.PublishAsync(PublishRequest)",
+      "level": "exact",
+      "span": {
+        "path": "HiddenConstructor.cs",
+        "start": 347,
+        "end": 422
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient.create()::SnsClient#0",
+      "caller": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient.create()",
+      "target": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient",
+      "level": "exact",
+      "span": {
+        "path": "HiddenConstructor.java",
+        "start": 218,
+        "end": 233
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()::(method_invocation).build#0",
+      "caller": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "HiddenConstructor.java",
+        "start": 373,
+        "end": 436
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()::(method_invocation).topicArn#0",
+      "caller": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "HiddenConstructor.java",
+        "start": 373,
+        "end": 428
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()::PublishRequest.builder#0",
+      "caller": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "HiddenConstructor.java",
+        "start": 373,
+        "end": 397
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()::SnsClient.create#0",
+      "caller": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()",
+      "target": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient.create()",
+      "level": "exact",
+      "span": {
+        "path": "HiddenConstructor.java",
+        "start": 330,
+        "end": 348
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()::client.publish#0",
+      "caller": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()",
+      "target": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient.publish(PublishRequest)",
+      "level": "exact",
+      "span": {
+        "path": "HiddenConstructor.java",
+        "start": 358,
+        "end": 437
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Mixed.java::Mixed.mixed(boolean,SnsClient)::SnsClient.create#0",
+      "caller": "local/aws-sdk-origins::Mixed.java::Mixed.mixed(boolean,SnsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Mixed.java",
+        "start": 217,
+        "end": 235
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)::(method_invocation).build#0",
+      "caller": "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Mixed.java",
+        "start": 383,
+        "end": 440
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)::(method_invocation).topicArn#0",
+      "caller": "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Mixed.java",
+        "start": 383,
+        "end": 432
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)::PublishRequest.builder#0",
+      "caller": "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Mixed.java",
+        "start": 383,
+        "end": 407
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)::client.publish#0",
+      "caller": "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Mixed.java",
+        "start": 368,
+        "end": 441
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)::mixed#0",
+      "caller": "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)",
+      "target": "local/aws-sdk-origins::Mixed.java::Mixed.mixed(boolean,SnsClient)",
+      "level": "exact",
+      "span": {
+        "path": "Mixed.java",
+        "start": 337,
+        "end": 358
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Declared(IAmazonSQS)::SendMessageRequest#0",
+      "caller": "local/aws-sdk-origins::Origins.cs::Origins.Declared(IAmazonSQS)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.cs",
+        "start": 796,
+        "end": 884
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Declared(IAmazonSQS)::client.SendMessageAsync#0",
+      "caller": "local/aws-sdk-origins::Origins.cs::Origins.Declared(IAmazonSQS)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.cs",
+        "start": 772,
+        "end": 885
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Guessed(object)::PublishRequest#0",
+      "caller": "local/aws-sdk-origins::Origins.cs::Origins.Guessed(object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.cs",
+        "start": 661,
+        "end": 704
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Guessed(object)::client.PublishAsync#0",
+      "caller": "local/aws-sdk-origins::Origins.cs::Origins.Guessed(object)",
+      "target": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.AmazonSimpleNotificationServiceClient.PublishAsync(PublishRequest)",
+      "level": "inferred",
+      "span": {
+        "path": "Origins.cs",
+        "start": 641,
+        "end": 705
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Guessed(object)::unknown.Make#0",
+      "caller": "local/aws-sdk-origins::Origins.cs::Origins.Guessed(object)",
+      "target": "local/aws-sdk-origins::Origins.cs::Origins.Make()",
+      "level": "inferred",
+      "span": {
+        "path": "Origins.cs",
+        "start": 611,
+        "end": 625
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Hidden(AmazonSimpleNotificationServiceClient)::PublishRequest#0",
+      "caller": "local/aws-sdk-origins::Origins.cs::Origins.Hidden(AmazonSimpleNotificationServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.cs",
+        "start": 498,
+        "end": 540
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Hidden(AmazonSimpleNotificationServiceClient)::client.PublishAsync#0",
+      "caller": "local/aws-sdk-origins::Origins.cs::Origins.Hidden(AmazonSimpleNotificationServiceClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.cs",
+        "start": 478,
+        "end": 541
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Make()::AmazonSimpleNotificationServiceClient#0",
+      "caller": "local/aws-sdk-origins::Origins.cs::Origins.Make()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.cs",
+        "start": 203,
+        "end": 246
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Positive()::Make#0",
+      "caller": "local/aws-sdk-origins::Origins.cs::Origins.Positive()",
+      "target": "local/aws-sdk-origins::Origins.cs::Origins.Make()",
+      "level": "exact",
+      "span": {
+        "path": "Origins.cs",
+        "start": 299,
+        "end": 305
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Positive()::PublishRequest#0",
+      "caller": "local/aws-sdk-origins::Origins.cs::Origins.Positive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.cs",
+        "start": 341,
+        "end": 385
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.cs::Origins.Positive()::client.PublishAsync#0",
+      "caller": "local/aws-sdk-origins::Origins.cs::Origins.Positive()",
+      "target": "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.AmazonSimpleNotificationServiceClient.PublishAsync(PublishRequest)",
+      "level": "inferred",
+      "span": {
+        "path": "Origins.cs",
+        "start": 321,
+        "end": 386
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.declared(SqsClient)::(method_invocation).build#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.declared(SqsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 813,
+        "end": 910
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.declared(SqsClient)::(method_invocation).queueUrl#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.declared(SqsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 813,
+        "end": 902
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.declared(SqsClient)::SendMessageRequest.builder#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.declared(SqsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 813,
+        "end": 841
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.declared(SqsClient)::client.sendMessage#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.declared(SqsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 794,
+        "end": 911
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)::(method_invocation).build#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 687,
+        "end": 739
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)::(method_invocation).topicArn#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 687,
+        "end": 731
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)::PublishRequest.builder#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 687,
+        "end": 711
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)::client.publish#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)",
+      "target": "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient.publish(PublishRequest)",
+      "level": "inferred",
+      "span": {
+        "path": "Origins.java",
+        "start": 672,
+        "end": 740
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)::unknown.make#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 648,
+        "end": 662
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.hidden(SnsClient)::(method_invocation).build#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.hidden(SnsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 532,
+        "end": 583
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.hidden(SnsClient)::(method_invocation).topicArn#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.hidden(SnsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 532,
+        "end": 575
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.hidden(SnsClient)::PublishRequest.builder#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.hidden(SnsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 532,
+        "end": 556
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.hidden(SnsClient)::client.publish#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.hidden(SnsClient)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 517,
+        "end": 584
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.make()::SnsClient.create#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.make()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 289,
+        "end": 307
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.positive()::(method_invocation).build#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.positive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 385,
+        "end": 464
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.positive()::(method_invocation).topicArn#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.positive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 385,
+        "end": 456
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.positive()::PublishRequest.builder#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.positive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 385,
+        "end": 409
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.positive()::client.publish#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.positive()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Origins.java",
+        "start": 370,
+        "end": 465
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::Origins.java::Origins.positive()::make#0",
+      "caller": "local/aws-sdk-origins::Origins.java::Origins.positive()",
+      "target": "local/aws-sdk-origins::Origins.java::Origins.make()",
+      "level": "exact",
+      "span": {
+        "path": "Origins.java",
+        "start": 354,
+        "end": 360
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::hidden_constructor.go::hiddenConstructor::aws.String#0",
+      "caller": "local/aws-sdk-origins::hidden_constructor.go::hiddenConstructor",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "hidden_constructor.go",
+        "start": 273,
+        "end": 305
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::hidden_constructor.go::hiddenConstructor::client.Publish#0",
+      "caller": "local/aws-sdk-origins::hidden_constructor.go::hiddenConstructor",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "hidden_constructor.go",
+        "start": 214,
+        "end": 307
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::hidden_constructor.go::hiddenConstructor::context.TODO#0",
+      "caller": "local/aws-sdk-origins::hidden_constructor.go::hiddenConstructor",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "hidden_constructor.go",
+        "start": 229,
+        "end": 243
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::hidden_constructor.go::hiddenConstructor::sns.NewFromConfig#0",
+      "caller": "local/aws-sdk-origins::hidden_constructor.go::hiddenConstructor",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "hidden_constructor.go",
+        "start": 187,
+        "end": 209
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::mixed.go::mixed::sns.NewFromConfig#0",
+      "caller": "local/aws-sdk-origins::mixed.go::mixed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "mixed.go",
+        "start": 212,
+        "end": 234
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::mixed.go::mixedSend::aws.String#0",
+      "caller": "local/aws-sdk-origins::mixed.go::mixedSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "mixed.go",
+        "start": 406,
+        "end": 432
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::mixed.go::mixedSend::client.Publish#0",
+      "caller": "local/aws-sdk-origins::mixed.go::mixedSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "mixed.go",
+        "start": 347,
+        "end": 434
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::mixed.go::mixedSend::context.TODO#0",
+      "caller": "local/aws-sdk-origins::mixed.go::mixedSend",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "mixed.go",
+        "start": 362,
+        "end": 376
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::mixed.go::mixedSend::mixed#0",
+      "caller": "local/aws-sdk-origins::mixed.go::mixedSend",
+      "target": "local/aws-sdk-origins::mixed.go::mixed",
+      "level": "exact",
+      "span": {
+        "path": "mixed.go",
+        "start": 321,
+        "end": 342
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::LocalFactory.makeClient::sns.NewFromConfig#0",
+      "caller": "local/aws-sdk-origins::origins.go::LocalFactory.makeClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 584,
+        "end": 606
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::declared::aws.String#0",
+      "caller": "local/aws-sdk-origins::origins.go::declared",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 876,
+        "end": 938
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::declared::client.SendMessage#0",
+      "caller": "local/aws-sdk-origins::origins.go::declared",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 809,
+        "end": 940
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::declared::context.TODO#0",
+      "caller": "local/aws-sdk-origins::origins.go::declared",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 828,
+        "end": 842
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::guessed::aws.String#0",
+      "caller": "local/aws-sdk-origins::origins.go::guessed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 743,
+        "end": 764
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::guessed::client.Publish#0",
+      "caller": "local/aws-sdk-origins::origins.go::guessed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 684,
+        "end": 766
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::guessed::context.TODO#0",
+      "caller": "local/aws-sdk-origins::origins.go::guessed",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 699,
+        "end": 713
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::guessed::unknown.makeClient#0",
+      "caller": "local/aws-sdk-origins::origins.go::guessed",
+      "target": "local/aws-sdk-origins::origins.go::LocalFactory.makeClient",
+      "level": "inferred",
+      "span": {
+        "path": "origins.go",
+        "start": 659,
+        "end": 679
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::hidden::aws.String#0",
+      "caller": "local/aws-sdk-origins::origins.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 476,
+        "end": 496
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::hidden::client.Publish#0",
+      "caller": "local/aws-sdk-origins::origins.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 417,
+        "end": 498
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::hidden::context.TODO#0",
+      "caller": "local/aws-sdk-origins::origins.go::hidden",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 432,
+        "end": 446
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::makeClient::sns.NewFromConfig#0",
+      "caller": "local/aws-sdk-origins::origins.go::makeClient",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 219,
+        "end": 241
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::positive::aws.String#0",
+      "caller": "local/aws-sdk-origins::origins.go::positive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 352,
+        "end": 374
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::positive::client.Publish#0",
+      "caller": "local/aws-sdk-origins::origins.go::positive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 293,
+        "end": 376
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::positive::context.TODO#0",
+      "caller": "local/aws-sdk-origins::origins.go::positive",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "origins.go",
+        "start": 308,
+        "end": 322
+      }
+    },
+    {
+      "id": "local/aws-sdk-origins::origins.go::positive::makeClient#0",
+      "caller": "local/aws-sdk-origins::origins.go::positive",
+      "target": "local/aws-sdk-origins::origins.go::makeClient",
+      "level": "exact",
+      "span": {
+        "path": "origins.go",
+        "start": 276,
+        "end": 288
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::sns::positive",
+      "site": "local/aws-sdk-origins::Origins.cs::Origins.Positive()::client.PublishAsync#0"
+    },
+    {
+      "contract": "channel::sns::positive",
+      "site": "local/aws-sdk-origins::Origins.java::Origins.positive()::client.publish#0"
+    },
+    {
+      "contract": "channel::sns::positive",
+      "site": "local/aws-sdk-origins::origins.go::positive::client.Publish#0"
+    },
+    {
+      "contract": "channel::sqs::declared",
+      "site": "local/aws-sdk-origins::Origins.cs::Origins.Declared(IAmazonSQS)::client.SendMessageAsync#0"
+    },
+    {
+      "contract": "channel::sqs::declared",
+      "site": "local/aws-sdk-origins::Origins.java::Origins.declared(SqsClient)::client.sendMessage#0"
+    },
+    {
+      "contract": "channel::sqs::declared",
+      "site": "local/aws-sdk-origins::origins.go::declared::client.SendMessage#0"
+    }
+  ],
+  "consumers": [],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/aws-sdk-origins::Conflicts.cs::Conflicts.Mixed(bool,AmazonSimpleNotificationServiceClient)",
+        "local/aws-sdk-origins::Conflicts.cs::Conflicts.UnknownReturn(bool,AmazonSimpleNotificationServiceClient)",
+        "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.AmazonSimpleNotificationServiceClient.PublishAsync(PublishRequest)",
+        "local/aws-sdk-origins::Origins.cs::Origins.Guessed(object)",
+        "local/aws-sdk-origins::Origins.cs::Origins.Make()",
+        "local/aws-sdk-origins::Origins.cs::Origins.Positive()"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.AmazonSimpleNotificationServiceClient",
+        "local/aws-sdk-origins::HiddenConstructor.cs::HiddenConstructor.Send()"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient",
+        "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient.create()",
+        "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.SnsClient.publish(PublishRequest)",
+        "local/aws-sdk-origins::HiddenConstructor.java::HiddenConstructor.send()",
+        "local/aws-sdk-origins::Origins.java::Origins.guessed(Object)"
+      ]
+    },
+    {
+      "name": ".#4",
+      "members": [
+        "local/aws-sdk-origins::Mixed.java::Mixed.mixed(boolean,SnsClient)",
+        "local/aws-sdk-origins::Mixed.java::Mixed.send(boolean,SnsClient)"
+      ]
+    },
+    {
+      "name": ".#5",
+      "members": [
+        "local/aws-sdk-origins::Origins.java::Origins.make()",
+        "local/aws-sdk-origins::Origins.java::Origins.positive()"
+      ]
+    },
+    {
+      "name": ".#6",
+      "members": [
+        "local/aws-sdk-origins::mixed.go::mixed",
+        "local/aws-sdk-origins::mixed.go::mixedSend"
+      ]
+    },
+    {
+      "name": ".#7",
+      "members": [
+        "local/aws-sdk-origins::origins.go::LocalFactory.makeClient",
+        "local/aws-sdk-origins::origins.go::guessed"
+      ]
+    },
+    {
+      "name": ".#8",
+      "members": [
+        "local/aws-sdk-origins::origins.go::makeClient",
+        "local/aws-sdk-origins::origins.go::positive"
+      ]
+    }
+  ],
+  "links": []
+}

@@ -1,14 +1,21 @@
 import { parseExport } from './core';
 
 interface Community { name: string; members: string[] }
-interface Side { contract: string | null; site: string }
+interface Side { contract: string | null; site: string; at?: string; root?: string }
+interface Execution { workload: string; root: string; repository: string; path: string; level: string; reason: string }
 interface Link {
   consumer: string; provider: string; contract: string; level: string; reason: string;
+  root?: string;
   by?: string; p?: number; drift?: { missing?: Record<string, string>; unchecked?: Record<string, string> };
 }
+interface Provisioner { contract: string; node: string; root: string }
+interface Provision {
+  side: string; provisioner: string; root: string; contract: string; level: string; reason: string; at?: string;
+}
+interface ConfigUse { contract: string; site: string; at: string }
 interface Stale { call: string; target: string; cause: string }
-interface Export { repository: string; communities?: Community[]; providers: Side[]; consumers: Side[]; links: Link[]; stale_decisions?: Stale[] }
-interface Contract { contract: string; providers: string[]; consumers: string[] }
+interface Export { repository: string; communities?: Community[]; providers: Side[]; consumers: Side[]; links: Link[]; stale_decisions?: Stale[]; provisioners?: Provisioner[]; provisions?: Provision[]; uses?: ConfigUse[]; executions?: Execution[] }
+interface Contract { contract: string; providers: string[]; consumers: string[]; provisioners?: string[]; uses?: string[] }
 
 /** parseExport checks every field with the release's Rust types before any model is built. */
 export function graphModel(text: string) {
@@ -22,10 +29,46 @@ export function graphModel(text: string) {
         row = { contract: entry.contract, providers: [], consumers: [] };
         contracts.set(entry.contract, row);
       }
-      row[side].push(entry.site);
+      const location = entry.at ? `${entry.site} (${entry.at})` : entry.site;
+      row[side].push(entry.root ? `${location} (root ${entry.root})` : location);
+    }
+  }
+  for (const entry of data.uses ?? []) {
+    let row = contracts.get(entry.contract);
+    if (!row) {
+      row = { contract: entry.contract, providers: [], consumers: [] };
+      contracts.set(entry.contract, row);
+    }
+    (row.uses ??= []).push(`${entry.site} ${entry.at}`);
+  }
+  for (const entry of data.provisioners ?? []) {
+    let row = contracts.get(entry.contract);
+    if (!row) {
+      row = { contract: entry.contract, providers: [], consumers: [] };
+      contracts.set(entry.contract, row);
+    }
+    (row.provisioners ??= []).push(`${entry.node} (root ${entry.root})`);
+  }
+  for (const entry of data.provisions ?? []) {
+    let row = contracts.get(entry.contract);
+    if (!row) {
+      row = { contract: entry.contract, providers: [], consumers: [] };
+      contracts.set(entry.contract, row);
+    }
+    const place = `${entry.provisioner} (root ${entry.root})`;
+    const provisioners = row.provisioners ??= [];
+    if (!provisioners.includes(place)) provisioners.push(place);
+    if (entry.at) {
+      const uses = row.uses ??= [];
+      const use = `${entry.side} ${entry.at}`;
+      if (!uses.includes(use)) uses.push(use);
     }
   }
   return {
+    images: data.links.filter(link => link.contract.startsWith('image::')),
+    alerts: data.links.filter(link => link.contract.startsWith('alert::')),
+    executions: data.executions ?? [],
+    provisions: data.provisions ?? [],
     repository: data.repository,
     communities: data.communities ?? [],
     contracts: [...contracts.values()].sort((a, b) => a.contract < b.contract ? -1 : a.contract > b.contract ? 1 : 0),

@@ -1,0 +1,21 @@
+example.com/acme/deploy deployment.yaml:1-14 Deployment.apps/shop/orders
+type: Deployment
+name: "orders"
+root: .
+overridable: none
+references: none
+referenced by: none
+images:
+orders: ghcr.io/acme/orders:v2
+migration: ghcr.io/acme/orders@sha256:abc
+values:
+example.com/acme/deploy deployment.yaml:1 apiVersion = "apps/v1"
+example.com/acme/deploy deployment.yaml:2 kind = "Deployment"
+example.com/acme/deploy deployment.yaml:4 metadata.name = "orders"
+example.com/acme/deploy deployment.yaml:5 metadata.namespace = "shop"
+example.com/acme/deploy deployment.yaml:10 spec.template.spec.containers[0].name = "orders"
+example.com/acme/deploy deployment.yaml:11 spec.template.spec.containers[0].image = "ghcr.io/acme/orders:v2"
+example.com/acme/deploy deployment.yaml:13 spec.template.spec.initContainers[0].name = "migration"
+example.com/acme/deploy deployment.yaml:14 spec.template.spec.initContainers[0].image = "ghcr.io/acme/orders@sha256:abc"
+image: image::ghcr.io/acme/orders
+  builder: example.com/acme/app [exact: image::ghcr.io/acme/orders]

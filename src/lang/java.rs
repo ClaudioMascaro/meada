@@ -168,6 +168,7 @@ struct Visit<'t> {
     interface: bool,
     visible: bool,
     definitions: bool,
+    returning: bool,
     depth: usize,
     /// The type parameters declared around the node: a type they name is no class.
     generics: Rc<Vec<String>>,
@@ -201,12 +202,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
         interface: false,
         visible: true,
         definitions: true,
+        returning: false,
         depth: 0,
         generics: Rc::new(Vec::new()),
     }];
     // The fields by declaring scope: a local is hidden by those of its class or an enclosing one.
     let mut fields: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut locals = Vec::new();
+    let mut returned: BTreeMap<String, Vec<Value>> = BTreeMap::new();
     // The types declared so far: a local whose scope is one sits in an initializer.
     let mut classes = BTreeSet::new();
     // Initializer calls of `var` locals (by `Class::Result` place) and chained calls (by place
@@ -225,7 +228,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // The locals declared with an initializer, and every name the file assigns: a local the
     // file assigns holds no one value, so its bound is dropped (`Facts::bound`).
     let mut initialized: Vec<Bound> = Vec::new();
-    let mut reassigned: BTreeSet<String> = BTreeSet::new();
+    let mut reassigned: Vec<(String, String)> = Vec::new();
     let mut seen = Declared::new(tree.root_node());
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
@@ -234,6 +237,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         interface,
         visible,
         definitions,
+        mut returning,
         depth,
         mut generics,
     }) = stack.pop()
@@ -253,6 +257,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 matches!(p.kind(), "object_creation_expression" | "enum_constant")
             });
         let defining = definitions && !anonymous && depth < DEFINITION_DEPTH;
+        if anonymous || node.kind() == "lambda_expression" {
+            returning = false;
+        }
         let kind = match node.kind() {
             "class_declaration"
             | "interface_declaration"
@@ -265,6 +272,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             _ => None,
         };
         if let Some(kind) = kind.filter(|_| defining) {
+            returning = kind == Kind::Method;
             let Some(name) = node.child_by_field_name("name") else {
                 continue;
             };
@@ -458,6 +466,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
         }
         match node.kind() {
+            "return_statement" if returning && definitions => {
+                if let Some(expression) = named(node).next() {
+                    returned
+                        .entry(scope.as_ref().clone())
+                        .or_default()
+                        .push(value(expression, src, 0));
+                }
+            }
             "method_invocation" => {
                 let mut at = call(&scope, callee(node, src), node.byte_range());
                 if !definitions && at.callee.starts_with("this.") {
@@ -647,7 +663,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     _ => named(node).next(),
                 };
                 if let Some(n) = left.filter(|n| n.kind() == "identifier") {
-                    reassigned.insert(text(n, src).to_string());
+                    reassigned.push((scope.as_ref().clone(), text(n, src).to_string()));
                 }
                 let write = match left {
                     Some(n) if n.kind() == "identifier" => {
@@ -730,10 +746,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 interface: in_interface,
                 visible: public,
                 definitions: definitions && !anonymous && (kind.is_none() || defining),
+                returning,
                 depth: nested,
                 generics: generics.clone(),
             });
         }
+    }
+    for def in &mut facts.defs {
+        def.return_values = returned.remove(&def.name).unwrap_or_default();
     }
     // A `final` field holds the one value its initializer or a constructor gives it: a constant
     // of the class, which no static context reads (it is no `statics`). Two values give none.
@@ -778,18 +798,53 @@ fn parse(src: &[u8]) -> Result<Facts> {
         facts.calls[outer].on = call_at(&inner);
     }
     // A local is bound to its initializer when it is the one binding of its name in its
-    // definition, no field of an enclosing class shares the name and the file never assigns it.
+    // definition, no field of an enclosing class shares the name and its binding is never assigned.
     let mut declared: BTreeMap<(&str, &str), usize> = BTreeMap::new();
     for local in &locals {
         *declared.entry((&local.scope, &local.name)).or_default() += 1;
     }
+    let bindings: BTreeSet<(&str, &str)> = declared
+        .keys()
+        .copied()
+        .chain(
+            facts
+                .defs
+                .iter()
+                .flat_map(|d| d.params.iter().map(|p| (d.name.as_str(), p.name.as_str()))),
+        )
+        .chain(fields.iter().flat_map(|(name, scopes)| {
+            scopes
+                .iter()
+                .map(move |scope| (scope.as_str(), name.as_str()))
+        }))
+        .collect();
+    // A bare write whose binding is not known stays conservative by spelling. Dropping
+    // it would prove an initializer unchanged from incomplete assignment knowledge.
+    let mut unknown_writes = BTreeSet::new();
+    let reassigned: BTreeSet<(String, String)> = reassigned
+        .into_iter()
+        .filter_map(|(scope, name)| {
+            let mut at = scope.as_str();
+            loop {
+                if bindings.contains(&(at, name.as_str())) {
+                    return Some((at.to_string(), name));
+                }
+                if at.is_empty() {
+                    unknown_writes.insert(name);
+                    return None;
+                }
+                at = crate::parent(at);
+            }
+        })
+        .collect();
     let field_hides = |name: &str, scope: &str| {
         (fields.get(name)).is_some_and(|at| at.iter().any(|at| encloses(at, scope)))
     };
     facts.bound = (initialized.into_iter())
         .filter(|b| {
             declared.get(&(b.scope.as_str(), b.name.as_str())) == Some(&1)
-                && !reassigned.contains(&b.name)
+                && !reassigned.contains(&(b.scope.clone(), b.name.clone()))
+                && !unknown_writes.contains(&b.name)
                 && !field_hides(&b.name, &b.scope)
         })
         .collect();

@@ -93,7 +93,7 @@
 - `jvm/spring.rs` (spec #26, #89): `PLACEHOLDER_DEPTH` (32) bounds how many keys deep a
   placeholder is resolved, a cycle included, and `PLACEHOLDER_BUDGET` (64 KiB) what one value
   may cost (each placeholder visited, each byte copied); past either the rest is an unknown
-  part. The YAML file goes through the provider documents' reader (`document/yaml.rs`), with its
+  part. The YAML file goes through the event reader (`document/events.rs`), with its
   budget and nesting limit; a `.properties` file is bounded by `lang::MAX_BYTES` like every pack
   config. A same-package `System` type in another file is not seen by the Java pack's
   `getenv`.

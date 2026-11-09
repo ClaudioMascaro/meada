@@ -26,8 +26,12 @@
   which stands for the package (`Modules::dir`: a `replace` of the importing file's module,
   none when it is by a module from outside, else the longest module path of the repository, a
   directory its module owns), and `shared` with the files of each directory and
-  `Facts::package`.
-- `resolve.rs`: the shared resolution behind the adapter. `Resolver` connects calls to definitions
+  `Facts::package`. A stable first binding of a multiple-result call is not a scalar
+  constant. `Facts::first_results` retains its scope/name and exact call range only in full
+  facts/value caches, after the same single-binding and assignment guards. The shared SDK
+  walk asks `Code::first_result`, which checks the nearest lexical binding before following
+  that exact call; ordinary value folding does not use this evidence.
+- `resolve.rs`, `resolve/mutations.rs`: shared resolution and scoped selector effects behind the adapter. `Resolver` connects calls to definitions
   (scope, imports, re-exports, `this.method`, member chains) and gives each a `Resolution`. A name may be
   bound by several imports (the latest in source order decides, whatever it resolves to), a
   callee may start with a dotted import, and an `Imported::All` import counts as one binding
@@ -132,3 +136,14 @@
   summaries are loaded; changing any build/settings file refreshes the same workspace links.
   The summary also keeps the source roots (`roots`, with the test ones in `test_roots`), so an
   edit to a Gradle `sourceSets` directory changes which provider classes an import reaches.
+
+
+`Code::constant_value` also recognizes a once-assigned class attribute, as the value-origin
+walk does. `Code::param_values` supplies complete exact-caller arguments or a selected call
+frame, including a declared default for an omitted argument; a missing argument stays unknown.
+Strict constructor readers use this seam without changing the legacy `param_args` policy.
+
+`Code::coroutine` exposes a definition's coroutine fact to strict readers. Python factory
+frames retain complete constructor evidence for ordinary and awaited parameter values,
+keyed by the function and those values, so shared parameter-return lattices are not expanded
+once per route. Each receiver question has its own memo and existing evaluation bounds.

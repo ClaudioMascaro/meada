@@ -1,0 +1,3 @@
+example.com/acme/app (.) indexed, 1 files
+  config files: 5 read, 2 skipped (lockfiles: 1, unreadable: 1); values: 46, redacted: 3
+  wrong conclusion? report it: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml

@@ -1,0 +1,10 @@
+resource "aws_sns_topic" "topic" { name = "arn:aws:sns:us-east-1:123456789012:alerts" }
+resource "aws_cloudwatch_event_bus" "bus" { name = "arn:aws:events:us-east-1:123456789012:event-bus/events" }
+resource "aws_kinesis_stream" "stream" { name = "arn:aws:kinesis:us-east-1:123456789012:stream/records" }
+resource "aws_dynamodb_table" "table" { name = "arn:aws:dynamodb:us-east-1:123456789012:table/orders" }
+resource "aws_db_instance" "database" { identifier = "arn:aws:rds:us-east-1:123456789012:db:orders-db" }
+resource "aws_rds_cluster" "database_cluster" { cluster_identifier = "arn:aws:rds:us-east-1:123456789012:cluster:orders-cluster" }
+resource "aws_elasticache_cluster" "cache" { cluster_id = "arn:aws:elasticache:us-east-1:123456789012:cluster:orders-cache" }
+resource "aws_elasticache_replication_group" "cache_group" { replication_group_id = "arn:aws:elasticache:us-east-1:123456789012:replicationgroup:orders-group" }
+resource "aws_ssm_parameter" "parameter" { name = "arn:aws:ssm:us-east-1:123456789012:parameter/orders/token" }
+resource "aws_secretsmanager_secret" "secret" { name = "arn:aws:secretsmanager:us-east-1:123456789012:secret:orders/token-Ab12Cd" }

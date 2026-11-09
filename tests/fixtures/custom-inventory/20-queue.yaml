@@ -1,0 +1,10 @@
+apiVersion: sqs.aws.upbound.io/v1beta1
+kind: Queue
+metadata:
+  name: operator-20
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: xp-parcels
+spec:
+  forProvider:
+    region: us-east-1

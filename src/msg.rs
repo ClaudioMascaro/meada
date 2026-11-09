@@ -28,6 +28,19 @@ const REPORT_URL: &str =
     "https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml";
 
 pub enum Msg<'a> {
+    OrphanAlert {
+        contract: &'a str,
+        place: &'a str,
+        emitter: bool,
+    },
+    AlertSummaryLimit(&'a str),
+    AlertLinkLimit,
+    AlertMatchLimit,
+    OrphanCounterpart {
+        contract: &'a str,
+        place: &'a str,
+        builder: bool,
+    },
     NotIndexed,
     OtherVersion,
     Indexed(i64),
@@ -115,8 +128,31 @@ pub enum Msg<'a> {
     },
     ViaFallback(&'a str),
     UnlinkedResource(&'a str),
+    OrphanProvisioner {
+        contract: &'a str,
+        place: &'a str,
+    },
+    OrphanUse {
+        contract: &'a str,
+        place: &'a str,
+    },
     /// The missing reads of the repository's consumers against the routes they call (spec #23).
     Drift(usize),
+    /// The config files of a repository (#639): read, skipped as lockfiles or as unreadable,
+    /// and the values they hold and redact.
+    ConfigFiles {
+        read: usize,
+        lockfiles: usize,
+        unreadable: usize,
+        values: usize,
+        redacted: usize,
+    },
+    /// The Kustomize entries of a repository that were not followed (#651): in all, and the
+    /// remote ones among them.
+    KustomizeUnresolved {
+        count: usize,
+        remote: usize,
+    },
     /// The line for the human at the end of a repository's status when it holds a drift or an
     /// `inferred` link: where a wrong conclusion goes.
     ReportHint,
@@ -146,6 +182,14 @@ pub enum Msg<'a> {
     BackstageProxyTarget {
         endpoint: &'a str,
         calls: usize,
+    },
+    /// A Backstage `$include` of an `app-config*.yaml` or of a file it includes (#689) that is not
+    /// followed: the file it is written in, the include as written and why. The keys under it
+    /// stay unread.
+    BackstageInclude {
+        file: &'a str,
+        include: &'a str,
+        reason: crate::http::IncludeReason,
     },
     DocumentUnreadable {
         path: &'a str,
@@ -1769,10 +1813,73 @@ impl Msg<'_> {
                 format!("{contract} sem ligação: nenhum escritor e leitor em repositórios diferentes"),
                 format!("{contract} sin vínculo: ningún escritor y lector en repositorios diferentes"),
             ),
+            Msg::OrphanProvisioner { contract, place } => pick(
+                format!("orphan {contract}: no use; {place}"),
+                format!("órfão {contract}: nenhum uso; {place}"),
+                format!("huérfano {contract}: ningún uso; {place}"),
+            ),
+            Msg::OrphanUse { contract, place } => pick(
+                format!("orphan {contract}: no provisioner; {place}"),
+                format!("órfão {contract}: nenhum provisionador; {place}"),
+                format!("huérfano {contract}: ningún provisionador; {place}"),
+            ),
+            Msg::OrphanAlert { contract, place, emitter } => {
+                let (en, pt, es) = if *emitter { ("emitter", "emissor", "emisor") } else { ("matcher", "matcher", "matcher") };
+                pick(format!("orphan {contract}: no {en}; {place}"), format!("órfão {contract}: nenhum {pt}; {place}"), format!("huérfano {contract}: ningún {es}; {place}"))
+            },
+            Msg::AlertMatchLimit => pick(
+                "alert routing skipped: evaluation limit".into(),
+                "roteamento de alertas ignorado: limite de avaliação".into(),
+                "enrutamiento de alertas omitido: límite de evaluación".into(),
+            ),
+            Msg::AlertLinkLimit => pick(
+                "alert routing skipped: link output limit".into(),
+                "roteamento de alertas ignorado: limite da saída de links".into(),
+                "enrutamiento de alertas omitido: límite de la salida de enlaces".into(),
+            ),
+            Msg::AlertSummaryLimit(path) => pick(
+                format!("alert file skipped: {path} (summary limit)"),
+                format!("arquivo de alertas ignorado: {path} (limite do resumo)"),
+                format!("archivo de alertas omitido: {path} (límite del resumen)"),
+            ),
+            Msg::OrphanCounterpart { contract, place, builder } => {
+                let (en, pt, es) = if *builder { ("builder", "construtor", "constructor") } else { ("runner", "executor", "ejecutor") };
+                pick(format!("orphan {contract}: no {en}; {place}"), format!("órfão {contract}: nenhum {pt}; {place}"), format!("huérfano {contract}: ningún {es}; {place}"))
+            },
             Msg::Drift(n) => pick(
                 format!("shape drift, missing reads: {n}"),
                 format!("drift de formato, leituras ausentes: {n}"),
                 format!("drift de formato, lecturas ausentes: {n}"),
+            ),
+            Msg::ConfigFiles {
+                read,
+                lockfiles,
+                unreadable,
+                values,
+                redacted,
+            } => {
+                let skipped = lockfiles + unreadable;
+                pick(
+                    format!(
+                        "config files: {read} read, {skipped} skipped (lockfiles: {lockfiles}, \
+                         unreadable: {unreadable}); values: {values}, redacted: {redacted}"
+                    ),
+                    format!(
+                        "arquivos de configuração: {read} lidos, {skipped} ignorados \
+                         (lockfiles: {lockfiles}, ilegíveis: {unreadable}); valores: {values}, \
+                         ocultados: {redacted}"
+                    ),
+                    format!(
+                        "archivos de configuración: {read} leídos, {skipped} omitidos \
+                         (lockfiles: {lockfiles}, ilegibles: {unreadable}); valores: {values}, \
+                         ocultados: {redacted}"
+                    ),
+                )
+            }
+            Msg::KustomizeUnresolved { count, remote } => pick(
+                format!("kustomize entries not followed: {count} (remote, never fetched: {remote})"),
+                format!("entradas do kustomize não seguidas: {count} (remotas, nunca baixadas: {remote})"),
+                format!("entradas de kustomize no seguidas: {count} (remotas, nunca descargadas: {remote})"),
             ),
             Msg::ReportHint => pick(
                 format!("wrong conclusion? report it: {REPORT_URL}"),
@@ -1804,6 +1911,77 @@ impl Msg<'_> {
                 format!("endpoint de proxy do Backstage {endpoint}: seu target ou o caminho que ele recebe não é lido (um target que não é ${{VAR}} nem uma URL http(s), um pathRewrite que faz mais que tirar o endpoint, ignorePath, prependPath, ou arquivos app-config que divergem), então {calls} chamada(s) por ele ficam sem ligação"),
                 format!("endpoint de proxy de Backstage {endpoint}: su target o la ruta que recibe no se lee (un target que no es ${{VAR}} ni una URL http(s), un pathRewrite que hace más que quitar el endpoint, ignorePath, prependPath, o archivos app-config que difieren), así que {calls} llamada(s) por él quedan sin enlace"),
             ),
+            Msg::BackstageInclude {
+                file,
+                include,
+                reason,
+            } => {
+                use crate::http::IncludeReason as R;
+                let (depth, count) = (crate::http::INCLUDE_DEPTH, crate::http::INCLUDES);
+                let mib = crate::lang::MAX_BYTES >> 20;
+                let words = |(en, pt, es): (&str, &str, &str)| (en.into(), pt.into(), es.into());
+                let (en, pt, es): (String, String, String) = match reason {
+                    R::Absolute => words(("an absolute path", "caminho absoluto", "ruta absoluta")),
+                    R::Outside => words((
+                        "a path that leaves the repository",
+                        "caminho que sai do repositório",
+                        "ruta que sale del repositorio",
+                    )),
+                    R::Variable => words(("a ${ in the path", "${ no caminho", "${ en la ruta")),
+                    R::Extension => words((
+                        "not a .json, .yaml or .yml file",
+                        "não é arquivo .json, .yaml ou .yml",
+                        "no es archivo .json, .yaml o .yml",
+                    )),
+                    R::Symlink => words(("a symbolic link", "link simbólico", "enlace simbólico")),
+                    R::Missing => words((
+                        "no such file, or one ignored or hidden",
+                        "arquivo inexistente, ignorado ou oculto",
+                        "archivo inexistente, ignorado u oculto",
+                    )),
+                    R::Unreadable => words((
+                        "a file that does not parse",
+                        "arquivo que não se lê",
+                        "archivo que no se lee",
+                    )),
+                    R::KeyPath => words((
+                        "a key path the file does not hold",
+                        "caminho de chave que o arquivo não tem",
+                        "ruta de clave que el archivo no tiene",
+                    )),
+                    R::Sibling => words((
+                        "another key beside $include",
+                        "outra chave ao lado de $include",
+                        "otra clave junto a $include",
+                    )),
+                    R::NotPath => words((
+                        "a value that is not a path",
+                        "valor que não é caminho",
+                        "valor que no es ruta",
+                    )),
+                    R::Cycle => words(("a cycle", "ciclo", "ciclo")),
+                    R::Depth => (
+                        format!("deeper than {depth} includes"),
+                        format!("mais fundo que {depth} includes"),
+                        format!("más hondo que {depth} includes"),
+                    ),
+                    R::Count => (
+                        format!("more than {count} includes from one root"),
+                        format!("mais de {count} includes a partir de uma raiz"),
+                        format!("más de {count} includes desde una raíz"),
+                    ),
+                    R::Size => (
+                        format!("past {mib} MiB of included files"),
+                        format!("mais de {mib} MiB de arquivos incluídos"),
+                        format!("más de {mib} MiB de archivos incluidos"),
+                    ),
+                };
+                pick(
+                    format!("{file}: Backstage $include {include} not followed ({en}): the keys under it stay unread"),
+                    format!("{file}: $include do Backstage {include} não seguido ({pt}): as chaves sob ele ficam sem leitura"),
+                    format!("{file}: $include de Backstage {include} no seguido ({es}): las claves bajo él quedan sin leer"),
+                )
+            }
             Msg::DocumentUnreadable { path, line, error } => pick(
                 format!("{path}:{line}: unreadable document ({error}), ignored"),
                 format!("{path}:{line}: documento ilegível ({error}), ignorado"),

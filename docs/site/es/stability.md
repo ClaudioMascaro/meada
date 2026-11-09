@@ -75,7 +75,7 @@ Todas las tablas y claves. Una clave desconocida es un error, con el archivo, la
 | `[[resource]]` | `kind` | texto, obligatorio | Identificador en minúsculas (letras, dígitos y guiones, empezando por letra). |
 | `[[resource]]` | `id` | texto, obligatorio | No vacío. |
 | `[[resource]]` | `role` | texto, obligatorio | `read`, `write` o `read-write`. |
-| `[[resource]]` | `via` | lista de textos, opcional | Símbolos que hacen el acceso, como `<ruta>::<nombre calificado>`. |
+| `[[resource]]` | `via` | lista de textos, opcional | Símbolos (`<ruta>::<nombre calificado>`), direcciones IaC o `<archivo>#<clave>`, con selectores `[clave=valor]`. |
 
 Consulta la [configuración](configuration.md).
 

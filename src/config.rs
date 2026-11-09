@@ -27,6 +27,8 @@ pub struct Config {
     /// by default a test's router or fake upstream is no provider of the repository.
     #[serde(default)]
     pub test_routes: bool,
+    #[serde(default)]
+    pub(crate) iac: crate::iac::mapping::Config,
 }
 
 #[derive(Deserialize, Clone)]

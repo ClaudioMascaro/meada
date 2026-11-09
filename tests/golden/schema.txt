@@ -21,7 +21,7 @@ CREATE INDEX candidates_call ON candidates (call);
 CREATE INDEX candidates_target ON candidates (target);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
-    method TEXT, fragments TEXT, shape TEXT
+    method TEXT, fragments TEXT, shape TEXT, identity TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (
@@ -33,12 +33,76 @@ CREATE TABLE manifests (
     summary TEXT NOT NULL
 );
 CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+CREATE INDEX exports_path ON exports (path);
 CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
 CREATE TABLE entry_points (identity TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, site TEXT NOT NULL);
 CREATE TABLE communities (name TEXT NOT NULL, member TEXT NOT NULL);
 CREATE INDEX communities_member ON communities (member);
 CREATE TABLE valued (path TEXT PRIMARY KEY);
+CREATE TABLE config_files (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL
+);
+CREATE TABLE contract_configs (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    summary TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE config_values (
+    id INTEGER PRIMARY KEY, path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
+    cut INTEGER NOT NULL, folded_key TEXT NOT NULL, folded_value TEXT
+);
+CREATE INDEX config_values_path ON config_values (path);
+CREATE INDEX config_values_folded_key ON config_values (folded_key);
+CREATE INDEX config_values_folded_value ON config_values (folded_value);
+CREATE VIRTUAL TABLE config_search USING fts5(
+    folded_key, folded_value, content='config_values', content_rowid='id',
+    tokenize='trigram case_sensitive 1'
+);
+CREATE TABLE iac_nodes (
+    address TEXT NOT NULL, root TEXT NOT NULL, type TEXT NOT NULL, name TEXT,
+    pattern INTEGER NOT NULL, overridable TEXT NOT NULL, path TEXT NOT NULL,
+    line INTEGER NOT NULL, end_line INTEGER NOT NULL, block TEXT NOT NULL,
+    image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
+    handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
+    subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
+    ingress TEXT NOT NULL, routes TEXT NOT NULL
+);
+CREATE INDEX iac_nodes_address ON iac_nodes (address);
+CREATE INDEX iac_nodes_path ON iac_nodes (path);
+CREATE TABLE iac_references (
+    root TEXT NOT NULL, source TEXT NOT NULL, target TEXT NOT NULL, via TEXT
+);
+CREATE INDEX iac_references_source ON iac_references (root, source);
+CREATE INDEX iac_references_target ON iac_references (root, target);
+CREATE TABLE iac_images (
+    root TEXT NOT NULL, address TEXT NOT NULL, container TEXT NOT NULL, image TEXT NOT NULL
+);
+CREATE INDEX iac_images_address ON iac_images (root, address);
+CREATE TABLE iac_unresolved (
+    root TEXT NOT NULL, path TEXT NOT NULL, entry TEXT NOT NULL, reason TEXT NOT NULL
+);
+
+receiver_identity
+[
+  {
+    "kind": "subscription",
+    "parts": [
+      {
+        "Literal": "orders"
+      },
+      {
+        "Environment": "SUBSCRIPTION"
+      }
+    ]
+  },
+  {
+    "kind": "entity",
+    "parts": [
+      "Unresolved"
+    ]
+  }
+]
 
 sample.ts
 {
@@ -125,6 +189,16 @@ sample.ts
       },
       "params": [],
       "hash": "a8dcd98b64ed70e3783cb0e922c13cef23fdf485e138e2d7c1d274d56c21ec21"
+    },
+    {
+      "name": "publishAws",
+      "kind": "Function",
+      "range": {
+        "start": 1144,
+        "end": 1232
+      },
+      "params": [],
+      "hash": "b43725bd799c67fe1d55d935d0074e46ffb5a576dfeeae9bcccebcb32cd50fbb"
     }
   ],
   "imports": [
@@ -152,6 +226,20 @@ sample.ts
       "source": "./helper",
       "name": {
         "Name": "helper"
+      }
+    },
+    {
+      "local": "SNSClient",
+      "source": "@aws-sdk/client-sns",
+      "name": {
+        "Name": "SNSClient"
+      }
+    },
+    {
+      "local": "PublishCommand",
+      "source": "@aws-sdk/client-sns",
+      "name": {
+        "Name": "PublishCommand"
       }
     }
   ],
@@ -270,6 +358,30 @@ sample.ts
         "start": 1039,
         "end": 1047
       }
+    },
+    {
+      "scope": "",
+      "callee": "SNSClient",
+      "range": {
+        "start": 1125,
+        "end": 1142
+      }
+    },
+    {
+      "scope": "publishAws",
+      "callee": "sdk.send",
+      "range": {
+        "start": 1170,
+        "end": 1229
+      }
+    },
+    {
+      "scope": "publishAws",
+      "callee": "PublishCommand",
+      "range": {
+        "start": 1179,
+        "end": 1228
+      }
     }
   ],
   "consts": [
@@ -284,6 +396,9 @@ sample.ts
     },
     {
       "name": "Rows"
+    },
+    {
+      "name": "sdk"
     }
   ],
   "locals": [
@@ -294,7 +409,14 @@ sample.ts
     "serve.item",
     "serve.error"
   ],
-  "receivers": []
+  "receivers": [],
+  "member_writes": [],
+  "loops": [
+    {
+      "start": 664,
+      "end": 724
+    }
+  ]
 }
 
 sample.py
@@ -421,6 +543,32 @@ sample.py
       },
       "params": [],
       "hash": "2c420469e96e5a133f3c28d89693ba5ecdfe3386b2e57d59bd9368a09283e62a"
+    },
+    {
+      "name": "maybe_client",
+      "kind": "Function",
+      "range": {
+        "start": 922,
+        "end": 993
+      },
+      "params": [
+        {
+          "name": "flag",
+          "binds": "Any"
+        }
+      ],
+      "hash": "95d4e130cecc70c231d27979b2ddec7c87b36c3de4706462e15cdf955434a510"
+    },
+    {
+      "name": "async_client",
+      "kind": "Function",
+      "range": {
+        "start": 996,
+        "end": 1055
+      },
+      "params": [],
+      "asynchronous": true,
+      "hash": "8f83f261b35ddaff0b278c2a2a4841f86717135464d787da6a7ef09408b95bfe"
     }
   ],
   "imports": [
@@ -466,6 +614,18 @@ sample.py
     }
   ],
   "exports": [
+    {
+      "Local": {
+        "exported": "async_client",
+        "local": "async_client"
+      }
+    },
+    {
+      "Local": {
+        "exported": "maybe_client",
+        "local": "maybe_client"
+      }
+    },
     {
       "All": {
         "source": ".extras"
@@ -611,6 +771,23 @@ sample.py
         "start": 795,
         "end": 806
       }
+    },
+    {
+      "scope": "maybe_client",
+      "callee": "Client",
+      "range": {
+        "start": 974,
+        "end": 982
+      }
+    },
+    {
+      "scope": "async_client",
+      "callee": "helpers.client",
+      "awaited": true,
+      "range": {
+        "start": 1039,
+        "end": 1055
+      }
     }
   ],
   "consts": [
@@ -700,6 +877,26 @@ sample.py
       "name": "shape",
       "class": {
         "Named": "Circle"
+      }
+    }
+  ],
+  "member_writes": [
+    {
+      "scope": "Circle.__init__",
+      "object": "self",
+      "field": "radius",
+      "range": {
+        "start": 314,
+        "end": 334
+      }
+    },
+    {
+      "scope": "Circle.__init__",
+      "object": "self",
+      "field": "client",
+      "range": {
+        "start": 343,
+        "end": 365
       }
     }
   ]
@@ -1344,7 +1541,8 @@ sample.go
       }
     }
   ],
-  "package": "store"
+  "package": "store",
+  "member_writes": []
 }
 
 sample.java
@@ -3223,4 +3421,974 @@ sample.tsconfig.json
 {
   "out_dir": "./dist",
   "root_dir": "src"
+}
+
+sample.values.yaml
+{
+  "read": {
+    "values": 11,
+    "redacted": 1
+  }
+}
+Row { key: "[0].apiVersion", value: Some("v1"), kind: "string", line: 3, cut: false }
+Row { key: "[0].kind", value: Some("ConfigMap"), kind: "string", line: 4, cut: false }
+Row { key: "[0].metadata.name", value: Some("web"), kind: "string", line: 6, cut: false }
+Row { key: "[0].metadata.annotations[\"app.kubernetes.io/name\"]", value: Some("web"), kind: "string", line: 8, cut: false }
+Row { key: "[0].data.replicas", value: Some("3"), kind: "number", line: 10, cut: false }
+Row { key: "[0].data.debug", value: Some("false"), kind: "boolean", line: 11, cut: false }
+Row { key: "[0].data.hosts[0]", value: Some("a.example.com"), kind: "string", line: 13, cut: false }
+Row { key: "[0].data.hosts[1]", value: Some("b.example.com"), kind: "string", line: 13, cut: false }
+Row { key: "[1].apiVersion", value: Some("v1"), kind: "string", line: 15, cut: false }
+Row { key: "[1].kind", value: Some("Secret"), kind: "string", line: 16, cut: false }
+Row { key: "[1].stringData.password", value: None, kind: "string", line: 18, cut: false }
+
+sample.kustomization.yaml
+Output {
+    nodes: [
+        Node {
+            address: "ConfigMap/shop/dev-settings",
+            root: "overlay",
+            ty: "ConfigMap",
+            name: Some(
+                "dev-settings",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "overlay/sample.kubernetes.yaml",
+            line: 33,
+            end_line: 38,
+            block: "[2]",
+            image: None,
+            build: None,
+            build_image: false,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+        Node {
+            address: "Deployment.apps/shop/dev-web",
+            root: "overlay",
+            ty: "Deployment",
+            name: Some(
+                "dev-web",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "overlay/sample.kubernetes.yaml",
+            line: 3,
+            end_line: 23,
+            block: "[0]",
+            image: None,
+            build: None,
+            build_image: false,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [
+                Entry {
+                    container: "main",
+                    image: Some(
+                        "ghcr.io/acme/web:dev",
+                    ),
+                    name: "QUEUE_URL",
+                    target: "envFrom ConfigMap/shop/dev-settings key QUEUE_URL",
+                    value: Some(
+                        "https://sqs.us-east-1.amazonaws.com/123456789012/orders",
+                    ),
+                    contract: None,
+                },
+                Entry {
+                    container: "main",
+                    image: Some(
+                        "ghcr.io/acme/web:dev",
+                    ),
+                    name: "TOKEN",
+                    target: "Secret/credentials key token (redacted)",
+                    value: None,
+                    contract: None,
+                },
+            ],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+        Node {
+            address: "Service/shop/dev-web",
+            root: "overlay",
+            ty: "Service",
+            name: Some(
+                "dev-web",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "overlay/sample.kubernetes.yaml",
+            line: 25,
+            end_line: 31,
+            block: "[1]",
+            image: None,
+            build: None,
+            build_image: false,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+        Node {
+            address: "ServiceAccount/shop/dev-runner",
+            root: "overlay",
+            ty: "ServiceAccount",
+            name: Some(
+                "dev-runner",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "overlay/sample.kubernetes.yaml",
+            line: 40,
+            end_line: 43,
+            block: "[3]",
+            image: None,
+            build: None,
+            build_image: false,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+    ],
+    references: [
+        Reference {
+            root: "overlay",
+            source: "Deployment.apps/shop/dev-web",
+            target: "ConfigMap/shop/dev-settings",
+            via: Some(
+                "envFrom",
+            ),
+        },
+        Reference {
+            root: "overlay",
+            source: "Deployment.apps/shop/dev-web",
+            target: "ServiceAccount/shop/dev-runner",
+            via: Some(
+                "serviceAccountName",
+            ),
+        },
+        Reference {
+            root: "overlay",
+            source: "Service/shop/dev-web",
+            target: "Deployment.apps/shop/dev-web",
+            via: Some(
+                "selector app=web",
+            ),
+        },
+    ],
+    images: [
+        Image {
+            root: "overlay",
+            address: "Deployment.apps/shop/dev-web",
+            container: "main",
+            image: "ghcr.io/acme/web:dev",
+        },
+    ],
+    unresolved: [
+        Unresolved {
+            root: "overlay",
+            path: "overlay/kustomization.yaml",
+            entry: "https://example.com/acme/base//kube?ref=v1",
+            reason: "remote",
+        },
+    ],
+}
+
+sample.crossplane.yaml
+Output {
+    nodes: [
+        Node {
+            address: "Bucket.s3.aws.upbound.io/assets",
+            root: "xp",
+            ty: "Bucket",
+            name: Some(
+                "acme-assets",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 44,
+            end_line: 52,
+            block: "[3]",
+            image: None,
+            build: None,
+            build_image: false,
+            role: Some(
+                "crossplane managed resource",
+            ),
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: Some(
+                Projection {
+                    name: Some(
+                        "acme-assets",
+                    ),
+                    pattern: false,
+                    through: [],
+                    entry: Some(
+                        "kubernetes:Bucket.s3.aws.upbound.io",
+                    ),
+                    defining: [
+                        "[3].metadata.annotations[\"crossplane.io/external-name\"]",
+                    ],
+                    code: None,
+                    binding: None,
+                },
+            ),
+            ingress: [],
+        },
+        Node {
+            address: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
+            root: "xp",
+            ty: "CompositeResourceDefinition",
+            name: Some(
+                "xqueues.acme.io",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 3,
+            end_line: 12,
+            block: "[0]",
+            image: None,
+            build: None,
+            build_image: false,
+            role: Some(
+                "crossplane composite resource definition",
+            ),
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+        Node {
+            address: "Composition.apiextensions.crossplane.io/xqueues.aws",
+            root: "xp",
+            ty: "Composition",
+            name: Some(
+                "xqueues.aws",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 14,
+            end_line: 36,
+            block: "[1]",
+            image: None,
+            build: None,
+            build_image: false,
+            role: Some(
+                "crossplane composition",
+            ),
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+        Node {
+            address: "Queue.acme.io/shop/orders",
+            root: "xp",
+            ty: "Queue",
+            name: Some(
+                "orders",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 38,
+            end_line: 42,
+            block: "[2]",
+            image: None,
+            build: None,
+            build_image: false,
+            role: Some(
+                "crossplane claim",
+            ),
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+        Node {
+            address: "Composition.apiextensions.crossplane.io/xqueues.aws/queue",
+            root: "xp",
+            ty: "Queue",
+            name: Some(
+                "*",
+            ),
+            pattern: true,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 23,
+            end_line: 29,
+            block: "[1].spec.resources[0]",
+            image: None,
+            build: None,
+            build_image: false,
+            role: Some(
+                "crossplane composed resource",
+            ),
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: Some(
+                Projection {
+                    name: None,
+                    pattern: false,
+                    through: [],
+                    entry: Some(
+                        "kubernetes:Queue.sqs.aws.upbound.io",
+                    ),
+                    defining: [
+                        "[1].spec.resources[0].base.metadata.annotations[\"crossplane.io/external-name\"]",
+                    ],
+                    code: None,
+                    binding: None,
+                },
+            ),
+            ingress: [],
+        },
+        Node {
+            address: "Composition.apiextensions.crossplane.io/xqueues.aws/topic",
+            root: "xp",
+            ty: "Topic",
+            name: Some(
+                "orders-topic",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "xp/sample.crossplane.yaml",
+            line: 30,
+            end_line: 36,
+            block: "[1].spec.resources[1]",
+            image: None,
+            build: None,
+            build_image: false,
+            role: Some(
+                "crossplane composed resource",
+            ),
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: Some(
+                Projection {
+                    name: Some(
+                        "orders-topic",
+                    ),
+                    pattern: false,
+                    through: [],
+                    entry: Some(
+                        "kubernetes:Topic.sns.aws.upbound.io",
+                    ),
+                    defining: [
+                        "[1].spec.resources[1].base.metadata.annotations[\"crossplane.io/external-name\"]",
+                    ],
+                    code: None,
+                    binding: None,
+                },
+            ),
+            ingress: [],
+        },
+    ],
+    references: [
+        Reference {
+            root: "xp",
+            source: "Composition.apiextensions.crossplane.io/xqueues.aws",
+            target: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
+            via: Some(
+                "compositeTypeRef XQueue.acme.io",
+            ),
+        },
+        Reference {
+            root: "xp",
+            source: "Composition.apiextensions.crossplane.io/xqueues.aws",
+            target: "Composition.apiextensions.crossplane.io/xqueues.aws/queue",
+            via: Some(
+                "resources",
+            ),
+        },
+        Reference {
+            root: "xp",
+            source: "Composition.apiextensions.crossplane.io/xqueues.aws",
+            target: "Composition.apiextensions.crossplane.io/xqueues.aws/topic",
+            via: Some(
+                "resources",
+            ),
+        },
+        Reference {
+            root: "xp",
+            source: "Queue.acme.io/shop/orders",
+            target: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
+            via: Some(
+                "composite XQueue.acme.io",
+            ),
+        },
+    ],
+    images: [],
+    unresolved: [],
+}
+
+sample.cloudformation.yaml
+(
+    [
+        Node {
+            address: "Queue",
+            root: "stack/template.yaml",
+            ty: "AWS::SQS::Queue",
+            name: Some(
+                "dev-*-jobs",
+            ),
+            pattern: true,
+            overridable: [
+                Overridable {
+                    path: "stack/template.yaml",
+                    line: 6,
+                    variable: "Parameters.Stage",
+                    tfvars: false,
+                },
+            ],
+            path: "stack/template.yaml",
+            line: 12,
+            end_line: 15,
+            block: "Resources.Queue",
+            image: None,
+            build: None,
+            build_image: false,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+        Node {
+            address: "Worker",
+            root: "stack/template.yaml",
+            ty: "AWS::Serverless::Function",
+            name: Some(
+                "dev-worker",
+            ),
+            pattern: false,
+            overridable: [
+                Overridable {
+                    path: "stack/template.yaml",
+                    line: 6,
+                    variable: "Parameters.Stage",
+                    tfvars: false,
+                },
+            ],
+            path: "stack/template.yaml",
+            line: 16,
+            end_line: 23,
+            block: "Resources.Worker",
+            image: None,
+            build: None,
+            build_image: false,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [
+                Entry {
+                    container: "Worker",
+                    image: None,
+                    name: "QUEUE",
+                    target: "SAM Environment (unresolved)",
+                    value: None,
+                    contract: None,
+                },
+            ],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+    ],
+    [
+        Reference {
+            root: "stack/template.yaml",
+            source: "Worker",
+            target: "Queue",
+            via: Some(
+                "DependsOn",
+            ),
+        },
+        Reference {
+            root: "stack/template.yaml",
+            source: "Worker",
+            target: "Queue",
+            via: Some(
+                "Fn::GetAtt.Arn",
+            ),
+        },
+    ],
+)
+Row { key: "AWSTemplateFormatVersion", value: Some("2010-09-09"), kind: "string", line: 1, cut: false }
+Row { key: "Transform", value: Some("AWS::Serverless-2016-10-31"), kind: "string", line: 2, cut: false }
+Row { key: "Parameters.Stage.Type", value: Some("String"), kind: "string", line: 5, cut: false }
+Row { key: "Parameters.Stage.Default", value: Some("dev"), kind: "string", line: 6, cut: false }
+Row { key: "Parameters.Token.Type", value: Some("String"), kind: "string", line: 8, cut: false }
+Row { key: "Parameters.Token.NoEcho", value: Some("true"), kind: "boolean", line: 9, cut: false }
+Row { key: "Parameters.Token.Default", value: None, kind: "string", line: 10, cut: false }
+Row { key: "Resources.Queue.Type", value: Some("AWS::SQS::Queue"), kind: "string", line: 13, cut: false }
+Row { key: "Resources.Queue.Properties.QueueName", value: Some("${Stage}-${AWS::Region}-jobs"), kind: "string", line: 15, cut: false }
+Row { key: "Resources.Worker.Type", value: Some("AWS::Serverless::Function"), kind: "string", line: 17, cut: false }
+Row { key: "Resources.Worker.DependsOn", value: Some("Queue"), kind: "string", line: 18, cut: false }
+Row { key: "Resources.Worker.Properties.FunctionName[0]", value: Some("-"), kind: "string", line: 20, cut: false }
+Row { key: "Resources.Worker.Properties.FunctionName[1][0]", value: Some("Stage"), kind: "string", line: 20, cut: false }
+Row { key: "Resources.Worker.Properties.FunctionName[1][1]", value: Some("worker"), kind: "string", line: 20, cut: false }
+Row { key: "Resources.Worker.Properties.Environment.Variables.QUEUE", value: Some("Queue.Arn"), kind: "string", line: 23, cut: false }
+
+contracts.role
+provider
+consumer
+binding
+publish
+import
+shape
+unmounted
+unfollowed
+
+unfollowed.method
+absolute
+outside
+variable
+extension
+symlink
+missing
+unreadable
+key-path
+sibling
+not-a-path
+cycle
+depth
+count
+size
+
+sample.serverless.yml
+(
+    [
+        Node {
+            address: "functions.hello",
+            root: "api/serverless.yml",
+            ty: "Serverless::Function",
+            name: Some(
+                "sample-dev-hello",
+            ),
+            pattern: false,
+            overridable: [
+                Overridable {
+                    path: "api/serverless.yml",
+                    line: 4,
+                    variable: "opt:stage, 'dev'",
+                    tfvars: false,
+                },
+            ],
+            path: "api/serverless.yml",
+            line: 6,
+            end_line: 13,
+            block: "functions.hello",
+            image: None,
+            build: None,
+            build_image: false,
+            role: None,
+            handler: Some(
+                Resolved {
+                    text: "src/hello.handler",
+                    overridable: false,
+                },
+            ),
+            events: [
+                Resolved {
+                    text: "http GET /hello",
+                    overridable: false,
+                },
+                Resolved {
+                    text: "sqs Queue.Arn",
+                    overridable: false,
+                },
+            ],
+            routes: [
+                Route {
+                    method: Resolved {
+                        text: "GET",
+                        overridable: false,
+                    },
+                    path: Resolved {
+                        text: "/hello",
+                        overridable: false,
+                    },
+                    at: "api/serverless.yml#functions.hello.events[0].http",
+                },
+            ],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+        Node {
+            address: "Queue",
+            root: "api/serverless.yml",
+            ty: "AWS::SQS::Queue",
+            name: Some(
+                "sample-dev-jobs",
+            ),
+            pattern: false,
+            overridable: [
+                Overridable {
+                    path: "api/serverless.yml",
+                    line: 19,
+                    variable: "opt:stage, 'dev'",
+                    tfvars: false,
+                },
+            ],
+            path: "api/serverless.yml",
+            line: 16,
+            end_line: 19,
+            block: "resources.Resources.Queue",
+            image: None,
+            build: None,
+            build_image: false,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+    ],
+    [
+        Reference {
+            root: "api/serverless.yml",
+            source: "functions.hello",
+            target: "Queue",
+            via: Some(
+                "Fn::GetAtt.Arn",
+            ),
+        },
+    ],
+)
+
+sample.provision.tf
+(
+    [
+        Node {
+            address: "aws_s3_bucket.archive",
+            root: ".",
+            ty: "aws_s3_bucket",
+            name: Some(
+                "archive",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "main.tf",
+            line: 1,
+            end_line: 1,
+            block: "resource.aws_s3_bucket.archive",
+            image: None,
+            build: None,
+            build_image: false,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+        Node {
+            address: "aws_sqs_queue.orders",
+            root: ".",
+            ty: "aws_sqs_queue",
+            name: Some(
+                "orders",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "main.tf",
+            line: 2,
+            end_line: 2,
+            block: "resource.aws_sqs_queue.orders",
+            image: None,
+            build: None,
+            build_image: false,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+    ],
+    [],
+)
+
+sample.alert.yaml
+{
+  "alert": {
+    "forwardings": [
+      {
+        "details": {},
+        "document": 1,
+        "name": "team-b",
+        "scopes": [],
+        "stream": "Opsgenie",
+        "tags": "support:{{ .CommonLabels.support }}",
+        "valid": true
+      },
+      {
+        "details": {
+          "support": "{{ .GroupLabels.support }}"
+        },
+        "document": 1,
+        "name": "team-b",
+        "scopes": [],
+        "stream": "Pagerduty",
+        "tags": null,
+        "valid": true
+      }
+    ],
+    "routes": [
+      {
+        "any": false,
+        "barrier": false,
+        "continuing": false,
+        "document": 1,
+        "end_line": 11,
+        "group": "",
+        "group_by": [
+          "support"
+        ],
+        "key": "[1].route",
+        "line": 10,
+        "logic": [],
+        "matchers": [],
+        "next": null,
+        "opaque": false,
+        "order": null,
+        "parent": null,
+        "receiver": "fallback",
+        "set": "",
+        "stream": "Labels",
+        "unknown_scope": false,
+        "valid": true
+      },
+      {
+        "any": false,
+        "barrier": false,
+        "continuing": false,
+        "document": 1,
+        "end_line": 14,
+        "group": "",
+        "group_by": [
+          "support"
+        ],
+        "key": "[1].route.routes[0]",
+        "line": 13,
+        "logic": [],
+        "matchers": [
+          {
+            "field": "",
+            "key": "support",
+            "op": "Regex",
+            "tag_value": "",
+            "tags": false,
+            "value": "team-.*"
+          }
+        ],
+        "next": null,
+        "opaque": false,
+        "order": null,
+        "parent": 0,
+        "receiver": "team-b",
+        "set": "",
+        "stream": "Labels",
+        "unknown_scope": false,
+        "valid": true
+      }
+    ],
+    "rules": [
+      {
+        "end_line": 7,
+        "key": "[0].groups[0].rules[0]",
+        "labels": {
+          "alertname": "ApiDown",
+          "region": "eu",
+          "support": "team-b"
+        },
+        "line": 5,
+        "name": "ApiDown",
+        "scopes": [],
+        "stream": "Labels",
+        "tags": [],
+        "unknown": [],
+        "unknown_tags": false
+      }
+    ],
+    "truncated": false
+  },
+  "http": [],
+  "image": {
+    "builders": [],
+    "code": [],
+    "paths": [],
+    "runners": []
+  }
+}
+
+sample.incident.tf
+{
+  "alert": {
+    "forwardings": [],
+    "routes": [
+      {
+        "any": false,
+        "barrier": false,
+        "continuing": false,
+        "document": 0,
+        "end_line": 16,
+        "group": "",
+        "group_by": [],
+        "key": "opsgenie_team_routing_rule.checkout",
+        "line": 5,
+        "logic": [],
+        "matchers": [
+          {
+            "field": "",
+            "key": "service",
+            "op": "Prefix",
+            "tag_value": "service:check",
+            "tags": true,
+            "value": "check"
+          }
+        ],
+        "next": null,
+        "opaque": false,
+        "order": null,
+        "parent": null,
+        "receiver": "platform-id",
+        "set": "",
+        "stream": "Opsgenie",
+        "unknown_scope": false,
+        "valid": true
+      },
+      {
+        "any": false,
+        "barrier": false,
+        "continuing": false,
+        "document": 0,
+        "end_line": 24,
+        "group": "sample.incident.tf::pagerduty_event_orchestration_service.checkout",
+        "group_by": [],
+        "key": "pagerduty_event_orchestration_service.checkout.set[0].rule[0]",
+        "line": 21,
+        "logic": [
+          {
+            "Atom": 0
+          }
+        ],
+        "matchers": [
+          {
+            "field": "event.custom_details.support",
+            "key": "support",
+            "op": "Equal",
+            "tag_value": "",
+            "tags": false,
+            "value": "team-b"
+          }
+        ],
+        "next": null,
+        "opaque": false,
+        "order": 0,
+        "parent": null,
+        "receiver": "checkout-id",
+        "set": "start",
+        "stream": "Pagerduty",
+        "unknown_scope": false,
+        "valid": true
+      }
+    ],
+    "rules": [
+      {
+        "end_line": 4,
+        "key": "datadog_monitor.checkout",
+        "labels": {},
+        "line": 1,
+        "name": "checkout",
+        "scopes": [],
+        "stream": "Opsgenie",
+        "tags": [
+          "service:checkout",
+          "support:team-b"
+        ],
+        "unknown": [],
+        "unknown_tags": false
+      }
+    ],
+    "truncated": false
+  },
+  "http": [],
+  "image": {
+    "builders": [],
+    "code": [],
+    "paths": [],
+    "runners": []
+  }
 }

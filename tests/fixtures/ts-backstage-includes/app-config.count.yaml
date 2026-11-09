@@ -1,0 +1,2 @@
+# More includes than one root follows: `partials/many.yaml` names `one.yaml` 64 times.
+many: { $include: ./partials/many.yaml }

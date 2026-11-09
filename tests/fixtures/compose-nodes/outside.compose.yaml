@@ -1,0 +1,3 @@
+services:
+  not-a-project:
+    image: ignored

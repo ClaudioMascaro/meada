@@ -1,0 +1,25 @@
+service: aws-worker
+provider:
+  name: aws
+  environment:
+    QUEUE_NAME: wrong-global
+    INHERITED: inherited
+custom:
+  queue: orders
+functions:
+  worker:
+    handler: worker/send.dispatch
+    environment:
+      QUEUE_NAME: ${self:custom.queue}
+      TYPED_QUEUE: !Ref Orders
+      SECRET_QUEUE: ${ssm:/hidden}
+  other:
+    handler: other/send.dispatch
+    environment:
+      QUEUE_NAME: refunds
+resources:
+  Resources:
+    Orders:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: orders

@@ -1,0 +1,8 @@
+example.com/resource-via/app (.) indexed, 1 files
+  resource::routing::team-b: `via` values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support matches no symbol, ignored
+  resource::routing::team-b: no `via` matches a symbol, so the repository as a whole is the side
+  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 6, redacted: 0
+example.com/resource-via/infra (../resource-via-infra) indexed, 0 files
+  resource::routing::team-b: `via` opsgenie_team_routing_rule.team_b matches no symbol, ignored
+  resource::routing::team-b: no `via` matches a symbol, so the repository as a whole is the side
+  config files: 8 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 21, redacted: 0

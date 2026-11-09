@@ -14,7 +14,7 @@ use jsonwebtoken::jwk::Jwk;
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use serde_json::{Value, json};
 
-use crate::manifest::{MANIFEST, chain_manifest, run, run_args};
+use crate::manifest::{CHAIN, MANIFEST, chain_manifest, run, run_args};
 use crate::server::Server;
 
 #[cfg(all(feature = "postgres", feature = "github-app"))]
@@ -668,6 +668,36 @@ fn a_grant_scopes_the_workspace_of_every_answer() {
     for answer in answers(&at, &grant(&[WEB])) {
         web_only(&answer);
     }
+}
+
+/// A grant scopes config values (#639) as it scopes symbols: every repository of the chain holds
+/// a value naming it, and `search` with the kind `value` behind `/WEB` lists the four under a
+/// grant of all, and only `WEB`'s under a grant of `WEB` alone.
+#[test]
+fn a_grant_scopes_the_config_values_of_a_search() {
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let dir = chain_manifest("oidc_grant_values");
+    for (identity, path) in CHAIN {
+        let owner = format!("owner: {identity}\n");
+        fs::write(dir.join(path).join("settings.yaml"), owner).unwrap();
+    }
+    assert!(run(&dir, "index").2);
+    append(&dir, MANIFEST, &issuer.base);
+    let server = start(&dir);
+    let at = format!("{}/{WEB}", server.url);
+    let grant = |identities: &[&str]| {
+        let claims = claims(&issuer.base, WEB, identities);
+        sign(&signing, "k1", Algorithm::ES256, &claims)
+    };
+    let search = || Some(("search", json!({"query": "owner", "kind": "value"})));
+    let every: Vec<&str> = SERVED.lines().collect();
+    let full = traced(&ask(&at, Some(&grant(&every)), &[], search()));
+    for (identity, _) in CHAIN {
+        let line = format!("{identity} settings.yaml:1 owner = \"{identity}\"");
+        assert!(full.contains(&line), "{line} in: {full}");
+    }
+    web_only(&traced(&ask(&at, Some(&grant(&[WEB])), &[], search())));
 }
 
 /// The same grant over a generation made by hand (`--generations`, no store needed).

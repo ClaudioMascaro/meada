@@ -1,0 +1,10 @@
+apiVersion: ssm.aws.upbound.io/v1beta1
+kind: Parameter
+metadata:
+  name: operator-28
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: /xp/config
+spec:
+  forProvider:
+    region: us-east-1

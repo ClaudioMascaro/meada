@@ -1,0 +1,20 @@
+orphan channel::eventbridge::unused-events: no use; literal/main.tf:2 aws_cloudwatch_event_bus.bus (root literal)
+orphan channel::kinesis::unused-records: no use; literal/main.tf:3 aws_kinesis_stream.stream (root literal)
+orphan channel::sns::unused-alerts: no use; literal/main.tf:1 aws_sns_topic.topic (root literal)
+orphan resource::dynamodb::unused-orders: no use; literal/main.tf:4 aws_dynamodb_table.table (root literal)
+orphan resource::elasticache::unused-cache: no use; literal/main.tf:7 aws_elasticache_cluster.cache (root literal)
+orphan resource::elasticache::unused-group: no use; literal/main.tf:8 aws_elasticache_replication_group.cache_group (root literal)
+orphan resource::rds::unused-cluster: no use; literal/main.tf:6 aws_rds_cluster.database_cluster (root literal)
+orphan resource::rds::unused-db: no use; literal/main.tf:5 aws_db_instance.database (root literal)
+orphan resource::secretsmanager::unused/token: no use; literal/main.tf:10 aws_secretsmanager_secret.secret (root literal)
+orphan resource::ssm::/unused/token: no use; literal/main.tf:9 aws_ssm_parameter.parameter (root literal)
+config files: 2 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 20, redacted: 0
+resource::dynamodb::orders is unlinked: no writer and reader in different repositories
+resource::rds::orders-db is unlinked: no writer and reader in different repositories
+resource::rds::orders-cluster is unlinked: no writer and reader in different repositories
+resource::elasticache::orders-cache is unlinked: no writer and reader in different repositories
+resource::elasticache::orders-group is unlinked: no writer and reader in different repositories
+resource::ssm::/orders/token is unlinked: no writer and reader in different repositories
+resource::secretsmanager::orders/token is unlinked: no writer and reader in different repositories
+asyncapi.yaml: asyncapi 2.6.0, channels: 3
+config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 15, redacted: 0

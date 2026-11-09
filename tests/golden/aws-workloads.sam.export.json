@@ -1,0 +1,203 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/sam",
+  "commit": "cd6398f1d0bc94c6a3c9133159caa2e26b7c39e2",
+  "dirty": false,
+  "files": [
+    {
+      "path": "outside.ts",
+      "hash": "1af669c3e577d0f8ace05efcb16473649309e79b33df0296674b940af8cff04a"
+    },
+    {
+      "path": "worker/send.ts",
+      "hash": "fad572b1c61ec654650bd12685ba1c81627fb256bd2cf2f1fc64e6e93c3a0d60"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/sam::outside.ts::outside",
+      "span": {
+        "path": "outside.ts",
+        "start": 110,
+        "end": 236
+      },
+      "hash": "9ea1fc9356af563d25ed61f15a8ba9b61364a8cc80ea0c36398db887681820d5"
+    },
+    {
+      "id": "example.com/acme/sam::worker/send.ts::dispatch",
+      "span": {
+        "path": "worker/send.ts",
+        "start": 110,
+        "end": 237
+      },
+      "hash": "db873b81c164ea9605fac2b0b0fab8a30012e7b9059b3aa1dbaa65b155c73722"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/acme/sam::outside.ts::SQSClient#0",
+      "caller": "example.com/acme/sam::outside.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "outside.ts",
+        "start": 84,
+        "end": 101
+      }
+    },
+    {
+      "id": "example.com/acme/sam::outside.ts::outside::SendMessageCommand#0",
+      "caller": "example.com/acme/sam::outside.ts::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "outside.ts",
+        "start": 152,
+        "end": 232
+      }
+    },
+    {
+      "id": "example.com/acme/sam::outside.ts::outside::client.send#0",
+      "caller": "example.com/acme/sam::outside.ts::outside",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "outside.ts",
+        "start": 140,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/sam::worker/send.ts::SQSClient#0",
+      "caller": "example.com/acme/sam::worker/send.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker/send.ts",
+        "start": 84,
+        "end": 101
+      }
+    },
+    {
+      "id": "example.com/acme/sam::worker/send.ts::dispatch::SendMessageCommand#0",
+      "caller": "example.com/acme/sam::worker/send.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker/send.ts",
+        "start": 153,
+        "end": 233
+      }
+    },
+    {
+      "id": "example.com/acme/sam::worker/send.ts::dispatch::client.send#0",
+      "caller": "example.com/acme/sam::worker/send.ts::dispatch",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker/send.ts",
+        "start": 141,
+        "end": 234
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::sqs",
+      "site": "example.com/acme/sam::outside.ts::outside::SendMessageCommand#0"
+    },
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/acme/sam::worker/send.ts::dispatch::SendMessageCommand#0",
+      "via": "workload:example.com/acme/sam::template.yaml::Worker (root template.yaml), env:QUEUE_NAME"
+    }
+  ],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/sam::template.yaml::Orders",
+      "address": "Orders",
+      "type": "AWS::SQS::Queue",
+      "root": "template.yaml",
+      "path": "template.yaml",
+      "line": 14,
+      "end_line": 17
+    },
+    {
+      "identity": "example.com/acme/sam::template.yaml::Worker",
+      "address": "Worker",
+      "type": "AWS::Serverless::Function",
+      "root": "template.yaml",
+      "path": "template.yaml",
+      "line": 18,
+      "end_line": 26
+    }
+  ],
+  "executions": [
+    {
+      "workload": "example.com/acme/sam::template.yaml::Worker",
+      "root": "template.yaml",
+      "repository": "example.com/acme/sam",
+      "path": "worker",
+      "level": "exact",
+      "reason": "SAM CodeUri template.yaml#Resources.Worker"
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::sqs::orders",
+      "node": "example.com/acme/sam::template.yaml::Orders",
+      "root": "template.yaml"
+    }
+  ],
+  "links": [],
+  "provisions": [
+    {
+      "side": "example.com/acme/sam::worker/send.ts::dispatch::SendMessageCommand#0",
+      "provisioner": "example.com/acme/sam::template.yaml::Orders",
+      "root": "template.yaml",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; workload:example.com/acme/sam::template.yaml::Worker (root template.yaml), env:QUEUE_NAME"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/sam::outside.ts::outside",
+      "kind": "export",
+      "label": "outside",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/sam",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/sam::outside.ts::outside"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/sam",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/sam::outside.ts::outside::SendMessageCommand#0",
+          "mark": "produces",
+          "contract": "channel::sqs"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/acme/sam::worker/send.ts::dispatch",
+      "kind": "export",
+      "label": "dispatch",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/sam",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/sam::worker/send.ts::dispatch"
+        }
+      ]
+    }
+  ]
+}

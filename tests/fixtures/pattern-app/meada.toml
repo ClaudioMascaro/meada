@@ -1,0 +1,27 @@
+[[peer]]
+repo = "example.com/pattern/infra"
+
+[[resource]]
+kind = "s3"
+id = "archive-prod"
+role = "read"
+
+[[resource]]
+kind = "s3"
+id = "archive-stage"
+role = "write"
+
+[[resource]]
+kind = "s3"
+id = "abc"
+role = "read"
+
+[[resource]]
+kind = "s3"
+id = "archive"
+role = "read"
+
+[[resource]]
+kind = "s3"
+id = "both-*"
+role = "read"

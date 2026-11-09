@@ -1,0 +1,4 @@
+apiVersion: v2
+name: cedar-values-only
+version: 0.1.0
+description: Unrendered chart source is not an alert emitter

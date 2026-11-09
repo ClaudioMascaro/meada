@@ -1,0 +1,11 @@
+example.com/acme/monitoring rules.yaml:5 [0].groups[0].rules[0]
+  →[exact: alert::support::team-b; matchers "support"="team-b"; receiver: equality] example.com/acme/monitoring alertmanager.yaml:4 [0].route.routes[0]
+  →[inferred: alert::support::team-(b|c); matchers "support"=~"team-(b|c)"; receiver: regex] example.com/acme/monitoring alertmanager.yaml:7 [0].route.routes[1]
+  →[inferred: alert::support::team-b; matchers "support"=~"team-b"; receiver: legacy-team] example.com/acme/monitoring alertmanager.yaml:37 [2].spec.route
+chain: inferred · 3 hops · 1 repos · 148 tokens
+
+example.com/acme/monitoring alertmanager.yaml:4 [0].route.routes[0]
+  →[exact: alert::support::team-b; matchers "support"="team-b"; receiver: equality] example.com/acme/monitoring loki.yaml:4 groups[0].rules[0]
+  →[exact: alert::support::team-b; matchers "support"="team-b"; receiver: equality] example.com/acme/monitoring rules.yaml:5 [0].groups[0].rules[0]
+  →[exact: alert::support::team-b; matchers "support"="team-b"; receiver: equality] example.com/acme/monitoring rules.yaml:22 [1].spec.groups[0].rules[0]
+chain: exact · 3 hops · 1 repos · 142 tokens

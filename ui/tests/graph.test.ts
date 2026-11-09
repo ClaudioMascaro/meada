@@ -76,3 +76,25 @@ test('an invalid export is refused with the core parse error before building any
   expect(() => graphModel('{"repository":"x","files":[{"path":"a","hash":7}]}'))
     .toThrow('files[0].hash');
 });
+
+test('config use sites stay separate from directed sides, even without a provisioner', () => {
+  const data = JSON.parse(golden('chain-web'));
+  data.uses = [{ contract: 'channel::sqs::configured',
+    site: 'example.com/chain/web', at: 'values.yaml#queue' }];
+  const graph = graphModel(JSON.stringify(data));
+  expect(graph.contracts.find(row => row.contract === 'channel::sqs::configured')).toEqual({
+    contract: 'channel::sqs::configured', providers: [], consumers: [],
+    uses: ['example.com/chain/web values.yaml#queue'],
+  });
+});
+
+test('image builders retain their config locations and direct workloads retain their code paths', () => {
+  const data = JSON.parse(golden('chain-web'));
+  data.providers = [{ contract: 'image::ghcr.io/acme/orders', site: data.repository, at: '.github/workflows/build.yml#jobs.publish.steps[0].with.tags' }];
+  data.consumers = [];
+  data.links = [];
+  data.executions = [{ workload: `${data.repository}::compose.yaml::services.orders`, root: '.', repository: data.repository, path: 'src', level: 'exact', reason: 'Compose build compose.yaml#services.orders.build' }];
+  const graph = graphModel(JSON.stringify(data));
+  expect(graph.contracts).toEqual([{ contract: 'image::ghcr.io/acme/orders', providers: [`${data.repository} (.github/workflows/build.yml#jobs.publish.steps[0].with.tags)`], consumers: [] }]);
+  expect(graph.executions).toEqual(data.executions);
+});

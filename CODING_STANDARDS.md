@@ -13,6 +13,12 @@ decide` closes. A rule that cannot tell yields nothing, or a name match at `infe
 `ambiguous`; a guess never becomes `exact`, a provider or a consumer. In an export golden, read
 each changed level, target, provider and consumer with `cargo run --example golden_diff`.
 
+Where Meada emulates another tool through a library (Terraform through `hcl-rs`), each value the
+library represents otherwise than the tool (precision, a zero's sign, a set's order, how a null
+or a collection shows as text) is converted exactly or left unresolved. For Terraform,
+`tests/terraform-oracle/` computes the tool's own answer with HashiCorp's HCL and cty libraries:
+add the case to `cases.tsv` and run `go run .` there.
+
 ## Exactly N, only X
 
 A test that proves "exactly N" or "only X" asserts over the whole output (every line of the
@@ -105,8 +111,9 @@ indexing carries on.
   `MAX_*`, `*_MAX`, `*_LIMIT` or `*_CAP` carries the marker, and that no two share a name), and a
   unit test feeds it an input past the limit.
 - A manifest or configuration reader reads a file of `lang::MAX_BYTES` built to explode (many
-  keys, deep nesting, wide fan-out) in bounded time, and returns a bounded size. A new reader
-  adds its row to `probes` in `src/package/hostile.rs`.
+  keys, deep nesting, wide fan-out) in bounded time and bounded memory, and returns a bounded
+  size; a value is copied after it is charged, never before. A new reader adds its row to
+  `probes` in `src/package/hostile.rs`, which also bounds the heap each row holds (`HEAP`).
 
 ## Service deadlines
 
@@ -163,7 +170,7 @@ within 24 KiB. Other areas keep their existing 64 KiB budget until split:
   `docs/agents/ceilings.md`), with its value and its reason; it is not repeated in the map.
 - A value the index now stores (a table, a column, a field of a stored summary) joins the list
   "Stored values" in `docs/agents/map/indexing/stored-values.md`, the detail of the invariant "The index holds
-  no source text and no values, apart from ..." in the map.
+  no source text and no values of code, apart from ..." in the map.
 - A kind's rule lives in its own files behind `ContractKind`. The engine, the items, the
   decisions, the trace, the entry points and the extraction loop of the index writer ask the seam
   (`contract::kind_of`, `shown`, `serves`, `place` and the other free functions) and import no
@@ -196,8 +203,9 @@ within 24 KiB. Other areas keep their existing 64 KiB budget until split:
   (`http/<language>.rs`, `channel/<language>.rs`); a form may live in a submodule of that module
   (`http/rust/frameworks.rs`). A table or a form of a library in a pack is a finding, and the
   kind owns it. Six exceptions are decided. The Rust pack folds `Method::GET` constants at
-  parse time (`METHOD_CRATES` and `VERBS`) and keeps them, `VERBS` being the one pack constant a
-  kind reads; the Go pack folds `net/http`'s `MethodGet`-style constants the same way, gated on
+  parse time (`METHOD_CRATES` and `VERBS`) and keeps them, `VERBS` being the one pack constant table
+  a kind reads, besides the TypeScript pack's `GLOBAL_URL`, the callee it gives a two-argument
+  `new URL` of the runtime global, which the file's own declarations decide; the Go pack folds `net/http`'s `MethodGet`-style constants the same way, gated on
   the file's `net/http` import (`METHODS` in `lang/go/values.rs`); and the Rust pack keeps
   `ROUTE_ATTRIBUTES`, because which attributes it emits as calls that decorate a function
   (`Call::decorates`) is a syntax decision a kind cannot take after the fact without a hook from

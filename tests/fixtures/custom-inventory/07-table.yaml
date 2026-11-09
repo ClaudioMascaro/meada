@@ -1,0 +1,7 @@
+apiVersion: dynamodb.services.k8s.aws/v1alpha1
+kind: Table
+metadata:
+  name: operator-07
+  namespace: platform
+spec:
+  tableName: ack-ledger

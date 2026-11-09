@@ -86,12 +86,12 @@
     "implement": {
       "path": "skills/engineering/implement",
       "upstreamTree": "4804b466ab26c9b9d8d42917547db133d1f20a9f",
-      "tree": "c0484bebb7b902fb682d0c5b6f5d2aefa872e21d"
+      "tree": "9556e54930f231fb902912260ce5044bd6596b02"
     },
     "implement-spec": {
       "path": "skills/engineering/implement-spec",
       "upstreamTree": "407c196f5c88af53c71efc8f31ee37c02dbb12e7",
-      "tree": "8d1494b5901fe7d56053d11e7feff21a75e1593f"
+      "tree": "cbaa84dd8526df28b20220cbb3b6041f411436fe"
     },
     "improve-codebase-architecture": {
       "path": "skills/engineering/improve-codebase-architecture",

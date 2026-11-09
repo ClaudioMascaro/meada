@@ -1,0 +1,65 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/deploy",
+  "commit": "7cf28302abd5f1886eaa5db5437a42039670c29f",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "image::ghcr.io/acme/aws-worker",
+      "site": "example.com/acme/deploy::main.tf::aws_lambda_function.worker",
+      "via": null,
+      "root": "."
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/deploy::main.tf::aws_lambda_function.worker",
+      "address": "aws_lambda_function.worker",
+      "type": "aws_lambda_function",
+      "root": ".",
+      "path": "main.tf",
+      "line": 4,
+      "end_line": 11
+    },
+    {
+      "identity": "example.com/acme/deploy::main.tf::aws_sqs_queue.orders",
+      "address": "aws_sqs_queue.orders",
+      "type": "aws_sqs_queue",
+      "root": ".",
+      "path": "main.tf",
+      "line": 1,
+      "end_line": 3
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::sqs::orders",
+      "node": "example.com/acme/deploy::main.tf::aws_sqs_queue.orders",
+      "root": "."
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/deploy::main.tf::aws_lambda_function.worker",
+      "provider": "example.com/acme/app",
+      "contract": "image::ghcr.io/acme/aws-worker",
+      "level": "exact",
+      "reason": "image::ghcr.io/acme/aws-worker",
+      "root": "."
+    }
+  ],
+  "provisions": [
+    {
+      "side": "example.com/acme/app::send.ts::dispatch::SendMessageCommand#0",
+      "provisioner": "example.com/acme/deploy::main.tf::aws_sqs_queue.orders",
+      "root": ".",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; workload:example.com/acme/deploy::main.tf::aws_lambda_function.worker (root .), env:QUEUE_NAME"
+    }
+  ]
+}

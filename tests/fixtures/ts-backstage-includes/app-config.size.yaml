@@ -1,0 +1,3 @@
+# More bytes than one root grafts: the test writes `partials/big.yaml`, past half the limit.
+first: { $include: ./partials/big.yaml }
+second: { $include: ./partials/big.yaml }

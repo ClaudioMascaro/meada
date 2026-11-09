@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "repository": "independent.invalid/azure/roots",
+  "commit": "fe1ecac1289d27ea066b40fb9e10db41e1cb405a",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "image::ghcr.io/independent/root-review",
+      "site": "independent.invalid/azure/roots",
+      "at": ".github/workflows/image.yml#jobs.build.steps[0].with.tags"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "image::ghcr.io/independent/root-review",
+      "site": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+      "via": null,
+      "root": "overlays/left"
+    },
+    {
+      "contract": "image::ghcr.io/independent/root-review",
+      "site": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+      "via": null,
+      "root": "overlays/right"
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+      "address": "Pod/common",
+      "type": "Pod",
+      "root": "overlays/left",
+      "path": "base/pod.yaml",
+      "line": 1,
+      "end_line": 12
+    },
+    {
+      "identity": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+      "address": "Pod/common",
+      "type": "Pod",
+      "root": "overlays/right",
+      "path": "base/pod.yaml",
+      "line": 1,
+      "end_line": 12
+    }
+  ],
+  "links": [
+    {
+      "consumer": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+      "provider": "independent.invalid/azure/roots",
+      "contract": "image::ghcr.io/independent/root-review",
+      "level": "exact",
+      "reason": "image::ghcr.io/independent/root-review",
+      "root": "overlays/left"
+    },
+    {
+      "consumer": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
+      "provider": "independent.invalid/azure/roots",
+      "contract": "image::ghcr.io/independent/root-review",
+      "level": "exact",
+      "reason": "image::ghcr.io/independent/root-review",
+      "root": "overlays/right"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+example.com/acme/infra api/serverless.yml:14 functions.createOrder (Serverless::Function, name "shop-dev-createOrder", root api/serverless.yml)
+example.com/acme/infra api/serverless.yml:24 functions.processOrder (Serverless::Function, name "shop-dev-processor", root api/serverless.yml)
+example.com/acme/infra api/serverless.yml:32 functions.audit (Serverless::Function, name "shop-dev-audit", root api/serverless.yml)
+example.com/acme/infra worker/serverless.yml:9 functions.send (Serverless::Function, name "mailer-prod-send", root worker/serverless.yml)
+
+example.com/acme/infra api/serverless.yml:14 functions.createOrder (Serverless::Function, name "shop-dev-createOrder", root api/serverless.yml)
+example.com/acme/infra api/serverless.yml:24 functions.processOrder (Serverless::Function, name "shop-dev-processor", root api/serverless.yml)
+example.com/acme/infra api/serverless.yml:32 functions.audit (Serverless::Function, name "shop-dev-audit", root api/serverless.yml)
+example.com/acme/infra api/serverless.yml:39 OrdersQueue (AWS::SQS::Queue, name "shop-dev-orders", root api/serverless.yml)
+example.com/acme/infra api/serverless.yml:43 OrdersTable (AWS::DynamoDB::Table, name "shop-dev-orders", root api/serverless.yml) (no use in the workspace)
+
+example.com/acme/infra worker/serverless.yml:9 functions.send (Serverless::Function, name "mailer-prod-send", root worker/serverless.yml)
+
+example.com/acme/infra api/serverless.yml:39 OrdersQueue (AWS::SQS::Queue, name "shop-dev-orders", root api/serverless.yml)
+example.com/acme/infra api/serverless.yml:47 DeadLetter (AWS::SQS::Queue, pattern "*-dead", root api/serverless.yml)
+
+no matches for `ignored`
+
+no matches for `nothing-here`

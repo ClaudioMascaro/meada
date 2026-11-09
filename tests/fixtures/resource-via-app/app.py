@@ -1,0 +1,2 @@
+def emit():
+    pass

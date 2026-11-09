@@ -1,0 +1,16 @@
+example.com/acme/app compose.yaml:2-4 services.orders
+type: service
+name: none
+root: .
+image: "ghcr.io/acme/orders:local" (overridable)
+build: "."
+overridable: none
+references:
+example.com/acme/app compose.yaml:5 services.external via networks.default
+referenced by:
+example.com/acme/app compose.yaml:5 services.external via networks.default
+values:
+example.com/acme/app compose.yaml:3 services.orders.build = "."
+example.com/acme/app compose.yaml:4 services.orders.image = "${IMAGE:-ghcr.io/acme/orders}:local"
+image: image::ghcr.io/acme/orders
+code: example.com/acme/app . [exact]

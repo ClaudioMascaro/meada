@@ -1,0 +1,240 @@
+{
+  "format": 1,
+  "repository": "example.com/azure/app",
+  "commit": "f60c2181588078de2f21915469ff05c06641e172",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [],
+  "uses": [
+    {
+      "contract": "channel::eventhubs::events",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#eventhubs_hub"
+    },
+    {
+      "contract": "channel::eventhubs::events",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#hub_id"
+    },
+    {
+      "contract": "channel::servicebus::events",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#servicebus_topic"
+    },
+    {
+      "contract": "channel::servicebus::events",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#topic_id"
+    },
+    {
+      "contract": "channel::servicebus::orders",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#queue_id"
+    },
+    {
+      "contract": "channel::servicebus::orders",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#servicebus_queue"
+    },
+    {
+      "contract": "channel::servicebus::subscription:events/audit",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#servicebus_subscription"
+    },
+    {
+      "contract": "channel::servicebus::subscription:events/audit",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#subscription_id"
+    },
+    {
+      "contract": "resource::azureblob::assetsstore",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#azureblob_container"
+    },
+    {
+      "contract": "resource::azureblob::assetsstore",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#blob_url"
+    },
+    {
+      "contract": "resource::azureblob::assetsstore",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#container_id"
+    },
+    {
+      "contract": "resource::azurestorage::assetsstore",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#account_id"
+    },
+    {
+      "contract": "resource::azurestorage::assetsstore",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#azurestorage_account"
+    },
+    {
+      "contract": "resource::keyvault::api-key",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#keyvault_secret"
+    },
+    {
+      "contract": "resource::keyvault::api-key",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#secret_id"
+    },
+    {
+      "contract": "resource::keyvault::api-key",
+      "site": "example.com/azure/app",
+      "at": "settings.yaml#secret_url"
+    }
+  ],
+  "links": [],
+  "provisions": [
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_eventhub.events",
+      "root": ".",
+      "contract": "channel::eventhubs::events",
+      "level": "exact",
+      "reason": "channel::eventhubs::events; config settings.yaml#hub_id",
+      "at": "settings.yaml#hub_id"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_eventhub.events",
+      "root": ".",
+      "contract": "channel::eventhubs::events",
+      "level": "inferred",
+      "reason": "channel::eventhubs::events; config settings.yaml#eventhubs_hub",
+      "at": "settings.yaml#eventhubs_hub"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_key_vault_secret.token",
+      "root": ".",
+      "contract": "resource::keyvault::api-key",
+      "level": "exact",
+      "reason": "resource::keyvault::api-key; config settings.yaml#secret_id",
+      "at": "settings.yaml#secret_id"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_key_vault_secret.token",
+      "root": ".",
+      "contract": "resource::keyvault::api-key",
+      "level": "exact",
+      "reason": "resource::keyvault::api-key; config settings.yaml#secret_url",
+      "at": "settings.yaml#secret_url"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_key_vault_secret.token",
+      "root": ".",
+      "contract": "resource::keyvault::api-key",
+      "level": "inferred",
+      "reason": "resource::keyvault::api-key; config settings.yaml#keyvault_secret",
+      "at": "settings.yaml#keyvault_secret"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_queue.orders",
+      "root": ".",
+      "contract": "channel::servicebus::orders",
+      "level": "exact",
+      "reason": "channel::servicebus::orders; config settings.yaml#queue_id",
+      "at": "settings.yaml#queue_id"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_queue.orders",
+      "root": ".",
+      "contract": "channel::servicebus::orders",
+      "level": "inferred",
+      "reason": "channel::servicebus::orders; config settings.yaml#servicebus_queue",
+      "at": "settings.yaml#servicebus_queue"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_subscription.audit",
+      "root": ".",
+      "contract": "channel::servicebus::subscription:events/audit",
+      "level": "exact",
+      "reason": "channel::servicebus::subscription:events/audit; config settings.yaml#subscription_id",
+      "at": "settings.yaml#subscription_id"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_subscription.audit",
+      "root": ".",
+      "contract": "channel::servicebus::subscription:events/audit",
+      "level": "inferred",
+      "reason": "channel::servicebus::subscription:events/audit; config settings.yaml#servicebus_subscription",
+      "at": "settings.yaml#servicebus_subscription"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_topic.events",
+      "root": ".",
+      "contract": "channel::servicebus::events",
+      "level": "exact",
+      "reason": "channel::servicebus::events; config settings.yaml#topic_id",
+      "at": "settings.yaml#topic_id"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_servicebus_topic.events",
+      "root": ".",
+      "contract": "channel::servicebus::events",
+      "level": "inferred",
+      "reason": "channel::servicebus::events; config settings.yaml#servicebus_topic",
+      "at": "settings.yaml#servicebus_topic"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_storage_account.assets",
+      "root": ".",
+      "contract": "resource::azurestorage::assetsstore",
+      "level": "exact",
+      "reason": "resource::azurestorage::assetsstore; config settings.yaml#account_id",
+      "at": "settings.yaml#account_id"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_storage_account.assets",
+      "root": ".",
+      "contract": "resource::azurestorage::assetsstore",
+      "level": "inferred",
+      "reason": "resource::azurestorage::assetsstore; config settings.yaml#azurestorage_account",
+      "at": "settings.yaml#azurestorage_account"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_storage_container.assets",
+      "root": ".",
+      "contract": "resource::azureblob::assetsstore",
+      "level": "exact",
+      "reason": "resource::azureblob::assetsstore; config settings.yaml#blob_url",
+      "at": "settings.yaml#blob_url"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_storage_container.assets",
+      "root": ".",
+      "contract": "resource::azureblob::assetsstore",
+      "level": "exact",
+      "reason": "resource::azureblob::assetsstore; config settings.yaml#container_id",
+      "at": "settings.yaml#container_id"
+    },
+    {
+      "side": "example.com/azure/app",
+      "provisioner": "example.com/azure/infra::main.tf::azurerm_storage_container.assets",
+      "root": ".",
+      "contract": "resource::azureblob::assetsstore",
+      "level": "inferred",
+      "reason": "resource::azureblob::assetsstore; config settings.yaml#azureblob_container",
+      "at": "settings.yaml#azureblob_container"
+    }
+  ]
+}

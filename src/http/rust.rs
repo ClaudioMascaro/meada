@@ -24,7 +24,7 @@
 mod axum;
 pub(super) mod frameworks;
 
-use std::cell::{Cell, OnceCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use super::{
@@ -33,7 +33,7 @@ use super::{
 };
 use crate::contract::{Found, Site};
 use crate::lang::rust::VERBS;
-use crate::lang::{Call, Class, Value};
+use crate::lang::{Call, Class, Import, Imported, Receiver, Value};
 use crate::resolve::{Code, Follow, Of, Outside, scope_of};
 use frameworks::Made;
 
@@ -100,6 +100,11 @@ struct Web<'c, 'a> {
     /// The names the files of each crate mention, by crate root; `None` for a crate one of
     /// whose files does not tell.
     mentioned: OnceCell<HashMap<&'a str, Option<BTreeSet<&'a str>>>>,
+    /// The scopes of each file that hold a service configuration (`config`), by file, read the
+    /// first time a call of the file is asked about.
+    configs: RefCell<HashMap<&'a str, BTreeSet<&'a str>>>,
+    /// Whether an import of the pack names `ServiceConfig`, which may bind it under another name.
+    imports_config: OnceCell<bool>,
 }
 
 /// `path` with each `{name}` or `{name:regex}` as one parameter, whatever the regex holds;
@@ -120,6 +125,20 @@ pub(super) fn actix_path(path: &str) -> Option<String> {
         }
     }
     (open == 0).then_some(out)
+}
+
+/// The type of actix-web's service configuration, by its last segment.
+const CONFIG: &str = "ServiceConfig";
+
+/// Whether an import writes `ServiceConfig` anywhere it may spell it.
+fn names_config(import: &Import) -> bool {
+    let named = match &import.name {
+        Imported::Name(name) | Imported::Path(name) => name.contains(CONFIG),
+        Imported::Member { name, module } => name.contains(CONFIG) || module.contains(CONFIG),
+        Imported::Glob { path, .. } => path.contains(CONFIG),
+        Imported::Qualified | Imported::Namespace | Imported::All => false,
+    };
+    named || import.local.contains(CONFIG) || import.source.contains(CONFIG)
 }
 
 /// The values `value` holds, the items of a tuple or a list (`.service((a, b))`) included.
@@ -143,6 +162,8 @@ impl<'c, 'a> Web<'c, 'a> {
             routes: Vec::new(),
             work: Cell::new(ITEM_WORK),
             mentioned: OnceCell::new(),
+            configs: RefCell::new(HashMap::new()),
+            imports_config: OnceCell::new(),
         }
     }
 
@@ -216,14 +237,36 @@ impl<'c, 'a> Web<'c, 'a> {
     /// whose type is actix-web's `ServiceConfig`.
     fn config(&self, path: &'a str, scope: &'a str, name: &str) -> bool {
         let receivers = &self.code.files()[path].receivers;
-        receivers.iter().any(|r| {
-            r.scope == scope
-                && r.name == name
-                && matches!(&r.class, Class::Type(t)
-                if self.code.outside(path, &r.scope, t, false).is_some_and(|o| {
-                    o.spelled.starts_with("actix_web.") && o.spelled.ends_with(".ServiceConfig")
-                }))
-        })
+        (receivers.iter()).any(|r| r.scope == scope && r.name == name && self.configures(path, r))
+    }
+
+    /// Whether the receiver `r` of `path` is written with actix-web's `ServiceConfig` type.
+    fn configures(&self, path: &'a str, r: &'a Receiver) -> bool {
+        matches!(&r.class, Class::Type(t)
+        if self.code.outside(path, &r.scope, t, false).is_some_and(|o| {
+            o.spelled.starts_with("actix_web.") && o.spelled.ends_with(".ServiceConfig")
+        }))
+    }
+
+    /// Whether `scope` of `path` binds a name to actix-web's `ServiceConfig` (`config`): without
+    /// one, no value written there is a service configuration (`configuration`).
+    fn holds_config(&self, path: &'a str, scope: &str) -> bool {
+        let mut configs = self.configs.borrow_mut();
+        let scopes = configs.entry(path).or_insert_with(|| {
+            // A type spelled `ServiceConfig` outside is written so, or bound by an import that
+            // names it: without such an import, a written type that does not name it is skipped.
+            let renamed = *self.imports_config.get_or_init(|| {
+                let files = self.code.files().values();
+                files.flat_map(|f| &f.imports).any(names_config)
+            });
+            let receivers = &self.code.files()[path].receivers;
+            (receivers.iter())
+                .filter(|r| renamed || matches!(&r.class, Class::Type(t) if t.contains(CONFIG)))
+                .filter(|r| self.configures(path, r))
+                .map(|r| r.scope.as_str())
+                .collect()
+        });
+        scopes.contains(scope)
     }
 
     /// The places the value a method is called on may be: the apps, scopes, resources and
@@ -291,7 +334,9 @@ impl<'c, 'a> Web<'c, 'a> {
                     // A function of the repository the call answers exactly: what it returns,
                     // else the call itself.
                     let function = code.definition(path, scope, &invocation.callee);
-                    let at = code.call_index(path, &invocation.range);
+                    let at = code
+                        .call_index(path, &invocation.range)
+                        .filter(|_| function.is_some());
                     let returned = at.map_or(Vec::new(), |at| code.returned(path, at));
                     let before = out.len();
                     for (at_path, name, value) in returned {
@@ -474,8 +519,12 @@ impl<'c, 'a> Web<'c, 'a> {
     /// (answered exactly) that takes one there is mounted where the first is.
     fn pass_config(&mut self, path: &'a str, call: &'a Call) {
         let code = self.code;
-        let (scope, plain) = (call.scope.as_str(), call.receiver.is_none());
-        let Some(target) = code.definition(path, scope, &call.callee).filter(|_| plain) else {
+        let scope = call.scope.as_str();
+        // An argument is a configuration only in a scope that binds one.
+        if call.receiver.is_some() || !self.holds_config(path, scope) {
+            return;
+        }
+        let Some(target) = code.definition(path, scope, &call.callee) else {
             return;
         };
         let defs = code.files()[target.path].defs.iter();

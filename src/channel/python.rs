@@ -1,6 +1,6 @@
 //! The channel kind's Python forms (spec #20, #73): the message libraries of the Python pack. A
 //! form is a method called on a client that traces back to the library's constructor
-//! (`Code::origins` with `Follow::Values` on the receiver), imported from the library's package:
+//! (complete constructor evidence in `names/python`), imported from the library's package:
 //! a `produce` on anything else is no producer. The constructor is named by `Code::imported`, the
 //! head of its callee, not by the `outside` an origin carries, which reads the whole name.
 
@@ -8,8 +8,9 @@ use super::message::{
     Handler, Message, bind, channel_name as name, consume, produce, publish, queue_name, topic,
     topics,
 };
-use crate::lang::{Call, Value, literal};
-use crate::resolve::{Code, Follow, Keywords, Of};
+use crate::lang::Value;
+use crate::names::python::{Construction, Factories, imported};
+use crate::resolve::{Code, Keywords};
 
 const CONFLUENT_PRODUCER: &str = "confluent_kafka.Producer";
 const CONFLUENT_CONSUMER: &str = "confluent_kafka.Consumer";
@@ -49,7 +50,11 @@ const METHODS: [&str; 12] = [
     "receive_message",
 ];
 /// The calls on a client that make another one: a connection's channel, a session's client.
-const FACTORIES: [&str; 2] = ["channel", "client"];
+const FACTORIES: [(&str, &str); 3] = [
+    ("pika.BlockingConnection", "channel"),
+    ("boto3.Session", "client"),
+    ("boto3.session.Session", "client"),
+];
 /// The callee of a call made on the result of another call, `pika.BlockingConnection(p).channel()`.
 const CALL: &str = "(call)";
 
@@ -63,18 +68,12 @@ enum Client {
     Redis,
 }
 
-/// A call that made a client, with the name its imports give what it called, such as
-/// `pika.BlockingConnection.channel`.
-struct Maker<'a> {
-    name: String,
-    call: &'a Call,
-}
-
 pub(super) fn messages(code: &Code) -> Vec<Message> {
     if !code.pack().extensions().contains(&"py") {
         return Vec::new();
     }
     let mut out = Vec::new();
+    let mut factories = Factories::new(code, &BOTO3_CLIENTS, &FACTORIES, "service_name");
     for (&path, facts) in code.files() {
         let kafka = facts.imports.iter().any(|i| i.source == "kafka");
         for (n, call) in facts.calls.iter().enumerate() {
@@ -94,8 +93,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             if receiver.is_empty() || !written || !METHODS.contains(&method) {
                 continue;
             }
-            let makers = receivers(code, path, call, true);
-            let Some(client) = makers.iter().find_map(client) else {
+            let Some(client) = factories.read(path, call).as_ref().and_then(client) else {
                 continue;
             };
             match (client, method) {
@@ -109,10 +107,10 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     out.extend(consume(code, path, n, "kafka", &read, None));
                 }
                 (Client::Sqs, "send_message" | "send_message_batch") => {
-                    out.extend(produce(code, path, n, "sqs", &|_, k| queue(k)));
+                    out.extend(sqs(code, path, n, false));
                 }
                 (Client::Sqs, "receive_message") => {
-                    out.extend(consume(code, path, n, "sqs", &|_, k| queue(k), None));
+                    out.extend(sqs(code, path, n, true));
                 }
                 (Client::Nats, "publish") => {
                     out.extend(produce(code, path, n, "nats", &|a, k| {
@@ -164,92 +162,18 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
 }
 
 /// The client `maker` made, if it is one a form is written for.
-fn client(maker: &Maker) -> Option<Client> {
+fn client(maker: &Construction) -> Option<Client> {
     Some(match maker.name.as_str() {
         CONFLUENT_PRODUCER | KAFKA_PRODUCER => Client::KafkaProducer,
         CONFLUENT_CONSUMER | KAFKA_CONSUMER => Client::KafkaConsumer,
         PIKA_CHANNEL => Client::Pika,
         name if NATS_CLIENTS.contains(&name) => Client::Nats,
         name if REDIS_CLIENTS.contains(&name) => Client::Redis,
-        name if BOTO3_CLIENTS.contains(&name) && is_sqs(maker.call) => Client::Sqs,
+        name if BOTO3_CLIENTS.contains(&name) && maker.argument.as_deref() == Some("sqs") => {
+            Client::Sqs
+        }
         _ => return None,
     })
-}
-
-/// The calls that made the client `form` is called on, written in `path`: the constructors and
-/// factories of a package outside the repository that its receiver traces back to, or the
-/// receiver itself when it is a call written in place. A factory (a connection's `channel()`, a
-/// session's `client()`) is named after the constructor of the client it is called on, a level
-/// deep.
-// ponytail: only one level of client factories is followed.
-fn receivers<'a>(code: &Code<'a>, path: &'a str, form: &'a Call, through: bool) -> Vec<Maker<'a>> {
-    let receiver = form.callee.rsplit_once('.').map_or("", |(r, _)| r);
-    let made: Vec<(&'a str, &'a Call)> = if receiver == CALL {
-        head(code, path, form)
-            .map(|call| (path, call))
-            .into_iter()
-            .collect()
-    } else {
-        (code
-            .origins(
-                path,
-                &form.scope,
-                Of::Name(receiver),
-                Follow::Values {
-                    passes: crate::resolve::passes_nothing,
-                },
-            )
-            .iter())
-        .filter_map(|o| o.call)
-        .filter_map(|(at, i)| Some((at, code.call(at, i)?)))
-        .collect()
-    };
-    (made.into_iter())
-        .flat_map(|(at, call)| made_by(code, at, call, through))
-        .collect()
-}
-
-/// The client the call `call` made, written in `at`: a constructor of a package outside the
-/// repository, or a factory on a client that one made.
-fn made_by<'a>(code: &Code<'a>, at: &'a str, call: &'a Call, through: bool) -> Vec<Maker<'a>> {
-    if let Some(name) = imported(code, at, &call.scope, &call.callee) {
-        return vec![Maker { name, call }];
-    }
-    let method = call.callee.rsplit_once('.').map(|(_, method)| method);
-    match method {
-        Some(method) if through && FACTORIES.contains(&method) => {
-            (receivers(code, at, call, false).into_iter())
-                .map(|made| Maker {
-                    name: format!("{}.{method}", made.name),
-                    call,
-                })
-                .collect()
-        }
-        _ => Vec::new(),
-    }
-}
-
-/// The call that `form`, a method called on a call written in place (`X(...).method()`), is
-/// called on: the last to end of the calls that start where `form` does, inside it.
-fn head<'a>(code: &Code<'a>, path: &'a str, form: &Call) -> Option<&'a Call> {
-    let (at, _) = (code.files()[path].calls.iter().enumerate())
-        .filter(|(_, c)| c.range.start == form.range.start && c.range.end < form.range.end)
-        .max_by_key(|(_, c)| c.range.end)?;
-    code.call(path, at)
-}
-
-/// What `callee`, written in `scope` of `path`, names in a package outside the repository,
-/// spelled from the package's import: `pika.BlockingConnection` however it is imported. A
-/// method of a local (`connection.channel`) is none.
-fn imported<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
-    let (package, spelled) = code.imported(path, scope, callee)?;
-    Some(format!("{package}.{spelled}"))
-}
-
-/// Whether a boto3 call makes a client for SQS: its service, the first argument, is `"sqs"`.
-fn is_sqs(call: &Call) -> bool {
-    let service = call.args.first().or_else(|| call.keyword("service_name"));
-    matches!(service, Some(Value::Str(parts)) if literal(parts).as_deref() == Some("sqs"))
 }
 
 /// The definition of the repository that the callback argument `at` (or the keyword `key`) of
@@ -304,6 +228,83 @@ fn streams(args: &[Value], kwargs: &Keywords) -> Option<Vec<Option<String>>> {
         Value::Ref(_) => None,
         _ => Some(vec![None]),
     }
+}
+
+/// AWS source-channel operations, in addition to the existing SQS forms.
+pub(super) fn aws(code: &Code) -> Vec<crate::contract::Found> {
+    if !code.pack().extensions().contains(&"py") {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    let mut factories = Factories::new(code, &BOTO3_CLIENTS, &FACTORIES, "service_name");
+    for (&path, facts) in code.files() {
+        for (n, call) in facts.calls.iter().enumerate() {
+            let Some((_, method)) = call.callee.rsplit_once('.') else {
+                continue;
+            };
+            if !super::aws::OPERATIONS.iter().any(|op| op.python == method) {
+                continue;
+            }
+            let Some(first) = factories.read(path, call).and_then(|made| made.argument) else {
+                continue;
+            };
+            let Some(operation) = super::aws::OPERATIONS
+                .iter()
+                .find(|op| op.service == first && op.python == method)
+            else {
+                continue;
+            };
+            let read = |_: &[Value], kwargs: &Keywords| operation.read(kwargs);
+            for found in code.expand(crate::resolve::Expand::Call(path, n), &read) {
+                out.extend(
+                    found
+                        .found
+                        .into_iter()
+                        .map(|name| operation.found(name, found.site)),
+                );
+            }
+        }
+    }
+    out
+}
+
+/// SQS queue arguments retain an environment read through the same exact expansion as URLs.
+fn sqs<'a>(code: &Code<'a>, path: &'a str, n: usize, consumer: bool) -> Vec<Message> {
+    code.expand(crate::resolve::Expand::Call(path, n), &|_, keywords| {
+        let names = queue(keywords)?;
+        let environment = keywords
+            .iter()
+            .find(|(key, _)| key == "QueueUrl")
+            .and_then(|(_, value)| crate::names::argument(value))
+            .and_then(|a| match a {
+                crate::names::Argument::Environment(name) => Some(name),
+                _ => None,
+            });
+        Some((names, environment))
+    })
+    .into_iter()
+    .flat_map(|expanded| {
+        let (names, environment) = expanded.found;
+        let role = if consumer {
+            super::message::Side::Consumer(Handler::Def {
+                path: expanded.site.0.into(),
+                name: code.files()[expanded.site.0].calls[expanded.site.1]
+                    .scope
+                    .clone(),
+            })
+        } else {
+            super::message::Side::Producer
+        };
+        names.into_iter().map(move |name| Message {
+            broker: "sqs",
+            name,
+            environment: environment.clone(),
+            path: expanded.site.0.into(),
+            call: expanded.site.1,
+            role: role.clone(),
+        })
+    })
+    .collect()
 }
 
 #[cfg(test)]

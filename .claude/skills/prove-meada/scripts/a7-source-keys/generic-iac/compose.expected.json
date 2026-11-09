@@ -1,0 +1,1568 @@
+{
+  "schema": 1,
+  "status": "SOURCE_KEY_READY_NOT_RUNTIME_PROOF",
+  "approved_source_commit": "fe0faf5dfd7408571bf982bc395ef10d1e456a0b",
+  "source": {
+    "origin": "https://github.com/zz-prove/a7-generic-compose-source-key.git",
+    "repository": "github.com/zz-prove/a7-generic-compose-source-key",
+    "commit": "f439b7f9eebbc7e4bb64130570c716fdb424c861",
+    "commit_message": "a7 independent source key",
+    "fixed_git": {
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_AUTHOR_NAME": "prove-meada",
+      "GIT_AUTHOR_EMAIL": "prove@example.com",
+      "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
+      "GIT_COMMITTER_NAME": "prove-meada",
+      "GIT_COMMITTER_EMAIL": "prove@example.com",
+      "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z"
+    },
+    "files": {
+      "harbor/compose.override.yaml": {
+        "mode": "file",
+        "bytes": 67,
+        "sha256": "6c160cd7973436a53d3210a9663dcbdeaa28d767a3d2c6564f69a22ec6875d41"
+      },
+      "harbor/docker-compose.yml": {
+        "mode": "file",
+        "bytes": 545,
+        "sha256": "c284da50b9de6048ee9d0f17ee53f204931c251b0a8c3031d018fd2f3c9757ef"
+      },
+      "harbor/source/Dockerfile": {
+        "mode": "file",
+        "bytes": 13,
+        "sha256": "bb57c7da220a8753d7bdabac0d3afdb6efa742e4c736c5bc93ab40dfd5e23b9b"
+      },
+      "orphan/compose.override.yml": {
+        "mode": "file",
+        "bytes": 63,
+        "sha256": "06b306dfc422aee81ab52867f69584e62f6ed9bbfb256a6f9add0fad3edc797a"
+      },
+      "port/compose.override.yaml": {
+        "mode": "file",
+        "bytes": 172,
+        "sha256": "3f1c70cdd8cc7d4ba7ed6a9225e405ebe12081a0b999970743918e713703ccd9"
+      },
+      "port/compose.override.yml": {
+        "mode": "file",
+        "bytes": 65,
+        "sha256": "793d785609b0dc19bd26ef99ad98c60fd986f2b057ed3f5d73684ccc032b83ab"
+      },
+      "port/compose.yaml": {
+        "mode": "file",
+        "bytes": 352,
+        "sha256": "4932b28c5d631bb2d7275be81cc8f88e689e51a469d3c04d8f095f6169e15e4d"
+      },
+      "port/compose.yml": {
+        "mode": "file",
+        "bytes": 59,
+        "sha256": "db7727970e72a6971405c1ddcd080a89ec4813c382edf9f8e9cd4472da463e9e"
+      },
+      "port/docker-compose.yaml": {
+        "mode": "file",
+        "bytes": 59,
+        "sha256": "d4d5863e8228af7c4c433a59c8416b42ec3a4f28fb7acd38ec6f327e5413ca6f"
+      },
+      "port/link": {
+        "mode": "symlink",
+        "target": "../harbor/source",
+        "target_sha256": "c340f09a4218d5b66d7bb5b73edcb2b7e23c0096c153c71a1a6a1e0561179c5d"
+      },
+      "port/src/Dockerfile": {
+        "mode": "file",
+        "bytes": 13,
+        "sha256": "bb57c7da220a8753d7bdabac0d3afdb6efa742e4c736c5bc93ab40dfd5e23b9b"
+      }
+    }
+  },
+  "rule_sources": [
+    "#642 stories18-31,39",
+    "ADR0025 Compose nodes, references and paths",
+    "docs/agents/ceilings/resolution-the-index-and-shape-readers/compose-cloudformation-serverless-and-images.md",
+    "https://github.com/compose-spec/compose-spec/blob/3a4a6995e4a971f6173dff9130cb3e38e6738651/container_spec.md#implicit-default-network"
+  ],
+  "derivation": "The ten services and sixteen exact reference groups below were hand-selected from the two small neutral projects before any product output. YAML parsing supplies source locations only; no Compose or general evaluator is run.",
+  "inventory_complete": true,
+  "runtime_verdict": "UNPROVEN",
+  "counts": {
+    "nodes": 10,
+    "references": 20,
+    "evaluation_units": 2,
+    "queries": 41
+  },
+  "nodes": [
+    {
+      "source": "a7-generic-compose-source-key",
+      "address": "services.api",
+      "type": "service",
+      "file": "port/compose.yaml",
+      "span": {
+        "first": 2,
+        "last": 7
+      },
+      "root": "port",
+      "block": "services.api",
+      "name": null,
+      "pattern": false,
+      "overridable": [],
+      "image": {
+        "text": "ghcr.io/proof-api:two",
+        "overridable": true,
+        "unresolved": false,
+        "source_field": {
+          "file": "port/compose.override.yaml",
+          "path": "services.api.image",
+          "line": 3
+        }
+      },
+      "build": {
+        "path": "port/src",
+        "overridable": false,
+        "source_field": {
+          "file": "port/compose.yaml",
+          "path": "services.api.build",
+          "line": 4
+        }
+      },
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "services.store",
+          "via": "depends_on",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.api.depends_on[0]",
+              "line": 5
+            }
+          ]
+        },
+        {
+          "to": "services.cache",
+          "via": "depends_on",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.override.yaml",
+              "path": "services.api.depends_on[0]",
+              "line": 4
+            }
+          ]
+        },
+        {
+          "to": "services.store",
+          "via": "links",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.api.links[0]",
+              "line": 6
+            }
+          ]
+        },
+        {
+          "to": "services.store",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.api.networks[0]",
+              "line": 7
+            }
+          ]
+        },
+        {
+          "to": "services.cache",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.api.networks[0]",
+              "line": 7
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "services.store",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.store.networks[0]",
+              "line": 11
+            }
+          ]
+        },
+        {
+          "from": "services.cache",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.cache.networks[0]",
+              "line": 15
+            }
+          ]
+        },
+        {
+          "from": "services.worker",
+          "via": "depends_on",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.override.yaml",
+              "path": "services.worker.depends_on[0]",
+              "line": 8
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-compose-source-key::port/compose.yaml::services.api"
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "address": "services.store",
+      "type": "service",
+      "file": "port/compose.yaml",
+      "span": {
+        "first": 8,
+        "last": 11
+      },
+      "root": "port",
+      "block": "services.store",
+      "name": null,
+      "pattern": false,
+      "overridable": [],
+      "image": {
+        "text": "redis:7",
+        "overridable": false,
+        "unresolved": false,
+        "source_field": {
+          "file": "port/compose.yaml",
+          "path": "services.store.image",
+          "line": 9
+        }
+      },
+      "build": null,
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "services.api",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.store.networks[0]",
+              "line": 11
+            }
+          ]
+        },
+        {
+          "to": "services.cache",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.store.networks[0]",
+              "line": 11
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "services.api",
+          "via": "depends_on",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.api.depends_on[0]",
+              "line": 5
+            }
+          ]
+        },
+        {
+          "from": "services.api",
+          "via": "links",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.api.links[0]",
+              "line": 6
+            }
+          ]
+        },
+        {
+          "from": "services.api",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.api.networks[0]",
+              "line": 7
+            }
+          ]
+        },
+        {
+          "from": "services.cache",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.cache.networks[0]",
+              "line": 15
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-compose-source-key::port/compose.yaml::services.store"
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "address": "services.cache",
+      "type": "service",
+      "file": "port/compose.yaml",
+      "span": {
+        "first": 12,
+        "last": 15
+      },
+      "root": "port",
+      "block": "services.cache",
+      "name": null,
+      "pattern": false,
+      "overridable": [],
+      "image": {
+        "text": "alpine:3",
+        "overridable": false,
+        "unresolved": false,
+        "source_field": {
+          "file": "port/compose.yaml",
+          "path": "services.cache.image",
+          "line": 13
+        }
+      },
+      "build": null,
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "services.api",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.cache.networks[0]",
+              "line": 15
+            }
+          ]
+        },
+        {
+          "to": "services.store",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.cache.networks[0]",
+              "line": 15
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "services.api",
+          "via": "depends_on",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.override.yaml",
+              "path": "services.api.depends_on[0]",
+              "line": 4
+            }
+          ]
+        },
+        {
+          "from": "services.api",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.api.networks[0]",
+              "line": 7
+            }
+          ]
+        },
+        {
+          "from": "services.store",
+          "via": "networks.shared",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.yaml",
+              "path": "services.store.networks[0]",
+              "line": 11
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-compose-source-key::port/compose.yaml::services.cache"
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "address": "services.worker",
+      "type": "service",
+      "file": "port/compose.override.yaml",
+      "span": {
+        "first": 5,
+        "last": 8
+      },
+      "root": "port",
+      "block": "services.worker",
+      "name": null,
+      "pattern": false,
+      "overridable": [],
+      "image": {
+        "text": "alpine:${UNSET}",
+        "overridable": false,
+        "unresolved": true,
+        "source_field": {
+          "file": "port/compose.override.yaml",
+          "path": "services.worker.image",
+          "line": 6
+        }
+      },
+      "build": {
+        "path": "port/link",
+        "overridable": false,
+        "source_field": {
+          "file": "port/compose.override.yaml",
+          "path": "services.worker.build",
+          "line": 7
+        }
+      },
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "services.api",
+          "via": "depends_on",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "port/compose.override.yaml",
+              "path": "services.worker.depends_on[0]",
+              "line": 8
+            }
+          ]
+        }
+      ],
+      "referenced_by": [],
+      "identity": "github.com/zz-prove/a7-generic-compose-source-key::port/compose.override.yaml::services.worker"
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "address": "services.api",
+      "type": "service",
+      "file": "harbor/docker-compose.yml",
+      "span": {
+        "first": 2,
+        "last": 11
+      },
+      "root": "harbor",
+      "block": "services.api",
+      "name": null,
+      "pattern": false,
+      "overridable": [],
+      "image": {
+        "text": "example/proof-api:${BRANCH}",
+        "overridable": false,
+        "unresolved": true,
+        "source_field": {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.api.image",
+          "line": 3
+        }
+      },
+      "build": null,
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "services.store",
+          "via": "depends_on",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.api.depends_on.store",
+              "line": 6
+            }
+          ]
+        },
+        {
+          "to": "services.store",
+          "via": "links",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.api.links[0]",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "to": "services.store",
+          "via": "networks.edge",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.api.networks[0]",
+              "line": 11
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "services.store",
+          "via": "networks.edge",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.store.networks[0]",
+              "line": 15
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-compose-source-key::harbor/docker-compose.yml::services.api"
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "address": "services.store",
+      "type": "service",
+      "file": "harbor/docker-compose.yml",
+      "span": {
+        "first": 12,
+        "last": 15
+      },
+      "root": "harbor",
+      "block": "services.store",
+      "name": null,
+      "pattern": false,
+      "overridable": [],
+      "image": {
+        "text": "redis:7",
+        "overridable": true,
+        "unresolved": false,
+        "source_field": {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.store.image",
+          "line": 13
+        }
+      },
+      "build": null,
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "services.api",
+          "via": "networks.edge",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.store.networks[0]",
+              "line": 15
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "services.api",
+          "via": "depends_on",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.api.depends_on.store",
+              "line": 6
+            }
+          ]
+        },
+        {
+          "from": "services.api",
+          "via": "links",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.api.links[0]",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "from": "services.api",
+          "via": "networks.edge",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.api.networks[0]",
+              "line": 11
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-compose-source-key::harbor/docker-compose.yml::services.store"
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "address": "services.observer",
+      "type": "service",
+      "file": "harbor/docker-compose.yml",
+      "span": {
+        "first": 16,
+        "last": 18
+      },
+      "root": "harbor",
+      "block": "services.observer",
+      "name": null,
+      "pattern": false,
+      "overridable": [],
+      "image": {
+        "text": "alpine:3",
+        "overridable": false,
+        "unresolved": false,
+        "source_field": {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.observer.image",
+          "line": 17
+        }
+      },
+      "build": {
+        "path": "harbor/source",
+        "overridable": false,
+        "source_field": {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.observer.build",
+          "line": 18
+        }
+      },
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "services.drifter",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.observer",
+              "line": 16,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        },
+        {
+          "to": "services.watcher",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.observer",
+              "line": 16,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "services.drifter",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.drifter",
+              "line": 20,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        },
+        {
+          "from": "services.watcher",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.watcher",
+              "line": 22,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-compose-source-key::harbor/docker-compose.yml::services.observer"
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "address": "services.drifter",
+      "type": "service",
+      "file": "harbor/docker-compose.yml",
+      "span": {
+        "first": 20,
+        "last": 21
+      },
+      "root": "harbor",
+      "block": "services.drifter",
+      "name": null,
+      "pattern": false,
+      "overridable": [],
+      "image": {
+        "text": "alpine:3",
+        "overridable": false,
+        "unresolved": false,
+        "source_field": {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.drifter.image",
+          "line": 21
+        }
+      },
+      "build": null,
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "services.watcher",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.drifter",
+              "line": 20,
+              "implicit": "project default network, networks/network_mode absent"
+            }
+          ]
+        },
+        {
+          "to": "services.observer",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.drifter",
+              "line": 20,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "services.watcher",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.watcher",
+              "line": 22,
+              "implicit": "project default network, networks/network_mode absent"
+            }
+          ]
+        },
+        {
+          "from": "services.observer",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.observer",
+              "line": 16,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-compose-source-key::harbor/docker-compose.yml::services.drifter"
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "address": "services.watcher",
+      "type": "service",
+      "file": "harbor/docker-compose.yml",
+      "span": {
+        "first": 22,
+        "last": 23
+      },
+      "root": "harbor",
+      "block": "services.watcher",
+      "name": null,
+      "pattern": false,
+      "overridable": [],
+      "image": {
+        "text": "alpine:3",
+        "overridable": false,
+        "unresolved": false,
+        "source_field": {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.watcher.image",
+          "line": 23
+        }
+      },
+      "build": null,
+      "handler": null,
+      "events": [],
+      "references": [
+        {
+          "to": "services.drifter",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.watcher",
+              "line": 22,
+              "implicit": "project default network, networks/network_mode absent"
+            }
+          ]
+        },
+        {
+          "to": "services.observer",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.watcher",
+              "line": 22,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        }
+      ],
+      "referenced_by": [
+        {
+          "from": "services.drifter",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.drifter",
+              "line": 20,
+              "implicit": "project default network, networks/network_mode absent"
+            }
+          ]
+        },
+        {
+          "from": "services.observer",
+          "via": "networks.default",
+          "level": "exact",
+          "source_fields": [
+            {
+              "file": "harbor/docker-compose.yml",
+              "path": "services.observer",
+              "line": 16,
+              "implicit": "project default network, networks empty or absent and network_mode absent"
+            }
+          ]
+        }
+      ],
+      "identity": "github.com/zz-prove/a7-generic-compose-source-key::harbor/docker-compose.yml::services.watcher"
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "address": "services.hoster",
+      "type": "service",
+      "file": "harbor/docker-compose.yml",
+      "span": {
+        "first": 24,
+        "last": 26
+      },
+      "root": "harbor",
+      "block": "services.hoster",
+      "name": null,
+      "pattern": false,
+      "overridable": [],
+      "image": {
+        "text": "alpine:3",
+        "overridable": false,
+        "unresolved": false,
+        "source_field": {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.hoster.image",
+          "line": 25
+        }
+      },
+      "build": null,
+      "handler": null,
+      "events": [],
+      "references": [],
+      "referenced_by": [],
+      "identity": "github.com/zz-prove/a7-generic-compose-source-key::harbor/docker-compose.yml::services.hoster"
+    }
+  ],
+  "references": [
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "port",
+      "from": "services.api",
+      "to": "services.store",
+      "via": "depends_on",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "port/compose.yaml",
+          "path": "services.api.depends_on[0]",
+          "line": 5
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "port",
+      "from": "services.api",
+      "to": "services.cache",
+      "via": "depends_on",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "port/compose.override.yaml",
+          "path": "services.api.depends_on[0]",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "port",
+      "from": "services.api",
+      "to": "services.store",
+      "via": "links",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "port/compose.yaml",
+          "path": "services.api.links[0]",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "port",
+      "from": "services.api",
+      "to": "services.store",
+      "via": "networks.shared",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "port/compose.yaml",
+          "path": "services.api.networks[0]",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "port",
+      "from": "services.api",
+      "to": "services.cache",
+      "via": "networks.shared",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "port/compose.yaml",
+          "path": "services.api.networks[0]",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "port",
+      "from": "services.store",
+      "to": "services.api",
+      "via": "networks.shared",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "port/compose.yaml",
+          "path": "services.store.networks[0]",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "port",
+      "from": "services.store",
+      "to": "services.cache",
+      "via": "networks.shared",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "port/compose.yaml",
+          "path": "services.store.networks[0]",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "port",
+      "from": "services.cache",
+      "to": "services.api",
+      "via": "networks.shared",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "port/compose.yaml",
+          "path": "services.cache.networks[0]",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "port",
+      "from": "services.cache",
+      "to": "services.store",
+      "via": "networks.shared",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "port/compose.yaml",
+          "path": "services.cache.networks[0]",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "port",
+      "from": "services.worker",
+      "to": "services.api",
+      "via": "depends_on",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "port/compose.override.yaml",
+          "path": "services.worker.depends_on[0]",
+          "line": 8
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.api",
+      "to": "services.store",
+      "via": "depends_on",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.api.depends_on.store",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.api",
+      "to": "services.store",
+      "via": "links",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.api.links[0]",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.api",
+      "to": "services.store",
+      "via": "networks.edge",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.api.networks[0]",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.store",
+      "to": "services.api",
+      "via": "networks.edge",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.store.networks[0]",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.drifter",
+      "to": "services.watcher",
+      "via": "networks.default",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.drifter",
+          "line": 20,
+          "implicit": "project default network, networks/network_mode absent"
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.watcher",
+      "to": "services.drifter",
+      "via": "networks.default",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.watcher",
+          "line": 22,
+          "implicit": "project default network, networks/network_mode absent"
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.drifter",
+      "to": "services.observer",
+      "via": "networks.default",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.drifter",
+          "line": 20,
+          "implicit": "project default network, networks empty or absent and network_mode absent"
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.observer",
+      "to": "services.drifter",
+      "via": "networks.default",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.observer",
+          "line": 16,
+          "implicit": "project default network, networks empty or absent and network_mode absent"
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.observer",
+      "to": "services.watcher",
+      "via": "networks.default",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.observer",
+          "line": 16,
+          "implicit": "project default network, networks empty or absent and network_mode absent"
+        }
+      ]
+    },
+    {
+      "source": "a7-generic-compose-source-key",
+      "root": "harbor",
+      "from": "services.watcher",
+      "to": "services.observer",
+      "via": "networks.default",
+      "level": "exact",
+      "source_fields": [
+        {
+          "file": "harbor/docker-compose.yml",
+          "path": "services.watcher",
+          "line": 22,
+          "implicit": "project default network, networks empty or absent and network_mode absent"
+        }
+      ]
+    }
+  ],
+  "negative_nodes": [
+    {
+      "file": "port/compose.yml",
+      "address": "services.refusedSecondBase",
+      "reason": "compose.yaml wins first-base filename order"
+    },
+    {
+      "file": "port/docker-compose.yaml",
+      "address": "services.refusedOtherFamily",
+      "reason": "compose family selected before docker-compose family"
+    },
+    {
+      "file": "port/compose.override.yml",
+      "address": "services.refusedSecondOverride",
+      "reason": "compose.override.yaml wins first override of selected family"
+    },
+    {
+      "file": "harbor/compose.override.yaml",
+      "address": "services.refusedWrongFamilyOverride",
+      "reason": "compose-family override does not merge into docker-compose base family"
+    },
+    {
+      "file": "orphan/compose.override.yml",
+      "address": "services.refusedOrphanOverride",
+      "reason": "override with no matching-family base is no project"
+    }
+  ],
+  "selected_units": [
+    {
+      "root": "port",
+      "base": "port/compose.yaml",
+      "override": "port/compose.override.yaml"
+    },
+    {
+      "root": "harbor",
+      "base": "harbor/docker-compose.yml",
+      "override": null
+    }
+  ],
+  "dropped_reference_sites": [
+    {
+      "root": "harbor",
+      "from": "services.api",
+      "target": "missing",
+      "via": "depends_on",
+      "reason": "no such service in evaluation unit"
+    },
+    {
+      "root": "harbor",
+      "from": "services.api",
+      "target": "missing",
+      "via": "links",
+      "reason": "no such service in evaluation unit"
+    }
+  ],
+  "build_path_controls": [
+    {
+      "root": "port",
+      "node": "services.api",
+      "source": "./src",
+      "stored": "port/src",
+      "reason": "relative path inside repository"
+    },
+    {
+      "root": "port",
+      "node": "services.store",
+      "source": "/proof-denied",
+      "stored": null,
+      "reason": "absolute path"
+    },
+    {
+      "root": "port",
+      "node": "services.cache",
+      "source": "https://example.invalid/source",
+      "stored": null,
+      "reason": "remote URL"
+    },
+    {
+      "root": "harbor",
+      "node": "services.api",
+      "source": "../../escape",
+      "stored": null,
+      "reason": "escapes repository root after normalization"
+    },
+    {
+      "root": "harbor",
+      "node": "services.store",
+      "source": "${CONTEXT}",
+      "stored": null,
+      "reason": "unresolved interpolation"
+    },
+    {
+      "root": "port",
+      "node": "services.worker",
+      "source": "./link",
+      "stored": "port/link",
+      "reason": "Compose text-only path recording follows no symlink; direct code or Dockerfile reading must refuse the symlink as required by ADR0025 and the documented Compose ceiling"
+    }
+  ],
+  "network_controls": [
+    "port api/store/cache share explicit shared only; worker has default alone but still references api by depends_on.",
+    "harbor api/store share edge; observer with networks: {} and drifter/watcher with omitted networks share implicit default; hoster network_mode host has no default-network references.",
+    "Equal service names in port and harbor never create cross-unit references."
+  ],
+  "refresh": [
+    {
+      "name": "same-size image edit",
+      "file": "port/compose.override.yaml",
+      "replace_once": {
+        "from": "TAG:-two",
+        "to": "TAG:-six"
+      },
+      "expected_changed_fields": [
+        {
+          "root": "port",
+          "node": "services.api",
+          "image": "ghcr.io/proof-api:six"
+        }
+      ],
+      "nodes_references_spans_roots_unchanged": true
+    },
+    {
+      "name": "override removal then exact restoration",
+      "remove_file": "port/compose.override.yaml",
+      "after_remove": {
+        "node_count": 9,
+        "reference_count": 14,
+        "removed_nodes": [
+          "services.worker (root port)"
+        ],
+        "changed_fields": [
+          {
+            "node": "services.api (root port)",
+            "image": "docker.io/proof-api:one"
+          }
+        ],
+        "removed_references": [
+          {
+            "root": "port",
+            "from": "services.api",
+            "to": "services.cache",
+            "via": "depends_on",
+            "level": "exact"
+          },
+          {
+            "root": "port",
+            "from": "services.worker",
+            "to": "services.api",
+            "via": "depends_on",
+            "level": "exact"
+          }
+        ]
+      },
+      "after_restore": "exact original tracked bytes and symlinks; original 10-node/16-reference multiset, both trace directions and same-scope stdio/HTTP bytes"
+    }
+  ],
+  "restoration_hashes": {
+    "harbor/compose.override.yaml": {
+      "mode": "file",
+      "bytes": 67,
+      "sha256": "6c160cd7973436a53d3210a9663dcbdeaa28d767a3d2c6564f69a22ec6875d41"
+    },
+    "harbor/docker-compose.yml": {
+      "mode": "file",
+      "bytes": 545,
+      "sha256": "c284da50b9de6048ee9d0f17ee53f204931c251b0a8c3031d018fd2f3c9757ef"
+    },
+    "harbor/source/Dockerfile": {
+      "mode": "file",
+      "bytes": 13,
+      "sha256": "bb57c7da220a8753d7bdabac0d3afdb6efa742e4c736c5bc93ab40dfd5e23b9b"
+    },
+    "orphan/compose.override.yml": {
+      "mode": "file",
+      "bytes": 63,
+      "sha256": "06b306dfc422aee81ab52867f69584e62f6ed9bbfb256a6f9add0fad3edc797a"
+    },
+    "port/compose.override.yaml": {
+      "mode": "file",
+      "bytes": 172,
+      "sha256": "3f1c70cdd8cc7d4ba7ed6a9225e405ebe12081a0b999970743918e713703ccd9"
+    },
+    "port/compose.override.yml": {
+      "mode": "file",
+      "bytes": 65,
+      "sha256": "793d785609b0dc19bd26ef99ad98c60fd986f2b057ed3f5d73684ccc032b83ab"
+    },
+    "port/compose.yaml": {
+      "mode": "file",
+      "bytes": 352,
+      "sha256": "4932b28c5d631bb2d7275be81cc8f88e689e51a469d3c04d8f095f6169e15e4d"
+    },
+    "port/compose.yml": {
+      "mode": "file",
+      "bytes": 59,
+      "sha256": "db7727970e72a6971405c1ddcd080a89ec4813c382edf9f8e9cd4472da463e9e"
+    },
+    "port/docker-compose.yaml": {
+      "mode": "file",
+      "bytes": 59,
+      "sha256": "d4d5863e8228af7c4c433a59c8416b42ec3a4f28fb7acd38ec6f327e5413ca6f"
+    },
+    "port/link": {
+      "mode": "symlink",
+      "target": "../harbor/source",
+      "target_sha256": "c340f09a4218d5b66d7bb5b73edcb2b7e23c0096c153c71a1a6a1e0561179c5d"
+    },
+    "port/src/Dockerfile": {
+      "mode": "file",
+      "bytes": 13,
+      "sha256": "bb57c7da220a8753d7bdabac0d3afdb6efa742e4c736c5bc93ab40dfd5e23b9b"
+    }
+  },
+  "limitations": [
+    "This source key supplies generic Compose fields and complete source reference groups, not the full image/build/direct-code or environment contract verdict.",
+    "Compose intentionally records a lexically bounded symlink build path without touching it; subsequent direct code/path reading must refuse traversal."
+  ],
+  "source_edits": [
+    {
+      "phase": "compose-image-default",
+      "starts_from": "baseline",
+      "file": "port/compose.override.yaml",
+      "replace_exactly_once": {
+        "before": "${TAG:-two}",
+        "after": "${TAG:-six}"
+      },
+      "sha256_before": "3f1c70cdd8cc7d4ba7ed6a9225e405ebe12081a0b999970743918e713703ccd9",
+      "sha256_after": "a1f9a6c7f2428fe3d7f49f88cd5fab751c67c5337504cf3d77d01be7b3f606c3",
+      "same_utf8_byte_count": true,
+      "expected": {
+        "node_count": 10,
+        "reference_count": 20,
+        "changed_image": {
+          "root": "port",
+          "address": "services.api",
+          "text": "ghcr.io/proof-api:six",
+          "overridable": true
+        }
+      },
+      "restoration": "Restore baseline exact bytes, then require original SHA256, complete node/reference/image/event sets, and matching warm/cold captures in both stdio/HTTP."
+    },
+    {
+      "phase": "compose-reference-remove",
+      "starts_from": "baseline",
+      "file": "port/compose.override.yaml",
+      "replace_exactly_once": {
+        "before": "depends_on: [cache]",
+        "after": "depends_on: [store]"
+      },
+      "sha256_before": "3f1c70cdd8cc7d4ba7ed6a9225e405ebe12081a0b999970743918e713703ccd9",
+      "sha256_after": "e98fe9ab0bf2878bd475a7c70bbfe7e6d8a040847d291f755a0a8fddd8b25eb0",
+      "same_utf8_byte_count": true,
+      "expected": {
+        "node_count": 10,
+        "reference_count": 19,
+        "removed_references": [
+          {
+            "root": "port",
+            "from": "services.api",
+            "to": "services.cache",
+            "via": "depends_on",
+            "level": "exact"
+          }
+        ],
+        "all_other_fields_unchanged": true
+      },
+      "restoration": "Restore baseline exact bytes, then require original SHA256, complete node/reference/image/event sets, and matching warm/cold captures in both stdio/HTTP."
+    },
+    {
+      "phase": "compose-override-clear",
+      "starts_from": "baseline",
+      "file": "port/compose.override.yaml",
+      "replace_exactly_once": {
+        "before": "services:\n  api:\n    image: ${REGISTRY:-ghcr.io}/proof-api:${TAG:-two}\n    depends_on: [cache]\n  worker:\n    image: alpine:${UNSET}\n    build: ./link\n    depends_on: [api]\n",
+        "after": ""
+      },
+      "sha256_before": "3f1c70cdd8cc7d4ba7ed6a9225e405ebe12081a0b999970743918e713703ccd9",
+      "sha256_after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "same_utf8_byte_count": false,
+      "expected": {
+        "node_count": 9,
+        "reference_count": 18,
+        "removed_nodes": [
+          "services.worker (root port)"
+        ],
+        "changed_fields": [
+          {
+            "node": "services.api (root port)",
+            "image": "docker.io/proof-api:one"
+          }
+        ],
+        "removed_references": [
+          {
+            "root": "port",
+            "from": "services.api",
+            "to": "services.cache",
+            "via": "depends_on",
+            "level": "exact"
+          },
+          {
+            "root": "port",
+            "from": "services.worker",
+            "to": "services.api",
+            "via": "depends_on",
+            "level": "exact"
+          }
+        ]
+      },
+      "restoration": "Restore baseline exact bytes, then require original SHA256, complete node/reference/image/event sets, and matching warm/cold captures in both stdio/HTTP."
+    }
+  ],
+  "contract_correction": {
+    "reason": "Official Compose empty-or-absent rule supplies four omitted directed default-network references. Source, query bytes and all node fields are unchanged.",
+    "official_source_sha256": "1196ff70551305967d82e2f1764cdbf261d2c451698516d5a637fdb1e7cf77aa",
+    "official_source_bytes": 51169,
+    "official_source_commit": "3a4a6995e4a971f6173dff9130cb3e38e6738651",
+    "revised_after_runtime_capture": true,
+    "checker_mode": "inline",
+    "prior_reference_count": 16,
+    "reference_count": 20,
+    "source_quote": "If `networks` is empty or absent from the Compose file, Compose considers an implicit definition for the service to be connected to the `default` network."
+  }
+}

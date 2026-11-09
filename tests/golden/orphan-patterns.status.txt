@@ -1,0 +1,8 @@
+example.com/orphan/app (.) indexed, 1 files
+  resource::s3::archive is unlinked: no writer and reader in different repositories
+  resource::s3::unmanaged-prod is unlinked: no writer and reader in different repositories
+  orphan channel::sqs::unmanaged: no provisioner; app.ts::sendUnmanaged::SendMessageCommand#0
+example.com/orphan/infra (../orphan-infra) indexed, 0 files
+  orphan channel::sqs::unused: no use; main.tf:2 aws_sqs_queue.unused (root .)
+  orphan resource::s3::unused: no use; main.tf:4 aws_s3_bucket.unused (root .)
+  config files: 2 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 6, redacted: 0

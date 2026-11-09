@@ -1,0 +1,15 @@
+channel::sqs::unmanaged
+  example.com/orphan/app producer app.ts:10 sendUnmanaged (no provisioner in the workspace)
+
+example.com/orphan/app app.ts:9-11 sendUnmanaged
+community: none
+processes: 1 (1 export; 1 repository): sendUnmanaged (example.com/orphan/app)
+async function sendUnmanaged() {
+  await client.send(new SendMessageCommand({ QueueUrl: "https://sqs.eu-west-1.amazonaws.com/123456789012/unmanaged", MessageBody: "{}" }));
+}
+callers: none
+callees:
+example.com/orphan/app app.ts:10 (unresolved) SendMessageCommand
+example.com/orphan/app app.ts:10 (unresolved) client.send
+contracts:
+example.com/orphan/app app.ts:10 produces channel::sqs::unmanaged (no provisioner in the workspace)

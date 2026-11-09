@@ -11,6 +11,9 @@ root=$(git rev-parse --show-toplevel)
 target=${CARGO_TARGET_DIR:-$root/target}
 mkdir -p "$run/bin"
 read -r -a cargo <<<"${PROVE_CARGO:-cargo}"
+# Every build of a run at one optimization level, whatever each tree's Cargo.toml sets for its
+# dev profile, so the time and memory budgets compare like with like.
+export CARGO_PROFILE_DEV_OPT_LEVEL=1
 args=(build --locked --target-dir "$target")
 [ -n "$features" ] && args+=(--features "$features")
 if [ "$rev" = . ]; then

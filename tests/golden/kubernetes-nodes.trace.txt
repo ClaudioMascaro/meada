@@ -1,0 +1,27 @@
+example.com/acme/deploy base/ingress.yaml:1 Ingress.networking.k8s.io/shop-dev/dev-edge
+  example.com/acme/deploy base/service.yaml:1 Service/shop-dev/dev-api via backend shop.example.com/api
+    example.com/acme/deploy base/deployment.yaml:1 Deployment.apps/shop-dev/dev-api via selector app=api
+      example.com/acme/deploy base/config.yaml:1 ConfigMap/shop-dev/dev-api-settings via envFrom
+      example.com/acme/deploy base/config.yaml:1 ConfigMap/shop-dev/dev-api-settings via volume settings (see above)
+      example.com/acme/deploy base/config.yaml:8 Secret/shop-dev/dev-db-credentials via env DATABASE_URL
+      example.com/acme/deploy base/serviceaccount.yaml:1 ServiceAccount/shop-dev/dev-runner via serviceAccountName
+chain: exact · 0 hops · 1 repos · 195 tokens
+
+example.com/acme/deploy base/service.yaml:1 Service/shop/api-v2
+  example.com/acme/deploy base/deployment.yaml:1 Deployment.apps/shop/api-v2 via selector app=api
+    example.com/acme/deploy base/config.yaml:1 ConfigMap/shop/api-settings-v2 via envFrom
+    example.com/acme/deploy base/config.yaml:1 ConfigMap/shop/api-settings-v2 via volume settings (see above)
+    example.com/acme/deploy base/config.yaml:8 Secret/shop/db-credentials-v2 via env DATABASE_URL
+    example.com/acme/deploy base/serviceaccount.yaml:1 ServiceAccount/shop/runner-v2 via serviceAccountName
+chain: exact · 0 hops · 1 repos · 154 tokens
+
+example.com/acme/deploy base/config.yaml:1 ConfigMap/shop/api-settings-v2
+  example.com/acme/deploy base/deployment.yaml:1 Deployment.apps/shop/api-v2 via envFrom
+    example.com/acme/deploy base/service.yaml:1 Service/shop/api-v2 via selector app=api
+      example.com/acme/deploy base/ingress.yaml:1 Ingress.networking.k8s.io/shop/edge-v2 via backend shop.example.com/api
+  example.com/acme/deploy base/deployment.yaml:1 Deployment.apps/shop/api-v2 via volume settings (see above)
+chain: exact · 0 hops · 1 repos · 133 tokens
+
+example.com/acme/deploy raw/stack.yaml:18 Service/tools/runner
+  example.com/acme/deploy raw/stack.yaml:6 Pod/tools/runner via selector app=runner
+chain: exact · 0 hops · 1 repos · 49 tokens

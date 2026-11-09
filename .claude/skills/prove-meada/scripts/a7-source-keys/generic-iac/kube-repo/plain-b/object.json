@@ -1,0 +1,1 @@
+{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"api","namespace":"amber"},"spec":{"template":{"metadata":{"labels":{"app":"proof"}},"spec":{"containers":[{"name":"server","image":"example/proof:v1","envFrom":[{"configMapRef":{"name":"cfg"}}]}]}}}}

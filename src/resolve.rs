@@ -12,10 +12,14 @@ use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::lang::{
-    Annotated, Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, Import, Imported,
-    Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step, Taker,
-    Through, Ty, Value,
+    Annotated, Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, FirstResult, Import,
+    Imported, Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step,
+    Taker, Through, Ty, Value,
 };
+
+mod mutations;
+pub(crate) use mutations::MemberEffect;
+pub(crate) type CallWrites = for<'a> fn(&Code<'a>, &'a str, usize) -> Option<Vec<MemberEffect<'a>>>;
 
 /// A definition: the repository-relative path of its file and its qualified name.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -24,6 +28,7 @@ pub struct Target<'a> {
     pub name: &'a str,
 }
 
+#[derive(Clone)]
 pub enum Resolution<'a> {
     /// Scope and import resolution found one definition.
     Exact(Target<'a>),
@@ -319,6 +324,66 @@ struct Cut;
 /// the position of the first parameter, then field of one, that spells it.
 type Params<'a> = HashMap<(&'a str, &'a str), (usize, Option<usize>)>;
 
+/// A file's scopes by the name they bind: as a local, constant, parameter or receiver
+/// (`values`), and as a function they declare (`functions`).
+#[derive(Default)]
+struct Binders<'a> {
+    values: HashMap<&'a str, Vec<&'a str>>,
+    functions: HashMap<&'a str, Vec<&'a str>>,
+}
+
+impl<'a> Binders<'a> {
+    /// Every file's, from the resolver's bindings and overload families.
+    fn of(
+        locals: &HashMap<&'a str, HashSet<&'a str>>,
+        consts: &HashMap<&'a str, HashSet<&'a str>>,
+        params: &HashMap<&'a str, Params<'a>>,
+        receivers: &HashMap<&'a str, HashMap<(&'a str, &'a str), &'a Class>>,
+        overloads: &HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
+    ) -> HashMap<&'a str, Self> {
+        // `scope.name`, split as `qualify` joins them.
+        let split = |q: &'a str| {
+            let scope = crate::parent(q);
+            (
+                scope,
+                if scope.is_empty() {
+                    q
+                } else {
+                    &q[scope.len() + 1..]
+                },
+            )
+        };
+        let mut all: HashMap<&'a str, Self> = HashMap::new();
+        for (&path, names) in locals.iter().chain(consts) {
+            let values = &mut all.entry(path).or_default().values;
+            for &q in names {
+                let (scope, name) = split(q);
+                values.entry(name).or_default().push(scope);
+            }
+        }
+        for (&path, bound) in params {
+            let values = &mut all.entry(path).or_default().values;
+            for &(scope, name) in bound.keys() {
+                values.entry(name).or_default().push(scope);
+            }
+        }
+        for (&path, bound) in receivers {
+            let values = &mut all.entry(path).or_default().values;
+            for &(scope, name) in bound.keys() {
+                values.entry(name).or_default().push(scope);
+            }
+        }
+        for (&path, families) in overloads {
+            let functions = &mut all.entry(path).or_default().functions;
+            for &q in families.keys() {
+                let (scope, name) = split(q);
+                functions.entry(name).or_default().push(scope);
+            }
+        }
+        all
+    }
+}
+
 /// The files of one language pack, resolved together.
 pub struct Resolver<'a> {
     files: &'a BTreeMap<&'a str, &'a Facts>,
@@ -379,6 +444,9 @@ pub struct Resolver<'a> {
     /// counts them all. Each is held by its file and name, owned: a `Target` here would make
     /// the resolver invariant in `'a`.
     linearizing: RefCell<Vec<(String, String)>>,
+    /// Each file's binding scopes by name (`around`), for a language whose blocks see a
+    /// receiver's members.
+    binders: HashMap<&'a str, Binders<'a>>,
     /// Whether a receiver was cut at `RECEIVER_DEPTH`, a family a member lookup reached at
     /// `FAMILY_DEPTH`, or a link at `LINK_DEPTH` past the links of the walks around it
     /// (`Resolver::cut_link`), since the outermost family began. The cut counts the receivers,
@@ -416,6 +484,13 @@ pub struct Resolver<'a> {
     /// reach another function: it is not kept, so a wrapper or a parameter is never climbed
     /// through it.
     callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
+    /// What each call resolved to when the resolver was built, by file and position
+    /// (`resolved_at`).
+    built: HashMap<&'a str, Vec<Resolution<'a>>>,
+    /// Whether `built` holds what `call` answers now: it was resolved under the `reaches` the
+    /// resolver has. Else only its `exact` calls are, since no name match gives one and only
+    /// name matches read `reaches` (`candidates`); `publishing` changes no call.
+    built_final: bool,
     /// The calls made on a receiver that reach each extension method (`Resolver::extension_call`),
     /// sorted: a name match the value flow takes, as the language binds it.
     extension_callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
@@ -705,11 +780,43 @@ impl<'a> Resolver<'a> {
     }
 
     /// `new`, with the groups of files that share one top-level scope (`Layout::shared`).
+    #[cfg(test)]
     pub fn with_shared(
         files: &'a BTreeMap<&'a str, &'a Facts>,
         modules: Modules,
         shared: Vec<Vec<String>>,
         language: &dyn LanguagePack,
+    ) -> Self {
+        Self::built(files, modules, shared, language, None)
+    }
+
+    /// The resolver of the files of a pack, under what its `layout` makes of them: the shared
+    /// scopes, the files it publishes (`publishing`) and the files each reaches.
+    pub fn with_layout(
+        files: &'a BTreeMap<&'a str, &'a Facts>,
+        layout: crate::lang::Layout,
+        language: &dyn LanguagePack,
+    ) -> Self {
+        let resolver = Self::built(
+            files,
+            layout.modules,
+            layout.shared,
+            language,
+            layout.reaches,
+        );
+        resolver.publishing(layout.published)
+    }
+
+    /// The resolver of `files`, its name matches limited to the definitions each file reaches
+    /// (`Layout::reaches`; `None` reaches every file) from the first call it resolves, unless
+    /// its extension callers need the calls resolved without that limit. `callers` holds exact
+    /// calls alone, which the limit leaves as they are.
+    fn built(
+        files: &'a BTreeMap<&'a str, &'a Facts>,
+        modules: Modules,
+        shared: Vec<Vec<String>>,
+        language: &dyn LanguagePack,
+        reaches: Option<Reaches>,
     ) -> Self {
         let defs: HashMap<&str, HashMap<&str, &Def>> = files
             .iter()
@@ -966,6 +1073,11 @@ impl<'a> Resolver<'a> {
                 (!stars.is_empty()).then_some((*path, (stars, after)))
             })
             .collect();
+        let binders = if language.members_in_scope() {
+            Binders::of(&locals, &consts, &params, &receivers, &overloads)
+        } else {
+            HashMap::new()
+        };
         let mut resolver = Self {
             files,
             defs,
@@ -997,6 +1109,7 @@ impl<'a> Resolver<'a> {
             takers,
             families: HashMap::new(),
             linearizing: RefCell::new(Vec::new()),
+            binders,
             cut: Cell::new(false),
             links: Cell::new(0),
             chain: Cell::new(0),
@@ -1010,6 +1123,8 @@ impl<'a> Resolver<'a> {
             known: crate::lang::known_outside(language),
             globals: language.globals(),
             callers: HashMap::new(),
+            built: HashMap::new(),
+            built_final: false,
             extension_callers: HashMap::new(),
             by_name,
             modules,
@@ -1161,11 +1276,22 @@ impl<'a> Resolver<'a> {
             .for_each(|b| b.sort_by_key(|b| b.of_trait));
         (resolver.impls, resolver.blocks, resolver.outside) = (impls, blocks, outside);
         (resolver.unread, resolver.extensions) = (unread, extensions);
+        // The extension callers are name matches made without `reaches`: a pack with extension
+        // methods is limited to it once they are found.
+        let mut reaches = reaches;
+        if !resolver.extension_methods {
+            resolver.reaches = reaches.take();
+            resolver.built_final = true;
+        }
         let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         let mut extension_callers: HashMap<Target, Vec<Caller>> = HashMap::new();
+        let mut built = HashMap::new();
         for (path, facts) in files {
+            let built: &mut Vec<Resolution> = built.entry(*path).or_default();
             for (index, call) in facts.calls.iter().enumerate() {
-                match resolver.call(path, call) {
+                let resolution = resolver.call(path, call);
+                built.push(resolution.clone());
+                match resolution {
                     Resolution::Exact(target) => {
                         callers
                             .entry(target)
@@ -1180,6 +1306,10 @@ impl<'a> Resolver<'a> {
             }
         }
         (resolver.callers, resolver.extension_callers) = (callers, extension_callers);
+        resolver.built = built;
+        if reaches.is_some() {
+            resolver.reaches = reaches;
+        }
         resolver
     }
 
@@ -1216,15 +1346,18 @@ impl<'a> Resolver<'a> {
         self
     }
 
-    /// Limits name matches to the definitions each file reaches (`Layout::reaches`); `None`
-    /// reaches every file. `callers` holds exact calls alone, which this leaves as they are.
-    pub fn reaching(mut self, reaches: Option<Reaches>) -> Self {
-        self.reaches = reaches;
-        self
-    }
-
     pub fn call(&self, path: &'a str, call: &'a Call) -> Resolution<'a> {
         self.resolved(path, call, true, &mut Work::default())
+    }
+
+    /// `call` of the call at `index` of `path`, read from what the resolver resolved when it
+    /// was built where that still holds (`built_final`).
+    pub fn resolved_at(&self, path: &'a str, index: usize) -> Resolution<'a> {
+        match self.built.get(path).and_then(|b| b.get(index)) {
+            Some(known) if self.built_final => known.clone(),
+            Some(exact @ Resolution::Exact(_)) => exact.clone(),
+            _ => self.call(path, &self.files[path].calls[index]),
+        }
     }
 
     /// `call`, resolved. Where the pack only guesses at constructor syntax
@@ -2999,7 +3132,15 @@ impl<'a> Resolver<'a> {
             name = next;
         }
         let (head, rest) = name.split_at(name.find('.').unwrap_or(name.len()));
-        let latest = self.by_local[path].of(head).last();
+        // The innermost scope's import of the head: a function's own hides the module's.
+        let mut at = Some(scope);
+        let latest = loop {
+            let Some(s) = at else { break None };
+            if let Some(found) = self.by_local[path].of(&crate::qualify(s, head)).last() {
+                break Some(found);
+            }
+            at = (!s.is_empty()).then(|| crate::parent(s));
+        };
         match latest.map(|&at| (&imports[at], &imports[at].name)) {
             Some((i, Imported::Namespace | Imported::Qualified)) => format!("{}{rest}", i.source),
             Some((i, Imported::Name(n) | Imported::Member { name: n, .. })) => {
@@ -3196,6 +3337,10 @@ impl<'a> Resolver<'a> {
         reading: Reading,
     ) -> Binding<'a> {
         let defs = &self.defs[path];
+        let start = scope;
+        // For each block of the climb, the function around it that binds `name` as a local or
+        // declares it as a local function (`around`), found once for the whole climb.
+        let (mut locals, mut functions) = (None, None);
         let mut scope = Some(scope);
         let (mut first, mut top) = (true, false);
         while let Some(s) = scope {
@@ -3234,7 +3379,19 @@ impl<'a> Resolver<'a> {
                         if reading == Reading::Method
                             && (self.blocks.contains_key(&(path, s))
                                 || self.unread.contains(&(path, s)))
-                            && let Some(found) = self.local_function(path, s, name)
+                            && let Some(found) = self.local_function(
+                                path,
+                                s,
+                                name,
+                                functions.get_or_insert_with(|| {
+                                    let binders = self.binders.get(path);
+                                    self.around(
+                                        path,
+                                        start,
+                                        binders.and_then(|b| b.functions.get(name)),
+                                    )
+                                }),
+                            )
                         {
                             return found;
                         }
@@ -3304,7 +3461,11 @@ impl<'a> Resolver<'a> {
                 return Binding::Param(Target { path, name: s }, n, field);
             }
             match self.receivers[path].get(&(s, name)) {
-                Some(Class::Imported) => return self.imported_in(path, name, seen, true),
+                Some(Class::Imported) => {
+                    return self
+                        .imported_at(path, s, name, seen)
+                        .unwrap_or_else(|| self.imported_in(path, name, seen, true));
+                }
                 Some(_) => return Binding::Local(path, s, name),
                 None => {}
             }
@@ -3315,7 +3476,15 @@ impl<'a> Resolver<'a> {
             // holds asks (`Reading::Member`): a constant's value and a call's receiver are read
             // outside the block (a Ktor `Application` or `Route` declares no `V1`). A called
             // name reads the block's methods (`Reading::Method`).
-            if self.members_in_scope && reading.read() && !self.local_around(path, s, name) {
+            if self.members_in_scope
+                && reading.read()
+                && !(locals.get_or_insert_with(|| {
+                    let binders = self.binders.get(path);
+                    self.around(path, start, binders.and_then(|b| b.values.get(name)))
+                }))
+                .iter()
+                .any(|&(block, _)| block == s.len())
+            {
                 if let Some(class) = self.blocks.get(&(path, s)) {
                     if let Some(found) = self.inherited_field(class.path, class.name, name) {
                         return found;
@@ -3350,45 +3519,65 @@ impl<'a> Resolver<'a> {
         })
     }
 
-    /// Whether a function or lambda around the block `block`, up to a class or the top level,
-    /// binds `name` (a parameter, a local, a binding with a class): Kotlin reads a local before
-    /// a member of an implicit receiver.
-    fn local_around(&self, path: &'a str, block: &'a str, name: &'a str) -> bool {
-        let defs = &self.defs[path];
-        let mut s = crate::parent(block);
-        while (defs.get(s))
-            .is_some_and(|d| matches!(d.kind, Kind::Function | Kind::Method | Kind::Inline))
-        {
-            let qualified = crate::qualify(s, name);
-            if self.locals[path].contains(qualified.as_str())
-                || self.consts[path].contains(qualified.as_str())
-                || self.params[path].contains_key(&(s, name))
-                || self.receivers[path].contains_key(&(s, name))
-            {
-                return true;
-            }
-            s = crate::parent(s);
+    /// For each block of `scope` (itself and the scopes around it, by the length of each), the
+    /// innermost function or lambda around it, up to a class or the top level, among the
+    /// scopes `binders` binding a name. One climb answers every block of a lookup, where asking
+    /// each block climbed again: cubic in the depth of nested lambdas.
+    fn around(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        binders: Option<&Vec<&'a str>>,
+    ) -> Vec<(usize, &'a str)> {
+        // A binder the climb meets is a prefix of `scope` as long as one of its scopes.
+        let bound: HashSet<usize> = (binders.into_iter().flatten())
+            .filter(|b| scope.starts_with(**b))
+            .map(|b| b.len())
+            .collect();
+        if bound.is_empty() {
+            return Vec::new();
         }
-        false
+        let defs = &self.defs[path];
+        let mut chain = vec![scope];
+        while let Some(&s) = chain.last().filter(|s| !s.is_empty()) {
+            chain.push(crate::parent(s));
+        }
+        // From the top down, each block takes its enclosing function, or what that one takes.
+        let (mut found, mut out) = (None, Vec::new());
+        for pair in chain.windows(2).rev() {
+            let (block, outer) = (pair[0], pair[1]);
+            let function = (defs.get(outer))
+                .is_some_and(|d| matches!(d.kind, Kind::Function | Kind::Method | Kind::Inline));
+            found = if !function {
+                None
+            } else if bound.contains(&outer.len()) {
+                Some(outer)
+            } else {
+                found
+            };
+            if let Some(function) = found {
+                out.push((block.len(), function));
+            }
+        }
+        out
     }
 
     /// The local function `name` of the functions around the block `scope` (Kotlin's `fun size()`
-    /// declared where an `apply` lambda calls `size()`), up to a class or the top level.
-    fn local_function(&self, path: &'a str, scope: &str, name: &str) -> Option<Binding<'a>> {
-        let defs = &self.defs[path];
-        let mut s = crate::parent(scope);
-        while (defs.get(s))
-            .is_some_and(|d| matches!(d.kind, Kind::Function | Kind::Method | Kind::Inline))
-        {
-            if let Some(found) = self.overloads[path].get(format!("{s}.{name}").as_str()) {
-                return Some(match found[..] {
-                    [one] => Binding::Def(one),
-                    _ => Binding::Several(found.clone()),
-                });
-            }
-            s = crate::parent(s);
-        }
-        None
+    /// declared where an `apply` lambda calls `size()`), up to a class or the top level, from
+    /// the functions `around` found declaring one.
+    fn local_function(
+        &self,
+        path: &'a str,
+        scope: &str,
+        name: &str,
+        around: &[(usize, &'a str)],
+    ) -> Option<Binding<'a>> {
+        let &(_, function) = around.iter().find(|&&(block, _)| block == scope.len())?;
+        let found = self.overloads[path].get(crate::qualify(function, name).as_str())?;
+        Some(match found[..] {
+            [one] => Binding::Def(one),
+            _ => Binding::Several(found.clone()),
+        })
     }
 
     /// Whether the top-level name `name` of `path` is not the one thing its constant says (Go: a
@@ -3630,6 +3819,14 @@ impl<'a> Resolver<'a> {
             let import = &imports[at];
             if let Imported::Path(target) = &import.name
                 && !seen.aliases.contains(&(path, target.as_str()))
+            {
+                return Some(self.import(path, scope, &import.source, &import.name, seen));
+            }
+            if !scope.is_empty()
+                && !matches!(
+                    import.name,
+                    Imported::Path(_) | Imported::Glob { .. } | Imported::All
+                )
             {
                 return Some(self.import(path, scope, &import.source, &import.name, seen));
             }
@@ -4622,6 +4819,8 @@ struct Written<'a, 'i> {
     chain: Option<&'a Call>,
     /// What the kind reads off annotated fields and parameters (`Code::expand_with`).
     inject: Option<&'i Inject<'a, 'i>>,
+    /// The calls that write a member (`Code::expand_written`).
+    writes: Option<CallWrites>,
 }
 
 /// What folding values and tracing where they come from may cost in one file, charged to the
@@ -4648,6 +4847,13 @@ pub(crate) const EVAL_DEPTH: usize = 256;
 // thousands of wrappers from overflowing the stack.
 const WRAPPER_DEPTH: usize = 64;
 
+/// How many struct fields deep `Code::field_read` folds a field through the values of others
+/// (`&T{base: o.base}`); deeper, the field is unknown. The values folded on the way share one
+/// `EVAL_DEPTH`.
+// ponytail: real clients copy a base through a field or two; the limit keeps a crafted chain of
+// fields, each set from the next, from overflowing the stack.
+pub(crate) const FIELD_DEPTH: usize = 16;
+
 /// Folding one value: the constants being folded (one met again folds to nothing), how deep it
 /// is, whether calls are folded too, an outside name kept (`Expand::Chain`), what the kind
 /// reads off the annotations of a field or a parameter (`Code::expand_with`), and how many of
@@ -4658,8 +4864,14 @@ struct Fold<'a, 'i> {
     held: Vec<(&'a str, &'a str)>,
     nested: usize,
     chain: bool,
+    /// Preserve verified constructor type names for selected SDK identity arguments.
+    new_types: Option<fn(&str) -> bool>,
+    selected: Option<mutations::Selection<'a>>,
+    objects: Vec<(mutations::Object<'a>, usize)>,
     inject: Option<&'i Inject<'a, 'i>>,
     foreign: usize,
+    /// How many struct fields deep the value is folded (`Code::field_read`).
+    field_depth: usize,
 }
 
 /// What a contract kind injects where the source gives no value (`Code::expand_with`), given
@@ -4781,9 +4993,16 @@ pub struct Code<'a> {
     /// The marker constants of the literals that set each field (`field_values`), by field name
     /// (`*` for a literal by position), built the first time a field is read.
     literals: OnceCell<HashMap<&'a str, BTreeSet<(&'a str, &'a str)>>>,
+    /// The environment read each struct field holds (`Code::field_read`), `Unknown` while it is
+    /// folded, so a field many reads reach is folded once and a field met again folds to nothing.
+    field_reads: RefCell<HashMap<Field<'a>, Value>>,
     /// The last segment of every callee of the repository (`save` of `repo.save`, `C` of
     /// `(opaque).C`), built the first time a parameter is injected (`Code::may_be_called`).
     callees: OnceCell<HashSet<&'a str>>,
+    /// The definitions a call that is no exact caller may reach, and how many definitions have
+    /// each last name segment (`Code::name_matched`).
+    matched: OnceCell<(HashSet<Target<'a>>, HashMap<&'a str, usize>)>,
+    mutations: RefCell<HashMap<usize, mutations::Index<'a>>>,
     pack: &'static dyn LanguagePack,
 }
 
@@ -4795,6 +5014,7 @@ struct ByName<'a> {
     consts: HashMap<&'a str, Vec<&'a Const>>,
     /// The values the locals were given (`Facts::bound`), by scope and name.
     bound: HashMap<(&'a str, &'a str), Vec<&'a Bound>>,
+    first_results: HashMap<(&'a str, &'a str), Vec<&'a FirstResult>>,
 }
 
 impl<'a> ByName<'a> {
@@ -4810,6 +5030,10 @@ impl<'a> ByName<'a> {
         for bound in &facts.bound {
             let key = (bound.scope.as_str(), bound.name.as_str());
             by_name.bound.entry(key).or_default().push(bound);
+        }
+        for first in &facts.first_results {
+            let key = (first.scope.as_str(), first.name.as_str());
+            by_name.first_results.entry(key).or_default().push(first);
         }
         by_name
     }
@@ -4945,7 +5169,10 @@ impl<'a> Code<'a> {
             folded: RefCell::new(HashMap::new()),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
             literals: OnceCell::new(),
+            field_reads: RefCell::new(HashMap::new()),
             callees: OnceCell::new(),
+            matched: OnceCell::new(),
+            mutations: RefCell::new(HashMap::new()),
             pack,
         }
     }
@@ -5110,6 +5337,15 @@ impl<'a> Code<'a> {
         seen: &mut Vec<(&'a str, &'a str)>,
     ) -> Option<Made<'a>> {
         match value {
+            Value::Await(value)
+                if self
+                    .pack
+                    .extensions()
+                    .iter()
+                    .any(|e| matches!(*e, "ts" | "cs")) =>
+            {
+                self.made_by(path, scope, value, seen)
+            }
             Value::Ref(name) => self.trace(path, scope, name, seen),
             Value::Call(call) => {
                 let mut made = self.trace(path, scope, &call.callee, seen)?;
@@ -5235,10 +5471,10 @@ impl<'a> Code<'a> {
     }
 
     /// The value the nearest binding of `name` around `scope` of `path` holds (`Facts::bound`,
-    /// which the Kotlin and C# packs fill), when no other binding of the name is in the same scope
-    /// (a name declared twice, a loop variable, a parameter, a constant, a property). Each scope
-    /// is looked up by name (`ByName::bound` and the resolver's maps), so a file of many locals
-    /// and calls costs each lookup its depth, never the file's width.
+    /// which the Kotlin, Java, C# and Swift packs fill), when no other binding of the name is in
+    /// the same scope (a name declared twice, a loop variable, a parameter, a constant, a
+    /// property). Each scope is looked up by name (`ByName::bound` and the resolver's maps), so a
+    /// file of many locals and calls costs each lookup its depth, never the file's width.
     pub fn local(&self, path: &'a str, scope: &'a str, name: &str) -> Option<&'a Bound> {
         let by_name = self.by_name(path)?;
         let r = self.resolver;
@@ -5268,6 +5504,30 @@ impl<'a> Code<'a> {
             }
         }
         None
+    }
+
+    /// The exact call whose first result the nearest stable local holds. Ordinary value
+    /// folding leaves this projection unknown; SDK readers still prove the call's origin.
+    pub(crate) fn first_result(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<(&'a str, usize)> {
+        let Binding::Local(at, within, local) =
+            self.resolver.lexical(path, scope, name, &mut Seen::new())
+        else {
+            return None;
+        };
+        let [first] = self
+            .by_name(at)?
+            .first_results
+            .get(&(within, local))?
+            .as_slice()
+        else {
+            return None;
+        };
+        Some((at, self.call_index(at, &first.call)?))
     }
 
     /// Every name `path` binds to a value (`Facts::bound`), in source order: the kinds that need
@@ -5304,6 +5564,12 @@ impl<'a> Code<'a> {
             out.extend(values.map(|v| (t.path, t.name, v)));
         }
         out
+    }
+
+    /// Whether calling this definition produces a coroutine before its return values.
+    pub fn coroutine(&self, function: Target<'a>) -> bool {
+        self.def(function.path, function.name)
+            .is_some_and(|d| d.asynchronous)
     }
 
     /// The names `path` mentions (`Facts::mentions`); `None` where the pack does not tell.
@@ -5371,6 +5637,16 @@ impl<'a> Code<'a> {
         by_path: bool,
     ) -> Option<Outside<'a>> {
         self.outside_read(path, scope, name, by_path, false)
+    }
+
+    /// An actual value binding hides an imported static-factory head, including in
+    /// languages whose type namespace may otherwise still name the imported class.
+    pub(crate) fn value_bound(&self, path: &'a str, scope: &'a str, name: &'a str) -> bool {
+        matches!(
+            self.resolver
+                .lexical(path, scope, name, &mut self.resolver.seen(path, scope)),
+            Binding::Param(..) | Binding::Local(..) | Binding::Const(..) | Binding::Hidden
+        )
     }
 
     /// `outside` for the callee of a decorator call (an annotation or attribute): no field of
@@ -5650,6 +5926,106 @@ impl<'a> Code<'a> {
         self.field_written(field) || self.resolver.written_in.contains(&(class, field))
     }
 
+    /// The environment read the struct field `field` holds: the one every composite literal of
+    /// the repository that sets it gives it (a literal sets the fields it names,
+    /// https://go.dev/ref/spec#Composite_literals), folded where the literal is written, and a
+    /// parameter of the function around it through every exact caller of that function. Unknown
+    /// when a literal may set it to a value the source does not tell (`Code::field_values`),
+    /// when no literal sets it, when two give different values or one gives anything but one
+    /// environment read (`Env` or `EnvOr`), when a function whose parameter it takes has no
+    /// exact caller, past `FIELD_DEPTH`, and while it is folded (a field met again). The caller
+    /// checks that no file writes it through a selector (`Code::field_written`).
+    fn field_read(&self, field: Field<'a>, depth: usize, nested: usize) -> Value {
+        let (at, ty, _) = field;
+        let struct_field = (self.resolver.defs.get(at).and_then(|d| d.get(ty)))
+            .is_some_and(|d| d.kind == Kind::Class);
+        if depth >= FIELD_DEPTH || !struct_field {
+            return Value::Unknown;
+        }
+        if let Some(known) = self.field_reads.borrow().get(&field) {
+            return known.clone();
+        }
+        (self.field_reads.borrow_mut()).insert(field, Value::Unknown);
+        let mut reads = Vec::new();
+        let all = self.field_values(field).is_some_and(|values| {
+            !values.is_empty()
+                && (values.into_iter()).all(|(path, scope, value)| {
+                    let frames = &mut Vec::new();
+                    self.literal_reads(path, scope, value, frames, (depth, nested), &mut reads)
+                })
+        });
+        let read = match (all, &reads[..]) {
+            (true, [first, rest @ ..]) if rest.iter().all(|r| r == first) => {
+                Value::Str(vec![first.clone()])
+            }
+            _ => Value::Unknown,
+        };
+        (self.field_reads.borrow_mut()).insert(field, read.clone());
+        read
+    }
+
+    /// Pushes onto `reads` what `value`, written in `scope` of `path`, folds to under `frames`:
+    /// once, or once per exact caller of the function whose parameter it leaves unbound, climbed
+    /// as `Code::expand` climbs a wrapper. Its own `wants`: the function climbed is no wrapper of
+    /// the walk that reads the field. `false` as soon as one is no single environment read, or a
+    /// function to climb has no exact caller or a call reaches it by a name match (which may pass
+    /// anything), is met again, is `WRAPPER_DEPTH` calls up or its caller's file has spent its
+    /// `EVAL_BUDGET`.
+    // ponytail: a constructor read as a value (`mk := New; mk(x)`) is not seen, so its exact
+    // callers alone give the field; reading every value of the repository for its name would
+    // see it.
+    fn literal_reads(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        frames: &mut Vec<Frame<'a>>,
+        (depth, nested): (usize, usize),
+        reads: &mut Vec<Part>,
+    ) -> bool {
+        let mut wants = None;
+        // The fold goes on as deep as the one that reads the field: `EVAL_DEPTH` bounds both.
+        let fold = &mut Fold {
+            field_depth: depth + 1,
+            nested,
+            ..Fold::default()
+        };
+        let folded = self.eval(path, scope, value, frames, 0, fold, &mut wants);
+        if let Value::Str(mut parts) = folded
+            && let [Part::Env(_) | Part::EnvOr(..)] = &parts[..]
+        {
+            reads.extend(parts.pop());
+            return true;
+        }
+        let Some(function) = wants else {
+            return false;
+        };
+        if frames.iter().any(|f| f.def == function)
+            || frames.len() >= WRAPPER_DEPTH
+            || self.name_matched(function)
+        {
+            return false;
+        }
+        let callers: Vec<Caller> = (self.resolver.callers.get(&function).into_iter().flatten())
+            .copied()
+            .collect();
+        !callers.is_empty()
+            && callers.into_iter().all(|caller| {
+                // Each climb is charged to the caller's file, as `Code::walk` charges its own.
+                if !self.charge(caller.path, 1) {
+                    return false;
+                }
+                frames.push(Frame {
+                    def: function,
+                    path: caller.path,
+                    index: caller.index,
+                });
+                let read = self.literal_reads(path, scope, value, frames, (depth, nested), reads);
+                frames.pop();
+                read
+            })
+    }
+
     /// The argument the call at `index` of `path` passes for parameter `n` of `function`: by
     /// position, or by the parameter's name among its keyword arguments. A method called on
     /// an instance (`x.m(a)`) is passed no argument for its receiver parameter.
@@ -5729,6 +6105,7 @@ impl<'a> Code<'a> {
 
     fn flow(&self, path: &'a str, scope: &'a str, value: &'a Value, trail: &mut Trail<'a>) {
         match value {
+            Value::Await(value) => self.flow(path, scope, value, trail),
             Value::Ref(name) => self.flow_name(path, scope, name, trail),
             Value::Call(call) => {
                 let calls = &self.resolver.files[path].calls;
@@ -5773,8 +6150,18 @@ impl<'a> Code<'a> {
                     });
                 }
                 if let Some(mut kept) = kept {
-                    for (origin, routes) in std::mem::take(&mut trail.out) {
-                        kept.entry(origin).or_default().extend(routes);
+                    // The smaller set goes into the larger: in a lattice of functions the routes
+                    // double at each level, and re-inserting them all at every level cost more
+                    // than the walk the budget charges.
+                    if kept.len() < trail.out.len() {
+                        std::mem::swap(&mut kept, &mut trail.out);
+                    }
+                    for (origin, mut routes) in std::mem::take(&mut trail.out) {
+                        let into = kept.entry(origin).or_default();
+                        if into.len() < routes.len() {
+                            std::mem::swap(into, &mut routes);
+                        }
+                        into.extend(routes);
                     }
                     trail.out = kept;
                 }
@@ -6106,6 +6493,28 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// The constant's expression and the scope where it was written. A constructor may bind
+    /// a final/readonly field from a parameter that hides a name of the field's class.
+    pub fn constant_value(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<(&'a str, &'a str, &'a Value)> {
+        let binding = self.resolver.read_member(path, scope, name);
+        let binding = match binding {
+            Binding::Local(at, within, name) => self.resolver.consts[at]
+                .get(crate::qualify(within, name).as_str())
+                .map_or(binding, |&constant| Binding::Const(at, constant)),
+            binding => binding,
+        };
+        let Binding::Const(at, constant) = binding else {
+            return None;
+        };
+        let (value, within) = self.held(at, constant)?;
+        Some((at, within, value))
+    }
+
     /// The value the `const` `constant` of `path` holds, as written, and the scope it is
     /// written in.
     fn held(&self, path: &'a str, constant: &'a str) -> Option<(&'a Value, &'a str)> {
@@ -6212,6 +6621,49 @@ impl<'a> Code<'a> {
             ))
         });
         args.collect()
+    }
+
+    /// Every argument an exact caller supplies, including a declared default when omitted.
+    /// A selected call frame binds this parameter alone; missing arguments stay unknown.
+    pub fn param_values(
+        &self,
+        function: Target<'a>,
+        n: usize,
+        frame: Option<(&'a str, usize)>,
+    ) -> Option<Vec<(&'a str, &'a str, &'a Value)>> {
+        let sites: Vec<_> = frame.map_or_else(
+            || {
+                self.resolver
+                    .callers
+                    .get(&function)
+                    .into_iter()
+                    .flatten()
+                    .map(|c| (c.path, c.index))
+                    .collect()
+            },
+            |site| vec![site],
+        );
+        if sites.is_empty() {
+            return None;
+        }
+        sites
+            .into_iter()
+            .map(|(path, index)| {
+                let call = self.call(path, index)?;
+                if call.keyword("...").is_some() || call.keyword("*").is_some() {
+                    return None;
+                }
+                if let Some(value) = self.arg(path, index, function, n) {
+                    Some((path, call.scope.as_str(), value))
+                } else {
+                    Some((
+                        function.path,
+                        crate::parent(function.name),
+                        self.param(function, n)?.default.as_ref()?,
+                    ))
+                }
+            })
+            .collect()
     }
 
     /// The function of the repository the value flow reaches through the call at `index` of
@@ -6439,6 +6891,7 @@ impl<'a> Code<'a> {
                     at: (path, index),
                     chain: None,
                     inject,
+                    writes: None,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out);
             }
@@ -6454,6 +6907,7 @@ impl<'a> Code<'a> {
                     at: (path, index),
                     chain: Some(call),
                     inject,
+                    writes: None,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out);
             }
@@ -6472,10 +6926,39 @@ impl<'a> Code<'a> {
                     at,
                     chain: None,
                     inject,
+                    writes: None,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out);
             }
         }
+        out
+    }
+
+    /// `expand` of the call `index` of `path`, a member of an object it names read as the call
+    /// sees it: one a statement or a call (`writes`) changes after the object is made, and
+    /// before the call, is unknown.
+    pub(crate) fn expand_written<R>(
+        &self,
+        path: &'a str,
+        index: usize,
+        writes: CallWrites,
+        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
+    ) -> Vec<Expanded<'a, R>> {
+        let mut out = Vec::new();
+        let Some(call) = self.call(path, index) else {
+            return out;
+        };
+        let written = Written {
+            path,
+            scope: &call.scope,
+            args: &call.args,
+            kwargs: &call.kwargs,
+            at: (path, index),
+            chain: None,
+            inject: None,
+            writes: Some(writes),
+        };
+        self.walk(&written, &mut Vec::new(), read, &mut out);
         out
     }
 
@@ -6503,6 +6986,10 @@ impl<'a> Code<'a> {
             let fold = &mut Fold {
                 chain,
                 inject: written.inject,
+                selected: (written.writes).map(|writes| mutations::Selection {
+                    site: Some(written.at),
+                    writes,
+                }),
                 ..Fold::default()
             };
             self.eval(path, scope, v, frames, 0, fold, &mut wants)
@@ -6571,6 +7058,32 @@ impl<'a> Code<'a> {
         }
     }
 
+    /// Whether a call that is no exact caller may reach `function`: a name match (`Inferred`,
+    /// `Narrowed`), one of the definitions an ambiguous call fits or, for a method, a call of
+    /// another definition of its name (an interface's method, whose calls dispatch to it).
+    // ponytail: any other definition of a method's name counts, an interface's or not, since no
+    // pack marks interfaces: two types with a constructor method of one name leave it unknown.
+    fn name_matched(&self, function: Target<'a>) -> bool {
+        let own = |name: &'a str| name[crate::parent(name).len()..].trim_start_matches('.');
+        let (matched, names) = self.matched.get_or_init(|| {
+            let matched = (self.resolver.built.values().flatten())
+                .flat_map(|r| match r {
+                    Resolution::Inferred(t) | Resolution::Narrowed(t) => std::slice::from_ref(t),
+                    Resolution::Ambiguous(targets) => targets.as_slice(),
+                    _ => &[],
+                })
+                .copied()
+                .collect();
+            let mut names = HashMap::new();
+            for name in self.resolver.defs.values().flat_map(|d| d.keys()) {
+                *names.entry(own(name)).or_insert(0) += 1;
+            }
+            (matched, names)
+        });
+        let method = self.resolver.defs[function.path][function.name].kind == Kind::Method;
+        matched.contains(&function) || (method && names.get(own(function.name)) > Some(&1))
+    }
+
     /// Whether a call of the repository may reach `function`, at any level: an exact caller, or
     /// any call whose callee ends in its name (the class's for a constructor), a name match, a
     /// call on an opaque receiver and `this(..)` or `super(..)` included.
@@ -6621,67 +7134,216 @@ impl<'a> Code<'a> {
         }
         fold.nested += 1;
         let folded = match value {
-            Value::Str(parts) => {
-                let mut out = Vec::new();
-                for part in parts {
-                    let Part::Ref(name) = part else {
-                        out.push(part.clone());
-                        continue;
-                    };
-                    match self.name(path, scope, name, frames, depth, fold, wants) {
-                        // The parts copied are charged: a string doubled through constants grows
-                        // faster than the values visited.
-                        Value::Str(parts) => match self.charge(path, parts.len()) {
-                            true => out.extend(parts),
-                            false => out.push(Part::Hole),
-                        },
-                        Value::Ref(name) => out.push(Part::Ref(name)),
-                        _ => out.push(Part::Hole),
-                    }
-                }
-                Value::Str(out)
-            }
-            Value::Object(properties) => Value::Object(
-                properties
-                    .iter()
-                    .map(|(k, v)| {
-                        let v = self.eval(path, scope, v, frames, depth, fold, wants);
-                        (k.clone(), v)
-                    })
-                    .collect(),
-            ),
+            Value::Await(value) => self.eval(path, scope, value, frames, depth, fold, wants),
+            Value::Str(parts) => self.eval_string(path, scope, parts, frames, depth, fold, wants),
+            Value::Object(_) => self.eval_object(path, scope, value, frames, depth, fold, wants),
             Value::List(items) => Value::List(
                 (items.iter())
                     .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
                     .collect(),
             ),
-            Value::New(callee, args) => Value::New(
-                callee.clone(),
-                (args.iter())
-                    .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
-                    .collect(),
-            ),
+            Value::New(callee, args) => {
+                self.eval_new(path, scope, callee, args, frames, depth, fold, wants)
+            }
             Value::Call(call) if fold.chain => {
-                let mut eval = |v| self.eval(path, scope, v, frames, depth, fold, wants);
-                let receiver = call.receiver.as_deref().map(|r| Box::new(eval(r)));
-                Value::Call(Invocation {
-                    callee: call.callee.clone(),
-                    receiver,
-                    args: call.args.iter().map(&mut eval).collect(),
-                    kwargs: (call.kwargs.iter())
-                        .map(|(k, v)| (k.clone(), eval(v)))
-                        .collect(),
-                    range: call.range.clone(),
-                })
+                self.eval_chain(path, scope, call, frames, depth, fold, wants)
             }
             Value::Call(call) => self
                 .built(path, call, frames, depth, fold, wants)
                 .unwrap_or_else(|| value.clone()),
             Value::Ref(name) => self.name(path, scope, name, frames, depth, fold, wants),
+            Value::Member(name, member) if fold.selected.is_some() => {
+                self.eval_member(path, scope, name, member, frames, depth, fold, wants)
+            }
             other => other.clone(),
         };
         fold.nested -= 1;
         folded
+    }
+
+    // Keep variant-specific temporaries out of every recursive alias frame. In debug
+    // builds their combined match frame can exhaust a test thread before EVAL_DEPTH.
+    #[expect(clippy::too_many_arguments)]
+    fn eval_string(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        parts: &'a [Part],
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        let mut out = Vec::new();
+        for part in parts {
+            let Part::Ref(name) = part else {
+                out.push(part.clone());
+                continue;
+            };
+            match self.name(path, scope, name, frames, depth, fold, wants) {
+                // The parts copied are charged: a string doubled through constants grows
+                // faster than the values visited.
+                Value::Str(parts) => match self.charge(path, parts.len()) {
+                    true => out.extend(parts),
+                    false => out.push(Part::Hole),
+                },
+                Value::Ref(name) => out.push(Part::Ref(name)),
+                _ => out.push(Part::Hole),
+            }
+        }
+        Value::Str(out)
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn eval_object(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        let Value::Object(properties) = value else {
+            return Value::Unknown;
+        };
+        let tracked = (fold.selected.zip(fold.objects.last().copied()))
+            .filter(|(_, (_, pointer))| *pointer == value as *const Value as usize);
+        let changed = |field: &str| {
+            tracked.is_some_and(|(selected, (object, _))| {
+                self.member_changed(object, field, selected, frames)
+            })
+        };
+        Value::Object(
+            properties
+                .iter()
+                .map(|(k, v)| {
+                    if changed(k) {
+                        return (k.clone(), Value::Unknown);
+                    }
+                    let v = self.eval(path, scope, v, frames, depth, fold, wants);
+                    (k.clone(), unwritten(k, v, &changed))
+                })
+                .collect(),
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn eval_new(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        callee: &'a str,
+        args: &'a [Value],
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        Value::New(
+            if let Some(known) = fold.new_types {
+                self.outside_written(path, scope, callee)
+                    .and_then(|o| crate::names::one(&o.spellings(), known).map(str::to_string))
+                    .unwrap_or_default()
+            } else {
+                callee.to_string()
+            },
+            (args.iter())
+                .map(|v| self.eval(path, scope, v, frames, depth, fold, wants))
+                .collect(),
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn eval_chain(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        call: &'a Invocation,
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        // Some packs retain only a call's range in a value. Selected-argument
+        // folding uses that exact stored call, never a method-name lookup.
+        let stored = fold
+            .new_types
+            .and_then(|_| self.call_index(path, &call.range))
+            .and_then(|index| self.call(path, index));
+        let scope = stored.map_or(scope, |c| c.scope.as_str());
+        let args = stored.map_or(call.args.as_slice(), |c| c.args.as_slice());
+        let kwargs = stored.map_or(call.kwargs.as_slice(), |c| c.kwargs.as_slice());
+        let receiver = call
+            .receiver
+            .as_deref()
+            .or_else(|| stored.and_then(|c| c.receiver.as_ref()));
+        let receiver = match receiver {
+            Some(receiver) => Some(Box::new(
+                self.eval(path, scope, receiver, frames, depth, fold, wants),
+            )),
+            None if stored.is_some() => call.callee.rsplit_once('.').map(|(head, _)| {
+                Box::new(self.name(path, scope, head, frames, depth, fold, wants))
+            }),
+            None => None,
+        };
+        let mut eval = |v| self.eval(path, scope, v, frames, depth, fold, wants);
+        Value::Call(Invocation {
+            callee: call.callee.clone(),
+            receiver,
+            args: args.iter().map(&mut eval).collect(),
+            kwargs: (kwargs.iter()).map(|(k, v)| (k.clone(), eval(v))).collect(),
+            range: call.range.clone(),
+        })
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn eval_member(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        member: &'a str,
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        let object = self.name(path, scope, name, frames, depth, fold, wants);
+        match object {
+            Value::Object(fields) => crate::lang::property(&fields, member)
+                .ok()
+                .flatten()
+                .cloned()
+                .unwrap_or(Value::Unknown),
+            _ => Value::Unknown,
+        }
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn argument_value(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        value: &'a Value,
+        frames: &[Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Value {
+        let object = fold
+            .selected
+            .and_then(|_| object_value(value))
+            .map(|pointer| (mutations::Object::Value(path, pointer), pointer));
+        if let Some(object) = object {
+            fold.objects.push(object);
+        }
+        let result = self.eval(path, scope, value, frames, depth, fold, wants);
+        if object.is_some() {
+            fold.objects.pop();
+        }
+        result
     }
 
     /// What `call`, written in `path`, folds to when it is an exact call of a function that only
@@ -6743,10 +7405,20 @@ impl<'a> Code<'a> {
                 };
                 let foreign = usize::from(within != scope_of(constant));
                 fold.held.push((at, constant));
+                let object = fold
+                    .selected
+                    .and_then(|_| object_value(value))
+                    .map(|pointer| (mutations::Object::Constant(at, constant), pointer));
+                if let Some(object) = object {
+                    fold.objects.push(object);
+                }
                 fold.foreign += foreign;
                 let folded = self.eval(at, within, value, frames, depth, fold, wants);
                 fold.foreign -= foreign;
                 fold.held.pop();
+                if object.is_some() {
+                    fold.objects.pop();
+                }
                 folded
             }
             // `*args` and `**kwargs` hold what no single argument gives.
@@ -6767,11 +7439,17 @@ impl<'a> Code<'a> {
                     let arg = self.arg(frame.path, frame.index, function, n);
                     let param = self.param(function, n);
                     let bound = match (arg, param.and_then(|p| p.default.as_ref())) {
-                        (Some(arg), _) => {
-                            self.eval(frame.path, &call.scope, arg, frames, depth + 1, fold, wants)
-                        }
+                        (Some(arg), _) => self.argument_value(
+                            frame.path,
+                            &call.scope,
+                            arg,
+                            frames,
+                            depth + 1,
+                            fold,
+                            wants,
+                        ),
                         // A left-out argument takes the parameter's default.
-                        (None, Some(default)) => self.eval(
+                        (None, Some(default)) => self.argument_value(
                             function.path,
                             function.name,
                             default,
@@ -6846,6 +7524,18 @@ impl<'a> Code<'a> {
                     return Value::Unknown;
                 }
                 fold.held.push(held);
+                let object =
+                    fold.selected
+                        .and_then(|_| object_value(&bound.value))
+                        .map(|pointer| {
+                            (
+                                mutations::Object::Local(path, &bound.scope, &bound.name),
+                                pointer,
+                            )
+                        });
+                if let Some(object) = object {
+                    fold.objects.push(object);
+                }
                 let folded = self.eval(
                     path,
                     &bound.within,
@@ -6856,19 +7546,41 @@ impl<'a> Code<'a> {
                     wants,
                 );
                 fold.held.pop();
+                if object.is_some() {
+                    fold.objects.pop();
+                }
                 folded
             }
-            // A field no file assigns holds what an annotation on it injects.
-            Binding::Local(at, class, field) => match fold.inject {
-                Some(inject) if !self.field_written_in(class, field) => {
-                    let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
-                    self.injected(at, marks, inject).unwrap_or(Value::Unknown)
-                }
-                _ => Value::Unknown,
-            },
+            // A field no file assigns holds what an annotation on it injects, else the
+            // environment read every composite literal that sets it gives it.
+            Binding::Local(at, class, field) if !self.field_written_in(class, field) => {
+                let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
+                let injected = fold.inject.and_then(|i| self.injected(at, marks, i));
+                let field = (at, class, field);
+                injected.unwrap_or_else(|| self.field_read(field, fold.field_depth, fold.nested))
+            }
             Binding::External(..) | Binding::Unknown if fold.chain => {
+                // An opaque member of a value is not a package path. On-demand type imports
+                // must not turn a parameter such as `java` into `java.util.Map` evidence.
+                let hidden_head = self.resolver.unordered_globs
+                    && name.split_once('.').is_some_and(|(head, _)| {
+                        matches!(
+                            self.resolver.lexical(
+                                path,
+                                scope,
+                                head,
+                                &mut self.resolver.seen(path, scope)
+                            ),
+                            Binding::Param(..)
+                                | Binding::Local(..)
+                                | Binding::Const(..)
+                                | Binding::Hidden
+                        )
+                    });
                 match self.outside(path, scope, name, false) {
-                    Some(o) if !o.candidates.is_empty() => Value::External(o.candidates),
+                    Some(o) if !o.candidates.is_empty() && !hidden_head => {
+                        Value::External(o.candidates)
+                    }
                     Some(o) if o.direct => Value::External(vec![o.spelled]),
                     _ => Value::Unknown,
                 }
@@ -6880,6 +7592,43 @@ impl<'a> Code<'a> {
 
 /// `value` with every parameter left in it unknown; with `chain`, inside its calls too, which
 /// only `Expand::Chain` folds (elsewhere a call's arguments are as written).
+/// A computed key (`"[]"`) or a spread (`"..."`) of a folded object, `value` being what it folds
+/// to: it names its fields once folded, a spread's own spreads and computed keys too, so a write
+/// to one of them (`changed`) makes it unknown.
+fn unwritten(key: &str, value: Value, changed: &dyn Fn(&str) -> bool) -> Value {
+    match (key, value) {
+        ("[]", Value::List(mut pair)) => {
+            if let [Value::Str(key), value] = pair.as_mut_slice()
+                && crate::lang::literal(key).is_some_and(|key| changed(&key))
+            {
+                *value = Value::Unknown;
+            }
+            Value::List(pair)
+        }
+        ("...", Value::Object(fields)) => Value::Object(
+            (fields.into_iter())
+                .map(|(field, value)| {
+                    let value = match field.as_str() {
+                        "[]" | "..." => unwritten(&field, value, changed),
+                        named if changed(named) => Value::Unknown,
+                        _ => value,
+                    };
+                    (field, value)
+                })
+                .collect(),
+        ),
+        (_, value) => value,
+    }
+}
+
+fn object_value(value: &Value) -> Option<usize> {
+    match value {
+        Value::Object(_) => Some(value as *const Value as usize),
+        Value::New(_, args) if args.len() == 1 => object_value(&args[0]),
+        _ => None,
+    }
+}
+
 fn unbind(value: Value, chain: bool) -> Value {
     let unbind = |v| unbind(v, chain);
     match value {
@@ -7090,6 +7839,68 @@ mod tests {
         assert!(origin(3).unwrap().ends_with("Dial.M.M.M"));
         assert!(origin(RECEIVER_DEPTH - 1).is_some());
         assert_eq!(origin(RECEIVER_DEPTH), None);
+    }
+
+    /// What the resolver built over the Rust conformance workspace answers each call when it is
+    /// built (`resolved_at`, from the build pass run under the workspace's `reaches`) equals what
+    /// `call` answers afterwards: resolving the build pass without `reaches` while keeping its
+    /// answers turns it red.
+    #[test]
+    fn the_build_pass_answers_every_call_as_call_does() {
+        use crate::lang::rust::Rust;
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/conformance-rust");
+        let (mut sources, mut configs) = (Vec::new(), Vec::new());
+        let mut dirs = vec![root.clone()];
+        while let Some(dir) = dirs.pop() {
+            for entry in std::fs::read_dir(dir).unwrap() {
+                let path = entry.unwrap().path();
+                let rel = path
+                    .strip_prefix(&root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string();
+                match path.extension().and_then(|e| e.to_str()) {
+                    _ if path.is_dir() => dirs.push(path),
+                    Some("rs") => sources.push((rel, std::fs::read(&path).unwrap())),
+                    _ if rel.ends_with("Cargo.toml") => {
+                        configs.push((rel, std::fs::read(&path).unwrap()))
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let parsed: Vec<(String, Facts)> = (sources.iter())
+            .map(|(rel, src)| (rel.clone(), Rust.parse(rel, src).unwrap()))
+            .collect();
+        let configs: Vec<(&str, &[u8])> = (configs.iter())
+            .map(|(p, c)| (p.as_str(), c.as_slice()))
+            .collect();
+        let mut files: BTreeMap<&str, &Facts> =
+            (parsed.iter()).map(|(p, f)| (p.as_str(), f)).collect();
+        let layout = Rust.layout(&configs, &files).unwrap();
+        if let Some(members) = &layout.members {
+            files.retain(|path, _| members.contains(*path));
+        }
+        let resolver = Resolver::with_layout(&files, layout, &Rust);
+        let answer = |r: Resolution| match r {
+            Resolution::Exact(t) => format!("exact {}::{}", t.path, t.name),
+            Resolution::Inferred(t) => format!("inferred {}::{}", t.path, t.name),
+            Resolution::Narrowed(t) => format!("narrowed {}::{}", t.path, t.name),
+            Resolution::Ambiguous(ts) => (ts.iter())
+                .map(|t| format!("{}::{}", t.path, t.name))
+                .fold("ambiguous".to_string(), |all, t| all + " " + &t),
+            Resolution::Unresolved => "unresolved".to_string(),
+        };
+        let mut calls = 0;
+        for (&path, facts) in &files {
+            for (index, call) in facts.calls.iter().enumerate() {
+                let built = answer(resolver.resolved_at(path, index));
+                assert_eq!(built, answer(resolver.call(path, call)), "{path} #{index}");
+                calls += 1;
+            }
+        }
+        assert!(calls > 100, "{calls} calls");
     }
 
     /// A Python file of `n` classes, each but the first deriving from the one before and

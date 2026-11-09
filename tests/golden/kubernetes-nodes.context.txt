@@ -1,0 +1,197 @@
+example.com/acme/deploy base/deployment.yaml:1-33 Deployment.apps/shop-dev/dev-api
+type: Deployment
+name: "dev-api"
+root: overlays/dev
+overridable: none
+references:
+example.com/acme/deploy base/config.yaml:1 ConfigMap/shop-dev/dev-api-settings via envFrom
+example.com/acme/deploy base/config.yaml:1 ConfigMap/shop-dev/dev-api-settings via volume settings
+example.com/acme/deploy base/config.yaml:8 Secret/shop-dev/dev-db-credentials via env DATABASE_URL
+example.com/acme/deploy base/serviceaccount.yaml:1 ServiceAccount/shop-dev/dev-runner via serviceAccountName
+referenced by:
+example.com/acme/deploy base/service.yaml:1 Service/shop-dev/dev-api via selector app=api
+images:
+web: ghcr.io/acme/api:dev
+values:
+example.com/acme/deploy base/deployment.yaml:1 apiVersion = "apps/v1"
+example.com/acme/deploy base/deployment.yaml:2 kind = "Deployment"
+example.com/acme/deploy base/deployment.yaml:4 metadata.name = "api"
+example.com/acme/deploy base/deployment.yaml:6 metadata.labels.app = "api"
+example.com/acme/deploy base/deployment.yaml:8 spec.replicas = 2
+example.com/acme/deploy base/deployment.yaml:11 spec.selector.matchLabels.app = "api"
+example.com/acme/deploy base/deployment.yaml:15 spec.template.metadata.labels.app = "api"
+example.com/acme/deploy base/deployment.yaml:17 spec.template.spec.serviceAccountName = "runner"
+example.com/acme/deploy base/deployment.yaml:19 spec.template.spec.containers[0].name = "web"
+example.com/acme/deploy base/deployment.yaml:20 spec.template.spec.containers[0].image = "ghcr.io/acme/api:1.0"
+example.com/acme/deploy base/deployment.yaml:22 spec.template.spec.containers[0].env[0].name = "DATABASE_URL"
+example.com/acme/deploy base/deployment.yaml:25 spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.name = "db-credentials"
+example.com/acme/deploy base/deployment.yaml:26 spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.key = "url"
+example.com/acme/deploy base/deployment.yaml:29 spec.template.spec.containers[0].envFrom[0].configMapRef.name = "api-settings"
+example.com/acme/deploy base/deployment.yaml:31 spec.template.spec.volumes[0].name = "settings"
+example.com/acme/deploy base/deployment.yaml:33 spec.template.spec.volumes[0].configMap.name = "api-settings"
+image: image::ghcr.io/acme/api (no builder in the workspace)
+env web DATABASE_URL -> Secret/shop-dev/dev-db-credentials key url (redacted): unresolved
+env web LOG_LEVEL -> envFrom ConfigMap/shop-dev/dev-api-settings key LOG_LEVEL: info
+
+example.com/acme/deploy base/deployment.yaml:1-33 Deployment.apps/shop/api-v2
+type: Deployment
+name: "api-v2"
+root: overlays/prod
+overridable: none
+references:
+example.com/acme/deploy base/config.yaml:1 ConfigMap/shop/api-settings-v2 via envFrom
+example.com/acme/deploy base/config.yaml:1 ConfigMap/shop/api-settings-v2 via volume settings
+example.com/acme/deploy base/config.yaml:8 Secret/shop/db-credentials-v2 via env DATABASE_URL
+example.com/acme/deploy base/serviceaccount.yaml:1 ServiceAccount/shop/runner-v2 via serviceAccountName
+referenced by:
+example.com/acme/deploy base/service.yaml:1 Service/shop/api-v2 via selector app=api
+images:
+web: registry.example.com/shop/api:1.4.0
+values:
+example.com/acme/deploy base/deployment.yaml:1 apiVersion = "apps/v1"
+example.com/acme/deploy base/deployment.yaml:2 kind = "Deployment"
+example.com/acme/deploy base/deployment.yaml:4 metadata.name = "api"
+example.com/acme/deploy base/deployment.yaml:6 metadata.labels.app = "api"
+example.com/acme/deploy base/deployment.yaml:8 spec.replicas = 2
+example.com/acme/deploy base/deployment.yaml:11 spec.selector.matchLabels.app = "api"
+example.com/acme/deploy base/deployment.yaml:15 spec.template.metadata.labels.app = "api"
+example.com/acme/deploy base/deployment.yaml:17 spec.template.spec.serviceAccountName = "runner"
+example.com/acme/deploy base/deployment.yaml:19 spec.template.spec.containers[0].name = "web"
+example.com/acme/deploy base/deployment.yaml:20 spec.template.spec.containers[0].image = "ghcr.io/acme/api:1.0"
+example.com/acme/deploy base/deployment.yaml:22 spec.template.spec.containers[0].env[0].name = "DATABASE_URL"
+example.com/acme/deploy base/deployment.yaml:25 spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.name = "db-credentials"
+example.com/acme/deploy base/deployment.yaml:26 spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.key = "url"
+example.com/acme/deploy base/deployment.yaml:29 spec.template.spec.containers[0].envFrom[0].configMapRef.name = "api-settings"
+example.com/acme/deploy base/deployment.yaml:31 spec.template.spec.volumes[0].name = "settings"
+example.com/acme/deploy base/deployment.yaml:33 spec.template.spec.volumes[0].configMap.name = "api-settings"
+image: image::registry.example.com/shop/api (no builder in the workspace)
+env web DATABASE_URL -> Secret/shop/db-credentials-v2 key url (redacted): unresolved
+env web LOG_LEVEL -> envFrom ConfigMap/shop/api-settings-v2 key LOG_LEVEL: info
+
+example.com/acme/deploy base/service.yaml:1-9 Service/shop/api-v2
+type: Service
+name: "api-v2"
+root: overlays/prod
+overridable: none
+references:
+example.com/acme/deploy base/deployment.yaml:1 Deployment.apps/shop/api-v2 via selector app=api
+referenced by:
+example.com/acme/deploy base/ingress.yaml:1 Ingress.networking.k8s.io/shop/edge-v2 via backend shop.example.com/api
+values:
+example.com/acme/deploy base/service.yaml:1 apiVersion = "v1"
+example.com/acme/deploy base/service.yaml:2 kind = "Service"
+example.com/acme/deploy base/service.yaml:4 metadata.name = "api"
+example.com/acme/deploy base/service.yaml:7 spec.selector.app = "api"
+example.com/acme/deploy base/service.yaml:9 spec.ports[0].port = 80
+
+example.com/acme/deploy base/config.yaml:8-13 Secret/shop-dev/dev-db-credentials
+type: Secret
+name: "dev-db-credentials"
+root: overlays/dev
+overridable: none
+references: none
+referenced by:
+example.com/acme/deploy base/deployment.yaml:1 Deployment.apps/shop-dev/dev-api via env DATABASE_URL
+values:
+example.com/acme/deploy base/config.yaml:8 [1].apiVersion = "v1"
+example.com/acme/deploy base/config.yaml:9 [1].kind = "Secret"
+example.com/acme/deploy base/config.yaml:11 [1].metadata.name = "db-credentials"
+example.com/acme/deploy base/config.yaml:13 [1].stringData.url = redacted
+
+example.com/acme/deploy base/serviceaccount.yaml:1-4 ServiceAccount/shop/runner-v2
+type: ServiceAccount
+name: "runner-v2"
+root: overlays/prod
+overridable: none
+references: none
+referenced by:
+example.com/acme/deploy base/deployment.yaml:1 Deployment.apps/shop/api-v2 via serviceAccountName
+values:
+example.com/acme/deploy base/serviceaccount.yaml:1 apiVersion = "v1"
+example.com/acme/deploy base/serviceaccount.yaml:2 kind = "ServiceAccount"
+example.com/acme/deploy base/serviceaccount.yaml:4 metadata.name = "runner"
+
+example.com/acme/deploy raw/stack.yaml:1-4 Namespace/tools
+type: Namespace
+name: "tools"
+root: raw
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/deploy raw/stack.yaml:1 [0].apiVersion = "v1"
+example.com/acme/deploy raw/stack.yaml:2 [0].kind = "Namespace"
+example.com/acme/deploy raw/stack.yaml:4 [0].metadata.name = "tools"
+
+example.com/acme/deploy raw/stack.yaml:6-16 Pod/tools/runner
+type: Pod
+name: "runner"
+root: raw
+overridable: none
+references: none
+referenced by:
+example.com/acme/deploy raw/stack.yaml:18 Service/tools/runner via selector app=runner
+images:
+main: busybox:1.36
+values:
+example.com/acme/deploy raw/stack.yaml:6 [1].apiVersion = "v1"
+example.com/acme/deploy raw/stack.yaml:7 [1].kind = "Pod"
+example.com/acme/deploy raw/stack.yaml:9 [1].metadata.name = "runner"
+example.com/acme/deploy raw/stack.yaml:10 [1].metadata.namespace = "tools"
+example.com/acme/deploy raw/stack.yaml:12 [1].metadata.labels.app = "runner"
+example.com/acme/deploy raw/stack.yaml:15 [1].spec.containers[0].name = "main"
+example.com/acme/deploy raw/stack.yaml:16 [1].spec.containers[0].image = "busybox:1.36"
+image: image::docker.io/library/busybox (no builder in the workspace)
+
+example.com/acme/deploy raw/job.json:2-5 Job.batch/tools/migrate
+type: Job
+name: "migrate"
+root: raw
+overridable: none
+references: none
+referenced by: none
+images:
+m: ghcr.io/acme/migrate:3
+values:
+example.com/acme/deploy raw/job.json:2 apiVersion = "batch/v1"
+example.com/acme/deploy raw/job.json:3 kind = "Job"
+example.com/acme/deploy raw/job.json:4 metadata.name = "migrate"
+example.com/acme/deploy raw/job.json:4 metadata.namespace = "tools"
+example.com/acme/deploy raw/job.json:5 spec.template.spec.containers[0].image = "ghcr.io/acme/migrate:3"
+example.com/acme/deploy raw/job.json:5 spec.template.spec.containers[0].name = "m"
+image: image::ghcr.io/acme/migrate (no builder in the workspace)
+
+example.com/acme/deploy base/deployment.yaml:1-33 Deployment.apps/shop-dev/dev-api
+type: Deployment
+name: "dev-api"
+root: overlays/dev
+overridable: none
+references:
+example.com/acme/deploy base/config.yaml:1 ConfigMap/shop-dev/dev-api-settings via envFrom
+example.com/acme/deploy base/config.yaml:1 ConfigMap/shop-dev/dev-api-settings via volume settings
+example.com/acme/deploy base/config.yaml:8 Secret/shop-dev/dev-db-credentials via env DATABASE_URL
+example.com/acme/deploy base/serviceaccount.yaml:1 ServiceAccount/shop-dev/dev-runner via serviceAccountName
+referenced by:
+example.com/acme/deploy base/service.yaml:1 Service/shop-dev/dev-api via selector app=api
+images:
+web: ghcr.io/acme/api:dev
+values:
+example.com/acme/deploy base/deployment.yaml:1 apiVersion = "apps/v1"
+example.com/acme/deploy base/deployment.yaml:2 kind = "Deployment"
+example.com/acme/deploy base/deployment.yaml:4 metadata.name = "api"
+example.com/acme/deploy base/deployment.yaml:6 metadata.labels.app = "api"
+example.com/acme/deploy base/deployment.yaml:8 spec.replicas = 2
+example.com/acme/deploy base/deployment.yaml:11 spec.selector.matchLabels.app = "api"
+example.com/acme/deploy base/deployment.yaml:15 spec.template.metadata.labels.app = "api"
+example.com/acme/deploy base/deployment.yaml:17 spec.template.spec.serviceAccountName = "runner"
+example.com/acme/deploy base/deployment.yaml:19 spec.template.spec.containers[0].name = "web"
+example.com/acme/deploy base/deployment.yaml:20 spec.template.spec.containers[0].image = "ghcr.io/acme/api:1.0"
+example.com/acme/deploy base/deployment.yaml:22 spec.template.spec.containers[0].env[0].name = "DATABASE_URL"
+example.com/acme/deploy base/deployment.yaml:25 spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.name = "db-credentials"
+example.com/acme/deploy base/deployment.yaml:26 spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.key = "url"
+example.com/acme/deploy base/deployment.yaml:29 spec.template.spec.containers[0].envFrom[0].configMapRef.name = "api-settings"
+example.com/acme/deploy base/deployment.yaml:31 spec.template.spec.volumes[0].name = "settings"
+example.com/acme/deploy base/deployment.yaml:33 spec.template.spec.volumes[0].configMap.name = "api-settings"
+image: image::ghcr.io/acme/api (no builder in the workspace)
+env web DATABASE_URL -> Secret/shop-dev/dev-db-credentials key url (redacted): unresolved
+env web LOG_LEVEL -> envFrom ConfigMap/shop-dev/dev-api-settings key LOG_LEVEL: info

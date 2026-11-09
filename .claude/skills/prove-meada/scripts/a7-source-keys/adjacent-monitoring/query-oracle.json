@@ -1,0 +1,3158 @@
+{
+  "expected_source": "expected.json",
+  "interpretation": "Indices bind every selected query to the complete pre-answer monitoring facts, sides, links and source locations. Native rendering is judged against these facts; this is not a product-derived transcript.",
+  "queries": [
+    {
+      "expected_emitter_indices": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_link_indices": [
+        0,
+        1,
+        2
+      ],
+      "expected_matcher_indices": [],
+      "index": 0,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "grafana/provisioning.yaml::groups[0].rules[0]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "255e176569b13c302feb751033a3fde5e36fd24ccc180f54ce9bf8f7937a72fc",
+      "source_node": "/rules/0"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[0].routes[0]",
+          "routing/alertmanager.yaml::route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 1,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "grafana/provisioning.yaml::groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "ee698c856f7da1f598fb09131a0f615d7c8fdc8e9c958fa94e5aefa0d1f70620",
+      "source_node": "/rules/0"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[0].routes[0]",
+          "routing/alertmanager.yaml::route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 2,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "grafana/provisioning.yaml::groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "c055bf8461ed50e93fc6344413e69c4254d09b5918a65fc23a4080061a730f88",
+      "source_node": "/rules/0"
+    },
+    {
+      "expected_emitter_indices": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "expected_link_indices": [
+        3,
+        4
+      ],
+      "expected_matcher_indices": [],
+      "index": 3,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "grafana/provisioning.yaml::groups[0].rules[1]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "41e8d02286a99040fadd97d0e378097d6950c49e6c49362a0cda787540f4542f",
+      "source_node": "/rules/1"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/native.json::spec.route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 4,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "grafana/provisioning.yaml::groups[0].rules[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "d1bb4dd650419663c84625aa17287ce1b333379671a6e5fb71bc0b89181c1f4c",
+      "source_node": "/rules/1"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/native.json::spec.route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 5,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "grafana/provisioning.yaml::groups[0].rules[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "942ec0954b6b2e99a3002562adbb4db8f101dc0402c45fedee3574f8f8ac0785",
+      "source_node": "/rules/1"
+    },
+    {
+      "expected_emitter_indices": [
+        8,
+        9,
+        10,
+        11
+      ],
+      "expected_link_indices": [
+        5,
+        6,
+        7
+      ],
+      "expected_matcher_indices": [],
+      "index": 6,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "ef3decf328f8b2f705bc28c3bb8163f66571e1d16e25351ce796fb77b00c7831",
+      "source_node": "/rules/2"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[0].routes[0]",
+          "routing/alertmanager.yaml::route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 7,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "5c35f2fdbb9190def68898fe98d21d0f4a3b53e49423a768b26df72433257b79",
+      "source_node": "/rules/2"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[0].routes[0]",
+          "routing/alertmanager.yaml::route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 8,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "41768e17f0993fb122fc2676f599c1ce57fd292c0fd279236b77a0e28c77b69d",
+      "source_node": "/rules/2"
+    },
+    {
+      "expected_emitter_indices": [
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "expected_link_indices": [
+        8,
+        9,
+        10,
+        11
+      ],
+      "expected_matcher_indices": [],
+      "index": 9,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "kubernetes/ledger.json::spec.groups[0].rules[0]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "13b8381760262a8a54a521bd6f7e825a6602b7e1711379f41727fc9a00fc0aa7",
+      "source_node": "/rules/3"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/native.json::spec.route.routes[0]",
+          "routing/native.json::spec.route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 10,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "kubernetes/ledger.json::spec.groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "8411e5de84ffe0bb718bd057f88313913be3ed9bbdc012f1400f9ee24d2de28d",
+      "source_node": "/rules/3"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/native.json::spec.route.routes[0]",
+          "routing/native.json::spec.route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 11,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "kubernetes/ledger.json::spec.groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "7291497a58b07aafec861bc5fd14ecfd146af2ca2862ff617bf841ba5a939c02",
+      "source_node": "/rules/3"
+    },
+    {
+      "expected_emitter_indices": [
+        17,
+        18,
+        19,
+        20
+      ],
+      "expected_link_indices": [
+        12
+      ],
+      "expected_matcher_indices": [],
+      "index": 12,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "loki/harbor.yaml::groups[0].rules[0]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "4840f30d08529f7455f06caa1654a45a9be8dd27e2b34ada7cb30f8561d3105e",
+      "source_node": "/rules/4"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[3]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 13,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "loki/harbor.yaml::groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "a7ed87e5d8bc5aea6643714d2532d677ca82ca937f55b74b29e914ce80f72211",
+      "source_node": "/rules/4"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[3]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 14,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "loki/harbor.yaml::groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "c36f9d76e7372c84066ffdb3590ee2b01790a0c240ff01714c103bea191cb081",
+      "source_node": "/rules/4"
+    },
+    {
+      "expected_emitter_indices": [
+        21,
+        22,
+        23,
+        24
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 15,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "loki/quartz.json::groups[0].rules[0]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "f05e028040d54514919daa34a3d9153e0a8d00943ce9d8f7bb9ba400c47d27a1",
+      "source_node": "/rules/5"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 16,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "loki/quartz.json::groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "49387bb4ec6aa5d967663787e5512c90637b8730fe65af739e98565823c02674",
+      "source_node": "/rules/5"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 17,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "loki/quartz.json::groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "1824b9832502ae4e97aee5adb548c20741f66448e1eb5fddaca8fc4fd57d8993",
+      "source_node": "/rules/5"
+    },
+    {
+      "expected_emitter_indices": [
+        25,
+        26,
+        27,
+        28
+      ],
+      "expected_link_indices": [
+        13,
+        14,
+        15
+      ],
+      "expected_matcher_indices": [],
+      "index": 18,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "prometheus/aurora.yaml::groups[0].rules[0]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "1f9559b66be760b6924b0d19b989836e4027cff6a1aa086ba9bfb48d3f0a7a16",
+      "source_node": "/rules/6"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[0].routes[0]",
+          "routing/alertmanager.yaml::route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 19,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "prometheus/aurora.yaml::groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "840cd8c11c371ae5f75805b9f23b66630e5c7852b81fc4b1c88a7d5aeb1debc0",
+      "source_node": "/rules/6"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[0].routes[0]",
+          "routing/alertmanager.yaml::route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 20,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "prometheus/aurora.yaml::groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "27c98e15af18daba735b7c514e164a2b4788090e79d259d73998118771d2e1f2",
+      "source_node": "/rules/6"
+    },
+    {
+      "expected_emitter_indices": [
+        29,
+        30,
+        31,
+        32
+      ],
+      "expected_link_indices": [
+        16,
+        17,
+        18
+      ],
+      "expected_matcher_indices": [],
+      "index": 21,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "prometheus/aurora.yaml::groups[0].rules[1]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "499d9c4653c4beb0eabba520228dd8ee9d570ff1e24fa1d3f65255bdb47c5d8b",
+      "source_node": "/rules/7"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[0].routes[1]",
+          "routing/alertmanager.yaml::route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 22,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "prometheus/aurora.yaml::groups[0].rules[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "ba2f300444183bd352d7b12b4bf0a0f4f9038d2ea8b81d762fa31cec4be93b0b",
+      "source_node": "/rules/7"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[0].routes[1]",
+          "routing/alertmanager.yaml::route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 23,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "prometheus/aurora.yaml::groups[0].rules[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "8c11b358ddc84325ae786f45d1e23b23d40dadac8fb1c8d85dd4fb67c8119c67",
+      "source_node": "/rules/7"
+    },
+    {
+      "expected_emitter_indices": [
+        33
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 24,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "prometheus/aurora.yaml::groups[1].rules[0]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "20f8bd960a047441259aa3e436664a88eb4f6a61fe30af5ffaaa5e8fc5275a5b",
+      "source_node": "/rules/8"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 25,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "prometheus/aurora.yaml::groups[1].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "0bf26bc571a3aa478e07d085a4a9739ee637f63ed1a56c7f452d5b66684779b2",
+      "source_node": "/rules/8"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 26,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "prometheus/aurora.yaml::groups[1].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "02abf8cb43334d96d74207a6a8afe86b3fb489f0784e9d74689879d87cc9f266",
+      "source_node": "/rules/8"
+    },
+    {
+      "expected_emitter_indices": [
+        34,
+        35,
+        36,
+        37
+      ],
+      "expected_link_indices": [
+        19,
+        20,
+        21
+      ],
+      "expected_matcher_indices": [],
+      "index": 27,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "prometheus/meridian.json::groups[0].rules[0]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "d8720b2061f82eaa9373465765c9bb74817a47d4921a63e771d4fcb0c6d2b9e0",
+      "source_node": "/rules/9"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[0].routes[0]",
+          "routing/alertmanager.yaml::route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 28,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "prometheus/meridian.json::groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "ecf889f66454f10e8939d12348c3d2dd90d5eda0578e805dedd041116ede20a9",
+      "source_node": "/rules/9"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [
+          "routing/alertmanager.yaml::route.routes[0].routes[0]",
+          "routing/alertmanager.yaml::route.routes[1]"
+        ],
+        "up_emitting_rules": []
+      },
+      "index": 29,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "prometheus/meridian.json::groups[0].rules[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "3d10734ee1066bd7e31aff17eebcc88e5572aa780291298137da4a681beac9d5",
+      "source_node": "/rules/9"
+    },
+    {
+      "expected_emitter_indices": [
+        38,
+        39,
+        40
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 30,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "prometheus/meridian.json::groups[0].rules[1]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "6229a38398d58cd7249f65440a8a3f6043673a9bd8232d8727c71b7dc9122334",
+      "source_node": "/rules/10"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 31,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "prometheus/meridian.json::groups[0].rules[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "58f262031539bf16088171fae5b892d6c1df978b0b6f0526f06a4df4c90469ec",
+      "source_node": "/rules/10"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 32,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "prometheus/meridian.json::groups[0].rules[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "041d2b13f75f1a6ac5ad059d9ad9e87eb8099f52b16e0591abf2d11d96994ba5",
+      "source_node": "/rules/10"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 33,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/alertmanager.yaml::route"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "55823c73ab31efea37f80cbb6d79463b5f80f2222540b722e15b2d5b4274d547",
+      "source_node": "/routes/0"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 34,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/alertmanager.yaml::route"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "be6b044dc2ebf0611b2a9cbb109b2a730c620e2898d295c2a798f92211353763",
+      "source_node": "/routes/0"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 35,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/alertmanager.yaml::route"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "6e7b731f0dbe946a115030456a2b56fa791503ddb5b60bf252db753a2eb4fb8a",
+      "source_node": "/routes/0"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        0
+      ],
+      "index": 36,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/alertmanager.yaml::route.routes[0]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "1859f1b79a5f184d889573da63a8083ee7c1447ccfa1eb32f9334c5007e0e690",
+      "source_node": "/routes/1"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 37,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/alertmanager.yaml::route.routes[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "672fe9ee97ffcbc174af9739d018d68b844e03b76b2e07afbf2e1cf696ac95a3",
+      "source_node": "/routes/1"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 38,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/alertmanager.yaml::route.routes[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "a9b9f8c7bd9706e96a104cd34007b1d26660a84a131ca106bc16fdc169c2c052",
+      "source_node": "/routes/1"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        0,
+        1,
+        5,
+        6,
+        13,
+        14,
+        19,
+        20
+      ],
+      "expected_matcher_indices": [
+        1,
+        2
+      ],
+      "index": 39,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/alertmanager.yaml::route.routes[0].routes[0]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "7b1b5380c1c3abce8f8b04a628ad06dc1106ae69fab471abbe824be048717f10",
+      "source_node": "/routes/2"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "grafana/provisioning.yaml::groups[0].rules[0]",
+          "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]",
+          "prometheus/aurora.yaml::groups[0].rules[0]",
+          "prometheus/meridian.json::groups[0].rules[0]"
+        ]
+      },
+      "index": 40,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/alertmanager.yaml::route.routes[0].routes[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "245e0f00cd4f235c71929d8debec7f40caed411b10a11b544efb23382e083d54",
+      "source_node": "/routes/2"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "grafana/provisioning.yaml::groups[0].rules[0]",
+          "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]",
+          "prometheus/aurora.yaml::groups[0].rules[0]",
+          "prometheus/meridian.json::groups[0].rules[0]"
+        ]
+      },
+      "index": 41,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/alertmanager.yaml::route.routes[0].routes[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "251865725d4c0faf0e26d0a27ec33bef30d6884e2f9babdd7d392217f653e600",
+      "source_node": "/routes/2"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        16,
+        17
+      ],
+      "expected_matcher_indices": [
+        3,
+        4
+      ],
+      "index": 42,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/alertmanager.yaml::route.routes[0].routes[1]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "be1b7747437dbb53f8431a789ac85220b82530a34d7a1597086cc0ba693f9c96",
+      "source_node": "/routes/3"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "prometheus/aurora.yaml::groups[0].rules[1]"
+        ]
+      },
+      "index": 43,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/alertmanager.yaml::route.routes[0].routes[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "8c10df3e409a1918fe4c40b24221a1f9309373a832b435a3a035acbc8c652853",
+      "source_node": "/routes/3"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "prometheus/aurora.yaml::groups[0].rules[1]"
+        ]
+      },
+      "index": 44,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/alertmanager.yaml::route.routes[0].routes[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "17999407b43f0b15d2f31cc26f5d74b91b79c6850c20e1a80ac80dac00f91efe",
+      "source_node": "/routes/3"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        2,
+        7,
+        15,
+        18,
+        21
+      ],
+      "expected_matcher_indices": [
+        5
+      ],
+      "index": 45,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/alertmanager.yaml::route.routes[1]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "c449fec0f9135093f082e4f765a174628bcbdb0754271998188576df076b2e37",
+      "source_node": "/routes/4"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "grafana/provisioning.yaml::groups[0].rules[0]",
+          "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]",
+          "prometheus/aurora.yaml::groups[0].rules[0]",
+          "prometheus/aurora.yaml::groups[0].rules[1]",
+          "prometheus/meridian.json::groups[0].rules[0]"
+        ]
+      },
+      "index": 46,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/alertmanager.yaml::route.routes[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "13db101e8557b803cd586b4a4e79d4ca7ec90650df37406c6b13c2f05ab504f8",
+      "source_node": "/routes/4"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "grafana/provisioning.yaml::groups[0].rules[0]",
+          "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]",
+          "prometheus/aurora.yaml::groups[0].rules[0]",
+          "prometheus/aurora.yaml::groups[0].rules[1]",
+          "prometheus/meridian.json::groups[0].rules[0]"
+        ]
+      },
+      "index": 47,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/alertmanager.yaml::route.routes[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "bcd32dcebc3d8e75dc8d8934d856952544f927c832473a71be59277fed4c16eb",
+      "source_node": "/routes/4"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        6
+      ],
+      "index": 48,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/alertmanager.yaml::route.routes[2]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "e34debcd4ff7bda7045fc73083ceace97fbaa082faf1aaaf9549d791ddc6b7d4",
+      "source_node": "/routes/5"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 49,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/alertmanager.yaml::route.routes[2]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "ba20d62daddd8b4501c8625947988db12ec9bf6adfbb97013a30e5e9bc229fd5",
+      "source_node": "/routes/5"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 50,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/alertmanager.yaml::route.routes[2]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "6ec5ff0a233dee945d10e9de62b467d747d4fe08af567c63fd4055ecfeb47a7f",
+      "source_node": "/routes/5"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        12
+      ],
+      "expected_matcher_indices": [
+        7
+      ],
+      "index": 51,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/alertmanager.yaml::route.routes[3]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "fbd486c1df86f85f74466c8cb8a50b12ea35df282fd5d7d233fc99caf48ae2ba",
+      "source_node": "/routes/6"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "loki/harbor.yaml::groups[0].rules[0]"
+        ]
+      },
+      "index": 52,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/alertmanager.yaml::route.routes[3]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "9f547a0b947dde53aae83e895c315dfc0cac3b730f70c153ba98905ca2e08a1c",
+      "source_node": "/routes/6"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "loki/harbor.yaml::groups[0].rules[0]"
+        ]
+      },
+      "index": 53,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/alertmanager.yaml::route.routes[3]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "ae1d5f019f5062d1d79fdc9f54edaab9bd81f496c3925f5adab86d2d9495ef51",
+      "source_node": "/routes/6"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        8
+      ],
+      "index": 54,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/alertmanager.yaml::route.routes[4]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "e5e16217bdca68fb81f1af61f07136297c4d6c58c78392a1177370118e692218",
+      "source_node": "/routes/7"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 55,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/alertmanager.yaml::route.routes[4]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "cb832e7256023bf1f3c56da17f439d406873ffb140491ed1544f32aba1e8af88",
+      "source_node": "/routes/7"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 56,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/alertmanager.yaml::route.routes[4]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "86f667344e542d139846e3a71731a76c183b68889547d1174a44c07193aa3805",
+      "source_node": "/routes/7"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        9
+      ],
+      "index": 57,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/alertmanager.yaml::route.routes[5]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "9069c18514d67b30296ed0c0b86f637daa47bd6fef2bbc0fa9310be65cec6d50",
+      "source_node": "/routes/8"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 58,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/alertmanager.yaml::route.routes[5]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "05f5da6d548a152e5be93b962d299d6ebbe375105d1c65d7746601bba90e7dee",
+      "source_node": "/routes/8"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 59,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/alertmanager.yaml::route.routes[5]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "e53071084caeba8018a00150d0835c8422733fecf454db408aaa030ca1ba202c",
+      "source_node": "/routes/8"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        10
+      ],
+      "index": 60,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/native.json::spec.route"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "d7f0ffce4c9e6b7035a325dedff7939010d68006535348fb2a5aa3007945e729",
+      "source_node": "/routes/9"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 61,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/native.json::spec.route"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "4e62e21a8e90d24847dc4c871622053d9fd5d64faec3adecc380523826259b7c",
+      "source_node": "/routes/9"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 62,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/native.json::spec.route"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "6ab43d3579da996c9022b483d868187181b71caace778c3662e1c822c28e3561",
+      "source_node": "/routes/9"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        8,
+        9
+      ],
+      "expected_matcher_indices": [
+        11,
+        12
+      ],
+      "index": 63,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/native.json::spec.route.routes[0]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "faba7f8b8b449b1e7e69f6cf5d26257608c4f7410b210db7009ad538bde1e869",
+      "source_node": "/routes/10"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "kubernetes/ledger.json::spec.groups[0].rules[0]"
+        ]
+      },
+      "index": 64,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/native.json::spec.route.routes[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "deb61c4383c4daa06d1ca7f43b6b4dccf35ebdb4c526242878d4c57b1a1cbc1d",
+      "source_node": "/routes/10"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "kubernetes/ledger.json::spec.groups[0].rules[0]"
+        ]
+      },
+      "index": 65,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/native.json::spec.route.routes[0]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "4c40cd61a2c063471c3f53b855854c421f18203380fe4a1ebbcd935c1b2af6d8",
+      "source_node": "/routes/10"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        3,
+        4,
+        10,
+        11
+      ],
+      "expected_matcher_indices": [
+        13,
+        14
+      ],
+      "index": 66,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/native.json::spec.route.routes[1]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "cd6f06f5d5b4e63cf4ba2f5a0c1eb2ed1ff834704e754ff5f44491bdd0fcbe68",
+      "source_node": "/routes/11"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "grafana/provisioning.yaml::groups[0].rules[1]",
+          "kubernetes/ledger.json::spec.groups[0].rules[0]"
+        ]
+      },
+      "index": 67,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/native.json::spec.route.routes[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "e28032146a13b858586c5985bf213aa407729457957c7c6abf01dac2fdbe2c6e",
+      "source_node": "/routes/11"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": [
+          "grafana/provisioning.yaml::groups[0].rules[1]",
+          "kubernetes/ledger.json::spec.groups[0].rules[0]"
+        ]
+      },
+      "index": 68,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/native.json::spec.route.routes[1]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "2f2f8ba96f5369fbfcb15ed51ec91718417f3b0fda82ac097a3adedf1e833845",
+      "source_node": "/routes/11"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        15,
+        16
+      ],
+      "index": 69,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/native.json::spec.route.routes[2]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "99dcbb923ae16f7b076dfaa10c5fb149050e5cf3f0e2e72f57a8761a4725d558",
+      "source_node": "/routes/12"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 70,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/native.json::spec.route.routes[2]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "643abbf683648d412f321aee764e503bd9faa76816d9de61bb804ac110180270",
+      "source_node": "/routes/12"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 71,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/native.json::spec.route.routes[2]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "a92df56af08eb96d37719d768ce381fe40957463044abbc8ac6e9d08c4496fe9",
+      "source_node": "/routes/12"
+    },
+    {
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        17,
+        18
+      ],
+      "index": 72,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "routing/native.json::spec.route.routes[3]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "13e86357ee68937f831549378b6318277c8399af23b9f42ca2ac31d755cab622",
+      "source_node": "/routes/13"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 73,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "down",
+          "from": "routing/native.json::spec.route.routes[3]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "09fc1c44795807c792859223c255e4fafc5372b9f59117cc9b309c389b9bfaf3",
+      "source_node": "/routes/13"
+    },
+    {
+      "expected_trace": {
+        "down_receiving_routes": [],
+        "up_emitting_rules": []
+      },
+      "index": 74,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "direction": "up",
+          "from": "routing/native.json::spec.route.routes[3]"
+        },
+        "tool": "trace"
+      },
+      "query_sha256": "2b7e7e3c7947c81cebcb8c2371992dcc84904057ad593a6cc5ecf547228355a7",
+      "source_node": "/routes/13"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::AuroraCritical"
+      ],
+      "expected_emitter_indices": [
+        25
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 75,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::alertname::AuroraCritical"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "901d4cf2fd60cbd59bf90d48cb2cb1df2342550d48e23ede7ea71d32e26117de"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::AuroraCritical"
+      ],
+      "expected_emitter_indices": [
+        25
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 76,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::alertname::AuroraCritical"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "16c88038199465efdcf666d0dfee8910e4bd2ddba95b7e9ca9a075a7c8b64db2"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::AuroraPreview"
+      ],
+      "expected_emitter_indices": [
+        29
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 77,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::alertname::AuroraPreview"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "36d74035e9e675a9a6bd48e1c98eb94eae97e9ed3b505dc51bc92afe07f18c45"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::AuroraPreview"
+      ],
+      "expected_emitter_indices": [
+        29
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 78,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::alertname::AuroraPreview"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "815499781b4160d1405bdbbd57efe640d3d68a1b6e81e1c10e0c31d4a221d024"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::CedarImplicit"
+      ],
+      "expected_emitter_indices": [
+        33
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 79,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::alertname::CedarImplicit"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "3ee47904e74c4c7f569927928144cb1ade8440d1da18b493afebbd549b70d500"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::CedarImplicit"
+      ],
+      "expected_emitter_indices": [
+        33
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 80,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::alertname::CedarImplicit"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "d6fbba5f894cc6fcac14b03e028ea9ca6e56478fd216412a287825b900ef7c37"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::HarborSlow"
+      ],
+      "expected_emitter_indices": [
+        17
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 81,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::alertname::HarborSlow"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "a33b344e99ecb44786c82e4e5d49be21de9e19da95a43d08ba925783282d6b1a"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::HarborSlow"
+      ],
+      "expected_emitter_indices": [
+        17
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 82,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::alertname::HarborSlow"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "2a05de01e707e171ec1d6a27acd6d38a6f9e5fa4cb60433be90bccf0623f8409"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::LedgerWarn"
+      ],
+      "expected_emitter_indices": [
+        12
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 83,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::alertname::LedgerWarn"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "9a9f51b640c03dcc08651d3ca2120954617d94f1a7e7908636d9bf77ca25fc2b"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::LedgerWarn"
+      ],
+      "expected_emitter_indices": [
+        12
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 84,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::alertname::LedgerWarn"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "205f36b436e239c97a885892927baba0a0fdb0c4c17f40b052bc56429cdff838"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::MeadowCritical"
+      ],
+      "expected_emitter_indices": [
+        8
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 85,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::alertname::MeadowCritical"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "fc77f781961d6731edd08b322d9ea0b942f0d09764ab3934d4ef52af7311748d"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::MeadowCritical"
+      ],
+      "expected_emitter_indices": [
+        8
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 86,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::alertname::MeadowCritical"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "e86f5458032412e2baa8de676539150d3431e6181c2d932209e834e5b6f0f763"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::MeridianCritical"
+      ],
+      "expected_emitter_indices": [
+        34
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 87,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::alertname::MeridianCritical"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "aa7c5178bbc053538dd66f1d6c9895872cffd2406d61c1dbbf738922322e030f"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::MeridianCritical"
+      ],
+      "expected_emitter_indices": [
+        34
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 88,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::alertname::MeridianCritical"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "6d5e4403183942ebe134eb7f75e179b5ea7f57b27faaac92d57459351659a449"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::MeridianOpaque"
+      ],
+      "expected_emitter_indices": [
+        38
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 89,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::alertname::MeridianOpaque"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "5a1507f2e43b439a732392d0646dd83092248d566a7eeea62098a046d2cb58c4"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::MeridianOpaque"
+      ],
+      "expected_emitter_indices": [
+        38
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 90,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::alertname::MeridianOpaque"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "1c83d2c505bde17ba03d3401b69a0b856930e1be5a1005410a6a6fa1a36fd6cb"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::QuartzUnknown"
+      ],
+      "expected_emitter_indices": [
+        21
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 91,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::alertname::QuartzUnknown"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "b2427c87737bd45ac011f6df40c8a4e40ff75c508994956591da3535e7b68fd7"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::QuartzUnknown"
+      ],
+      "expected_emitter_indices": [
+        21
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 92,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::alertname::QuartzUnknown"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "ef3ff21e92f81df18f58ba22c867ae33b3a8ec5828dd981ade3e593546554de6"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::WrittenGrafanaName"
+      ],
+      "expected_emitter_indices": [
+        0
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 93,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::alertname::WrittenGrafanaName"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "d6a6d0cbf7892e10aa8eeb54f759b0db8ad61ced384fce472703544d688b717a"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::WrittenGrafanaName"
+      ],
+      "expected_emitter_indices": [
+        0
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 94,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::alertname::WrittenGrafanaName"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "58949da1222d69d4ede5011b36ca9de70a32139156ab5d449f7b9dca9b4061d5"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::cedar-.+"
+      ],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        17
+      ],
+      "expected_matcher_indices": [
+        4
+      ],
+      "index": 95,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::service::cedar-.+"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "108aca532ac06ea90bbf06fe930ad08952ae777cf806d405f50eeb852d8b14a0"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::cedar-.+"
+      ],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        17
+      ],
+      "expected_matcher_indices": [
+        4
+      ],
+      "index": 96,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::service::cedar-.+"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "90e5e6ad6e10ed1882b1a6e160ff4352290d6101554e390c11ffc0840fdad39d"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::cedar-api"
+      ],
+      "expected_emitter_indices": [
+        26,
+        30
+      ],
+      "expected_link_indices": [
+        17
+      ],
+      "expected_matcher_indices": [],
+      "index": 97,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::service::cedar-api"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "4a139a4c43562cd9c90615956f03f6eaa6f6e3b1ecff95c111d10736122b172c"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::cedar-api"
+      ],
+      "expected_emitter_indices": [
+        26,
+        30
+      ],
+      "expected_link_indices": [
+        17
+      ],
+      "expected_matcher_indices": [],
+      "index": 98,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::service::cedar-api"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "e053a07b7837528e6265abd5859151ab77fa9a6e562875e4f30bef506e75c237"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::cedar-grafana"
+      ],
+      "expected_emitter_indices": [
+        1
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 99,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::service::cedar-grafana"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "150d48082a33562b16ede5833bbb6c71dfb6c1155a737cff5845aaa09eef0c9e"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::cedar-grafana"
+      ],
+      "expected_emitter_indices": [
+        1
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 100,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::service::cedar-grafana"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "b21d2b49af6e875b1ec64e26571e44d186e1f4e3dfc773292c7970737cd3e99b"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::cedar-meadow"
+      ],
+      "expected_emitter_indices": [
+        9
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 101,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::service::cedar-meadow"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "93a7b679d44e5d9a8bc3ce4403dba88962675311156baba0f31b0b4ecc59bb57"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::cedar-meadow"
+      ],
+      "expected_emitter_indices": [
+        9
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 102,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::service::cedar-meadow"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "d4a456555296421ec705a173eb16b2d6c7564e7dbf17b40398b5458be00094b8"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::cedar-worker"
+      ],
+      "expected_emitter_indices": [
+        35,
+        39
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 103,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::service::cedar-worker"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "60ff793ae515899f3fcd2371c85b5108d79de1cb7ca1f8c69c19bb541e0d6e70"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::cedar-worker"
+      ],
+      "expected_emitter_indices": [
+        35,
+        39
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 104,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::service::cedar-worker"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "62fccf4a51fb7865ca184dcea60b88b35e0086d997bdf0a0472cd61c69c1ed5f"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::harbor-.+"
+      ],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        12
+      ],
+      "expected_matcher_indices": [
+        7
+      ],
+      "index": 105,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::service::harbor-.+"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "6c0935a868eed98f728701389b266660425991a201a5c759704d378a26c75499"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::harbor-.+"
+      ],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        12
+      ],
+      "expected_matcher_indices": [
+        7
+      ],
+      "index": 106,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::service::harbor-.+"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "b27b6775a8f4ced140c813762913950017cee188c8df9a5a180a494338818a21"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::harbor-edge"
+      ],
+      "expected_emitter_indices": [
+        18
+      ],
+      "expected_link_indices": [
+        12
+      ],
+      "expected_matcher_indices": [],
+      "index": 107,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::service::harbor-edge"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "71e27d6ed75d35673c509d571927d6f8ba2af4b22f86b9f19077fea29c5e2ead"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::harbor-edge"
+      ],
+      "expected_emitter_indices": [
+        18
+      ],
+      "expected_link_indices": [
+        12
+      ],
+      "expected_matcher_indices": [],
+      "index": 108,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::service::harbor-edge"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "fe452d74f1fabf8d39905583493a9dfdb5a6c9f00611c85df1f4e9b8f37287bc"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::ledger-.+"
+      ],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        4,
+        11
+      ],
+      "expected_matcher_indices": [
+        14
+      ],
+      "index": 109,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::service::ledger-.+"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "15b41efb859f083d843e7c60afe6502413bfdcc8b017fa2b1f1fc5f115f532d1"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::ledger-.+"
+      ],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [
+        4,
+        11
+      ],
+      "expected_matcher_indices": [
+        14
+      ],
+      "index": 110,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::service::ledger-.+"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "00133420307a15e8be32f6b405df1ccf5317d1f294ec9619d8c1a9e3976a2e99"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::ledger-api"
+      ],
+      "expected_emitter_indices": [
+        13
+      ],
+      "expected_link_indices": [
+        11
+      ],
+      "expected_matcher_indices": [
+        18
+      ],
+      "index": 111,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::service::ledger-api"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "e2db3fc9146f4e7529fcf2b7ce1e7f7acf1394a4b2d8e35401e022d47ef8be76"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::ledger-api"
+      ],
+      "expected_emitter_indices": [
+        13
+      ],
+      "expected_link_indices": [
+        11
+      ],
+      "expected_matcher_indices": [
+        18
+      ],
+      "index": 112,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::service::ledger-api"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "207b108dc58ae61412158bec8d2b1185a6f4b47963047d5fcab6bc3e107ebdbe"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::ledger-ui"
+      ],
+      "expected_emitter_indices": [
+        4
+      ],
+      "expected_link_indices": [
+        4
+      ],
+      "expected_matcher_indices": [],
+      "index": 113,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::service::ledger-ui"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "99cc5f013e1322cd56cb186723f4222d3c11a519b34609deb9a1919b9d198d52"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::ledger-ui"
+      ],
+      "expected_emitter_indices": [
+        4
+      ],
+      "expected_link_indices": [
+        4
+      ],
+      "expected_matcher_indices": [],
+      "index": 114,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::service::ledger-ui"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "5c61fbcc67f6e62727ede345275dd1dd599d489e10e19be98749438d5ada4670"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::quartz"
+      ],
+      "expected_emitter_indices": [
+        22
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        9
+      ],
+      "index": 115,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::service::quartz"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "a160d88752e97e27dd22668987ad079f5b5b89e32439b4124bd736ddbb9e97a2"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::service::quartz"
+      ],
+      "expected_emitter_indices": [
+        22
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        9
+      ],
+      "index": 116,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::service::quartz"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "97b770d68857b285d0f8b186a0866346da11aa9c8eb317efcb0fcbc4274e2c27"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::severity::critical"
+      ],
+      "expected_emitter_indices": [
+        2,
+        5,
+        10,
+        27,
+        36
+      ],
+      "expected_link_indices": [
+        1,
+        6,
+        14,
+        20
+      ],
+      "expected_matcher_indices": [
+        2
+      ],
+      "index": 117,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::severity::critical"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "592d103eb29992b7f69947ecf6f286db8095519994d16221b1b02b70144edbca"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::severity::critical"
+      ],
+      "expected_emitter_indices": [
+        2,
+        5,
+        10,
+        27,
+        36
+      ],
+      "expected_link_indices": [
+        1,
+        6,
+        14,
+        20
+      ],
+      "expected_matcher_indices": [
+        2
+      ],
+      "index": 118,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::severity::critical"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "61f587198a72a6a16c1618fd3864d1725af229d8cd081faeb0e8661f7f6c1a37"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::severity::warn",
+        "alert::severity::warning"
+      ],
+      "expected_emitter_indices": [
+        14,
+        19,
+        23,
+        31,
+        40
+      ],
+      "expected_link_indices": [
+        9
+      ],
+      "expected_matcher_indices": [
+        12
+      ],
+      "index": 119,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::severity::warn"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "ec12971ff84c4ff7aa4a16963feb490a78d06461d6b580fe0068189dee5923ac"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::severity::warn"
+      ],
+      "expected_emitter_indices": [
+        14
+      ],
+      "expected_link_indices": [
+        9
+      ],
+      "expected_matcher_indices": [
+        12
+      ],
+      "index": 120,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::severity::warn"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "b3ef1fbbd026704aa8d0010d719d22fc229679701f7c7b609f829d045e770d63"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::severity::warning"
+      ],
+      "expected_emitter_indices": [
+        19,
+        23,
+        31,
+        40
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 121,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::severity::warning"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "af72ce3a56789486330b7ffe11ba9a10e72849fb2ff7148cd0c7c9b4f8b13d28"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::severity::warning"
+      ],
+      "expected_emitter_indices": [
+        19,
+        23,
+        31,
+        40
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 122,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::severity::warning"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "9dba74145fe34eb23f49c738b08da9e8d13d63177ed11d0b71204af02095b5ac"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::support::aurora"
+      ],
+      "expected_emitter_indices": [
+        3,
+        11,
+        28,
+        32,
+        37
+      ],
+      "expected_link_indices": [
+        0,
+        2,
+        5,
+        7,
+        13,
+        15,
+        16,
+        18,
+        19,
+        21
+      ],
+      "expected_matcher_indices": [
+        0,
+        1,
+        3,
+        5,
+        6
+      ],
+      "index": 123,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::support::aurora"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "0a2b79dbaea25d8772b76a912f30ec347cc0402a600471db1a2e82abb9826d6f"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::support::aurora"
+      ],
+      "expected_emitter_indices": [
+        3,
+        11,
+        28,
+        32,
+        37
+      ],
+      "expected_link_indices": [
+        0,
+        2,
+        5,
+        7,
+        13,
+        15,
+        16,
+        18,
+        19,
+        21
+      ],
+      "expected_matcher_indices": [
+        0,
+        1,
+        3,
+        5,
+        6
+      ],
+      "index": 124,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::support::aurora"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "913b7054d34175a5dfd48e85028cdfca58e1cf001139a4a569f581c905c8a0f2"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::support::harbor"
+      ],
+      "expected_emitter_indices": [
+        20
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 125,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::support::harbor"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "d47e698bd8713ad0ec44afd02a5ac676fe820aafc676902ef8b2c37394ca5843"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::support::harbor"
+      ],
+      "expected_emitter_indices": [
+        20
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 126,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::support::harbor"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "5c1b104b474f7f6266cf7ea3387ca8d94b92dc2bfe96e4180649b6bf09242ca2"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::support::ledger"
+      ],
+      "expected_emitter_indices": [
+        6,
+        15
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 127,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::support::ledger"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "e4b9a2cf24a0e308950a43587e1989821502fdf47971b5ef3f436e6be2352562"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::support::ledger"
+      ],
+      "expected_emitter_indices": [
+        6,
+        15
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 128,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::support::ledger"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "ec497b8ce7f09755d44cc6a60b254e14356678acd9f82e98bb34ad3b502c8977"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::support::quartz"
+      ],
+      "expected_emitter_indices": [
+        24
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 129,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::support::quartz"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "75c8dc03fc86db1d425f841dadbb2c9971382824c2b11e70b5619b72dfeaea9f"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::support::quartz"
+      ],
+      "expected_emitter_indices": [
+        24
+      ],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 130,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::support::quartz"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "8e5753675347ea1b57d2feda08c86843d5b278f7e7c95f9aa5ca82eddc8d2f91"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::team::ledger"
+      ],
+      "expected_emitter_indices": [
+        7,
+        16
+      ],
+      "expected_link_indices": [
+        3,
+        8,
+        10
+      ],
+      "expected_matcher_indices": [
+        10,
+        11,
+        13,
+        15,
+        17
+      ],
+      "index": 131,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::team::ledger"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "3150d31bc2700422daa0e7698d5acc6c6b517eb0a3b5775d873a063a1baf671d"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::team::ledger"
+      ],
+      "expected_emitter_indices": [
+        7,
+        16
+      ],
+      "expected_link_indices": [
+        3,
+        8,
+        10
+      ],
+      "expected_matcher_indices": [
+        10,
+        11,
+        13,
+        15,
+        17
+      ],
+      "index": 132,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::team::ledger"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "23659a59a78885da65d19931f9cb8e6f04b1ffd937c70a19f1af23c553977270"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::unwritten::present"
+      ],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        16
+      ],
+      "index": 133,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::unwritten::present"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "99a3872758b94911590c6ecb02f916a48462bbe74a47e5dedc296c367dcf25e3"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::unwritten::present"
+      ],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        16
+      ],
+      "index": 134,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::unwritten::present"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "91ffeba3b0485100686d785615a9ee37c1717236b96e59a088ce0bf468ed263f"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::zone::red"
+      ],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        8
+      ],
+      "index": 135,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::zone::red"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "3d6f5d3fb55b90836dc83f6f5e24a73b47bfab3895e9111f16c3f7cc8be28156"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::zone::red"
+      ],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [
+        8
+      ],
+      "index": 136,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "alert::zone::red"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "e2ad69062bf7700f6aa8e26f4bd64079efb82f7e982fa5c9943b73ab490976c9"
+    },
+    {
+      "expected_contract_identities": [
+        "alert::alertname::AuroraCritical",
+        "alert::alertname::AuroraPreview",
+        "alert::alertname::CedarImplicit",
+        "alert::alertname::HarborSlow",
+        "alert::alertname::LedgerWarn",
+        "alert::alertname::MeadowCritical",
+        "alert::alertname::MeridianCritical",
+        "alert::alertname::MeridianOpaque",
+        "alert::alertname::QuartzUnknown",
+        "alert::alertname::WrittenGrafanaName",
+        "alert::service::cedar-.+",
+        "alert::service::cedar-api",
+        "alert::service::cedar-grafana",
+        "alert::service::cedar-meadow",
+        "alert::service::cedar-worker",
+        "alert::service::harbor-.+",
+        "alert::service::harbor-edge",
+        "alert::service::ledger-.+",
+        "alert::service::ledger-api",
+        "alert::service::ledger-ui",
+        "alert::service::quartz",
+        "alert::severity::critical",
+        "alert::severity::warn",
+        "alert::severity::warning",
+        "alert::support::aurora",
+        "alert::support::harbor",
+        "alert::support::ledger",
+        "alert::support::quartz",
+        "alert::team::ledger",
+        "alert::unwritten::present",
+        "alert::zone::red"
+      ],
+      "expected_emitter_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40
+      ],
+      "expected_link_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "expected_matcher_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "index": 137,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "alert::"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "50eb50aa9b66ef644a88af475957b53781517b64080b2c0ccc7f3771675bc981"
+    },
+    {
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 138,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "HelmGhost"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "e9bcb8cc632593110f69cc9a4d70d0982b295baeb0bd3fe955550d3fe7a2f396"
+    },
+    {
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 139,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "SecretGhost"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "eea90f4c2c93b6e51c3c56dbd244a096683243d2f9283e430a26238830d452a7"
+    },
+    {
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 140,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "annotation-ghost"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "21c59e25f9861a4a5e61345432966d8ecea720e2a6c91aefeca5047a13382b38"
+    },
+    {
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 141,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "metadata-ghost"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "a5cc65fa4b634f5063fe4d6ce57c8f09e71132cd9e94fa4ea153801ac86013c9"
+    },
+    {
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 142,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "recording-ghost"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "16421270b433512f785a0a49eb11dae03105ffe0e4739bfcfe75e53755fb6ad2"
+    },
+    {
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 143,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "RuleAlias"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "9a8a811c176e9e2b4656c057d68af1e8947ee49e4c35d942c6bf548b39314f09"
+    },
+    {
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 144,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "GroupAlias"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "de499d970f41f3c1bcfdf4acb6ad4e53b494900e566e8d410ea3209999ef9909"
+    },
+    {
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 145,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "BeaconLedger"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "9fea00533ec9145e065437b148c51c2c9ef98af907b4b580c188eb1c987af2d9"
+    },
+    {
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 146,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "unknown-zone"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "7e7597b8ca572ddecb9e1d057b19b825bd193f6c32a4a09884dab3b4c5228006"
+    },
+    {
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 147,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "kind": "alert",
+          "query": "blocked-ledger"
+        },
+        "tool": "search"
+      },
+      "query_sha256": "2e30b8c080f7867da76cfddecb81913841bad9371667e484e512dd03e55bea26"
+    },
+    {
+      "expect_no_alert_node_or_sides": true,
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 148,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "kubernetes/bundle.yaml::[0].spec.groups[0].rules[1]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "16b9642f45a22c3936601eccf2a0da07f26151cd10a1362f788a9e88077f6ffc"
+    },
+    {
+      "expect_no_alert_node_or_sides": true,
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 149,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "loki/harbor.yaml::groups[0].rules[1]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "a33891e3ad8f9f05fe925c0ce8af0fa6acc1efb0e18f012686a75a985eb2d89f"
+    },
+    {
+      "expect_no_alert_node_or_sides": true,
+      "expected_contract_identities": [],
+      "expected_emitter_indices": [],
+      "expected_link_indices": [],
+      "expected_matcher_indices": [],
+      "index": 150,
+      "query": {
+        "arguments": {
+          "budget": 200000,
+          "symbol": "prometheus/aurora.yaml::groups[0].rules[2]"
+        },
+        "tool": "context"
+      },
+      "query_sha256": "10efb32b0debae73689c98278374839825bf89580744ca871a30ff5bd6dd82ee"
+    }
+  ],
+  "search_kind": "alert, no config-value fallback",
+  "status": "FROZEN_SOURCE_ONLY_NOT_PROVED"
+}

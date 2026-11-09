@@ -1,0 +1,15 @@
+apiVersion: platform.example.com/v1
+kind: MessageQueue
+metadata:
+  name: custom-object
+spec:
+  endpoints:
+    - name: private-custom
+---
+apiVersion: neighbor.example.com/v1
+kind: MessageQueue
+metadata:
+  name: searchable-unknown
+spec:
+  endpoints:
+    - name: wrong-custom-group

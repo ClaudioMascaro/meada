@@ -1,0 +1,7 @@
+services:
+  escape:
+    build: ../../../outside
+  remote:
+    build: https://github.com/acme/tool.git
+  unset:
+    build: ${TOOL_DIR}/src

@@ -1,0 +1,102 @@
+example.com/acme/infra stack/compose.yaml:2-8 services.web
+type: service
+name: none
+root: stack
+image: "ghcr.io/acme/web:1.4" (overridable)
+build: "stack/web"
+overridable: none
+references:
+example.com/acme/infra stack/compose.yaml:9 services.api via depends_on
+example.com/acme/infra stack/compose.yaml:9 services.api via networks.front
+referenced by:
+example.com/acme/infra stack/compose.yaml:9 services.api via networks.front
+values:
+example.com/acme/infra stack/compose.yaml:3 services.web.image = "ghcr.io/acme/web:${WEB_TAG:-1.4}"
+example.com/acme/infra stack/compose.yaml:4 services.web.build = "./web"
+example.com/acme/infra stack/compose.yaml:6 services.web.depends_on[0] = "api"
+example.com/acme/infra stack/compose.yaml:8 services.web.networks[0] = "front"
+image: image::ghcr.io/acme/web
+  builder: example.com/acme/infra [inferred: image::ghcr.io/acme/web; image: stack/compose.yaml#services.web.image (Compose default); stack/compose.yaml#services.web.image]
+
+example.com/acme/infra stack/compose.yaml:9-21 services.api
+type: service
+name: none
+root: stack
+image: "acme/api:${API_TAG}" (unresolved)
+build: "services/api-dev" (overridable)
+overridable: none
+references:
+example.com/acme/infra stack/compose.yaml:2 services.web via networks.front
+example.com/acme/infra stack/compose.yaml:22 services.db via depends_on
+example.com/acme/infra stack/compose.yaml:22 services.db via links
+example.com/acme/infra stack/compose.yaml:22 services.db via networks.back
+referenced by:
+example.com/acme/infra stack/compose.yaml:2 services.web via depends_on
+example.com/acme/infra stack/compose.yaml:2 services.web via networks.front
+example.com/acme/infra stack/compose.yaml:22 services.db via networks.back
+values:
+example.com/acme/infra stack/compose.yaml:10 services.api.image = "acme/api:${API_TAG}"
+example.com/acme/infra stack/compose.yaml:12 services.api.build.context = "../services/api"
+example.com/acme/infra stack/compose.yaml:13 services.api.build.dockerfile = "Dockerfile"
+example.com/acme/infra stack/compose.yaml:16 services.api.depends_on.db.condition = "service_healthy"
+example.com/acme/infra stack/compose.yaml:18 services.api.links[0] = "db:database"
+example.com/acme/infra stack/compose.yaml:20 services.api.networks[0] = "front"
+example.com/acme/infra stack/compose.yaml:21 services.api.networks[1] = "back"
+image: image::docker.io/acme/api
+  builder: example.com/acme/infra [exact: image::docker.io/acme/api]
+
+example.com/acme/infra stack/compose.override.yaml:8-11 services.cache
+type: service
+name: none
+root: stack
+image: "redis:7"
+overridable: none
+references:
+example.com/acme/infra stack/compose.yaml:22 services.db via depends_on
+referenced by: none
+values:
+example.com/acme/infra stack/compose.override.yaml:9 services.cache.image = "redis:7"
+example.com/acme/infra stack/compose.override.yaml:11 services.cache.depends_on[0] = "db"
+image: image::docker.io/library/redis
+
+example.com/acme/infra tools/docker-compose.yml:2-3 services.escape
+type: service
+name: none
+root: tools
+overridable: none
+references:
+example.com/acme/infra tools/docker-compose.yml:4 services.remote via networks.default
+example.com/acme/infra tools/docker-compose.yml:6 services.unset via networks.default
+referenced by:
+example.com/acme/infra tools/docker-compose.yml:4 services.remote via networks.default
+example.com/acme/infra tools/docker-compose.yml:6 services.unset via networks.default
+values:
+example.com/acme/infra tools/docker-compose.yml:3 services.escape.build = "../../../outside"
+
+example.com/acme/infra tools/docker-compose.yml:4-5 services.remote
+type: service
+name: none
+root: tools
+overridable: none
+references:
+example.com/acme/infra tools/docker-compose.yml:2 services.escape via networks.default
+example.com/acme/infra tools/docker-compose.yml:6 services.unset via networks.default
+referenced by:
+example.com/acme/infra tools/docker-compose.yml:2 services.escape via networks.default
+example.com/acme/infra tools/docker-compose.yml:6 services.unset via networks.default
+values:
+example.com/acme/infra tools/docker-compose.yml:5 services.remote.build = "https://github.com/acme/tool.git"
+
+example.com/acme/infra tools/docker-compose.yml:6-7 services.unset
+type: service
+name: none
+root: tools
+overridable: none
+references:
+example.com/acme/infra tools/docker-compose.yml:2 services.escape via networks.default
+example.com/acme/infra tools/docker-compose.yml:4 services.remote via networks.default
+referenced by:
+example.com/acme/infra tools/docker-compose.yml:2 services.escape via networks.default
+example.com/acme/infra tools/docker-compose.yml:4 services.remote via networks.default
+values:
+example.com/acme/infra tools/docker-compose.yml:7 services.unset.build = "${TOOL_DIR}/src"

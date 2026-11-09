@@ -1,0 +1,3 @@
+example.com/orphan/infra main.tf:1 aws_sqs_queue.orders (root .) provisioner channel::sqs::orders (no use in the workspace)
+example.com/orphan/infra main.tf:1 aws_sqs_queue.orders (root .) provisioner channel::sqs::orders (no use in the workspace)
+example.com/orphan/infra main.tf:1 aws_sqs_queue.orders (root .) provisioner channel::sqs::orders (no use in the workspace)

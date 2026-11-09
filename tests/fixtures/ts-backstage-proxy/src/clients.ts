@@ -65,3 +65,51 @@ export async function viaIgnorePath() {
 export async function viaDisputed() {
   return fetch('/api/proxy/disputed/clusters');
 }
+
+export async function viaShort() {
+  return fetch('/api/proxy/short/clusters');
+}
+
+export async function viaShortEnv() {
+  return fetch('/api/proxy/shortenv/clusters');
+}
+
+export async function viaShortEnvDirect() {
+  return fetch('/api/proxy/shortenvdirect/clusters');
+}
+
+export async function viaShortIgnored() {
+  return fetch('/api/proxy/shortignored/clusters');
+}
+
+export async function viaShortPrepend() {
+  return fetch('/api/proxy/shortprepend/clusters');
+}
+
+export async function viaShortRewrite() {
+  return fetch('/api/proxy/shortrewrite/clusters');
+}
+
+export async function viaShortStripped() {
+  return fetch('/api/proxy/shortstripped/clusters');
+}
+
+export async function viaIncluded() {
+  return fetch('/api/proxy/included/clusters');
+}
+
+export async function viaIncludedShort() {
+  return fetch('/api/proxy/includedshort/clusters');
+}
+
+export async function viaOldShape() {
+  return fetch('/api/proxy/oldshape/clusters');
+}
+
+export async function viaProdShape() {
+  return fetch('/api/proxy/prodshape/clusters');
+}
+
+export async function viaLocalShape() {
+  return fetch('/api/proxy/localshape/clusters');
+}

@@ -6,6 +6,31 @@ this file, and a change to these modules updates it.
 
 ## Modules in brief
 
+- AWS subscriptions (#658): `iac/subscription.rs` evaluates source and SQS target names in
+  each Terraform/OpenTofu instance, with bounded alias/module traversal and known-resource
+  name/ARN/id references. `channel.rs` routes consumer links and related context sides through
+  the stored summaries, preserving levels and subscription reasons. New AWS source channels
+  (`sns`, `eventbridge`, `kinesis`) can start a trace through the existing `starts` seam;
+  provisioning traces continue through documented producers when consumers follow them.
+  Resource addresses and EventBridge rules are indexed once per root; each subscription
+  receives its node index directly, so lookups never rescan all pending nodes.
+  These decisions apply equally to full and partial exports.
+
+- Orphans (#657): `iac::orphans::Scope` groups provisioners and uses by
+  `ContractKind::provisioned_group` (contract kind plus broker or resource kind). Status lists
+  unmatched sides only in groups with both roles in the visible exports, using provisioning
+  links to preserve pattern and root semantics. Search and context mark sides when their
+  group's other role is absent. Unresolved sides have no group; existing resource diagnostics
+  are unchanged. The scope is the engine's already filtered workspace, never another index.
+
+- Provisioning (#656): `crate::iac::provision::context` lists a symbol's provisioners from its
+  own sides and its calls. `crate::engine::Engine::context_fresh` hydrates every side of a
+  selected IaC node before listing contracts; `crate::trace::Graph::attached_rows` continues
+  an IaC trace through ordinary links in either direction, and downward into provisioned code, while `crate::trace::Walk::provisioners_up` crosses back.
+  Provisioning links retain root labels, never enter consumer links or decision replay, and
+  do not change process membership. `crate::index::contracts` loads the same provisioner facts
+  for full and partial exports; `crate::engine::Engine::export` includes links touching the
+  local repository, including repository-level sides.
 - `engine.rs`: `Engine`, the one query seam (`open`, `refresh`, `export`, `search`, `context`,
   `trace`, open items, decisions, `status`); it builds the results of `search` and `context`,
   which `meada-core` renders. `Engine::export` names the indexed commit from its `CommitSource`
@@ -109,7 +134,13 @@ this file, and a change to these modules updates it.
   `Routes::reached`). `context` on a symbol adds
   `produces <channel>` (at the producing call), `publishes <exchange> <key>` followed by
   `produces <queue> [<level>: <reason>]` for each queue the bindings route it to, or `consumes
-  <channel>` (the handler) to its `contracts:`. Which contracts `context` lists by side, and
+  <channel>` (the handler) to its `contracts:`. A call's decided consumer link includes its
+  level, reason and provider identity. An inferred link includes them when its kind's
+  `explain_inferred` display policy enables it, given the consumer's repository: HTTP opts in
+  when a recorded environment-derived base URL selects a peer declared by `base_url_env`,
+  naming the variable and selected peer, also after a field or included config value is
+  refreshed (#683). Other call consumers keep the plain contract line.
+  Which contracts `context` lists by side, and
   the words for them, is `ContractKind::sides` (`writer`/`reader`, `producer`/`consumer`). After
   a `provides <route>` line with a shape come `<repository> <document> response fields: <paths>`
   and, when some are open, `<repository> <document> response open: <paths>`
@@ -169,7 +200,8 @@ this file, and a change to these modules updates it.
   (`Engine::status_report`), nothing
   otherwise, so no repository without drift changes.
 - `items.rs`: open items (`OpenItem`, `Candidate`, `ItemKind`, re-exported by `engine`) and `list`,
-  the one place that derives them. `list` takes the exports and the core's links (before any
+  which derives consumer items. Kind-owned source items and provisioning items join them in
+  `Engine::items`. `list` takes the exports and the core's links (before any
   decision), so an item is an ambiguous link or an unresolved consumer, in id order, whose
   candidates sort by repository, method, path, as if undecided. The routes a dynamic URL may
   reach come from each provider's kind (`ContractKind::candidate`; for HTTP, `route_fits`: method,
@@ -179,9 +211,12 @@ this file, and a change to these modules updates it.
   decision applies (its call has a `Level::Decided` link after replay); `open_items` and
   `local_items` drop those, so `search` with kind `ambiguous` or `unresolved` and `meada
   decide` never offer a decided call, while `local_item(id)` keeps it, for `--item` to redo.
-  `list` skips the ambiguous links of a kind that says `decidable` is false (packages): several
-  providers of a package name are no call for a person to decide. Decision replay asks the
-  seam's `serves` whether a provider serves a decided contract.
+  Item-site hydration, `list` and ordinary replay share `contract::consumer_item`, whose
+  default follows `decidable` (false for packages): several
+  providers of a package name are no call for a person to decide, while a patterned image
+  builder can own its ambiguity instead of the runner. Candidate reconstruction and replay
+  share `link_candidate`; its default uses the kind's `serves` alias rule, while a kind can
+  account for current query-local selections.
 - `search` kind `duplicate` (`search_duplicates`, an early branch, #254) groups the symbols of the
   workspace by `Symbol::hash` (the BLAKE3 of the span's exact bytes, set by `lang::hash_spans`
   when a file is parsed and kept in `Def::hash`, `symbols.hash` and the export). A group of two
@@ -235,8 +270,13 @@ this file, and a change to these modules updates it.
   `Walk`; `meada-core`'s `trace.rs`
   holds the result (`Row`, `Chain`) and its answer (`Chain::answer`: the rows that fit, the cut
   note, the chain footer, the missing peers), with `level_mark` and `arrow`. A link
-  whose consumer is a symbol (a resource reader) is crossed from provider to consumer going
-  down and back going up; a call-site consumer the other way. A channel link (producer call,
+  follows its kind's direction: `ContractKind::flows_to_consumer` sends resource and channel
+  data from provider to consumer going down, and back going up, for both symbol and call sides.
+  A receiving call keeps its identity and actual span/owner label, and continues through its
+  owner's body. It never calls its writer going down. Up from the call or its owner reads the
+  data-use links on that owner's calls. Partial loading hydrates the same owner/callee rows;
+  `Graph::edges` uses the same continuation, and reverse process membership includes the
+  owning symbol of a reached receiving call. Package and HTTP call directions are unchanged. A channel link (producer call,
   handler symbol) goes down from the producing call (`call_down` reads `into[call]`) into the
   handler, and up from the handler (`out[handler]`, a provider that is a call) to the producing
   call and its caller (a publish to a named exchange is such a call, linked through the bindings).
@@ -293,3 +333,40 @@ this file, and a change to these modules updates it.
   checks `meada-core` holds are `meada_core::msg`'s (a few arms delegate to it), and so is the
   language setting: `msg::init` sets it for both. Only `main.rs` calls
   `msg::init`; `meada mcp` forces English, so the MCP surface and library tests are English.
+
+## Declared key sites (#641)
+
+Before each kind declares, `Engine::exports` and `partial` call `read_declarations` against the
+repository's own index. `Export::config_sites` keeps only resolved locations. Context accepts
+both a canonical key locator and its declared selector; contract context and search print the
+actual key and line. Trace starts from the same locations and traverses directed links. The
+resource kind owns which declarations resolve and how their contract sections are described.
+Unqualified key queries union declared and automatic-use locations across the visible scope;
+trace deduplicates their canonical identities. A key with both keeps its inferred-use context
+and can continue through a declared read-write side.
+
+## Anchored provisioning decisions (#674)
+
+`iac::provision` keeps infrastructure choices separate from consumer/provider links. Its
+`items` adapter places an ambiguous pattern at its IaC or use site and lists the literal contracts
+used by producers, consumers or directionless configuration sides. The decision identity
+includes the provisioner and evaluation root, or the use site and pattern contract; choosing a literal name retains every use of
+that name. `links` replays valid choices at `decided` for export, context, trace and orphans.
+`reports` follows the existing missing-peer and stale-decision causes. The engine combines
+these items and evaluations with ordinary contract decisions; `decisions::replay` accepts a
+predicate selecting its decisions. Query-only `Export::decisions` comes from the workspace
+and is never written into the index or canonical export.
+
+Before placing items, the partial query hydrates patterned provisioning use sites as well
+as consumer/provider items, so SDK calls retain their source path, line and excerpt even
+without a producer or writer. Repository-level declarations fall back to their contract text.
+`Source::placement` uses indexed file/key/line and contract metadata for declared config keys,
+without reading source lines that could reintroduce redacted or cut scalar values.
+
+Provisioning candidate groups and provisioner identities are indexed once per adapter pass.
+Source placement indexes config-key metadata and hydrated call, symbol and IaC locations once
+per repository, without rescanning them for each ambiguous source.
+Replay applies the valid choices in one traversal of the links, and literal-only workspaces
+with no provisioning decisions avoid building those groups. Reverse-pattern ambiguity uses
+names accumulated during the existing provisioner scan, without rescanning provisioners for
+each resulting link.

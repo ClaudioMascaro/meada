@@ -28,11 +28,26 @@ For each corpus entry (`scripts/corpus.tsv`), with the head binary first and the
    `$RUN/queries/<entry>.jsonl`.
 
 Then `compare.md`, per entry: the budget lines, the export diff per section (`golden_diff`'s keys:
-symbols and calls by id, links by consumer, provider and contract), up to `--sample` (10) new or
+symbols and calls by id, links by consumer, provider, contract and root; rows sharing a key pair
+identical rows first, then stay apart as `key #2`), up to `--sample` (10) new or
 changed resolutions with the line of the call site and of the target, the tool list, and a
 unified diff of every MCP answer that differs.
 
-Exit 0 means no difference at all, 1 differences or budget overruns, 2 BLOCKED.
+Exit 0 means no difference at all, 1 differences, 2 BLOCKED (a crash or a refusal too), 3 a budget
+overrun or a nondeterministic index.
+
+The stdio client flushes each request, saves every sent and received JSON message beside its
+stderr log as `*.wire.jsonl`, and bounds each response wait at 120 seconds. A timeout is
+BLOCKED with the last request visible in that transcript, never an empty successful answer.
+The drive checkpoints its measured index/export results before MCP and saves each completed
+answer as it arrives.
+
+After an interrupted run, retain every partial capture and audit the exact frozen input,
+binary contents, queries and options before any run-local recovery. There is no generic
+resume flag. A manually audited recovery may reuse completed measured phases, but its script,
+identity audit and previous attempts stay with the receipt. Replaying a partial MCP phase
+archives its old stderr, wire transcript and partial answers under `mcp-attempts/` first.
+Record the interruption and every retry in the receipt.
 
 ## Queries
 

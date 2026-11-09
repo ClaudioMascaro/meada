@@ -1,0 +1,43 @@
+{"tool": "search", "arguments": {"query": "functions.createOrder", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "functions.createOrder (root api/serverless.yml)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "functions.createOrder (root api/serverless.yml)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "functions.createOrder (root api/serverless.yml)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "functions.processOrder", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "functions.processOrder (root api/serverless.yml)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "functions.processOrder (root api/serverless.yml)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "functions.processOrder (root api/serverless.yml)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "functions.audit", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "functions.audit (root api/serverless.yml)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "functions.audit (root api/serverless.yml)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "functions.audit (root api/serverless.yml)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "OrdersQueue", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "OrdersQueue (root api/serverless.yml)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "OrdersQueue (root api/serverless.yml)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "OrdersQueue (root api/serverless.yml)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "OrdersTable", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "OrdersTable (root api/serverless.yml)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "OrdersTable (root api/serverless.yml)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "OrdersTable (root api/serverless.yml)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "DeadLetter", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "DeadLetter (root api/serverless.yml)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "DeadLetter (root api/serverless.yml)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "DeadLetter (root api/serverless.yml)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Assets", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "Assets (root api/serverless.yml)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "Assets (root api/serverless.yml)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "Assets (root api/serverless.yml)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Vault", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "Vault (root api/serverless.yml)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "Vault (root api/serverless.yml)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "Vault (root api/serverless.yml)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "functions.send", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "functions.send (root worker/serverless.yml)", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "functions.send (root worker/serverless.yml)", "direction": "down", "budget": 200000}}
+{"tool": "trace", "arguments": {"from": "functions.send (root worker/serverless.yml)", "direction": "up", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "Serverless::Function", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "AWS::SQS::Queue", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "AWS::DynamoDB::Table", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "AWS::S3::Bucket", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "AWS::SecretsManager::Secret", "kind": "iac", "budget": 200000}}
+{"tool": "search", "arguments": {"query": "functions.ignored", "kind": "iac", "budget": 200000}}
+{"tool": "context", "arguments": {"symbol": "functions.ignored (root misc/serverless.yml)", "budget": 200000}}

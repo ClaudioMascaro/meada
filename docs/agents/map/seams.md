@@ -8,6 +8,11 @@ The extension steps of the package ecosystems, the readers the JVM and .NET shar
 entries per library of the HTTP and channel kinds. The other extension steps are in
 [Seams and what extends them](overview/seams-and-what-extends-them.md).
 
+Curated operators and registry/private IaC types extend the existing embedded type table,
+Eval, Kubernetes reader, configuration stamp and kind-owned projection hooks. The field and
+phase contracts are in [custom IaC (#671)](contracts/custom-iac-671.md); new cloud policy belongs
+to its contract kind, including batch routed provision uses, never an engine switch.
+
 - `dotnet/` holds what the .NET pack and ecosystems share (spec #28), as `jvm/` does for the
   JVM: `dotnet/msbuild.rs` reads an SDK-style project file (`msbuild::read`: whether it is a
   project and, if so, its `Using`s (the SDK's implicit usings among them), its `PackageId`,
@@ -154,7 +159,8 @@ entries per library of the HTTP and channel kinds. The other extension steps are
   that has one (`Resolver::lexical_as`, through `Facts::impls` and `Facts::extensions`), for
   every name read: the head of a call, a constant's value, the type a name is declared with
   (`Code::declared`) and the object the flow of `Follow::Values` follows. A parameter or a local
-  of the code around the block comes first (`Resolver::local_around`), and the property of the
+  of the code around the block comes first (`Resolver::around`, one climb per lookup over the
+  scopes `Binders` indexes by name), and the property of the
   class around only when the receiver is a class of the repository without that member. A
   receiver whose type is not the repository's leaves the name unknown only where the object it
   holds is asked (`Reading::Member`: `Code::declared` and the flow of `Follow::Values`, which find

@@ -1,0 +1,117 @@
+{
+  "format": 1,
+  "repository": "local/aws-sdk-java",
+  "files": [
+    {
+      "path": "Sends.java",
+      "hash": "b9359d3fb54914e0316809852546e6723d92f70b2bcef3c8c968fefd18660755"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/aws-sdk-java::Sends.java::Sends",
+      "span": {
+        "path": "Sends.java",
+        "start": 120,
+        "end": 323
+      },
+      "hash": "58f713f40c8ce8fc811f9e71564d74df017ac4410443ca678162c749742b539b"
+    },
+    {
+      "id": "local/aws-sdk-java::Sends.java::Sends.send()",
+      "span": {
+        "path": "Sends.java",
+        "start": 138,
+        "end": 321
+      },
+      "hash": "8c70a602803eafa535424505875509955dac6f25a4c847356509373653eb8da6"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/aws-sdk-java::Sends.java::Sends.send()::(method_invocation).build#0",
+      "caller": "local/aws-sdk-java::Sends.java::Sends.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.java",
+        "start": 170,
+        "end": 197
+      }
+    },
+    {
+      "id": "local/aws-sdk-java::Sends.java::Sends.send()::(method_invocation).build#1",
+      "caller": "local/aws-sdk-java::Sends.java::Sends.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.java",
+        "start": 219,
+        "end": 313
+      }
+    },
+    {
+      "id": "local/aws-sdk-java::Sends.java::Sends.send()::(method_invocation).message#0",
+      "caller": "local/aws-sdk-java::Sends.java::Sends.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.java",
+        "start": 219,
+        "end": 305
+      }
+    },
+    {
+      "id": "local/aws-sdk-java::Sends.java::Sends.send()::(method_invocation).topicArn#0",
+      "caller": "local/aws-sdk-java::Sends.java::Sends.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.java",
+        "start": 219,
+        "end": 288
+      }
+    },
+    {
+      "id": "local/aws-sdk-java::Sends.java::Sends.send()::PublishRequest.builder#0",
+      "caller": "local/aws-sdk-java::Sends.java::Sends.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.java",
+        "start": 219,
+        "end": 243
+      }
+    },
+    {
+      "id": "local/aws-sdk-java::Sends.java::Sends.send()::SnsClient.builder#0",
+      "caller": "local/aws-sdk-java::Sends.java::Sends.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.java",
+        "start": 170,
+        "end": 189
+      }
+    },
+    {
+      "id": "local/aws-sdk-java::Sends.java::Sends.send()::sns.publish#0",
+      "caller": "local/aws-sdk-java::Sends.java::Sends.send()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.java",
+        "start": 207,
+        "end": 314
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::sns::alerts",
+      "site": "local/aws-sdk-java::Sends.java::Sends.send()::sns.publish#0"
+    }
+  ],
+  "consumers": [],
+  "links": []
+}

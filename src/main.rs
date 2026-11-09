@@ -353,7 +353,7 @@ fn workspace(command: WorkspaceCommand) -> ! {
     }
     match answer {
         Ok(text) => {
-            print!("{text}");
+            out(text);
             std::process::exit(0);
         }
         Err(e) => {
@@ -493,7 +493,7 @@ fn github_app(command: GithubAppCommand) -> ! {
     };
     match reply {
         Ok(reply) => {
-            print!("{}", reply.stdout);
+            out(&reply.stdout);
             for note in &reply.notes {
                 eprintln!("meada: {note}");
             }
@@ -598,8 +598,8 @@ fn pull(manifest: &Path, every: Option<u64>) -> ! {
             pulled
         });
         match pulled {
-            Ok(Pulled::Swapped(id)) => println!("{id}"),
-            Ok(Pulled::Current(id)) if every.is_none() => println!("{id}"),
+            Ok(Pulled::Swapped(id)) => out(format_args!("{id}\n")),
+            Ok(Pulled::Current(id)) if every.is_none() => out(format_args!("{id}\n")),
             Ok(Pulled::Current(_)) => {}
             Ok(Pulled::Running(dir)) => {
                 eprintln!(
@@ -642,6 +642,18 @@ fn drained(serve: impl FnOnce() -> meada::Result<()>) -> meada::Result<()> {
         return meada::mcp::with_drain_bound(bound, serve);
     }
     serve()
+}
+
+/// Prints `text` on stdout, as `print!` does, but a reader that closed its end early
+/// (`meada export | head`) is no error: the rest is dropped and the command ends as it would.
+fn out(text: impl std::fmt::Display) {
+    use std::io::Write;
+    let mut stdout = std::io::stdout().lock();
+    if let Err(e) = write!(stdout, "{text}").and_then(|()| stdout.flush())
+        && e.kind() != std::io::ErrorKind::BrokenPipe
+    {
+        panic!("failed printing to stdout: {e}");
+    }
 }
 
 fn main() -> ExitCode {
@@ -910,7 +922,7 @@ fn main() -> ExitCode {
             generations: true,
         } => meada::with_busy_timeout(engine::PROBE_BUSY, || {
             engine::status_generations(&manifest).map(|status| {
-                print!("{status}");
+                out(status);
                 if let Err(problems) = engine::served_generation(&manifest) {
                     for line in problems.to_string().lines() {
                         eprintln!("meada: {line}");
@@ -926,7 +938,7 @@ fn main() -> ExitCode {
             generations: true,
         } => Engine::open_node(&manifest, &repo)
             .and_then(|engine| engine.export())
-            .map(|json| print!("{json}")),
+            .map(out),
         Command::Mcp {
             listen, workspace, ..
         } => {
@@ -944,13 +956,13 @@ fn main() -> ExitCode {
             ..
         } => meada::with_busy_timeout(engine::PROBE_BUSY, || {
             engine::probe_workspace(&manifest).map(|(status, ready)| {
-                print!("{status}");
+                out(status);
                 unready = !ready;
             })
         }),
         Command::Status {
             workspace: None, ..
-        } => engine::status(here).map(|status| print!("{status}")),
+        } => engine::status(here).map(out),
         // Every repository's problem on its own line, then the stage and the count, exit 1;
         // the others are refreshed all the same.
         Command::Index {
@@ -970,7 +982,7 @@ fn main() -> ExitCode {
             command: SnapshotCommand::Publish { workspace },
         } => match meada::snapshot::publish(&workspace) {
             Ok(generation) => {
-                println!("{generation}");
+                out(format_args!("{generation}\n"));
                 Ok(())
             }
             // Every repository's problem on its own line, as `index --workspace` reports them.
@@ -1006,12 +1018,12 @@ fn main() -> ExitCode {
         }
         // The answer is the only thing on stdout; a refusal's reason is on stderr, exit 1.
         #[cfg(feature = "workspaces")]
-        Command::Workspaces { command } => workspaces(command).map(|text| print!("{text}")),
+        Command::Workspaces { command } => workspaces(command).map(out),
         // The version reached is the only line on stdout.
         #[cfg(feature = "postgres")]
         Command::Postgres {
             command: PostgresCommand::Migrate { workspace },
-        } => meada::postgres::migrate(&workspace).map(|version| println!("{version}")),
+        } => meada::postgres::migrate(&workspace).map(|version| out(format_args!("{version}\n"))),
         // The generated password, when there is one, is the only line on stdout.
         #[cfg(all(feature = "ui", feature = "accounts"))]
         Command::Ui {
@@ -1019,7 +1031,7 @@ fn main() -> ExitCode {
             ..
         } => meada::ui::reset_admin(&workspace).map(|generated| {
             if let Some(password) = generated {
-                println!("{password}");
+                out(format_args!("{password}\n"));
             }
         }),
         // Every problem that refuses the start on its own line. The API is English whatever
@@ -1070,7 +1082,7 @@ fn main() -> ExitCode {
             let author = meada::snapshot::lock::cli_author();
             let op = || meada::snapshot::operation::pointer_set(&workspace, &generation, &author);
             pointer_audited(&workspace, &author, "pointer.set", &generation, op)
-                .map(|state| println!("{state}"))
+                .map(|state| out(format_args!("{state}\n")))
         }
         #[cfg(feature = "refresh-lock")]
         Command::Snapshot {
@@ -1087,7 +1099,7 @@ fn main() -> ExitCode {
             let op =
                 || meada::snapshot::operation::pointer_retain(&workspace, &generation, &author);
             pointer_audited(&workspace, &author, "pointer.retain", &generation, op)
-                .map(|id| println!("{id}"))
+                .map(|id| out(format_args!("{id}\n")))
         }
         #[cfg(feature = "refresh-lock")]
         Command::Snapshot {
@@ -1103,7 +1115,7 @@ fn main() -> ExitCode {
             let author = meada::snapshot::lock::cli_author();
             let op = || meada::snapshot::operation::pointer_drop(&workspace, &generation, &author);
             pointer_audited(&workspace, &author, "pointer.drop", &generation, op)
-                .map(|id| println!("{id}"))
+                .map(|id| out(format_args!("{id}\n")))
         }
         // What could not be counted on stderr, the new fence on stdout.
         #[cfg(feature = "refresh-lock")]
@@ -1138,7 +1150,7 @@ fn main() -> ExitCode {
                 for line in skipped.iter().flat_map(|s| s.lines()) {
                     eprintln!("meada: {line}");
                 }
-                println!("{fence}");
+                out(format_args!("{fence}\n"));
             })
         }
         Command::Export {
@@ -1147,7 +1159,7 @@ fn main() -> ExitCode {
             ..
         } => Engine::open_manifest(&manifest, &repo)
             .and_then(|engine| engine.export())
-            .map(|json| print!("{json}")),
+            .map(out),
         Command::Decide {
             item,
             dry_run,
@@ -1174,7 +1186,7 @@ fn main() -> ExitCode {
             )
         }),
         command => Engine::open(here).and_then(|engine| match command {
-            Command::Export { .. } => engine.export().map(|json| print!("{json}")),
+            Command::Export { .. } => engine.export().map(out),
             _ => engine.refresh(),
         }),
     };

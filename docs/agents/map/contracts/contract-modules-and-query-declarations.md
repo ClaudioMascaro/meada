@@ -1,10 +1,11 @@
-# Contract modules and query declarations
+# Library forms and query declarations
 
 - `contract.rs`, `http.rs` and its `http/` submodules, `resource.rs`, `channel.rs` and its `channel/` submodules
   (`channel/message.rs`: the message types and broker helpers; `channel/{ts,python,rust,go,java,csharp}.rs`:
   the message libraries of each language): the
   `ContractKind` trait and the HTTP kind (`http.rs`: the contract and path rules, the mount
-  machinery and the shared consumer readers; one submodule per language: `http/ts.rs` and
+  machinery and the shared consumer readers, and `http/join.rs`, the RFC 3986 join of Swift's
+  `URL(string:relativeTo:)` and TS's `new URL(reference, base)`; one submodule per language: `http/ts.rs` and
   `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers, with
   `http/ts/backstage.rs` mounting each Backstage backend plugin's router at `/api/<pluginId>` (a
   mount node per `createBackendPlugin` call in Express's `Mounts`) and folding a
@@ -13,9 +14,15 @@
   serves, from the routes `ts::providers` reports as mounted; a plugin whose `pluginId` is
   neither a literal nor a `const` of the file bound to one is a `Role::Unmounted` row that
   `Http::status` reports; `http/ts/config.rs` reads the `proxy.endpoints` of `app-config*.yaml`
-  (#616): a URL that starts with `/api/proxy/<ep>` is rewritten to the endpoint's `target`, the
-  consumer's `via` keeping the endpoint after `PROXY_VIA` for the reason, and an endpoint whose
-  target is not read gives the `client:` `via` that `backstage::unread` finds for `status`);
+  (#616; with no `endpoints` key in any file, nor an include not followed at the root, `proxy` or
+  `proxy.endpoints`, `config::TABLE_PATHS` and `includes::Grafted::watched_unread`, #709, the keys of `proxy` that start with `/`,
+  and a string value as `{ target }` in either shape, #690): a URL that starts with
+  `/api/proxy/<ep>` is rewritten to the endpoint's `target`, the consumer's `via` keeping the
+  endpoint after `PROXY_VIA` for the reason, and an endpoint whose
+  target is not read gives the `client:` `via` that `backstage::unread` finds for `status`; each
+  root is a tree first, `config/includes.rs` grafting its `$include`s and reading its `$env`s,
+  #689, then flattened by `spring::flatten`, and an include not followed is a `Role::Unfollowed`
+  row of the TS group's first file that `Http::status` names);
   `http/python.rs` and `http/python/clients.rs`, FastAPI, Flask and Django providers and the
   requests, httpx and aiohttp consumers, whose rows also list reqwest and ureq; `http/rust.rs`
   and `http/rust/axum.rs`, actix-web, Rocket and axum providers; `http/go.rs` and

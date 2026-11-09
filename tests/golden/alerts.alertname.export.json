@@ -1,0 +1,85 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/monitoring",
+  "commit": "c40bfebba16c189d925429f43480b8568c446166",
+  "dirty": true,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "alert::alertname::ApiDown",
+      "site": "example.com/acme/monitoring::rules.yaml::groups[0].rules[1]"
+    },
+    {
+      "contract": "alert::alertname::HighCPU",
+      "site": "example.com/acme/monitoring::rules.yaml::groups[0].rules[0]"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "alert::alertname::HighCPU",
+      "site": "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]",
+      "via": "alert matcher ="
+    },
+    {
+      "contract": "alert::alertname::ApiDown",
+      "site": "example.com/acme/monitoring::alertmanager.yaml::route.routes[1]",
+      "via": "alert matcher ="
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]",
+      "address": "route.routes[0]",
+      "type": "AlertmanagerRoute",
+      "root": "alertmanager.yaml",
+      "path": "alertmanager.yaml",
+      "line": 4,
+      "end_line": 5
+    },
+    {
+      "identity": "example.com/acme/monitoring::alertmanager.yaml::route.routes[1]",
+      "address": "route.routes[1]",
+      "type": "AlertmanagerRoute",
+      "root": "alertmanager.yaml",
+      "path": "alertmanager.yaml",
+      "line": 6,
+      "end_line": 7
+    },
+    {
+      "identity": "example.com/acme/monitoring::rules.yaml::groups[0].rules[0]",
+      "address": "groups[0].rules[0]",
+      "type": "AlertRule",
+      "root": "rules.yaml",
+      "path": "rules.yaml",
+      "line": 4,
+      "end_line": 5
+    },
+    {
+      "identity": "example.com/acme/monitoring::rules.yaml::groups[0].rules[1]",
+      "address": "groups[0].rules[1]",
+      "type": "AlertRule",
+      "root": "rules.yaml",
+      "path": "rules.yaml",
+      "line": 6,
+      "end_line": 8
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/monitoring::alertmanager.yaml::route.routes[0]",
+      "provider": "example.com/acme/monitoring::rules.yaml::groups[0].rules[0]",
+      "contract": "alert::alertname::HighCPU",
+      "level": "exact",
+      "reason": "alert::alertname::HighCPU; matchers \"alertname\"=\"HighCPU\"; receiver: cpu"
+    },
+    {
+      "consumer": "example.com/acme/monitoring::alertmanager.yaml::route.routes[1]",
+      "provider": "example.com/acme/monitoring::rules.yaml::groups[0].rules[1]",
+      "contract": "alert::alertname::ApiDown",
+      "level": "exact",
+      "reason": "alert::alertname::ApiDown; matchers \"alertname\"=\"ApiDown\"; receiver: api"
+    }
+  ]
+}

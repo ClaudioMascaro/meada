@@ -1,0 +1,58 @@
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: orders
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: assets
+  Topic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: events
+  Bus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: bus
+  Stream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: stream
+  Table:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: records
+  Global:
+    Type: AWS::DynamoDB::GlobalTable
+    Properties:
+      TableName: global-records
+  Simple:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: simple-records
+  Database:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: database
+  Cluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DBClusterIdentifier: cluster
+  Cache:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      ClusterName: cache
+  Replicas:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      ReplicationGroupId: replicas
+  Parameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /config/endpoint
+  Secret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: app-token

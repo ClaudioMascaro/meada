@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Shared messaging and storage
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+  DbPassword:
+    Type: String
+    NoEcho: true
+    Default: hunter2
+  Retention:
+    Type: Number
+    Default: 14
+Resources:
+  JobsQueue:
+    Type: AWS::SQS::Queue
+    DependsOn: JobsDeadLetter
+    Properties:
+      QueueName: !Sub "${Environment}-jobs"
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt JobsDeadLetter.Arn
+        maxReceiveCount: 5
+  JobsDeadLetter:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Join ["-", [!Ref Environment, jobs, dead]]
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${AWS::StackName}-alerts"
+      Subscription:
+        - Protocol: sqs
+          Endpoint: !GetAtt JobsQueue.Arn
+  AssetsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ["-", [assets, !Ref Environment, !Ref "AWS::Region"]]
+  Database:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub "${Environment}-db"
+      MasterUserPassword: !Ref DbPassword
+  QueueLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub
+        - "/aws/${Environment}/${Queue}/${Shard}"
+        - Shard: "0"
+      RetentionInDays: !Ref Retention
+      Tags:
+        - Key: queue
+          Value: !Sub "${JobsQueue.QueueName}"
+  SharedName:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !ImportValue shared-parameter-name
+      Type: String
+      Value: !Ref JobsQueue
+  BucketAlias:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref AssetsBucket
+      Type: String
+      Value: "alias"
+  Literal:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: "${!NotAVariable}"
+      Type: String
+      Value: !Sub "literal ${!Escaped}"

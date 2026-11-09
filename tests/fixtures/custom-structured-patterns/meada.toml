@@ -1,0 +1,13 @@
+[[iac.module]]
+source="private/queue"
+entry="terraform:aws_sqs_queue"
+input="identity"
+
+[[iac.module]]
+source="private/gcp"
+entry="terraform:google_storage_bucket"
+input="identity"
+[[iac.module]]
+source="private/azure"
+entry="terraform:azurerm_servicebus_queue"
+input="identity"

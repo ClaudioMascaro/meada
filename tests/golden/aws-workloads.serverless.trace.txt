@@ -1,0 +1,14 @@
+example.com/acme/serverless serverless.yml:10 functions.worker
+  runs code example.com/acme/serverless worker/send.ts [exact: Serverless handler serverless.yml#functions.worker.handler]
+    example.com/acme/serverless worker/send.ts:3 dispatch
+    example.com/acme/serverless worker/send.ts:7 typedDispatch
+  example.com/acme/serverless serverless.yml:22 Orders via Ref
+    provisions channel::sqs::orders [inferred: channel::sqs::orders; config serverless.yml#custom.queue] example.com/acme/serverless use serverless.yml#custom.queue (line 8) [inferred]
+    provisions channel::sqs::orders [inferred: channel::sqs::orders; workload:example.com/acme/serverless::serverless.yml::functions.worker (root serverless.yml), env:QUEUE_NAME] example.com/acme/serverless worker/send.ts:4 dispatch
+    provisions channel::sqs::orders [inferred: channel::sqs::orders; workload:example.com/acme/serverless::serverless.yml::functions.worker (root serverless.yml), env:TYPED_QUEUE] example.com/acme/serverless worker/send.ts:8 typedDispatch
+chain: inferred · 4 hops · 1 repos · 270 tokens
+
+example.com/acme/serverless worker/send.ts:7 typedDispatch
+  runs code [exact: Serverless handler serverless.yml#functions.worker.handler] example.com/acme/serverless serverless.yml:10 functions.worker (root serverless.yml)
+  provisions channel::sqs::orders [inferred: channel::sqs::orders; workload:example.com/acme/serverless::serverless.yml::functions.worker (root serverless.yml), env:TYPED_QUEUE] example.com/acme/serverless serverless.yml:22 Orders (root serverless.yml)
+chain: inferred · 2 hops · 1 repos · 132 tokens

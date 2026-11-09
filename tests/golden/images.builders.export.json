@@ -1,0 +1,84 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/app",
+  "commit": "c0d48799c76b56e967dbf633bd6936c7be1932a8",
+  "dirty": true,
+  "files": [
+    {
+      "path": "orders.py",
+      "hash": "ddd0871081cd0d82932847eebdbbc828bf12959bda30f1ca622d434871c1fa8f"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/acme/app::orders.py::orders",
+      "span": {
+        "path": "orders.py",
+        "start": 0,
+        "end": 33
+      },
+      "hash": "72ad7419c3ebee979d4bdf27bbc05684ecd6921ce9350f5909a26980df6b941e"
+    }
+  ],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "image::ghcr.io/*/unknown",
+      "site": "example.com/acme/app",
+      "at": ".github/workflows/build.yml#jobs.publish.steps[2].with.tags"
+    },
+    {
+      "contract": "image::ghcr.io/acme/dynamic-tag",
+      "site": "example.com/acme/app",
+      "at": ".github/workflows/build.yml#jobs.publish.steps[2].with.tags"
+    },
+    {
+      "contract": "image::ghcr.io/acme/gradle-orders",
+      "site": "example.com/acme/app",
+      "at": "build.gradle.kts#jib.to.image"
+    },
+    {
+      "contract": "image::ghcr.io/acme/ko-orders",
+      "site": "example.com/acme/app",
+      "at": ".github/workflows/build.yml#jobs.publish.steps[1].run"
+    },
+    {
+      "contract": "image::ghcr.io/acme/maven-orders",
+      "site": "example.com/acme/app",
+      "at": "pom.xml#project.build.plugins.jib.configuration.to.image"
+    },
+    {
+      "contract": "image::ghcr.io/acme/meta-orders",
+      "site": "example.com/acme/app",
+      "at": ".github/workflows/build.yml#jobs.publish.steps[0].with.images"
+    },
+    {
+      "contract": "image::ghcr.io/acme/skaffold-orders",
+      "site": "example.com/acme/app",
+      "at": "skaffold.yaml#[0].build.artifacts[0].image"
+    },
+    {
+      "contract": "image::ghcr.io/acme/skaffold-worker",
+      "site": "example.com/acme/app",
+      "at": "skaffold.yaml#[1].build.artifacts[0].image"
+    }
+  ],
+  "consumers": [],
+  "links": [],
+  "processes": [
+    {
+      "entry_point": "example.com/acme/app::orders.py::orders",
+      "kind": "export",
+      "label": "orders",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/acme/app",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/acme/app::orders.py::orders"
+        }
+      ]
+    }
+  ]
+}

@@ -191,6 +191,27 @@ When you configure `[oidc]`, local sign-in turns off for every account (see [Bre
 
 What stops working: sign-in for any account other than `admin`; the session and agent tokens of the local accounts (the nodes and the proposal server admit only the provider's tokens, and agents use identity provider tokens instead); the accounts page, agent token issuing and login verification (404); and the `local:<username>` subjects recorded as authors, named-workspace operators and audit records, which never match the provider's, so redo the operator list of each named workspace. The accounts stay in the table, inert. No account or group is migrated on its own.
 
+## Infrastructure in the graph
+
+In **Code graph**, load a repository identity and, optionally, a generation. **Contracts** shows
+provisioners with their IaC address and evaluation root (module or overlay), alongside providers,
+consumers and config uses. **Provisioning links** keeps every use connected to every provisioner,
+with the root, level and reason.
+
+**Image links** shows builder → runner: the repository publishing the image and the workload
+running it. **Alert links** shows emitter → matcher: the label or tag and the condition testing it.
+These views include links within one repository and across repositories, while the general
+cross-repository links view keeps its scope. Each kind's contracts table also shows sides without
+a counterpart; no link is invented for them. The legend explains the roles, and link tables
+retain levels and reasons.
+
+Use Tab to reach the view selector and tables; arrow keys choose a view and scroll a focused
+table. Each table has an accessible name and headers. Infrastructure views appear when the
+export contains the corresponding sides or links. Reloading retains the selected view, or returns
+to communities if that view is no longer available.
+The playground offers `value`, `iac` and `alert` filters alongside `image` and the existing kinds,
+and displays the API answer unchanged.
+
 ## Fleet and diagnostics
 
 Each `snapshot pull --every` sends a heartbeat, the node's periodic status record. It reports generation, fence, local generations, readiness, version and time.

@@ -1,14 +1,24 @@
 # Split area files
 
-The architecture, contract and resolution/index/shape ceiling indexes stay within 8 KiB
-(`MAP_BUDGET`). Their overview and topic leaves stay within 24 KiB (`DETAIL_BUDGET`). Other
-Markdown files under `docs/agents` keep their existing 64 KiB (`AREA_BUDGET`) until migrated;
-`tests/it/docs.rs` checks every file. A file past its budget is split by its `## ` headings
-with `cargo run --example split_agents -- <file>` in the same change, never trimmed by dropping
-entries. Prepare meaningful headings first when a single section is too large. The file keeps
-its introduction and one line per part, and each part is a file of its own in a directory
-named after it. Read the index and the topics relevant to the change, including extension and
-invariant details when changing a seam. Existing split families and their references follow:
+Every Markdown file under `docs/agents` stays within its byte budget (`tests/it/docs.rs` checks
+it): `MAP_BUDGET` is 8 KiB for `architecture.md`, `map/contracts.md` and
+`ceilings/resolution-the-index-and-shape-readers.md`; `DETAIL_BUDGET` is 24 KiB for the topics
+under `map/overview/`, `map/contracts/` and `ceilings/resolution-the-index-and-shape-readers/`.
+`AREA_BUDGET` stays 64 KiB for the other files while those areas await their own split.
+Read an index to choose the relevant topics, not every part. A file past its budget is split by
+its `## ` headings with `cargo run --example split_agents -- <file>` in the same change, never
+trimmed by dropping entries: the file keeps its introduction and one line per part, and each part
+is a file of its own in a directory named after it. Prepare meaningful headings first when a
+single section would still exceed its budget. The split families include:
+
+- [architecture.md](../../architecture.md): flow, crates, module descriptions, identities,
+  extension seams, invariants, builds, deployment and tests live in this `map/overview/`
+  directory; the routing index retains every module's area.
+- [contracts](../contracts.md): library forms, the kind interface, HTTP, resources, channels,
+  packages and their ecosystems, AWS SDK sides and images.
+- [resolution, the index and shape readers](../../ceilings/resolution-the-index-and-shape-readers.md):
+  resolution, engine/index/query costs, package/build readers, shapes/documents, configuration,
+  Terraform/provisioning, Kubernetes/Crossplane and workload configuration.
 
 - [map/tests.md](../tests.md): [harness](../tests/test-crates-harness-and-fixtures.md),
   [test modules by subject](../tests/test-modules-by-subject.md),

@@ -1,0 +1,4 @@
+proxy:
+  # Only the legacy shape in this file, `endpoints` in the others: still only `endpoints` is read.
+  '/localshape':
+    target: ${INVENTORY_URL}

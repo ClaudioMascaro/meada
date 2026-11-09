@@ -1,0 +1,22 @@
+{
+  "additional_immutable_blob_gets": 122,
+  "complete_tree_entries": 358,
+  "initial_missing_list": "missing-blobs.json",
+  "initial_missing_list_is_historical": true,
+  "initially_retained_files": 13,
+  "pin": "b6c2f62b287524652592e6e2f7ea0d3054cb8ac6",
+  "preserved_original_prep_sha256": {
+    "pinned-kube-examples.json": "89596d1ad7bf044173ec5c16d89b4236f4e3a552593137a563f6820feeb5af2f",
+    "pinned-kube-source.json": "038f1b9ace2bc90fc025c4889a3ee49354c3f88134089d72f5f6b3d84beb111d",
+    "pinned-kube-tree.json": "15e3054d63b71beef1f9f6eed094c6679260502c48f1514b65d48f14a617f311",
+    "pinned-monitoring-expected.json": "7a032d8c76181198a0cbe08bd4aa46bd272b73afa53f6df37535ea66f7f4ce87",
+    "pinned-monitoring.jsonl": "130babf6ee4414628fc174cfe096ae068b57ae2fc6ad05f42b62f1a95d985c4a",
+    "verified-source-hashes.json": "7a7066cefbfab09c084705580c1dc72faa7546999a6a203799d13fcdda0109fa"
+  },
+  "remaining_missing_blobs": [],
+  "selected_blob_files": 135,
+  "selected_ignore_files": 2,
+  "selected_yaml_json": 133,
+  "status": "COMPLETE_VERIFIED_SOURCE_ONLY_NOT_PROVED",
+  "tree_truncated": false
+}

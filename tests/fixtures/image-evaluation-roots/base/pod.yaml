@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata: {name: common}
+spec:
+  containers:
+    - name: worker
+      image: ghcr.io/independent/root-review:stable
+      env:
+        - name: ROUTE
+          valueFrom: {configMapKeyRef: {name: per-root, key: route}}
+        - name: READER
+          valueFrom: {configMapKeyRef: {name: per-root, key: reader}}

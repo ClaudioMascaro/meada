@@ -169,6 +169,11 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
             let Some(client) = client(code, path, stored) else {
                 continue;
             };
+            // Kotlin keeps its existing typed SQS form. Java's AWS form is shared with the other
+            // services in `aws`, where a declared SQS client type still stands for construction.
+            if client == Client::Sqs && !kotlin(path) {
+                continue;
+            }
             let call = || Expand::Call(path, n);
             let chain = || Expand::Chain(path, n);
             let inject = Some(&inject as &Inject<'a, '_>);
@@ -192,18 +197,21 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
                     let read = |a: &[Value], _: &Keywords| streams(a, map_of);
                     out.extend(consume_with(code, chain(), inject, broker, &read, None));
                 }
-                (Client::Sqs, "sendMessage") => {
-                    out.extend(produce_with(code, chain(), inject, broker, &queue_url));
-                }
-                (Client::Sqs, "receiveMessage") => {
-                    out.extend(consume_with(
-                        code,
-                        chain(),
-                        inject,
-                        broker,
-                        &queue_url,
-                        None,
-                    ));
+                (Client::Sqs, "sendMessage" | "receiveMessage") => {
+                    use crate::contract::sdk::java::{rebuilt, root};
+                    let changed = code.call(path, n).is_some_and(|c| {
+                        (c.args.first().and_then(root)).is_some_and(|b| {
+                            rebuilt(code, path, &c.scope, b, &c.range, &|m| m == "queueUrl")
+                        })
+                    });
+                    let read = |a: &[Value], k: &Keywords| match changed {
+                        true => Some(vec![None]),
+                        false => queue_url(a, k),
+                    };
+                    out.extend(match method {
+                        "sendMessage" => produce_with(code, chain(), inject, broker, &read),
+                        _ => consume_with(code, chain(), inject, broker, &read, None),
+                    });
                 }
                 (Client::Rabbit, "convertAndSend") => {
                     let Some(written) = code.call(path, n) else {
@@ -630,6 +638,7 @@ fn listen<'a>(
     let texts =
         |key: &str| -> Vec<Option<String>> { all(key).iter().map(|v| text(v, config)).collect() };
     let message = |name: Option<String>, role: Side| Message {
+        environment: None,
         broker: "",
         name,
         path: path.into(),
@@ -759,8 +768,11 @@ mod tests {
             exported: &[],
             files: &[],
             configs: &configs,
+            symlinks: &[],
         };
-        let lines = crate::channel::message::lines(messages(&code, &indexed));
+        let mut messages = messages(&code, &indexed);
+        messages.extend(super::super::aws::test_messages(&code, Some(&indexed)));
+        let lines = crate::channel::message::lines(messages);
         let module = format!("{module}::");
         lines.into_iter().map(|l| l.replace(&module, "")).collect()
     }
@@ -1141,6 +1153,18 @@ mod tests {
                 "sqs orders consumer a.C.run()",
             ]
         );
+        // A builder held in a local that receives another call names no queue.
+        let body = "SqsClient sqs;\n\
+            void send() {\n\
+            var b = SendMessageRequest.builder().queueUrl(\"https://sqs/1/old\");\n\
+            b.queueUrl(\"https://sqs/1/new\");\n\
+            sqs.sendMessage(b.messageBody(\"m\").build());\n\
+            var k = SendMessageRequest.builder().queueUrl(\"https://sqs/1/kept\");\n\
+            sqs.sendMessage(k.build());\n}";
+        assert_eq!(
+            read(SQS, body),
+            ["sqs unresolved producer", "sqs kept producer"]
+        );
     }
 
     const NATS: &str = "import io.nats.client.Connection;\nimport io.nats.client.Dispatcher;\n";
@@ -1244,6 +1268,32 @@ mod tests {
             void send(SendMessageRequest request) { sqs.sendMessage(request); }\n\
             void ship() { send(SendMessageRequest.builder().queueUrl(\"https://sqs/1/shipments\").build()); }";
         assert_eq!(read(SQS, body), ["sqs shipments producer"]);
+    }
+
+    /// A declared client is the SDK's through the imports alone: a repository type of that
+    /// name hides it.
+    #[test]
+    fn a_repository_type_named_like_the_sqs_client_hides_it() {
+        let body = "static class SqsClient { void sendMessage(Object request) {} }\n\
+            SqsClient sqs;\n\
+            void send() { sqs.sendMessage(SendMessageRequest.builder().queueUrl(\"https://sqs/1/hidden\").build()); }";
+        assert!(read(SQS, body).is_empty());
+    }
+
+    /// A parameter or a typed local declared with the SDK's SQS client type is a client
+    /// whatever made it, also through a plain alias.
+    #[test]
+    fn a_declared_sqs_client_is_read_through_an_alias() {
+        let body = "void send(SqsClient conduit, foreign.Factory opaque) {\n\
+            var alias = conduit;\n\
+            alias.sendMessage(SendMessageRequest.builder().queueUrl(\"https://sqs/1/aliased\").build());\n\
+            SqsClient made = opaque.makeClient();\n\
+            made.sendMessage(SendMessageRequest.builder().queueUrl(\"https://sqs/1/typed\").build());\n\
+            }";
+        assert_eq!(
+            read(SQS, body),
+            ["sqs aliased producer", "sqs typed producer"]
+        );
     }
 
     /// A wrapper reached only by a name match (a call on a receiver whose type the source does
@@ -1650,6 +1700,7 @@ mod tests {
                 exported: &[],
                 files: &[],
                 configs: &[],
+                symlinks: &[],
             };
             (0..3)
                 .map(|_| {
@@ -1689,6 +1740,7 @@ mod tests {
                 exported: &[],
                 files: &[],
                 configs: &[],
+                symlinks: &[],
             };
             (0..3)
                 .map(|_| {

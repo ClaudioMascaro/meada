@@ -424,6 +424,16 @@ sends the MCP-shaped query that `playground.ts` builds, displaying the answer un
 `parseExport` before deriving communities, contracts, cross-repository links, drift and
 applied/stale decisions. View changes are local; explicit generation exports are cached in the
 page and a current-generation load reads again. `graph-i18n.ts` holds this area's pt-BR/en copy.
+Provisioner sides (#656) join their contracts with the IaC address and root label; provisioning
+links have a separate view with every side, root, level and reason. The export parser in
+meada-core validates these optional arrays before the graph reads them.
+Image and alert views (#675) reuse those parsed sides with builder/runner and emitter/matcher
+headings, plus forward-role link tables with levels, reasons and workload roots. They include
+same-repository links; the general links view still filters to cross-repository links. Sides
+without a counterpart remain in their kind's contracts table. The bilingual legend names
+roles, roots and native keyboard controls. Named, focusable table regions and column headers
+keep those views at the existing accessibility seam. Reloading retains the view when available,
+falling back to communities otherwise. The playground also exposes `value`, `iac` and `alert`.
 `OperationalPage.tsx` reads the fleet, store, repositories, credentials and admission routes;
 `operations.ts` projects their checked DTOs, with bilingual copy in `operations-i18n.ts`.
 Missing modules name their sections, errors remain local to the page, and the pasted token
@@ -513,4 +523,13 @@ and turns the editor read-only. Every role sees owners in the versions page and 
 The frontend container stage copies the one shared validation fixture because TypeScript also
 checks its tests; Rust/default stages gain no frontend input.
 Vitest exercises the built WASM and the public client, view-model and DOM
-seams, without a browser end-to-end suite.
+seams. The Proof workflow (`prove-meada`, `proof-a7-a8-ui`) also drives the built console through
+`console-graph.py`/`console-graph.mjs` in the prove skill: neutral source inputs, complete
+same-mode CLI/API exports, keyboard graph navigation, named tables, orphan sides and search
+filters, with screenshots, load/CLS budgets, axe findings and console-error captures retained.
+`tests/it/ui/playground.rs` serves the provisioner, image and alert fixtures through the real API.
+
+Config uses (#661) appear in the contracts view's separate optional uses column, as repository
+plus `at`; the graph never puts them in provider or consumer columns. Provisioning rows retain
+those uses' repository-level side and key locator, while existing directed links keep their
+own view. WASM `parseExport` retains the optional `uses` and provisioning `at` fields.

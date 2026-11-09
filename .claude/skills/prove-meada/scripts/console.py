@@ -5,12 +5,15 @@
   console.py api --run RUN
   console.py stop --run RUN
 
-`start` writes a bootstrap manifest of every head repository of RUN, indexes it, starts
+`start` writes a bootstrap manifest of the selected head repositories of RUN, indexes it, starts
 `meada ui` detached on a free loopback port and waits until `/api/v1/config` answers. Without
 `--accounts` the console admits every request as a viewer (the operator's proxy case). With it,
 `[postgres]` reads `MEADA_TEST_POSTGRES_URL` and a schema of this run, and `[accounts]` signs in
-`admin` with a password derived from the run's signing key, never written. `api` checks the console's API against the head's MCP
-stdio answers and `meada export` bytes. Exit 0: checks passed, 1: differences, 2: BLOCKED.
+`admin` with a password derived from the run's signing key, never written. `api` uses one
+selected entry per manifest to match standalone MCP stdio scope: success text is byte-equal,
+tool errors require HTTP 422/tool_error with the exact same message. Export bytes match CLI
+export on that identical manifest/repository, with all fields retained. Repeat per corpus
+entry. Exit 0: checks passed, 1: differences, 2: BLOCKED.
 """
 
 import argparse
@@ -37,10 +40,12 @@ def http(url, method="GET", body=None, headers=None):
         return e.code, e.read()
 
 
-def repos(run):
+def repos(run, selected=None):
     out = []
     for export in sorted(run.glob("head/*/export1.json")):
         name = export.parent.name
+        if selected is not None and name not in selected:
+            continue
         identity = json.loads(export.read_text())["repository"]
         out.append((name, identity, run / "work" / "head" / name))
     return out
@@ -70,7 +75,13 @@ def cmd_start(a):
         port = s.getsockname()[1]
     url = f"http://127.0.0.1:{port}"
     text = 'index_dir = "indexes"\n'
-    for _, identity, path in repos(run):
+    selected = a.repos.split(',') if a.repos else None
+    entries = repos(run, selected)
+    if selected is not None and set(selected) != {name for name, _, _ in entries}:
+        sys.exit('BLOCKED: --repos names a corpus entry absent from this run')
+    (d / 'selected.json').write_text(json.dumps([name for name, _, _ in entries]))
+    (d / 'binary').write_text(a.bin)
+    for _, identity, path in entries:
         text += f'\n[[repository]]\nrepo = "{identity}"\npath = "{path}"\n'
     text += f'\n[ui]\ndir = "{ui_dir}"\npublic_url = "{url}"\n'
     env = dict(os.environ)
@@ -114,6 +125,15 @@ def cmd_start(a):
     sys.exit(f"BLOCKED: no answer from {url}/api/v1/config in 30 s, see {d}/ui.log")
 
 
+def query_equal(status, payload, expected):
+    """The existing API protocol: success text, or 422/tool_error with the MCP error text."""
+    if expected.startswith('TOOL ERROR '):
+        failure = payload.get('error', {})
+        return (status == 422 and failure.get('code') == 'tool_error'
+                and failure.get('message') == expected.removeprefix('TOOL ERROR '))
+    return status == 200 and payload.get('text') == expected
+
+
 def cmd_api(a):
     run = Path(a.run).resolve()
     d = run / "console"
@@ -142,25 +162,43 @@ def cmd_api(a):
         status, _ = http(url + "/api/v1/manifest")
         lines.append(f"manifest without a token: {status}" + ("" if status == 401 else "  UNEXPECTED, expected 401"))
         differences += status != 401
-    for name, identity, _ in repos(run):
+    selected = json.loads((d / 'selected.json').read_text()) if (d / 'selected.json').exists() else None
+    entries = repos(run, selected)
+    if len(entries) != 1:
+        sys.exit('BLOCKED: API parity needs one corpus entry per manifest to match standalone stdio; start with --repos ENTRY')
+    for name, identity, _ in entries:
         rec = json.loads((run / "head" / name / "record.json").read_text())
-        same = 0
+        same, errors_same = 0, 0
+        captures = d / 'responses' / name
+        captures.mkdir(parents=True, exist_ok=True)
         for i, q in enumerate(rec["queries"]):
             status, body = http(url + "/api/v1/query", "POST",
                                 {"repository": identity, "generation": None, "tool": q["tool"], "arguments": q["arguments"]}, origin)
-            text = json.loads(body).get("text") if status == 200 else f"HTTP {status} {body.decode()[:200]}"
-            if text == rec["answers"][i]:
+            (captures / f'{i}.json').write_text(json.dumps({
+                'query': q, 'status': status, 'body': body.decode('utf-8', errors='replace')}, indent=2))
+            expected = rec['answers'][i]
+            payload = json.loads(body)
+            equal = query_equal(status, payload, expected)
+            errors_same += bool(equal and expected.startswith('TOOL ERROR '))
+            if equal:
                 same += 1
             else:
                 differences += 1
-                lines.append(f"{name} query {i} {q['tool']}: differs from MCP stdio: {text[:200]!r}")
-        lines.append(f"{name}: {same}/{len(rec['queries'])} query answers byte-equal to MCP stdio")
+                lines.append(f"{name} query {i} {q['tool']}: differs from MCP stdio: HTTP {status} {body.decode()[:200]!r}")
+        lines.append(f"{name}: {same}/{len(rec['queries'])} query results match MCP stdio: "
+                     f"{same - errors_same} successful texts byte-equal, {errors_same} exact tool-error messages with HTTP 422/tool_error")
         status, body = http(f"{url}/api/v1/repositories/{identity}/export", headers={k: v for k, v in origin.items() if k == "Authorization"})
-        exported = (run / "head" / name / "export1.json").read_bytes()
+        binary = (d / 'binary').read_text()
+        cli = subprocess.run([binary, 'export', '--workspace', str(d / 'meada.workspace.toml'), '--repo', identity],
+                             cwd=d, capture_output=True, timeout=120)
+        (d / f'{name}.cli.export.json').write_bytes(cli.stdout)
+        (d / f'{name}.cli.export.err').write_bytes(cli.stderr)
+        (d / f'{name}.cli.export.exit').write_text(str(cli.returncode))
         (d / f"{name}.export.json").write_bytes(body)
-        equal = status == 200 and body == exported
+        equal = cli.returncode == 0 and status == 200 and body == cli.stdout
         differences += not equal
-        lines.append(f"{name}: export {status}, {'byte-equal to' if equal else 'DIFFERS from'} meada export ({d}/{name}.export.json)")
+        lines.append(f"{name}: export {status}, {'byte-equal to' if equal else 'DIFFERS from'} CLI export on the same manifest/repo "
+                     f"(CLI exit {cli.returncode}; all fields retained; {d}/{name}.export.json)")
     verdict = "checks passed" if not differences else f"differences found: {differences}"
     (d / "api.md").write_text(f"# console.py api\n\n{verdict}\n\n" + "\n".join(f"- {l}" for l in lines) + "\n")
     print(verdict)
@@ -191,6 +229,7 @@ def main():
     s.add_argument("--run", required=True)
     s.add_argument("--ui-dir", required=True)
     s.add_argument("--accounts", action="store_true")
+    s.add_argument('--repos', help='comma-separated corpus entries to serve; API parity uses one at a time')
     for name in ("api", "stop"):
         sub.add_parser(name).add_argument("--run", required=True)
     a = p.parse_args()

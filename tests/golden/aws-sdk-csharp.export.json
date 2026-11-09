@@ -1,0 +1,162 @@
+{
+  "format": 1,
+  "repository": "local/aws-sdk-csharp",
+  "files": [
+    {
+      "path": "Sends.cs",
+      "hash": "7dfaa5d2bca36172ecb667b379c9413cea7c3db82a8c24cf2999cdd43e088882"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends",
+      "span": {
+        "path": "Sends.cs",
+        "start": 165,
+        "end": 716
+      },
+      "hash": "687d53c646bdd540146bb15ecce58e2bfc19d393fe817d442c482468ef1dfd85"
+    },
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "span": {
+        "path": "Sends.cs",
+        "start": 183,
+        "end": 714
+      },
+      "hash": "1d8069292a09ef435cdb1fc0182ff0bcf632cf5c8632dd5f065a05e88e4fbc17"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::AmazonSecretsManagerClient#0",
+      "caller": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.cs",
+        "start": 524,
+        "end": 556
+      }
+    },
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::AmazonSimpleNotificationServiceClient#0",
+      "caller": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.cs",
+        "start": 220,
+        "end": 263
+      }
+    },
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::Environment.GetEnvironmentVariable#0",
+      "caller": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.cs",
+        "start": 328,
+        "end": 371
+      }
+    },
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::Environment.GetEnvironmentVariable#1",
+      "caller": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.cs",
+        "start": 448,
+        "end": 497
+      }
+    },
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::GetSecretValueRequest#0",
+      "caller": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.cs",
+        "start": 600,
+        "end": 706
+      }
+    },
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::PublishRequest#0",
+      "caller": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.cs",
+        "start": 296,
+        "end": 373
+      }
+    },
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::PublishRequest#1",
+      "caller": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.cs",
+        "start": 416,
+        "end": 499
+      }
+    },
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::secrets.GetSecretValueAsync#0",
+      "caller": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.cs",
+        "start": 572,
+        "end": 707
+      }
+    },
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::sns.PublishAsync#0",
+      "caller": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.cs",
+        "start": 279,
+        "end": 374
+      }
+    },
+    {
+      "id": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::sns.PublishAsync#1",
+      "caller": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Sends.cs",
+        "start": 390,
+        "end": 500
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::sns",
+      "site": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::sns.PublishAsync#0",
+      "via": "env:TOPIC"
+    },
+    {
+      "contract": "channel::sns",
+      "site": "local/aws-sdk-csharp::Sends.cs::Sends.Use()::sns.PublishAsync#1",
+      "via": "env:NAMED_TOPIC"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::secretsmanager::orders/token",
+      "site": "local/aws-sdk-csharp::Sends.cs::Sends.Use()",
+      "via": null
+    }
+  ],
+  "links": []
+}

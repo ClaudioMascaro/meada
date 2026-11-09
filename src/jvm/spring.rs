@@ -19,6 +19,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::document::events::{self, Syntax};
 use crate::lang::{Annotated, Marked, Part, Value};
 use crate::names::annotation as known_annotation;
 use crate::package::Manifest;
@@ -181,13 +182,24 @@ fn read_properties(src: &str) -> Properties {
 /// when its joined keys pass `YAML_KEY_BUDGET`), and so is a document
 /// that activates on a profile.
 pub fn read_yaml(src: &str) -> Properties {
-    let Ok(root) = crate::document::yaml::parse(src) else {
+    let Ok(root) = events::first(Syntax::Yaml, src.as_bytes()) else {
         return Properties::new();
     };
+    let out = flatten(&root);
+    if PROFILE_KEYS.iter().any(|k| out.contains_key(*k)) {
+        return Properties::new();
+    }
+    out
+}
+
+/// The scalars of a tree, by their keys joined with dots (`api.url`): a list and a null are left
+/// out, and so is everything when the joined keys pass `YAML_KEY_BUDGET`. `read_yaml` reads a
+/// Spring file through it, and Backstage's `app-config*.yaml` once its includes are grafted.
+pub fn flatten(root: &serde_json::Value) -> Properties {
     let mut out = Properties::new();
     // The YAML reader bounds the nesting; the walk is an explicit stack.
     let mut budget = YAML_KEY_BUDGET;
-    let mut pending = vec![(String::new(), &root)];
+    let mut pending = vec![(String::new(), root)];
     while let Some((key, value)) = pending.pop() {
         let scalar = match value {
             serde_json::Value::Object(map) => {
@@ -210,9 +222,6 @@ pub fn read_yaml(src: &str) -> Properties {
             _ => continue,
         };
         out.insert(key, scalar);
-    }
-    if PROFILE_KEYS.iter().any(|k| out.contains_key(*k)) {
-        return Properties::new();
     }
     out
 }

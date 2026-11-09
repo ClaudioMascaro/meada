@@ -1,0 +1,9 @@
+example.com/acme/tasks main.tf:2 aws_ecs_task_definition.worker
+  runs code example.com/acme/app . [exact: image::ghcr.io/acme/aws-worker]
+    example.com/acme/app send.ts:3 dispatch
+chain: exact · 1 hops · 2 repos · 58 tokens
+
+example.com/acme/app send.ts:3 dispatch
+  runs code [exact: image::ghcr.io/acme/aws-worker] example.com/acme/tasks main.tf:2 aws_ecs_task_definition.worker (root .)
+  provisions channel::sqs::orders [inferred: channel::sqs::orders; workload:example.com/acme/tasks::main.tf::aws_ecs_task_definition.worker (root .), env:QUEUE_NAME] example.com/acme/tasks main.tf:1 aws_sqs_queue.orders (root .)
+chain: inferred · 2 hops · 2 repos · 112 tokens

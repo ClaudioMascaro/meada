@@ -1,0 +1,151 @@
+{"arguments": {"budget": 200000, "symbol": "grafana/provisioning.yaml::groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "grafana/provisioning.yaml::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "grafana/provisioning.yaml::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "grafana/provisioning.yaml::groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "grafana/provisioning.yaml::groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "grafana/provisioning.yaml::groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "kubernetes/bundle.yaml::[0].spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "kubernetes/ledger.json::spec.groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "kubernetes/ledger.json::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "kubernetes/ledger.json::spec.groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "loki/harbor.yaml::groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "loki/harbor.yaml::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "loki/harbor.yaml::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "loki/quartz.json::groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "loki/quartz.json::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "loki/quartz.json::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "prometheus/aurora.yaml::groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "prometheus/aurora.yaml::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "prometheus/aurora.yaml::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "prometheus/aurora.yaml::groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "prometheus/aurora.yaml::groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "prometheus/aurora.yaml::groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "prometheus/aurora.yaml::groups[1].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "prometheus/aurora.yaml::groups[1].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "prometheus/aurora.yaml::groups[1].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "prometheus/meridian.json::groups[0].rules[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "prometheus/meridian.json::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "prometheus/meridian.json::groups[0].rules[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "prometheus/meridian.json::groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "prometheus/meridian.json::groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "prometheus/meridian.json::groups[0].rules[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/alertmanager.yaml::route"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/alertmanager.yaml::route"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/alertmanager.yaml::route"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/alertmanager.yaml::route.routes[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/alertmanager.yaml::route.routes[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/alertmanager.yaml::route.routes[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/alertmanager.yaml::route.routes[0].routes[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/alertmanager.yaml::route.routes[0].routes[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/alertmanager.yaml::route.routes[0].routes[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/alertmanager.yaml::route.routes[0].routes[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/alertmanager.yaml::route.routes[0].routes[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/alertmanager.yaml::route.routes[0].routes[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/alertmanager.yaml::route.routes[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/alertmanager.yaml::route.routes[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/alertmanager.yaml::route.routes[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/alertmanager.yaml::route.routes[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/alertmanager.yaml::route.routes[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/alertmanager.yaml::route.routes[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/alertmanager.yaml::route.routes[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/alertmanager.yaml::route.routes[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/alertmanager.yaml::route.routes[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/alertmanager.yaml::route.routes[4]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/alertmanager.yaml::route.routes[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/alertmanager.yaml::route.routes[4]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/alertmanager.yaml::route.routes[5]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/alertmanager.yaml::route.routes[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/alertmanager.yaml::route.routes[5]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/native.json::spec.route"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/native.json::spec.route"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/native.json::spec.route"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/native.json::spec.route.routes[0]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/native.json::spec.route.routes[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/native.json::spec.route.routes[0]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/native.json::spec.route.routes[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/native.json::spec.route.routes[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/native.json::spec.route.routes[1]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/native.json::spec.route.routes[2]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/native.json::spec.route.routes[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/native.json::spec.route.routes[2]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "symbol": "routing/native.json::spec.route.routes[3]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "direction": "down", "from": "routing/native.json::spec.route.routes[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "direction": "up", "from": "routing/native.json::spec.route.routes[3]"}, "tool": "trace"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::AuroraCritical"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::AuroraCritical"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::AuroraPreview"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::AuroraPreview"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::CedarImplicit"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::CedarImplicit"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::HarborSlow"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::HarborSlow"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::LedgerWarn"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::LedgerWarn"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::MeadowCritical"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::MeadowCritical"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::MeridianCritical"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::MeridianCritical"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::MeridianOpaque"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::MeridianOpaque"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::QuartzUnknown"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::QuartzUnknown"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::alertname::WrittenGrafanaName"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::alertname::WrittenGrafanaName"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::service::cedar-.+"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::service::cedar-.+"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::service::cedar-api"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::service::cedar-api"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::service::cedar-grafana"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::service::cedar-grafana"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::service::cedar-meadow"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::service::cedar-meadow"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::service::cedar-worker"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::service::cedar-worker"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::service::harbor-.+"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::service::harbor-.+"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::service::harbor-edge"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::service::harbor-edge"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::service::ledger-.+"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::service::ledger-.+"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::service::ledger-api"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::service::ledger-api"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::service::ledger-ui"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::service::ledger-ui"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::service::quartz"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::service::quartz"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::severity::critical"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::severity::critical"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::severity::warn"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::severity::warn"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::severity::warning"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::severity::warning"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::support::aurora"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::support::aurora"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::support::harbor"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::support::harbor"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::support::ledger"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::support::ledger"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::support::quartz"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::support::quartz"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::team::ledger"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::team::ledger"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::unwritten::present"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::unwritten::present"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::zone::red"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "alert::zone::red"}, "tool": "context"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "alert::"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "HelmGhost"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "SecretGhost"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "annotation-ghost"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "metadata-ghost"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "recording-ghost"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "RuleAlias"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "GroupAlias"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "BeaconLedger"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "unknown-zone"}, "tool": "search"}
+{"arguments": {"budget": 200000, "kind": "alert", "query": "blocked-ledger"}, "tool": "search"}
+{"arguments": {"budget": 200000, "symbol": "kubernetes/bundle.yaml::[0].spec.groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "loki/harbor.yaml::groups[0].rules[1]"}, "tool": "context"}
+{"arguments": {"budget": 200000, "symbol": "prometheus/aurora.yaml::groups[0].rules[2]"}, "tool": "context"}

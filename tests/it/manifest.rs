@@ -136,8 +136,8 @@ fn files(dir: &Path) -> Vec<String> {
 }
 
 /// After a command: the only files under `<dir>/indexes` are each listed repository's
-/// `index.db`, SQLite's companions and the rebuild lock (`index.db.new.*` exists only during a
-/// rebuild), and no mirror has a `.meada/`.
+/// `index.db`, SQLite's companions, the rebuild lock (`index.db.new.*` exists only during a
+/// rebuild) and the values cache (`values.db`, ADR 0027), and no mirror has a `.meada/`.
 pub(crate) fn assert_nothing_else_written(dir: &Path, indexed: &[&str]) {
     let written = files(&dir.join("indexes"));
     for file in &written {
@@ -150,7 +150,9 @@ pub(crate) fn assert_nothing_else_written(dir: &Path, indexed: &[&str]) {
                 "index.db.lock",
                 "index.db-journal",
                 "index.db-wal",
-                "index.db-shm"
+                "index.db-shm",
+                "values.db",
+                "values.db-journal"
             ]
             .contains(&name),
             "{file}"

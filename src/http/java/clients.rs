@@ -484,6 +484,7 @@ mod tests {
             exported: &[],
             files: &[],
             configs: &configs,
+            symlinks: &[],
         };
         let mut found: Vec<Sent> = (consumers(&code, &indexed).into_iter())
             .map(|f| (f.contract, f.via, f.method))
@@ -1025,6 +1026,15 @@ mod tests {
             .replace("String base", "var base")
             .replace("URI url", "var url");
         assert_eq!(sent(&var), sent(&body));
+        // Known bindings in sibling scopes cannot reassign this method's local.
+        for other in [
+            "void h(String base) { base = null; }",
+            "void h(String o) { String base = \"x\"; base = o; }",
+            "static class Other { String base; void h(String o) { base = o; } }",
+        ] {
+            assert_eq!(sent(&format!("{body}\n{other}")), sent(&body), "{other}");
+        }
+        // An unbound bare write still carries unknown assignment knowledge.
         let assigned = format!("{body}\nvoid h(String o) {{ base = o; }}");
         assert_eq!(
             sent(&assigned),
@@ -1073,7 +1083,18 @@ mod tests {
             sent(&chain(LOCAL_DEPTH + 1)),
             [via("http::GET::/a", "env:WEB_URL")]
         );
-        assert_eq!(sent(&chain(EVAL_DEPTH * 4)), [to("http::GET::/a")]);
+        let hostile = chain(EVAL_DEPTH * 4);
+        assert_eq!(sent(&hostile), [to("http::GET::/a")]);
+        let with_after = format!(
+            "{hostile}\nvoid after() {{ rest.getForObject(System.getenv(\"AFTER_URL\") + \"/after\", String.class); }}"
+        );
+        assert_eq!(
+            sent(&with_after),
+            [
+                to("http::GET::/a"),
+                via("http::GET::/after", "env:AFTER_URL")
+            ]
+        );
     }
 
     #[test]

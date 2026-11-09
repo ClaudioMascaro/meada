@@ -1,0 +1,36 @@
+{
+  "status": "SOURCE_KEY_FROZEN_NOT_RUNTIME_PROOF",
+  "files": {
+    "../serverless-expected.json": "43bd25a05b3b3c5b92894ca58f8158ff34857cd3adaf0b7c39118abb5c646b6a",
+    "../serverless-source.json": "94b6b938571467cd7abbb72c3767608b1ad30b129280a54a6f1860a5d03d003c",
+    "../serverless.jsonl": "ca93ffdc08f046022073e13ca4959460bff078e61711db619f37912366fe8351",
+    "a7-generic-kube-source-key.queries.jsonl": "cfe4add02a7cf78086773a1c2e55bbe30fe6a264a7fa417d2f6c2fe74081d704",
+    "boutique.queries.jsonl": "b3fca39a7ddea50d4749e9603b471fcb547b6a22ec4e4c13607ae1823553b2dd",
+    "capture-plan.json": "17fd8dda2c0daccb39b7a984a38070903ba52326edba644230ae59981b90858a",
+    "compose-repo-identity.json": "7c664aeca4551dc5178e5b5c509416c7e8001cba3ea64e07193a3aeafa284baf",
+    "compose.expected.json": "c088795149dc6e810088a3d1df470f3e5de97a73767ba33c583ec02289b5d5c1",
+    "compose.jsonl": "aa0d85d6f68128c135fca10ccb5b239db0c67aa762719476a00569294efab291",
+    "crossplane-aws.queries.jsonl": "e4e6a6c20d09c0b1514991100a350786dbdb27d62180930ebdfc65048e4a9c33",
+    "crossplane.a7-generic-kube-source-key.jsonl": "fa608d64281d3ecb3b74667f6c79d928fa9e1da51bf60c951ffc75fe3f39e4c8",
+    "crossplane.crossplane-aws.jsonl": "e4e6a6c20d09c0b1514991100a350786dbdb27d62180930ebdfc65048e4a9c33",
+    "crossplane.expected.json": "49b1127c840f89a06bb3f979e06f739f571c0ba6ba54b27b2ebda26f11c881df",
+    "crossplane.jsonl": "00252356e85325031f4051e2e6ce917cbcff274ebf9fe30db56f08ccdc6cce2f",
+    "kube-prometheus.queries.jsonl": "d52912404ad06f2d3823eb4f86741ce583a0e3194614c25d0eef98894721011e",
+    "kube-repo-identity.json": "381f165fbe89ae9304c5e15a76d713ddb0d7387d81c5f6dd6100eb56da3b3d48",
+    "kubernetes-kustomize.a7-generic-kube-source-key.jsonl": "31214dbd107cdafffdea3be72fc381d7e06d42cb68c85841d9f6502ab5c86c2e",
+    "kubernetes-kustomize.boutique.jsonl": "b3fca39a7ddea50d4749e9603b471fcb547b6a22ec4e4c13607ae1823553b2dd",
+    "kubernetes-kustomize.expected.json": "9c7897089bd968189aff7be9009e9e7ec7155164018a0f54bcf4af395da92bb9",
+    "kubernetes-kustomize.jsonl": "efdbe1e1a2ea44477a4d1cd8a5137885718852bcbffbcab8e490d9e463fff52c",
+    "kubernetes-kustomize.kube-prometheus.jsonl": "d52912404ad06f2d3823eb4f86741ce583a0e3194614c25d0eef98894721011e",
+    "neutral-kube-lifecycle.json": "cf9beff30edf7ca96db0b35135aa090cb9ff895cd1f41fc3dc8f5584d7d2ff37",
+    "queries.jsonl": "cfe4add02a7cf78086773a1c2e55bbe30fe6a264a7fa417d2f6c2fe74081d704",
+    "source-inventory.json": "bf50b516ac8966be5c08a527a1fa838d1298ce21a0aa1f85b970d2adae2769ea",
+    "source-sha256.json": "d98de56fd645a7269e4aefd033b54da0eac7b9a259e418899cc4ac23f844a0f0",
+    "PLAN.md": "5482df5b24e0e2683a11e839fb74bb279cb2ab4f854771031c88f3611a9799b2"
+  },
+  "fixture_identities": [
+    "compose-repo-identity.json",
+    "kube-repo-identity.json"
+  ],
+  "public_sources": "source-sha256.json"
+}

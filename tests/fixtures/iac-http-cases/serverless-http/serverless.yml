@@ -1,0 +1,15 @@
+service: inventory
+provider:
+  name: aws
+functions:
+  inventory:
+    handler: runtime.inventory
+    events:
+      - http: GET inventory/{sku}
+      - http:
+          method: post
+          path: inventory
+      - httpApi:
+          method: '*'
+          path: /inventory/any/{sku}
+

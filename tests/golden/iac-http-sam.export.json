@@ -1,0 +1,115 @@
+{
+  "format": 1,
+  "repository": "example.com/route-oracle/sam",
+  "commit": "50f57b1942e0585209ef64b28e5b9cd84e82df07",
+  "dirty": true,
+  "files": [
+    {
+      "path": "runtime/app.ts",
+      "hash": "87c9de51501ae4901c439baa4f5fe6d74e0445f82837e8a29be58f45b784d6c6"
+    },
+    {
+      "path": "unrelated.ts",
+      "hash": "19cc9a5e7dbe7619d088421ec92a7d84632f2cef441499d838a6f76481e3d994"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/route-oracle/sam::runtime/app.ts::orchard",
+      "span": {
+        "path": "runtime/app.ts",
+        "start": 7,
+        "end": 74
+      },
+      "hash": "2533bbfb963bb523751ae5dc370ff88cde66b62c2b3c53a5f819ec96ef551c16"
+    },
+    {
+      "id": "example.com/route-oracle/sam::unrelated.ts::orchard",
+      "span": {
+        "path": "unrelated.ts",
+        "start": 7,
+        "end": 72
+      },
+      "hash": "4bedb105020f399d2f27707c723f6b7315bc4b09948e7070c6635975eb64b70d"
+    }
+  ],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "http::GET::/orchards/{}",
+      "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+    },
+    {
+      "contract": "http::POST::/orchards",
+      "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+    }
+  ],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/route-oracle/sam::template.yaml::OrchardFunction",
+      "address": "OrchardFunction",
+      "type": "AWS::Serverless::Function",
+      "root": "template.yaml",
+      "path": "template.yaml",
+      "line": 4,
+      "end_line": 20
+    }
+  ],
+  "executions": [
+    {
+      "workload": "example.com/route-oracle/sam::template.yaml::OrchardFunction",
+      "root": "template.yaml",
+      "repository": "example.com/route-oracle/sam",
+      "path": "runtime",
+      "level": "exact",
+      "reason": "SAM CodeUri template.yaml#Resources.OrchardFunction"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/route-oracle/consumer::client.ts::createOrchard::fetch#0",
+      "provider": "example.com/route-oracle/sam::runtime/app.ts::orchard",
+      "contract": "http::POST::/orchards",
+      "level": "exact",
+      "reason": "host orchards.example.test is served by example.com/route-oracle/sam"
+    },
+    {
+      "consumer": "example.com/route-oracle/consumer::client.ts::readOrchard::fetch#0",
+      "provider": "example.com/route-oracle/sam::runtime/app.ts::orchard",
+      "contract": "http::GET::/orchards/{}",
+      "level": "exact",
+      "reason": "host orchards.example.test is served by example.com/route-oracle/sam"
+    }
+  ],
+  "processes": [
+    {
+      "entry_point": "example.com/route-oracle/sam::runtime/app.ts::orchard",
+      "kind": "export",
+      "label": "orchard",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/sam",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/sam::runtime/app.ts::orchard"
+        }
+      ]
+    },
+    {
+      "entry_point": "example.com/route-oracle/sam::unrelated.ts::orchard",
+      "kind": "export",
+      "label": "orchard",
+      "steps": [
+        {
+          "depth": 0,
+          "repository": "example.com/route-oracle/sam",
+          "level": null,
+          "via": "entry",
+          "node": "example.com/route-oracle/sam::unrelated.ts::orchard"
+        }
+      ]
+    }
+  ]
+}

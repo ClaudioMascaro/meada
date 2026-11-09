@@ -191,6 +191,27 @@ Al configurar `[oidc]`, el login local se desactiva para todas las cuentas (mira
 
 Lo que deja de funcionar: el inicio de sesión de cualquier cuenta que no sea `admin`; los tokens de sesión y de agente de las cuentas locales (los nodos y el servidor de propuestas pasan a admitir solo los tokens del proveedor, y los agentes pasan a usar tokens del proveedor de identidad); la página de cuentas, la emisión de tokens de agente y la verificación del login (404); y los sujetos `local:<usuario>` registrados como autores, operadores de workspaces con nombre y registros de auditoría, que nunca coinciden con los del proveedor, así que rehaz la lista de operadores de cada workspace con nombre. Las cuentas siguen en la tabla, inertes. Ninguna cuenta ni grupo se migra solo.
 
+## Infraestructura en el grafo
+
+En **Grafo de código**, carga la identidad de un repositorio y, opcionalmente, una generación.
+**Contratos** muestra aprovisionadores con su dirección IaC y raíz de evaluación (módulo u
+overlay), junto a proveedores, consumidores y usos de configuración. **Enlaces de
+aprovisionamiento** conserva cada uso enlazado con cada aprovisionador, con raíz, nivel y motivo.
+
+**Enlaces de imágenes** muestra constructor → ejecutor: el repositorio que publica la imagen y
+la carga de trabajo que la ejecuta. **Enlaces de alertas** muestra emisor → matcher: la etiqueta
+o tag y la condición que la comprueba. Estas vistas incluyen enlaces dentro del mismo
+repositorio y entre repositorios; la vista general conserva su alcance entre repositorios.
+Las tablas de contratos de cada tipo también muestran lados sin contraparte, sin inventar
+enlaces para ellos. La leyenda explica los roles y las tablas de enlaces conservan nivel y motivo.
+
+Usa Tab para llegar al selector de vista y las tablas; las flechas eligen la vista y desplazan
+la tabla enfocada. Cada tabla tiene nombre accesible y encabezados. Las vistas de infraestructura
+aparecen cuando el export contiene los lados o enlaces correspondientes. Recargar conserva la
+vista seleccionada, o vuelve a comunidades si dejó de estar disponible. El playground ofrece los filtros `value`, `iac` y `alert`, junto a `image`
+y los tipos existentes, y muestra la respuesta de la API sin reescribirla. La interfaz está en
+portugués e inglés.
+
 ## Flota y diagnóstico
 
 Cada `snapshot pull --every` envía un heartbeat, el registro periódico de estado del nodo. Informa generación, fence, generaciones locales, disponibilidad, versión y hora.

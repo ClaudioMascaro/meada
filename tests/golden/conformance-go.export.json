@@ -11220,7 +11220,8 @@
     },
     {
       "contract": "channel::sqs",
-      "site": "example.com/acme/conformance::messages/queues.go::SqsProduce::client.SendMessage#1"
+      "site": "example.com/acme/conformance::messages/queues.go::SqsProduce::client.SendMessage#1",
+      "via": "env:QUEUE_URL"
     },
     {
       "contract": "channel::sqs::invoices",

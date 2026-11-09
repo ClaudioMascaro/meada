@@ -1,0 +1,629 @@
+{
+  "format": 1,
+  "repository": "local/gcp-sdk-await",
+  "files": [
+    {
+      "path": "Scene.cs",
+      "hash": "4f41ea69a4995dfdf21912d8a22ea1b1267bd545d1082483f81d05ce42cd436b"
+    },
+    {
+      "path": "scene.js",
+      "hash": "21f0a9e6f1924d3d6d9c887af778452e7f6c9536d2a509cc8a2a8e75090a7196"
+    },
+    {
+      "path": "scene.py",
+      "hash": "934eb3af9ecf5f80c2c5b5cd0f5ec5288e116022cbdaaeceb6c52556f9059439"
+    },
+    {
+      "path": "scene.ts",
+      "hash": "0d2eaade7912f4d972cbf9244c909364e543a8f4141fedaa585e512bac5041fd"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene",
+      "span": {
+        "path": "Scene.cs",
+        "start": 60,
+        "end": 729
+      },
+      "hash": "8f98fb64cf6c2a8a0477ec488d66541d1d17d85929dfe333309c9665fad88ebf"
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.Awaited()",
+      "span": {
+        "path": "Scene.cs",
+        "start": 75,
+        "end": 225
+      },
+      "hash": "c0dfef8d4f285ad69a8bb18bc115c87c87f312b54677bbcf79468080219b5688"
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.DoubleAwait()",
+      "span": {
+        "path": "Scene.cs",
+        "start": 551,
+        "end": 727
+      },
+      "hash": "5cef9cc19efdae3bf3cd3fc0ff095656f0f9a70c3cbe70836dd821f38d2ec28e"
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.LateAwait()",
+      "span": {
+        "path": "Scene.cs",
+        "start": 227,
+        "end": 398
+      },
+      "hash": "c484fbca393a0961a7c8213cd52b55f292b87aa2a34e99fc72dbcab1c67b4a5e"
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.Unawaited()",
+      "span": {
+        "path": "Scene.cs",
+        "start": 400,
+        "end": 549
+      },
+      "hash": "351aa8033187850892e9330eafcf3e5b18f11f954daaca1c4dc4d86a738a4599"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::Awaited",
+      "span": {
+        "path": "scene.js",
+        "start": 115,
+        "end": 202
+      },
+      "hash": "ea8b28971e85ab8620f46d0e3e60a241d890b5c0a50cae92a23435cca00f424a"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::LateAwait",
+      "span": {
+        "path": "scene.js",
+        "start": 210,
+        "end": 320
+      },
+      "hash": "6e81a5c3f5a1da321bdc806c1c7ce9d262efcdb87c315a05cd9f292270f128c7"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::Unawaited",
+      "span": {
+        "path": "scene.js",
+        "start": 328,
+        "end": 420
+      },
+      "hash": "029f27cd51733e91cfb129da70a7324ca30a304e668c2b24613fed85f21153c3"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::make",
+      "span": {
+        "path": "scene.js",
+        "start": 45,
+        "end": 107
+      },
+      "hash": "ea06af6123b38cd5598ea243af127084163f46e4b665c143891f9487ca80c1e9"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.py::Awaited",
+      "span": {
+        "path": "scene.py",
+        "start": 92,
+        "end": 203
+      },
+      "hash": "1b51bc4c124e077eecf499e13822b3ceaa2f729f145d71d358ea6bdd8a8887f5"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.py::LateAwait",
+      "span": {
+        "path": "scene.py",
+        "start": 204,
+        "end": 336
+      },
+      "hash": "4987f79b77374d739aeb74eac98781b2be80b1f4b0d39bb2c976cb938ec06bea"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.py::Unawaited",
+      "span": {
+        "path": "scene.py",
+        "start": 337,
+        "end": 447
+      },
+      "hash": "387e6f3ba6e82d1dc9ac79704ea642f09af00b3bae9cf22dacb57505a871d6be"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.py::make",
+      "span": {
+        "path": "scene.py",
+        "start": 35,
+        "end": 91
+      },
+      "hash": "c1fbbce096dd3bcbeb73be11e48faac7d8da5e2c5df29d5f6a7497799cca842d"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::Awaited",
+      "span": {
+        "path": "scene.ts",
+        "start": 115,
+        "end": 202
+      },
+      "hash": "cf0d46ec5e01f40f4bd6c0b49480f38883fdaf69fbc5dd3b116fbd3c5d51950a"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::LateAwait",
+      "span": {
+        "path": "scene.ts",
+        "start": 210,
+        "end": 320
+      },
+      "hash": "252a49082d28bf05dfda705d8bdd109564373963377f1ace4d2267f66792a703"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::Unawaited",
+      "span": {
+        "path": "scene.ts",
+        "start": 328,
+        "end": 420
+      },
+      "hash": "4207e0986fe6826c530f43159156c0a8cf878c94c6c71be852bcb3a21e9297a1"
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::make",
+      "span": {
+        "path": "scene.ts",
+        "start": 45,
+        "end": 107
+      },
+      "hash": "ea06af6123b38cd5598ea243af127084163f46e4b665c143891f9487ca80c1e9"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.Awaited()::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.Awaited()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 118,
+        "end": 197
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.Awaited()::TopicName.FromProjectTopic#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.Awaited()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 146,
+        "end": 196
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.Awaited()::bus.PublishAsync#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.Awaited()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 198,
+        "end": 223
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.DoubleAwait()::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.DoubleAwait()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 598,
+        "end": 677
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.DoubleAwait()::TopicName.FromProjectTopic#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.DoubleAwait()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 626,
+        "end": 676
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.DoubleAwait()::twice.PublishAsync#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.DoubleAwait()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 698,
+        "end": 725
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.LateAwait()::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.LateAwait()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 270,
+        "end": 348
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.LateAwait()::TopicName.FromProjectTopic#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.LateAwait()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 298,
+        "end": 347
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.LateAwait()::bus.PublishAsync#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.LateAwait()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 371,
+        "end": 396
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.Unawaited()::PublisherClient.CreateAsync#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.Unawaited()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 437,
+        "end": 517
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.Unawaited()::TopicName.FromProjectTopic#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.Unawaited()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 465,
+        "end": 516
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::Scene.cs::Scene.Unawaited()::pending.PublishAsync#0",
+      "caller": "local/gcp-sdk-await::Scene.cs::Scene.Unawaited()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Scene.cs",
+        "start": 518,
+        "end": 547
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::Awaited::bus.publishMessage#0",
+      "caller": "local/gcp-sdk-await::scene.js::Awaited",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 174,
+        "end": 200
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::Awaited::make#0",
+      "caller": "local/gcp-sdk-await::scene.js::Awaited",
+      "target": "local/gcp-sdk-await::scene.js::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 157,
+        "end": 173
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::LateAwait::bus.publishMessage#0",
+      "caller": "local/gcp-sdk-await::scene.js::LateAwait",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 292,
+        "end": 318
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::LateAwait::make#0",
+      "caller": "local/gcp-sdk-await::scene.js::LateAwait",
+      "target": "local/gcp-sdk-await::scene.js::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 252,
+        "end": 267
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::Unawaited::make#0",
+      "caller": "local/gcp-sdk-await::scene.js::Unawaited",
+      "target": "local/gcp-sdk-await::scene.js::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.js",
+        "start": 364,
+        "end": 387
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::Unawaited::pending.publishMessage#0",
+      "caller": "local/gcp-sdk-await::scene.js::Unawaited",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 388,
+        "end": 418
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::make::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-await::scene.js::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 80,
+        "end": 104
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.js::make::PubSub#0",
+      "caller": "local/gcp-sdk-await::scene.js::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.js",
+        "start": 80,
+        "end": 92
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.py::Awaited::client.publish#0",
+      "caller": "local/gcp-sdk-await::scene.py::Awaited",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 141,
+        "end": 203
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.py::Awaited::make#0",
+      "caller": "local/gcp-sdk-await::scene.py::Awaited",
+      "target": "local/gcp-sdk-await::scene.py::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.py",
+        "start": 130,
+        "end": 136
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.py::LateAwait::client.publish#0",
+      "caller": "local/gcp-sdk-await::scene.py::LateAwait",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 275,
+        "end": 336
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.py::LateAwait::make#0",
+      "caller": "local/gcp-sdk-await::scene.py::LateAwait",
+      "target": "local/gcp-sdk-await::scene.py::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.py",
+        "start": 239,
+        "end": 245
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.py::Unawaited::make#0",
+      "caller": "local/gcp-sdk-await::scene.py::Unawaited",
+      "target": "local/gcp-sdk-await::scene.py::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.py",
+        "start": 366,
+        "end": 372
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.py::Unawaited::pending.publish#0",
+      "caller": "local/gcp-sdk-await::scene.py::Unawaited",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 377,
+        "end": 447
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.py::make::pubsub_v1.PublisherClient#0",
+      "caller": "local/gcp-sdk-await::scene.py::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.py",
+        "start": 64,
+        "end": 91
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::Awaited::bus.publishMessage#0",
+      "caller": "local/gcp-sdk-await::scene.ts::Awaited",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 174,
+        "end": 200
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::Awaited::make#0",
+      "caller": "local/gcp-sdk-await::scene.ts::Awaited",
+      "target": "local/gcp-sdk-await::scene.ts::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 157,
+        "end": 173
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::LateAwait::bus.publishMessage#0",
+      "caller": "local/gcp-sdk-await::scene.ts::LateAwait",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 292,
+        "end": 318
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::LateAwait::make#0",
+      "caller": "local/gcp-sdk-await::scene.ts::LateAwait",
+      "target": "local/gcp-sdk-await::scene.ts::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 252,
+        "end": 267
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::Unawaited::make#0",
+      "caller": "local/gcp-sdk-await::scene.ts::Unawaited",
+      "target": "local/gcp-sdk-await::scene.ts::make",
+      "level": "exact",
+      "span": {
+        "path": "scene.ts",
+        "start": 364,
+        "end": 387
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::Unawaited::pending.publishMessage#0",
+      "caller": "local/gcp-sdk-await::scene.ts::Unawaited",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 388,
+        "end": 418
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::make::(new_expression).topic#0",
+      "caller": "local/gcp-sdk-await::scene.ts::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 80,
+        "end": 104
+      }
+    },
+    {
+      "id": "local/gcp-sdk-await::scene.ts::make::PubSub#0",
+      "caller": "local/gcp-sdk-await::scene.ts::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "scene.ts",
+        "start": 80,
+        "end": 92
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "channel::pubsub::await-js",
+      "site": "local/gcp-sdk-await::scene.js::Awaited::bus.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::await-python",
+      "site": "local/gcp-sdk-await::scene.py::Awaited::client.publish#0"
+    },
+    {
+      "contract": "channel::pubsub::await-ts",
+      "site": "local/gcp-sdk-await::scene.ts::Awaited::bus.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::await-valid",
+      "site": "local/gcp-sdk-await::Scene.cs::Scene.Awaited()::bus.PublishAsync#0"
+    },
+    {
+      "contract": "channel::pubsub::late-js",
+      "site": "local/gcp-sdk-await::scene.js::LateAwait::bus.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::late-python",
+      "site": "local/gcp-sdk-await::scene.py::LateAwait::client.publish#0"
+    },
+    {
+      "contract": "channel::pubsub::late-ts",
+      "site": "local/gcp-sdk-await::scene.ts::LateAwait::bus.publishMessage#0"
+    },
+    {
+      "contract": "channel::pubsub::late-valid",
+      "site": "local/gcp-sdk-await::Scene.cs::Scene.LateAwait()::bus.PublishAsync#0"
+    }
+  ],
+  "consumers": [],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/gcp-sdk-await::scene.js::Awaited",
+        "local/gcp-sdk-await::scene.js::LateAwait",
+        "local/gcp-sdk-await::scene.js::Unawaited",
+        "local/gcp-sdk-await::scene.js::make"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/gcp-sdk-await::scene.py::Awaited",
+        "local/gcp-sdk-await::scene.py::LateAwait",
+        "local/gcp-sdk-await::scene.py::Unawaited",
+        "local/gcp-sdk-await::scene.py::make"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "local/gcp-sdk-await::scene.ts::Awaited",
+        "local/gcp-sdk-await::scene.ts::LateAwait",
+        "local/gcp-sdk-await::scene.ts::Unawaited",
+        "local/gcp-sdk-await::scene.ts::make"
+      ]
+    }
+  ],
+  "links": []
+}

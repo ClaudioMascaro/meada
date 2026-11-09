@@ -6,9 +6,11 @@
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 
+use crate::alert::Alert;
 use crate::channel::Channel;
 use crate::entry::EntryKind;
 use crate::http::Http;
+use crate::image::Image;
 use crate::index::{Consumer, Export, Indexed, Provider};
 use crate::package::Packages;
 use crate::resolve::Code;
@@ -17,6 +19,20 @@ use crate::shape::Shape;
 use crate::workspace::Repository;
 
 pub use meada_core::export::{Level, Link};
+
+pub(crate) mod azure;
+pub(crate) mod gcp;
+mod receiver;
+pub(crate) mod sdk;
+pub use receiver::{EnvironmentScope, EnvironmentValue, ReceiverIdentity};
+
+/// A kind's additional, already-routed use of infrastructure, kept only for this query.
+pub struct ProvisionUse {
+    pub site: String,
+    pub contract: String,
+    pub level: Level,
+    pub reason: String,
+}
 
 /// A contract the repository holds, before the index gives its site an identity.
 pub struct Found {
@@ -36,6 +52,8 @@ pub struct Found {
     /// The shape the code gives the side (spec #23): for an HTTP consumer, the fields it reads
     /// from the parsed response.
     pub shape: Option<Shape>,
+    /// Kind-owned name evidence, stored internally for scoped workload resolution.
+    pub identity: Option<ReceiverIdentity>,
 }
 
 /// Which side of a contract a site holds.
@@ -64,9 +82,27 @@ pub enum Role {
     /// `createBackendPlugin` call, no `contract`: its routers stay at the root. Stored, never
     /// exported; `meada status` reports it.
     Unmounted,
+    /// Neither side: a Backstage `$include` Meada did not follow (#689), no `contract`: the
+    /// including config file in `via`, the reason in `method` and the include as written in
+    /// `fragments`, at the first file of the TS and JavaScript group (it has no code site of its
+    /// own). Stored, never exported; `meada status` reports it.
+    Unfollowed,
 }
 
 impl Role {
+    /// Every role, in declaration order: the stored format's golden lists their names.
+    #[cfg(test)]
+    pub const ALL: [Role; 8] = [
+        Role::Provider,
+        Role::Consumer,
+        Role::Binding,
+        Role::Publish,
+        Role::Import,
+        Role::Shape,
+        Role::Unmounted,
+        Role::Unfollowed,
+    ];
+
     /// The name the index stores.
     pub fn name(self) -> &'static str {
         match self {
@@ -77,6 +113,7 @@ impl Role {
             Role::Import => "import",
             Role::Shape => "shape",
             Role::Unmounted => "unmounted",
+            Role::Unfollowed => "unfollowed",
         }
     }
 }
@@ -168,6 +205,12 @@ pub struct Related<'e> {
 
 pub use meada_core::search::Hit;
 
+/// Evaluated configuration facts, grouped once by file during indexing.
+#[derive(Default)]
+pub struct ConfigFacts<'a> {
+    pub(crate) nodes: &'a [&'a crate::iac::Node],
+}
+
 /// A contract kind: the whole interface of one, so that the engine, the open items, the
 /// decisions, the trace and the entry points ask a kind instead of naming it. Every question
 /// but `prefix`, `extract` and `link` has a default body; a kind overrides only what it
@@ -175,8 +218,8 @@ pub use meada_core::search::Hit;
 ///
 /// The engine fixes the phase order, and the kinds answer in `KINDS` order: `extract` and
 /// `entry` when the index is written; then every kind's `declare` over every repository, then
-/// every kind's `workspace_step` over all of them, then `link`, then the decisions replay,
-/// then every kind's `after_links`. The decisions are kind-free and a pass over the links must
+/// every kind's `workspace_step` and then `workspace_ready` over all of them, then `link`,
+/// then the decisions replay, then every kind's `after_links`. The decisions are kind-free and a pass over the links must
 /// see the decided ones, so they sit between. The queries ask the rest of the questions.
 ///
 /// One rule for "unresolved": a side is unresolved when its contract is absent (a consumer
@@ -197,6 +240,61 @@ pub trait ContractKind {
     /// say, the others ignore it.
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found>;
 
+    /// Normalize a workload's literal value using the operation's identity policy.
+    fn environment_name(
+        &self,
+        contract: &str,
+        value: &str,
+        _operation: Option<&str>,
+    ) -> Option<String> {
+        environment_name(contract, value)
+    }
+
+    /// Whether a typed workload target is compatible with this operation and subtype.
+    fn environment_target(&self, contract: &str, target: &str, _operation: Option<&str>) -> bool {
+        target
+            .rsplit_once("::")
+            .is_some_and(|(prefix, _)| prefix == contract)
+    }
+
+    /// Resolve companion receiver arguments using only certain values in the same scope.
+    /// `Some`, including an empty result, owns the identity and prevents scalar fallback.
+    fn environment_identity(
+        &self,
+        _contract: &str,
+        _identity: &ReceiverIdentity,
+        _values: &dyn Fn(&str) -> Vec<EnvironmentValue>,
+    ) -> Option<Vec<(String, String)>> {
+        None
+    }
+
+    /// Whether this kind reads configuration independently of a language pack.
+    fn config_file(&self, _path: &str) -> bool {
+        false
+    }
+
+    /// Stored facts of one configuration file, bounded by the shared per-file ceiling. A path it
+    /// reads goes through `contract::probe`, so a refresh summarizes the file again when what is
+    /// there changes, as when its bytes or the IaC nodes it is given do.
+    fn config_summary(
+        &self,
+        _path: &str,
+        _src: &[u8],
+        _root: &std::path::Path,
+        _facts: &ConfigFacts<'_>,
+    ) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    /// Workloads that run repository code, for the shared trace to cross into it.
+    fn executions(
+        &self,
+        _exports: &[Export],
+        _links: &[Link],
+    ) -> Vec<meada_core::export::Execution> {
+        Vec::new()
+    }
+
     /// Which entry point kind a `role` side of `contract` makes. It is a function of the
     /// contract alone, since entry points are stored when the index is written: changing an
     /// answer needs a reindex.
@@ -210,8 +308,21 @@ pub trait ContractKind {
     /// derive at query time, so an edit to `meada.toml` needs no reindex.
     fn declare(&self, _repo: &Repository, _export: &mut Export) {}
 
-    /// The symbols of `repo` that `declare`, `workspace_step`, `link` and `status` look up in
-    /// its export, given the export's contract rows: a query reads only some code rows of an
+    /// Reads indexed locations needed by declarations before `declare` runs. Query-time
+    /// configuration may change independently of the index; server-mode callers use the same
+    /// indexed rows and never open source through this hook. This runs before `symbols_read`,
+    /// so a declaration may use exact indexed exports to name the symbols it needs.
+    fn read_declarations(
+        &self,
+        _repo: &Repository,
+        _db: &rusqlite::Connection,
+        _export: &mut Export,
+    ) -> crate::Result<()> {
+        Ok(())
+    }
+
+    /// The symbols of `repo` that `declare`, `workspace_step`, `workspace_ready`, `link` and
+    /// `status` look up in its export, given the export's contract rows: a query reads only some code rows of an
     /// index (#396, `partial.rs`), these before any kind declares. `None` is every symbol of
     /// the repository; none by default.
     fn symbols_read(&self, _repo: &Repository, _export: &Export) -> Option<Vec<String>> {
@@ -221,7 +332,16 @@ pub trait ContractKind {
     /// Runs once over the index content of every repository of the workspace (in workspace
     /// order), after every kind's `declare` has run on every repository: a step that needs
     /// all of them, such as an index of the providers of the whole workspace.
-    fn workspace_step(&self, _exports: &mut [Export]) {}
+    fn workspace_step(&self, _exports: &mut [Export], _repositories: &[Repository]) {}
+
+    /// A prepared view that depends on every kind's workspace step, before links are read.
+    fn workspace_ready(&self, _exports: &mut [Export], _repositories: &[Repository]) {}
+
+    /// Batch projected uses whose contract is known only after the workspace is prepared.
+    /// The tuple identifies the repository holding the real source site; raw sides stay intact.
+    fn provision_uses(&self, _exports: &[Export]) -> Vec<(usize, ProvisionUse)> {
+        Vec::new()
+    }
 
     /// The links from `consumer`, held by the repository `from`, to the providers of the
     /// workspace (each with the repository holding it) and, for a queue, the publishes the
@@ -235,6 +355,16 @@ pub trait ContractKind {
         exports: &[Export],
     ) -> Vec<Link>;
 
+    /// A kind may derive all its links once when its consumers share a routing tree.
+    /// `None` keeps the ordinary per-consumer hook and its order unchanged.
+    fn workspace_links(
+        &self,
+        _exports: &[Export],
+        _providers: &[(&Repository, &Provider)],
+    ) -> Option<Vec<Link>> {
+        None
+    }
+
     /// Runs once over the links of the whole workspace, after the decisions replay, so it sees
     /// the decided links: a pass that sets something on them, such as the drift of a link.
     fn after_links(&self, _links: &mut [Link], _exports: &[Export]) {}
@@ -246,11 +376,28 @@ pub trait ContractKind {
         false
     }
 
+    /// Whether data travels from the provider to its consumer: a write reaches its reader,
+    /// or a message its handler. A consumer at a call is then a receiving operation.
+    fn flows_to_consumer(&self) -> bool {
+        false
+    }
+
+    /// Whether repository-level sites participate in the kind's exported links.
+    fn exports_repository_links(&self) -> bool {
+        false
+    }
+
     /// Whether the identifier is an unresolved side: one whose name could not be evaluated
     /// (a channel that is only its broker prefix). It never links, is no open item, and is
     /// shown with the unresolved suffix.
     fn unresolved(&self, _contract: &str) -> bool {
         false
+    }
+
+    /// Evidence of a directed use when joining a provisioner. Some kinds have both written
+    /// operations and explicit declarations, which retain their declared level.
+    fn use_level(&self, _via: Option<&str>, _operation: Option<&str>) -> Level {
+        Level::Exact
     }
 
     /// How the identifier is labelled in candidates and entry points. It is a function of the
@@ -263,6 +410,12 @@ pub trait ContractKind {
     /// and an id, or a broker and a name. A route path ranks as its last part.
     fn parts<'c>(&self, contract: &'c str) -> (Option<&'c str>, Option<&'c str>) {
         (None, last(contract))
+    }
+
+    /// The broker or resource kind whose provisioners and uses share an orphan report.
+    /// No group for a kind without provisioners, or for an unresolved side.
+    fn provisioned_group<'c>(&self, _contract: &'c str) -> Option<&'c str> {
+        None
     }
 
     /// Where `site` of `repository` sits when it is neither a symbol, a call, the repository
@@ -314,12 +467,36 @@ pub trait ContractKind {
         Vec::new()
     }
 
+    /// Optionally group related sides once in workspace order, using links already prepared
+    /// for this query. None preserves the ordinary per-repository hook and its order.
+    fn workspace_related_sides<'e>(
+        &self,
+        _exports: &'e [Export],
+        _links: &[Link],
+        _contract: &str,
+    ) -> Option<Vec<Vec<Related<'e>>>> {
+        None
+    }
+
     /// The lines that a symbol's `contracts:` gets for the call `call` of `export`, after the
     /// line of each provider sitting at it: none by default (channels: the publish and the
     /// queues its bindings route it to, a publish having no contract of its own). `exports` are
     /// the workspace's.
     fn at_call(&self, _exports: &[Export], _export: &Export, _call: &str) -> Vec<String> {
         Vec::new()
+    }
+
+    /// Whether a symbol's `context` explains an inferred link from this call consumer of
+    /// repository `from`.
+    /// This display policy changes no links; decided links are always explained.
+    fn explain_inferred(
+        &self,
+        _consumer: &Consumer,
+        _from: &Repository,
+        _link: &Link,
+        _exports: &[Export],
+    ) -> bool {
+        false
     }
 
     /// The sections a symbol's `context` adds after its callees, as lines (packages:
@@ -333,6 +510,18 @@ pub trait ContractKind {
         _symbol: &str,
     ) -> Vec<String> {
         Vec::new()
+    }
+
+    /// Root-qualified workload context; ordinary symbols have no evaluation root.
+    fn context_at(
+        &self,
+        exports: &[Export],
+        repos: &[Repository],
+        links: &[Link],
+        site: &str,
+        _root: Option<&str>,
+    ) -> Vec<String> {
+        self.context_sections(exports, repos, links, site)
     }
 
     /// The call sites `context_sections` looks up for `symbol` among `links` (the
@@ -354,15 +543,71 @@ pub trait ContractKind {
         Vec::new()
     }
 
+    /// Status whose counterpart rule depends on the whole visible workspace.
+    fn scope_status(
+        &self,
+        repository: &Repository,
+        export: &Export,
+        _exports: &[Export],
+        links: &[Link],
+    ) -> Vec<String> {
+        self.status(repository, export, links)
+    }
+
+    /// Optionally prepare status rows once in workspace order. None preserves the ordinary
+    /// per-repository status hooks and their call order.
+    fn workspace_status(
+        &self,
+        _repositories: &[Repository],
+        _exports: &[Export],
+        _links: &[Link],
+    ) -> Option<Vec<Vec<String>>> {
+        None
+    }
+
+    /// A missing counterpart note, when the kind has a two-role orphan rule.
+    fn side_note(&self, _exports: &[Export], _contract: &str, _role: Role) -> &'static str {
+        ""
+    }
+
     /// Whether the kind's ambiguous links are open items: a call for a person to decide.
     fn decidable(&self) -> bool {
         true
+    }
+
+    /// Whether an ambiguous link belongs to a consumer item, rather than a kind-owned
+    /// source item (a patterned image builder, for example).
+    fn consumer_item(&self, _link: &Link, _exports: &[Export]) -> bool {
+        self.decidable()
+    }
+
+    /// Decisions for source items that the kind replays itself.
+    fn owns_decision(&self, _decision: &crate::decisions::Decision) -> bool {
+        false
+    }
+
+    fn decision_items(&self, _exports: &[Export]) -> Vec<(crate::items::OpenItem, bool)> {
+        Vec::new()
+    }
+
+    fn decision_reports(
+        &self,
+        _workspace: &crate::workspace::Workspace,
+        _exports: &[Export],
+    ) -> Vec<crate::decisions::Evaluation> {
+        Vec::new()
     }
 
     /// Whether `provider` serves `contract`, aliases included (HTTP: a gateway path, any
     /// method).
     fn serves(&self, provider: &Provider, contract: &str) -> bool {
         provider.contract == contract
+    }
+
+    /// Whether this provider is a current candidate of the link, including query-local
+    /// selections. The default keeps the kind's ordinary alias matching.
+    fn link_candidate(&self, provider: &Provider, link: &Link, _exports: &[Export]) -> bool {
+        provider.site == link.provider && serves(provider, &link.contract)
     }
 
     /// Whether `provider` is a candidate for `consumer`, which has no contract.
@@ -372,7 +617,92 @@ pub trait ContractKind {
 }
 
 /// Every contract kind of this release.
-pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages];
+pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages, &Image, &Alert];
+
+/// Shared phase order for whole exports and answer-sized reads.
+pub(crate) fn workspace_steps(exports: &mut [Export], repositories: &[Repository]) {
+    for export in exports.iter_mut() {
+        export.provision_uses.clear();
+    }
+    for kind in KINDS {
+        kind.workspace_step(exports, repositories);
+    }
+    for kind in KINDS {
+        kind.workspace_ready(exports, repositories);
+    }
+    for kind in KINDS {
+        for (repository, side) in kind.provision_uses(exports) {
+            if let Some(export) = exports.get_mut(repository) {
+                export.provision_uses.push(side);
+            }
+        }
+    }
+}
+
+/// Contract configurations are read once at indexing time; queries use their stored summaries.
+pub(crate) fn config_file(path: &str) -> bool {
+    KINDS.iter().any(|k| k.config_file(path))
+}
+
+/// What is at a path of the repository, read without following a symbolic link: the one fact a
+/// configuration summary takes from the disk beside the file's bytes and its IaC nodes.
+#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(crate) enum Probe {
+    Missing,
+    Link,
+    Dir,
+    File,
+    Other,
+}
+
+thread_local! {
+    /// The paths the summary being made probed (`probed`), none outside one.
+    static PROBES: std::cell::RefCell<Option<std::collections::BTreeMap<String, Probe>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// What `rel` is under `root`, recorded for the summary `probed` is making.
+pub(crate) fn probe(root: &std::path::Path, rel: &str) -> Probe {
+    let found = match std::fs::symlink_metadata(root.join(rel)) {
+        Err(_) => Probe::Missing,
+        Ok(m) if m.file_type().is_symlink() => Probe::Link,
+        Ok(m) if m.is_dir() => Probe::Dir,
+        Ok(m) if m.is_file() => Probe::File,
+        Ok(_) => Probe::Other,
+    };
+    PROBES.with_borrow_mut(|probes| {
+        if let Some(probes) = probes {
+            probes.insert(rel.to_string(), found);
+        }
+    });
+    found
+}
+
+/// What `summarize` returns, with every path it probed and what was there: a refresh summarizes
+/// the file again only when one of them, its bytes or its nodes changed.
+pub(crate) fn probed<T>(
+    summarize: impl FnOnce() -> T,
+) -> (T, std::collections::BTreeMap<String, Probe>) {
+    let outer = PROBES.replace(Some(Default::default()));
+    let value = summarize();
+    (value, PROBES.replace(outer).unwrap_or_default())
+}
+
+pub(crate) fn config_summary(
+    path: &str,
+    src: &[u8],
+    root: &std::path::Path,
+    nodes: &[&crate::iac::Node],
+) -> serde_json::Value {
+    let mut summaries = serde_json::Map::new();
+    for kind in KINDS.iter().filter(|k| k.config_file(path)) {
+        summaries.insert(
+            kind.prefix().into(),
+            kind.config_summary(path, src, root, &ConfigFacts { nodes }),
+        );
+    }
+    summaries.into()
+}
 
 /// The kind of a contract identifier, from its prefix.
 pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
@@ -380,11 +710,83 @@ pub fn kind_of(contract: &str) -> Option<&'static dyn ContractKind> {
     KINDS.iter().copied().find(|k| k.prefix() == prefix)
 }
 
+/// Existing kind-neutral workload literal rules. Cloud-specific readers override the
+/// trait's question; orchestration retains only workload and typed-entry scope.
+pub(crate) fn environment_name(prefix: &str, value: &str) -> Option<String> {
+    if !(prefix.starts_with("channel::") || prefix.starts_with("resource::")) {
+        return None;
+    }
+    if let Some(contract) = crate::iac::types::identified(value) {
+        return (contract.rsplit_once("::")?.0 == prefix).then_some(contract);
+    }
+    (!value.is_empty()
+        && value.bytes().all(|b| {
+            b.is_ascii_alphanumeric()
+                || b"._-".contains(&b)
+                || (prefix.starts_with("resource::") && b == b'/')
+        }))
+    .then(|| format!("{prefix}::{value}"))
+}
+
+/// Explanation retained by a side resolved through a workload environment.
+pub(crate) fn environment_reason(via: Option<&str>) -> Option<&str> {
+    via.filter(|v| v.starts_with("workload:"))
+}
+
+pub(crate) fn environment_link(link: &mut Link, via: Option<&str>) {
+    if let Some(reason) = environment_reason(via) {
+        link.level = link.level.max(Level::Inferred);
+        let evidence = format!("; {reason}");
+        if !link.reason.contains(&evidence) {
+            link.reason += &evidence;
+        }
+    }
+}
+
+/// The kind's evidence level for a directed use; unknown kinds cannot establish exact uses.
+pub(crate) fn use_level(contract: &str, via: Option<&str>, operation: Option<&str>) -> Level {
+    if environment_reason(via).is_some() {
+        Level::Inferred
+    } else {
+        kind_of(contract).map_or(Level::Declared, |kind| kind.use_level(via, operation))
+    }
+}
+
+/// Preserve each kind's export scope, including repository-level builders where supported.
+pub(crate) fn link_in_repository(link: &Link, repository: &str) -> bool {
+    let prefix = format!("{repository}::");
+    link.consumer.starts_with(&prefix)
+        || link.provider.starts_with(&prefix)
+        || (kind_of(&link.contract).is_some_and(|k| k.exports_repository_links())
+            && (link.consumer == repository || link.provider == repository))
+}
+
 /// Whether a consumer at a definition calls the provider it links to, by the rule of its kind
 /// (`ContractKind::calls_from_definition`). An unresolved consumer has no contract and is read
 /// as a route's, the only kind that leaves its contract out.
 pub fn calls_from_definition(contract: Option<&str>) -> bool {
     contract.is_none_or(|c| kind_of(c).is_some_and(|k| k.calls_from_definition()))
+}
+
+/// The direction of data through a known contract kind, independently of call ownership.
+pub fn flows_to_consumer(contract: Option<&str>) -> bool {
+    contract
+        .and_then(kind_of)
+        .is_some_and(|kind| kind.flows_to_consumer())
+}
+
+/// Whether the consumer's kind shows its inferred link in a symbol's `context`.
+pub(crate) fn explain_inferred(
+    consumer: &Consumer,
+    from: &Repository,
+    link: &Link,
+    exports: &[Export],
+) -> bool {
+    consumer
+        .contract
+        .as_deref()
+        .and_then(kind_of)
+        .is_some_and(|kind| kind.explain_inferred(consumer, from, link, exports))
 }
 
 /// Whether `contract` is an unresolved side, by the rule of its kind.
@@ -430,9 +832,9 @@ pub fn parts(contract: &str) -> (Option<&str>, Option<&str>) {
     kind_of(contract).map_or_else(|| (None, last(contract)), |k| k.parts(contract))
 }
 
-/// Where `site` of `repository` sits, as the first kind that places it says.
-pub fn place(repository: &str, site: &str) -> Option<String> {
-    KINDS.iter().find_map(|k| k.place(repository, site))
+/// Where this contract's kind places `site` of `repository`.
+pub fn place(contract: &str, repository: &str, site: &str) -> Option<String> {
+    kind_of(contract)?.place(repository, site)
 }
 
 /// Whether `provider` serves `contract`, by the rule of the contract's kind, else by equality.
@@ -440,6 +842,20 @@ pub fn serves(provider: &Provider, contract: &str) -> bool {
     kind_of(contract).map_or(provider.contract == contract, |k| {
         k.serves(provider, contract)
     })
+}
+
+/// Whether an ambiguous link belongs to a consumer item under its kind's current rules.
+pub(crate) fn consumer_item(link: &Link, exports: &[Export]) -> bool {
+    link.level == Level::Ambiguous
+        && kind_of(&link.contract).is_none_or(|kind| kind.consumer_item(link, exports))
+}
+
+/// Whether this provider remains a candidate of the link in the current query.
+pub(crate) fn link_candidate(provider: &Provider, link: &Link, exports: &[Export]) -> bool {
+    kind_of(&link.contract).map_or(
+        provider.site == link.provider && provider.contract == link.contract,
+        |kind| kind.link_candidate(provider, link, exports),
+    )
 }
 
 /// Which entry point kind a `role` side of `contract` makes, by the rule of its kind.
@@ -623,7 +1039,7 @@ mod tests {
         ];
         let mut exports = vec![export];
         for kind in [&Packages as &dyn ContractKind, &Http, &Resource, &Channel] {
-            kind.workspace_step(&mut exports);
+            kind.workspace_step(&mut exports, &[]);
         }
         let kept: Vec<_> = (exports[0].entry_points.iter())
             .map(|e| &e.identity[..])
@@ -643,6 +1059,8 @@ mod tests {
                 Search::Filter("resource"),
                 Search::Filter("channel"),
                 Search::Own("package"),
+                Search::Filter("image"),
+                Search::Filter("alert"),
             ]
         );
         let (kind, search) = searched("package").unwrap();
@@ -693,14 +1111,14 @@ mod tests {
         }
     }
 
-    /// The seam places a site as the first kind that answers does, and not at all otherwise.
+    /// The seam asks the contract's kind to place its site, leaving unrelated sites alone.
     #[test]
     fn the_seam_places_a_manifest_site_and_leaves_any_other_alone() {
         assert_eq!(
-            place("r", "r::kit/package.json"),
+            place("package::npm::kit", "r", "r::kit/package.json"),
             Some("kit/package.json".into())
         );
-        assert_eq!(place("r", "r::src/app.ts::main"), None);
+        assert_eq!(place("http::GET::/", "r", "r::src/app.ts::main"), None);
     }
 
     /// The HTTP pass after links sets nothing on a link with no shapes; a kind with no pass
@@ -727,6 +1145,7 @@ mod tests {
     #[test]
     fn names_without_a_file_mark_a_question_about_its_inline_definitions() {
         let inline = |path: &str| super::Found {
+            identity: None,
             role: super::Role::Provider,
             site: super::Site::Inline {
                 path: path.into(),

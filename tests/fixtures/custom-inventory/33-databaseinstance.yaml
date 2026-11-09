@@ -1,0 +1,9 @@
+apiVersion: sql.gcp.upbound.io/v1beta2
+kind: DatabaseInstance
+metadata:
+  name: operator-33
+  namespace: platform
+  annotations:
+    crossplane.io/external-name: xp-sql
+spec:
+  forProvider: {}

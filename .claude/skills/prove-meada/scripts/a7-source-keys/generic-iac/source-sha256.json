@@ -1,0 +1,1800 @@
+{
+  "crossplane-aws": {
+    "commit": "57fa3b0127c8ce263327f2d43b4e46d07fb90896",
+    "tree_entries": 47,
+    "tree_truncated": false,
+    "files": {
+      ".gitignore": {
+        "git_blob_sha1": "db611f15a58d9b67b88a043b8de11a928c8de1d7",
+        "sha256": "fb5f6e6e961c7301da39e1676e90b15d58b2d7a6644f7a52d0deec6580331727",
+        "bytes": 18,
+        "mode": "100644"
+      },
+      ".github/workflows/ci.yaml": {
+        "git_blob_sha1": "e3701cd10c08dff9cefef7cbef2f24d04ed03f7c",
+        "sha256": "8f11913de34b34c0f5aaab42f7c0f576344f7f03b18a0d21e42a27c0a002ae70",
+        "bytes": 1878,
+        "mode": "100644"
+      },
+      ".github/workflows/composition-tests.yaml": {
+        "git_blob_sha1": "2715ef55369e1db1d4f604a6894c9957f13568a0",
+        "sha256": "1c718a15087044f96446f3ea63324f3a99962a386b07592a58abcbfe60b52fc5",
+        "bytes": 544,
+        "mode": "100644"
+      },
+      ".github/workflows/e2e.yaml": {
+        "git_blob_sha1": "1aa19285d48e79c5694c0253790ec35cbfd130f8",
+        "sha256": "152cdf532a6b99906a8d2d5ab697809469ea44c8fbe37068fe4b0ff8d695b97d",
+        "bytes": 1747,
+        "mode": "100644"
+      },
+      ".github/workflows/tag.yaml": {
+        "git_blob_sha1": "e2dd5cf69924ade530cf0a447621720763a00ab7",
+        "sha256": "72e2db9dac6b79505bb57078f3d967cc4acb4a0d84d7a7d64b5327e76792e7ab",
+        "bytes": 640,
+        "mode": "100644"
+      },
+      ".github/workflows/tag.yml": {
+        "git_blob_sha1": "e2dd5cf69924ade530cf0a447621720763a00ab7",
+        "sha256": "72e2db9dac6b79505bb57078f3d967cc4acb4a0d84d7a7d64b5327e76792e7ab",
+        "bytes": 640,
+        "mode": "100644"
+      },
+      ".github/workflows/yamllint.yaml": {
+        "git_blob_sha1": "ae49dff4a70246922b3a56e97da0463ceb619679",
+        "sha256": "a1d74709b027013a6ba741822dfd91747999b5468314ffce5558545d1106c5dd",
+        "bytes": 456,
+        "mode": "100644"
+      },
+      "apis/clusters/composition.yaml": {
+        "git_blob_sha1": "8c9d1cf11fc46b0155ebe6a2558426b390ecc392",
+        "sha256": "05de21293dc81677b75e75d5544230dae2c456e0b420a2f0d1af0ac0abedec21",
+        "bytes": 491,
+        "mode": "100644"
+      },
+      "apis/clusters/definition.yaml": {
+        "git_blob_sha1": "f47acea9105c87906e60299244ef91fc39d0bcd3",
+        "sha256": "0a322bdd7042fecb124a56feefa887dabe9863998bf8fbe3cba8e12cfcff417f",
+        "bytes": 7924,
+        "mode": "100644"
+      },
+      "examples/app-xr.yaml": {
+        "git_blob_sha1": "523761f794c56e84742185c2f3639e7e6fc563c5",
+        "sha256": "22192ae207413cf8ccd74e60c59da229acf3d21d908258fae9f8c9fdf7e3adf3",
+        "bytes": 732,
+        "mode": "100644"
+      },
+      "examples/aws-default-provider.yaml": {
+        "git_blob_sha1": "3d23ed9a04afc07e19f898b2a293b4a9bca11ec4",
+        "sha256": "22ffed8ad83be62937342303f0ead302a52aa78f0ab519795de17f63419f223b",
+        "bytes": 219,
+        "mode": "100644"
+      },
+      "examples/cluster-xr.yaml": {
+        "git_blob_sha1": "0469045a8da365165a592f8a624c6f409c0cfd98",
+        "sha256": "a558a61e7c3c6cb3e7eaa01441cb903bc55f88e714619ee4fc54f596eb31194c",
+        "bytes": 683,
+        "mode": "100644"
+      },
+      "examples/configuration.yaml": {
+        "git_blob_sha1": "36791b307755c4da9b25eb1d13f3a026b4d17294",
+        "sha256": "07dbaa1de2f45e99e1d34d667dce58147defbc7d3021997e311714903bcfb808",
+        "bytes": 153,
+        "mode": "100644"
+      },
+      "examples/mariadb-xr.yaml": {
+        "git_blob_sha1": "929b1838e2365668d988470960d3f972fa92d802",
+        "sha256": "b94f42541ab91b2274d72ac6896dc7110ea2781829b77ff1ea34e5318bb2f9e7",
+        "bytes": 382,
+        "mode": "100644"
+      },
+      "examples/postgres-xr.yaml": {
+        "git_blob_sha1": "a6292f7231bd214debe1d8244b7a42fa1c3abdcc",
+        "sha256": "afca5a7134638dfefe07575e55883bf00282d1b01c309654732c778b6c0168e8",
+        "bytes": 583,
+        "mode": "100644"
+      },
+      "upbound.yaml": {
+        "git_blob_sha1": "2e92e9533b0b1bb8a8203b7927fa2b05d5f6d247",
+        "sha256": "bf33ff76cd5d57ec98e3875f2fd162ea639ee901ac64efa1c24ef5a9df60ef8f",
+        "bytes": 2405,
+        "mode": "100644"
+      }
+    },
+    "skipped_before_parse": []
+  },
+  "boutique": {
+    "commit": "c7cb6d5bfd6ea3aed768634ebbcb98cb7a523712",
+    "tree_entries": 458,
+    "tree_truncated": false,
+    "files": {
+      ".gitignore": {
+        "git_blob_sha1": "bb79cdbbf08c31992efdc57f1248af2c49ca7d8e",
+        "sha256": "ff88d1f0395b89bf3aa2d9e67fa135bdb1e7723df0f46183e599cc8d42d73ec9",
+        "bytes": 327,
+        "mode": "100644"
+      },
+      "src/currencyservice/.gitignore": {
+        "git_blob_sha1": "c2658d7d1b31848c3b71960543cb0368e56cd4c7",
+        "sha256": "4d56952b0fb13bf8f9b6c13a6d4c34a075bac3af447636a1df4335d7576e2f97",
+        "bytes": 14,
+        "mode": "100644"
+      },
+      ".github/auto-approve.yml": {
+        "git_blob_sha1": "e5d98c401057e5c3e6a9289d584336e3dfe6ab57",
+        "sha256": "36cba984af98e7b8b791d1e6fbc055bffef55a0245b9c1b560bd56ab640c88a8",
+        "bytes": 841,
+        "mode": "100644"
+      },
+      ".github/header-checker-lint.yml": {
+        "git_blob_sha1": "39733ace7e66cfc7d1dab1edcb0b0a19f1503d1d",
+        "sha256": "6fffe02ae13ff0dc2fe60b5ff5aaa839b6670d4692df3f2deba42f9c151c6c2d",
+        "bytes": 1530,
+        "mode": "100644"
+      },
+      ".github/release-cluster/backend-config.yaml": {
+        "git_blob_sha1": "8e5d9768931fa2d8eae05507519385a3ed2728b3",
+        "sha256": "8f6db32de437f61709d045b7c0550a7306ec908facb101e32c4d7aebdd8ab93e",
+        "bytes": 736,
+        "mode": "100644"
+      },
+      ".github/release-cluster/frontend-config.yaml": {
+        "git_blob_sha1": "6cd700c24238497ec8fe4c448e4ce3b2c3941c8b",
+        "sha256": "cf769e674521110bc8405d9a3b66217845515c51ba1e56fe8ca95152bad72460",
+        "bytes": 809,
+        "mode": "100644"
+      },
+      ".github/release-cluster/frontend-ingress.yaml": {
+        "git_blob_sha1": "42029ac2e7d8cb3287fe4030f123f668cd23c5e0",
+        "sha256": "d4027f339fa41b54c75124da05be56f426a9dde4b22dd75763657e486b395a76",
+        "bytes": 1170,
+        "mode": "100644"
+      },
+      ".github/release-cluster/frontend-service.yaml": {
+        "git_blob_sha1": "e4a304aa8f24441a3a46ce8367db1307c61e2b93",
+        "sha256": "39ec955c83f5bc3ca07bca291dd34eff210d206ec1e7a501177e3cce1726365c",
+        "bytes": 883,
+        "mode": "100644"
+      },
+      ".github/release-cluster/managed-cert.yaml": {
+        "git_blob_sha1": "afcd4c4ee8518ebe9cb7789a0b3aeba1213dfd27",
+        "sha256": "cbcc281e060c8d37d625de05f35cc86e388f50c740ffb4db8eaeed3a6e94f5d9",
+        "bytes": 735,
+        "mode": "100644"
+      },
+      ".github/snippet-bot.yml": {
+        "git_blob_sha1": "26d99f1aa292cff59e15de3b9b78e50422ae8515",
+        "sha256": "6c98ab744ea5c0dd51cd43cf20b7113578bc65c3c65c352400acc2727f81c8de",
+        "bytes": 576,
+        "mode": "100644"
+      },
+      ".github/workflows/ci-main.yaml": {
+        "git_blob_sha1": "41457ecd0f76252cc91088e4e5b76f2c7b0551a0",
+        "sha256": "2447ce2be41eb5baa59ca56b943d391219c507a2a4f5df45e3c65bf0f3d87296",
+        "bytes": 5781,
+        "mode": "100644"
+      },
+      ".github/workflows/ci-pr.yaml": {
+        "git_blob_sha1": "c7453557b72116f89145253c8b4715861da572b8",
+        "sha256": "fa4529f560ee87b5cf8b0a3c4b074c62afb2574e2c7bad938218595a6ac13436",
+        "bytes": 2150,
+        "mode": "100644"
+      },
+      ".github/workflows/cleanup.yaml": {
+        "git_blob_sha1": "9386213f7aec71a11355b8862dbbb2c905484f1c",
+        "sha256": "7349bbe18c1ea5b3fcfdc37b845c556d02ef86b07fa6444a78abeb68ad035f6b",
+        "bytes": 2618,
+        "mode": "100644"
+      },
+      ".github/workflows/deploy-pr.yaml": {
+        "git_blob_sha1": "d0ab3bd16d0de8c44494fb04eaabf72db2e51b19",
+        "sha256": "f809de9a18aa50d0c4e4e203f2218446b62341007bc7666eb14cb2bd3661a914",
+        "bytes": 7925,
+        "mode": "100644"
+      },
+      ".github/workflows/helm-chart-ci.yaml": {
+        "git_blob_sha1": "67036a52525b0de6222fd94f1d763917024abd22",
+        "sha256": "ab6ab5d32ae5709840c4e24d1d3f91d24dc177381835f1ddd862eaa48154f4ba",
+        "bytes": 4491,
+        "mode": "100644"
+      },
+      ".github/workflows/kubevious-manifests-ci.yaml": {
+        "git_blob_sha1": "92fbc6de5ae4d774a2d7c391fb24b654cbbddd06",
+        "sha256": "895ab91809619c119b53e361c2327cc7ef1c9f395b235f526ed61fc31cdaae62",
+        "bytes": 1614,
+        "mode": "100644"
+      },
+      ".github/workflows/kustomize-build-ci.yaml": {
+        "git_blob_sha1": "fe623a8fe399dfb384e2948f034feeeece144aa2",
+        "sha256": "d1f262c0b7942e7385228869600f01a013c0a2bd4144582e1687dce12c4612a6",
+        "bytes": 1419,
+        "mode": "100644"
+      },
+      ".github/workflows/make-release.yaml": {
+        "git_blob_sha1": "de30d88617ae8f4bf0344df0bd4da5f7b9bbcf95",
+        "sha256": "8c54ac5f660c249449df618d42e9928d114ef1d234eb8ee0b70b3f371d6b4c7f",
+        "bytes": 4057,
+        "mode": "100644"
+      },
+      ".github/workflows/terraform-validate-ci.yaml": {
+        "git_blob_sha1": "41c747bd89f6afcd1c368496ee1dd0bb5883da3e",
+        "sha256": "701b945a987dc2273c003cf6a92fe9da52441b8b6b527a16da37ff92c7fc2689",
+        "bytes": 1130,
+        "mode": "100644"
+      },
+      "cloudbuild.yaml": {
+        "git_blob_sha1": "fa45ecdae04825379caf5158a0a5e5d60e9e4535",
+        "sha256": "4665fc0d5b3658672d7f58722e2acc529239dd3f51fa54eb98335241dac4a4b7",
+        "bytes": 1490,
+        "mode": "100644"
+      },
+      "helm-chart/Chart.yaml": {
+        "git_blob_sha1": "13f2d60e5fe734e8ed6987405c8279fab6609c37",
+        "sha256": "a63143a1f7b90667ced4163db57e8d81d5d66c5a9437982d4a700573090543e4",
+        "bytes": 1747,
+        "mode": "100644"
+      },
+      "helm-chart/templates/adservice.yaml": {
+        "git_blob_sha1": "6c07400afb8a09d156789304052db25eeab4dc43",
+        "sha256": "03895b5281ebb5980adf47f6a9be9cd95bcf3952837f1a332360fa533324f91d",
+        "bytes": 4630,
+        "mode": "100644"
+      },
+      "helm-chart/templates/cartservice.yaml": {
+        "git_blob_sha1": "39466782e6fdc9b9c50a3cabd2a887371d77adf4",
+        "sha256": "033763a0964d28b7b9b9a4d0d3bd12ffd1b78c0fe22bcd2771c5b1b426543e1c",
+        "bytes": 11557,
+        "mode": "100644"
+      },
+      "helm-chart/templates/checkoutservice.yaml": {
+        "git_blob_sha1": "c93a7f58ac7d9dcc78c9cc343d29a0f5cbe91bf6",
+        "sha256": "107331577ffd4a9e5e2818436748a799ff9d75ff635747e0d9115ec80f654933",
+        "bytes": 6204,
+        "mode": "100644"
+      },
+      "helm-chart/templates/common.yaml": {
+        "git_blob_sha1": "a3d53b0839991c6e45690e472e75ad9b3297d07b",
+        "sha256": "96ad21e6b2f5078fe58f928e21c26c10e2cfa5264444957a7fb3f9f31795189e",
+        "bytes": 1009,
+        "mode": "100644"
+      },
+      "helm-chart/templates/currencyservice.yaml": {
+        "git_blob_sha1": "7b547d2a88972489e1f004abe817a2d5b522cb11",
+        "sha256": "5b3b6ae0391ac2b263e3dddf9836e456bc8cf2568e02c2524a08d56f027c9e1b",
+        "bytes": 5413,
+        "mode": "100644"
+      },
+      "helm-chart/templates/emailservice.yaml": {
+        "git_blob_sha1": "8a725a971ecfa9ab57b201cd427e8a43c2bd1fc8",
+        "sha256": "8c9652d00d34dc75414b42b0885a03ffeda02b03ad403883195359f95afc2f25",
+        "bytes": 5172,
+        "mode": "100644"
+      },
+      "helm-chart/templates/frontend.yaml": {
+        "git_blob_sha1": "2d6adec18916b15b444075f34ea457c597f6003c",
+        "sha256": "620540b303a4294963e627f80d5945c6a80a824b7a67a342769ce5e0988a5555",
+        "bytes": 8919,
+        "mode": "100644"
+      },
+      "helm-chart/templates/loadgenerator.yaml": {
+        "git_blob_sha1": "657ff455ad6d8d562229874a43f277535e2a91a9",
+        "sha256": "fa5b588f5e9d3c83fd4c12a6954cb2be10e7da29a52e37431fd5d1e77cb5cdc6",
+        "bytes": 4775,
+        "mode": "100644"
+      },
+      "helm-chart/templates/opentelemetry-collector.yaml": {
+        "git_blob_sha1": "df40d02640d7813132fb9b55c6dead2a8a83b2dd",
+        "sha256": "2c503cf715d87025bb5aa7d84857045a093577e748e76236598acc5ed7a6e126",
+        "bytes": 8513,
+        "mode": "100644"
+      },
+      "helm-chart/templates/paymentservice.yaml": {
+        "git_blob_sha1": "60ad2742c5ad7db454e2aafe676f45e508349fa1",
+        "sha256": "c0fb2b9602a27990c41b5fcc31e149ca37d2ea23befc840634a455d024cc67da",
+        "bytes": 5151,
+        "mode": "100644"
+      },
+      "helm-chart/templates/productcatalogservice.yaml": {
+        "git_blob_sha1": "dec0e2d882721e0ab69f022eea1b26178978c6cf",
+        "sha256": "be8181a2939a44c3a32571596ce17b9617c58f233fecf2b0e75dcf80c40da001",
+        "bytes": 5799,
+        "mode": "100644"
+      },
+      "helm-chart/templates/recommendationservice.yaml": {
+        "git_blob_sha1": "828a14c236e7e5220d48a938eb7b8da16844aaff",
+        "sha256": "f5b508d4fcabf72d480837e63b696c7fb55d466144a118552bc71758bb2f2851",
+        "bytes": 5538,
+        "mode": "100644"
+      },
+      "helm-chart/templates/shippingservice.yaml": {
+        "git_blob_sha1": "193bbd8e6cfb61ad0a75560d5da811a080f8e33e",
+        "sha256": "1069278d85c5ea30221fced4dd19c3e77455eb3900d692b234f68c163d592d77",
+        "bytes": 4981,
+        "mode": "100644"
+      },
+      "helm-chart/values.yaml": {
+        "git_blob_sha1": "5573d8bf3a17514be6ece572ad7802811fe03929",
+        "sha256": "4cc974ac64ec7fb513a6081e267d91448bd76a236e0b4cf75e1510597034f745",
+        "bytes": 5286,
+        "mode": "100644"
+      },
+      "istio-manifests/allow-egress-googleapis.yaml": {
+        "git_blob_sha1": "50410b2794bfbbefc1a8e663e176aa6fbb2471b5",
+        "sha256": "4e3489bfc0bfc0551452f6140b497a06e841e6ee1f86f1324c81a1b72a7f0806",
+        "bytes": 1192,
+        "mode": "100644"
+      },
+      "istio-manifests/frontend-gateway.yaml": {
+        "git_blob_sha1": "b3a1a64737311422f03259c2a3b3c1e458b259a4",
+        "sha256": "c71cb34d10ce680e1a1eb4dc40b2dd9ec6be15ad73916fbe6e3b8c098c777b38",
+        "bytes": 1103,
+        "mode": "100644"
+      },
+      "istio-manifests/frontend.yaml": {
+        "git_blob_sha1": "23cd64832c09fe5db7c9abae4b48e2001e267bd2",
+        "sha256": "d9015c739bb9bd35f4df1a3ad0980fdf411dab1bf1a40517d5269efaab5811f4",
+        "bytes": 817,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/adservice.yaml": {
+        "git_blob_sha1": "25ff1b7f578f7e25f8ad324d0f020d664932b5b8",
+        "sha256": "0ade8f5abc5edd0ee25d4e7cc423c9728fd3577b266ebd0ba09f9c725c16fb82",
+        "bytes": 2033,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/cartservice.yaml": {
+        "git_blob_sha1": "5470d36453f05eedef0d166cd08ce5b13fa253f2",
+        "sha256": "e4ad956409551a90e7c2fc8065f285b65255e81bc15b7b722debf3a6ec761428",
+        "bytes": 3391,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/checkoutservice.yaml": {
+        "git_blob_sha1": "c7dc5a0d9d8ca9bce77b321e41758dd53d8ca66d",
+        "sha256": "84441514b468118abfcef95d5042e956db3ebce2f41ec8d3a0118d8950be0f9b",
+        "bytes": 2474,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/currencyservice.yaml": {
+        "git_blob_sha1": "58fc03284a94413ab91f05ecf4d3c5504ee0477e",
+        "sha256": "9719c00aa72236b8a72100f937719df1ef80f3c705894e8d6a2ac01acaec1382",
+        "bytes": 2043,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/emailservice.yaml": {
+        "git_blob_sha1": "bea781adb7d554b3aba2541a4590841fcc3cf212",
+        "sha256": "04a83d1dfe64bf3655a0d712dd0d6cf6d11aa1a67d8474a09b3eeeb2926d0021",
+        "bytes": 2046,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/frontend.yaml": {
+        "git_blob_sha1": "5aec4f3d466455f4e7fb0d223c6cbce38083112a",
+        "sha256": "3f74f35588c80760a25fda936d5d008fec4bd08b80282f66b4eae8e42f453e26",
+        "bytes": 4032,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/kustomization.yaml": {
+        "git_blob_sha1": "bf69f4ea2374afd86a00c3db666a9be79ce175ad",
+        "sha256": "56c411ecbc6e567c6c33913b9bc16f2667c9d5374dad0c7070015940a52e1974",
+        "bytes": 1460,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/loadgenerator.yaml": {
+        "git_blob_sha1": "d4e4420624bf535000985ba253aa8d1b933025ba",
+        "sha256": "367a01bbd6cf160eac30f013269c20e3c978f14fa2b294446ae027cbdc91b875",
+        "bytes": 2881,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/paymentservice.yaml": {
+        "git_blob_sha1": "a0a1526f073918d8a3785ba00dcb2dd57a326f3c",
+        "sha256": "8499a5f215e74ea0fa12cc37ff77b74aca55d14a59a8ae69a55fd7011174205f",
+        "bytes": 2018,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/productcatalogservice.yaml": {
+        "git_blob_sha1": "6774650622ef4914a74a56e0e5461c2d1386a761",
+        "sha256": "a2d7d1eb5923b54ca37cfbe0a65da8c8ea10aad2d1cab24274b5cd64a96488d9",
+        "bytes": 2082,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/recommendationservice.yaml": {
+        "git_blob_sha1": "2d2c6eed9d3144013c4f75e434796a1201bf70ad",
+        "sha256": "ecdf5496ecd9b4543b6aaced38287be7ab1a019e3cb3e929a982c1dc9aa2179a",
+        "bytes": 2228,
+        "mode": "100644"
+      },
+      "kubernetes-manifests/shippingservice.yaml": {
+        "git_blob_sha1": "41cd5260d79413b26736d0610109a858d8528f14",
+        "sha256": "b10de1eab50accc163cd80b07fad8311aacb5ff6a0c0113c1ef770d3b7a418e2",
+        "bytes": 2016,
+        "mode": "100644"
+      },
+      "kustomize/base/adservice.yaml": {
+        "git_blob_sha1": "6eb458d9a306bd66e9a3eab65407cf212a7c5d55",
+        "sha256": "6dae935d91f372bab352f7d805572e685f049467f9fdc993500220a57e8da19f",
+        "bytes": 2106,
+        "mode": "100644"
+      },
+      "kustomize/base/cartservice.yaml": {
+        "git_blob_sha1": "69fade6cc43467b8270ddcc7493e6695fbd20705",
+        "sha256": "e52d02664c85b4716f6450b0a4b39e8297b7fe0782968b429052c1c103cf0525",
+        "bytes": 3464,
+        "mode": "100644"
+      },
+      "kustomize/base/checkoutservice.yaml": {
+        "git_blob_sha1": "82557be52c21267fd6684d799fda0918d603ac4e",
+        "sha256": "ec1a2a7ad2f360aa70370d69e425068430c19f6fba30fd605d6ed9cff18a6c27",
+        "bytes": 2547,
+        "mode": "100644"
+      },
+      "kustomize/base/currencyservice.yaml": {
+        "git_blob_sha1": "ea2d5d3136989891b0d2f09f7d5579f6b674bd8b",
+        "sha256": "5f0b8ccd761858030329560d3528afabaadec92bb993c6489bd33c8fb72ff86b",
+        "bytes": 2116,
+        "mode": "100644"
+      },
+      "kustomize/base/emailservice.yaml": {
+        "git_blob_sha1": "090abe254a5896333920d64ecb875bf243349293",
+        "sha256": "a40c696283105d3219cd20f76a0b5085ab6da3f8c14959e0a202b80fc433b9ca",
+        "bytes": 2119,
+        "mode": "100644"
+      },
+      "kustomize/base/frontend.yaml": {
+        "git_blob_sha1": "e72387589230c6cd51b235f1d4ed8a820c05d2ea",
+        "sha256": "89381e6ac7980a9a81d501c728621f3e5005e25ea2122952c133b810ec4667c4",
+        "bytes": 4105,
+        "mode": "100644"
+      },
+      "kustomize/base/kustomization.yaml": {
+        "git_blob_sha1": "44b660d4a7f994668c07850f697314b1d0b16e90",
+        "sha256": "b8d7a9d1b2e5f6dce8025c476f8b27a803d51cad81d24c037270bdb571505fdb",
+        "bytes": 893,
+        "mode": "100644"
+      },
+      "kustomize/base/loadgenerator.yaml": {
+        "git_blob_sha1": "6c173aa78e3acd71d486a929878e81c233c3eb23",
+        "sha256": "33b27fd395d9bd4f282a3cfb80836a2f8afcb25b036d6e87fb2cdb571a7a5b02",
+        "bytes": 2954,
+        "mode": "100644"
+      },
+      "kustomize/base/paymentservice.yaml": {
+        "git_blob_sha1": "29c2e578f01a12d67ee6574e2cdd9beb24d0e100",
+        "sha256": "5e5b1653b9c1a890589388c69efa396109c43f47e218b4cd190dda6646381ed9",
+        "bytes": 2091,
+        "mode": "100644"
+      },
+      "kustomize/base/productcatalogservice.yaml": {
+        "git_blob_sha1": "7e6104d9ced6d3170eb5ddc1867ed7237e2fab37",
+        "sha256": "18803933c1dcc8647ccf7120ab1e4d6906243c6d42a67191410457b23a4c99ad",
+        "bytes": 2155,
+        "mode": "100644"
+      },
+      "kustomize/base/recommendationservice.yaml": {
+        "git_blob_sha1": "ca53188fc512178c78eb6e152eeec6256be5fd95",
+        "sha256": "abd0a35177926fead99563cfb756c5f4cc8b64a5396c0c00a8bcf339742067d9",
+        "bytes": 2301,
+        "mode": "100644"
+      },
+      "kustomize/base/shippingservice.yaml": {
+        "git_blob_sha1": "0fc047e34db00c9edbafd6ffe864e73fb0052b8a",
+        "sha256": "e55d540daccd1e0f35b203040a4be5908e7f8c0fe03e3e9471c92e68d2e30410",
+        "bytes": 2089,
+        "mode": "100644"
+      },
+      "kustomize/components/alloydb/kustomization.yaml": {
+        "git_blob_sha1": "3327bb0dd4501c226c5903e76fdf0da2e6303d60",
+        "sha256": "46a2fec8ce7a6d8b4d41fca345c40e8d37e36b95707209b816e2831b94478e49",
+        "bytes": 3245,
+        "mode": "100644"
+      },
+      "kustomize/components/container-images-registry/kustomization.yaml": {
+        "git_blob_sha1": "95ef08e0e84e79c320b513b832f93e28c77f11ce",
+        "sha256": "5a0dd935f57cfd35effd1f1d71b8a3a3ffd99dbbed8db064a9874ab2eb699644",
+        "bytes": 2242,
+        "mode": "100644"
+      },
+      "kustomize/components/container-images-tag-suffix/kustomization.yaml": {
+        "git_blob_sha1": "2fda1feaac612044a7eeff0ae561680b9642c1e4",
+        "sha256": "dd4960d01ce9ebc584c2377005cc9dd51e9464ab5c0a50c42b2290d6d5f2ecc2",
+        "bytes": 2063,
+        "mode": "100644"
+      },
+      "kustomize/components/container-images-tag/kustomization.yaml": {
+        "git_blob_sha1": "367ee05905af36892825fbf5d795ba5dabc7f0d5",
+        "sha256": "5a061db6cae636a37c859db94c8c841862252ac3a688ba00fb569729ad375f27",
+        "bytes": 1954,
+        "mode": "100644"
+      },
+      "kustomize/components/custom-base-url/kustomization.yaml": {
+        "git_blob_sha1": "2a41c153bc831fcdb7b86ffc55507a6b6cb76ef6",
+        "sha256": "041d44dd9826a1f7f39f4082875c9665f3ec289522ab390df9cf3efdf1448e69",
+        "bytes": 1100,
+        "mode": "100644"
+      },
+      "kustomize/components/cymbal-branding/kustomization.yaml": {
+        "git_blob_sha1": "c2a1f802e287cf92dc32783c5a3db2bfb3b799d6",
+        "sha256": "f236fbef8047c778e75557aa4a26ed18b8296b27aec4b96c2448016297ea6cab",
+        "bytes": 906,
+        "mode": "100644"
+      },
+      "kustomize/components/google-cloud-operations/kustomization.yaml": {
+        "git_blob_sha1": "e9980947a898dc69d6a821f1cfa2f7cee962c8d0",
+        "sha256": "fa7ba2cd068fc6d06946b24dbed9e2f0b4a01311e5d5294159f59068e9192a68",
+        "bytes": 4932,
+        "mode": "100644"
+      },
+      "kustomize/components/google-cloud-operations/otel-collector.yaml": {
+        "git_blob_sha1": "c1ba3194f3c342c9b3902f12e6a19d83d5a7e9e3",
+        "sha256": "0a71fbd75c7e1833de91f582708781ee6517c311de98e652f2b53deee41d72cf",
+        "bytes": 4063,
+        "mode": "100644"
+      },
+      "kustomize/components/memorystore/kustomization.yaml": {
+        "git_blob_sha1": "18a09da2247f8f4c5a38a6a1c41c970e20790443",
+        "sha256": "97e875ec8f95c947c49c2d69852e8535d8917f3b347ada1749158815e9f4fab7",
+        "bytes": 1310,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/kustomization.yaml": {
+        "git_blob_sha1": "c08f153348103afe4bc3910227120e4ecbadc108",
+        "sha256": "7b9d46f5a08cf330dfd9d6eda0f848e969b2ab93556a1671528410a2a633969c",
+        "bytes": 1114,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-adservice.yaml": {
+        "git_blob_sha1": "0be415ec84ccf90e64649d8332270f0da88d1d6d",
+        "sha256": "17950bae1ef0f49cb434734c37812fd741ad28c0d05a3fb790d79a4d56d23089",
+        "bytes": 905,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-cartservice.yaml": {
+        "git_blob_sha1": "a62d3463966e30734879db805c2690a627add667",
+        "sha256": "71e5539804cb66b077fa9e056bddcded9d1e42f25981dace499f77aca1e5d1d3",
+        "bytes": 980,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-checkoutservice.yaml": {
+        "git_blob_sha1": "40d9d8c9d315d5b57d3cbbeecdd3d460a23f502b",
+        "sha256": "7262307fe4cd20c8714ba503c1b198fc7607fceead9713e3eb11707c3d2affdd",
+        "bytes": 917,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-currencyservice.yaml": {
+        "git_blob_sha1": "fc2e6c5ee308a02795156fd3f51f15532f052dc9",
+        "sha256": "d73e6c0ab0d72f9ad4698968a8d2c33d11807f942e871dc4e89370e4b34e3b98",
+        "bytes": 988,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-deny-all.yaml": {
+        "git_blob_sha1": "0b6a47e77192502e907fe48ac6e2720db1e768dc",
+        "sha256": "b652eb906e44e1f1528744dec34cc0548403e7bef2b35ada93b289baedfe4457",
+        "bytes": 718,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-emailservice.yaml": {
+        "git_blob_sha1": "2503cdab5235d7bfc6fca86c0a625eeaf8d2f91c",
+        "sha256": "dc4d2e9c1866ecb2c84ff18b167ced8b855b39862aa56f255d746d61e3885aee",
+        "bytes": 918,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-frontend.yaml": {
+        "git_blob_sha1": "53b36ed579080adb538daabc6f1263b81190902b",
+        "sha256": "c596bc8def5e75a06f92a63a86be84d6d592172a7348d5f9aa184348b9e7e604",
+        "bytes": 786,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-loadgenerator.yaml": {
+        "git_blob_sha1": "1fc77990c95619d4737d555d001b80fd02b9619a",
+        "sha256": "19b0b5d5fa047c5e689b6bb464c41fdf1ef4b0f7f8b3473d81408a44fd1c927f",
+        "bytes": 766,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-paymentservice.yaml": {
+        "git_blob_sha1": "e74d73a5fa4f20ae7c33931eed91e456558d88cb",
+        "sha256": "17939596207035d2152261552a3bb589921e85a4ca3d55630c552d3284ba85fb",
+        "bytes": 923,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-productcatalogservice.yaml": {
+        "git_blob_sha1": "d24f8bacf6fb90dfed1c9f55257ec66d32cab421",
+        "sha256": "198e957a61c568d2688209b4304df3df8101fc117b83f196d26b42dc7b24db91",
+        "bytes": 1077,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-recommendationservice.yaml": {
+        "git_blob_sha1": "973dc60c843a6d25a7f2a4bf6e969c46e5403f21",
+        "sha256": "de3d1237841711a5e39d85ed475e35f60d155f6f0ce076c0f61496a0f198c117",
+        "bytes": 929,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-redis.yaml": {
+        "git_blob_sha1": "a73f0ac8a0549182f924a54c915c55076c527d38",
+        "sha256": "2b80b55480bda5e31cd9f39e8e4c741931a904a9ba3f329087352b1de994c069",
+        "bytes": 911,
+        "mode": "100644"
+      },
+      "kustomize/components/network-policies/network-policy-shippingservice.yaml": {
+        "git_blob_sha1": "a85ebab50be82d14b455c3d6546303886675c864",
+        "sha256": "e2cfc2c833955a478fc8072d387b6e2b6a8eb5ec5bfa90c8225db8b8d1b3c876",
+        "bytes": 989,
+        "mode": "100644"
+      },
+      "kustomize/components/non-public-frontend/kustomization.yaml": {
+        "git_blob_sha1": "ca35bcb54f5c6f6eceb3a5fe42c94dbd7afc7dd2",
+        "sha256": "3d318cd221fb934f6e357dc9d444d77573e7578b12a7372b6bc82aae0b9d3133",
+        "bytes": 804,
+        "mode": "100644"
+      },
+      "kustomize/components/service-mesh-istio/allow-egress-googleapis.yaml": {
+        "git_blob_sha1": "50410b2794bfbbefc1a8e663e176aa6fbb2471b5",
+        "sha256": "4e3489bfc0bfc0551452f6140b497a06e841e6ee1f86f1324c81a1b72a7f0806",
+        "bytes": 1192,
+        "mode": "100644"
+      },
+      "kustomize/components/service-mesh-istio/frontend-gateway.yaml": {
+        "git_blob_sha1": "4f628444ccc2799f9d21a7c82eeabe90e69f5df4",
+        "sha256": "e68361d8673d5fa69ace53fe5ec8fe06394b8ed556329d00c55474bca75b91df",
+        "bytes": 1063,
+        "mode": "100644"
+      },
+      "kustomize/components/service-mesh-istio/frontend.yaml": {
+        "git_blob_sha1": "23cd64832c09fe5db7c9abae4b48e2001e267bd2",
+        "sha256": "d9015c739bb9bd35f4df1a3ad0980fdf411dab1bf1a40517d5269efaab5811f4",
+        "bytes": 817,
+        "mode": "100644"
+      },
+      "kustomize/components/service-mesh-istio/kustomization.yaml": {
+        "git_blob_sha1": "2399e65e951aa4042f910905b03505565b5d3879",
+        "sha256": "1d735cc45b557fe01e348aa583a19ed3af0f2caabcde09c8cd6ad1b9b2b0261a",
+        "bytes": 932,
+        "mode": "100644"
+      },
+      "kustomize/components/shopping-assistant/kustomization.yaml": {
+        "git_blob_sha1": "90ec7866d6be594e932937cc1fa45aa6147b5983",
+        "sha256": "f1ff7e22a599f82f838bfcf81205f8d1cf740df3d8704fa5b1962bb5ffc9d9e2",
+        "bytes": 951,
+        "mode": "100644"
+      },
+      "kustomize/components/shopping-assistant/shoppingassistantservice.yaml": {
+        "git_blob_sha1": "d4c180f38968106ece51e26f99d03e1ad83bfca1",
+        "sha256": "181ffc9457727462f5320a48e3810fb1631e22fc46d745821e2ed17f4f7b1ceb",
+        "bytes": 2550,
+        "mode": "100644"
+      },
+      "kustomize/components/single-shared-session/kustomization.yaml": {
+        "git_blob_sha1": "93c3b6a1d3109fd60567419cbdb528b75b233ff9",
+        "sha256": "6d114c4aa13db271f5ac87104b1e88f58f11c646407beba05af92947b780cfde",
+        "bytes": 969,
+        "mode": "100644"
+      },
+      "kustomize/components/spanner/kustomization.yaml": {
+        "git_blob_sha1": "298e0d18c74b6b11a17ad6409b21b4944cd80581",
+        "sha256": "7106c65b28e022d1c921713f47dfc4ee76179d35c7849cd036800d7fabc70f21",
+        "bytes": 1698,
+        "mode": "100644"
+      },
+      "kustomize/components/without-loadgenerator/delete-loadgenerator.patch.yaml": {
+        "git_blob_sha1": "8e5c77f9eb433b85c494b49f9a3c603e0de7ed9a",
+        "sha256": "6d9964a977266ee68852bad1e4818363cf12783e384449ab7d90fac5dc45fe22",
+        "bytes": 84,
+        "mode": "100644"
+      },
+      "kustomize/components/without-loadgenerator/kustomization.yaml": {
+        "git_blob_sha1": "f866136ea6d076a8bfb36dbe3f9bf2302d10b1bb",
+        "sha256": "c90e5514cb72569fd01f29d3725a1871d19d160a7c47745b1b8c6e73081e7ae6",
+        "bytes": 686,
+        "mode": "100644"
+      },
+      "kustomize/kustomization.yaml": {
+        "git_blob_sha1": "c89a81698551df081d0b13ac8c93a0dd459b042f",
+        "sha256": "176a4cdd49bdd2df20af37a73ad009b77973bf1556bbfe85de5012ce01fb6292",
+        "bytes": 1183,
+        "mode": "100644"
+      },
+      "kustomize/tests/memorystore-with-all-components/kustomization.yaml": {
+        "git_blob_sha1": "05e6d41c51c575926f94764d84e8a677016f3b95",
+        "sha256": "9dbe4f1fed0a1ec80ceb1a9205e0aa20de7bd9e3214fd4709ec8295c09faa8fd",
+        "bytes": 821,
+        "mode": "100644"
+      },
+      "kustomize/tests/service-mesh-istio-with-all-components/kustomization.yaml": {
+        "git_blob_sha1": "edb8980843c0f703c419ccc1a7baa2fe6f3a56fb",
+        "sha256": "f8913ae180b0d9985b2b8f344444bdd11c03bc3ac72cd7fa13ff4b89c004be4d",
+        "bytes": 828,
+        "mode": "100644"
+      },
+      "kustomize/tests/spanner-with-all-components/kustomization.yaml": {
+        "git_blob_sha1": "5d7ba0df2ceba67a3ce16616e40d536ee5f46c31",
+        "sha256": "78bb7569ab7f9dc3ccdec0c5242274f991f5f8d8ae5de77ac8b7bc301fb35b82",
+        "bytes": 817,
+        "mode": "100644"
+      },
+      "release/istio-manifests.yaml": {
+        "git_blob_sha1": "9b1309d860e9a188793539df191e41b903c69e02",
+        "sha256": "6d32e7b84b4be21c738ed15e7de3a94f9c29e7f804ea5dab43f802d7310f3f66",
+        "bytes": 2244,
+        "mode": "100644"
+      },
+      "release/kubernetes-manifests.yaml": {
+        "git_blob_sha1": "635bf6cc5203dffa16f0a6de9f2b21627e128e5b",
+        "sha256": "ae3c20181c051048e6a5cae51fa530681affa4043ba60ae95d4f39e1262f2744",
+        "bytes": 22638,
+        "mode": "100644"
+      },
+      "skaffold.yaml": {
+        "git_blob_sha1": "9a13f5f2ee79de043999ed6519a8bfb60082b527",
+        "sha256": "04ce2acc42fdcdc3378fdeda1e9a5769a307663e8d22306c1eb5d081c6627b08",
+        "bytes": 3412,
+        "mode": "100644"
+      },
+      "src/cartservice/src/appsettings.json": {
+        "git_blob_sha1": "02e5e60e2f00f072d5993b4f4520c49ba19f3b89",
+        "sha256": "29a497efc52b5c669e04588bb717f0fdf422bf59e7ce34a0a9dbd787075b2ed0",
+        "bytes": 288,
+        "mode": "100644"
+      },
+      "src/currencyservice/data/currency_conversion.json": {
+        "git_blob_sha1": "bd28709f207ce979744e58bd37013ac6db16df66",
+        "sha256": "19a38bb8616729b4562c0319a7d2e4f4d99cc2eddf2e56fab7006c6e46f5c23e",
+        "bytes": 635,
+        "mode": "100644"
+      },
+      "src/currencyservice/package.json": {
+        "git_blob_sha1": "2fb0eecba215250a56e65ac7805cf4c8ce5acd6b",
+        "sha256": "55ce04d89842901925939b12cfb9ec1a76cf36676fe72524de45f4c7bee62f8b",
+        "bytes": 896,
+        "mode": "100644"
+      },
+      "src/paymentservice/package.json": {
+        "git_blob_sha1": "7d703c356ad7f961b1be8b0f84614dc1df2109e6",
+        "sha256": "78eefae0e7f1d442b3c5696c402bed7884312ac24651378c23355f6e16e5a88e",
+        "bytes": 861,
+        "mode": "100644"
+      },
+      "src/productcatalogservice/products.json": {
+        "git_blob_sha1": "d5dd59194de4cefc788037677578e0a12cf2eb18",
+        "sha256": "766cd816fb1721ec0ce8d9261214fb5e10f6b89ce70600e2d20f149c7b5afffa",
+        "bytes": 3847,
+        "mode": "100644"
+      }
+    },
+    "skipped_before_parse": [
+      {
+        "path": ".deploystack/deploystack.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "669bc11598663bdaec93908be1389a917a5263a4",
+        "size": 518,
+        "url": "https://api.github.com/repos/GoogleCloudPlatform/microservices-demo/git/blobs/669bc11598663bdaec93908be1389a917a5263a4",
+        "reason": "hidden path outside fixed CI allowlist"
+      },
+      {
+        "path": ".deploystack/test.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c9d6a34a2293d8e570c15b64058287808fa3c63a",
+        "size": 1211,
+        "url": "https://api.github.com/repos/GoogleCloudPlatform/microservices-demo/git/blobs/c9d6a34a2293d8e570c15b64058287808fa3c63a",
+        "reason": "hidden path outside fixed CI allowlist"
+      },
+      {
+        "path": "src/currencyservice/package-lock.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3e4938161edcdd6f5b528031f255d34e00df5bb7",
+        "size": 131657,
+        "url": "https://api.github.com/repos/GoogleCloudPlatform/microservices-demo/git/blobs/3e4938161edcdd6f5b528031f255d34e00df5bb7",
+        "reason": "format fixed lockfile skip"
+      },
+      {
+        "path": "src/paymentservice/package-lock.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bcfc4eccbaefb08d3ac39306bd72b4ee112cd55e",
+        "size": 212172,
+        "url": "https://api.github.com/repos/GoogleCloudPlatform/microservices-demo/git/blobs/bcfc4eccbaefb08d3ac39306bd72b4ee112cd55e",
+        "reason": "format fixed lockfile skip"
+      }
+    ]
+  },
+  "kube-prometheus": {
+    "commit": "b6c2f62b287524652592e6e2f7ea0d3054cb8ac6",
+    "tree_entries": 358,
+    "tree_truncated": false,
+    "files": {
+      ".gitignore": {
+        "git_blob_sha1": "65b8eb04daed559eff3db2f59d2ba54808e8c0ac",
+        "sha256": "1e04fcb5e1d3e12fd4e4a3ac336a2c01afb26733fb82ddbdf71bcfd9311ae23f",
+        "bytes": 312,
+        "mode": "100644"
+      },
+      "jsonnet/kube-prometheus/.gitignore": {
+        "git_blob_sha1": "52a75ecba7d108a48c1a496227a324b28cb0fdbe",
+        "sha256": "64448ab87b2caff430cc109585d3fe473665abd05536d9bbef1c7eda36e92c26",
+        "bytes": 30,
+        "mode": "100644"
+      },
+      ".github/dependabot.yml": {
+        "git_blob_sha1": "f4ae8cd2c2eb7b90ac9743df6121335c4548d63b",
+        "sha256": "f0610a7c7faa89aa9fdd28eff421b7bfb636bd71b112a6db5daf57f8abff3a0d",
+        "bytes": 285,
+        "mode": "100644"
+      },
+      ".github/workflows/action-lint.yaml": {
+        "git_blob_sha1": "bdf973a57c808164b7c0926c9d1304a0046fd077",
+        "sha256": "5b029ad445df7c4e2656b53dff4c3db15b5488fb411eec25f6a6c7413b505c3d",
+        "bytes": 821,
+        "mode": "100644"
+      },
+      ".github/workflows/ci.yaml": {
+        "git_blob_sha1": "a06ad694229d348b1d9eac03da434dfc7b6e076e",
+        "sha256": "12ca8b4a8c0930a30f15b0d146355e1fd88f7a5daf3697bb2f04ae5f98d68822",
+        "bytes": 10256,
+        "mode": "100644"
+      },
+      ".github/workflows/stale.yaml": {
+        "git_blob_sha1": "a9f943040d1318f2f763d6abd4ddf116021581ce",
+        "sha256": "eb3ec8cb221e0004234b99d56569823ee629e84bf1912fc3ea94f8ce1e5598ae",
+        "bytes": 886,
+        "mode": "100644"
+      },
+      ".github/workflows/versions.yaml": {
+        "git_blob_sha1": "6902ddf1de525cd46efb4b6892a2672aa6aa2165",
+        "sha256": "74c254f9c4caa268ecd31d407ff3c0d0844dbd590aca777144f5bb192a417211",
+        "bytes": 3824,
+        "mode": "100644"
+      },
+      "examples/alertmanager-config-with-template.yaml": {
+        "git_blob_sha1": "383332b5d15768524fed5a6ed3fc90aecb8f8af6",
+        "sha256": "0a5cf5fe79cd740ca585c475132f370ae2f93cb7c539a0a4fa67b4873de0b92c",
+        "bytes": 619,
+        "mode": "100644"
+      },
+      "examples/alertmanager-config.yaml": {
+        "git_blob_sha1": "87391e795f898623136cd51594468f5eaa6b35e9",
+        "sha256": "4096eed799a32571d69c2454a1f350b2275c04ac53a68f064062b845f3a0f537",
+        "bytes": 897,
+        "mode": "100644"
+      },
+      "examples/basic-auth/secrets.yaml": {
+        "git_blob_sha1": "fa0dd897c0d2a66c096dc33f08274fbba0197ad4",
+        "sha256": "fa8ada5b7bfbea04d48397510c94d93ec24fed624e4c99cdd170d2be7bcc3121",
+        "bytes": 128,
+        "mode": "100644"
+      },
+      "examples/basic-auth/service-monitor.yaml": {
+        "git_blob_sha1": "82ac0b6557d235a635d7b04b61df3019f0d78bca",
+        "sha256": "974e4188be64427dec68d85543b54a54e7bef0562ff0e2892463626cd6e96114",
+        "bytes": 427,
+        "mode": "100644"
+      },
+      "examples/continuous-delivery/argocd/application.yaml": {
+        "git_blob_sha1": "1bc1264e749c606f73583c995f0e10c663d6c744",
+        "sha256": "7b809e02f5103a57bb91c3faa0a2bd19968066133a02b1bff15f89725e831e30",
+        "bytes": 587,
+        "mode": "100644"
+      },
+      "examples/continuous-delivery/argocd/appproject.yaml": {
+        "git_blob_sha1": "a571b7820c61d28926481a63250e3921ec83a6ba",
+        "sha256": "d3978ec9579107d5aae8f1498b6574dc600e468254af1e5b400b0bd35c13bf3b",
+        "bytes": 613,
+        "mode": "100644"
+      },
+      "examples/example-app/example-app.yaml": {
+        "git_blob_sha1": "71d9e5671c728d82498f42921a4e549d2e3e30d0",
+        "sha256": "5b34ae36d38f637dd8226eb39513be46508721fff7f446b7f0e5dd34ae003ef9",
+        "bytes": 750,
+        "mode": "100644"
+      },
+      "examples/example-app/prometheus-frontend-alertmanager-discovery-role-binding.yaml": {
+        "git_blob_sha1": "7a179fe0650bb8125601882a1b16c1270ce49708",
+        "sha256": "d19ba1c691934c265804e5a4d8aa7a23962080a8d2e34720d4b78a5a6416caec",
+        "bytes": 294,
+        "mode": "100644"
+      },
+      "examples/example-app/prometheus-frontend-alertmanager-discovery-role.yaml": {
+        "git_blob_sha1": "cb9f2886603bcb276b63ca31b9af8f2c52266f3c",
+        "sha256": "b494cecb84702395245c0a70e8e84e60ac159eb8e1e13d06df27853370a3f817",
+        "bytes": 218,
+        "mode": "100644"
+      },
+      "examples/example-app/prometheus-frontend-role-binding.yaml": {
+        "git_blob_sha1": "e40a52ca25bb5a7f8ae8553531e7d66ac0379a1f",
+        "sha256": "67f59477be18efb86f872505e0f3cbf345f15cffb92e3e2a0d338dd76658fdf3",
+        "bytes": 288,
+        "mode": "100644"
+      },
+      "examples/example-app/prometheus-frontend-role.yaml": {
+        "git_blob_sha1": "634ad6b9a072b087c1217411c1639709e87a8f73",
+        "sha256": "025b5e5ae957551b831810546c6c2ac2f317c0856beef32354bac1a7dfce1c4f",
+        "bytes": 292,
+        "mode": "100644"
+      },
+      "examples/example-app/prometheus-frontend-service-account.yaml": {
+        "git_blob_sha1": "4dd7c26be6408de223ba3614a904cab3ac9d908c",
+        "sha256": "853377ec07b8176e33699131db8a7c856b9f998e12a0ac9ee95add02dc994ab4",
+        "bytes": 95,
+        "mode": "100644"
+      },
+      "examples/example-app/prometheus-frontend-svc.yaml": {
+        "git_blob_sha1": "7002e8f18a691e4fddbd9cd29ae9ec3fcf8f0188",
+        "sha256": "aebdbf560b69f29b12a5fae6ca3a147114161382f08dfd4ac2338619a7c6e7fa",
+        "bytes": 244,
+        "mode": "100644"
+      },
+      "examples/example-app/prometheus-frontend.yaml": {
+        "git_blob_sha1": "d56515293e6db54fe99cbf91015ee596b3c04877",
+        "sha256": "e53c51006a721f31d8fed9c74138f7cec40563518f7d9e13b4e5c3e4b48db45e",
+        "bytes": 662,
+        "mode": "100644"
+      },
+      "examples/example-app/servicemonitor-frontend.yaml": {
+        "git_blob_sha1": "2bc935af75770096dac81820e544e29912737348",
+        "sha256": "d9b09adb60a3e207146bee8efa0d9f7c739c527d7647adbe7d229537202c49c8",
+        "bytes": 316,
+        "mode": "100644"
+      },
+      "examples/example-grafana-dashboard.json": {
+        "git_blob_sha1": "a891040be1c044ad2fa596fdd0f95f9750df0318",
+        "sha256": "aa7201a7f5554deff6db0d0b9698c715bb6f204bbd58c08146402710efb1214a",
+        "bytes": 4768,
+        "mode": "100644"
+      },
+      "examples/existingrule.json": {
+        "git_blob_sha1": "8486eb7d721506133c2720706f48892e6190e2d4",
+        "sha256": "61ad3af81ee3daad2a2f5d329c9bfbac04c714226e884fc9f76cccca74af1f87",
+        "bytes": 181,
+        "mode": "100644"
+      },
+      "examples/existingrule.yaml": {
+        "git_blob_sha1": "ab5de27041282bd0fe173bc8ad0e8401811c5e29",
+        "sha256": "4ca3bbed8f27372ebf5d35d1f5e23b930963ee90cb82e55f65884f55f05750d0",
+        "bytes": 183,
+        "mode": "100644"
+      },
+      "jsonnet/kube-prometheus/addons/weave-net/grafana-weave-net-cluster.json": {
+        "git_blob_sha1": "102269f0b03f8cee4cbab505d1a9f9223d5d8c78",
+        "sha256": "c8f94261d34392ddf9d2b20c981fa4817f25d3f9b8a2209f5bb6bd0bdd0b38e2",
+        "bytes": 75361,
+        "mode": "100644"
+      },
+      "jsonnet/kube-prometheus/addons/weave-net/grafana-weave-net.json": {
+        "git_blob_sha1": "fb0e5049daacd939243d38f316f192eef5aa7953",
+        "sha256": "fa2ec92c52c047d7ffca3ff6ca86edcf028dca6a69255b9e5ce0afe077f08726",
+        "bytes": 58543,
+        "mode": "100644"
+      },
+      "jsonnet/kube-prometheus/jsonnetfile.json": {
+        "git_blob_sha1": "8123ccda65cec10bce07f122448cd2d0d289878b",
+        "sha256": "cc0c751d1674470fb9584f982be731774d642dad84fbcaae62b087dd5fbd283e",
+        "bytes": 3400,
+        "mode": "100644"
+      },
+      "jsonnet/kube-prometheus/versions.json": {
+        "git_blob_sha1": "e53532e63b1b3f6b0b81f4f559c489e614e5aa4a",
+        "sha256": "e3b185886197bcfa23d5b78c2793e2e3504f29974af587ce684f33aaa5b82a0a",
+        "bytes": 399,
+        "mode": "100644"
+      },
+      "jsonnetfile.json": {
+        "git_blob_sha1": "d48ecd629bfae90cfa6f462471658ddcd8f20ead",
+        "sha256": "d76f9b011c286cd1f006ca8956c2b25a0c9584efc84e95a50018ebc41c8085f2",
+        "bytes": 400,
+        "mode": "100644"
+      },
+      "jsonnetfile.lock.json": {
+        "git_blob_sha1": "6524ae9381aa8526b0285af97f9bf80c130b09d4",
+        "sha256": "d0476dd311ea3ad3d9af0dbff2182fd38623bbf269bbe99e4edc2f11b65dd563",
+        "bytes": 7226,
+        "mode": "100644"
+      },
+      "kubescape-exceptions.json": {
+        "git_blob_sha1": "77cdaab3a9a9923c67c60835c17a5ab7358cd8c2",
+        "sha256": "bc3000ed77e34760c9af33441336a225fffdf54a05050c8fdf0009fb3952551c",
+        "bytes": 1807,
+        "mode": "100644"
+      },
+      "kustomization.yaml": {
+        "git_blob_sha1": "e0d8039ed7384d3598b1a1901aa5e3c68a461fec",
+        "sha256": "de8f2f6844e1b54d82646171940ba33998d42e3316e3101734d7d72dfd385549",
+        "bytes": 4902,
+        "mode": "100644"
+      },
+      "manifests/alertmanager-alertmanager.yaml": {
+        "git_blob_sha1": "dadd0abbfa69bbeb690aff9d39e0d4889d27236a",
+        "sha256": "e69ff8f8a3fd848877dcb191f8e246b5b83c0f1147f566b3bea31f9ac2351cf5",
+        "bytes": 975,
+        "mode": "100644"
+      },
+      "manifests/alertmanager-networkPolicy.yaml": {
+        "git_blob_sha1": "d4706882ad781e5312e058bcc3dd3c5795aa5e13",
+        "sha256": "65657cc05c0e703d290814b275f5cecbff1cae99a700d3c40186b6d16b04b279",
+        "bytes": 977,
+        "mode": "100644"
+      },
+      "manifests/alertmanager-podDisruptionBudget.yaml": {
+        "git_blob_sha1": "1925659c22e4a68bcdcef1c8a0e485e6409934b1",
+        "sha256": "9fb3c6278b29e125e9283a63097e5074837f04389c6270eb29a2bb7a50b7d244",
+        "bytes": 561,
+        "mode": "100644"
+      },
+      "manifests/alertmanager-prometheusRule.yaml": {
+        "git_blob_sha1": "7acb6bebc1e722c1f9738ceb7b9e97209a6d049e",
+        "sha256": "795f2c0a7312364c0bf47ce9206530f198b0e274cf3c2a21c02132296f99f2e7",
+        "bytes": 8114,
+        "mode": "100644"
+      },
+      "manifests/alertmanager-secret.yaml": {
+        "git_blob_sha1": "e8c3bac3f06fc737ed4a570835195240d16d4bb8",
+        "sha256": "5505874e1abf30beadcee875e19a06f76cf73e60bd4954eb579d845b6c25e9f2",
+        "bytes": 1443,
+        "mode": "100644"
+      },
+      "manifests/alertmanager-service.yaml": {
+        "git_blob_sha1": "35e56106287e8fcce466f1901272434c25feb4ef",
+        "sha256": "6d8727872ff92c8e98a53fc3f13a5f00a2ffae8f1285742b61691e58ee2f7e6e",
+        "bytes": 650,
+        "mode": "100644"
+      },
+      "manifests/alertmanager-serviceAccount.yaml": {
+        "git_blob_sha1": "d5670a59673eebe8353ad678d2cf2a57459cfc8f",
+        "sha256": "29bdbcf8dc84aeef780fceec6ee770ab80f82ffbe5e292c01d8c08be23994c95",
+        "bytes": 351,
+        "mode": "100644"
+      },
+      "manifests/alertmanager-serviceMonitor.yaml": {
+        "git_blob_sha1": "ded36f5f69aa4403ab257e58eb10fb2d0f1a0b3f",
+        "sha256": "693df6afcaff0157b041aae1f3cfe78cf41ede65a5da2ab4b606ab3c1536da44",
+        "bytes": 637,
+        "mode": "100644"
+      },
+      "manifests/blackboxExporter-clusterRole.yaml": {
+        "git_blob_sha1": "5dedfcad8bac6110eac7c0d1c2b123d1f06c08f4",
+        "sha256": "cc0d1e1d51c9a6c88cb9e89d95a0a00561cd6a35d6b7f8769ed35a91ed75094e",
+        "bytes": 470,
+        "mode": "100644"
+      },
+      "manifests/blackboxExporter-clusterRoleBinding.yaml": {
+        "git_blob_sha1": "ad1de57fc6d4cba79c4ee71154a1656ba42f1bd5",
+        "sha256": "fcb3e074d466461c942bda378b2c64d4d2a20094ac1aae8fd910ea7316e2989a",
+        "bytes": 461,
+        "mode": "100644"
+      },
+      "manifests/blackboxExporter-configuration.yaml": {
+        "git_blob_sha1": "e4c52d2c502cd2b218f1a6ac8eda84f56edcd7cf",
+        "sha256": "5b377fcbe1ba6576547eb721c6d71241c941587d1b206ce10f2cf872d5aaabfc",
+        "bytes": 1392,
+        "mode": "100644"
+      },
+      "manifests/blackboxExporter-deployment.yaml": {
+        "git_blob_sha1": "353467474552d0f153b9ee7ed977d391145bce00",
+        "sha256": "dd2d9f8dd2fd11cbc418725775249d25a567b18ea269fb5e44e0df365cb3c506",
+        "bytes": 3645,
+        "mode": "100644"
+      },
+      "manifests/blackboxExporter-networkPolicy.yaml": {
+        "git_blob_sha1": "5528a4fdaa8326549594ea06280a15986219742c",
+        "sha256": "e812777ddb25e4e7dd6b2a7abe08df1ea19cac1dabd04fc6f1b47c15e56acb45",
+        "bytes": 722,
+        "mode": "100644"
+      },
+      "manifests/blackboxExporter-service.yaml": {
+        "git_blob_sha1": "f742664bf5c8f1c2177216b5ae85bc682dbca0d8",
+        "sha256": "4a86f6eb7d0afd9568d69784901fcc225aa157852c0e3f83f203d58192afaa22",
+        "bytes": 540,
+        "mode": "100644"
+      },
+      "manifests/blackboxExporter-serviceAccount.yaml": {
+        "git_blob_sha1": "c777627ca9d3f263fb8c86180d816366818d48ac",
+        "sha256": "cf5f26490f6cc5a3538d403f47545268573f91f76a3f3c112418d327c581b1d5",
+        "bytes": 315,
+        "mode": "100644"
+      },
+      "manifests/blackboxExporter-serviceMonitor.yaml": {
+        "git_blob_sha1": "8a0de5022f3331a9e31e590457251c6f741b12eb",
+        "sha256": "797ae59798c3069a547b38baf5a5f2787674cb9b26dce214180fe0a9fd709557",
+        "bytes": 680,
+        "mode": "100644"
+      },
+      "manifests/grafana-config.yaml": {
+        "git_blob_sha1": "65f6a7411f9f785b9b9d749190f3c41a7ad64d6b",
+        "sha256": "f445470993e9224f41c6b3e074c9c6940eb08171e2aa0bdff2f961a8baca59e2",
+        "bytes": 345,
+        "mode": "100644"
+      },
+      "manifests/grafana-dashboardDatasources.yaml": {
+        "git_blob_sha1": "56318f0dd424de26c15abf7e238ceba4ca652fa8",
+        "sha256": "c858b97972348103c136c88f81150107c976393b7b80f58ba3ce38850ab8a790",
+        "bytes": 681,
+        "mode": "100644"
+      },
+      "manifests/grafana-dashboardSources.yaml": {
+        "git_blob_sha1": "714a62562073a444a6a5315869217b6c9e8bd6cb",
+        "sha256": "2b6c4a51a1049935948c7d18e28dd40c92159f8b8645f2e4ea9864112a6e3003",
+        "bytes": 659,
+        "mode": "100644"
+      },
+      "manifests/grafana-deployment.yaml": {
+        "git_blob_sha1": "dbf39cba7d1488d0e152704e99b42260fa480737",
+        "sha256": "7096768f770e5a67f98dcc0b0586dd63bacfe1bcf8b2cf2d7d3a73ad7c8b61af",
+        "bytes": 11806,
+        "mode": "100644"
+      },
+      "manifests/grafana-networkPolicy.yaml": {
+        "git_blob_sha1": "9ba1f11497bcd72689a9cb836d51af80dac27c40",
+        "sha256": "6a00ea66bfbf5b44cb6a825183c1c1b3d7a1f2d524cb6c3cc187ffa75861a4ad",
+        "bytes": 652,
+        "mode": "100644"
+      },
+      "manifests/grafana-prometheusRule.yaml": {
+        "git_blob_sha1": "b9161c575e0887ef2eb5258cacc9ef0b581b50ca",
+        "sha256": "ef07841b4043580a1b3a4b87cce2ed79c6b8d21fc4e07954badbaab173ecd9d4",
+        "bytes": 1423,
+        "mode": "100644"
+      },
+      "manifests/grafana-service.yaml": {
+        "git_blob_sha1": "461f05b5b7ba4d6017df54bbc16ab414430b673c",
+        "sha256": "fb8262f011fdcaa2271fb3b1bf7b7b6979ad3e27f6eb3499a6ae289e2555ba43",
+        "bytes": 453,
+        "mode": "100644"
+      },
+      "manifests/grafana-serviceAccount.yaml": {
+        "git_blob_sha1": "b69b63f6573ec1c4e08114157a11b2e1c0e256b5",
+        "sha256": "f95b31d203be164f521b3c5138fbf8fb250326149f12b7a76dc4e34144119175",
+        "bytes": 294,
+        "mode": "100644"
+      },
+      "manifests/grafana-serviceMonitor.yaml": {
+        "git_blob_sha1": "28459014565ae1c43b860f27d2a1d9b0c6bbabc3",
+        "sha256": "fe59dcd733473cbc5804286d3a61d462dfd570b6bb2678743782e587d6c2c21f",
+        "bytes": 399,
+        "mode": "100644"
+      },
+      "manifests/kubePrometheus-prometheusRule.yaml": {
+        "git_blob_sha1": "f14be25a7417c6611422f091e80975f4def2c17a",
+        "sha256": "5bf4529862bf908953a6331c926d9a21435a69b0946187bbf40fcb17e62231c6",
+        "bytes": 4350,
+        "mode": "100644"
+      },
+      "manifests/kubeStateMetrics-clusterRole.yaml": {
+        "git_blob_sha1": "a6ed07b69a7c7997c2715d4b95d2e057992a0607",
+        "sha256": "154a5865ca3bce270c1d81339a73858e8dfbb6fdce1e4eed2986f3e47943d3d5",
+        "bytes": 2134,
+        "mode": "100644"
+      },
+      "manifests/kubeStateMetrics-clusterRoleBinding.yaml": {
+        "git_blob_sha1": "aab74e153d00f1ba13751857a442dafdffb5b915",
+        "sha256": "f905d0518747dc64a0632577430c5570d5ea58a9fd3fa1e1649c2a4f270eedad",
+        "bytes": 465,
+        "mode": "100644"
+      },
+      "manifests/kubeStateMetrics-deployment.yaml": {
+        "git_blob_sha1": "f6c721169f4acf262c826a5f8a1b402c1ea266cd",
+        "sha256": "2b2ab8bc26c4db3d58f4744f2ba470c186ece604a02730e96f698541cdc4a203",
+        "bytes": 3617,
+        "mode": "100644"
+      },
+      "manifests/kubeStateMetrics-networkPolicy.yaml": {
+        "git_blob_sha1": "d0d0cf629005bc4cce93a476eecc7106a3b11ad1",
+        "sha256": "2734513603ad0d1935516e447e2b9fcf8cb886cc8413f51040b92c6e7065629b",
+        "bytes": 724,
+        "mode": "100644"
+      },
+      "manifests/kubeStateMetrics-prometheusRule.yaml": {
+        "git_blob_sha1": "9d2650af06d3d63048db3a8099de433a6c479f41",
+        "sha256": "098ce9003b41990335714b981aa40289c37ef9597432b09c21a513f5908a9dd1",
+        "bytes": 3183,
+        "mode": "100644"
+      },
+      "manifests/kubeStateMetrics-service.yaml": {
+        "git_blob_sha1": "118b206158c16467d62dfadfb52633faa89677a1",
+        "sha256": "5d71a899a9435a0f16d085faf0d8a1bff3846dddfc4ad9221253944a328fc7ee",
+        "bytes": 581,
+        "mode": "100644"
+      },
+      "manifests/kubeStateMetrics-serviceAccount.yaml": {
+        "git_blob_sha1": "1acbe9efc1d11b435f7a9b505834968db0319c44",
+        "sha256": "1633cdf5d5d662a0f89828681ca33c5c33fc7bebe1c2441d117e27253736e095",
+        "bytes": 317,
+        "mode": "100644"
+      },
+      "manifests/kubeStateMetrics-serviceMonitor.yaml": {
+        "git_blob_sha1": "7879d00376195d2155acc22447df32f2b4d1e1ca",
+        "sha256": "1504f21f92b4e0f650182e5ce002a69a47f09913292c406dfcfcad3e1b58a7fd",
+        "bytes": 1164,
+        "mode": "100644"
+      },
+      "manifests/kubernetesControlPlane-prometheusRule.yaml": {
+        "git_blob_sha1": "348469fc09a525764aee230ad107976cd65b8fd9",
+        "sha256": "a5545dabab60c1d8f63c49e9da59f3bd9e77368d98abcce7a78f415fb9ce1b43",
+        "bytes": 84422,
+        "mode": "100644"
+      },
+      "manifests/kubernetesControlPlane-serviceMonitorApiserver.yaml": {
+        "git_blob_sha1": "a5189cac31e86a30f0f37a716059030563a7649c",
+        "sha256": "c9da3b711903f70d386a8c6adad5cbead1f56987ed1f203f1ee71579b435980c",
+        "bytes": 7824,
+        "mode": "100644"
+      },
+      "manifests/kubernetesControlPlane-serviceMonitorCoreDNS.yaml": {
+        "git_blob_sha1": "78998a4e133f391ff0b5bcbb0cfa54168a4289f9",
+        "sha256": "a4c9f4d7ca3298c04c73ab105f03fb5422c05cd37fa072373170abf4b8640450",
+        "bytes": 635,
+        "mode": "100644"
+      },
+      "manifests/kubernetesControlPlane-serviceMonitorKubeControllerManager.yaml": {
+        "git_blob_sha1": "f69823e4370b76450a501bfd760f4b320b886d23",
+        "sha256": "95dee25218a9886e938861de05a51dd56310f0871d891f6bf7ce8517644491b2",
+        "bytes": 7005,
+        "mode": "100644"
+      },
+      "manifests/kubernetesControlPlane-serviceMonitorKubeScheduler.yaml": {
+        "git_blob_sha1": "70d66c5cfe967ceaa270cbad5026b54a03c607dd",
+        "sha256": "3e00fc58c019976b063814f3152f20fe09a0dbe2b635a4d737044a14bf0e12e2",
+        "bytes": 942,
+        "mode": "100644"
+      },
+      "manifests/kubernetesControlPlane-serviceMonitorKubelet.yaml": {
+        "git_blob_sha1": "b651ca8d6645e3186eaf761fdbc28e772049b3a3",
+        "sha256": "d5df62f38aee95e064f0c07a55b72e5e60f454a6b59a857117fec40b7d55cc76",
+        "bytes": 8407,
+        "mode": "100644"
+      },
+      "manifests/nodeExporter-clusterRole.yaml": {
+        "git_blob_sha1": "0084fd6fba7409502ee0306bb38e77d035f71e2b",
+        "sha256": "6210c388548e8059d56f11efc05b129382873d6863e9956fb2fcc60337dcbe13",
+        "bytes": 462,
+        "mode": "100644"
+      },
+      "manifests/nodeExporter-clusterRoleBinding.yaml": {
+        "git_blob_sha1": "1d441cfb3e1a2e9cd257c7f2097e4bc3d6bf84d5",
+        "sha256": "fca8df5200aba9ce80eb4e25c37c1a3134880c533b091f148e05a16e01b20591",
+        "bytes": 445,
+        "mode": "100644"
+      },
+      "manifests/nodeExporter-daemonset.yaml": {
+        "git_blob_sha1": "c61b0482219a9b9e44b1069c6cc5d4a8bcabf841",
+        "sha256": "ec8a9a143f62e9fe3301202dad07e6cc95df27b460839be36e1f68b69450b495",
+        "bytes": 3775,
+        "mode": "100644"
+      },
+      "manifests/nodeExporter-networkPolicy.yaml": {
+        "git_blob_sha1": "c6b3ca5611957901aaeb4704026dcf216759b0c2",
+        "sha256": "62aed0692342da2f80c65c6b552524b52d78182c108774548d51753feebb5a77",
+        "bytes": 672,
+        "mode": "100644"
+      },
+      "manifests/nodeExporter-prometheusRule.yaml": {
+        "git_blob_sha1": "f53de25b162bc41c0ff13adbd98827e7ffdf50f3",
+        "sha256": "ae160575bd33a4d17281180caf0ccdd513957a66cb790f25627ff1dd110a9a2a",
+        "bytes": 21237,
+        "mode": "100644"
+      },
+      "manifests/nodeExporter-service.yaml": {
+        "git_blob_sha1": "2736dbab41a7e2577176770e0bd28b14bd67e527",
+        "sha256": "8f6973358639fd20068c6b61e7d091d6d8c08c80144d423208bda0d98b7c22c2",
+        "bytes": 493,
+        "mode": "100644"
+      },
+      "manifests/nodeExporter-serviceAccount.yaml": {
+        "git_blob_sha1": "9dd6d1f4f80df0a1f0f0233aa8258d3d43473e71",
+        "sha256": "e5f1a0bf352858bb4cf9c5389c1d40549666f7526353f99fe613c7d0b6bad828",
+        "bytes": 307,
+        "mode": "100644"
+      },
+      "manifests/nodeExporter-serviceMonitor.yaml": {
+        "git_blob_sha1": "5e3c46f0ace4e230d78e88f48a9f7fe72082206b",
+        "sha256": "9d3be13a964c8d404fde9c7ba635e6f84eba12519d83d1e98014cacf4022a654",
+        "bytes": 851,
+        "mode": "100644"
+      },
+      "manifests/prometheus-clusterRole.yaml": {
+        "git_blob_sha1": "405a15816d420f7898c82f290f7c621ceca6a357",
+        "sha256": "dd69c248e29d3cfd8a6a8b143eb36639bd98e3d19105ba798123bd456106a5f8",
+        "bytes": 448,
+        "mode": "100644"
+      },
+      "manifests/prometheus-clusterRoleBinding.yaml": {
+        "git_blob_sha1": "d5db3209967224c8cdbcd87f115c4e51e6996f1c",
+        "sha256": "b09a471a8aaba9b46250d3fc1347bc740f56996b2d9f45097954a6f69b71790d",
+        "bytes": 483,
+        "mode": "100644"
+      },
+      "manifests/prometheus-networkPolicy.yaml": {
+        "git_blob_sha1": "5e7e2d0d4fa8a758444859f0da7da2dbf9a90989",
+        "sha256": "377d7a0a03bccd809543d82061e65cd961129de6aaf7316988cd019a98815136",
+        "bytes": 1073,
+        "mode": "100644"
+      },
+      "manifests/prometheus-podDisruptionBudget.yaml": {
+        "git_blob_sha1": "5a8778e21e382930caadbd7be9cb98106f53f637",
+        "sha256": "f3e5b66e11d6a7630ec5645ebbb502ca236ad3294d3a764301b28aaaa04e535f",
+        "bytes": 546,
+        "mode": "100644"
+      },
+      "manifests/prometheus-prometheus.yaml": {
+        "git_blob_sha1": "7c86b55c42e9caa78906e0afb069952b1c1f9eb9",
+        "sha256": "91540194914f7d445904905866e9a5105f01e7908229003e39ee2c5c206c5c73",
+        "bytes": 1339,
+        "mode": "100644"
+      },
+      "manifests/prometheus-prometheusRule.yaml": {
+        "git_blob_sha1": "aea8606b87f0519119c5c6e5f7bee3a2a0b98148",
+        "sha256": "5469dcbc360b7a5487a4e6625b955c98d3504728393acf8a6e531a04cf398c16",
+        "bytes": 17233,
+        "mode": "100644"
+      },
+      "manifests/prometheus-roleBindingConfig.yaml": {
+        "git_blob_sha1": "6a76f27ce286466a59a233993ac791df695a8d17",
+        "sha256": "be4bd4c4b80dfd9a9f9db285dc6b9359e0d4b3584481db35cd25333a3f0ab7e8",
+        "bytes": 507,
+        "mode": "100644"
+      },
+      "manifests/prometheus-roleBindingSpecificNamespaces.yaml": {
+        "git_blob_sha1": "ca9fd1248b458ffecc7d9210597731365f345a56",
+        "sha256": "947577a3f5f049330479fcbb12961a0c83d9556c23ce07126f88b7c14e1198e1",
+        "bytes": 1661,
+        "mode": "100644"
+      },
+      "manifests/prometheus-roleConfig.yaml": {
+        "git_blob_sha1": "9c1eb69448d5319464c58cf6aeec8417d82190c2",
+        "sha256": "bcbb4c889b978023ff01d5822c1756bd580a572f0d8562c19fba95f539934f80",
+        "bytes": 402,
+        "mode": "100644"
+      },
+      "manifests/prometheus-roleSpecificNamespaces.yaml": {
+        "git_blob_sha1": "ac366ed7803e269982d22988bd5718e3e74614f5",
+        "sha256": "736bd919f29ea774c83b394eb51f3e28e40182b8381128bd9d64830df8b8e13a",
+        "bytes": 2467,
+        "mode": "100644"
+      },
+      "manifests/prometheus-service.yaml": {
+        "git_blob_sha1": "71e41107347f1d573c4369181b26994cc1173536",
+        "sha256": "fc6e2203aad3b1084a5e06f6a9ce9ea99d8fd34bbbc6b506a1ed21b1645db14f",
+        "bytes": 637,
+        "mode": "100644"
+      },
+      "manifests/prometheus-serviceAccount.yaml": {
+        "git_blob_sha1": "087993a2602e74688999c19efee8f9d5cd7416de",
+        "sha256": "32388005ec99b4a4b54bfd2a2972626bf9d535328a78997f948ed512ea790a70",
+        "bytes": 342,
+        "mode": "100644"
+      },
+      "manifests/prometheus-serviceMonitor.yaml": {
+        "git_blob_sha1": "f17760a96ddd3f112d3f9f154fb7b5e21e445cb1",
+        "sha256": "d6c9d57ab597698567c36aec1296eb574c52d11e6911239de5d804a62bf941aa",
+        "bytes": 624,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-apiService.yaml": {
+        "git_blob_sha1": "4618e9c1b58a9cf66f8934ad9ba6e96ad3492a53",
+        "sha256": "e7092f74b283460de49d332956ee14dbe9633fbfbc5a791daa2d6857560511b6",
+        "bytes": 483,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-clusterRole.yaml": {
+        "git_blob_sha1": "d1af3163f0e026d259b2ca630a44a6285885e11e",
+        "sha256": "95cf612af3a11fd6b8e96ff822d6a25123ca824ac3f9e520dd20b580e35981e4",
+        "bytes": 410,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-clusterRoleAggregatedMetricsReader.yaml": {
+        "git_blob_sha1": "672c8c43b90fab386911ffdf73ac1af24a22625f",
+        "sha256": "47f032670df7f3cc9be17119dbbcad190a549974e2ee84f4b006b8cd6ad1b3bb",
+        "bytes": 577,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-clusterRoleBinding.yaml": {
+        "git_blob_sha1": "1c6cb3000797b98252873080d615360b454274bd",
+        "sha256": "91b7427f3d7140d630a9c4d15bc830fcc358b9009fd52cb215791b85832d4aa9",
+        "bytes": 472,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-clusterRoleBindingDelegator.yaml": {
+        "git_blob_sha1": "63f7ccc7eba6a0fd5941d9c36a1d93001443b1ee",
+        "sha256": "70f1f08265a4e64433b2424d9be7626132634b09844c280772f9c0b0f0e1331e",
+        "bytes": 495,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-clusterRoleServerResources.yaml": {
+        "git_blob_sha1": "22eba1d0291f5869fc7ab2fcdb5cf6a5e017e7cd",
+        "sha256": "babe806dc43c4ead9fbe2513cbcdadd6b654e27b4996a123ac56d9df52b283a9",
+        "bytes": 379,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-configMap.yaml": {
+        "git_blob_sha1": "a39a87430eed66ce83f448cdbd43a628d16b0501",
+        "sha256": "a929ba7c4857cdbaa53771a61a3ccfaa599b50eb09dced37c654f044b8e8460f",
+        "bytes": 2205,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-deployment.yaml": {
+        "git_blob_sha1": "d97e02a582bdc04f947eaf935c0691fa924f0683",
+        "sha256": "ec7a29df16f18d131f636f4e9747fdfaa3bf6e7b5822aaa566cfabad349c75aa",
+        "bytes": 3426,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-networkPolicy.yaml": {
+        "git_blob_sha1": "df8c6644acc550e810bbcdda486418c859b0c660",
+        "sha256": "306c69d7df933fd969716e3921f3c1e26ffbfec1b7e9b0a77314ff6423c167e7",
+        "bytes": 565,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-podDisruptionBudget.yaml": {
+        "git_blob_sha1": "09348f7e95fee182292b1e9ab172a4cd3cc44c06",
+        "sha256": "13723a06a4f5774761fc6966a1c0f662be3fbd39f1c1b4bf66b02fb8957ad047",
+        "bytes": 502,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-roleBindingAuthReader.yaml": {
+        "git_blob_sha1": "c21491a51bc365f4d9b30a2930254c2ac7c7080d",
+        "sha256": "445f272837df2e42ceef8c67474fe2d97b2ea5589699cb0a62c903083faf2f01",
+        "bytes": 516,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-service.yaml": {
+        "git_blob_sha1": "033f93eb9eb29e22236169b83720b6ee23bf8a1c",
+        "sha256": "635a67577cbe362d0af0df112dc64b95970456e268e8e3e65d45a97ebfa03bec",
+        "bytes": 502,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-serviceAccount.yaml": {
+        "git_blob_sha1": "04ab178745408e6b494f8b2297100c6620acb8f3",
+        "sha256": "6134e89176aa931212209f00b35641fee5c74eba095422418d9aec81b44bf874",
+        "bytes": 324,
+        "mode": "100644"
+      },
+      "manifests/prometheusAdapter-serviceMonitor.yaml": {
+        "git_blob_sha1": "0fe1e8a9d6822821bcfd53a5c2769fd95db1017b",
+        "sha256": "04db8e9ffb14aed561a1cb4e21fe664acf70b60b8c5fb5e8c9932ed2d78b86f5",
+        "bytes": 907,
+        "mode": "100644"
+      },
+      "manifests/prometheusOperator-clusterRole.yaml": {
+        "git_blob_sha1": "f69d01e413113de2c2ab0ea01c98a5a5962afde6",
+        "sha256": "efe122e18de1cbe02ebd099fb35740b3257246f6d7cb1a219a415c87f8232346",
+        "bytes": 2613,
+        "mode": "100644"
+      },
+      "manifests/prometheusOperator-clusterRoleBinding.yaml": {
+        "git_blob_sha1": "ea1bacb401f6bdf194fb67810a11fc800a33788a",
+        "sha256": "ff1bd7af8ebfe6b4be434eee76b4a5608e5d4bc879582ffa85db43f1507d2f7a",
+        "bytes": 471,
+        "mode": "100644"
+      },
+      "manifests/prometheusOperator-deployment.yaml": {
+        "git_blob_sha1": "0d79684d0c11a0e6227e711884ed87f24b8ca824",
+        "sha256": "fcdc94df892c624b6ca3bdff008f1ac93cab5c7cdcabe62d285b47c04c98aab2",
+        "bytes": 2997,
+        "mode": "100644"
+      },
+      "manifests/prometheusOperator-networkPolicy.yaml": {
+        "git_blob_sha1": "9bfd462793deb57ac46d4f079eff64b20fbaa05a",
+        "sha256": "5b50419a526c49358d1bb2f2ae372920a2c1a53198be372f8f6b52cd070054dc",
+        "bytes": 694,
+        "mode": "100644"
+      },
+      "manifests/prometheusOperator-prometheusRule.yaml": {
+        "git_blob_sha1": "38acc79cec7ae7435e34dad26cc777f05aa094bc",
+        "sha256": "ea33fc88d13dac23c2b9455e68dbacb31d39a285b4f8a8cbff1709e71ed15d8b",
+        "bytes": 6591,
+        "mode": "100644"
+      },
+      "manifests/prometheusOperator-service.yaml": {
+        "git_blob_sha1": "32c9c11a6288b3cb8c27549019e3e6c68a8f6bae",
+        "sha256": "b6c7125abf840c2f05bead8b900d31a5c43e1b0cd152cf0e826da3431a4c4048",
+        "bytes": 515,
+        "mode": "100644"
+      },
+      "manifests/prometheusOperator-serviceAccount.yaml": {
+        "git_blob_sha1": "667f3a8e49e1acfc0a818c70bec13bd2e1ea0b65",
+        "sha256": "5f7cea8606b76bdda848cd8112538f9551df622c8ef2cfa2a41cee388f35c254",
+        "bytes": 321,
+        "mode": "100644"
+      },
+      "manifests/prometheusOperator-serviceMonitor.yaml": {
+        "git_blob_sha1": "4af3855e0b14351acb3907413af05678557fbe69",
+        "sha256": "e0fab19b7ad02af2631e230c7bc8f23d0aef35b05458ef18e41e6d50674b37f2",
+        "bytes": 715,
+        "mode": "100644"
+      },
+      "manifests/setup/0alertmanagerConfigCustomResourceDefinition.yaml": {
+        "git_blob_sha1": "93a6287063d936dae49a437da70dba3b1b739592",
+        "sha256": "19a77db958f9b710ad0528f927e2e27de7f4a31acd8d0257e42c249e701fda94",
+        "bytes": 768244,
+        "mode": "100644"
+      },
+      "manifests/setup/0alertmanagerCustomResourceDefinition.yaml": {
+        "git_blob_sha1": "a09776cb027e087380c4a0127e9b4918a1a2e6b7",
+        "sha256": "daca10113adfa27d39fb4a22a77bcdcc6abcaa5bbc67f626bd433af06a5b6dce",
+        "bytes": 625321,
+        "mode": "100644"
+      },
+      "manifests/setup/0podmonitorCustomResourceDefinition.yaml": {
+        "git_blob_sha1": "37e062bf15edd4afdd562eb0eb432bd0e6864790",
+        "sha256": "a693f924b62845b44a75f93562312b9be00a35db6e0a37fd28a07167270f9996",
+        "bytes": 72364,
+        "mode": "100644"
+      },
+      "manifests/setup/0probeCustomResourceDefinition.yaml": {
+        "git_blob_sha1": "c2fe9dd919474b6b4d17c75f89e0d39600ac91c9",
+        "sha256": "06a205ea906c02bbd5d849ff51fde3f310577a6d75a8429126666726d2f35d93",
+        "bytes": 69940,
+        "mode": "100644"
+      },
+      "manifests/setup/0prometheusCustomResourceDefinition.yaml": {
+        "git_blob_sha1": "c5ab357cce5ac4e3060ef14fcb5dc5fa503d70b7",
+        "sha256": "72e2a743ad38747ee562721e780b8b1f90db5dd3280c276eed637dc2daa694f9",
+        "bytes": 834604,
+        "mode": "100644"
+      },
+      "manifests/setup/0prometheusagentCustomResourceDefinition.yaml": {
+        "git_blob_sha1": "773e9ce16d8424d06be2c482c8a575a8544b16a8",
+        "sha256": "794bf8f6467d11f512c2c92fd29e91179f5bc8f0a50458ef67fdbe16377f25c2",
+        "bytes": 707657,
+        "mode": "100644"
+      },
+      "manifests/setup/0prometheusruleCustomResourceDefinition.yaml": {
+        "git_blob_sha1": "1cd491d1fef3c2a06114c06d3ce89e8c2c35b498",
+        "sha256": "f8d5cbac3c1368274f58fc234e2b8e7695a22d8d843a1588d3108abbe58d766b",
+        "bytes": 12694,
+        "mode": "100644"
+      },
+      "manifests/setup/0scrapeconfigCustomResourceDefinition.yaml": {
+        "git_blob_sha1": "1e27fb6b5778e039063c92bf6205b15de9013acb",
+        "sha256": "3733f868737587ca12bef52a216e869206d1e6e98fae189b660dd32acf3f76cc",
+        "bytes": 699007,
+        "mode": "100644"
+      },
+      "manifests/setup/0servicemonitorCustomResourceDefinition.yaml": {
+        "git_blob_sha1": "f0077de4143fe9fc89d54aa2282f17a47b383851",
+        "sha256": "60b649be58df8d841deb9a59877af6e8bdaa5d2552a82a2a94a34446fb456d92",
+        "bytes": 73283,
+        "mode": "100644"
+      },
+      "manifests/setup/0thanosrulerCustomResourceDefinition.yaml": {
+        "git_blob_sha1": "378edafef3b3379e0444677a0c11201f54aafea6",
+        "sha256": "bd8b782752c0a38aebf6c1292c38d17eb77e5de63e60bb21b03cf3b2414ba4ae",
+        "bytes": 604690,
+        "mode": "100644"
+      },
+      "manifests/setup/namespace.yaml": {
+        "git_blob_sha1": "5ca07c8edcb33479ad5399607e409651e093ec9d",
+        "sha256": "b1203a107dad0d01d2024178b2006f0d3bad911202d1fe0e9474ec822066ac7f",
+        "bytes": 170,
+        "mode": "100644"
+      },
+      "tests/e2e/kind/config.yml": {
+        "git_blob_sha1": "be70b28fd09c19d3aff7a86c314d22381837669b",
+        "sha256": "dba30a205f208076269857fa62874a6bcbd1d5bed8e21c5003c51ee00e85bdab",
+        "bytes": 568,
+        "mode": "100644"
+      },
+      "tests/e2e/kind/kube-router.yaml": {
+        "git_blob_sha1": "b63ea7e31ab42df8c0754b38d691acee5c1d9f15",
+        "sha256": "e1219133d913ebdac0fd1e61cd86349f4d0cfe35d7527e431edf6df8eb4334f1",
+        "bytes": 4503,
+        "mode": "100644"
+      },
+      "tests/e2e/kind/kubernetesControlPlane-kubeControllerManagerPrometheusDiscoveryService.yaml": {
+        "git_blob_sha1": "c0082adc5571a8b6ce889008d0af7ce0249363cc",
+        "sha256": "6a4042fe277834e1e249d030bf25d6d809a8fcfdbc5092abfac6c17cd35a0edc",
+        "bytes": 325,
+        "mode": "100644"
+      },
+      "tests/e2e/kind/kubernetesControlPlane-kubeSchedulerPrometheusDiscoveryService.yaml": {
+        "git_blob_sha1": "38903ab307b13d1fa771d722596db2b346bae6cb",
+        "sha256": "c922e9a102b9f3305930b4d7e508d7f41dd6c1aeff5240205616d74aa4b4ca91",
+        "bytes": 298,
+        "mode": "100644"
+      },
+      "tests/e2e/kind/patches/kube-controller-manager.yaml": {
+        "git_blob_sha1": "fb41faf1a878a050ae5830dae30359fedeb21a9a",
+        "sha256": "bb4a41e34d8242638b3ecd1c00f511f72b7884e2033bcaea2b31b6d5cbba4f0a",
+        "bytes": 201,
+        "mode": "100644"
+      }
+    },
+    "skipped_before_parse": [
+      {
+        "path": ".gitpod.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "47ce355ee55e71c138738d79dc990271586da92e",
+        "size": 1474,
+        "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/47ce355ee55e71c138738d79dc990271586da92e",
+        "reason": "hidden path outside fixed CI allowlist"
+      },
+      {
+        "path": ".mdox.validate.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f8273c3e1d71d8117562185423c7bdbaca5043f9",
+        "size": 993,
+        "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/f8273c3e1d71d8117562185423c7bdbaca5043f9",
+        "reason": "hidden path outside fixed CI allowlist"
+      },
+      {
+        "path": "manifests/grafana-dashboardDefinitions.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9de2fb2a6c734280a57494694be9f5285c08bba4",
+        "size": 1053739,
+        "url": "https://api.github.com/repos/prometheus-operator/kube-prometheus/git/blobs/9de2fb2a6c734280a57494694be9f5285c08bba4",
+        "reason": "per-file MAX_BYTES exceeded"
+      }
+    ]
+  },
+  "a7-generic-compose-source-key": {
+    "origin": "https://github.com/zz-prove/a7-generic-compose-source-key.git",
+    "repository": "github.com/zz-prove/a7-generic-compose-source-key",
+    "commit": "f439b7f9eebbc7e4bb64130570c716fdb424c861",
+    "commit_message": "a7 independent source key",
+    "fixed_git": {
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_AUTHOR_NAME": "prove-meada",
+      "GIT_AUTHOR_EMAIL": "prove@example.com",
+      "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
+      "GIT_COMMITTER_NAME": "prove-meada",
+      "GIT_COMMITTER_EMAIL": "prove@example.com",
+      "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z"
+    },
+    "files": {
+      "harbor/compose.override.yaml": {
+        "mode": "file",
+        "bytes": 67,
+        "sha256": "6c160cd7973436a53d3210a9663dcbdeaa28d767a3d2c6564f69a22ec6875d41"
+      },
+      "harbor/docker-compose.yml": {
+        "mode": "file",
+        "bytes": 545,
+        "sha256": "c284da50b9de6048ee9d0f17ee53f204931c251b0a8c3031d018fd2f3c9757ef"
+      },
+      "harbor/source/Dockerfile": {
+        "mode": "file",
+        "bytes": 13,
+        "sha256": "bb57c7da220a8753d7bdabac0d3afdb6efa742e4c736c5bc93ab40dfd5e23b9b"
+      },
+      "orphan/compose.override.yml": {
+        "mode": "file",
+        "bytes": 63,
+        "sha256": "06b306dfc422aee81ab52867f69584e62f6ed9bbfb256a6f9add0fad3edc797a"
+      },
+      "port/compose.override.yaml": {
+        "mode": "file",
+        "bytes": 172,
+        "sha256": "3f1c70cdd8cc7d4ba7ed6a9225e405ebe12081a0b999970743918e713703ccd9"
+      },
+      "port/compose.override.yml": {
+        "mode": "file",
+        "bytes": 65,
+        "sha256": "793d785609b0dc19bd26ef99ad98c60fd986f2b057ed3f5d73684ccc032b83ab"
+      },
+      "port/compose.yaml": {
+        "mode": "file",
+        "bytes": 352,
+        "sha256": "4932b28c5d631bb2d7275be81cc8f88e689e51a469d3c04d8f095f6169e15e4d"
+      },
+      "port/compose.yml": {
+        "mode": "file",
+        "bytes": 59,
+        "sha256": "db7727970e72a6971405c1ddcd080a89ec4813c382edf9f8e9cd4472da463e9e"
+      },
+      "port/docker-compose.yaml": {
+        "mode": "file",
+        "bytes": 59,
+        "sha256": "d4d5863e8228af7c4c433a59c8416b42ec3a4f28fb7acd38ec6f327e5413ca6f"
+      },
+      "port/link": {
+        "mode": "symlink",
+        "target": "../harbor/source",
+        "target_sha256": "c340f09a4218d5b66d7bb5b73edcb2b7e23c0096c153c71a1a6a1e0561179c5d"
+      },
+      "port/src/Dockerfile": {
+        "mode": "file",
+        "bytes": 13,
+        "sha256": "bb57c7da220a8753d7bdabac0d3afdb6efa742e4c736c5bc93ab40dfd5e23b9b"
+      }
+    }
+  },
+  "a7-generic-kube-source-key": {
+    "origin": "https://github.com/zz-prove/a7-generic-kube-source-key.git",
+    "repository": "github.com/zz-prove/a7-generic-kube-source-key",
+    "commit": "d2e4d2f3ec01da8b7e0866000fe68cd6a9380f41",
+    "commit_message": "a7 independent source key",
+    "fixed_git": {
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_AUTHOR_NAME": "prove-meada",
+      "GIT_AUTHOR_EMAIL": "prove@example.com",
+      "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
+      "GIT_COMMITTER_NAME": "prove-meada",
+      "GIT_COMMITTER_EMAIL": "prove@example.com",
+      "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z"
+    },
+    "files": {
+      "base/bundle.yaml": {
+        "mode": "file",
+        "bytes": 1391,
+        "sha256": "39ee9d18b1cb1e41d5a2a7e6fee6f6cacea0f007cf52b77d0fceb0b80bb57645"
+      },
+      "cycle-a/kustomization.yaml": {
+        "mode": "file",
+        "bytes": 24,
+        "sha256": "1e38ad5bf792f4a696ebee21de92137bf7dc05f067fe21ac817b97ca263b848c"
+      },
+      "cycle-b/kustomization.yaml": {
+        "mode": "file",
+        "bytes": 24,
+        "sha256": "8c04ff4c7869c833f82807ead2c6a88853a38820a1375b9ddc0ec47b35039254"
+      },
+      "helm/templated.yaml": {
+        "mode": "file",
+        "bytes": 101,
+        "sha256": "7b17b842a588b80560a769797755453d08429e98bc3b9e23a662582868ea49e7"
+      },
+      "linked-base": {
+        "mode": "symlink",
+        "target": "base",
+        "target_sha256": "cae662172fd450bb0cd710a769079c05bfc5d8e35efa6576edc7d0377afdd4a2"
+      },
+      "middle/kustomization.yaml": {
+        "mode": "file",
+        "bytes": 238,
+        "sha256": "e2ef34b569fdf770dd317350d1a1dbfbfc52fb9afe7ec5b0e6085f8789f8d1e4"
+      },
+      "overlays/cedar/kustomization.yaml": {
+        "mode": "file",
+        "bytes": 623,
+        "sha256": "2822b20573f8908fe2f7725a248b42993e311ceaebbaf9d035f2d921f7979d7d"
+      },
+      "overlays/harbor/kustomization.yaml": {
+        "mode": "file",
+        "bytes": 253,
+        "sha256": "90a87730690dc02d23a5deb93182fd069292ed5c0aee1c3aa772ea5897f116e3"
+      },
+      "patch.yaml": {
+        "mode": "file",
+        "bytes": 93,
+        "sha256": "27d531432efc1eb0ffecca5cf06a7b3e9910b432b20895a5113c89a905d8034a"
+      },
+      "plain-a/bundle.yaml": {
+        "mode": "file",
+        "bytes": 611,
+        "sha256": "4f8b8c7b372e5062aab5dde183bc72c79ec353f6a3e9f14a8294414ae20a0090"
+      },
+      "plain-b/config.json": {
+        "mode": "file",
+        "bytes": 117,
+        "sha256": "3e7b4812cfbda8792c726bcdc8b67cddb56a32b754d9a24447a3bb4a1af63ba0"
+      },
+      "plain-b/object.json": {
+        "mode": "file",
+        "bytes": 264,
+        "sha256": "aec9ecbe9a6bd986c75a654cbcc3ae990001145bd385cd9c416b7e2e70cbf675"
+      },
+      "xp-one/bundle.yaml": {
+        "mode": "file",
+        "bytes": 3419,
+        "sha256": "9a5a3626053e83955c33a56b09b95588b0777bf112bbc244eec4bbca3d0d72be"
+      },
+      "xp-two/bundle.yaml": {
+        "mode": "file",
+        "bytes": 262,
+        "sha256": "163e3eba3d2fde0d66bbfc29784041bb6ac5673dcddd924732ac0aba0cf3012a"
+      }
+    }
+  },
+  "a7-sls": {
+    "entry": "a7-sls",
+    "origin": "https://github.com/zz-prove/a7-sls.git",
+    "repository": "github.com/zz-prove/a7-sls",
+    "preparation_source_commit": "fe0faf5dfd7408571bf982bc395ef10d1e456a0b",
+    "files_sha256": {
+      "README.md": "5d3d1fc402c766a4de76fa595a027bbf274d394b3475496e7a2a235668b30143",
+      "api/serverless.yml": "81da6a7e05d065077346083389f5e8af03c0cf35736d12c039a433b2d28836d5",
+      "misc/serverless.yml": "d4cc43419344076672495a18c151442f331e8ef7e348154e922550e7767cee39",
+      "worker/serverless.yml": "59be58d47077c399a659abce8d8823e039b6b2f338e1c7b4b750a04b27343934"
+    }
+  }
+}

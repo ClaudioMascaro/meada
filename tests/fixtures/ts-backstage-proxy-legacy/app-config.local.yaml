@@ -1,0 +1,12 @@
+proxy:
+  '/shortignored':
+    target: https://stock.example.com
+    ignorePath: true
+  '/shortrewritten':
+    target: https://stock.example.com
+    pathRewrite:
+      '^/api/proxy/shortrewritten': '/v1'
+  '/shortprepended':
+    target: https://stock.example.com
+    prependPath: false
+  '/local': https://local.example.com

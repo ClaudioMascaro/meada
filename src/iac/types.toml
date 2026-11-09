@@ -1,0 +1,849 @@
+# The type table (ADR 0025, ADR 0026, #656): what an IaC type provisions. Embedded in the binary
+# (`iac::types`), versioned with the code; a type it does not list is still an IaC node, with its
+# references and config values, and holds no contract side.
+#
+# One `[[entry]]` per type:
+#
+# - `format`: the IaC format the type belongs to: `terraform` (a `resource` block of a `.tf` or
+#   `.tofu` file; OpenTofu shares the types).
+# - `type`: the type as the format writes it (`aws_sqs_queue`).
+# - `contract`: `channel` (a queue, topic, bus or stream) or `resource` (a bucket, table,
+#   database, cache or secret), the contract kind of ADR 0026.
+# - `kind`: the broker of the channel or the kind of the resource, a name of ADR 0026's tables;
+#   the contract is `channel::<kind>::<name>` or `resource::<kind>::<name>`.
+# - `name`: the argument that holds the physical name, evaluated as ADR 0025 says.
+# - `forms`: how to read a name out of an ARN or a URL that the argument (or, later, a config
+#   value) holds, each a template where `{name}` is the name and `*` any other part; both match
+#   one or more characters other than `:` and `/`. A text fits a form when it is the form, or the
+#   form followed by `/` and anything (an object key under a bucket). A text that fits no form is
+#   the name as it is.
+#
+# `{path}` captures a name including `/` and must fit the whole text; `?` matches one
+# ASCII alphanumeric character (the six-character Secrets Manager ARN suffix).
+#
+# GCP structured identities use the contract kind's validated projection: subscriptions keep
+# `subscriptions/<id>`, and Cloud SQL databases combine their instance and name.
+# Every entry has a fixture case in `tests/fixtures/{provision-infra,aws-infra,gcp-infra,azure-infra}/`
+# (`types::tests::every_entry_has_a_fixture_case`).
+
+[[entry]]
+format = "kubernetes"
+type = "KafkaTopic.kafka.strimzi.io"
+contract = "channel"
+kind = "kafka"
+name = "spec.topicName"
+fallback = "metadata.name"
+
+[[entry]]
+format = "terraform"
+type = "aws_sqs_queue"
+contract = "channel"
+kind = "sqs"
+name = "name"
+forms = [
+  "arn:*:sqs:*:*:{name}",
+  "https://sqs.*.amazonaws.com/*/{name}",
+  "https://*.queue.amazonaws.com/*/{name}",
+]
+
+[[entry]]
+format = "terraform"
+type = "aws_s3_bucket"
+contract = "resource"
+kind = "s3"
+name = "bucket"
+forms = [
+  "arn:*:s3:::{name}",
+  "s3://{name}",
+  "https://{name}.s3.amazonaws.com",
+  "https://{name}.s3.*.amazonaws.com",
+  "https://s3.*.amazonaws.com/{name}",
+]
+
+# Workloads (#662): image paths are read by their format reader; [] names every list item.
+[[workload]]
+format = "terraform"
+type = "aws_lambda_function"
+images = ["image_uri"]
+code = "filename"
+name = "function_name"
+
+[[workload]]
+format = "kubernetes"
+type = "Deployment"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "StatefulSet"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "DaemonSet"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "ReplicaSet"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "ReplicationController"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "Job"
+images = ["spec.template.spec.containers[].image", "spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "CronJob"
+images = ["spec.jobTemplate.spec.template.spec.containers[].image", "spec.jobTemplate.spec.template.spec.initContainers[].image"]
+[[workload]]
+format = "kubernetes"
+type = "Pod"
+images = ["spec.containers[].image", "spec.initContainers[].image"]
+[[workload]]
+format = "compose"
+type = "service"
+images = ["image"]
+code = "build.context"
+[[workload]]
+format = "helm"
+type = "HelmValues"
+images = ["image.repository"]
+[[entry]]
+format = "terraform"
+type = "aws_sns_topic"
+contract = "channel"
+kind = "sns"
+name = "name"
+forms = ["arn:*:sns:*:*:{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_cloudwatch_event_bus"
+contract = "channel"
+kind = "eventbridge"
+name = "name"
+forms = ["arn:*:events:*:*:event-bus/{path}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_kinesis_stream"
+contract = "channel"
+kind = "kinesis"
+name = "name"
+forms = ["arn:*:kinesis:*:*:stream/{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_dynamodb_table"
+contract = "resource"
+kind = "dynamodb"
+name = "name"
+forms = ["arn:*:dynamodb:*:*:table/{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_db_instance"
+contract = "resource"
+kind = "rds"
+name = "identifier"
+forms = ["arn:*:rds:*:*:db:{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_rds_cluster"
+contract = "resource"
+kind = "rds"
+name = "cluster_identifier"
+forms = ["arn:*:rds:*:*:cluster:{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_elasticache_cluster"
+contract = "resource"
+kind = "elasticache"
+name = "cluster_id"
+forms = ["arn:*:elasticache:*:*:cluster:{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_elasticache_replication_group"
+contract = "resource"
+kind = "elasticache"
+name = "replication_group_id"
+forms = ["arn:*:elasticache:*:*:replicationgroup:{name}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_ssm_parameter"
+contract = "resource"
+kind = "ssm"
+name = "name"
+forms = ["arn:*:ssm:*:*:parameter{path}"]
+
+[[entry]]
+format = "terraform"
+type = "aws_secretsmanager_secret"
+contract = "resource"
+kind = "secretsmanager"
+name = "name"
+forms = ["arn:*:secretsmanager:*:*:secret:{path}-??????"]
+
+# CloudFormation/SAM aliases of the curated AWS provisioner inventory (#664).
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::SQS::Queue"
+contract = "channel"
+kind = "sqs"
+name = "QueueName"
+forms = ["arn:*:sqs:*:*:{name}", "https://sqs.*.amazonaws.com/*/{name}", "https://*.queue.amazonaws.com/*/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::S3::Bucket"
+contract = "resource"
+kind = "s3"
+name = "BucketName"
+forms = ["arn:*:s3:::{name}", "s3://{name}", "https://{name}.s3.amazonaws.com", "https://{name}.s3.*.amazonaws.com", "https://s3.*.amazonaws.com/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::SNS::Topic"
+contract = "channel"
+kind = "sns"
+name = "TopicName"
+forms = ["arn:*:sns:*:*:{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::Events::EventBus"
+contract = "channel"
+kind = "eventbridge"
+name = "Name"
+forms = ["arn:*:events:*:*:event-bus/{path}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::Kinesis::Stream"
+contract = "channel"
+kind = "kinesis"
+name = "Name"
+forms = ["arn:*:kinesis:*:*:stream/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::DynamoDB::Table"
+contract = "resource"
+kind = "dynamodb"
+name = "TableName"
+forms = ["arn:*:dynamodb:*:*:table/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::DynamoDB::GlobalTable"
+contract = "resource"
+kind = "dynamodb"
+name = "TableName"
+forms = ["arn:*:dynamodb:*:*:table/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::Serverless::SimpleTable"
+contract = "resource"
+kind = "dynamodb"
+name = "TableName"
+forms = ["arn:*:dynamodb:*:*:table/{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::RDS::DBInstance"
+contract = "resource"
+kind = "rds"
+name = "DBInstanceIdentifier"
+forms = ["arn:*:rds:*:*:db:{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::RDS::DBCluster"
+contract = "resource"
+kind = "rds"
+name = "DBClusterIdentifier"
+forms = ["arn:*:rds:*:*:cluster:{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::ElastiCache::CacheCluster"
+contract = "resource"
+kind = "elasticache"
+name = "ClusterName"
+forms = ["arn:*:elasticache:*:*:cluster:{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::ElastiCache::ReplicationGroup"
+contract = "resource"
+kind = "elasticache"
+name = "ReplicationGroupId"
+forms = ["arn:*:elasticache:*:*:replicationgroup:{name}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::SSM::Parameter"
+contract = "resource"
+kind = "ssm"
+name = "Name"
+forms = ["arn:*:ssm:*:*:parameter{path}"]
+
+[[entry]]
+format = "cloudformation"
+type = "AWS::SecretsManager::Secret"
+contract = "resource"
+kind = "secretsmanager"
+name = "Name"
+forms = ["arn:*:secretsmanager:*:*:secret:{path}-??????"]
+
+[[workload]]
+format = "cloudformation"
+type = "AWS::Serverless::Function"
+images = ["Properties.ImageUri"]
+code = "Properties.CodeUri"
+
+[[entry]]
+format = "terraform"
+type = "google_pubsub_topic"
+contract = "channel"
+kind = "pubsub"
+name = "name"
+forms = ["projects/*/topics/{name}"]
+
+[[entry]]
+format = "terraform"
+type = "google_pubsub_subscription"
+contract = "channel"
+kind = "pubsub"
+name = "name"
+forms = ["projects/*/subscriptions/{name}"]
+
+[[entry]]
+format = "terraform"
+type = "google_storage_bucket"
+contract = "resource"
+kind = "gcs"
+name = "name"
+forms = ["gs://{name}"]
+
+[[entry]]
+format = "terraform"
+type = "google_sql_database_instance"
+contract = "resource"
+kind = "cloudsql"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "google_sql_database"
+contract = "resource"
+kind = "cloudsql"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "google_secret_manager_secret"
+contract = "resource"
+kind = "gcpsecretmanager"
+name = "secret_id"
+forms = ["projects/*/secrets/{name}"]
+
+[[workload]]
+format = "terraform"
+type = "google_cloud_run_service"
+images = ["template.spec.containers[].image"]
+[[workload]]
+format = "terraform"
+type = "google_cloud_run_v2_service"
+images = ["template.containers[].image"]
+[[workload]]
+format = "terraform"
+type = "google_cloud_run_v2_job"
+images = ["template.template.containers[].image"]
+
+[[workload]]
+format = "terraform"
+type = "aws_ecs_task_definition"
+images = ["container_definitions[].image"]
+name = "family"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_servicebus_queue"
+contract = "channel"
+kind = "servicebus"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_servicebus_topic"
+contract = "channel"
+kind = "servicebus"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_servicebus_subscription"
+contract = "channel"
+kind = "servicebus"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_eventhub"
+contract = "channel"
+kind = "eventhubs"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_storage_account"
+contract = "resource"
+kind = "azurestorage"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_storage_container"
+contract = "resource"
+kind = "azureblob"
+name = "name"
+
+[[entry]]
+format = "terraform"
+type = "azurerm_key_vault_secret"
+contract = "resource"
+kind = "keyvault"
+name = "name"
+
+[[workload]]
+format = "terraform"
+type = "azurerm_linux_function_app"
+images = ["site_config.application_stack.docker[].registry_url", "site_config.application_stack.docker[].image_name", "site_config.application_stack.docker[].image_tag"]
+code = "zip_deploy_file"
+code_file = true
+
+[[workload]]
+format = "terraform"
+type = "azurerm_windows_function_app"
+images = []
+code = "zip_deploy_file"
+code_file = true
+
+# Curated custom resources (#671); every row is exercised by custom-inventory.
+
+[[entry]]
+format = "kubernetes"
+type = "Queue.rabbitmq.com"
+contract = "channel"
+kind = "amqp"
+name = "spec.name"
+
+[[entry]]
+format = "kubernetes"
+type = "Queue.sqs.services.k8s.aws"
+contract = "channel"
+kind = "sqs"
+name = "spec.queueName"
+basis = "terraform:aws_sqs_queue"
+
+[[entry]]
+format = "kubernetes"
+type = "Bucket.s3.services.k8s.aws"
+contract = "resource"
+kind = "s3"
+name = "spec.name"
+basis = "terraform:aws_s3_bucket"
+
+[[entry]]
+format = "kubernetes"
+type = "Topic.sns.services.k8s.aws"
+contract = "channel"
+kind = "sns"
+name = "spec.name"
+basis = "terraform:aws_sns_topic"
+
+[[entry]]
+format = "kubernetes"
+type = "EventBus.eventbridge.services.k8s.aws"
+contract = "channel"
+kind = "eventbridge"
+name = "spec.name"
+basis = "terraform:aws_cloudwatch_event_bus"
+
+[[entry]]
+format = "kubernetes"
+type = "Stream.kinesis.services.k8s.aws"
+contract = "channel"
+kind = "kinesis"
+name = "spec.name"
+basis = "terraform:aws_kinesis_stream"
+
+[[entry]]
+format = "kubernetes"
+type = "Table.dynamodb.services.k8s.aws"
+contract = "resource"
+kind = "dynamodb"
+name = "spec.tableName"
+basis = "terraform:aws_dynamodb_table"
+
+[[entry]]
+format = "kubernetes"
+type = "DBInstance.rds.services.k8s.aws"
+contract = "resource"
+kind = "rds"
+name = "spec.dbInstanceIdentifier"
+basis = "terraform:aws_db_instance"
+
+[[entry]]
+format = "kubernetes"
+type = "DBCluster.rds.services.k8s.aws"
+contract = "resource"
+kind = "rds"
+name = "spec.dbClusterIdentifier"
+basis = "terraform:aws_rds_cluster"
+
+[[entry]]
+format = "kubernetes"
+type = "CacheCluster.elasticache.services.k8s.aws"
+contract = "resource"
+kind = "elasticache"
+name = "spec.cacheClusterID"
+basis = "terraform:aws_elasticache_cluster"
+
+[[entry]]
+format = "kubernetes"
+type = "ReplicationGroup.elasticache.services.k8s.aws"
+contract = "resource"
+kind = "elasticache"
+name = "spec.replicationGroupID"
+basis = "terraform:aws_elasticache_replication_group"
+
+[[entry]]
+format = "kubernetes"
+type = "Parameter.ssm.services.k8s.aws"
+contract = "resource"
+kind = "ssm"
+name = "spec.name"
+basis = "terraform:aws_ssm_parameter"
+
+[[entry]]
+format = "kubernetes"
+type = "Secret.secretsmanager.services.k8s.aws"
+contract = "resource"
+kind = "secretsmanager"
+name = "spec.name"
+basis = "terraform:aws_secretsmanager_secret"
+
+[[entry]]
+format = "kubernetes"
+type = "PubSubTopic.pubsub.cnrm.cloud.google.com"
+contract = "channel"
+kind = "pubsub"
+name = "spec.resourceID"
+basis = "terraform:google_pubsub_topic"
+fallback = "metadata.name"
+
+[[entry]]
+format = "kubernetes"
+type = "PubSubSubscription.pubsub.cnrm.cloud.google.com"
+contract = "channel"
+kind = "pubsub"
+name = "spec.resourceID"
+basis = "terraform:google_pubsub_subscription"
+fallback = "metadata.name"
+source = "spec.topicRef"
+source_type = "PubSubTopic.pubsub.cnrm.cloud.google.com"
+filter = "spec.filter"
+
+[[entry]]
+format = "kubernetes"
+type = "StorageBucket.storage.cnrm.cloud.google.com"
+contract = "resource"
+kind = "gcs"
+name = "spec.resourceID"
+basis = "terraform:google_storage_bucket"
+fallback = "metadata.name"
+
+[[entry]]
+format = "kubernetes"
+type = "SQLInstance.sql.cnrm.cloud.google.com"
+contract = "resource"
+kind = "cloudsql"
+name = "spec.resourceID"
+basis = "terraform:google_sql_database_instance"
+fallback = "metadata.name"
+
+[[entry]]
+format = "kubernetes"
+type = "SQLDatabase.sql.cnrm.cloud.google.com"
+contract = "resource"
+kind = "cloudsql"
+name = "spec.resourceID"
+basis = "terraform:google_sql_database"
+fallback = "metadata.name"
+qualifier = "spec.instanceRef"
+qualifier_type = "SQLInstance.sql.cnrm.cloud.google.com"
+
+[[entry]]
+format = "kubernetes"
+type = "SecretManagerSecret.secretmanager.cnrm.cloud.google.com"
+contract = "resource"
+kind = "gcpsecretmanager"
+name = "spec.resourceID"
+basis = "terraform:google_secret_manager_secret"
+fallback = "metadata.name"
+
+[[entry]]
+format = "kubernetes"
+type = "Queue.sqs.aws.upbound.io"
+contract = "channel"
+kind = "sqs"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_sqs_queue"
+
+[[entry]]
+format = "kubernetes"
+type = "Bucket.s3.aws.upbound.io"
+contract = "resource"
+kind = "s3"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_s3_bucket"
+
+[[entry]]
+format = "kubernetes"
+type = "Topic.sns.aws.upbound.io"
+contract = "channel"
+kind = "sns"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_sns_topic"
+
+[[entry]]
+format = "kubernetes"
+type = "Bus.cloudwatchevents.aws.upbound.io"
+contract = "channel"
+kind = "eventbridge"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_cloudwatch_event_bus"
+
+[[entry]]
+format = "kubernetes"
+type = "Stream.kinesis.aws.upbound.io"
+contract = "channel"
+kind = "kinesis"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_kinesis_stream"
+
+[[entry]]
+format = "kubernetes"
+type = "Table.dynamodb.aws.upbound.io"
+contract = "resource"
+kind = "dynamodb"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_dynamodb_table"
+
+[[entry]]
+format = "kubernetes"
+type = "Instance.rds.aws.upbound.io"
+contract = "resource"
+kind = "rds"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_db_instance"
+
+[[entry]]
+format = "kubernetes"
+type = "Cluster.elasticache.aws.upbound.io"
+contract = "resource"
+kind = "elasticache"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_elasticache_cluster"
+
+[[entry]]
+format = "kubernetes"
+type = "Parameter.ssm.aws.upbound.io"
+contract = "resource"
+kind = "ssm"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_ssm_parameter"
+
+[[entry]]
+format = "kubernetes"
+type = "Secret.secretsmanager.aws.upbound.io"
+contract = "resource"
+kind = "secretsmanager"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:aws_secretsmanager_secret"
+
+[[entry]]
+format = "kubernetes"
+type = "Topic.pubsub.gcp.upbound.io"
+contract = "channel"
+kind = "pubsub"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_pubsub_topic"
+
+[[entry]]
+format = "kubernetes"
+type = "Subscription.pubsub.gcp.upbound.io"
+contract = "channel"
+kind = "pubsub"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_pubsub_subscription"
+source = "spec.forProvider.topic"
+source_ref = "spec.forProvider.topicRef"
+source_type = "Topic.pubsub.gcp.upbound.io"
+filter = "spec.forProvider.filter"
+
+[[entry]]
+format = "kubernetes"
+type = "Bucket.storage.gcp.upbound.io"
+contract = "resource"
+kind = "gcs"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_storage_bucket"
+
+[[entry]]
+format = "kubernetes"
+type = "DatabaseInstance.sql.gcp.upbound.io"
+contract = "resource"
+kind = "cloudsql"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_sql_database_instance"
+
+[[entry]]
+format = "kubernetes"
+type = "Database.sql.gcp.upbound.io"
+contract = "resource"
+kind = "cloudsql"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_sql_database"
+qualifier = "spec.forProvider.instance"
+qualifier_ref = "spec.forProvider.instanceRef"
+qualifier_type = "DatabaseInstance.sql.gcp.upbound.io"
+
+[[entry]]
+format = "kubernetes"
+type = "Secret.secretmanager.gcp.upbound.io"
+contract = "resource"
+kind = "gcpsecretmanager"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:google_secret_manager_secret"
+
+[[entry]]
+format = "kubernetes"
+type = "Queue.servicebus.azure.upbound.io"
+contract = "channel"
+kind = "servicebus"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_servicebus_queue"
+
+[[entry]]
+format = "kubernetes"
+type = "Topic.servicebus.azure.upbound.io"
+contract = "channel"
+kind = "servicebus"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_servicebus_topic"
+
+[[entry]]
+format = "kubernetes"
+type = "Subscription.servicebus.azure.upbound.io"
+contract = "channel"
+kind = "servicebus"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_servicebus_subscription"
+
+[[entry]]
+format = "kubernetes"
+type = "EventHub.eventhub.azure.upbound.io"
+contract = "channel"
+kind = "eventhubs"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_eventhub"
+
+[[entry]]
+format = "kubernetes"
+type = "Account.storage.azure.upbound.io"
+contract = "resource"
+kind = "azurestorage"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_storage_account"
+
+[[entry]]
+format = "kubernetes"
+type = "Container.storage.azure.upbound.io"
+contract = "resource"
+kind = "azureblob"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_storage_container"
+
+[[entry]]
+format = "kubernetes"
+type = "Secret.keyvault.azure.upbound.io"
+contract = "resource"
+kind = "keyvault"
+name = "metadata.annotations[\"crossplane.io/external-name\"]"
+basis = "terraform:azurerm_key_vault_secret"
+
+# Registry sources read only these declared inputs; no module is downloaded or evaluated.
+[[module]]
+source = "terraform-aws-modules/sqs/aws"
+entry = "terraform:aws_sqs_queue"
+input = "name"
+create = ["create"]
+fifo = "fifo_queue"
+prefix = "use_name_prefix"
+
+[[module]]
+source = "terraform-aws-modules/sns/aws"
+entry = "terraform:aws_sns_topic"
+input = "name"
+create = ["create"]
+fifo = "fifo_topic"
+prefix = "use_name_prefix"
+
+[[module]]
+source = "terraform-aws-modules/s3-bucket/aws"
+entry = "terraform:aws_s3_bucket"
+input = "bucket"
+create = ["create", "create_bucket"]
+
+[[module]]
+source = "terraform-aws-modules/dynamodb-table/aws"
+entry = "terraform:aws_dynamodb_table"
+input = "name"
+create = ["create", "create_table"]
+
+[[module]]
+source = "terraform-aws-modules/lambda/aws"
+entry = "terraform:aws_lambda_function"
+input = "function_name"
+create = ["create", "create_function", "putin_khuylo"]
+disable = ["create_layer"]
+
+[[module]]
+source = "terraform-aws-modules/ecs/aws//modules/service"
+entry = "terraform:aws_ecs_task_definition"
+input = "name"
+create = ["create", "create_service", "create_task_definition"]
+
+# Rabbit topology roles are distinct from channel provisioners.
+[[topology]]
+format = "kubernetes"
+type = "Queue.rabbitmq.com"
+role = "queue"
+[[topology]]
+format = "kubernetes"
+type = "Exchange.rabbitmq.com"
+role = "exchange"
+[[topology]]
+format = "kubernetes"
+type = "Binding.rabbitmq.com"
+role = "binding"

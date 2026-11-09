@@ -1,0 +1,76 @@
+{
+  "format": 1,
+  "repository": "example.com/pattern/infra",
+  "commit": "c0edc496010b0e4c40a571f139cfe019496de4a4",
+  "dirty": true,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/pattern/infra::main.tf::aws_s3_bucket.both",
+      "address": "aws_s3_bucket.both",
+      "type": "aws_s3_bucket",
+      "root": ".",
+      "path": "main.tf",
+      "line": 5,
+      "end_line": 5
+    },
+    {
+      "identity": "example.com/pattern/infra::main.tf::aws_s3_bucket.several",
+      "address": "aws_s3_bucket.several",
+      "type": "aws_s3_bucket",
+      "root": ".",
+      "path": "main.tf",
+      "line": 2,
+      "end_line": 2
+    },
+    {
+      "identity": "example.com/pattern/infra::main.tf::aws_sqs_queue.orders",
+      "address": "aws_sqs_queue.orders",
+      "type": "aws_sqs_queue",
+      "root": ".",
+      "path": "main.tf",
+      "line": 1,
+      "end_line": 1
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::sqs::*-orders",
+      "node": "example.com/pattern/infra::main.tf::aws_sqs_queue.orders",
+      "root": "."
+    },
+    {
+      "contract": "resource::s3::archive-*",
+      "node": "example.com/pattern/infra::main.tf::aws_s3_bucket.several",
+      "root": "."
+    },
+    {
+      "contract": "resource::s3::both-*",
+      "node": "example.com/pattern/infra::main.tf::aws_s3_bucket.both",
+      "root": "."
+    }
+  ],
+  "links": [],
+  "provisions": [
+    {
+      "side": "example.com/pattern/app",
+      "provisioner": "example.com/pattern/infra::main.tf::aws_s3_bucket.several",
+      "root": ".",
+      "contract": "resource::s3::archive-prod",
+      "level": "decided",
+      "reason": "decided by human"
+    },
+    {
+      "side": "example.com/pattern/app::app.ts::send::SendMessageCommand#0",
+      "provisioner": "example.com/pattern/infra::main.tf::aws_sqs_queue.orders",
+      "root": ".",
+      "contract": "channel::sqs::prod-orders",
+      "level": "inferred",
+      "reason": "channel::sqs::*-orders; pattern"
+    }
+  ]
+}

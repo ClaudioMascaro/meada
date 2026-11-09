@@ -1,0 +1,171 @@
+{
+  "format": 1,
+  "repository": "local/aws-sdk-go",
+  "files": [
+    {
+      "path": "main.go",
+      "hash": "9bb5fc81a4dfaa924a6fbbb7b021311e7b04fdf9a274a7f9478c59c6a53b7e77"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket",
+      "span": {
+        "path": "main.go",
+        "start": 141,
+        "end": 471
+      },
+      "hash": "436c8b503e295de52a9571f6e61c41fb7e77c22fbb253b3088cdd24c461ffae0"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket::aws.String#0",
+      "caller": "local/aws-sdk-go::main.go::useBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 260,
+        "end": 281
+      }
+    },
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket::aws.String#1",
+      "caller": "local/aws-sdk-go::main.go::useBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 348,
+        "end": 369
+      }
+    },
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket::aws.String#2",
+      "caller": "local/aws-sdk-go::main.go::useBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 436,
+        "end": 467
+      }
+    },
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket::client.GetObject#0",
+      "caller": "local/aws-sdk-go::main.go::useBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 288,
+        "end": 371
+      }
+    },
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket::client.GetObject#1",
+      "caller": "local/aws-sdk-go::main.go::useBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 376,
+        "end": 469
+      }
+    },
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket::client.PutObject#0",
+      "caller": "local/aws-sdk-go::main.go::useBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 200,
+        "end": 283
+      }
+    },
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket::context.TODO#0",
+      "caller": "local/aws-sdk-go::main.go::useBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 217,
+        "end": 231
+      }
+    },
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket::context.TODO#1",
+      "caller": "local/aws-sdk-go::main.go::useBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 305,
+        "end": 319
+      }
+    },
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket::context.TODO#2",
+      "caller": "local/aws-sdk-go::main.go::useBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 393,
+        "end": 407
+      }
+    },
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket::os.Getenv#0",
+      "caller": "local/aws-sdk-go::main.go::useBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 447,
+        "end": 466
+      }
+    },
+    {
+      "id": "local/aws-sdk-go::main.go::useBucket::s3.NewFromConfig#0",
+      "caller": "local/aws-sdk-go::main.go::useBucket",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "main.go",
+        "start": 174,
+        "end": 195
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "resource::s3::uploads",
+      "site": "local/aws-sdk-go::main.go::useBucket::client.PutObject#0"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "resource::s3",
+      "site": "local/aws-sdk-go::main.go::useBucket",
+      "via": "env:BUCKET"
+    },
+    {
+      "contract": "resource::s3::uploads",
+      "site": "local/aws-sdk-go::main.go::useBucket",
+      "via": null
+    }
+  ],
+  "links": [
+    {
+      "consumer": "local/aws-sdk-go::main.go::useBucket",
+      "provider": "local/aws-sdk-go::main.go::useBucket::client.PutObject#0",
+      "contract": "resource::s3::uploads",
+      "level": "exact",
+      "reason": "resource::s3::uploads"
+    }
+  ]
+}

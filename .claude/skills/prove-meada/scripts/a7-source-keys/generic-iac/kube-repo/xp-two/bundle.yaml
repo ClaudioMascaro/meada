@@ -1,0 +1,16 @@
+apiVersion: proof.example.org/v1
+kind: Relay
+metadata:
+  name: request
+  namespace: amber
+spec:
+  compositionRef:
+    name: proof-route
+---
+apiVersion: relay.proof.example.org/v1
+kind: Delivery
+metadata:
+  name: remote
+  namespace: amber
+spec:
+  forProvider: {}

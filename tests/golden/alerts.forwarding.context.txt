@@ -1,0 +1,10 @@
+example.com/acme/forwarding main.tf:17-20 pagerduty_event_orchestration_service.checkout.set[0].rule[0]
+type: PagerdutyOrchestrationRule
+name: "checkout-id"
+root: main.tf
+overridable: none
+references: none
+referenced by: none
+values: none
+matcher: alert::support::team-b
+receiver: checkout-id

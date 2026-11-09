@@ -1,0 +1,12 @@
+[[peer]]
+repo = "example.com/orphan/infra"
+
+[[resource]]
+kind = "s3"
+id = "archive"
+role = "read"
+
+[[resource]]
+kind = "s3"
+id = "unmanaged"
+role = "read"

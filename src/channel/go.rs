@@ -12,8 +12,7 @@
 //! polling one, the function that holds the call naming the topic or the queue.
 
 use crate::channel::message::{
-    Handler, Message, bind, channel_name as name, consume, produce, publish, queue_name, topic,
-    topics,
+    Handler, Message, bind, channel_name as name, consume, produce, publish, topic, topics,
 };
 use crate::lang::go::modfile::unversioned;
 use crate::lang::go::package_call;
@@ -29,7 +28,6 @@ enum Client {
     SaramaConsumer,
     SaramaGroup,
     Amqp,
-    Sqs,
     Nats,
     Redis,
 }
@@ -119,12 +117,6 @@ const LIBRARIES: &[Library] = &[
             "DialTLS_ExternalAuth",
         ],
         passes: &["Channel"],
-    },
-    Library {
-        client: Client::Sqs,
-        packages: &["github.com/aws/aws-sdk-go-v2/service/sqs"],
-        makers: &["Client", "NewFromConfig", "New"],
-        passes: &[],
     },
     Library {
         client: Client::Nats,
@@ -291,12 +283,6 @@ fn form<'a>(
             };
             bind(code, path, n, &read)
         }
-        (Client::Sqs, "SendMessage" | "SendMessageBatch") => {
-            produce(code, path, n, "sqs", &|a, _| queue_of(arg(a, 1)))
-        }
-        (Client::Sqs, "ReceiveMessage") => {
-            consume(code, path, n, "sqs", &|a, _| queue_of(arg(a, 1)), None)
-        }
         (Client::Nats, "Publish") => produce(code, path, n, "nats", &one),
         (Client::Nats, "Subscribe" | "QueueSubscribe") => {
             let at = if method == "Subscribe" { 1 } else { 2 };
@@ -418,11 +404,6 @@ fn one_field(
     }])
 }
 
-/// The queue the `QueueUrl` of an SQS input names.
-fn queue_of(input: &Value) -> Option<Vec<Option<String>>> {
-    Some(vec![queue_name(field(input, "QueueUrl")?)?])
-}
-
 /// The streams of the `Streams` field of an `XReadGroupArgs`: the stream names are the first
 /// half of the list, the ids the second.
 fn streams(args: &Value) -> Option<Vec<Option<String>>> {
@@ -508,7 +489,9 @@ mod tests {
         let modules = Go.modules(&[], &BTreeMap::new()).unwrap();
         let resolver = Resolver::new(&files, modules, &Go);
         let code = Code::new(&resolver, &files, &Go);
-        crate::channel::message::lines(messages(&code))
+        let mut messages = messages(&code);
+        messages.extend(super::super::aws::test_messages(&code, None));
+        crate::channel::message::lines(messages)
     }
 
     #[test]
@@ -537,6 +520,43 @@ func run() {
                 "nats unresolved producer".to_string(),
                 format!("nats orders.created consumer inline x.go::run.@{at}"),
             ]
+        );
+    }
+
+    /// A client declared `*sqs.Client` is the SDK's, injected as a parameter; one a factory found
+    /// by name returns is not.
+    #[test]
+    fn an_sqs_client_declared_with_the_sdk_type_sends_and_receives() {
+        let src = r#"package x
+
+import (
+	"context"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+)
+
+const host = "https://sqs.eu-west-1.amazonaws.com/123456789012/"
+
+func Send(ctx context.Context, client *sqs.Client) {
+	client.SendMessage(ctx, &sqs.SendMessageInput{QueueUrl: aws.String(host + "tasks")})
+}
+
+func Poll(ctx context.Context, client *sqs.Client) {
+	client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{QueueUrl: aws.String(host + "tasks")})
+}
+
+type knownFactory struct{}
+
+func (knownFactory) makeClient() *sqs.Client { return nil }
+
+func Guessed(ctx context.Context, opaque Unknown) {
+	made := opaque.makeClient()
+	made.SendMessage(ctx, &sqs.SendMessageInput{QueueUrl: aws.String(host + "guessed")})
+}
+"#;
+        assert_eq!(
+            lines(src),
+            ["sqs tasks producer", "sqs tasks consumer x.go::Poll"]
         );
     }
 }

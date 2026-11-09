@@ -1,0 +1,17 @@
+{
+  "resource": {
+    "aws_sns_topic": {
+      "events": {
+        "name": "order-events"
+      }
+    },
+    "aws_sqs_queue": {
+      "billing": {
+        "name": "${var.environment}-billing",
+        "tags": {
+          "team": "billing"
+        }
+      }
+    }
+  }
+}

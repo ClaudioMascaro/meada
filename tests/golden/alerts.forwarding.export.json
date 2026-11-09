@@ -1,0 +1,122 @@
+{
+  "format": 1,
+  "repository": "example.com/acme/forwarding",
+  "commit": "4fa044e762fe3252f7543b45e8575e5331775717",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "alert::alertname::ApiDown",
+      "site": "example.com/acme/forwarding::rules.yaml::groups[0].rules[0]"
+    },
+    {
+      "contract": "alert::alertname::NoForward",
+      "site": "example.com/acme/forwarding::rules.yaml::groups[0].rules[1]"
+    },
+    {
+      "contract": "alert::owner::team-c",
+      "site": "example.com/acme/forwarding::rules.yaml::groups[0].rules[0]"
+    },
+    {
+      "contract": "alert::owner::team-c",
+      "site": "example.com/acme/forwarding::rules.yaml::groups[0].rules[1]"
+    },
+    {
+      "contract": "alert::support::team-a",
+      "site": "example.com/acme/forwarding::rules.yaml::groups[0].rules[1]"
+    },
+    {
+      "contract": "alert::support::team-b",
+      "site": "example.com/acme/forwarding::rules.yaml::groups[0].rules[0]"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "alert::support::team-b",
+      "site": "example.com/acme/forwarding::alertmanager.yaml::route.routes[0]",
+      "via": "alert matcher ="
+    },
+    {
+      "contract": "alert::target::team-c",
+      "site": "example.com/acme/forwarding::main.tf::opsgenie_team_routing_rule.transformed",
+      "via": "alert matcher ="
+    },
+    {
+      "contract": "alert::support::team-b",
+      "site": "example.com/acme/forwarding::main.tf::pagerduty_event_orchestration_service.checkout.set[0].rule[0]",
+      "via": "alert matcher ="
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/forwarding::alertmanager.yaml::route.routes[0]",
+      "address": "route.routes[0]",
+      "type": "AlertmanagerRoute",
+      "root": "alertmanager.yaml",
+      "path": "alertmanager.yaml",
+      "line": 5,
+      "end_line": 6
+    },
+    {
+      "identity": "example.com/acme/forwarding::main.tf::opsgenie_team_routing_rule.transformed",
+      "address": "opsgenie_team_routing_rule.transformed",
+      "type": "opsgenie_team_routing_rule",
+      "root": ".",
+      "path": "main.tf",
+      "line": 1,
+      "end_line": 12
+    },
+    {
+      "identity": "example.com/acme/forwarding::main.tf::pagerduty_event_orchestration_service.checkout.set[0].rule[0]",
+      "address": "pagerduty_event_orchestration_service.checkout.set[0].rule[0]",
+      "type": "PagerdutyOrchestrationRule",
+      "root": "main.tf",
+      "path": "main.tf",
+      "line": 17,
+      "end_line": 20
+    },
+    {
+      "identity": "example.com/acme/forwarding::rules.yaml::groups[0].rules[0]",
+      "address": "groups[0].rules[0]",
+      "type": "AlertRule",
+      "root": "rules.yaml",
+      "path": "rules.yaml",
+      "line": 4,
+      "end_line": 6
+    },
+    {
+      "identity": "example.com/acme/forwarding::rules.yaml::groups[0].rules[1]",
+      "address": "groups[0].rules[1]",
+      "type": "AlertRule",
+      "root": "rules.yaml",
+      "path": "rules.yaml",
+      "line": 7,
+      "end_line": 9
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/acme/forwarding::alertmanager.yaml::route.routes[0]",
+      "provider": "example.com/acme/forwarding::rules.yaml::groups[0].rules[0]",
+      "contract": "alert::support::team-b",
+      "level": "exact",
+      "reason": "alert::support::team-b; matchers \"support\"=\"team-b\"; receiver: incidents"
+    },
+    {
+      "consumer": "example.com/acme/forwarding::main.tf::opsgenie_team_routing_rule.transformed",
+      "provider": "example.com/acme/forwarding::rules.yaml::groups[0].rules[0]",
+      "contract": "alert::target::team-c",
+      "level": "exact",
+      "reason": "alert::target::team-c; matchers \"tags\"=\"target:team-c\"; receiver: team-c-id; forwarding: Alertmanager example.com/acme/forwarding::alertmanager.yaml::route.routes[0]; receiver: incidents; tags"
+    },
+    {
+      "consumer": "example.com/acme/forwarding::main.tf::pagerduty_event_orchestration_service.checkout.set[0].rule[0]",
+      "provider": "example.com/acme/forwarding::rules.yaml::groups[0].rules[0]",
+      "contract": "alert::support::team-b",
+      "level": "exact",
+      "reason": "alert::support::team-b; matchers \"event.custom_details.support\"=\"team-b\"; receiver: checkout-id; forwarding: Alertmanager example.com/acme/forwarding::alertmanager.yaml::route.routes[0]; receiver: incidents; details -> event.custom_details"
+    }
+  ]
+}

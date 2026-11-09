@@ -1,0 +1,6 @@
+# Not a service: no `service` key.
+provider:
+  name: aws
+functions:
+  ignored:
+    handler: x.y

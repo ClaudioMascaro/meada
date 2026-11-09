@@ -1,0 +1,131 @@
+{
+  "artifacts": {
+    "adjacent-monitoring/PLAN.md": {
+      "bytes": 4670,
+      "sha256": "8e679d2d9ee2159c959a845b6d4797f4fff2c9f1025ad0aaec4d42c9398ae3e0"
+    },
+    "adjacent-monitoring/expected-same-size-edit.json": {
+      "bytes": 198208,
+      "sha256": "62757e57b01da49fdb6ab956a3448236b276001904da29f4bca5d7d4309fb0cf"
+    },
+    "adjacent-monitoring/expected.json": {
+      "bytes": 201191,
+      "sha256": "a1f39e7c0876e2910c41a4949819929c276ecb12e2f37466b121e2f50d844a6b"
+    },
+    "adjacent-monitoring/input-sha256.json": {
+      "bytes": 4759,
+      "sha256": "320f097eb16dffc42f57ebf412f8aaeec5f9e0a1889abde60cceaa3cb6b587bb"
+    },
+    "adjacent-monitoring/phase-plan.json": {
+      "bytes": 38251,
+      "sha256": "4abc1d4be3d09ff1ea109665fd3d17dbc99c7cf03f59c6da57d493ca59dfcede"
+    },
+    "adjacent-monitoring/queries.jsonl": {
+      "bytes": 16610,
+      "sha256": "c8fbc045c372e68f902e5088b4fa96bf2ef36471436caeb2f7e6a492896bf841"
+    },
+    "adjacent-monitoring/query-oracle-same-size-edit.json": {
+      "bytes": 80196,
+      "sha256": "165e86ee571e9bf42c31b73dbc2456298caa23f4b4b10158b3b10b1ba04bd80d"
+    },
+    "adjacent-monitoring/query-oracle.json": {
+      "bytes": 81605,
+      "sha256": "ec681de32d32aa771ad8ce38c4945e9b9b762839456ff2f083ba4aeb00a1f0b0"
+    },
+    "monitoring-format-authority/alertmanager-configuration.md": {
+      "bytes": 66116,
+      "sha256": "e236e96df65d74c5cbcf8b09f1449a7812948a6e74cc78b236fdf49321f6e0ec"
+    },
+    "monitoring-format-authority/grafana-file-provisioning.md": {
+      "bytes": 27046,
+      "sha256": "ca7405e6b59e6b5065859ba7c39846a0a420f96a21bdaf9a50440312bbb9506a"
+    },
+    "monitoring-format-authority/loki-alerting.md": {
+      "bytes": 15269,
+      "sha256": "7bb5b1cec4147930ab08e7db0be2b06c89d79f9fcfef93094dabc90b45b0493a"
+    },
+    "monitoring-format-authority/prometheus-alerting.md": {
+      "bytes": 4855,
+      "sha256": "92085dedf36ae2a9f16aa008931379815397862a9aee835f888ce087a741b7b5"
+    },
+    "monitoring-format-authority/prometheus-recording.md": {
+      "bytes": 5894,
+      "sha256": "7d9a9264340a9612d7153aba57641555203ad4433ef393a5a4635d0e2a62fda7"
+    },
+    "monitoring-format-authority/source.json": {
+      "bytes": 3361,
+      "sha256": "5351263fd2b1987fd815504354527a59809fb43ede4b7e7e5fb3620e1fc3c95e"
+    },
+    "monitoring-key-counts.json": {
+      "bytes": 841,
+      "sha256": "784d0db16200e2cbd0342fcf20b6b853f63b0c1a2b1f0a4c5c071b03e2d6765a"
+    },
+    "pinned-monitoring-completeness/PLAN.md": {
+      "bytes": 4050,
+      "sha256": "1a451c1c9d8c4d4efe8ea4feb5ebbfe05a0a708a89eb6dd69c1adaa663e1afc6"
+    },
+    "pinned-monitoring-completeness/acquisition.json": {
+      "bytes": 1110,
+      "sha256": "cd0c4879298d16a7cd2ce3947c5c1df73fff71b076b4734cc007f7d05a22e18b"
+    },
+    "pinned-monitoring-completeness/expected.json": {
+      "bytes": 1504444,
+      "sha256": "d33fa1f62a63389a6ea9c4206f72b1d96864d30f974142595064266396814e74"
+    },
+    "pinned-monitoring-completeness/input-sha256.json": {
+      "bytes": 33214,
+      "sha256": "401e88b403fed64b16e5b1c5fd4aa2945b6313faf352c0a696feb5c5d3181634"
+    },
+    "pinned-monitoring-completeness/missing-blobs.json": {
+      "bytes": 37950,
+      "sha256": "380a1d4d5fe3b366fdbdcfdf0279b599460b5ce11a9fc8cc007532d53f81b4f9"
+    },
+    "pinned-monitoring-completeness/queries.jsonl": {
+      "bytes": 110213,
+      "sha256": "b49c88b1102ea04af5d1d0050a2b9a3c66df93f4f38c5c94f19dac0c66f76dfe"
+    },
+    "pinned-monitoring-completeness/query-oracle.json": {
+      "bytes": 445167,
+      "sha256": "ab3ea1034c5fafca3efb3e6cb58f678fdad4036d669fc493d29da955b3605c7f"
+    },
+    "pinned-monitoring-completeness/selected-tree.json": {
+      "bytes": 44531,
+      "sha256": "c89795bba299c2b0f055d3f3930953221801d84222cde06399cb3dbcadadb492"
+    },
+    "prepare-independent-monitoring.py": {
+      "bytes": 33428,
+      "sha256": "7787382f33cc621798fa3b1dea6045037cbc297539f0f4631613a834e0315216"
+    }
+  },
+  "boundaries": "Source-only independent key preparation. Product capture, same-size warm/cold/restoration phases, exact-scope orphan controls, HTTP parity and final-source independent judgment are separate runtime obligations.",
+  "network_during_indexing": false,
+  "preparation_tooling": {
+    "parser": "PyYAML syntax nodes, not constructors",
+    "pyyaml_version": "6.0.3"
+  },
+  "product_output_used": false,
+  "product_runtime_executed": false,
+  "runtime_verdict": "UNPROVEN",
+  "source_groups": {
+    "adjacent_monitoring": {
+      "all_rule_route_shapes_including_opaque_negatives": 32,
+      "edited_expected": "adjacent-monitoring/expected-same-size-edit.json",
+      "expected": "adjacent-monitoring/expected.json",
+      "input_commit": "da43b36c4f43b70c21cef28a6cecdfa751b64318",
+      "input_tree": "0f90e7861ea569c873a3b6eac86825f1575b264c",
+      "phase_plan": "adjacent-monitoring/phase-plan.json",
+      "queries": 151,
+      "recognized_rules_and_routes": 28,
+      "repository_identity": "independent-monitoring/cedar-harbor-lab",
+      "source_bytes": 7587,
+      "source_files": 12
+    },
+    "pinned_monitoring": {
+      "expected": "pinned-monitoring-completeness/expected.json",
+      "pin": "b6c2f62b287524652592e6e2f7ea0d3054cb8ac6",
+      "queries": 808,
+      "verified_blob_files": 135
+    }
+  },
+  "status": "FROZEN_SOURCE_ONLY_NOT_PROVED"
+}

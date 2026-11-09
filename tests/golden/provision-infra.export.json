@@ -1,0 +1,309 @@
+{
+  "format": 1,
+  "repository": "example.com/provision/infra",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/provision/infra::envs/dev/main.tf::aws_s3_bucket.archive",
+      "address": "aws_s3_bucket.archive",
+      "type": "aws_s3_bucket",
+      "root": "envs/dev",
+      "path": "envs/dev/main.tf",
+      "line": 2,
+      "end_line": 2
+    },
+    {
+      "identity": "example.com/provision/infra::envs/dev/main.tf::aws_sns_topic.unlisted",
+      "address": "aws_sns_topic.unlisted",
+      "type": "aws_sns_topic",
+      "root": "envs/dev",
+      "path": "envs/dev/main.tf",
+      "line": 6,
+      "end_line": 6
+    },
+    {
+      "identity": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.arn",
+      "address": "aws_sqs_queue.arn",
+      "type": "aws_sqs_queue",
+      "root": "envs/dev",
+      "path": "envs/dev/main.tf",
+      "line": 7,
+      "end_line": 7
+    },
+    {
+      "identity": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.orders",
+      "address": "aws_sqs_queue.orders",
+      "type": "aws_sqs_queue",
+      "root": "envs/dev",
+      "path": "envs/dev/main.tf",
+      "line": 1,
+      "end_line": 1
+    },
+    {
+      "identity": "example.com/provision/infra::envs/prod/main.tf::aws_s3_bucket.archive",
+      "address": "aws_s3_bucket.archive",
+      "type": "aws_s3_bucket",
+      "root": "envs/prod",
+      "path": "envs/prod/main.tf",
+      "line": 4,
+      "end_line": 4
+    },
+    {
+      "identity": "example.com/provision/infra::envs/prod/main.tf::aws_s3_bucket.arn",
+      "address": "aws_s3_bucket.arn",
+      "type": "aws_s3_bucket",
+      "root": "envs/prod",
+      "path": "envs/prod/main.tf",
+      "line": 9,
+      "end_line": 9
+    },
+    {
+      "identity": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.orders",
+      "address": "aws_sqs_queue.orders",
+      "type": "aws_sqs_queue",
+      "root": "envs/prod",
+      "path": "envs/prod/main.tf",
+      "line": 3,
+      "end_line": 3
+    },
+    {
+      "identity": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.url",
+      "address": "aws_sqs_queue.url",
+      "type": "aws_sqs_queue",
+      "root": "envs/prod",
+      "path": "envs/prod/main.tf",
+      "line": 6,
+      "end_line": 8
+    },
+    {
+      "identity": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "address": "module.shared.aws_sqs_queue.this",
+      "type": "aws_sqs_queue",
+      "root": "envs/dev",
+      "path": "modules/queue/main.tf",
+      "line": 1,
+      "end_line": 1
+    },
+    {
+      "identity": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "address": "module.shared.aws_sqs_queue.this",
+      "type": "aws_sqs_queue",
+      "root": "envs/prod",
+      "path": "modules/queue/main.tf",
+      "line": 1,
+      "end_line": 1
+    }
+  ],
+  "provisioners": [
+    {
+      "contract": "channel::sns::orders",
+      "node": "example.com/provision/infra::envs/dev/main.tf::aws_sns_topic.unlisted",
+      "root": "envs/dev"
+    },
+    {
+      "contract": "channel::sqs::orders",
+      "node": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.orders",
+      "root": "envs/dev"
+    },
+    {
+      "contract": "channel::sqs::orders",
+      "node": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.orders",
+      "root": "envs/prod"
+    },
+    {
+      "contract": "channel::sqs::refunds",
+      "node": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.arn",
+      "root": "envs/dev"
+    },
+    {
+      "contract": "channel::sqs::refunds",
+      "node": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.url",
+      "root": "envs/prod"
+    },
+    {
+      "contract": "channel::sqs::refunds",
+      "node": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "root": "envs/dev"
+    },
+    {
+      "contract": "channel::sqs::refunds",
+      "node": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "root": "envs/prod"
+    },
+    {
+      "contract": "resource::s3::archive",
+      "node": "example.com/provision/infra::envs/dev/main.tf::aws_s3_bucket.archive",
+      "root": "envs/dev"
+    },
+    {
+      "contract": "resource::s3::archive",
+      "node": "example.com/provision/infra::envs/prod/main.tf::aws_s3_bucket.archive",
+      "root": "envs/prod"
+    },
+    {
+      "contract": "resource::s3::archive-arn",
+      "node": "example.com/provision/infra::envs/prod/main.tf::aws_s3_bucket.arn",
+      "root": "envs/prod"
+    }
+  ],
+  "uses": [
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/provision/infra",
+      "at": "envs/prod/terraform.tfvars#queue"
+    }
+  ],
+  "links": [],
+  "provisions": [
+    {
+      "side": "example.com/provision/app",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_s3_bucket.archive",
+      "root": "envs/dev",
+      "contract": "resource::s3::archive",
+      "level": "declared",
+      "reason": "resource::s3::archive"
+    },
+    {
+      "side": "example.com/provision/app",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_s3_bucket.archive",
+      "root": "envs/prod",
+      "contract": "resource::s3::archive",
+      "level": "inferred",
+      "reason": "resource::s3::archive; overridable: example.com/provision/infra envs/prod/main.tf:2 var.bucket (default)"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::drain",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.orders",
+      "root": "envs/dev",
+      "contract": "channel::sqs::orders",
+      "level": "exact",
+      "reason": "channel::sqs::orders"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::drain",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.orders",
+      "root": "envs/prod",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; overridable: example.com/provision/infra envs/prod/terraform.tfvars:1 var.queue (tfvars)"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.arn",
+      "root": "envs/dev",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.url",
+      "root": "envs/prod",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "provisioner": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "root": "envs/dev",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "provisioner": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "root": "envs/prod",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueOrder",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_s3_bucket.archive",
+      "root": "envs/dev",
+      "contract": "resource::s3::archive",
+      "level": "declared",
+      "reason": "resource::s3::archive"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueOrder",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_s3_bucket.archive",
+      "root": "envs/prod",
+      "contract": "resource::s3::archive",
+      "level": "inferred",
+      "reason": "resource::s3::archive; overridable: example.com/provision/infra envs/prod/main.tf:2 var.bucket (default)"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueOrder::SendMessageCommand#0",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.orders",
+      "root": "envs/dev",
+      "contract": "channel::sqs::orders",
+      "level": "exact",
+      "reason": "channel::sqs::orders"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueOrder::SendMessageCommand#0",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.orders",
+      "root": "envs/prod",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; overridable: example.com/provision/infra envs/prod/terraform.tfvars:1 var.queue (tfvars)"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueRefund::enqueue#0",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.arn",
+      "root": "envs/dev",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueRefund::enqueue#0",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.url",
+      "root": "envs/prod",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueRefund::enqueue#0",
+      "provisioner": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "root": "envs/dev",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/app::src/producer.ts::enqueueRefund::enqueue#0",
+      "provisioner": "example.com/provision/infra::modules/queue/main.tf::module.shared.aws_sqs_queue.this",
+      "root": "envs/prod",
+      "contract": "channel::sqs::refunds",
+      "level": "exact",
+      "reason": "channel::sqs::refunds"
+    },
+    {
+      "side": "example.com/provision/infra",
+      "provisioner": "example.com/provision/infra::envs/dev/main.tf::aws_sqs_queue.orders",
+      "root": "envs/dev",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; config envs/prod/terraform.tfvars#queue",
+      "at": "envs/prod/terraform.tfvars#queue"
+    },
+    {
+      "side": "example.com/provision/infra",
+      "provisioner": "example.com/provision/infra::envs/prod/main.tf::aws_sqs_queue.orders",
+      "root": "envs/prod",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; overridable: example.com/provision/infra envs/prod/terraform.tfvars:1 var.queue (tfvars); config envs/prod/terraform.tfvars#queue",
+      "at": "envs/prod/terraform.tfvars#queue"
+    }
+  ]
+}

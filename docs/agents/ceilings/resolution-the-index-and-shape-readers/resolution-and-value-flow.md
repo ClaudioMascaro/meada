@@ -1,5 +1,35 @@
 # Resolution and value flow
 
+`Code::value_within_at` (#668) folds one selected identity argument with exact return-call
+frames and a kind-supplied typed-construction predicate. It uses the existing evaluation
+limits and does not change ordinary `Code::value`. Shared SDK evidence memoizes normalized
+frame argument names and client evidence; unknown alternatives invalidate the result. Go
+records only guarded first-result call ranges for the shared SDK evidence walk; ordinary
+scalar folding and error/other result bindings remain unknown. These facts follow the full
+value cache, not the lean index, and reuse the nearest lexical binding query.
+Scoped selector effects (`resolve/mutations.rs`) follow exact aliases and argument frames,
+compare actual read/write call order, and share selection/memo normalization. A write inside a
+loop that also holds the read comes before it (`Facts::loops`: the outermost `for`, `while` and
+`do` statements of TypeScript/JavaScript, Python and Go; a comprehension, a callback such as
+`forEach`'s and a recursive call are no loop). The rule is lexical: an object made inside the
+loop, or a `break` or `return` right after the write, still names nothing, and a function that
+calls and then writes keeps its name when a loop of its caller calls it. A computed key or a
+spread names its fields once folded, through spreads of spreads: a write to one of them changes
+it. A recursive call through a written parameter anywhere in the group refuses all write
+knowledge, so every named request object of the group is unresolved. A write Meada cannot tie to one object (through a parameter of a function it finds
+no caller for, which a function value may still receive, or a member path such as
+`cmd.input.Bucket`) changes that field of every object its scope can reach: a module-level
+object anywhere in the file, a function's own object only in that function. Retained write
+facts charge their names and scopes to `MAX_BYTES` (1 MiB); overflow removes complete write
+knowledge rather than keeping a partial list. Indexing, alias expansion and querying charge
+`EVAL_BUDGET` and `EVAL_DEPTH`. Missing facts/calls, opaque aliases, cycles or exhausted work
+cannot prove an object unchanged. A write to a shared default object is conservative across
+invocations; a constructor with no honest source call site uses all-writes mode. Standard
+mapping effects are supplied by `contract/sdk/mutations.rs`, never cloud policy in a pack.
+Typed helper subtypes stay in kind-owned identity and complete memo keys until projection;
+an incompatible helper stays unresolved. C# async SDK factories require one await; a bare
+Task or an already-awaited client awaited again supplies no receiver evidence.
+
 - `names.rs`, `http/csharp.rs`, `channel/java.rs` (#466): two cases are not pinned.
   (1) #358: a Rabbit `convertAndSend("orders", o)` whose `o` is a parameter of a type the
   repository does not declare (`void f(Order o)`) reads as the named producer `amqp orders
@@ -41,9 +71,10 @@
   method called on a receiver whose class Meada cannot tell (in TypeScript any receiver but
   `this`, a `const api = new Api()` included), or a function called by a bare name no import
   binds, is read where it stands; value flow (`Code::origins`, for a parameter's arguments) does
-  not climb such a call either; a parameter captured by a closure is unknown (`Code::origins`
-  does not follow it either; nor a name its scope binds more than once, or an attribute not
-  assigned a call once in its class); a nested or rest
+  not climb such a call either; a parameter captured by a closure is unknown while a different function frame is active;
+  a root value walk without a bound frame may climb the outer function's exact callers.
+  `Code::origins` does not follow a name its scope binds more than once, or an attribute not
+  assigned a call once in its class; a nested or rest
   pattern in a destructured parameter binds nothing, and a spread in the object a caller passes
   makes the names it may override unknown. `WRAPPER_DEPTH` (64): a wrapper more calls up than
   that is read where the climb stops, its parameters unknown. `EVAL_BUDGET` (2^16 per file):
@@ -57,6 +88,9 @@
   folded deeper than that, through the items of lists and objects, the constants it names and
   the arguments callers pass, is unknown, and a value traced through more constants,
   parameters and return values than that, each into the next, has no origin.
+  `Code::eval` keeps variant-specific temporaries in separate helpers so an alias step does
+  not reserve the combined object/call frame. The Java HTTP local-chain regression also runs
+  in CI's debug profile: a debug0 pass alone does not establish stack safety at this limit.
   `FAMILY_DEPTH` (128): a class family (the class and its ancestors in C3 order) longer than
   that is absent, so every member of the class is unknown (a name match at most), and the
   linearization recurses no deeper down the bases. The bases count from where the walk
@@ -92,6 +126,22 @@
   `RECEIVER_DEPTH` cuts a walk, or `LINK_DEPTH` cuts one begun past an import, the families
   being linearized give up and none is kept: each is linearized again when asked for, and does
   not depend on the walk that first reached it.
+
+- `resolve.rs` (`Code::field_read`, #687): a Go struct field holds an environment read only when
+  every composite literal that sets it gives one and the same read (`Env` or `EnvOr`, nothing
+  around it), a constructor's parameter through every exact caller; a literal string, a read
+  with a suffix (`os.Getenv("X") + "/v1"`), a constructor with no caller or that any call
+  reaches by a name match, a constructor method another definition shares the name of (an
+  interface's, whose calls dispatch to it; no pack marks interfaces, so any other counts), and a
+  field some file writes through a selector of any type (`x.base = ..`, matched by the field's
+  name alone) leave it unknown, as do the literals `Code::field_values` cannot read (by
+  position, an alias's, a conversion). `FIELD_DEPTH` (16): a field folded through more fields
+  than that (`&T{base: o.base}`, each from the next) is unknown, and the values folded on the
+  way share one `EVAL_DEPTH`; the first depth a field is folded at is the one kept for it, so a
+  field first met deep in a chain stays unknown for every later read. The constructors climbed
+  are bound by `WRAPPER_DEPTH` and a constructor met again leaves the field unknown. A
+  constructor read as a value (`mk := New; mk(x)`) is not seen: its exact callers alone give the
+  field.
 
 - `resolve.rs`, `lang/ts.rs` (#536): a call folds to the string its function returns
   (`Code::built`, `Def::lone_string`) only for TypeScript and JavaScript (the other packs leave

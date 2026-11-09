@@ -1,0 +1,11 @@
+services:
+  web:
+    ports:
+      - "8080:80"
+  api:
+    build:
+      context: ${API_DIR:-../services/api-dev}
+  cache:
+    image: redis:7
+    depends_on:
+      - db

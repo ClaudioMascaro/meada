@@ -30,12 +30,15 @@ write tools; one index per repository; determinism) live in
 ## Workflow
 
 - Conventional Commits.
-- Local gate before every commit: `gate --staged` delegates to `scripts/check`, selecting checks
-  from the staged diff or, on a clean tree, the last commit. Docs, agent instructions and harness
-  configuration get pertinent static checks and harness self-checks, without rebuilding the
-  product, running its full suite or producing a `.prove-it` receipt. Unknown or product paths
-  conservatively run the full applicable gate: fmt, clippy and tests, plus the relevant cloud
-  feature checks (ADR 0012). Heavy commands run through `bounded`; see the local workflow policy.
+- Local gate before every push: `scripts/check --unpushed` checks every commit not yet on the
+  branch's upstream (`scripts/check` alone: the staged diff or, on a clean tree, the last
+  commit). Docs, agent instructions and harness configuration get pertinent static checks and
+  harness self-checks, without rebuilding the product, running its full suite or producing a
+  `.prove-it` receipt. Unknown or product paths conservatively run the full applicable gate:
+  fmt, clippy and tests, plus the relevant cloud feature checks (ADR 0012). Before each commit
+  in between, `scripts/check --scope <name>` (repeatable) runs fmt, clippy and only the unit and
+  `tests/it` tests whose path holds a name, such as a module (`iac`, `alert`). Heavy commands run
+  through `bounded` when it is on PATH.
 - Product E2E runs only in GitHub Actions, for a relevant large implementation marked with the
   `e2e` label on a non-draft PR. Locally, `/prove-meada` prepares the scope and answer keys or
   reads CI evidence; it does not build or start the product. Docs-only follow-up commits also
@@ -47,6 +50,10 @@ write tools; one index per repository; determinism) live in
   summary, without creating a `.prove-it` receipt.
 - Mutation audits are explicit manual GitHub Actions `workflow_dispatch` runs, never an
   automatic task-completion step or a consequence of editing a skill.
+- For product integration handoff, also run `scripts/clippy-features` locally; it reads the CI
+  feature matrix (ADR 0012). Documentation and harness-only follow-ups do not repeat it.
+- GitHub Actions owns the full integration, UI and deployment checks. CI for the exact PR
+  head must be green before marking the PR ready for review or merging into main.
 - `.githooks/` runs part of the gate locally: `cargo fmt --check` and no em dash in staged
   Markdown on commit; on push, a check against the maintainer's private-term list. Enable it
   once per clone with `git config core.hooksPath .githooks`.

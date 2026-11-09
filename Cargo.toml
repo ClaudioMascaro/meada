@@ -5,7 +5,7 @@ members = [".", "meada-core"]
 default-members = [".", "meada-core"]
 
 [workspace.package]
-version = "1.2.0"
+version = "1.4.0"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/ClaudioMascaro/meada"
@@ -48,13 +48,17 @@ clap = { version = "4.6.7", features = ["derive"] }
 # A bundle's download as a stream (`meada snapshot pull`), only behind `snapshot`. rmcp already
 # brings it into the default build, so it is no canary of the module.
 futures = { version = "0.3.34", optional = true, default-features = false, features = ["std"] }
+# Terraform and OpenTofu files (ADR 0025): `hcl-edit` parses with a span for every node, `hcl-rs`
+# evaluates a template that holds literals only (a heredoc), so the value is the string HCL reads.
+hcl-edit = "0.10.0"
+hcl-rs = "0.20.0"
 # The listener under rmcp's streamable HTTP server, which is a service with none (server mode).
 http-body-util = "0.1.3"
 hyper = { version = "1.9.0", features = ["server", "http1"] }
 hyper-util = { version = "0.1.21", features = ["tokio"] }
 ignore = "0.4.33"
 # At the workspace's version, exactly: bump both together.
-meada-core = { path = "meada-core", version = "=1.2.0" }
+meada-core = { path = "meada-core", version = "=1.4.0" }
 # The OIDC module's JWT validation (ADR 0012), only behind `oidc`, and the GitHub App module's
 # JWT signing (ADR 0013), only behind `github-app`, and the local accounts' Ed25519 tokens (ADR
 # 0024), only behind `accounts`: RustCrypto as its backend, since the other, aws-lc-rs, would be a
@@ -74,6 +78,9 @@ object_store = { version = "=0.14.2", optional = true, default-features = false,
     "ring",
 ] }
 percent-encoding = "2.3.2"
+# Alertmanager label matchers use bounded, anchored regular expressions.
+regex = "1.13.1"
+regex-syntax = "0.8.11"
 # The Valkey client of the cloud modules (ADR 0012), only behind the internal `valkey` feature.
 # Default features off: no native-tls, only rustls.
 redis = { version = "=1.7.1", optional = true, default-features = false, features = [
@@ -247,6 +254,11 @@ rmcp = { version = "3.5.1", features = [
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+# Keep indexing and contract code compact in development builds as the graph grows.
+# This also avoids paying for unoptimized serialization code on every CLI invocation.
+[profile.dev.package.meada]
+opt-level = 1
 
 # The argon2id hashes of local accounts (ADR 0024) at full speed in debug builds too: unoptimised,
 # one 19 MiB hash takes a large part of a second, and the console's tests hash many, some in a row

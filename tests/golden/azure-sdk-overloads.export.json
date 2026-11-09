@@ -1,0 +1,1513 @@
+{
+  "format": 1,
+  "repository": "local/azure-sdk-overloads",
+  "files": [
+    {
+      "path": "Worker.cs",
+      "hash": "8e7d2f3e2471b5746074c3c5139a23206ec4d2dd09b4541addf560ad792ed81e"
+    },
+    {
+      "path": "worker.js",
+      "hash": "d9ab48e2b41432082e3a1048a21a3b97d1090738a602d968e88cae4d6f000cf4"
+    },
+    {
+      "path": "worker.ts",
+      "hash": "5a6fece80e714e232b14961b22fcbf17f9c5822ca60761a99234117a45e66b57"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker",
+      "span": {
+        "path": "Worker.cs",
+        "start": 34,
+        "end": 2079
+      },
+      "hash": "a9f6d9ce4bab44c161fc7c4f0c8f32acdbce2c1fe602a7ff868625e2bffcd46b"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.ChangedFields()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 570,
+        "end": 789
+      },
+      "hash": "29a403414954e67ee172a1a7de6d88048bbf053d1f884c0d9d0d53891b925331"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1560,
+        "end": 1700
+      },
+      "hash": "124e2a390b992af4546a3374d17764bd68c2ca5c79fa61f1261e3ce890693355"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1842,
+        "end": 2077
+      },
+      "hash": "6b7738994e491e780602b0504a7dd3819efadcd6dd072144957cd97249c3106f"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.HiddenOptions()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1896,
+        "end": 2074
+      },
+      "hash": "8a4fb3c9f953877c73973de59ab12a364a57dda4b4b5a4969406b2c3171cca5f"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.ServiceBusReceiverOptions",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1859,
+        "end": 1893
+      },
+      "hash": "fb4fb5c70c2d36adc667c52637bd024700545498b6ea1183d281c8675145a50f"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.InlineOptions()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 50,
+        "end": 219
+      },
+      "hash": "2b8bab6030a17dca75212e3b941174064535c27830654532a45622c87b3dd9da"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Make(ServiceBusReceiverOptions)",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1414,
+        "end": 1558
+      },
+      "hash": "9c462cb0fb6e17054a2e4fe0a2ca4cd7586166ee1c3577e0574ca205552e9e2c"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.NamedOptions()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 221,
+        "end": 409
+      },
+      "hash": "4642cda386860e4f54394b7d835c94d42d26d1a48da4c4533c502c515b13806a"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.NullNamedOptions()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 411,
+        "end": 568
+      },
+      "hash": "bb6905de3ee1d1780863a5d42775a39b5c31d520512ea9f6b985c1eea9b2b7c4"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Reassigned()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 791,
+        "end": 1007
+      },
+      "hash": "867acfcf943e6ee6557bcef595b040f6e91a460de0bc4ac8c83360a4c4fefecf"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.StringSubscription()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1200,
+        "end": 1412
+      },
+      "hash": "08f80b9b02c2ac240ad111fef8dfc7355ff360432f8e7653c3feba44dfee59df"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Unaffected()",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1702,
+        "end": 1840
+      },
+      "hash": "dc47617585be1bbdee39d5b25e701b7bb779d53e2404e514f0b31382f1334285"
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.UnknownOptions(ServiceBusReceiverOptions)",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1009,
+        "end": 1198
+      },
+      "hash": "114fe1c051df8fe5a2a5384978f6950cc0650090ad53dad902b1481905c0157c"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::changedFields",
+      "span": {
+        "path": "worker.js",
+        "start": 484,
+        "end": 649
+      },
+      "hash": "71174317c5a43a31c7fd294f9cb1b539b7fc9012f45c4e48ad0888e60c24c512"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::exactFactories",
+      "span": {
+        "path": "worker.js",
+        "start": 1323,
+        "end": 1436
+      },
+      "hash": "da8634ea117353933fbfc16997c105ed571d714fae843bc5eb4e7d1e7aa83ab5"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::hiddenUndefined",
+      "span": {
+        "path": "worker.js",
+        "start": 947,
+        "end": 1065
+      },
+      "hash": "ba0589f69122c8dcfefcb1bb082ff14ccf01fe798684fcdbb7bffa61bc3bf0ba"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::inlineOptions",
+      "span": {
+        "path": "worker.js",
+        "start": 108,
+        "end": 222
+      },
+      "hash": "10619230e4a4afe3c77814a157829fc9c5e7e28d8d3ec6005c4d5673a6dcceba"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::make",
+      "span": {
+        "path": "worker.js",
+        "start": 1232,
+        "end": 1315
+      },
+      "hash": "af33d15913fae3e6a72a338332641853cf5da92b7779c065de8b29868df0bb63"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::namedOptions",
+      "span": {
+        "path": "worker.js",
+        "start": 230,
+        "end": 364
+      },
+      "hash": "38c971c5272979104c33309c252aa3159a37b00760a0229519f705e15b2313e8"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::reassigned",
+      "span": {
+        "path": "worker.js",
+        "start": 657,
+        "end": 817
+      },
+      "hash": "e2dcda4c821da5579b2bf3e8800be33eae425925b494a0ecc1067de47a5f744b"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::stringSubscription",
+      "span": {
+        "path": "worker.js",
+        "start": 1073,
+        "end": 1231
+      },
+      "hash": "0a652d989e313ebe7d19283fedf81a6aad3b15befebcbf5458903c0e9b32f124"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::unaffected",
+      "span": {
+        "path": "worker.js",
+        "start": 1444,
+        "end": 1533
+      },
+      "hash": "320c72916e8ab6fb8e3d9df83687922f8c7a5937af9c8e44abb6ac5a1cdc79af"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::undefinedOptions",
+      "span": {
+        "path": "worker.js",
+        "start": 372,
+        "end": 476
+      },
+      "hash": "fde3a901be70a4a367fc0e677e1b9e79e8c69283ce8b71346a478adab222327b"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::unknownOptions",
+      "span": {
+        "path": "worker.js",
+        "start": 825,
+        "end": 939
+      },
+      "hash": "134f1b5bbdf5ba3067236c3845754d54ef18c0d3b3b4726425c3d1f3c68d0990"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::changedFields",
+      "span": {
+        "path": "worker.ts",
+        "start": 484,
+        "end": 649
+      },
+      "hash": "55cae25510cdaaa6ea1a29926bccceb0947f5fbcec7e58bf918012d24efa367b"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::exactFactories",
+      "span": {
+        "path": "worker.ts",
+        "start": 1323,
+        "end": 1436
+      },
+      "hash": "da8634ea117353933fbfc16997c105ed571d714fae843bc5eb4e7d1e7aa83ab5"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::hiddenUndefined",
+      "span": {
+        "path": "worker.ts",
+        "start": 947,
+        "end": 1065
+      },
+      "hash": "f2de66b522ccd2c94d81b1edae364c3efd64c6933628c98e88d14757fc7263c0"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::inlineOptions",
+      "span": {
+        "path": "worker.ts",
+        "start": 108,
+        "end": 222
+      },
+      "hash": "4332f1c58c6fcea7e6083a61fc54f90ff1177276c672b24dc02ddc39994f6324"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::make",
+      "span": {
+        "path": "worker.ts",
+        "start": 1232,
+        "end": 1315
+      },
+      "hash": "2db02d68dc0697366fc75de54e81dde8061a427802eca807e05f940e6273a50a"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::namedOptions",
+      "span": {
+        "path": "worker.ts",
+        "start": 230,
+        "end": 364
+      },
+      "hash": "4663a911b3eb47c17b08360f001fe4d606b3ae2cf653e3e547d6cb1f66fcad06"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::reassigned",
+      "span": {
+        "path": "worker.ts",
+        "start": 657,
+        "end": 817
+      },
+      "hash": "957a0936a01447d0a62cada528bf3131277f49895da8ed9a3ccb1511bb40db03"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::stringSubscription",
+      "span": {
+        "path": "worker.ts",
+        "start": 1073,
+        "end": 1231
+      },
+      "hash": "27182c4c3450191211be328799fbfc9b2716708fb01b5fadf2b43637bf3466be"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::unaffected",
+      "span": {
+        "path": "worker.ts",
+        "start": 1444,
+        "end": 1533
+      },
+      "hash": "41c00f3b3bda6ad3fe4d99e20545c556e988230503359247859dffcae75a8f9a"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::undefinedOptions",
+      "span": {
+        "path": "worker.ts",
+        "start": 372,
+        "end": 476
+      },
+      "hash": "b59da5cded7c59107c943a9f7c8365d581700136fac12ddcd2c1240212875248"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::unknownOptions",
+      "span": {
+        "path": "worker.ts",
+        "start": 825,
+        "end": 939
+      },
+      "hash": "860c8e41146dbca482432b11b402c1a1247584889a4cfc0c7c6e7e22ce363c54"
+    }
+  ],
+  "calls": [
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.ChangedFields()::(invocation_expression).ReceiveMessageAsync#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.ChangedFields()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 721,
+        "end": 786
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.ChangedFields()::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.ChangedFields()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 607,
+        "end": 639
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.ChangedFields()::ServiceBusReceiverOptions#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.ChangedFields()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 653,
+        "end": 684
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.ChangedFields()::bus.CreateReceiver#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.ChangedFields()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 721,
+        "end": 764
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()::(invocation_expression).ReceiveMessageAsync#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1596,
+        "end": 1655
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()::(invocation_expression).ReceiveMessageAsync#1",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1663,
+        "end": 1697
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()::Make#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()",
+      "target": "local/azure-sdk-overloads::Worker.cs::Worker.Make(ServiceBusReceiverOptions)",
+      "level": "exact",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1596,
+        "end": 1633
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()::Make#1",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()",
+      "target": "local/azure-sdk-overloads::Worker.cs::Worker.Make(ServiceBusReceiverOptions)",
+      "level": "exact",
+      "span": {
+        "path": "Worker.cs",
+        "start": 1663,
+        "end": 1675
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()::ServiceBusReceiverOptions#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1601,
+        "end": 1632
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.HiddenOptions()::(invocation_expression).ReceiveMessageAsync#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.HiddenOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1973,
+        "end": 2071
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.HiddenOptions()::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.HiddenOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1933,
+        "end": 1965
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.HiddenOptions()::ServiceBusReceiverOptions#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.HiddenOptions()",
+      "target": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.ServiceBusReceiverOptions",
+      "level": "exact",
+      "span": {
+        "path": "Worker.cs",
+        "start": 2017,
+        "end": 2048
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.HiddenOptions()::bus.CreateReceiver#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.HiddenOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1973,
+        "end": 2049
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.InlineOptions()::(invocation_expression).ReceiveMessageAsync#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.InlineOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 127,
+        "end": 216
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.InlineOptions()::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.InlineOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 87,
+        "end": 119
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.InlineOptions()::ServiceBusReceiverOptions#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.InlineOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 162,
+        "end": 193
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.InlineOptions()::bus.CreateReceiver#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.InlineOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 127,
+        "end": 194
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Make(ServiceBusReceiverOptions)::(expression).CreateReceiver#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Make(ServiceBusReceiverOptions)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1482,
+        "end": 1555
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Make(ServiceBusReceiverOptions)::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Make(ServiceBusReceiverOptions)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1482,
+        "end": 1514
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.NamedOptions()::(invocation_expression).ReceiveMessageAsync#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.NamedOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 342,
+        "end": 406
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.NamedOptions()::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.NamedOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 257,
+        "end": 289
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.NamedOptions()::ServiceBusReceiverOptions#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.NamedOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 303,
+        "end": 334
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.NamedOptions()::bus.CreateReceiver#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.NamedOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 342,
+        "end": 384
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.NullNamedOptions()::(invocation_expression).ReceiveMessageAsync#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.NullNamedOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 491,
+        "end": 565
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.NullNamedOptions()::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.NullNamedOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 451,
+        "end": 483
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.NullNamedOptions()::bus.CreateReceiver#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.NullNamedOptions()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 491,
+        "end": 543
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Reassigned()::(invocation_expression).ReceiveMessageAsync#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Reassigned()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 926,
+        "end": 1004
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Reassigned()::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Reassigned()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 825,
+        "end": 857
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Reassigned()::ServiceBusReceiverOptions#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Reassigned()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 871,
+        "end": 902
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Reassigned()::bus.CreateReceiver#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Reassigned()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 926,
+        "end": 982
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.StringSubscription()::(invocation_expression).ReceiveMessageAsync#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.StringSubscription()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1308,
+        "end": 1409
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.StringSubscription()::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.StringSubscription()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1242,
+        "end": 1274
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.StringSubscription()::ServiceBusReceiverOptions#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.StringSubscription()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1355,
+        "end": 1386
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.StringSubscription()::bus.CreateReceiver#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.StringSubscription()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1308,
+        "end": 1387
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Unaffected()::(invocation_expression).ReceiveMessageAsync#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Unaffected()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1776,
+        "end": 1837
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Unaffected()::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Unaffected()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1736,
+        "end": 1768
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.Unaffected()::bus.CreateReceiver#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.Unaffected()",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1776,
+        "end": 1815
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.UnknownOptions(ServiceBusReceiverOptions)::(invocation_expression).ReceiveMessageAsync#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.UnknownOptions(ServiceBusReceiverOptions)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1120,
+        "end": 1195
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.UnknownOptions(ServiceBusReceiverOptions)::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.UnknownOptions(ServiceBusReceiverOptions)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1080,
+        "end": 1112
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::Worker.cs::Worker.UnknownOptions(ServiceBusReceiverOptions)::bus.CreateReceiver#0",
+      "caller": "local/azure-sdk-overloads::Worker.cs::Worker.UnknownOptions(ServiceBusReceiverOptions)",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "Worker.cs",
+        "start": 1120,
+        "end": 1173
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::worker.js",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 67,
+        "end": 99
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::changedFields::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.js::changedFields",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 580,
+        "end": 646
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::changedFields::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.js::changedFields",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 580,
+        "end": 627
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::exactFactories::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.js::exactFactories",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 1351,
+        "end": 1400
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::exactFactories::(call_expression).receiveMessages#1",
+      "caller": "local/azure-sdk-overloads::worker.js::exactFactories",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 1402,
+        "end": 1433
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::exactFactories::make#0",
+      "caller": "local/azure-sdk-overloads::worker.js::exactFactories",
+      "target": "local/azure-sdk-overloads::worker.js::make",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1351,
+        "end": 1381
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::exactFactories::make#1",
+      "caller": "local/azure-sdk-overloads::worker.js::exactFactories",
+      "target": "local/azure-sdk-overloads::worker.js::make",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1402,
+        "end": 1414
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::hiddenUndefined::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.js::hiddenUndefined",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 985,
+        "end": 1062
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::hiddenUndefined::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.js::hiddenUndefined",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 985,
+        "end": 1043
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::inlineOptions::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.js::inlineOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 135,
+        "end": 219
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::inlineOptions::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.js::inlineOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 135,
+        "end": 200
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::make::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.js::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 1264,
+        "end": 1312
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::namedOptions::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.js::namedOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 296,
+        "end": 361
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::namedOptions::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.js::namedOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 296,
+        "end": 342
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::reassigned::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.js::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 735,
+        "end": 814
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::reassigned::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.js::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 735,
+        "end": 795
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::stringSubscription::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.js::stringSubscription",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 1133,
+        "end": 1228
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::stringSubscription::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.js::stringSubscription",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 1133,
+        "end": 1209
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::unaffected::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.js::unaffected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 1468,
+        "end": 1530
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::unaffected::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.js::unaffected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 1468,
+        "end": 1511
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::undefinedOptions::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.js::undefinedOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 402,
+        "end": 473
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::undefinedOptions::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.js::undefinedOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 402,
+        "end": 454
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::unknownOptions::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.js::unknownOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 860,
+        "end": 936
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.js::unknownOptions::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.js::unknownOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.js",
+        "start": 860,
+        "end": 917
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::ServiceBusClient#0",
+      "caller": "local/azure-sdk-overloads::worker.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 67,
+        "end": 99
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::changedFields::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::changedFields",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 580,
+        "end": 646
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::changedFields::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::changedFields",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 580,
+        "end": 627
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::exactFactories::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::exactFactories",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1351,
+        "end": 1400
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::exactFactories::(call_expression).receiveMessages#1",
+      "caller": "local/azure-sdk-overloads::worker.ts::exactFactories",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1402,
+        "end": 1433
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::exactFactories::make#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::exactFactories",
+      "target": "local/azure-sdk-overloads::worker.ts::make",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1351,
+        "end": 1381
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::exactFactories::make#1",
+      "caller": "local/azure-sdk-overloads::worker.ts::exactFactories",
+      "target": "local/azure-sdk-overloads::worker.ts::make",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1402,
+        "end": 1414
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::hiddenUndefined::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::hiddenUndefined",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 985,
+        "end": 1062
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::hiddenUndefined::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::hiddenUndefined",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 985,
+        "end": 1043
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::inlineOptions::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::inlineOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 135,
+        "end": 219
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::inlineOptions::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::inlineOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 135,
+        "end": 200
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::make::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::make",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1264,
+        "end": 1312
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::namedOptions::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::namedOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 296,
+        "end": 361
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::namedOptions::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::namedOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 296,
+        "end": 342
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::reassigned::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 735,
+        "end": 814
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::reassigned::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::reassigned",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 735,
+        "end": 795
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::stringSubscription::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::stringSubscription",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1133,
+        "end": 1228
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::stringSubscription::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::stringSubscription",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1133,
+        "end": 1209
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::unaffected::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::unaffected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1468,
+        "end": 1530
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::unaffected::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::unaffected",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 1468,
+        "end": 1511
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::undefinedOptions::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::undefinedOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 402,
+        "end": 473
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::undefinedOptions::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::undefinedOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 402,
+        "end": 454
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::unknownOptions::(call_expression).receiveMessages#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::unknownOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 860,
+        "end": 936
+      }
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::unknownOptions::bus.createReceiver#0",
+      "caller": "local/azure-sdk-overloads::worker.ts::unknownOptions",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "worker.ts",
+        "start": 860,
+        "end": 917
+      }
+    }
+  ],
+  "providers": [],
+  "consumers": [
+    {
+      "contract": "channel::servicebus::csharp-fields",
+      "site": "local/azure-sdk-overloads::Worker.cs::Worker.ChangedFields()",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::csharp-factory",
+      "site": "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.HiddenOptions()",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::csharp-inline",
+      "site": "local/azure-sdk-overloads::Worker.cs::Worker.InlineOptions()",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::csharp-named",
+      "site": "local/azure-sdk-overloads::Worker.cs::Worker.NamedOptions()",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::csharp-null-named",
+      "site": "local/azure-sdk-overloads::Worker.cs::Worker.NullNamedOptions()",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::Worker.cs::Worker.Reassigned()",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::subscription:csharp-topic/audit",
+      "site": "local/azure-sdk-overloads::Worker.cs::Worker.StringSubscription()",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::csharp-unaffected",
+      "site": "local/azure-sdk-overloads::Worker.cs::Worker.Unaffected()",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::Worker.cs::Worker.UnknownOptions(ServiceBusReceiverOptions)",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::javascript-fields",
+      "site": "local/azure-sdk-overloads::worker.js::changedFields",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::worker.js::exactFactories",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::javascript-factory",
+      "site": "local/azure-sdk-overloads::worker.js::exactFactories",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::worker.js::hiddenUndefined",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::javascript-inline",
+      "site": "local/azure-sdk-overloads::worker.js::inlineOptions",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::javascript-named",
+      "site": "local/azure-sdk-overloads::worker.js::namedOptions",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::worker.js::reassigned",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::subscription:javascript-topic/audit",
+      "site": "local/azure-sdk-overloads::worker.js::stringSubscription",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::javascript-unaffected",
+      "site": "local/azure-sdk-overloads::worker.js::unaffected",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::javascript-undefined",
+      "site": "local/azure-sdk-overloads::worker.js::undefinedOptions",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::worker.js::unknownOptions",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::typescript-fields",
+      "site": "local/azure-sdk-overloads::worker.ts::changedFields",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::worker.ts::exactFactories",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::typescript-factory",
+      "site": "local/azure-sdk-overloads::worker.ts::exactFactories",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::worker.ts::hiddenUndefined",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::typescript-inline",
+      "site": "local/azure-sdk-overloads::worker.ts::inlineOptions",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::typescript-named",
+      "site": "local/azure-sdk-overloads::worker.ts::namedOptions",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::worker.ts::reassigned",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::subscription:typescript-topic/audit",
+      "site": "local/azure-sdk-overloads::worker.ts::stringSubscription",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::typescript-unaffected",
+      "site": "local/azure-sdk-overloads::worker.ts::unaffected",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus::typescript-undefined",
+      "site": "local/azure-sdk-overloads::worker.ts::undefinedOptions",
+      "via": null
+    },
+    {
+      "contract": "channel::servicebus",
+      "site": "local/azure-sdk-overloads::worker.ts::unknownOptions",
+      "via": null
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/azure-sdk-overloads::Worker.cs::Worker.ExactFactories()",
+        "local/azure-sdk-overloads::Worker.cs::Worker.Make(ServiceBusReceiverOptions)"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.HiddenOptions()",
+        "local/azure-sdk-overloads::Worker.cs::Worker.Hidden.ServiceBusReceiverOptions"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "local/azure-sdk-overloads::worker.js::exactFactories",
+        "local/azure-sdk-overloads::worker.js::make"
+      ]
+    },
+    {
+      "name": ".#4",
+      "members": [
+        "local/azure-sdk-overloads::worker.ts::exactFactories",
+        "local/azure-sdk-overloads::worker.ts::make"
+      ]
+    }
+  ],
+  "links": []
+}

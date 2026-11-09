@@ -135,10 +135,17 @@ pub(super) fn base<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<Strin
         return None;
     };
     match parts.first()? {
-        Part::Ref(name) => match code.constant(path, &fetch.scope, name)? {
-            (_, Value::Call(call)) => discovered(&call.callee, &call.args),
-            _ => None,
-        },
+        Part::Ref(name) => {
+            let (_, mut value) = code.constant(path, &fetch.scope, name)?;
+            // Await is retained for constructor evidence; this discovery result is its URL.
+            while let Value::Await(inner) = value {
+                value = inner;
+            }
+            match value {
+                Value::Call(call) => discovered(&call.callee, &call.args),
+                _ => None,
+            }
+        }
         Part::Hole => {
             // A call written in another argument (`{ headers: ... }`) is not the URL's.
             let mut elsewhere = Vec::new();
@@ -163,6 +170,7 @@ pub(super) fn base<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<Strin
 /// Where every call `value` holds starts, at any depth.
 fn calls_in(value: &Value, out: &mut Vec<usize>) {
     match value {
+        Value::Await(value) => calls_in(value, out),
         Value::Call(call) => {
             out.push(call.range.start);
             call.receiver.iter().for_each(|r| calls_in(r, out));

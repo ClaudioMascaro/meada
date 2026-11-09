@@ -77,6 +77,10 @@ The crates are described in the [crate overview](overview/crates.md). The module
 - `meada-core/src/msg.rs`: the messages of those checks and the language setting the binary's
   `msg.rs` reads too; `meada-core/src/http.rs`: `normalize_path` and `PARAM`, which the HTTP
   kind re-exports. `qualify` and `parent` (dotted names) live in its `meada-core/src/lib.rs`.
+- Provisioning export (#656): `meada_core::export::IacNode`, `meada_core::export::Provisioner`
+  and `meada_core::export::Provision` carry the optional format-1 arrays `iac_nodes`,
+  `provisioners` and `provisions`. Empty arrays are omitted; node identity and root label
+  distinguish module instances, and provisioning links keep their own level and reason.
 - `meada-core/src/export.rs`: the export's types as `meada export` writes them (`Export` and
   every piece, `Level`, `Link`, `Process` with its `Step`, `Via` and `Mark`, `Stale`, `Cause`,
   `EntryKind`, `Format`, `How`), `Serialize` and `Deserialize`, so a parsed export written again
@@ -100,3 +104,7 @@ The crates are described in the [crate overview](overview/crates.md). The module
   and `trace.rs` (`Row`, `Chain::answer` with the footer): the results of `search`, `context`
   and `trace` and their text answers. The engine walks the indexes and places each line (a
   `path:line` reads the file); these assemble and cut the answer.
+
+- Config use export (#661): `Use` and the optional `Export::uses` keep contract,
+  repository-level site and the `at` key locator, without scalar text. These are directionless sides,
+  independent of `providers`, `consumers` and `links`; provisioning reads them as uses.

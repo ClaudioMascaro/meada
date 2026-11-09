@@ -1,0 +1,58 @@
+service: shop
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'}
+  region: ${env:AWS_REGION}
+
+custom:
+  prefix: ${self:service}-${self:provider.stage}
+  ordersTable: ${self:custom.prefix}-orders
+
+functions:
+  createOrder:
+    handler: src/orders.create
+    environment:
+      QUEUE_URL: !Ref OrdersQueue
+      TABLE: ${self:custom.ordersTable}
+    events:
+      - http:
+          path: orders
+          method: post
+      - httpApi: 'GET /orders/{id}'
+  processOrder:
+    name: ${self:custom.prefix}-processor
+    handler: src/orders.process
+    events:
+      - sqs:
+          arn: !GetAtt OrdersQueue.Arn
+          batchSize: 5
+      - schedule: rate(5 minutes)
+  audit:
+    handler: ${env:AUDIT_HANDLER}
+    events:
+      - sns: ${self:custom.prefix}-alerts
+
+resources:
+  Resources:
+    OrdersQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.prefix}-orders
+    OrdersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.ordersTable}
+    DeadLetter:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${env:DLQ_NAME}-dead
+    Assets:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: !Sub "${AWS::Region}-${self:service}-assets"
+    Vault:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: ${ssm:/shop/vault-name}

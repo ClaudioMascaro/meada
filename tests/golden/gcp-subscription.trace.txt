@@ -1,0 +1,9 @@
+example.com/gcp/app use settings.yaml#exact.subscription (line 3) [exact]
+  provisions channel::pubsub::subscriptions/orders [exact: channel::pubsub::subscriptions/orders; config settings.yaml#exact.subscription] example.com/gcp/infra main.tf:2 google_pubsub_subscription.orders (root .)
+chain: exact · 1 hops · 2 repos · 84 tokens
+example.com/gcp/infra main.tf:1 google_pubsub_topic.orders
+  provisions channel::pubsub::orders [exact: channel::pubsub::orders] example.com/gcp/app asyncapi.json pubsub send orders (documented only)
+    →[inferred: channel::pubsub::subscriptions/orders subscription google_pubsub_subscription.orders (root .); filter] example.com/gcp/app asyncapi.json pubsub receive subscriptions/orders (documented only)
+  provisions channel::pubsub::orders [exact: channel::pubsub::orders; config settings.yaml#exact.topic] example.com/gcp/app use settings.yaml#exact.topic (line 2) [exact]
+  provisions channel::pubsub::orders [inferred: channel::pubsub::orders; config settings.yaml#typed.pubsub_topic] example.com/gcp/app use settings.yaml#typed.pubsub_topic (line 7) [inferred]
+chain: inferred · 4 hops · 2 repos · 206 tokens

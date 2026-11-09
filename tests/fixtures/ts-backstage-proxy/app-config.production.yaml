@@ -1,6 +1,23 @@
 proxy:
+  # Both shapes in one file: the legacy key is no endpoint.
+  '/prodshape':
+    target: ${INVENTORY_URL}
   endpoints:
     '/disputed':
       target: https://stock.prod.example.com
     '/stock':
       target: https://stock.example.com/
+    '/shortignored':
+      target: https://stock.example.com
+      ignorePath: true
+    '/shortprepend':
+      target: https://stock.example.com
+      prependPath: false
+    '/shortrewrite':
+      target: https://stock.example.com
+      pathRewrite:
+        '^/api/proxy/shortrewrite': '/v1'
+    '/shortstripped':
+      target: https://stock.example.com
+      pathRewrite:
+        '^/api/proxy/shortstripped': ''

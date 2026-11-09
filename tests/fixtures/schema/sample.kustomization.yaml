@@ -1,0 +1,10 @@
+# A kustomization as the IaC nodes store it (#651): the overlay is the root of its nodes, its
+# prefix, namespace and images change what it lists, a remote entry is kept as unresolved.
+resources:
+  - sample.kubernetes.yaml
+  - https://example.com/acme/base//kube?ref=v1
+namePrefix: dev-
+namespace: shop
+images:
+  - name: ghcr.io/acme/web
+    newTag: dev

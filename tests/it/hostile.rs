@@ -2,7 +2,8 @@
 //! and indexing carries on. Each limit has a unit test of its own; this subject is the net for
 //! the one nobody wrote. Per language pack, pathological repositories sized past the limits of
 //! "Known ceilings" are indexed on a thread with a small stack, joined with a wall-clock
-//! budget: a recursion with no limit overflows the stack (the process aborts: with
+//! budget, twice, each run within the budget: the second time without the index, over the
+//! values cache the first left (ADR 0027), to the same export. A recursion with no limit overflows the stack (the process aborts: with
 //! `--nocapture`, the case named with no time after it is the one), a loop with none misses
 //! the budget.
 //!
@@ -85,17 +86,25 @@ fn index(pack: &str, name: &str, files: &[(String, String)]) -> String {
     let worker = std::thread::Builder::new()
         .stack_size(STACK)
         .spawn(move || {
-            let _ = tx.send(
-                Engine::open(&repo)
-                    .and_then(|e| e.export())
-                    .map_err(|e| e.to_string()),
-            );
+            let index = || -> meada::Result<String> { Engine::open(&repo)?.export() };
+            let _ = tx.send(index().map_err(|e| e.to_string()));
+            // Then a cold index again over the values cache the first left (ADR 0027): the
+            // values read back on the same stack, the same export, within a budget of its own.
+            let _ = fs::remove_file(repo.join(".meada/index.db"));
+            let _ = tx.send(index().map_err(|e| e.to_string()));
         })
         .unwrap();
-    let done = rx
-        .recv_timeout(BUDGET)
-        .unwrap_or_else(|_| panic!("{pack}/{name}: no end within {BUDGET:?}"));
-    let export = done.unwrap_or_else(|e| panic!("{pack}/{name}: {e}"));
+    let run = || {
+        let done = rx
+            .recv_timeout(BUDGET)
+            .unwrap_or_else(|_| panic!("{pack}/{name}: no end within {BUDGET:?}"));
+        done.unwrap_or_else(|e| panic!("{pack}/{name}: {e}"))
+    };
+    let (export, cached) = (run(), run());
+    assert!(
+        export == cached,
+        "{pack}/{name}: the values cache changed the export"
+    );
     worker
         .join()
         .unwrap_or_else(|_| panic!("{pack}/{name}: panicked"));

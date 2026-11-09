@@ -15,6 +15,411 @@ fn api(case: &str) -> PathBuf {
 }
 
 #[test]
+fn a_shadowed_string_conversion_keeps_the_url_unknown_without_hiding_the_global_elsewhere() {
+    let repo = fixture_repo("urls_string_shadow", "http-url-builder", None);
+    std::fs::remove_dir_all(repo.join("src")).unwrap();
+    std::fs::create_dir(repo.join("src")).unwrap();
+    std::fs::write(
+        repo.join("src/client.ts"),
+        "export function hidden(String: (value: URL) => string) {\n\
+           const value = new URL('https://api.example.com/api/vets');\n\
+           return fetch(String(value));\n\
+         }\n\
+         export function control() {\n\
+           const value = new URL('https://api.example.com/api/vets');\n\
+           return fetch(String(value));\n\
+         }\n",
+    )
+    .unwrap();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), 2, "{export}");
+    for consumer in consumers {
+        let site = consumer["site"].as_str().unwrap();
+        if site.contains("::hidden::") {
+            assert!(consumer["contract"].is_null(), "{export}");
+            assert!(consumer["via"].is_null(), "{export}");
+        } else {
+            assert!(site.contains("::control::"), "{export}");
+            assert_eq!(consumer["contract"], "http::GET::/api/vets", "{export}");
+            assert_eq!(consumer["via"], "host:api.example.com", "{export}");
+        }
+    }
+}
+
+#[test]
+fn string_url_conversions_respect_bindings_and_global_writes_in_javascript_and_typescript() {
+    let repo = fixture_repo("urls_string_bindings", "http-url-builder", None);
+    std::fs::remove_dir_all(repo.join("src")).unwrap();
+    std::fs::create_dir(repo.join("src")).unwrap();
+    let cases = [
+        ("parameter", "export function hidden(String) {", "}"),
+        ("destructured", "export function hidden({ String }) {", "}"),
+        ("arrow", "export const hidden = String => {", "};"),
+        (
+            "local",
+            "export function hidden() { const String = convert;",
+            "}",
+        ),
+        (
+            "catch",
+            "export function hidden() { try { opaque(); } catch (String) {",
+            "}}",
+        ),
+        (
+            "loop_lexical",
+            "export function hidden() { for (const String of converters) {",
+            "}}",
+        ),
+        (
+            "loop_var",
+            "export function hidden() { for (var String of converters) {}",
+            "}",
+        ),
+        (
+            "imported",
+            "import String from 'opaque-string'; export function hidden() {",
+            "}",
+        ),
+        (
+            "declared",
+            "function String(value) { return transform(value); } export function hidden() {",
+            "}",
+        ),
+        ("updated", "String++; export function hidden() {", "}"),
+    ];
+    let body =
+        "const value = new URL('https://api.example.com/api/vets'); return fetch(String(value));";
+    for extension in ["js", "ts"] {
+        for (name, before, after) in cases {
+            std::fs::write(
+                repo.join(format!("src/{name}.{extension}")),
+                format!("{before}\n{body}\n{after}\n"),
+            )
+            .unwrap();
+        }
+        for (name, prefix) in [
+            ("control", ""),
+            (
+                "expression",
+                "const converter = function String(value) { return transform(value); };",
+            ),
+        ] {
+            std::fs::write(
+                repo.join(format!("src/{name}.{extension}")),
+                format!("{prefix}\nexport function visible() {{ {body} }}\n"),
+            )
+            .unwrap();
+        }
+    }
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), (cases.len() + 2) * 2, "{export}");
+    for consumer in consumers {
+        let site = consumer["site"].as_str().unwrap();
+        if site.contains("::src/control.") || site.contains("::src/expression.") {
+            assert_eq!(consumer["contract"], "http::GET::/api/vets", "{export}");
+            assert_eq!(consumer["via"], "host:api.example.com", "{export}");
+        } else {
+            assert!(consumer["contract"].is_null(), "{site}: {export}");
+            assert!(consumer["via"].is_null(), "{site}: {export}");
+        }
+    }
+}
+
+/// Annex B makes a block function a function-scoped binding in non-strict JavaScript.
+/// Modules, directive prologues and class bodies keep the declaration inside its block.
+#[test]
+fn block_string_functions_follow_the_enclosing_javascript_strict_mode() {
+    let repo = fixture_repo("urls_string_block_functions", "http-url-builder", None);
+    std::fs::remove_dir_all(repo.join("src")).unwrap();
+    std::fs::create_dir(repo.join("src")).unwrap();
+    let body = "return fetch(String(new URL('https://api.example.com/api/vets')));";
+    let declaration = "{ function String(value) { return transform(value); } }";
+    let cases = [
+        (
+            "sloppy_function.js",
+            format!("function probe() {{ {declaration} {body} }}"),
+            false,
+        ),
+        (
+            "sloppy_program.js",
+            format!("{declaration} function probe() {{ {body} }}"),
+            false,
+        ),
+        (
+            "strict_function.js",
+            format!("function probe() {{ /* directive */ 'use strict'; {declaration} {body} }}"),
+            true,
+        ),
+        (
+            "strict_program.js",
+            format!("'use strict'; {declaration} function probe() {{ {body} }}"),
+            true,
+        ),
+        (
+            "module.js",
+            format!("export function probe() {{ {declaration} {body} }}"),
+            true,
+        ),
+        (
+            "class.js",
+            format!("class Client {{ probe() {{ {declaration} {body} }} }}"),
+            true,
+        ),
+        (
+            "unrelated.js",
+            format!("function other() {{ {declaration} }} function probe() {{ {body} }}"),
+            true,
+        ),
+        (
+            "generator.js",
+            format!(
+                "function probe() {{ {{ function* String(value) {{ yield value; }} }} {body} }}"
+            ),
+            true,
+        ),
+        (
+            "async.js",
+            format!(
+                "function probe() {{ {{ async function String(value) {{ return value; }} }} {body} }}"
+            ),
+            true,
+        ),
+        (
+            "module_extension.mjs",
+            format!("function probe() {{ {declaration} {body} }}"),
+            true,
+        ),
+    ];
+    for (name, source, _) in &cases {
+        std::fs::write(repo.join(format!("src/{name}")), source).unwrap();
+    }
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), cases.len(), "{export}");
+    for (name, _, global) in cases {
+        let consumer = consumers
+            .iter()
+            .find(|c| {
+                c["site"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("::src/{name}::"))
+            })
+            .unwrap();
+        if global {
+            assert_eq!(
+                consumer["contract"], "http::GET::/api/vets",
+                "{name}: {consumer}"
+            );
+            assert_eq!(
+                consumer["via"], "host:api.example.com",
+                "{name}: {consumer}"
+            );
+        } else {
+            assert!(consumer["contract"].is_null(), "{name}: {consumer}");
+            assert!(consumer["via"].is_null(), "{name}: {consumer}");
+        }
+    }
+}
+
+/// A binding named URL is the runtime constructor only when its export proves it. Unknown
+/// packages, repository aliases and other exports must not invent consumers or links (#709).
+#[test]
+fn only_proven_runtime_url_bindings_produce_http_contracts() {
+    let case = "urls_runtime_bindings";
+    let repo = fixture_repo(
+        case,
+        "http-url-builder",
+        Some("https://example.com/acme/vets-web.git"),
+    );
+    fixture_repo(
+        case,
+        "http-url-builder-api",
+        Some("https://example.com/acme/vets-api.git"),
+    );
+    std::fs::remove_dir_all(repo.join("src")).unwrap();
+    std::fs::create_dir(repo.join("src")).unwrap();
+    std::fs::write(
+        repo.join("tsconfig.json"),
+        r#"{"compilerOptions":{"baseUrl":".","paths":{"@app/*":["src/*"]}}}"#,
+    )
+    .unwrap();
+    std::fs::write(repo.join("src/builder.ts"), "export class URL {}\n").unwrap();
+    let cases = [
+        ("global.ts", "", true),
+        ("node.ts", "import { URL } from 'node:url';", true),
+        ("url.ts", "import { URL } from 'url';", true),
+        ("require.js", "const { URL } = require('node:url');", true),
+        ("require_url.ts", "const { URL } = require('url');", true),
+        (
+            "require_pair.ts",
+            "const { URL: URL } = require('url');",
+            true,
+        ),
+        ("unknown.ts", "import { URL } from 'unknown-url';", false),
+        (
+            "unknown_alias.ts",
+            "import { Builder as URL } from 'unknown-url';",
+            false,
+        ),
+        ("alias.ts", "import { URL } from '@app/builder';", false),
+        ("relative.ts", "import { URL } from './builder';", false),
+        (
+            "wrong_export.ts",
+            "import { parse as URL } from 'url';",
+            false,
+        ),
+        ("default.ts", "import URL from 'node:url';", false),
+        ("namespace.ts", "import * as URL from 'url';", false),
+        (
+            "unknown_require.js",
+            "const { URL } = require('unknown-url');",
+            false,
+        ),
+        (
+            "alias_require.ts",
+            "const { URL } = require('@app/builder');",
+            false,
+        ),
+        (
+            "wrong_require.ts",
+            "const { parse: URL } = require('node:url');",
+            false,
+        ),
+        ("module_require.ts", "const URL = require('url');", false),
+        (
+            "shadow_require.ts",
+            "function require(name) { return {}; } const { URL } = require('url');",
+            false,
+        ),
+        (
+            "import_require.ts",
+            "import require from 'unknown-loader'; const { URL } = require('url');",
+            false,
+        ),
+        ("assigned.ts", "URL = other;", false),
+        ("parameter.ts", "function hidden({ URL }) {}", false),
+        ("catch.ts", "try { run(); } catch ({ URL }) {}", false),
+    ];
+    for (file, binding, _) in cases {
+        std::fs::write(
+            repo.join("src").join(file),
+            format!(
+                "{binding}\nexport function single() {{ return fetch(new URL('https://api.example.com/api/vets').toString()); }}\nexport function joined() {{ return fetch(new URL('/api/vets', 'https://api.example.com')); }}\n"
+            ),
+        )
+        .unwrap();
+    }
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), cases.len() * 2);
+    for consumer in consumers {
+        let file = consumer["site"]
+            .as_str()
+            .unwrap()
+            .split("::")
+            .nth(1)
+            .unwrap();
+        let runtime = cases
+            .iter()
+            .find(|(f, _, _)| file == format!("src/{f}"))
+            .unwrap()
+            .2;
+        assert_eq!(
+            consumer["contract"].as_str(),
+            runtime.then_some("http::GET::/api/vets"),
+            "{consumer}"
+        );
+    }
+    let links = json["links"].as_array().unwrap();
+    assert_eq!(
+        links.len(),
+        cases.iter().filter(|(_, _, runtime)| *runtime).count() * 2
+    );
+    for link in links {
+        let file = link["consumer"]
+            .as_str()
+            .unwrap()
+            .split("::")
+            .nth(1)
+            .unwrap();
+        assert!(
+            cases
+                .iter()
+                .any(|(f, _, runtime)| *runtime && file == format!("src/{f}")),
+            "{link}"
+        );
+        assert_eq!(link["level"], "exact");
+    }
+}
+
+/// Less common binding syntax must hide the runtime just like a parameter or declaration.
+#[test]
+fn loop_import_equals_and_named_expression_url_bindings_stay_opaque() {
+    let repo = fixture_repo(
+        "urls_hidden_runtime_bindings",
+        "http-url-builder",
+        Some("https://example.com/acme/vets-web.git"),
+    );
+    std::fs::remove_dir_all(repo.join("src")).unwrap();
+    std::fs::create_dir(repo.join("src")).unwrap();
+    let call = "fetch(new URL('https://api.example.com/api/vets').toString()); fetch(new URL('/api/vets', 'https://api.example.com'));";
+    let cases = [
+        (
+            "import_equals",
+            format!("import URL = require('unknown-url'); export function run() {{ {call} }}"),
+        ),
+        (
+            "import_alias",
+            format!("import URL = Unknown.Constructor; export function run() {{ {call} }}"),
+        ),
+        (
+            "loop_url",
+            format!("export function run(ctors) {{ for (const URL of ctors) {{ {call} }} }}"),
+        ),
+        (
+            "loop_require",
+            format!(
+                "export function run(loaders) {{ for (const require of loaders) {{ const {{ URL }} = require('url'); {call} }} }}"
+            ),
+        ),
+        (
+            "named_function",
+            format!(
+                "export const run = function require(name) {{ const {{ URL }} = require('url'); {call} }};"
+            ),
+        ),
+        (
+            "named_class",
+            format!("export const run = class URL {{ method() {{ {call} }} }};"),
+        ),
+        (
+            "alias_require",
+            format!(
+                "import require = Unknown.Loader; const {{ URL }} = require('url'); export function run() {{ {call} }}"
+            ),
+        ),
+    ];
+    for (name, source) in &cases {
+        std::fs::write(repo.join("src").join(format!("{name}.ts")), source).unwrap();
+    }
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers = json["consumers"].as_array().unwrap();
+    assert_eq!(consumers.len(), cases.len() * 2);
+    for consumer in consumers {
+        assert!(consumer["contract"].is_null(), "{consumer}");
+    }
+    assert!(json["links"].as_array().unwrap().is_empty());
+}
+
+#[test]
 fn constants_fold_into_urls_across_files() {
     let case = "urls_constants";
     let paths = fixture_repo(
@@ -333,13 +738,70 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
     assert_eq!(linked("src/plain.js"), ["http::GET::/api/vets"]);
     // An arrow function with a block body folds when the block is one `return` and not otherwise.
     assert_eq!(linked("src/block.ts"), ["http::GET::/api/vets"]);
+    // `new URL(x)` of one argument is `x` (WHATWG URL Standard), through `toString()`, `href`,
+    // `String(u)`, a template string and a client wrapper; `searchParams`, `search` and `hash`
+    // keep the path.
+    assert_eq!(
+        linked("src/whatwg.ts"),
+        [
+            "http::GET::/api/owners",
+            "http::GET::/api/owners",
+            "http::GET::/api/owners",
+            "http::GET::/api/vets",
+            "http::GET::/api/vets",
+            "http::GET::/api/vets",
+        ]
+    );
+    // `new URL(reference, base)` is the join of the two (RFC 3986 section 5.2). Over a literal base
+    // an absolute reference is itself, `//host/x` takes its host, `/x` replaces the path and `x`
+    // joins the base's directory, in the argument, through a constant and a client wrapper. Over
+    // an environment read or a hole an absolute path keeps the lead; the rest is unresolved.
+    let consumers: std::collections::BTreeMap<String, Option<&str>> =
+        (json["consumers"].as_array().unwrap())
+            .iter()
+            .filter(|c| c["site"].as_str().unwrap().contains("src/join.ts"))
+            .map(|c| {
+                let site = c["site"].as_str().unwrap().split("::").collect::<Vec<_>>();
+                (site[2..].join("::"), c["contract"].as_str())
+            })
+            .collect();
+    let vets = Some("http::GET::/api/vets");
+    let owners = Some("http::GET::/api/owners");
+    let expected = [
+        ("absolute::fetch#0", vets),
+        ("absolutePath::fetch#0", vets),
+        ("envAbsolutePath::fetch#0", vets),
+        ("envNetworkPath::fetch#0", None),
+        ("envReference::fetch#0", None),
+        ("envRelative::fetch#0", None),
+        ("fragmentOnly::fetch#0", None),
+        ("holeAbsolutePath::fetch#0", vets),
+        ("holeBareAbsolutePath::fetch#0", owners),
+        ("holeBareRelative::fetch#0", None),
+        ("networkPath::fetch#0", owners),
+        ("queryOnly::fetch#0", None),
+        ("relativeUnderSlash::fetch#0", owners),
+        ("relativeWithoutSlash::fetch#0", vets),
+        ("throughConstant::fetch#0", owners),
+        ("wrapped::from#0", vets),
+        ("wrapped::get#0", owners),
+    ];
+    let expected: std::collections::BTreeMap<_, _> =
+        expected.map(|(k, v)| (k.to_string(), v)).into();
+    assert_eq!(consumers, expected);
+    assert_eq!(linked("src/join.ts").len(), 11);
     // A base read from the environment, a body of two statements, a name match and a name a
-    // parameter, a `catch` binding or a local hides fold nothing.
+    // parameter, a `catch` binding or a local hides fold nothing; neither does a `new URL`
+    // written through its path or host, nor a `URL` the file declares or imports from the
+    // repository.
     for file in [
         "src/env.ts",
         "src/statements.ts",
         "src/names.ts",
         "src/hidden.ts",
+        "src/written.ts",
+        "src/declared.ts",
+        "src/own.ts",
     ] {
         assert_eq!(linked(file), Vec::<String>::new(), "{file}");
     }
@@ -503,6 +965,22 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         ))
     };
     let (stripped_via, slashed_via) = (stock("/stripped"), stock("/slashed"));
+    let short = Some("host:short.example.com through proxy endpoint /short".to_string());
+    let inventory_at = |endpoint: &str| {
+        Some(format!(
+            "env:INVENTORY_URL through proxy endpoint {endpoint}"
+        ))
+    };
+    let unread = |endpoint: &str| format!("client:Backstage proxy endpoint {endpoint}{said}");
+    let (shortenv_via, shortenvdirect_via) =
+        (inventory_at("/shortenv"), inventory_at("/shortenvdirect"));
+    let (included_via, includedshort_via) = (inventory_at("/included"), stock("/includedshort"));
+    let shortstripped_via = stock("/shortstripped");
+    let (shortignored_said, shortprepend_said, shortrewrite_said) = (
+        unread("/shortignored"),
+        unread("/shortprepend"),
+        unread("/shortrewrite"),
+    );
     let mut expected = [
         // `/inventoryx` is no `/inventory`.
         (
@@ -564,6 +1042,68 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
             "http::GET::/api/proxy/disputed/clusters",
             Some(disputed.as_str()),
         ),
+        // A string is `{ target }` with the default `pathRewrite`, under `endpoints`: a host, or a
+        // variable written as `${VAR}` or `$env`. The options another file gives the same
+        // endpoint apply to it.
+        ("viaShort", "http::GET::/clusters", short.as_deref()),
+        (
+            "viaShortEnv",
+            "http::GET::/clusters",
+            shortenv_via.as_deref(),
+        ),
+        (
+            "viaShortEnvDirect",
+            "http::GET::/clusters",
+            shortenvdirect_via.as_deref(),
+        ),
+        (
+            "viaShortIgnored",
+            "http::GET::/api/proxy/shortignored/clusters",
+            Some(shortignored_said.as_str()),
+        ),
+        (
+            "viaShortPrepend",
+            "http::GET::/api/proxy/shortprepend/clusters",
+            Some(shortprepend_said.as_str()),
+        ),
+        (
+            "viaShortRewrite",
+            "http::GET::/api/proxy/shortrewrite/clusters",
+            Some(shortrewrite_said.as_str()),
+        ),
+        (
+            "viaShortStripped",
+            "http::GET::/clusters",
+            shortstripped_via.as_deref(),
+        ),
+        // An endpoint in an included partial, whole or as the string a key path selects.
+        (
+            "viaIncluded",
+            "http::GET::/clusters",
+            included_via.as_deref(),
+        ),
+        (
+            "viaIncludedShort",
+            "http::GET::/clusters",
+            includedshort_via.as_deref(),
+        ),
+        // Both shapes, in one file (`/oldshape`, `/prodshape`) or across files (`/localshape`,
+        // alone in its file): only `endpoints` is read, so a legacy key is no endpoint.
+        (
+            "viaOldShape",
+            "http::GET::/api/proxy/oldshape/clusters",
+            None,
+        ),
+        (
+            "viaProdShape",
+            "http::GET::/api/proxy/prodshape/clusters",
+            None,
+        ),
+        (
+            "viaLocalShape",
+            "http::GET::/api/proxy/localshape/clusters",
+            None,
+        ),
         // A part Meada cannot read in the endpoint, or right after it, names no endpoint.
         ("holeAfterEndpoint", "http::GET::/api/proxy/{}", None),
         ("holeInEndpoint", "http::GET::/api/proxy/{}/clusters", None),
@@ -590,6 +1130,11 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
     let through = format!(
         "base URL from INVENTORY_URL through the proxy endpoint /inventory, a base_url_env of peer {peer}"
     );
+    let through_at = |endpoint: &str| {
+        format!(
+            "base URL from INVENTORY_URL through the proxy endpoint {endpoint}, a base_url_env of peer {peer}"
+        )
+    };
     let served = |function: &str, level, reason: &str| {
         (
             function.to_string(),
@@ -606,11 +1151,32 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         [
             served("viaBrowserPath", "inferred", &through),
             served("viaDiscovery", "inferred", &through),
+            served("viaIncluded", "inferred", &through_at("/included")),
+            served(
+                "viaIncludedShort",
+                "exact",
+                &format!(
+                    "host stock.example.com through the proxy endpoint /includedshort is served by {peer}"
+                ),
+            ),
             served(
                 "viaLiteralTarget",
                 "exact",
                 &format!(
                     "host stock.example.com through the proxy endpoint /stock is served by {peer}"
+                ),
+            ),
+            served("viaShortEnv", "inferred", &through_at("/shortenv")),
+            served(
+                "viaShortEnvDirect",
+                "inferred",
+                &through_at("/shortenvdirect")
+            ),
+            served(
+                "viaShortStripped",
+                "exact",
+                &format!(
+                    "host stock.example.com through the proxy endpoint /shortstripped is served by {peer}"
                 ),
             ),
             served(
@@ -646,12 +1212,396 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         unread("/ignored", 1),
         unread("/legacy", 2),
         unread("/rewritten", 1),
+        unread("/shortignored", 1),
+        unread("/shortprepend", 1),
+        unread("/shortrewrite", 1),
         unread("/slashed", 1),
         unread("/twice", 1),
+        "  config files: 5 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 39, \
+         redacted: 0"
+            .to_string(),
         "  wrong conclusion? report it: \
          https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml"
             .to_string(),
         "example.com/backstage/inventory (../go-backstage-inventory) indexed, 1 files".to_string(),
     ];
     assert_eq!(status.lines().collect::<Vec<_>>(), expected, "{status}");
+}
+
+/// Backstage's legacy proxy shape (#690): with no `proxy.endpoints` in any file, the keys of
+/// `proxy` that start with `/` are the endpoints, as strings (`{ target }`) or objects, inline or
+/// in an included partial, in any `app-config*.yaml`, with the same `pathRewrite`, `ignorePath`
+/// and `prependPath` rules as `endpoints`.
+#[test]
+fn the_legacy_proxy_shape_and_its_strings_send_a_call_to_their_target() {
+    let case = "urls_backstage_proxy_legacy";
+    let web = fixture_repo(
+        case,
+        "ts-backstage-proxy-legacy",
+        Some("https://example.com/backstage/web.git"),
+    );
+    fixture_repo(
+        case,
+        "go-backstage-inventory",
+        Some("https://example.com/backstage/inventory.git"),
+    );
+    let export = Engine::open(&web).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let function = |site: &str| site.split("::").nth(2).unwrap().to_string();
+    let mut consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+        .iter()
+        .map(|c| {
+            let site = function(c["site"].as_str().unwrap());
+            let via = c["via"].as_str().map(str::to_string);
+            (site, c["contract"].as_str().unwrap().to_string(), via)
+        })
+        .collect();
+    consumers.sort();
+    let said = " (its target or the path it gets is not read: a target neither ${VAR} nor an http(s) URL, a pathRewrite that does more than strip the endpoint, ignorePath, prependPath, or app-config files that disagree)";
+    let env = |ep: &str| format!("env:INVENTORY_URL through proxy endpoint {ep}");
+    let host = |h: &str, ep: &str| format!("host:{h} through proxy endpoint {ep}");
+    let unread = |ep: &str| format!("client:Backstage proxy endpoint {ep}{said}");
+    let served = |function: &str, via: String| {
+        (
+            function.to_string(),
+            "http::GET::/clusters".to_string(),
+            Some(via),
+        )
+    };
+    let unlinked = |function: &str, ep: &str| {
+        (
+            function.to_string(),
+            format!("http::GET::/api/proxy/{ep}/clusters"),
+            Some(unread(&format!("/{ep}"))),
+        )
+    };
+    let mut expected = vec![
+        served("viaInventory", env("/inventory")),
+        served("viaDiscovery", env("/inventory")),
+        // A string is `{ target }`: a host, or a variable.
+        served("viaStock", host("stock.example.com", "/stock")),
+        served("viaStockEnv", env("/stockenv")),
+        served("viaStripped", host("stock.example.com", "/stripped")),
+        // An endpoint in an included partial, and in another file.
+        served("viaIncluded", env("/included")),
+        served("viaFromFile", env("/fromfile")),
+        served(
+            "viaFromFileShort",
+            host("stock.example.com", "/fromfileshort"),
+        ),
+        served("viaLocal", host("local.example.com", "/local")),
+        // The rules of the object form, also over a string another file gives the options.
+        unlinked("viaRewritten", "rewritten"),
+        unlinked("viaIgnored", "ignored"),
+        unlinked("viaPrepended", "prepended"),
+        unlinked("viaShortIgnored", "shortignored"),
+        unlinked("viaShortRewritten", "shortrewritten"),
+        unlinked("viaShortPrepended", "shortprepended"),
+    ];
+    expected.sort();
+    assert_eq!(consumers, expected);
+
+    let links: Vec<_> = (json["links"].as_array().unwrap())
+        .iter()
+        .map(|l| {
+            (
+                function(l["consumer"].as_str().unwrap()),
+                l["level"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    let (inferred, exact) = ("inferred", "exact");
+    assert_eq!(
+        links,
+        [
+            ("viaDiscovery", inferred),
+            ("viaFromFile", inferred),
+            ("viaFromFileShort", exact),
+            ("viaIncluded", inferred),
+            ("viaInventory", inferred),
+            ("viaStock", exact),
+            ("viaStockEnv", inferred),
+            ("viaStripped", exact),
+        ]
+        .map(|(f, l)| (f.to_string(), l))
+    );
+    // `meada status` names each unread endpoint of the legacy shape, as it does one of `endpoints`.
+    let status = meada::engine::status(&web).unwrap();
+    let unread: Vec<_> = (status.lines())
+        .filter_map(|l| l.trim().strip_prefix("Backstage proxy endpoint "))
+        .map(|l| l.split(':').next().unwrap())
+        .collect();
+    assert_eq!(
+        unread,
+        [
+            "/ignored",
+            "/prepended",
+            "/rewritten",
+            "/shortignored",
+            "/shortprepended",
+            "/shortrewritten"
+        ],
+        "{status}"
+    );
+}
+
+/// A `proxy.endpoints` that exists, empty or not an object, is the table Backstage's proxy backend
+/// reads (#690), so the legacy keys of another file are no endpoints, and the call stays
+/// unlinked.
+#[test]
+fn an_empty_endpoints_table_still_hides_the_legacy_keys_of_another_file() {
+    for fixture in ["ts-backstage-proxy-empty", "ts-backstage-proxy-scalar"] {
+        let case = format!("urls_{}", fixture.replace('-', "_"));
+        let web = fixture_repo(
+            &case,
+            fixture,
+            Some("https://example.com/backstage/web.git"),
+        );
+        fixture_repo(
+            &case,
+            "go-backstage-inventory",
+            Some("https://example.com/backstage/inventory.git"),
+        );
+        let export = Engine::open(&web).unwrap().export().unwrap();
+        let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+        let consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+            .iter()
+            .map(|c| c["contract"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            consumers,
+            ["http::GET::/api/proxy/inventory/clusters"],
+            "{fixture}"
+        );
+        assert!(json["links"].as_array().unwrap().is_empty(), "{fixture}");
+    }
+}
+
+/// A `proxy.endpoints`, a whole `proxy` or a whole root behind an include Meada does not follow
+/// may hold the table Backstage's proxy backend reads, and Backstage reads it (or refuses to
+/// start) whatever it gives (#709): the legacy keys beside it or in another file are no
+/// endpoints, the call stays unlinked and `meada status` names the include.
+#[test]
+fn an_endpoints_table_behind_an_include_not_followed_hides_the_legacy_keys() {
+    for (n, (fixture, include)) in [
+        ("ts-backstage-proxy-unfollowed", "./proxy-endpoints.yaml"),
+        ("ts-backstage-proxy-unfollowed", "/etc/backstage/proxy.yaml"),
+        (
+            "ts-backstage-proxy-unfollowed-proxy",
+            "/etc/backstage/proxy.yaml",
+        ),
+        (
+            "ts-backstage-proxy-unfollowed-root",
+            "/etc/backstage/app-config.yaml",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let case = format!("urls_{}_{n}", fixture.replace('-', "_"));
+        let web = fixture_repo(
+            &case,
+            fixture,
+            Some("https://example.com/backstage/web.git"),
+        );
+        let config = web.join("app-config.yaml");
+        std::fs::write(
+            &config,
+            std::fs::read_to_string(&config)
+                .unwrap()
+                .replace("./proxy-endpoints.yaml", include),
+        )
+        .unwrap();
+        fixture_repo(
+            &case,
+            "go-backstage-inventory",
+            Some("https://example.com/backstage/inventory.git"),
+        );
+        let export = Engine::open(&web).unwrap().export().unwrap();
+        let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+        let consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+            .iter()
+            .map(|c| c["contract"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            consumers,
+            ["http::GET::/api/proxy/inventory/clusters"],
+            "{fixture}"
+        );
+        assert!(json["links"].as_array().unwrap().is_empty(), "{fixture}");
+        let status = meada::engine::status(&web).unwrap();
+        assert!(status.contains(include), "{fixture}: {status}");
+    }
+}
+
+/// Backstage transforms only the children of an included value. Including that same value at
+/// the root or at `proxy` is not a cycle and must not hide a legacy table from another file.
+#[test]
+fn a_self_include_at_the_root_or_proxy_keeps_legacy_endpoints() {
+    for (n, config) in [
+        "$include: ./app-config.yaml\n",
+        "proxy: { $include: ./app-config.yaml#proxy }\n",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let case = format!("urls_proxy_self_include_{n}");
+        let web = fixture_repo(
+            &case,
+            "ts-backstage-proxy-unfollowed",
+            Some("https://example.com/backstage/web.git"),
+        );
+        fixture_repo(
+            &case,
+            "go-backstage-inventory",
+            Some("https://example.com/backstage/inventory.git"),
+        );
+        std::fs::write(web.join("app-config.yaml"), config).unwrap();
+        std::fs::write(
+            web.join("app-config.local.yaml"),
+            "proxy:\n  '/inventory':\n    target: ${INVENTORY_URL}\n",
+        )
+        .unwrap();
+        let export = Engine::open(&web).unwrap().export().unwrap();
+        let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+        let consumers: Vec<_> = json["consumers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["contract"].as_str())
+            .collect();
+        assert_eq!(consumers, [Some("http::GET::/clusters")], "{config}");
+        let links = json["links"].as_array().unwrap();
+        assert_eq!(links.len(), 1, "{config}: {links:?}");
+        assert_eq!(links[0]["level"], "inferred");
+        assert!(
+            links[0]["provider"]
+                .as_str()
+                .unwrap()
+                .starts_with("example.com/backstage/inventory::")
+        );
+        assert!(
+            !meada::engine::status(&web)
+                .unwrap()
+                .contains("not followed")
+        );
+    }
+}
+
+/// An include at `proxy.endpoints` whose `#` key path ends at a key the partial lacks gives
+/// Backstage `undefined`, a key its loader leaves out rather than a failed load (#709): no table
+/// stands there, so the legacy key beside it links the call, and `meada status` names the include.
+#[test]
+fn an_endpoints_include_whose_last_key_is_absent_leaves_the_legacy_keys_read() {
+    let case = "urls_backstage_proxy_keypath";
+    let web = fixture_repo(
+        case,
+        "ts-backstage-proxy-keypath",
+        Some("https://example.com/backstage/web.git"),
+    );
+    fixture_repo(
+        case,
+        "go-backstage-inventory",
+        Some("https://example.com/backstage/inventory.git"),
+    );
+    let export = Engine::open(&web).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let consumers: Vec<_> = (json["consumers"].as_array().unwrap())
+        .iter()
+        .map(|c| c["contract"].as_str().unwrap())
+        .collect();
+    assert_eq!(consumers, ["http::GET::/clusters"]);
+    let links: Vec<_> = (json["links"].as_array().unwrap())
+        .iter()
+        .map(|l| l["level"].as_str().unwrap())
+        .collect();
+    assert_eq!(links, ["inferred"]);
+    let status = meada::engine::status(&web).unwrap();
+    assert!(status.contains("./partials/proxy.yaml#nope"), "{status}");
+}
+
+/// Backstage's `$include` (#689): an include Meada does not follow leaves its subtree unread, and
+/// `meada status` names it with its reason, one fixture case per reason. A read through the
+/// include it follows is the variable the partial names; one under an include it does not follow
+/// stays a hole.
+#[test]
+fn backstage_includes_not_followed_are_named_with_their_reason() {
+    let repo = fixture_repo(
+        "urls_backstage_includes",
+        "ts-backstage-includes",
+        Some("https://example.com/backstage/includes.git"),
+    );
+    std::os::unix::fs::symlink("ok.yaml", repo.join("partials/link.yaml")).unwrap();
+    // Two of these graft more than `lang::MAX_BYTES` into one root.
+    let big = format!("url: u\npad: '{}'\n", "x".repeat(600 * 1024));
+    std::fs::write(repo.join("partials/big.yaml"), big).unwrap();
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let via = |function: &str| {
+        (json["consumers"].as_array().unwrap().iter())
+            .find(|c| {
+                c["site"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("::{function}::"))
+            })
+            .map(|c| c["via"].clone())
+            .unwrap_or_else(|| panic!("no consumer in {function}"))
+    };
+    assert_eq!(via("viaFollowed"), "env:OK_URL");
+    assert_eq!(via("viaMissing"), serde_json::Value::Null);
+
+    let status = meada::engine::status(&repo).unwrap();
+    let named: Vec<&str> = (status.lines())
+        .filter(|l| l.contains("Backstage $include"))
+        .map(str::trim)
+        .collect();
+    let line = |file: &str, include: &str, why: &str| {
+        format!(
+            "{file}: Backstage $include {include} not followed ({why}): the keys under it stay \
+             unread"
+        )
+    };
+    let root = "app-config.yaml";
+    assert_eq!(
+        named,
+        [
+            line(
+                "app-config.size.yaml",
+                "./partials/big.yaml",
+                "past 1 MiB of included files"
+            ),
+            line(root, "../outside.yaml", "a path that leaves the repository"),
+            line(root, "./${ENV}/app.yaml", "a ${ in the path"),
+            line(root, "./partials/broken.yaml", "a file that does not parse"),
+            line(
+                root,
+                "./partials/gone.yaml",
+                "no such file, or one ignored or hidden"
+            ),
+            line(root, "./partials/link.yaml", "a symbolic link"),
+            line(
+                root,
+                "./partials/notes.txt",
+                "not a .json, .yaml or .yml file"
+            ),
+            line(root, "./partials/ok.yaml", "another key beside $include"),
+            line(
+                root,
+                "./partials/ok.yaml#nope",
+                "a key path the file does not hold"
+            ),
+            line(root, "/etc/backstage/app.yaml", "an absolute path"),
+            line(root, "3", "a value that is not a path"),
+            line("chain/c8.yaml", "c9.yaml", "deeper than 8 includes"),
+            line("partials/cycle.yaml", "../app-config.yaml", "a cycle"),
+            line(
+                "partials/many.yaml",
+                "one.yaml",
+                "more than 64 includes from one root"
+            ),
+        ],
+        "{status}"
+    );
 }
