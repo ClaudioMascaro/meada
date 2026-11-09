@@ -392,13 +392,11 @@ Send the findings back to the agent that made the change: the failing steps, the
 
 ## Gotchas
 
-- When head and base have the same package versions, building the base in the shared target
-  directory can replace `meada-core` artifacts that Cargo then reuses for a head UI build.
-  Invalidate only generated core artifacts with `cargo clean -p meada-core --target-dir
-  "${CARGO_TARGET_DIR:-$PWD/target}"` after the base build and before `build.sh head-ui`, then
-  build the head UI again. Keep the first failure and retry logs: #662's independent proof
-  observed 22 missing-field/type errors that disappeared after this invalidation, with source
-  hashes unchanged. Copied proof binaries remain immutable.
+- When head and base have the same package versions, the base build in the shared target
+  directory replaces `meada-core` artifacts that Cargo would reuse for a head UI build (#662
+  saw 22 missing-field/type errors). `build.sh` touches the head's local Rust sources before
+  its build, so no manual `cargo clean -p meada-core` is needed. Keep the first failure logs
+  if one still shows. Copied proof binaries remain immutable.
 - CI uses the workflow's timeout and worker limits; `bounded` applies to local gate commands.
   Keep the corpus time and memory budgets unchanged. The whole corpus took 98 s with release
   builds on 2026-11-02; debug builds index several times slower.
