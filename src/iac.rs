@@ -752,10 +752,10 @@ fn evaluation(expr: &Expression, ctx: &Context) -> (Option<Value>, bool) {
 /// its number type casts a large unsigned operand to signed, wraps on overflow and divides by
 /// zero into a float, each of which would print as a wrong exact name. A result past
 /// `i64::MIN..=u64::MAX`, a division with a remainder and arithmetic on a fraction or a non-number
-/// become an undefined name, so the value stays unresolved. An operand that does not evaluate in
-/// `ctx` (a `for` variable) turns its operation, and every operation around it, into a call of
-/// `meada_exact`, which does the same arithmetic as `hcl-rs` evaluates, so no operand is
-/// evaluated twice.
+/// become an undefined name (`undefined`), so the value stays unresolved. An operand that does
+/// not evaluate in `ctx` (a `for` variable) turns its operation, and every operation around it,
+/// into a call of `meada_exact`, which does the same arithmetic as `hcl-rs` evaluates, so no
+/// operand is evaluated twice.
 ///
 /// It also puts each object literal's keys in lexical order, the order Terraform walks an object
 /// in, where `hcl-rs` keeps the written one. A `for` over a collection holding an object whose
@@ -776,7 +776,7 @@ impl VisitMut for Exact<'_, '_> {
         visit_mut::visit_for_intro_mut(self, node);
         if self.unordered > unordered {
             self.inexact = true;
-            node.collection_expr = Expression::from(hcl_edit::Ident::new("meada_inexact"));
+            node.collection_expr = undefined();
         }
     }
 
@@ -788,7 +788,7 @@ impl VisitMut for Exact<'_, '_> {
             // The visitor never visits a call it writes, so this one is the file's: no Terraform
             // function.
             Expression::FuncCall(f) if f.name.name.as_str() == "meada_exact" => {
-                *expr = Expression::from(hcl_edit::Ident::new("meada_inexact"));
+                *expr = undefined();
                 return;
             }
             Expression::Object(object) => {
@@ -856,10 +856,16 @@ impl VisitMut for Exact<'_, '_> {
             Some(n) => Expression::from(n),
             None => {
                 self.inexact = true;
-                Expression::from(hcl_edit::Ident::new("meada_inexact"))
+                undefined()
             }
         };
     }
+}
+
+/// A name no file can bind (it holds a space), so evaluating it always fails: what `Exact` puts
+/// in place of a value Meada cannot write exactly.
+fn undefined() -> Expression {
+    Expression::from(hcl_edit::Ident::new_unchecked("meada inexact"))
 }
 
 /// The exact result of an integer `+ - * / %` (`None` for negation), `None` past
@@ -3487,6 +3493,9 @@ mod tests {
             "resource \"a\" \"inner\" { name = [for s in [\"x\"] : [for k, v in { zeta = s, alpha = 1 } : k][0]][0] }\n",
             // Meada's own helper is no Terraform function.
             "resource \"a\" \"inject\" { name = \"inj-${meada_exact(\"+\", 1, 2)}\" }\n",
+            // Nor can a file bind the name that stands for what Meada cannot evaluate.
+            "resource \"a\" \"shadowcall\" { name = [for meada_inexact in [\"x\"] : meada_exact(\"+\", 1, 2)][0] }\n",
+            "resource \"a\" \"shadowfor\" { name = [for meada_inexact in [[\"y\"]] : [for k, v in { (local.svc) = 1 } : v][0]][0] }\n",
         );
         assert_eq!(
             names(&[("main.tf", text)]),
@@ -3521,6 +3530,8 @@ mod tests {
                 "a.computed ~ \"*\"",
                 "a.inner = \"alpha\"",
                 "a.inject ~ \"inj-*\"",
+                "a.shadowcall ~ \"*\"",
+                "a.shadowfor ~ \"*\"",
             ]
         );
     }
@@ -3877,6 +3888,7 @@ mod tests {
                     "resource \"a\" \"loophalf\" { name = \"orders-${[for x in [7] : x / 2][0]}\" }\n",
                     "resource \"a\" \"loopwrap\" { name = \"orders-${[for x in [9223372036854775807] : -x * 3][0]}\" }\n",
                     "resource \"a\" \"loopbig\" { name = \"orders-${[for x in [18446744073709551615] : x - 1][0]}\" }\n",
+                    "resource \"a\" \"shadow\" { name = \"orders-${[for meada_inexact in [5] : 7 / 2][0]}\" }\n",
                 ),
             ),
             (
@@ -3906,6 +3918,7 @@ mod tests {
                 "a.loophalf ~ \"orders-*\"",
                 "a.loopwrap ~ \"orders-*\"",
                 "a.loopbig = \"orders-18446744073709551614\"",
+                "a.shadow ~ \"orders-*\"",
             ]
         );
     }
