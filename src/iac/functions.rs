@@ -29,7 +29,7 @@ pub(super) fn declare(ctx: &mut Context) {
     };
     let list = || ParamType::array_of(Any);
     let map = || ParamType::object_of(Any);
-    let funcs: [(&str, FuncDef); 29] = [
+    let funcs: [(&str, FuncDef); 28] = [
         ("format", variadic(vec![Str], Any, format)),
         ("formatlist", variadic(vec![Str], Any, formatlist)),
         ("join", variadic(vec![Str], list(), join)),
@@ -64,11 +64,20 @@ pub(super) fn declare(ctx: &mut Context) {
         ("tostring", fixed(vec![Any], tostring)),
         ("tonumber", fixed(vec![Any], tonumber)),
         ("jsonencode", fixed(vec![Any], jsonencode)),
-        ("meada_exact", variadic(vec![Str], Any, super::exact_call)),
     ];
     for (name, def) in funcs {
         ctx.declare_func(name, def);
     }
+    declare_exact(ctx);
+}
+
+/// `ctx` with `meada_exact` alone, the call `Exact` puts in: a var file calls no function.
+pub(super) fn declare_exact(ctx: &mut Context) {
+    let def = FuncDef::builder()
+        .params(vec![ParamType::String])
+        .variadic_param(ParamType::Any)
+        .build(super::exact_call);
+    ctx.declare_func("meada_exact", def);
 }
 
 fn string(v: &Value) -> &str {

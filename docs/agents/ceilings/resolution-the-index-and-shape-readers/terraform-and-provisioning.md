@@ -103,7 +103,7 @@
   `i64::MIN..=u64::MAX`, a division with a remainder (`7 / 2`, 3.5 in Terraform) and arithmetic on a
   fraction are unresolved (in a var file, given but unresolved, so the default does not stand
   in); an operation on a `for` variable becomes a call of `meada_exact`, the same arithmetic at
-  evaluation time (in a var file, which declares no function, given but unresolved). A number
+  evaluation time (declared alone in a var file, which calls no function). A number
   `hcl-rs` would print otherwise than Terraform (past `i64::MIN..=u64::MAX`, more digits than a
   64-bit float holds, or a float it writes with an exponent, past 1e16 or below 1e-5) is
   unresolved too, as a literal or a `tonumber`, and so is a JSON number written with a fraction or
@@ -124,7 +124,8 @@
   reader of the same local gets the cut value. A `for_each` over a list of strings expands
   (`toset` gives a list too, so a list Terraform refuses cannot be told apart). `toset` orders as
   cty does (strings bytewise, numbers by value, `false` before `true`, a null last); a set of
-  collections, in cty's hash order, is unresolved. An object walks its keys in lexical order, as Terraform
+  collections, in cty's hash order, is unresolved. `tolist` keeps its elements' types, where
+  Terraform converts a mix of strings and numbers to strings (`tolist(["a", 1])`). An object walks its keys in lexical order, as Terraform
   does: a value a name binds, a literal whose keys are written as names or strings, a `merge`,
   anything `jsonencode` writes. A `for` whose collection expression contains, anywhere, an object
   whose keys are known only once evaluated (a computed key, a comprehension) is unresolved, even

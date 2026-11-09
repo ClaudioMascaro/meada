@@ -1078,12 +1078,14 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
         let body = parser::parse_body(text).ok()?;
         let line = lines(text);
         let mut work = EVAL_WORK_MAX;
+        let mut ctx = Context::new();
+        functions::declare_exact(&mut ctx);
         for a in body.attributes() {
             let cost = cost(&a.value, &Map::new(), &mut Vec::new()).max(1);
             let spend = cost.saturating_add(widths(&a.value));
             let value = if cost <= EVAL_COST_MAX && spend <= work {
                 work -= spend;
-                match evaluation(&a.value, &Context::new()) {
+                match evaluation(&a.value, &ctx) {
                     (Some(v), _) => (size(&v) <= EVAL_VALUE_MAX).then_some(v),
                     // Terraform has a value Meada cannot write exactly (`7 / 2`): the default
                     // must not stand in for it.
@@ -4125,6 +4127,42 @@ mod tests {
                 "a.vm ~ \"q-*\" [var.m terraform.tfvars.json:1 tfvars]",
                 "a.vn ~ \"q-*\" [var.n terraform.tfvars.json:1 tfvars]",
                 "a.lj ~ \"q-*\"",
+            ]
+        );
+    }
+
+    /// A var file is evaluated as Terraform does, with no function: a template and arithmetic on a
+    /// `for` variable resolve, and a null interpolation (Terraform refuses it) gives no value, so
+    /// the default stands in, as for a function call.
+    #[test]
+    fn a_var_file_evaluates_templates_and_for_arithmetic() {
+        let main = concat!(
+            "variable \"env\" {\n  default = \"dev\"\n}\n",
+            "variable \"n\" {}\n",
+            "variable \"b\" {}\n",
+            "variable \"c\" {\n  default = \"dev\"\n}\n",
+            "variable \"d\" {\n  default = \"dev\"\n}\n",
+            "resource \"a\" \"env\" { name = \"orders-${var.env}\" }\n",
+            "resource \"a\" \"n\" { name = var.n }\n",
+            "resource \"a\" \"b\" { name = \"q-${var.b}\" }\n",
+            "resource \"a\" \"c\" { name = var.c }\n",
+            "resource \"a\" \"d\" { name = var.d }\n",
+        );
+        let tfvars = concat!(
+            "env = \"prd-${\"eu\"}\"\n",
+            "n = \"%{for x in [\"a\", \"b\"]}${x}%{endfor}-${1}\"\n",
+            "b = [for x in [1, 2] : x * 2][1]\n",
+            "c = \"pre-${null}\"\n",
+            "d = upper(\"x\")\n",
+        );
+        assert_eq!(
+            names(&[("main.tf", main), ("terraform.tfvars", tfvars)]),
+            [
+                "a.env = \"orders-prd-eu\" [var.env terraform.tfvars:1 tfvars]",
+                "a.n = \"ab-1\" [var.n terraform.tfvars:2 tfvars]",
+                "a.b = \"q-4\" [var.b terraform.tfvars:3 tfvars]",
+                "a.c = \"dev\" [var.c main.tf:6]",
+                "a.d = \"dev\" [var.d main.tf:9]",
             ]
         );
     }

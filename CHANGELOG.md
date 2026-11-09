@@ -562,6 +562,8 @@ All notable changes to Meada are recorded here. The format follows
   are `*`.
 - Terraform: a null or a collection interpolated into a name (`"q-${null}"`, `"q-${[1]}"`), which
   Terraform refuses, is `*`, where it gave the `exact` names `q-null` and `q-[\n  1\n]`.
+- Terraform: arithmetic on a `for` variable in a `.tfvars` file (`[for x in [1, 2] : x * 2][1]`)
+  resolves, as Terraform evaluates it, where the value was given but unresolved.
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes
