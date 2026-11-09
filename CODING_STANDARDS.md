@@ -148,6 +148,11 @@ forever.
 - Other async calls (Valkey, the store, status probes) go through `modules::within(bound, ask,
   timeout)`, where `bound` is the duration and `timeout` builds the timeout message.
 - A new service brings its bound with it. A call outside a deadline is a review finding.
+- A new failure answer from a service inside a loop over candidates (installations, credentials,
+  peers) says whether it ends the loop, passes to the next candidate or fails the run, and a test
+  asks the second candidate.
+- A header with more than one form (`Retry-After`: delay-seconds or HTTP-date) is parsed in every
+  form or read by presence.
 
 ## One decision, one function
 
