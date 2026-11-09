@@ -1430,10 +1430,7 @@ fn cost(
             .fold(2, add),
         Expression::Object(object) => (object.iter())
             .map(|(k, v)| {
-                let key = match k {
-                    ObjectKey::Ident(i) => i.as_str().len(),
-                    ObjectKey::Expression(e) => cost(e, roots, iters, parsed),
-                };
+                let key = key_cost(k, roots, iters, parsed);
                 add(key, cost(v.expr(), roots, iters, parsed))
             })
             .fold(2, add),
@@ -1489,7 +1486,7 @@ fn cost(
         ),
         Expression::ForExpr(f) => {
             let intro = &f.intro;
-            let (n, each) = elements(&intro.collection_expr, roots, iters, parsed);
+            let (n, each, made) = elements(&intro.collection_expr, roots, iters, parsed);
             let vars = [intro.key_var.as_ref(), Some(&intro.value_var)];
             let depth = iters.len();
             iters.extend(
@@ -1506,8 +1503,21 @@ fn cost(
                 .fold(4, add);
             *parsed = add(before, n.saturating_mul(*parsed));
             iters.truncate(depth);
-            n.saturating_mul(body)
+            n.saturating_mul(body).saturating_add(made)
         }
+    }
+}
+
+/// The bytes an object key makes: its name, or what its expression makes.
+fn key_cost(
+    key: &ObjectKey,
+    roots: &Map<String, Value>,
+    iters: &mut Vec<(String, usize)>,
+    parsed: &mut usize,
+) -> usize {
+    match key {
+        ObjectKey::Ident(i) => i.as_str().len(),
+        ObjectKey::Expression(e) => cost(e, roots, iters, parsed),
     }
 }
 
@@ -1540,7 +1550,7 @@ fn template_cost(
                 }
                 Directive::For(d) => {
                     let f = &d.for_expr;
-                    let (n, each) = elements(&f.collection_expr, roots, iters, parsed);
+                    let (n, each, made) = elements(&f.collection_expr, roots, iters, parsed);
                     let depth = iters.len();
                     let vars = [f.key_var.as_ref(), Some(&f.value_var)];
                     iters.extend(
@@ -1552,7 +1562,7 @@ fn template_cost(
                     let body = template_cost(&f.template, roots, iters, parsed);
                     *parsed = before.saturating_add(n.saturating_mul(*parsed));
                     iters.truncate(depth);
-                    n.saturating_mul(body)
+                    n.saturating_mul(body).saturating_add(made)
                 }
             },
         };
@@ -1561,14 +1571,16 @@ fn template_cost(
     total
 }
 
-/// How many elements the collection `expr` gives at most, and the bytes one of them (or its key)
-/// holds at most: exact for a bound value, else its cost for both.
+/// How many elements the collection `expr` gives at most, the bytes one of them (or its key)
+/// holds at most, and the bytes making the collection itself takes: exact for a bound value (made
+/// already, so none), the elements counted and the largest one's cost for a literal, else its
+/// cost for both.
 fn elements(
     expr: &Expression,
     roots: &Map<String, Value>,
     iters: &mut Vec<(String, usize)>,
     parsed: &mut usize,
-) -> (usize, usize) {
+) -> (usize, usize, usize) {
     if let Expression::FuncCall(f) = expr
         && matches!(f.name.name.as_str(), "tolist" | "toset" | "tomap")
         && f.args.len() == 1
@@ -1580,6 +1592,9 @@ fn elements(
         // refuses the call, is costed as any call.
         return elements(arg, roots, iters, parsed);
     }
+    if let Expression::Parenthesis(p) = expr {
+        return elements(p.inner(), roots, iters, parsed);
+    }
     let found = match expr {
         Expression::Traversal(t) if iters.is_empty() => bound(t, roots),
         Expression::Variable(v) if iters.is_empty() => roots.get(v.as_str()),
@@ -1587,33 +1602,37 @@ fn elements(
     };
     let most = |sizes: &mut dyn Iterator<Item = usize>| sizes.max().unwrap_or(0);
     match found {
-        Some(Value::Array(items)) => (items.len(), most(&mut items.iter().map(size))),
+        Some(Value::Array(items)) => (items.len(), most(&mut items.iter().map(size)), 0),
         Some(Value::Object(map)) => (
             map.len(),
             most(&mut map.iter().map(|(k, v)| (k.len() + 2).max(size(v)))),
+            0,
         ),
-        Some(v) => (1, size(v)),
-        // A literal collection is counted as a bound one: its elements, and the most one costs.
-        None => match expr {
-            Expression::Array(items) => (
-                items.len(),
-                most(&mut items.iter().map(|e| cost(e, roots, iters, parsed))),
-            ),
-            Expression::Object(object) => (
-                object.len(),
-                most(&mut object.iter().map(|(k, v)| {
-                    let key = match k {
-                        ObjectKey::Ident(i) => i.as_str().len(),
-                        ObjectKey::Expression(e) => cost(e, roots, iters, parsed),
-                    };
-                    key.max(cost(v.expr(), roots, iters, parsed))
-                })),
-            ),
-            _ => {
-                let c = cost(expr, roots, iters, parsed);
-                (c, c)
-            }
-        },
+        Some(v) => (1, size(v), 0),
+        // A literal is counted as a bound collection is, with the bytes making it added: `hcl-rs`
+        // evaluates it once before the `for` runs.
+        None => {
+            let parts: Vec<(usize, usize)> = match expr {
+                Expression::Array(items) => (items.iter())
+                    .map(|e| (0, cost(e, roots, iters, parsed)))
+                    .collect(),
+                Expression::Object(object) => (object.iter())
+                    .map(|(k, v)| {
+                        (
+                            key_cost(k, roots, iters, parsed),
+                            cost(v.expr(), roots, iters, parsed),
+                        )
+                    })
+                    .collect(),
+                _ => {
+                    let c = cost(expr, roots, iters, parsed);
+                    return (c, c, 0);
+                }
+            };
+            let each = most(&mut parts.iter().map(|(k, v)| *k.max(v)));
+            let made = (parts.iter()).fold(0, |a: usize, (k, v)| a.saturating_add(k + v));
+            (parts.len(), each, made)
+        }
     }
 }
 
@@ -4406,6 +4425,34 @@ mod tests {
         let took = start.elapsed();
         assert_eq!(got, ["a.q ~ \"q-*\""]);
         assert!(took < std::time::Duration::from_secs(20), "{took:?}");
+    }
+
+    /// The literal a `for` runs over is made first, so it is charged too: a costly `for` inside a
+    /// one-element literal list stays unresolved, and a `for` over a literal object (in
+    /// parentheses, too) expands by its keys.
+    #[test]
+    fn a_for_over_a_literal_is_charged_what_makes_the_literal() {
+        let list = (0..400)
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let main = format!(
+            concat!(
+                "locals {{ x = [for z in [[for a in [{0}] : [for b in [{0}] : a]]] : 0] }}\n",
+                "resource \"a\" \"q\" {{ name = \"q-${{length(local.x)}}\" }}\n",
+                "resource \"a\" \"o\" {{\n",
+                "  for_each = {{ for k, v in ({{ x = 1, y = 2 }}) : k => v }}\n",
+                "  name = \"o-${{each.key}}\"\n}}\n",
+            ),
+            list
+        );
+        let got = names(&[("main.tf", &main)]);
+        let want = [
+            "a.q ~ \"q-*\"",
+            "a.o[\"x\"] = \"o-x\"",
+            "a.o[\"y\"] = \"o-y\"",
+        ];
+        assert_eq!(got, want);
     }
 
     /// A key bound over `toset(...)` is the element in Terraform, where Meada's set is a list
