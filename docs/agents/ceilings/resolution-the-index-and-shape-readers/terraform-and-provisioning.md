@@ -123,9 +123,13 @@
   A value cut at `EVAL_DEPTH_MAX` or around a cycle is memoized for its instance, so a shallower
   reader of the same local gets the cut value. A `for_each` over a list of strings expands
   (`toset` gives a list too, so a list Terraform refuses cannot be told apart). `tolist`, `toset`
-  and `tomap` convert their elements to one type as cty does (scalars with a string become
-  strings, a number with a bool is refused); elements of differing collection types are
-  unresolved, where Terraform converts them too (`tolist([[1], ["a"]])`). `toset` orders as cty
+  and `tomap` convert their elements to one type as cty unifies them (scalars with a string
+  become strings, objects of one set of attributes attribute by attribute and others to a map,
+  tuples of one length element by element and others to a list, a number with a bool refused). A
+  list value is read as a tuple and a map as an object, so a `tolist` or `tomap` result beside a
+  literal of the same length or attributes may unify where Terraform converts more to strings. A
+  null beside a collection is unresolved, but for a `tomap` whose other values share one type.
+  `toset` orders as cty
   does (strings bytewise, numbers by value, `false` before `true`, a null last); a set of
   collections, in cty's hash order, is unresolved. An object walks its keys in lexical order, as Terraform
   does: a value a name binds, a literal whose keys are written as names or strings, a `merge`,

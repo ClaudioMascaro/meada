@@ -6,7 +6,7 @@
 //! `%s`, `%d`, `%v`, `%q` and `%%`) is an error, which leaves the call unresolved too.
 
 use std::cmp::Ordering;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use hcl::eval::{Context, FuncArgs, FuncDef, ParamType};
 use hcl::{Map, Number, Value};
@@ -356,49 +356,137 @@ fn tomap(args: FuncArgs) -> Out {
     let Some(map) = args[0].as_object() else {
         return Ok(args[0].clone());
     };
-    let values = unified(&map.values().cloned().collect::<Vec<_>>())?;
+    let values: Vec<Value> = map.values().cloned().collect();
+    // A map, unlike a list, takes a null beside values of one type, which stay as they are.
+    let mut given = values.iter().filter(|v| !v.is_null()).map(type_of);
+    let first = given.next();
+    let values = match unified(&values) {
+        Err(_) if given.all(|t| Some(t) == first) => values,
+        unified => unified?,
+    };
     Ok(Value::Object(map.keys().cloned().zip(values).collect()))
 }
 
-/// Elements converted to one type, as cty does for a list, set or map: of one type (a null aside)
-/// they stay as they are, and scalars with a string become strings. A number with a bool has no
-/// common type (Terraform refuses it), and collections of differing types are unresolved.
+/// Elements converted to their one type, as cty's `convert` does for a list or a set.
 fn unified(items: &[Value]) -> Result<Vec<Value>, String> {
-    let given: Vec<&Value> = items.iter().filter(|v| !v.is_null()).collect();
-    let scalars = given.iter().all(|v| !(v.is_array() || v.is_object()));
-    if scalars && given.iter().any(|v| v.is_string()) {
-        let text = |v: &Value| shown(v).map_or(Value::Null, Value::String);
-        return Ok(items.iter().map(text).collect());
-    }
-    let first = given.first().map(|v| type_of(v));
-    if given.iter().any(|v| Some(type_of(v)) != first) {
-        return Err("elements of no one type".into());
-    }
-    Ok(items.to_vec())
+    let ty = unify(&items.iter().map(type_of).collect::<Vec<_>>())?;
+    Ok(items.iter().map(|v| converted(v, &ty)).collect())
 }
 
-/// A value's type as a text two values share exactly when cty gives them one type: a list whose
-/// elements share a type is a list of it, whatever its length.
-fn type_of(v: &Value) -> String {
+/// A value's type as cty reads a literal: a list is a tuple, a null has any type (`Dynamic`).
+/// Unification also gives lists and maps.
+#[derive(Clone, PartialEq)]
+enum Type {
+    Dynamic,
+    Bool,
+    Number,
+    String,
+    List(Box<Type>),
+    Map(Box<Type>),
+    Tuple(Vec<Type>),
+    Object(BTreeMap<String, Type>),
+}
+
+fn type_of(v: &Value) -> Type {
     match v {
-        Value::Null => "null".into(),
-        Value::Bool(_) => "bool".into(),
-        Value::Number(_) => "number".into(),
-        Value::String(_) => "string".into(),
-        Value::Array(items) => {
-            let types: Vec<String> = items.iter().map(type_of).collect();
-            match &types[..] {
-                [first, rest @ ..] if rest.iter().all(|t| t == first) => format!("list({first})"),
-                _ => format!("tuple({})", types.join(",")),
-            }
-        }
+        Value::Null => Type::Dynamic,
+        Value::Bool(_) => Type::Bool,
+        Value::Number(_) => Type::Number,
+        Value::String(_) => Type::String,
+        Value::Array(items) => Type::Tuple(items.iter().map(type_of).collect()),
         Value::Object(map) => {
-            let mut entries: Vec<String> = (map.iter())
-                .map(|(k, v)| format!("{k:?}:{}", type_of(v)))
-                .collect();
-            entries.sort_unstable();
-            format!("object({})", entries.join(","))
+            Type::Object(map.iter().map(|(k, v)| (k.clone(), type_of(v))).collect())
         }
+    }
+}
+
+/// The type cty's `unify` gives values of these types: objects of one set of attributes unify
+/// attribute by attribute, others to a map; tuples of one length element by element, others to a
+/// list; a string takes any scalar. A null beside a collection unifies to cty's dynamic type, which
+/// a list refuses and nested values seldom pass: unresolved.
+fn unify(types: &[Type]) -> Result<Type, String> {
+    let count = |kind: fn(&Type) -> bool| types.iter().filter(|t| kind(t)).count();
+    let nulls = count(|t| *t == Type::Dynamic);
+    let objects = count(|t| matches!(t, Type::Object(_)));
+    let tuples = count(|t| matches!(t, Type::Tuple(_)));
+    if (objects > 0 || tuples > 0) && nulls > 0 {
+        return Err("a null beside a collection".into());
+    }
+    if objects == types.len() && objects > 0 {
+        let attrs: Vec<_> = (types.iter())
+            .filter_map(|t| {
+                if let Type::Object(a) = t {
+                    Some(a)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if attrs.iter().any(|a| !a.keys().eq(attrs[0].keys())) {
+            let all: Vec<Type> = attrs.iter().flat_map(|a| a.values().cloned()).collect();
+            return Ok(Type::Map(Box::new(unify(&all)?)));
+        }
+        let across = |k: &String| unify(&attrs.iter().map(|a| a[k].clone()).collect::<Vec<_>>());
+        return (attrs[0].keys())
+            .map(|k| Ok((k.clone(), across(k)?)))
+            .collect::<Result<_, String>>()
+            .map(Type::Object);
+    }
+    if tuples == types.len() && tuples > 0 {
+        let elems: Vec<_> = (types.iter())
+            .filter_map(|t| {
+                if let Type::Tuple(e) = t {
+                    Some(e)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if elems.iter().any(|e| e.len() != elems[0].len()) {
+            let all: Vec<Type> = elems.iter().flat_map(|e| e.iter().cloned()).collect();
+            return Ok(Type::List(Box::new(unify(&all)?)));
+        }
+        let across = |i: usize| unify(&elems.iter().map(|e| e[i].clone()).collect::<Vec<_>>());
+        return (0..elems[0].len())
+            .map(across)
+            .collect::<Result<_, String>>()
+            .map(Type::Tuple);
+    }
+    if objects > 0 || tuples > 0 {
+        return Err("a collection beside a scalar or another kind of collection".into());
+    }
+    if types.contains(&Type::String) {
+        return Ok(Type::String);
+    }
+    let mut given = types.iter().filter(|t| **t != Type::Dynamic);
+    let first = given.next().cloned().unwrap_or(Type::Dynamic);
+    match given.all(|t| *t == first) {
+        true => Ok(first),
+        false => Err("a number with a bool".into()),
+    }
+}
+
+/// `v` converted to `ty`, a type `unify` gave it: only a scalar becoming a string changes.
+fn converted(v: &Value, ty: &Type) -> Value {
+    match (v, ty) {
+        (Value::Array(items), Type::List(t)) => {
+            Value::Array(items.iter().map(|i| converted(i, t)).collect())
+        }
+        (Value::Array(items), Type::Tuple(ts)) => {
+            Value::Array(items.iter().zip(ts).map(|(i, t)| converted(i, t)).collect())
+        }
+        (Value::Object(map), Type::Map(t)) => Value::Object(
+            map.iter()
+                .map(|(k, x)| (k.clone(), converted(x, t)))
+                .collect(),
+        ),
+        (Value::Object(map), Type::Object(ts)) => Value::Object(
+            map.iter()
+                .map(|(k, x)| (k.clone(), converted(x, &ts[k])))
+                .collect(),
+        ),
+        (_, Type::String) => shown(v).map_or(Value::Null, Value::String),
+        _ => v.clone(),
     }
 }
 

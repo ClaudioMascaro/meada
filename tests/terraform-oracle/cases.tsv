@@ -192,22 +192,50 @@
 =	jsonencode(tolist([1.5, "x"]))	q-["1.5","x"]
 =	tolist(["a", 1])[1]	q-1
 =	jsonencode([for x in tolist(["a", 1]) : x])	q-["a","1"]
-~	jsonencode(tolist([[1], ["a"]]))	q-[["1"],["a"]]
+=	jsonencode(tolist([[1], ["a"]]))	q-[["1"],["a"]]
 =	jsonencode(tolist([[1], [1, 2]]))	q-[[1],[1,2]]
 =	jsonencode(tolist([[1, "a"]]))	q-[[1,"a"]]
-~	jsonencode(tolist([{a = 1}, {a = "x"}]))	q-[{"a":"1"},{"a":"x"}]
+=	jsonencode(tolist([{a = 1}, {a = "x"}]))	q-[{"a":"1"},{"a":"x"}]
 =	jsonencode(tolist([{a = 1}, {a = 2}]))	q-[{"a":1},{"a":2}]
-~	jsonencode(tolist([{a = 1}, {b = 2}]))	q-[{"a":1},{"b":2}]
+=	jsonencode(tolist([{a = 1}, {b = 2}]))	q-[{"a":1},{"b":2}]
 ~	jsonencode(tolist([{a = 1}, [1]]))	!Error in function call
 ~	jsonencode(tolist(["a", [1]]))	!Error in function call
-~	jsonencode(tolist([{a = null}, {a = 1}]))	q-[{"a":null},{"a":1}]
+=	jsonencode(tolist([{a = null}, {a = 1}]))	q-[{"a":null},{"a":1}]
 =	jsonencode(tolist([null]))	q-[null]
 =	jsonencode(tomap({a = 1, b = "x"}))	q-{"a":"1","b":"x"}
 ~	jsonencode(tomap({a = 1, b = true}))	!Error in function call
 =	jsonencode(tomap({a = true, b = "x"}))	q-{"a":"true","b":"x"}
 =	jsonencode(tomap({a = [1], b = [2, 3]}))	q-{"a":[1],"b":[2,3]}
-~	jsonencode(tomap({a = {x = 1}, b = {y = 1}}))	q-{"a":{"x":1},"b":{"y":1}}
+=	jsonencode(tomap({a = {x = 1}, b = {y = 1}}))	q-{"a":{"x":1},"b":{"y":1}}
 =	jsonencode(tomap({a = null, b = 1}))	q-{"a":null,"b":1}
+=	jsonencode(tolist([{a = null}, {a = "x"}]))	q-[{"a":null},{"a":"x"}]
+=	jsonencode(tolist([["a"], [null]]))	q-[["a"],[null]]
+=	jsonencode(tolist([[], [1]]))	q-[[],[1]]
+=	jsonencode(tolist([[], []]))	q-[[],[]]
+=	jsonencode(tolist([[], [null]]))	q-[[],[null]]
+=	jsonencode(tomap({a = [], b = ["x"]}))	q-{"a":[],"b":["x"]}
+=	jsonencode(tolist([{a = 1}, {a = 2, b = 3}]))	q-[{"a":1},{"a":2,"b":3}]
+=	jsonencode(tolist([{}, {a = 1}]))	q-[{},{"a":1}]
+=	jsonencode(tolist([{a = {b = 1}}, {a = {c = 1}}]))	q-[{"a":{"b":1}},{"a":{"c":1}}]
+=	jsonencode(tolist([{a = 1}, {b = "x"}]))	q-[{"a":"1"},{"b":"x"}]
+=	jsonencode(tolist([{a = 1, b = 2}, {a = "x"}]))	q-[{"a":"1","b":"2"},{"a":"x"}]
+=	jsonencode(tolist([{a = 1, b = true}, {a = 1, b = "x"}]))	q-[{"a":1,"b":"true"},{"a":1,"b":"x"}]
+=	jsonencode(tolist([{a = [1]}, {a = ["x"]}]))	q-[{"a":["1"]},{"a":["x"]}]
+=	jsonencode(tolist([[1, "a"], [2]]))	q-[["1","a"],["2"]]
+=	jsonencode(tolist([[1, 2], [1, "a"]]))	q-[[1,"2"],[1,"a"]]
+=	jsonencode(tolist([[{a = 1}], [{b = "x"}, {c = 2}]]))	q-[[{"a":"1"}],[{"b":"x"},{"c":"2"}]]
+=	jsonencode(tomap({a = [1], b = ["x", "y"]}))	q-{"a":["1"],"b":["x","y"]}
+=	jsonencode(tomap({a = {n = 1}, b = {n = "x"}}))	q-{"a":{"n":"1"},"b":{"n":"x"}}
+=	jsonencode(tomap({a = {x = 1}, b = null}))	q-{"a":{"x":1},"b":null}
+=	jsonencode(tomap({a = {x = 1}, b = {x = 2}, c = null}))	q-{"a":{"x":1},"b":{"x":2},"c":null}
+~	jsonencode(tomap({a = [1], b = [1, 2], c = null}))	!Error in function call
+~	jsonencode(tolist([{a = 1}, null]))	!Error in function call
+~	jsonencode(tolist([[1], null]))	!Error in function call
+~	jsonencode(tolist([{a = {x = 1}}, {a = null}]))	!Error in function call
+~	jsonencode(tolist([1, true, null]))	!Error in function call
+~	jsonencode(tolist([{a = 1}, {b = [1]}]))	!Error in function call
+~	jsonencode(tolist([[1], {a = 1}]))	!Error in function call
+=	jsonencode(tolist([1, null]))	q-[1,null]
 =	tomap({a = 1, b = "x"}).a	q-1
 =	jsonencode(tolist(toset([1, "a"])))	q-["1","a"]
 =	jsonencode(["a", 1])	q-["a",1]

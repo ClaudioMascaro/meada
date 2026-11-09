@@ -570,8 +570,8 @@ All notable changes to Meada are recorded here. The format follows
   file's template, with or without line comments, no longer drops the value for the default.
 - Terraform: `tolist` and `tomap` convert their elements to one type, as Terraform does, where
   they kept each element's type: `jsonencode(tolist(["a", 1]))` gave an `exact` `["a",1]` for
-  Terraform's `["a","1"]`. A number with a bool, which Terraform refuses, and collections of
-  differing types are `*`.
+  Terraform's `["a","1"]`; collections unify as cty does (`[[1], ["a"]]` to `[["1"],["a"]]`). A
+  number with a bool and a list's null beside a collection, which Terraform refuses, are `*`.
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes
