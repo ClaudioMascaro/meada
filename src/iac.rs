@@ -737,6 +737,7 @@ fn evaluation(expr: &Expression, ctx: &Context) -> (Option<Value>, bool) {
         ctx,
         left: 0,
         inexact: false,
+        unordered: 0,
     };
     let value = quiet(|| {
         let mut expr = expr.clone();
@@ -752,21 +753,64 @@ fn evaluation(expr: &Expression, ctx: &Context) -> (Option<Value>, bool) {
 /// zero into a float, each of which would print as a wrong exact name. A result past
 /// `i64::MIN..=u64::MAX`, a division with a remainder and arithmetic on a fraction or a non-number
 /// become an undefined name, so the value stays unresolved. An operand that does not evaluate in
-/// `ctx` (a `for` variable) leaves its operation, and every operation around it, to `hcl-rs`,
-/// so no operand is evaluated twice.
+/// `ctx` (a `for` variable) turns its operation, and every operation around it, into a call of
+/// `meada_exact`, which does the same arithmetic as `hcl-rs` evaluates, so no operand is
+/// evaluated twice.
+///
+/// It also puts each object literal's keys in lexical order, the order Terraform walks an object
+/// in, where `hcl-rs` keeps the written one. A `for` over a collection holding an object whose
+/// keys are known only once evaluated (a computed key, a comprehension) becomes the undefined
+/// name too.
 struct Exact<'a, 'c> {
     ctx: &'a Context<'c>,
     left: usize,
-    /// Whether an operation became the undefined name.
+    /// Whether an operation became the undefined name, or a call that may fail as one.
     inexact: bool,
+    /// The objects seen so far whose keys are not written as plain names or strings.
+    unordered: usize,
 }
 
 impl VisitMut for Exact<'_, '_> {
+    fn visit_for_intro_mut(&mut self, node: &mut hcl_edit::expr::ForIntro) {
+        let unordered = self.unordered;
+        visit_mut::visit_for_intro_mut(self, node);
+        if self.unordered > unordered {
+            self.inexact = true;
+            node.collection_expr = Expression::from(hcl_edit::Ident::new("meada_inexact"));
+        }
+    }
+
     fn visit_expr_mut(&mut self, expr: &mut Expression) {
         use hcl_edit::expr::{BinaryOperator as B, UnaryOperator};
         let left = self.left;
         visit_mut::visit_expr_mut(self, expr);
         let (operator, operands) = match expr {
+            Expression::Object(object) => {
+                let mut entries: Vec<_> = std::mem::take(object).into_iter().collect();
+                let keys: Option<Vec<String>> = (entries.iter())
+                    .map(|(k, _)| match k {
+                        ObjectKey::Ident(i) => Some(i.as_str().to_string()),
+                        ObjectKey::Expression(Expression::String(s)) => {
+                            Some(s.as_str().to_string())
+                        }
+                        ObjectKey::Expression(_) => None,
+                    })
+                    .collect();
+                match keys {
+                    Some(keys) => {
+                        let mut keyed: Vec<_> = keys.into_iter().zip(entries).collect();
+                        keyed.sort_by(|a, b| a.0.cmp(&b.0));
+                        entries = keyed.into_iter().map(|(_, e)| e).collect();
+                    }
+                    None => self.unordered += 1,
+                }
+                *object = entries.into_iter().collect();
+                return;
+            }
+            Expression::ForExpr(f) if f.key_expr.is_some() => {
+                self.unordered += 1;
+                return;
+            }
             Expression::BinaryOp(op)
                 if matches!(
                     op.operator.value(),
@@ -790,25 +834,18 @@ impl VisitMut for Exact<'_, '_> {
             .flatten();
         let Some(values) = values else {
             self.left += 1;
+            self.inexact = true;
+            let operator = operator.map_or("neg", |o| o.as_str());
+            let args = [Expression::from(operator)].into_iter();
+            let args = args
+                .chain(operands.into_iter().cloned())
+                .collect::<Vec<_>>();
+            let name = hcl_edit::expr::FuncName::new(hcl_edit::Ident::new("meada_exact"));
+            *expr = Expression::from(hcl_edit::expr::FuncCall::new(name, args.into()));
             return;
         };
-        let exact = values
-            .into_iter()
-            .collect::<Option<Vec<i128>>>()
-            .and_then(|v| match (operator, v.as_slice()) {
-                (None, &[a]) => a.checked_neg(),
-                (Some(B::Plus), &[a, b]) => a.checked_add(b),
-                (Some(B::Minus), &[a, b]) => a.checked_sub(b),
-                (Some(B::Mul), &[a, b]) => a.checked_mul(b),
-                (Some(B::Div), &[a, b]) => (b != 0 && a % b == 0).then(|| a / b),
-                (Some(B::Mod), &[a, b]) => a.checked_rem(b),
-                _ => None,
-            });
-        let number = exact.and_then(|n| {
-            (i64::try_from(n).map(hcl::Number::from))
-                .or_else(|_| u64::try_from(n).map(hcl::Number::from))
-                .ok()
-        });
+        let number = (values.into_iter().collect::<Option<Vec<i128>>>())
+            .and_then(|v| arithmetic(operator, &v));
         *expr = match number {
             Some(n) => Expression::from(n),
             None => {
@@ -817,6 +854,49 @@ impl VisitMut for Exact<'_, '_> {
             }
         };
     }
+}
+
+/// The exact result of an integer `+ - * / %` (`None` for negation), `None` past
+/// `i64::MIN..=u64::MAX` or for a division with a remainder.
+fn arithmetic(
+    operator: Option<hcl_edit::expr::BinaryOperator>,
+    values: &[i128],
+) -> Option<hcl::Number> {
+    use hcl_edit::expr::BinaryOperator as B;
+    let n = match (operator, values) {
+        (None, &[a]) => a.checked_neg(),
+        (Some(B::Plus), &[a, b]) => a.checked_add(b),
+        (Some(B::Minus), &[a, b]) => a.checked_sub(b),
+        (Some(B::Mul), &[a, b]) => a.checked_mul(b),
+        (Some(B::Div), &[a, b]) => (b != 0 && a % b == 0).then(|| a / b),
+        (Some(B::Mod), &[a, b]) => a.checked_rem(b),
+        _ => None,
+    }?;
+    (i64::try_from(n).map(hcl::Number::from))
+        .or_else(|_| u64::try_from(n).map(hcl::Number::from))
+        .ok()
+}
+
+/// `meada_exact(operator, operands...)`: the operation `Exact` could not do before evaluating
+/// (`"neg"` for negation), done as exactly, an error where `Exact` writes the undefined name.
+fn exact_call(args: hcl::eval::FuncArgs) -> std::result::Result<Value, String> {
+    let operator = match args[0].as_str() {
+        Some("neg") => None,
+        Some(o) => Some(o.parse().map_err(|_| "no operator")?),
+        None => return Err("no operator".into()),
+    };
+    let integer = |v: &Value| match v {
+        Value::Number(n) if !n.is_f64() => {
+            n.as_i64().map(i128::from).or(n.as_u64().map(i128::from))
+        }
+        _ => None,
+    };
+    let values = (args.iter().skip(1))
+        .map(integer)
+        .collect::<Option<Vec<_>>>();
+    (values.and_then(|v| arithmetic(operator, &v)))
+        .map(Value::Number)
+        .ok_or_else(|| "arithmetic Meada cannot do exactly".into())
 }
 
 impl Exact<'_, '_> {
@@ -1111,8 +1191,6 @@ impl Evaluated {
 }
 
 /// `v` with every object's keys in lexical order, the order Terraform walks them in.
-// ponytail: an object literal written inside the expression keeps its written order; sort
-// `hcl-rs`'s object results if one is ever iterated in place.
 fn lexical(v: Value) -> Value {
     match v {
         Value::Object(map) => {
@@ -3391,6 +3469,16 @@ mod tests {
             "resource \"a\" \"directive\" { name = \"%{ for k, v in local.m }${v}%{ endfor }-q\" }\n",
             "resource \"a\" \"first\" { name = \"first-${[for k, v in local.m : k][0]}\" }\n",
             "resource \"a\" \"ordered\" { name = jsonencode(local.m) }\n",
+            // An object built inside the expression is walked in lexical order too: a merge, a
+            // literal, a comprehension. A `for` over one whose keys Meada cannot order before
+            // evaluating (a computed key, a comprehension) stays unresolved.
+            "resource \"a\" \"merged\" { name = jsonencode(merge(local.m, { beta = \"bb\" })) }\n",
+            "resource \"a\" \"literal\" { name = join(\"-\", [for k, v in { zeta = 1, \"alpha\" = 2 } : k]) }\n",
+            "resource \"a\" \"mergefor\" { name = \"m-${[for k, v in merge({ zeta = 1 }, { alpha = 2 }) : k][0]}\" }\n",
+            "resource \"a\" \"comprehension\" { name = jsonencode({ for s in [\"b\", \"a\"] : s => s }) }\n",
+            "resource \"a\" \"overcomp\" { name = join(\"-\", [for k, v in { for s in [\"b\", \"a\"] : s => s } : k]) }\n",
+            "resource \"a\" \"computed\" { name = join(\"-\", [for k, v in { (local.svc) = 1, alpha = 2 } : k]) }\n",
+            "resource \"a\" \"inner\" { name = [for s in [\"x\"] : [for k, v in { zeta = s, alpha = 1 } : k][0]][0] }\n",
         );
         assert_eq!(
             names(&[("main.tf", text)]),
@@ -3417,6 +3505,13 @@ mod tests {
                 "a.directive ~ \"*-q\"",
                 "a.first = \"first-alpha\"",
                 "a.ordered = \"{\\\"alpha\\\":\\\"aa\\\",\\\"zeta\\\":\\\"zz\\\"}\"",
+                "a.merged = \"{\\\"alpha\\\":\\\"aa\\\",\\\"beta\\\":\\\"bb\\\",\\\"zeta\\\":\\\"zz\\\"}\"",
+                "a.literal = \"alpha-zeta\"",
+                "a.mergefor = \"m-alpha\"",
+                "a.comprehension = \"{\\\"a\\\":\\\"a\\\",\\\"b\\\":\\\"b\\\"}\"",
+                "a.overcomp ~ \"*\"",
+                "a.computed ~ \"*\"",
+                "a.inner = \"alpha\"",
             ]
         );
     }
@@ -3741,8 +3836,8 @@ mod tests {
     /// `i64::MAX` takes the rest of the string as Terraform does: a hostile file never stops
     /// indexing. Integer arithmetic is exact, as Terraform's: a result past `u64` or below `i64`,
     /// a division with a remainder or by zero and arithmetic on a fraction stay unresolved rather
-    /// than print `hcl-rs`'s cast, wrapped or float result as an exact name; a `for` variable's
-    /// arithmetic still evaluates. A var file's value is given but unresolved: the variable's
+    /// than print `hcl-rs`'s cast, wrapped or float result as an exact name, a `for` variable's
+    /// too. A var file's value is given but unresolved: the variable's
     /// default does not stand in for it.
     #[test]
     fn arithmetic_the_evaluator_cannot_do_leaves_the_value_unresolved() {
@@ -3769,6 +3864,10 @@ mod tests {
                     "resource \"a\" \"low\" { name = \"orders-${-9223372036854775807 - 1}\" }\n",
                     "resource \"a\" \"mod\" { name = \"orders-${-7 % 3}\" }\n",
                     "resource \"a\" \"loop\" { name = join(\"-\", [for x in [1, 2] : x + 1]) }\n",
+                    "resource \"a\" \"loopneg\" { name = \"orders-${[for x in [0] : x - 18446744073709551615][0]}\" }\n",
+                    "resource \"a\" \"loophalf\" { name = \"orders-${[for x in [7] : x / 2][0]}\" }\n",
+                    "resource \"a\" \"loopwrap\" { name = \"orders-${[for x in [9223372036854775807] : -x * 3][0]}\" }\n",
+                    "resource \"a\" \"loopbig\" { name = \"orders-${[for x in [18446744073709551615] : x - 1][0]}\" }\n",
                 ),
             ),
             (
@@ -3794,6 +3893,10 @@ mod tests {
                 "a.low = \"orders--9223372036854775808\"",
                 "a.mod = \"orders--1\"",
                 "a.loop = \"2-3\"",
+                "a.loopneg ~ \"orders-*\"",
+                "a.loophalf ~ \"orders-*\"",
+                "a.loopwrap ~ \"orders-*\"",
+                "a.loopbig = \"orders-18446744073709551614\"",
             ]
         );
     }

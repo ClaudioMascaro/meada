@@ -444,6 +444,8 @@ All notable changes to Meada are recorded here. The format follows
   ceiling of 2^26 steps per pass apart from the evaluation ceiling, so that label stops before
   matching and `status` reports the evaluation limit, while route visits and evaluations count as
   before.
+- Alerts: a regular expression Go refuses for a repetition operator stacked on another (`a**`,
+  `a{2}*`) no longer links.
 - Alerts: an AlertmanagerConfig route links `inferred`, since prometheus-operator also matches
   the alert's namespace, which Meada does not read (its consumers say `(AlertmanagerConfig
   namespace)`); a Grafana rule group repeated with `count` or `for_each` declares no rule (it may
@@ -536,14 +538,16 @@ All notable changes to Meada are recorded here. The format follows
   the image another root runs it from, with its environment and provisions; only that root runs
   code without an image.
 - Terraform: `split(",", "")` gives one empty element (a `count` over its length made no node),
-  a value a variable or local binds walks its object keys in lexical order (a `for` over it or a
-  `jsonencode` of it gave an `exact` name in written order), an IaC name pattern needs three
+  an object walks its keys in lexical order, whether a variable or local binds it or the
+  expression builds it (a literal, a `merge`): a `for` over it or a `jsonencode` of it gave an
+  `exact` name in written order, and a `for` over an object whose keys are known only once
+  evaluated (a computed key, a comprehension) is now `*`; an IaC name pattern needs three
   letters or digits besides its wildcards (`*.*.*.*` matched any dotted name), and integer
   arithmetic is exact, as Terraform's: a result past `u64` or below `i64`
   (`0 - 18446744073709551615`), a division by zero or with a remainder (`7 / 2`) and arithmetic
-  on a fraction leave that part of the name `*`, where the evaluator printed a cast, clamped or
-  floating-point value as an `exact` name; such a value in a var file is given but unresolved,
-  so the variable's default no longer stands in for it.
+  on a fraction leave that part of the name `*`, also on a `for` variable, where the evaluator
+  printed a cast, wrapped or floating-point value as an `exact` name; such a value in a var file
+  is given but unresolved, so the variable's default no longer stands in for it.
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes

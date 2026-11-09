@@ -104,7 +104,10 @@
   variable holds reads its input where it is made, not at the `send`. Operations not in
   the documented table do not. A hierarchy query (`GetParametersByPath`) has no physical
   parameter name and stays unresolved. RDS and ElastiCache control-plane clients establish
-  no data uses. Kotlin keeps the earlier typed SQS reader.
+  no data uses. Kotlin keeps the earlier typed SQS reader. A Java request is seen whole (an
+  omitted bus is `default`, a phone or endpoint publish names no topic) only when its chain
+  starts at `T.builder()` with `T` named `*Request` or `*RequestEntry`: a repository class so
+  named counts too, and a bare `builder()` a static import brings keeps its unresolved side.
 
 - Python complete factory evidence (#659/#660): `EVAL_DEPTH` (256) bounds each receiver question,
   including argument inventories, and every visit of a value is a step. The questions one reader
@@ -129,7 +132,11 @@
   `EVAL_DEPTH` (256) and `EVAL_BUDGET` (65,536) bound each file's walk and exact-frame argument
   inventory; equivalent normalized frames share memo entries. Each frame's arguments are kept once
   and a memo key names them by index, so a call forwarding 2,000 clients through a wrapper holds
-  5 MiB, where a copy in the key of every value it read held 371 MiB. Only ADR 0026's five-group
+  5 MiB, where a copy in the key of every value it read held 371 MiB. An argument inventory
+  charges the file's budget once per argument of each frame it reads, so a file of wide calls
+  (`N(W+1)(W+2)/2` past about 30,000 for `N` calls of `W` arguments) spends it, and other sides
+  of the file, unrelated ones and ones written before included, may lose their name: a missing
+  name, never a wrong one. Only ADR 0026's five-group
   constructor/operation inventory is recognized. Injected types, unknown factories, opaque
   return branches, reassigned clients and hidden constructors supply no side. Unsupported
   overloads and builders are not implied by a supported operation name. A subscription never

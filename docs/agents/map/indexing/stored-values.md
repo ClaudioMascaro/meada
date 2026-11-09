@@ -157,7 +157,9 @@ as optional `via`; existing providers keep it absent. The SDK stored-format samp
 the schema key so indexes produced before these extraction forms rebuild.
 
 The stamped `contract_configs` table (#662) stores each contract kind's configuration summary,
-keyed by its prefix, with path, hash, mtime and size. The image summary contains normalized
+keyed by its prefix, with path, hash, mtime and size, and `inputs`: the stored IaC nodes'
+digest and every path `contract::probe` looked at, so a refresh summarizes the row again when
+one of them moved even though its own bytes did not. The image summary contains normalized
 builder names (patterns included), their config locations and overridable flags, Helm runner
 names with key paths and lines, and the safe local Compose build paths. It holds no source
 text, commands, arbitrary environment values or base-image configuration. It follows the same

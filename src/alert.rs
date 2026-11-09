@@ -1663,6 +1663,14 @@ mod regexp_semantics {
         assert!(regex("a{1001}").is_none());
         assert!(regex("(?:a{1000}){2}").is_none());
         assert!(regex("a{1000}").is_some());
+        // Go refuses a repetition operator stacked on another; a group or a lazy `?` between is
+        // no stacking.
+        for pattern in ["a**", "a*+", "a+*", "a{2}{3}", "a{2}*", "a*??"] {
+            assert!(regex(pattern).is_none(), "{pattern}");
+        }
+        for pattern in ["(?:a*)*", "(a+)?", "a*?", "a{2}?"] {
+            assert!(regex(pattern).is_some(), "{pattern}");
+        }
         assert!(regex(r"\p{Alphabetic}").is_none());
         assert!(regex(r"\p{Latn}").is_none());
         assert!(regex(r"\p{Latin}").unwrap().is_match("A"));

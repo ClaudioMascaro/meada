@@ -28,7 +28,7 @@ pub(super) fn declare(ctx: &mut Context) {
     };
     let list = || ParamType::array_of(Any);
     let map = || ParamType::object_of(Any);
-    let funcs: [(&str, FuncDef); 28] = [
+    let funcs: [(&str, FuncDef); 29] = [
         ("format", variadic(vec![Str], Any, format)),
         ("formatlist", variadic(vec![Str], Any, formatlist)),
         ("join", variadic(vec![Str], list(), join)),
@@ -63,6 +63,7 @@ pub(super) fn declare(ctx: &mut Context) {
         ("tostring", fixed(vec![Any], tostring)),
         ("tonumber", fixed(vec![Any], tonumber)),
         ("jsonencode", fixed(vec![Any], jsonencode)),
+        ("meada_exact", variadic(vec![Str], Any, super::exact_call)),
     ];
     for (name, def) in funcs {
         ctx.declare_func(name, def);
@@ -308,6 +309,7 @@ fn merge(args: FuncArgs) -> Out {
     for m in args.iter().filter_map(Value::as_object) {
         out.extend(m.iter().map(|(k, v)| (k.clone(), v.clone())));
     }
+    out.sort_keys();
     Ok(Value::Object(out))
 }
 
@@ -380,9 +382,10 @@ fn tonumber(args: FuncArgs) -> Out {
     }
 }
 
-/// JSON as Terraform's `jsonencode` writes it: compact, `<`, `>` and `&` escaped as Go does.
+/// JSON as Terraform's `jsonencode` writes it: compact, keys in lexical order, `<`, `>` and `&`
+/// escaped as Go does.
 fn encoded(v: &Value) -> Result<String, String> {
-    let json = serde_json::to_string(v).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string(&super::lexical(v.clone())).map_err(|e| e.to_string())?;
     Ok(json
         .replace('<', "\\u003c")
         .replace('>', "\\u003e")

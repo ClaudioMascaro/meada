@@ -39,7 +39,7 @@ const FOLD_DEPTH: usize = 256;
 /// method chain reads the chain below it again. Past it a receiver is `Unknown`, which the SDK
 /// kinds read as no client.
 // ponytail: real files read a few kilobytes of receivers; one budget per file keeps a crafted
-// chain from costing the square of its length.
+// chain from costing the square of its length: a file costs its length plus at most the budget.
 const RECEIVER_BUDGET: usize = 1 << 20;
 
 pub struct TsJs;
@@ -3014,7 +3014,7 @@ mod tests {
     }
 
     #[test]
-    fn a_long_method_chain_is_read_in_linear_time() {
+    fn a_long_method_chain_reads_its_receivers_within_one_budget() {
         // Each call of the chain reads the chain below it as its receiver: the receivers of a
         // file share one budget of bytes, past which a receiver is unknown.
         let n = 30_000;

@@ -42,7 +42,8 @@
   cloning it or formatting the repeated conjunction reason. Overflow discards all alert
   links; status reports the output limit and suppresses misleading orphan reports.
 - `RE2_REPEAT_MAX` (`alert/regexp.rs`): Go/RE2's counted-repeat limit of 1000, including
-  nested counted-repeat products. Rust-only flags, class operators and Unicode property
+  nested counted-repeat products; a repetition operator stacked on another (`a**`, `a{2}*`) is
+  refused, as Go refuses it. Rust-only flags, class operators and Unicode property
   aliases are refused; canonical Go categories/scripts and ASCII Perl classes are read.
 
 - `ALERT_MATCH_WORK_MAX` (`alert.rs`): 1,000,000 route visits and matcher evaluations per
@@ -68,7 +69,10 @@
   took 43 s for each route; it now stops before matching, as do twenty empty captures in each of a
   hundred counted copies (121 s for a pass of 2^26 steps when they cost none). The ceiling bounds
   steps, not time: 2^26 steps take about 5.6 s at that rate, a class of many single characters
-  runs slower (243 ns a step, 16.5 s a pass) and `status` may run two passes. A literal
+  runs slower (243 ns a step, 16.5 s a pass) and `status` may run two passes. Translating and
+  compiling an expression before a ceiling refuses it costs about 3 to 30 ms for 4 KB (debug), so
+  time grows linearly with the regex text a workspace holds: 4,000 configurations of one 4 KB
+  `(?i)[\w-]` expression each took 44 s to export; no budget bounds it. A literal
   alternation costs its characters and its choice whatever the value and an ordinary expression on
   a short value a few hundred steps: 1,000 rules tried against 400 routes of `.*-apix` on an
   11-byte label take 33.6 million, and OpsGenie monitors of ten short tags matched by such

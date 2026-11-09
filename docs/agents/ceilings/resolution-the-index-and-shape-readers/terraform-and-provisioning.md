@@ -102,7 +102,8 @@
   `iac::Exact` puts integer arithmetic's exact value in place first; a result outside
   `i64::MIN..=u64::MAX`, a division with a remainder (`7 / 2`, 3.5 in Terraform) and arithmetic on a
   fraction are unresolved (in a var file, given but unresolved, so the default does not stand
-  in), and an operation on a `for` variable is left to `hcl-rs`. `cost`
+  in); an operation on a `for` variable becomes a call of `meada_exact`, the same arithmetic at
+  evaluation time (in a var file, which declares no function, given but unresolved). `cost`
   bounds a `for` by the size of what it iterates, so a `for` over a value it cannot size (a
   function's result) is costed as its square and may stay unresolved below the real ceiling.
   The type table selects `bucket` for S3 and `name` for SQS; unlisted types still read
@@ -115,9 +116,11 @@
   A value cut at `EVAL_DEPTH_MAX` or around a cycle is memoized for its instance, so a shallower
   reader of the same local gets the cut value. A `for_each` over a list of strings expands
   (`toset` gives a list too, so a list Terraform refuses cannot be told apart), and `toset` over
-  mixed types keeps their first order. A value a name binds walks its object keys in lexical
-  order, as Terraform does, but an object literal written inside the expression that iterates
-  it keeps its written order, and a template `%{ for }` directive is not evaluated (a `*`).
+  mixed types keeps their first order. An object walks its keys in lexical order, as Terraform
+  does: a value a name binds, a literal whose keys are written as names or strings, a `merge`,
+  anything `jsonencode` writes. A `for` over a collection that holds an object whose keys are
+  known only once evaluated (a computed key, a comprehension) is unresolved, even where the order
+  does not show (a `length` of it), and a template `%{ for }` directive is not evaluated (a `*`).
   A function over an unresolved argument is `*` whole, even
   `format` or `join`, which keep no literal part. A literal
   `*` in a name reads as a wildcard. A child module's variable default its call leaves is not

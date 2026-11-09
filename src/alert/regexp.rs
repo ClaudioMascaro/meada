@@ -593,7 +593,8 @@ fn regex_source(pattern: &str) -> Option<String> {
     Some(out)
 }
 
-/// Go bounds each nested counted-repeat product.
+/// Go bounds each nested counted-repeat product and refuses a repetition operator stacked on
+/// another (`a**`, `a{2}*`).
 fn re2_ast(ast: &Ast) -> Option<()> {
     let mut pending = vec![(ast, 1u32)];
     while let Some((ast, parent)) = pending.pop() {
@@ -608,7 +609,8 @@ fn re2_ast(ast: &Ast) -> Option<()> {
                     _ => 1,
                 };
                 let product = parent.checked_mul(copies)?;
-                if copies > RE2_REPEAT_MAX || product > RE2_REPEAT_MAX {
+                let stacked = matches!(*repetition.ast, Ast::Repetition(_));
+                if stacked || copies > RE2_REPEAT_MAX || product > RE2_REPEAT_MAX {
                     return None;
                 }
                 pending.push((&repetition.ast, product));

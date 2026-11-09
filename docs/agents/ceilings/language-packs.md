@@ -53,7 +53,9 @@
   told by name (a function of the repository called `apply` is not told apart), and a receiver
   is known when it is a name with a written type, a constructor call `T(..)` or an `apply` or
   `also` chain of them; any other (a call's result, a property chain) leaves the lambda as any
-  other. A function's written return type is its `Def::result` (`Box?` and `Box<T>` name `Box`; none
+  other. A local `fun` declared inside a lambda is no symbol, so a call to it there reads as the
+  receiver's member at `inferred`; a local class body ends the climb to the enclosing
+  function's locals, an object expression does not. A function's written return type is its `Def::result` (`Box?` and `Box<T>` name `Box`; none
   for an expression body, a type parameter or a function type), and a class and each secondary
   constructor give their class, so a call made on a call (`make().m()`, `Box().m()`, also
   through `?.`, `!!` and a property) has `Call::on` and resolves within that class's family. A
