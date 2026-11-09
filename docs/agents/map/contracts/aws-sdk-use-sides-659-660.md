@@ -76,5 +76,11 @@ SDK resource readers link to SDK writers in their repository as well as peers. E
 configuration declarations keep their cross-repository rule and their level.
 
 SSM hierarchy queries stay unresolved instead of naming the path as a parameter; DynamoDB
-transaction condition checks are readers. Computed object keys are syntax facts (`[]` holding
-the key and value), folded by `Code::expand`; batch readers retain literal and environment keys.
+transaction condition checks are readers. Java, Go and .NET read transactions (#719) through
+one `Service` row per direction of a method: `TransactItems[].Put|Update|Delete.TableName`
+writes, `TransactItems[].ConditionCheck.TableName` and `TransactItems[].Get.TableName` read.
+`A|B` before a field's last member names the variants an element may set; `request` skips a
+whole element that sets none of them (a Java chain from `TransactWriteItem.builder()`, a Go or
+C# literal), and one it cannot see whole keeps an unresolved side. Computed object keys are
+syntax facts (`[]` holding the key and value), folded by `Code::expand`; batch readers retain
+literal and environment keys.

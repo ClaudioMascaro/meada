@@ -714,6 +714,177 @@ fn aws_sdk_operation_matrix_has_only_the_requested_sides() {
     assert_golden("aws-sdk-matrix.sides.txt", &(actual.join("\n") + "\n"));
 }
 
+/// The Java 2.x, Go v2 and .NET operation tables (#719): one call per operation in its own
+/// method, so a reader keeps its own site, and the same sides in all three languages.
+#[test]
+fn aws_sdk_operation_matrix_covers_java_go_and_dotnet() {
+    let repo = fixture_repo(
+        "aws_sdk_matrix_jvm_go_dotnet",
+        "aws-sdk-matrix-jvm-go-dotnet",
+        Some("https://example.com/aws/jvm.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+    let export: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let providers = export["providers"].as_array().unwrap();
+    let consumers = export["consumers"].as_array().unwrap();
+    // Per language: 21 writers and 14 readers, and .NET's blocking `GetObjectMetadata` reader.
+    assert_eq!(providers.len(), 63, "{export}");
+    assert_eq!(consumers.len(), 43, "{export}");
+    let mut actual = Vec::new();
+    let mut by_language: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+        Default::default();
+    for (role, sides) in [("writer", providers), ("reader", consumers)] {
+        for side in sides {
+            let site = side["site"]
+                .as_str()
+                .unwrap()
+                .strip_prefix("example.com/aws/jvm::")
+                .unwrap();
+            let contract = side["contract"].as_str().unwrap();
+            let via = side["via"].as_str().unwrap_or("");
+            actual.push(format!("{role} {site} {contract} {via}"));
+            let (file, _) = site.split_once("::").unwrap();
+            by_language
+                .entry(file.rsplit('.').next().unwrap().into())
+                .or_default()
+                .insert(format!("{role} {contract} {via}"));
+        }
+    }
+    actual.sort();
+    assert_golden(
+        "aws-sdk-matrix-jvm-go-dotnet.sides.txt",
+        &(actual.join("\n") + "\n"),
+    );
+    let sets: Vec<_> = by_language.iter().collect();
+    assert_eq!(
+        sets.iter()
+            .map(|(language, _)| language.as_str())
+            .collect::<Vec<_>>(),
+        ["cs", "go", "java"],
+        "{export}"
+    );
+    assert_eq!(sets[0].1, sets[1].1, "C# and Go name different sides");
+    assert_eq!(sets[1].1, sets[2].1, "Go and Java name different sides");
+    // A hierarchy path is no parameter name: the reader stays unresolved.
+    let by_path: Vec<_> = consumers
+        .iter()
+        .filter(|s| {
+            s["site"]
+                .as_str()
+                .unwrap()
+                .to_lowercase()
+                .contains("getparametersbypath")
+        })
+        .map(|s| s["contract"].as_str().unwrap())
+        .collect();
+    assert_eq!(by_path, ["resource::ssm"; 3], "{export}");
+}
+
+/// A DynamoDB transaction in Java, Go and .NET (#719): each `Put`, `Update` and `Delete` entry
+/// writes its own table, each `ConditionCheck` and `Get` reads its own, and a name that is not a
+/// literal follows the other name arguments: an environment read keeps its variable, a computed
+/// name stays unresolved.
+#[test]
+fn dynamodb_transactions_keep_every_entry_table_and_direction_in_java_go_and_dotnet() {
+    let repo = fixture_repo("aws_sdk_transactions", "aws-sdk-transactions", None);
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut by_language: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+    for (role, sides) in [("writer", "providers"), ("reader", "consumers")] {
+        for side in export[sides].as_array().unwrap() {
+            let site = side["site"].as_str().unwrap();
+            let mut parts = site.split("::").skip(1);
+            let file = parts.next().unwrap();
+            // The enclosing method, spelled `Transactions.write()`, `write` or `Transactions.Write()`.
+            let method = parts.next().unwrap().trim_end_matches("()");
+            let method = method.rsplit('.').next().unwrap().to_lowercase();
+            by_language
+                .entry(file.rsplit('.').next().unwrap().into())
+                .or_default()
+                .push(format!(
+                    "{method} {role} {} {}",
+                    side["contract"].as_str().unwrap(),
+                    side["via"].as_str().unwrap_or("")
+                ));
+        }
+    }
+    let expected = [
+        "computed reader resource::dynamodb ",
+        "computed writer resource::dynamodb ",
+        "fromenvironment reader resource::dynamodb env:CHECKED",
+        "fromenvironment writer resource::dynamodb env:TABLE",
+        "read reader resource::dynamodb::customers ",
+        "read reader resource::dynamodb::orders ",
+        "write reader resource::dynamodb::customers ",
+        "write writer resource::dynamodb::archive ",
+        "write writer resource::dynamodb::orders ",
+        "write writer resource::dynamodb::totals ",
+    ];
+    assert_eq!(by_language.len(), 3, "{export}");
+    for (language, mut sides) in by_language {
+        sides.sort();
+        assert_eq!(sides, expected, "{language}: {export}");
+    }
+}
+
+/// A transaction entry held in a named value and changed after it is made names no table, as
+/// the other named values on a name's path do (a Java builder is read per builder).
+#[test]
+fn dynamodb_transaction_entries_changed_after_they_are_made_name_no_table() {
+    let repo = fixture_repo("aws_sdk_transactions_changed", "aws-sdk-controls", None);
+    std::fs::write(
+        repo.join("Changed.java"),
+        "import software.amazon.awssdk.services.dynamodb.DynamoDbClient;\n\
+         import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;\n\
+         import software.amazon.awssdk.services.dynamodb.model.Put;\n\
+         import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;\n\
+         import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;\n\
+         class Changed {\n\
+         void put(boolean prod) { var db = DynamoDbClient.create(); var p = Put.builder().tableName(\"old-put\"); if (prod) p.tableName(\"new-put\"); db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p.build()).build()).build()); }\n\
+         void check(boolean prod) { var db = DynamoDbClient.create(); var c = ConditionCheck.builder().tableName(\"old-check\"); if (prod) c.tableName(\"new-check\"); db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().conditionCheck(c.build()).build()).build()); }\n\
+         void kept() { var db = DynamoDbClient.create(); var k = Put.builder().tableName(\"kept-put\"); db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(k.build()).build()).build()); }\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("changed.go"),
+        "package application\n\nimport (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/aws\"\n\t\"github.com/aws/aws-sdk-go-v2/service/dynamodb\"\n\t\"github.com/aws/aws-sdk-go-v2/service/dynamodb/types\"\n)\n\n\
+         func put(ctx context.Context) {\n\tclient := dynamodb.NewFromConfig(cfg)\n\tp := types.Put{TableName: aws.String(\"old-put-go\")}\n\tp.TableName = aws.String(\"new-put-go\")\n\tclient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: []types.TransactWriteItem{{Put: &p}}})\n}\n\n\
+         func check(ctx context.Context) {\n\tclient := dynamodb.NewFromConfig(cfg)\n\tc := types.ConditionCheck{TableName: aws.String(\"old-check-go\")}\n\tc.TableName = aws.String(\"new-check-go\")\n\tclient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: []types.TransactWriteItem{{ConditionCheck: &c}}})\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("Changed.cs"),
+        "using System.Collections.Generic;\nusing Amazon.DynamoDBv2;\nusing Amazon.DynamoDBv2.Model;\n\
+         class Changed {\n\
+         async System.Threading.Tasks.Task Put() { var db = new AmazonDynamoDBClient(); var put = new Put { TableName = \"old-put-cs\" }; put.TableName = \"new-put-cs\"; await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { Put = put } } }); }\n\
+         async System.Threading.Tasks.Task Check() { var db = new AmazonDynamoDBClient(); var check = new ConditionCheck { TableName = \"old-check-cs\" }; check.TableName = \"new-check-cs\"; await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { ConditionCheck = check } } }); }\n}\n",
+    )
+    .unwrap();
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut contracts: Vec<_> = ["providers", "consumers"]
+        .iter()
+        .flat_map(|side| export[side].as_array().unwrap())
+        .map(|s| s["contract"].as_str().unwrap())
+        .collect();
+    contracts.sort();
+    // A changed entry keeps an unresolved side in its own direction (three writers and three
+    // readers); only the Java builder nothing sets again keeps its table.
+    assert_eq!(
+        contracts,
+        [
+            "resource::dynamodb",
+            "resource::dynamodb",
+            "resource::dynamodb",
+            "resource::dynamodb",
+            "resource::dynamodb",
+            "resource::dynamodb",
+            "resource::dynamodb::kept-put",
+        ],
+        "{export}"
+    );
+}
+
 #[test]
 fn hidden_aws_client_and_command_names_never_feed_contracts() {
     let typescript = [

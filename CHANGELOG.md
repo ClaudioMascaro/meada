@@ -8,6 +8,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- DynamoDB transactions in Java, Go and C# (#719): `TransactWriteItems` and `TransactGetItems`
+  give sides as they do in JavaScript and Python. Each `Put`, `Update` and `Delete` entry
+  writes its own table, each `ConditionCheck` and `Get` entry reads its own, with the literal
+  and environment rules of the other names. Every Java, Go and .NET AWS operation now has a
+  test. Included in the 1.4.0 minor release.
 - Curated operators and private IaC mappings (#671): 43 explicit Strimzi, RabbitMQ Queue,
   ACK, Config Connector and Crossplane AWS/GCP/Azure types provision existing contracts.
   RabbitMQ Exchange/Binding topology routes real publishes to queues without inventing an

@@ -90,6 +90,10 @@ pub(crate) struct Client {
 /// An operation's direction and the request field naming the contract.
 pub(crate) struct Operation {
     pub method: &'static str,
+    /// The path to the name: `.` descends, `[]` takes every element, `.*` every key of a map.
+    /// Before the last member, `A|B` names the variants an element may set (a transaction entry's
+    /// `Put|Update|Delete`): an element setting none of them has no use for this row. A method
+    /// can have several rows, one per direction.
     pub field: &'static str,
     pub role: Role,
     /// A hierarchy query does not identify one physical resource.
@@ -181,14 +185,13 @@ pub(crate) fn extract<'a>(
         };
         for (index, stored) in facts.calls.iter().enumerate() {
             let method = crate::resolve::method(&stored.callee);
-            for service in services {
-                let Some(operation) = service
-                    .operations
-                    .iter()
-                    .find(|o| language.method(method, o.method))
-                else {
-                    continue;
-                };
+            // A method can have several rows: a transaction's entries differ in direction.
+            let operations = services.iter().flat_map(|service| {
+                (service.operations.iter())
+                    .filter(|o| language.method(method, o.method))
+                    .map(move |operation| (service, operation))
+            });
+            for (service, operation) in operations {
                 if !origins.call(path, index, &service.client)
                     && !origins.declared(path, index, service.declared)
                 {
@@ -277,7 +280,7 @@ fn changed_request<'a>(
         Language::Java => {
             // A step sets a member of the name's path (`topicArn`, `entries`, `eventBusName`).
             let setter = |method: &str| {
-                selector.split('.').any(|member| {
+                selector.split(['.', '|']).any(|member| {
                     let member = member.trim_end_matches("[]");
                     member.get(..1).is_some_and(|head| {
                         method.len() == member.len()
@@ -294,25 +297,27 @@ fn changed_request<'a>(
     // when a file writes the member read off it.
     let mut values: Vec<&Value> = request.into_iter().collect();
     for member in selector.split('.') {
-        let field = member.trim_end_matches("[]");
         let mut next = Vec::new();
         for value in values {
-            if let Value::Ref(_) = value {
-                if opaque(code, field, language, written) {
-                    return true;
+            // Each variant of a member is on the path.
+            for field in member.split('|').map(|f| f.trim_end_matches("[]")) {
+                if let Value::Ref(_) = value {
+                    if opaque(code, field, language, written) {
+                        return true;
+                    }
+                    continue;
                 }
-                continue;
-            }
-            let inner = match language {
-                Language::Go => go::field_of(value, field),
-                _ => csharp::field_of(value, field),
-            };
-            let Some(Some(inner)) = inner else {
-                continue;
-            };
-            match member.ends_with("[]").then(|| sequence(inner)).flatten() {
-                Some(items) => next.extend(items),
-                None => next.push(inner),
+                let inner = match language {
+                    Language::Go => go::field_of(value, field),
+                    _ => csharp::field_of(value, field),
+                };
+                let Some(Some(inner)) = inner else {
+                    continue;
+                };
+                match member.ends_with("[]").then(|| sequence(inner)).flatten() {
+                    Some(items) => next.extend(items),
+                    None => next.push(inner),
+                }
             }
         }
         values = next;
@@ -377,7 +382,18 @@ fn request<'v>(
             .map(|(_, v)| v))
         .or_else(|| call.args.first()),
     };
+    // `Put|Update.TableName`: the variants an element may set, then the name read off it.
+    let (variants, field) = tail.map_or((None, None), |tail| match tail.rsplit_once('.') {
+        Some((variants, field)) => (Some(variants), Some(field)),
+        None => (None, Some(tail)),
+    });
+    let member = |value: &'v Value, field: &str| match language {
+        Language::Java => Some(java::field_of(value, field)?.first().copied().flatten()),
+        Language::Go => go::field_of(value, field),
+        Language::Csharp => csharp::field_of(value, field),
+    };
     let mut out = Vec::new();
+    let mut skipped = false;
     for value in values {
         let Some(value) = value else {
             out.push((!whole.is_some_and(complete)).then_some(Value::Unknown));
@@ -393,13 +409,30 @@ fn request<'v>(
             vec![value]
         };
         for value in values {
-            let read = match tail {
+            let value = match variants {
+                None => value,
+                Some(variants) => {
+                    let mut set = None;
+                    for variant in variants.split('|') {
+                        set = set.or(member(value, variant)?);
+                    }
+                    match set {
+                        Some(set) => set,
+                        // A whole element that sets none of the variants has no use here.
+                        None if complete(value) => {
+                            skipped = true;
+                            continue;
+                        }
+                        None => {
+                            out.push(Some(Value::Unknown));
+                            continue;
+                        }
+                    }
+                }
+            };
+            let read = match field {
                 None => Some(value),
-                Some(field) => match language {
-                    Language::Java => java::field_of(value, field)?.first().copied().flatten(),
-                    Language::Go => go::field_of(value, field)?,
-                    Language::Csharp => csharp::field_of(value, field)?,
-                },
+                Some(field) => member(value, field)?,
             };
             out.push(match read {
                 Some(read) => Some(read.clone()),
@@ -407,7 +440,7 @@ fn request<'v>(
             });
         }
     }
-    if out.is_empty() {
+    if out.is_empty() && !skipped {
         out.push(Some(Value::Unknown));
     }
     Some(out)
@@ -415,7 +448,8 @@ fn request<'v>(
 
 /// Whether a request value shows every field it sets: a Go or C# literal, or a Java builder
 /// chain started by an SDK request type's `builder()` (`PublishRequest.builder()`, not a
-/// helper or factory of the repository's own named `builder`). Only then does a missing field
+/// helper or factory of the repository's own named `builder`; a transaction entry is built by
+/// `TransactWriteItem.builder()` or `TransactGetItem.builder()`). Only then does a missing field
 /// mean the request leaves it out.
 fn complete(value: &Value) -> bool {
     match value {
@@ -429,7 +463,10 @@ fn complete(value: &Value) -> bool {
         .is_some_and(|first| {
             first.callee.rsplit_once('.').is_some_and(|(ty, method)| {
                 let ty = ty.rsplit('.').next().unwrap_or(ty);
-                method == "builder" && (ty.ends_with("Request") || ty.ends_with("RequestEntry"))
+                method == "builder"
+                    && (ty.ends_with("Request")
+                        || ty.ends_with("RequestEntry")
+                        || matches!(ty, "TransactWriteItem" | "TransactGetItem"))
             })
         }),
         _ => false,

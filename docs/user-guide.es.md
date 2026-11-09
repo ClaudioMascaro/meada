@@ -667,8 +667,8 @@ declarado con el tipo de cliente SQS del SDK (`SqsClient`, `SqsAsyncClient`, `*s
 ese nombre no lo es.
 
 Los nombres literales y los ARN identifican el contrato; una lectura del entorno mantiene el
-lado sin nombre resuelto y registra su variable, también en productores. Los lotes conservan
-todos los nombres. Los lectores pertenecen a su función contenedora, los escritores a la
+lado sin nombre resuelto y registra su variable, también en productores. Los lotes y las
+transacciones de DynamoDB conservan todos los nombres, y un `ConditionCheck` lee su tabla. Los lectores pertenecen a su función contenedora, los escritores a la
 llamada de la operación, y los vínculos SDK son `exact`; las declaraciones de recursos siguen
 siendo `declared`. Los lados sin nombre resuelto no se vinculan y `GetParametersByPath` no
 identifica un parámetro físico. La [tabla de capacidades](site/es/capabilities.md) enumera las
