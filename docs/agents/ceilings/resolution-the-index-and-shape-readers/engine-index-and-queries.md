@@ -96,6 +96,9 @@
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 
-- Refreshes of one index run one after the other (#704): each takes the write lock first and
-  waits up to the busy timeout (10 s), so a call that waits behind a longer refresh (a first
-  index, a large checkout, a `meada index` beside it) answers `database is locked` (no marker).
+- Concurrent refreshes of one index (#704): one that finds nothing to write takes no write lock
+  and never waits on one. One that has something to write and meets another writer waits up to
+  the busy timeout (10 s) for that writer's commit, then walks again; a writer that holds the
+  lock longer (a first index of a large checkout, a `meada index` beside it) still leaves it
+  `database is locked`. After three such waits a refresh takes the write lock first (no
+  marker).

@@ -686,14 +686,24 @@ pub struct Indexed<'a> {
 /// a `[serve]` table the repository has none. They hold no code, so an edited document changes
 /// no code row: `Http::declare` reads them at query time.
 ///
-/// Refreshes of one index (MCP calls in flight together, or two processes) run one after the
-/// other: each takes the write lock first and waits up to the busy timeout for it (#704), so
-/// one that waits behind a longer refresh still fails.
+/// Refreshes of one index (MCP calls in flight together, or two processes) share it (#704): one
+/// that finds nothing to write takes no write lock, so it runs beside the others and never
+/// waits on a write lock. One whose first write meets another refresh's lock waits for that
+/// refresh to commit, then starts over and finds what it wrote, so the walks done while the lock
+/// is held follow the changes, not the number of waiting calls (`refresh_keeping`).
 pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
     refresh_keeping(db, root, identity, serve, true)
 }
 
-/// `refresh`, keeping the rows of the groups nothing changed in when `keep` says so.
+/// Deferred attempts before a refresh takes the write lock first (`refresh_keeping`).
+const DEFERRED_ATTEMPTS: usize = 3;
+
+/// `refresh`, keeping the rows of the groups nothing changed in when `keep` says so. Each
+/// attempt runs in a deferred transaction. SQLite refuses at once, without the busy timeout, a
+/// first write while another connection holds the write lock (#704); the attempt is then rolled
+/// back, waits up to the busy timeout for the lock to come free (the other refresh committed),
+/// and starts over from a new walk. Past `DEFERRED_ATTEMPTS`, as when the tree keeps changing
+/// under a stream of refreshes, the last attempt takes the write lock first.
 fn refresh_keeping(
     db: &Connection,
     root: &Path,
@@ -701,10 +711,50 @@ fn refresh_keeping(
     serve: &Serve,
     keep: bool,
 ) -> Result<()> {
+    for _ in 0..DEFERRED_ATTEMPTS {
+        match refresh_attempt(
+            db,
+            root,
+            identity,
+            serve,
+            keep,
+            TransactionBehavior::Deferred,
+        ) {
+            Err(e) if busy(&*e) => db.execute_batch("BEGIN IMMEDIATE; ROLLBACK")?,
+            done => return done,
+        }
+    }
+    refresh_attempt(
+        db,
+        root,
+        identity,
+        serve,
+        keep,
+        TransactionBehavior::Immediate,
+    )
+}
+
+/// Whether `e` is SQLite's busy or locked error.
+fn busy(e: &(dyn std::error::Error + 'static)) -> bool {
+    (e.downcast_ref::<rusqlite::Error>()).is_some_and(|e| {
+        matches!(
+            e.sqlite_error_code(),
+            Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
+        )
+    })
+}
+
+/// One attempt of `refresh_keeping`, in a transaction of `behavior`.
+fn refresh_attempt(
+    db: &Connection,
+    root: &Path,
+    identity: &str,
+    serve: &Serve,
+    keep: bool,
+    behavior: TransactionBehavior,
+) -> Result<()> {
     let now = SystemTime::now();
-    // Immediate: a deferred transaction reads first, and SQLite skips the busy handler when
-    // that read lock is upgraded to write while another refresh holds it (#704).
-    let tx = Transaction::new_unchecked(db, TransactionBehavior::Immediate)?;
+    let tx = Transaction::new_unchecked(db, behavior)?;
     let known = tx
         .query_row("SELECT identity, configs FROM meta", [], |r| {
             Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
@@ -931,10 +981,13 @@ fn refresh_keeping(
         let src = fs::read(abs)?;
         let hash = blake3::hash(&src).to_hex().to_string();
         if current && known.is_some_and(|k| k.hash == hash) {
-            tx.execute(
-                "UPDATE files SET mtime = ?2, size = ?3 WHERE path = ?1",
-                params![path, mtime, size],
-            )?;
+            // A racy stamp stays racy: an update that changes nothing still takes the write lock.
+            if known.is_some_and(|k| (k.mtime, k.size) != (mtime, size)) {
+                tx.execute(
+                    "UPDATE files SET mtime = ?2, size = ?3 WHERE path = ?1",
+                    params![path, mtime, size],
+                )?;
+            }
             continue;
         }
         // What `extend` added last time is most likely what it adds again.
@@ -2203,10 +2256,13 @@ fn refresh_stamped(
         };
         let hash = blake3::hash(&src).to_hex().to_string();
         if !forced && known.is_some_and(|k| k.hash == hash) {
-            tx.execute(
-                &format!("UPDATE {table} SET mtime = ?2, size = ?3 WHERE path = ?1"),
-                params![path, mtime, size],
-            )?;
+            // As in `refresh`: no update that changes nothing, so no write lock for it.
+            if known.is_some_and(|k| (k.mtime, k.size) != (mtime, size)) {
+                tx.execute(
+                    &format!("UPDATE {table} SET mtime = ?2, size = ?3 WHERE path = ?1"),
+                    params![path, mtime, size],
+                )?;
+            }
             continue;
         }
         let summary = summarize(path, &src)?;
@@ -3684,6 +3740,56 @@ mod tests {
     /// The `files` rows of an index read through `db`.
     fn files(db: &Connection) -> i64 {
         (db.query_row("SELECT count(*) FROM files", [], |r| r.get(0))).unwrap()
+    }
+
+    /// The symbols whose identity ends in `::name` in the index read through `db`.
+    fn named(db: &Connection, name: &str) -> i64 {
+        let count = "SELECT count(*) FROM symbols WHERE id LIKE '%::' || ?1";
+        (db.query_row(count, [name], |r| r.get(0))).unwrap()
+    }
+
+    /// A refresh that finds nothing to write takes no write lock (#704): it answers at once
+    /// while another connection holds the write lock, even with its file's stamp still racy
+    /// (written within `RACY`), where an update that changes nothing would ask for the lock.
+    #[test]
+    fn a_refresh_with_nothing_to_write_runs_while_another_holds_the_write_lock() {
+        use super::refresh;
+        let (dir, index) = index_dir("refresh_beside_a_writer");
+        let root = checkout(&dir);
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        let writer = Connection::open(&index).unwrap();
+        writer.execute_batch("BEGIN IMMEDIATE").unwrap();
+
+        let refreshed = with_busy_timeout(Duration::from_millis(50), || {
+            refresh(&db, &root, REPO, &Serve::default())
+        });
+        assert!(refreshed.is_ok(), "{refreshed:?}");
+        assert_eq!(named(&db, "a"), 1);
+    }
+
+    /// A refresh whose first write meets another connection's write lock waits for it to end,
+    /// then starts over and writes the change it found (#704): no `database is locked`, and no
+    /// answer from the index as it was before the change.
+    #[test]
+    fn a_refresh_that_meets_another_writer_waits_for_it_and_writes_its_change() {
+        use super::refresh;
+        let (dir, index) = index_dir("refresh_after_a_writer");
+        let root = checkout(&dir);
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        fs::write(root.join("a.ts"), "export function b() {\n  return 2;\n}\n").unwrap();
+        let writer = Connection::open(&index).unwrap();
+        writer.execute_batch("BEGIN IMMEDIATE").unwrap();
+        let ends = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            writer.execute_batch("ROLLBACK").unwrap();
+        });
+
+        let refreshed = with_busy_timeout(Duration::from_secs(10), || {
+            refresh(&db, &root, REPO, &Serve::default())
+        });
+        ends.join().unwrap();
+        assert!(refreshed.is_ok(), "{refreshed:?}");
+        assert_eq!((named(&db, "a"), named(&db, "b")), (0, 1));
     }
 
     /// A rebuild (spec #259) builds the new index beside the old one and renames it over it:
