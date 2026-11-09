@@ -78,8 +78,8 @@ seams](map/seams.md). Read the relevant extension before changing it.
 - A change under `docs/site/`, to `mkdocs.yml` or under `scripts/docs/` runs the site checks before it is done
   ([steps](../engineering/documentation-build.md)): `python3 -m venv .venv-docs`, then in it
   `python -m pip install --require-hashes -r scripts/docs/requirements.txt`,
-  `npm ci --prefix scripts/docs --no-audit --no-fund`, `mkdocs build --strict` and
-  `python scripts/docs/check.py`. The `Documentation` workflow (`.github/workflows/pages.yml`) runs the same on every PR.
+  `npm ci --prefix scripts/docs --no-audit --no-fund`, `bounded mkdocs build --strict` and
+  `bounded python scripts/docs/check.py`. The `Documentation` workflow (`.github/workflows/pages.yml`) runs the same on every PR.
 
 ## Split area files
 
