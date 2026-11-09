@@ -50,7 +50,7 @@ def light(path):
     return (path.startswith(("docs/", "scripts/docs/", ".github/", ".claude/hooks/"))
             or (len(p.parts) == 1 and (p.suffix == ".md" or p.name.startswith("LICENSE")))
             or path in {".agents/skills-lock.json", ".claude/settings.json", ".mcp.json",
-                        "scripts/check", "scripts/prove-ci", "tests/it/docs.rs", "examples/split_agents.rs"}
+                        "scripts/check", "scripts/prove-ci"}
             or (path.startswith((".agents/skills/", ".claude/skills/"))
                 and p.suffix in {".md", ".json", ".yaml", ".yml", ".toml"})
             or path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/")))
@@ -142,7 +142,13 @@ def ci_selection(event, payload):
     if event == "push":
         head = commit(payload["after"])
         before = payload.get("before")
-        if isinstance(before, str) and SHA.fullmatch(before) and set(before) == {"0"}:
+        default = f"refs/remotes/origin/{(payload.get('repository') or {}).get('default_branch')}"
+        loop = str(payload.get("ref", "")).startswith("refs/heads/loop/")
+        if loop and subprocess.run(["git", "rev-parse", "--verify", "-q", default],
+                                   stdout=subprocess.DEVNULL).returncode == 0:
+            # Its pull request's gates: the same check names report on this commit.
+            base = commit(git("merge-base", default, head))
+        elif isinstance(before, str) and SHA.fullmatch(before) and set(before) == {"0"}:
             base = empty_tree()
         else:
             base = commit(before)
@@ -315,6 +321,9 @@ def selftest():
         (["new-unknown-config"], True, True, True),
         (["ui/src/AccountPages.tsx"], True, True, True),
         (["tests/it/query.rs"], True, False, False),
+        # Rust the static path compiles only in part still builds with the product.
+        (["tests/it/docs.rs"], True, False, False),
+        (["examples/split_agents.rs"], True, True, True),
         (["tests/golden/query.txt"], True, True, True),
         ([".claude/skills/prove-meada/scripts/console.py"], False, True, True),
         ([".claude/skills/prove-meada/SKILL.md", ".agents/skills-lock.json"], False, False, False),
@@ -416,6 +425,14 @@ def selftest():
             refused(lambda: ci_selection("push", {"before": "f" * 40, "after": docs}))
             pushed = ci_selection("push", {"before": "0" * 40, "after": docs})[0]
             assert pushed["routine"] and not pushed["e2e"] and pushed["product"]
+            # A loop branch push gates its whole change against the default branch, as its pull
+            # request does: a later push of docs alone keeps the gates its earlier code needs.
+            git("update-ref", "refs/remotes/origin/main", base)
+            def pushed_to(ref):
+                return ci_selection("push", {"ref": ref, "before": code, "after": docs,
+                                             "repository": {"default_branch": "main"}})[0]
+            assert pushed_to("refs/heads/loop/1")["product"] and pushed_to("refs/heads/loop/1")["base"] == base
+            assert not pushed_to("refs/heads/main")["product"] and pushed_to("refs/heads/main")["base"] == code
             manual = ci_selection("workflow_dispatch", {})[0]
             assert not any(manual[key] for key in FLAGS)
             inputs = [".claude/skills/prove-meada/scripts/a7-probe/chart/templates/deployment.yaml",

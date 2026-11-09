@@ -15,7 +15,8 @@ prints "checks passed" or the differences found: the verdict is the checker's, n
 `values` (A7) reads every config file of each entry with its own YAML and JSON oracle, then asks
 the head for `meada status` and `search` with the kind `value` and compares each answer, line by
 line and in order, with the oracle's; the base binary answers the default search and the export.
-Exit 0: no difference, 1: differences or budget overruns, 2: a run failed (BLOCKED).
+Exit 0: no difference, 1: differences for the checker, 2: a run failed (BLOCKED), 3: a budget
+overrun or a nondeterministic index (`run`), which no expected difference explains.
 """
 
 import argparse
@@ -46,17 +47,18 @@ KEYED = {
     "symbols": ("id",),
     "calls": ("id",),
     "packages": ("ecosystem", "directory", "name"),
-    "links": ("consumer", "provider", "contract"),
+    "links": ("consumer", "provider", "contract", "root"),
     "iac_nodes": ("identity", "root"),
     "provisioners": ("contract", "node", "root"),
     "provisions": ("side", "provisioner", "root", "contract", "at"),
     "uses": ("contract", "site", "at"),
     "subscriptions": ("source", "target", "node", "root"),
-    "providers": ("contract", "site"),
-    "consumers": ("contract", "site"),
+    "providers": ("contract", "site", "at"),
+    "consumers": ("contract", "site", "root"),
 }
 WATCHED = {"calls": ("level", "target", "candidates"), "links": ("level",), "provisions": ("level", "reason"), "packages": ("version",), "consumers": ("via",)}
-OTHER = ("files", "imports", "documents", "bindings", "publishes", "dependencies", "communities", "processes")
+OTHER = ("files", "imports", "documents", "bindings", "publishes", "dependencies", "communities", "processes",
+         "executions", "stale_decisions")
 FIXED_GIT = {
     "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
     "GIT_AUTHOR_NAME": "prove-meada", "GIT_AUTHOR_EMAIL": "prove@example.com", "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
@@ -381,6 +383,17 @@ def keyed(section, v):
     return " | ".join(str(v.get(p)) for p in KEYED[section])
 
 
+def rows(section, values):
+    """`values` by their key; rows that share a key stay apart as `key #2`, `key #3`, in the
+    order of their JSON."""
+    out, seen = {}, {}
+    for v in sorted(values, key=lambda v: json.dumps(v, sort_keys=True)):
+        k = keyed(section, v)
+        seen[k] = seen.get(k, 0) + 1
+        out[k if seen[k] == 1 else f"{k} #{seen[k]}"] = v
+    return out
+
+
 def short(field, value):
     """golden_diff's short form: a target is `set`, a list is counted, so moves group."""
     if field == "target" and isinstance(value, str):
@@ -411,8 +424,7 @@ def export_diff(base, head, repo=None, cap=20):
             lines.append(f"  {field}: {base.get(field)} -> {head.get(field)}")
     symbols = {s["id"]: s for s in head.get("symbols", [])}
     for section, _ in KEYED.items():
-        b = {keyed(section, v): v for v in base.get(section, [])}
-        h = {keyed(section, v): v for v in head.get(section, [])}
+        b, h = rows(section, base.get(section, [])), rows(section, head.get(section, []))
         added = sorted(set(h) - set(b))
         removed = sorted(set(b) - set(h))
         changed = sorted(k for k in set(b) & set(h) if b[k] != h[k])
@@ -516,7 +528,7 @@ def cmd_run(a):
     if unknown:
         sys.exit(f"unknown corpus entries {unknown}; see {HERE}/corpus.tsv")
     run.mkdir(parents=True, exist_ok=True)
-    report, differences, blocked = [], 0, False
+    report, differences, hard, blocked = [], 0, 0, False
     records = {"base": {}, "head": {}}
     for name in names:
         src = run / "work" / "src" / name
@@ -545,6 +557,7 @@ def cmd_run(a):
                  "restore_equal", "restore_original")
         det = [r["deterministic"] and all(r.get(k, True) for k in flags) for r in (b, h)]
         differences += det.count(False)
+        hard += det.count(False)
         report.append(f"Determinism: cold twice equal base {b['deterministic']}, head {h['deterministic']}; "
                       f"refresh equal base {b.get('refresh_equal')}, head {h.get('refresh_equal')}; "
                       f"content refresh equal base {b.get('content_refresh_equal')}, head {h.get('content_refresh_equal')} "
@@ -572,6 +585,7 @@ def cmd_run(a):
                                               ("export bytes", b["export_bytes"], h["export_bytes"], SIZE, True)):
             over = applies and hv > bv * limit
             differences += over
+            hard += over
             budget.append(f"  {label}: {bv} -> {hv} (limit x{limit}{'' if applies else ', not applied under 2 s'})"
                           + (" OVER BUDGET" if over else ""))
         report.append("Budget:\n" + "\n".join(budget))
@@ -604,7 +618,7 @@ def cmd_run(a):
     (run / "compare.md").write_text(f"# prove.py run\n\n{verdict}\n\n" + "\n".join(report) + "\n")
     print(verdict)
     print(f"full report: {run}/compare.md")
-    sys.exit(2 if blocked else 1 if differences else 0)
+    sys.exit(2 if blocked else 3 if hard else 1 if differences else 0)
 
 
 def cmd_rebless(a):
@@ -783,15 +797,28 @@ def cmd_selftest(_):
     text = "\n".join(lines)
     assert "provisions: +0 -0 ~1" in text and "level: inferred -> exact: 1" in text, text
     assert uses[0]["at"] in text and uses[1]["at"] not in text, text
-    # Retain the failure mechanism: removing at from the feature's identity key makes
-    # the two-row addition fail its required +2 comparison, not merely a saved JSON check.
+    # Retain the failure mechanism: removing at from the feature's identity key leaves the two
+    # rows apart only as a shared key's `#2`, without the locator each one needs.
     fields = KEYED["provisions"]
     try:
         KEYED["provisions"] = tuple(f for f in fields if f != "at")
         mutant, _ = export_diff({}, pair)
-        assert "provisions: +2 -0 ~0" not in "\n".join(mutant), mutant
+        assert "channel::sqs::parcel #2" in "\n".join(mutant), mutant
+        assert uses[0]["at"] not in "\n".join(m for m in mutant if "provisions" in m or "aws_sqs" in m), mutant
     finally:
         KEYED["provisions"] = fields
+    # #648 (P14): an image link keeps its evaluation root, rows sharing one key stay apart, and
+    # executions and stale decisions are compared too, so a goldens rebless cannot call them
+    # formatting.
+    link = {"consumer": "d::k.yaml::Deployment/api", "provider": "app", "contract": "image::docker.io/a/b"}
+    lines, _ = export_diff({}, {"links": [dict(link, root=r) for r in ("overlays/dev", "overlays/prod")]})
+    assert "links: +2 -0 ~0" in "\n".join(lines), lines
+    vias = [{"contract": "c", "site": "s", "via": v} for v in ("a", "b")]
+    lines, _ = export_diff({"consumers": vias[:1]}, {"consumers": vias})
+    assert "consumers: +1 -0 ~0" in "\n".join(lines), lines
+    for section in ("executions", "stale_decisions"):
+        lines, _ = export_diff({}, {section: [{"path": "x"}]})
+        assert f"{section}: +1 -0" in "\n".join(lines), (section, lines)
     assert spread(list(range(100)), 4) == [0, 25, 50, 75] and spread([1, 2], 10) == [1, 2]
     assert short("target", "r::x") == "set" and short("candidates", [1]) == "[1 items]"
     q = auto_queries({"calls": [{"target": "r::k.kt::p.Flow.test(Duration?,String?)"}], "providers": []})

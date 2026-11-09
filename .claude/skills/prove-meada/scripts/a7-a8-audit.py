@@ -100,8 +100,7 @@ def record_command(command, folder, name, cwd=ROOT, env=None, timeout=1200):
 def compiler_lock(run):
     # The managed host has one common compiler lock; an isolated public runner needs only
     # its own. Waiting is bounded in CI by the job timeout, with no active compiler outside it.
-    path = Path(os.environ.get('PROVE_COMPILER_LOCK', '/workspace/meada-cargo.lock'
-                if Path('/workspace/meada-cargo.lock').exists() else str(run / 'compiler.lock')))
+    path = Path(os.environ.get('PROVE_COMPILER_LOCK') or run / 'compiler.lock')
     with path.open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         if shutil.disk_usage(ROOT).free < 6 * 1024 ** 3:
@@ -215,7 +214,8 @@ def baseline(args):
             build(worktree, run / 'bin' / label, run / (label + '-build'))
         finally:
             subprocess.run(['git', '-C', str(ROOT), 'worktree', 'remove', '--force', str(worktree)], check=True)
-    checks = check_flows(baseline_bin, baseline_bin, base_bin, run / 'checks', ALL, run / 'bin/meada-pre-extensions')
+    # #648: the base binary is the answer key of the existing flows; the head is never its own.
+    checks = check_flows(baseline_bin, base_bin, base_bin, run / 'checks', ALL, run / 'bin/meada-pre-extensions')
     manifest = {'source_commit': head, 'source_tree': git('rev-parse', 'HEAD^{tree}'), 'base_commit': base,
                 'verifier_keys': keys(), 'binaries': {
                     label: {'sha256': digest(run / 'bin' / label), 'built_commit': revision}
@@ -223,7 +223,8 @@ def baseline(args):
                 'checks': checks,
                 'requires_ui_receipt': True,
                 'required_separate_scope': list(SEPARATE_SCOPE),
-                'existing_answer_key': 'immutable clean A7 binary; A8 unchanged fields additionally use merge-base',
+                'existing_answer_key': 'baseline: the merge-base binary; candidate and final checks: the immutable '
+                                       'clean binary; A8 unchanged fields additionally use merge-base',
                 'not_covered': ['Separate UI/corpus/API/public-source and supplementary controls require bound receipts',
                                 'GitHub CI full suites/UI/docs/deployment remain separate from this audit',
                                 'a script pass is not a PROVED baseline or a blind mutation verdict']}

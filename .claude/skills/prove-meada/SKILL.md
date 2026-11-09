@@ -19,7 +19,7 @@ alone does not activate E2E. Product execution recipes below run only inside Git
 2. For selected E2E, prepare Scope, Sort and Find the spec below. Record base/head SHAs,
    corpus entries, queries, probes, surfaces and independent answer keys for the CI runner.
    A PR must be non-draft and carry `e2e`; external writes still require the user's authorization.
-3. Read workflow `CI` (`.github/workflows/ci.yml`), job `prove-meada`, and artifact
+3. Read workflow `Proof` (`.github/workflows/proof.yml`), job `prove-meada`, and artifact
    `prove-meada-<PR number>-<head SHA>` for the tested SHA. Confirm its base/head identity,
    scope, raw captures and checker provenance before interpreting results. A docs-only follow-up
    does not trigger another E2E run: cite the original artifact SHA, never relabel it as HEAD.

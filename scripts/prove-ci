@@ -41,10 +41,13 @@ def capture(run, scope, base, head, repos):
     blocked = None
     python = sys.executable
 
-    def command(name, args, required=False):
+    def command(name, args, required=False, compares=False):
         with (run / 'logs' / (name + '.log')).open('w') as log:
             result = subprocess.run([str(arg) for arg in args], stdout=log, stderr=subprocess.STDOUT)
         steps.append({'name': name, 'exit_code': result.returncode})
+        # A comparison's exit 1 is a difference from the base: evidence, not a failed capture.
+        if compares and result.returncode == 1:
+            steps[-1]['differences'] = True
         print(f'{name}: exit {result.returncode}', flush=True)
         if required and result.returncode:
             raise RuntimeError(f'{name} failed; see logs/{name}.log')
@@ -54,7 +57,8 @@ def capture(run, scope, base, head, repos):
             command('build-head', [SCRIPTS / 'build.sh', 'head', '.', run], required=True)
             command('build-base', [SCRIPTS / 'build.sh', 'base', base, run], required=True)
             command('cli-mcp', [python, SCRIPTS / 'prove.py', 'run', '--base-bin', run / 'bin/meada-base',
-                               '--head-bin', run / 'bin/meada-head', '--repos', repos, '--run', run, '--http'])
+                               '--head-bin', run / 'bin/meada-head', '--repos', repos, '--run', run, '--http'],
+                    compares=True)
         if scope['console']:
             # The base can leave same-version core artifacts in the shared Cargo target.
             command('clean-console-core', ['cargo', 'clean', '-p', 'meada-core', '--target-dir',
@@ -85,9 +89,10 @@ def capture(run, scope, base, head, repos):
                                       *(['--accounts'] if scope['accounts'] else [])], required=True)
             command('console-pages', ['node', SCRIPTS / 'console-pages.mjs', run])
         if scope['goldens']:
-            command('goldens', [python, SCRIPTS / 'prove.py', 'rebless', '--base', base, '--run', run])
+            command('goldens', [python, SCRIPTS / 'prove.py', 'rebless', '--base', base, '--run', run], compares=True)
         if scope['deploy']:
-            command('deploy-diff', [python, SCRIPTS / 'prove.py', 'deploy', '--base', base, '--run', run])
+            command('deploy-diff', [python, SCRIPTS / 'prove.py', 'deploy', '--base', base, '--run', run],
+                    compares=True)
             command('compose-contract', [python, 'scripts/compose-check'])
             command('helm-contract', [python, 'scripts/helm-check'])
         if scope['container']:
@@ -106,7 +111,7 @@ def capture(run, scope, base, head, repos):
         (run / 'console/private.pem').unlink(missing_ok=True)
         blocked = blocked or next((f"{step['name']} reported BLOCKED" for step in steps
                                    if step['exit_code'] == 2), None)
-        failed = blocked is not None or any(step['exit_code'] for step in steps)
+        failed = blocked is not None or any(step['exit_code'] and not step.get('differences') for step in steps)
         receipt = {
             'base': base, 'head': head, 'surfaces': [name for name in SURFACES if scope[name]],
             'repos': repos, 'run_url': os.environ.get('PROVE_RUN_URL'), 'steps': steps,
@@ -134,7 +139,9 @@ def selftest():
             raise AssertionError('local E2E must be refused')
     scope = dict.fromkeys(SURFACES, False)
     scope['cli'] = True
-    for code, expected in ((0, 'CAPTURED'), (1, 'FAILED'), (2, 'BLOCKED')):
+    # A difference from the base is evidence for the checker (exit 1); a budget overrun or a
+    # nondeterministic index fails the capture (exit 3).
+    for code, expected in ((0, 'CAPTURED'), (1, 'CAPTURED'), (3, 'FAILED'), (2, 'BLOCKED')):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
             def fake(args, **kwargs):
                 return subprocess.CompletedProcess(args, code if 'run' in args else 0)
@@ -142,7 +149,8 @@ def selftest():
                 run = Path(temp) / 'proof'
                 result = capture(run, scope, 'a' * 40, 'b' * 40, 'meada')
             receipt = json.loads((run / 'receipt.json').read_text())
-            assert bool(result) == bool(code) and receipt['capture'] == expected
+            assert bool(result) == (expected != 'CAPTURED') and receipt['capture'] == expected
+            assert bool(receipt['steps'][2].get('differences')) == (code == 1), receipt['steps']
             assert receipt['verdict'] == 'UNPROVEN' and receipt['head'] == 'b' * 40
             assert receipt['steps'][-1]['name'] == 'clean'
     with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):

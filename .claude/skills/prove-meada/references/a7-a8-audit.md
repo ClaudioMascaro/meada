@@ -9,9 +9,10 @@ The two inline config controls exercise different mapping layers. Additional A8 
 remain regressions. SDK/route flows added later retain their own receipts and Scope rows;
 this bounded mix does not claim to mutate every child flow.
 
-The existing `CI` workflow runs `proof-a7-a8` only through explicit `workflow_dispatch`
-phases: `baseline`, `candidate`, `check` and `final`. Ordinary PR/push runs use the scoped
-routine gates and selected milestone E2E; they run neither this audit's baseline nor mutations.
+The `Proof` workflow (`.github/workflows/proof.yml`) runs `proof-a7-a8` only through explicit
+`workflow_dispatch` phases: `baseline`, `candidate`, `check` and `final`. Ordinary PR/push runs
+use the routine gates of `CI` (`ci.yml`) and, on a labeled PR, the selected milestone E2E of
+`Proof`; they run neither this audit's baseline nor mutations.
 The manual baseline's 26 named native checks include the full AWS subscription/provision/orphan
 flow separately from JSON SSM and generic provisioning, GCP/Azure and JVM/Go/.NET AWS SDK
 drivers, IaC HTTP routes, custom mappings, declared resources, orphans, patterns and image regressions. The executable
@@ -44,7 +45,7 @@ identical generated input. HTTP parity supplements these keys. It never replaces
 | `bin/meada-pre-image` | before #662: `eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62` |
 | `bin/meada-pre-extensions` | compatible A7 before #666/#668/#670/#671: `e6d27d0d7c046eceb8771f17111f00511a8d6c3d` |
 
-The ordinary `frontend` job depends only on scope selection and also builds/uploads the
+`Proof`'s `e2e-frontend` job depends only on `e2e-scope` and also builds/uploads the
 exact dispatched source for an explicit manual baseline. The separate `proof-a7-a8-ui` job
 runs only after that frontend and `proof-a7-a8` baseline both succeed. It checks out the same
 source SHA, downloads that frontend and baseline manifest, and prepares the pinned browser
