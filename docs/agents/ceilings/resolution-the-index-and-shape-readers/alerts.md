@@ -31,7 +31,8 @@
   operand (`*prod`), a backward class range (`[z-a]`), a repetition stacked on another (`a**`),
   a count above 1000, a backward one or a nested product above it (`a{1001}`, `a{2,1}`), an
   escape Go does not read (`\y`, `\1` to `\9` as a backreference, `\u`), Perl syntax Go lacks
-  (`(?=`, `(?!`, `(?<=`, a flag other than `imsU`, `(?P=`) and an invalid group name. Any other
+  (`(?=`, `(?!`, a flag other than `imsU`, `(?P=`) and an invalid group name (`(?P<a.b>`,
+  `(?<=`). Any other
   failure to compile keeps its old answer, a matcher left unmatched and the rest linked, as Go
   may read it: an expression past `ALERT_REGEX_MAX` (never judged, valid or not) or a budget
   below, a Unicode property name outside the list (the tables follow Go's version), an
