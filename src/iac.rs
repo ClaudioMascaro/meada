@@ -851,10 +851,14 @@ impl VisitMut for Exact<'_, '_> {
                         let mut keyed: Vec<_> = keys.into_iter().zip(entries).collect();
                         keyed.sort_by(|a, b| a.0.cmp(&b.0));
                         entries = keyed.into_iter().map(|(_, e)| e).collect();
-                        // `hcl-rs` keeps a template as its text: each entry ends in a comma, so
-                        // the reordered object still parses there.
+                        // `hcl-rs` keeps a template as its text: the entry that ended the object
+                        // takes a comma, so the reordered object still parses there. A newline
+                        // stays, since it also ends a line comment the entry may carry.
+                        use hcl_edit::expr::ObjectValueTerminator::{Comma, None as Last};
                         for (_, value) in &mut entries {
-                            value.set_terminator(hcl_edit::expr::ObjectValueTerminator::Comma);
+                            if value.terminator() == Last {
+                                value.set_terminator(Comma);
+                            }
                         }
                     }
                     None => self.unordered += 1,
@@ -4162,6 +4166,8 @@ mod tests {
             "variable \"f\" {\n  default = \"dev\"\n}\n",
             "variable \"g\" {}\n",
             "variable \"h\" {}\n",
+            "variable \"i\" {\n  default = \"dev\"\n}\n",
+            "variable \"j\" {}\n",
             "resource \"a\" \"env\" { name = \"orders-${var.env}\" }\n",
             "resource \"a\" \"n\" { name = var.n }\n",
             "resource \"a\" \"b\" { name = \"q-${var.b}\" }\n",
@@ -4171,6 +4177,10 @@ mod tests {
             "resource \"a\" \"f\" { name = var.f }\n",
             "resource \"a\" \"g\" { name = \"q-${var.g}\" }\n",
             "resource \"a\" \"h\" { name = var.h }\n",
+            "resource \"a\" \"i\" { name = \"q-${var.i}\" }\n",
+            "resource \"a\" \"j\" { name = var.j }\n",
+            // A line comment ends an entry of a sorted object: the newline stays its terminator.
+            "resource \"a\" \"k\" {\n  name = chomp(<<EOT\nq-${{\n  b = 2 # note\n  a = 1\n}[\"a\"]}\nEOT\n  )\n}\n",
         );
         let tfvars = concat!(
             "env = \"prd-${\"eu\"}\"\n",
@@ -4184,6 +4194,8 @@ mod tests {
             "f = \"%{for x in [meada_exact(\"+\", 1, 2)]}${x}%{endfor}\"\n",
             "g = \"${{b = 1, a = 2}[\"a\"]}\"\n",
             "h = \"%{for x in [-0]}${x}%{endfor}\"\n",
+            "i = \"${{\n  b = 1 # note\n  a = 2\n}[\"a\"]}\"\n",
+            "j = \"%{for k, v in {\n  b = 1 // note\n  a = 2\n}}${k}%{endfor}\"\n",
         );
         assert_eq!(
             names(&[("main.tf", main), ("terraform.tfvars", tfvars)]),
@@ -4197,6 +4209,9 @@ mod tests {
                 "a.f = \"dev\" [var.f main.tf:13]",
                 "a.g = \"q-2\" [var.g terraform.tfvars:8 tfvars]",
                 "a.h ~ \"*\" [var.h terraform.tfvars:9 tfvars]",
+                "a.i = \"q-2\" [var.i terraform.tfvars:10 tfvars]",
+                "a.j = \"ab\" [var.j terraform.tfvars:14 tfvars]",
+                "a.k = \"q-1\"",
             ]
         );
     }
