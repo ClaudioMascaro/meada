@@ -3572,7 +3572,11 @@ mod tests {
     }
 
     /// Each node's address and physical name (` = "<name>"`, ` ~ "<pattern>"` for a pattern),
-    /// then each overridable value its name went through.
+    /// then each overridable value its name went through. Expect these forms: an instance key in
+    /// the address (`a.q["0"]` for a `for_each` key, `a.q[0]` for a `count` index), a `[var.s
+    /// main.tf:1]` suffix on an exact name that a variable's value reached, a `module.m` line for
+    /// the call itself beside the nodes inside it, and the evaluator's order of nodes, not the
+    /// files'.
     fn names(list: &[(&str, &str)]) -> Vec<String> {
         let (nodes, _) = evaluate(&files(list));
         (nodes.iter())
