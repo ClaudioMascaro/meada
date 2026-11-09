@@ -134,6 +134,19 @@ def query_equal(status, payload, expected):
     return status == 200 and payload.get('text') == expected
 
 
+def export_equal(console, cli):
+    """Both exports as JSON without `commit` and `dirty`: the console's index has neither."""
+    try:
+        a, b = (json.loads(x) for x in (console, cli))
+    except ValueError:
+        return False
+    for e in (a, b):
+        if isinstance(e, dict):
+            e.pop('commit', None)
+            e.pop('dirty', None)
+    return a == b
+
+
 def cmd_api(a):
     run = Path(a.run).resolve()
     d = run / "console"
@@ -195,9 +208,9 @@ def cmd_api(a):
         (d / f'{name}.cli.export.err').write_bytes(cli.stderr)
         (d / f'{name}.cli.export.exit').write_text(str(cli.returncode))
         (d / f"{name}.export.json").write_bytes(body)
-        equal = cli.returncode == 0 and status == 200 and body == cli.stdout
+        equal = cli.returncode == 0 and status == 200 and export_equal(body, cli.stdout)
         differences += not equal
-        lines.append(f"{name}: export {status}, {'byte-equal to' if equal else 'DIFFERS from'} CLI export on the same manifest/repo "
+        lines.append(f"{name}: export {status}, {'byte-equal to' if equal else 'DIFFERS from'} CLI export (without commit and dirty) on the same manifest/repo "
                      f"(CLI exit {cli.returncode}; all fields retained; {d}/{name}.export.json)")
     verdict = "checks passed" if not differences else f"differences found: {differences}"
     (d / "api.md").write_text(f"# console.py api\n\n{verdict}\n\n" + "\n".join(f"- {l}" for l in lines) + "\n")
