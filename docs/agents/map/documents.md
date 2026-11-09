@@ -158,7 +158,7 @@ this file, and a change to these modules updates it.
   phrase, for a needle of three characters or more without a NUL, narrowed again by `instr`;
   else a scan of `instr`; `matches_by` takes the choice so a test compares both), a row keeping
   its first rank and only its sort key and rowid; `line` renders the row an answer shows
-  (`search::answer_by` makes no line past the budget) as `<repository> <path>:<line> <key path> = <value>` (a string as JSON,
+  (`search::answer_by` stops making lines at the first tie group past the budget) as `<repository> <path>:<line> <key path> = <value>` (a string as JSON,
   `(cut)` after a cut one, `redacted` for a secret), tie-broken by repository, path, zero-padded
   line and key path; `Engine::search` answers `kind = "value"` with them, and the default search
   with them only when it found no symbol and no contract. `status(db)` is the `meada status`

@@ -26,4 +26,9 @@ class Defaults {
         var sns = SnsClient.create();
         sns.publish(template.toBuilder().message("m").build());
     }
+
+    void factory() {
+        var sns = SnsClient.create();
+        sns.publish(Requests.builder().message("m").build());
+    }
 }

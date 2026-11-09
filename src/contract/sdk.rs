@@ -414,7 +414,9 @@ fn request<'v>(
 }
 
 /// Whether a request value shows every field it sets: a Go or C# literal, or a Java builder
-/// chain started by `builder()`. Only then does a missing field mean the request leaves it out.
+/// chain started by an SDK request type's `builder()` (`PublishRequest.builder()`, not a
+/// helper or factory of the repository's own named `builder`). Only then does a missing field
+/// mean the request leaves it out.
 fn complete(value: &Value) -> bool {
     match value {
         Value::Object(_) => true,
@@ -424,7 +426,12 @@ fn complete(value: &Value) -> bool {
             _ => None,
         })
         .last()
-        .is_some_and(|first| crate::resolve::method(&first.callee) == "builder"),
+        .is_some_and(|first| {
+            first.callee.rsplit_once('.').is_some_and(|(ty, method)| {
+                let ty = ty.rsplit('.').next().unwrap_or(ty);
+                method == "builder" && (ty.ends_with("Request") || ty.ends_with("RequestEntry"))
+            })
+        }),
         _ => false,
     }
 }

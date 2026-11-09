@@ -4278,7 +4278,8 @@ mod tests {
         let sam = "Transform: AWS::Serverless-2016-10-31\nResources:\n  Worker:\n    Type: \
                    AWS::Serverless::Function\n    Properties:\n      CodeUri: worker.zip\n      \
                    Handler: index.handler\n      Runtime: nodejs20.x\n";
-        let edits: [(&str, Option<&str>); 11] = [
+        let handler = sam.replace("worker.zip", "worker/");
+        let edits: [(&str, Option<&str>); 17] = [
             ("a.ts", Some("export function b() {}\n")),
             ("b.ts", Some("export const c = 1;\n")),
             ("b.ts", None),
@@ -4297,11 +4298,27 @@ mod tests {
             ("template.yaml", Some(sam)),
             ("worker.zip", Some("PK")),
             ("worker.zip", None),
+            // So do a function's handler file and a Compose build directory (a name ending in
+            // `/` is a directory).
+            ("template.yaml", Some(&handler)),
+            ("worker/index.js", Some("exports.handler = () => 1;\n")),
+            ("worker/index.js", None),
+            (
+                "compose.yaml",
+                Some("services:\n  api:\n    build: ./app\n"),
+            ),
+            ("app/", Some("")),
+            ("app/", None),
         ];
         for (file, content) in edits {
-            match content {
-                Some(content) => fs::write(root.join(file), content).unwrap(),
-                None => fs::remove_file(root.join(file)).unwrap(),
+            match (file.strip_suffix('/'), content) {
+                (Some(dir), Some(_)) => fs::create_dir_all(root.join(dir)).unwrap(),
+                (Some(dir), None) => fs::remove_dir_all(root.join(dir)).unwrap(),
+                (None, Some(content)) => {
+                    fs::create_dir_all(root.join(file).parent().unwrap()).unwrap();
+                    fs::write(root.join(file), content).unwrap();
+                }
+                (None, None) => fs::remove_file(root.join(file)).unwrap(),
             }
             assert!(!is_fresh(REPO), "{file} {content:?}");
             index_now();

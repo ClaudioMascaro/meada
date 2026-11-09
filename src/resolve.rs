@@ -324,6 +324,66 @@ struct Cut;
 /// the position of the first parameter, then field of one, that spells it.
 type Params<'a> = HashMap<(&'a str, &'a str), (usize, Option<usize>)>;
 
+/// A file's scopes by the name they bind: as a local, constant, parameter or receiver
+/// (`values`), and as a function they declare (`functions`).
+#[derive(Default)]
+struct Binders<'a> {
+    values: HashMap<&'a str, Vec<&'a str>>,
+    functions: HashMap<&'a str, Vec<&'a str>>,
+}
+
+impl<'a> Binders<'a> {
+    /// Every file's, from the resolver's bindings and overload families.
+    fn of(
+        locals: &HashMap<&'a str, HashSet<&'a str>>,
+        consts: &HashMap<&'a str, HashSet<&'a str>>,
+        params: &HashMap<&'a str, Params<'a>>,
+        receivers: &HashMap<&'a str, HashMap<(&'a str, &'a str), &'a Class>>,
+        overloads: &HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
+    ) -> HashMap<&'a str, Self> {
+        // `scope.name`, split as `qualify` joins them.
+        let split = |q: &'a str| {
+            let scope = crate::parent(q);
+            (
+                scope,
+                if scope.is_empty() {
+                    q
+                } else {
+                    &q[scope.len() + 1..]
+                },
+            )
+        };
+        let mut all: HashMap<&'a str, Self> = HashMap::new();
+        for (&path, names) in locals.iter().chain(consts) {
+            let values = &mut all.entry(path).or_default().values;
+            for &q in names {
+                let (scope, name) = split(q);
+                values.entry(name).or_default().push(scope);
+            }
+        }
+        for (&path, bound) in params {
+            let values = &mut all.entry(path).or_default().values;
+            for &(scope, name) in bound.keys() {
+                values.entry(name).or_default().push(scope);
+            }
+        }
+        for (&path, bound) in receivers {
+            let values = &mut all.entry(path).or_default().values;
+            for &(scope, name) in bound.keys() {
+                values.entry(name).or_default().push(scope);
+            }
+        }
+        for (&path, families) in overloads {
+            let functions = &mut all.entry(path).or_default().functions;
+            for &q in families.keys() {
+                let (scope, name) = split(q);
+                functions.entry(name).or_default().push(scope);
+            }
+        }
+        all
+    }
+}
+
 /// The files of one language pack, resolved together.
 pub struct Resolver<'a> {
     files: &'a BTreeMap<&'a str, &'a Facts>,
@@ -384,6 +444,9 @@ pub struct Resolver<'a> {
     /// counts them all. Each is held by its file and name, owned: a `Target` here would make
     /// the resolver invariant in `'a`.
     linearizing: RefCell<Vec<(String, String)>>,
+    /// Each file's binding scopes by name (`around`), for a language whose blocks see a
+    /// receiver's members.
+    binders: HashMap<&'a str, Binders<'a>>,
     /// Whether a receiver was cut at `RECEIVER_DEPTH`, a family a member lookup reached at
     /// `FAMILY_DEPTH`, or a link at `LINK_DEPTH` past the links of the walks around it
     /// (`Resolver::cut_link`), since the outermost family began. The cut counts the receivers,
@@ -1010,6 +1073,11 @@ impl<'a> Resolver<'a> {
                 (!stars.is_empty()).then_some((*path, (stars, after)))
             })
             .collect();
+        let binders = if language.members_in_scope() {
+            Binders::of(&locals, &consts, &params, &receivers, &overloads)
+        } else {
+            HashMap::new()
+        };
         let mut resolver = Self {
             files,
             defs,
@@ -1041,6 +1109,7 @@ impl<'a> Resolver<'a> {
             takers,
             families: HashMap::new(),
             linearizing: RefCell::new(Vec::new()),
+            binders,
             cut: Cell::new(false),
             links: Cell::new(0),
             chain: Cell::new(0),
@@ -3268,6 +3337,10 @@ impl<'a> Resolver<'a> {
         reading: Reading,
     ) -> Binding<'a> {
         let defs = &self.defs[path];
+        let start = scope;
+        // For each block of the climb, the function around it that binds `name` as a local or
+        // declares it as a local function (`around`), found once for the whole climb.
+        let (mut locals, mut functions) = (None, None);
         let mut scope = Some(scope);
         let (mut first, mut top) = (true, false);
         while let Some(s) = scope {
@@ -3306,7 +3379,19 @@ impl<'a> Resolver<'a> {
                         if reading == Reading::Method
                             && (self.blocks.contains_key(&(path, s))
                                 || self.unread.contains(&(path, s)))
-                            && let Some(found) = self.local_function(path, s, name)
+                            && let Some(found) = self.local_function(
+                                path,
+                                s,
+                                name,
+                                functions.get_or_insert_with(|| {
+                                    let binders = self.binders.get(path);
+                                    self.around(
+                                        path,
+                                        start,
+                                        binders.and_then(|b| b.functions.get(name)),
+                                    )
+                                }),
+                            )
                         {
                             return found;
                         }
@@ -3391,7 +3476,15 @@ impl<'a> Resolver<'a> {
             // holds asks (`Reading::Member`): a constant's value and a call's receiver are read
             // outside the block (a Ktor `Application` or `Route` declares no `V1`). A called
             // name reads the block's methods (`Reading::Method`).
-            if self.members_in_scope && reading.read() && !self.local_around(path, s, name) {
+            if self.members_in_scope
+                && reading.read()
+                && !(locals.get_or_insert_with(|| {
+                    let binders = self.binders.get(path);
+                    self.around(path, start, binders.and_then(|b| b.values.get(name)))
+                }))
+                .iter()
+                .any(|&(block, _)| block == s.len())
+            {
                 if let Some(class) = self.blocks.get(&(path, s)) {
                     if let Some(found) = self.inherited_field(class.path, class.name, name) {
                         return found;
@@ -3426,45 +3519,65 @@ impl<'a> Resolver<'a> {
         })
     }
 
-    /// Whether a function or lambda around the block `block`, up to a class or the top level,
-    /// binds `name` (a parameter, a local, a binding with a class): Kotlin reads a local before
-    /// a member of an implicit receiver.
-    fn local_around(&self, path: &'a str, block: &'a str, name: &'a str) -> bool {
-        let defs = &self.defs[path];
-        let mut s = crate::parent(block);
-        while (defs.get(s))
-            .is_some_and(|d| matches!(d.kind, Kind::Function | Kind::Method | Kind::Inline))
-        {
-            let qualified = crate::qualify(s, name);
-            if self.locals[path].contains(qualified.as_str())
-                || self.consts[path].contains(qualified.as_str())
-                || self.params[path].contains_key(&(s, name))
-                || self.receivers[path].contains_key(&(s, name))
-            {
-                return true;
-            }
-            s = crate::parent(s);
+    /// For each block of `scope` (itself and the scopes around it, by the length of each), the
+    /// innermost function or lambda around it, up to a class or the top level, among the
+    /// scopes `binders` binding a name. One climb answers every block of a lookup, where asking
+    /// each block climbed again: cubic in the depth of nested lambdas.
+    fn around(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        binders: Option<&Vec<&'a str>>,
+    ) -> Vec<(usize, &'a str)> {
+        // A binder the climb meets is a prefix of `scope` as long as one of its scopes.
+        let bound: HashSet<usize> = (binders.into_iter().flatten())
+            .filter(|b| scope.starts_with(**b))
+            .map(|b| b.len())
+            .collect();
+        if bound.is_empty() {
+            return Vec::new();
         }
-        false
+        let defs = &self.defs[path];
+        let mut chain = vec![scope];
+        while let Some(&s) = chain.last().filter(|s| !s.is_empty()) {
+            chain.push(crate::parent(s));
+        }
+        // From the top down, each block takes its enclosing function, or what that one takes.
+        let (mut found, mut out) = (None, Vec::new());
+        for pair in chain.windows(2).rev() {
+            let (block, outer) = (pair[0], pair[1]);
+            let function = (defs.get(outer))
+                .is_some_and(|d| matches!(d.kind, Kind::Function | Kind::Method | Kind::Inline));
+            found = if !function {
+                None
+            } else if bound.contains(&outer.len()) {
+                Some(outer)
+            } else {
+                found
+            };
+            if let Some(function) = found {
+                out.push((block.len(), function));
+            }
+        }
+        out
     }
 
     /// The local function `name` of the functions around the block `scope` (Kotlin's `fun size()`
-    /// declared where an `apply` lambda calls `size()`), up to a class or the top level.
-    fn local_function(&self, path: &'a str, scope: &str, name: &str) -> Option<Binding<'a>> {
-        let defs = &self.defs[path];
-        let mut s = crate::parent(scope);
-        while (defs.get(s))
-            .is_some_and(|d| matches!(d.kind, Kind::Function | Kind::Method | Kind::Inline))
-        {
-            if let Some(found) = self.overloads[path].get(format!("{s}.{name}").as_str()) {
-                return Some(match found[..] {
-                    [one] => Binding::Def(one),
-                    _ => Binding::Several(found.clone()),
-                });
-            }
-            s = crate::parent(s);
-        }
-        None
+    /// declared where an `apply` lambda calls `size()`), up to a class or the top level, from
+    /// the functions `around` found declaring one.
+    fn local_function(
+        &self,
+        path: &'a str,
+        scope: &str,
+        name: &str,
+        around: &[(usize, &'a str)],
+    ) -> Option<Binding<'a>> {
+        let &(_, function) = around.iter().find(|&&(block, _)| block == scope.len())?;
+        let found = self.overloads[path].get(crate::qualify(function, name).as_str())?;
+        Some(match found[..] {
+            [one] => Binding::Def(one),
+            _ => Binding::Several(found.clone()),
+        })
     }
 
     /// Whether the top-level name `name` of `path` is not the one thing its constant says (Go: a

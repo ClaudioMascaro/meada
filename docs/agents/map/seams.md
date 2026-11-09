@@ -159,7 +159,8 @@ to its contract kind, including batch routed provision uses, never an engine swi
   that has one (`Resolver::lexical_as`, through `Facts::impls` and `Facts::extensions`), for
   every name read: the head of a call, a constant's value, the type a name is declared with
   (`Code::declared`) and the object the flow of `Follow::Values` follows. A parameter or a local
-  of the code around the block comes first (`Resolver::local_around`), and the property of the
+  of the code around the block comes first (`Resolver::around`, one climb per lookup over the
+  scopes `Binders` indexes by name), and the property of the
   class around only when the receiver is a class of the repository without that member. A
   receiver whose type is not the repository's leaves the name unknown only where the object it
   holds is asked (`Reading::Member`: `Code::declared` and the flow of `Follow::Values`, which find

@@ -338,13 +338,17 @@ All notable changes to Meada are recorded here. The format follows
   starts with a read, and a query or a fragment alone stay unresolved, and a parameter on either
   side is resolved at the call sites. A base is placed only when its scheme leads it, so a
   proxy's `${X}/fetch/https://api.example.com/` is an opaque base, not a link to that host, and
-  every reference loses its dot segments. Swift's `URL(string:relativeTo:)` goes through the
-  same resolver and follows the same rules (#686).
+  every reference loses its dot segments. Swift's `URL(string:relativeTo:)` over a literal base
+  goes through the same resolver and follows the same rules; over a base read from the
+  environment it stays unresolved (#686).
 
 ### Changed
 
 - Development and test builds optimize the main `meada` package at level 1 to reduce the
   resident code footprint of the expanded indexing and contract readers.
+- Kotlin: a name read or called in a lambda looks for a local or local function of the code
+  around it in one climb, not one from every enclosing lambda: a file of 300 nested `apply`
+  blocks indexes in about 12 s instead of over 100 s (debug build), with the same answers.
 
 - A refresh reads the values of the files it did not change from a values cache beside the index
   (`values.db`, ADR 0027) instead of parsing them again: on this repository, a one-line edit of a
@@ -358,15 +362,17 @@ All notable changes to Meada are recorded here. The format follows
   read or a path it looked at changed: 60 ConfigMaps of 290 KB refresh with no change in 0.01 s
   instead of 4.5 s (debug build), and a removed or added Lambda handler or Compose build path
   still moves its answer.
-- `search` with the kind `value` reads only the rows its answer shows, so a broad query such as
-  `e` no longer formats every matching value before the budget cuts it.
+- `search` with the kind `value` reads the value of only the rows its answer shows (each match
+  keeps just its sort key), so a broad query such as `e` no longer formats every matching value
+  before the budget cuts it.
 
 ### Fixed
 
 - AWS SDK forms in Java, Go and C# follow the ADR 0026 rule TypeScript and Python already
   followed: an EventBridge entry without `EventBusName` produces to `default`, and an SNS
   publish to a phone number or endpoint names no topic. A request Meada cannot see whole (a
-  builder from `toBuilder()`, a helper's result) keeps its unresolved side. TypeScript and
+  builder from `toBuilder()` or from a factory of the repository's own, a helper's result) keeps
+  its unresolved side. TypeScript and
   Python now read the S3, SSM and Secrets Manager operations Java, Go and C# read
   (`DeleteObject`, `HeadObject`, `ListObjects`, `ListObjectsV2`, `PutParameter`,
   `DeleteParameter`, `DeleteParameters`, `PutSecretValue`, `UpdateSecret`, `CreateSecret`,
@@ -375,8 +381,8 @@ All notable changes to Meada are recorded here. The format follows
   configuration or a path its summary looked at changed (a removed Lambda `worker.zip`, a
   Compose build context): the index is fresh only while all of them are as it read them.
 - An image's Helm values file is any YAML file with a `values` word in its name, as for alerts,
-  so `prod-values.yaml` and `values.prod.yml` declare image consumers and `valuesets.yaml` does
-  not.
+  so `prod-values.yaml` declares image consumers, as `values.prod.yml` already did, and
+  `valuesets.yaml` does not.
 
 - Python: an import inside a function names its library in that function again, so
   `from requests import get` and `import requests as r` there are HTTP consumers, and
@@ -535,8 +541,9 @@ All notable changes to Meada are recorded here. The format follows
   letters or digits besides its wildcards (`*.*.*.*` matched any dotted name), and integer
   arithmetic is exact, as Terraform's: a result past `u64` or below `i64`
   (`0 - 18446744073709551615`), a division by zero or with a remainder (`7 / 2`) and arithmetic
-  on a fraction leave that part of the name `*`, where the evaluator printed a cast, wrapped or
-  floating-point value as an `exact` name.
+  on a fraction leave that part of the name `*`, where the evaluator printed a cast, clamped or
+  floating-point value as an `exact` name; such a value in a var file is given but unresolved,
+  so the variable's default no longer stands in for it.
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes

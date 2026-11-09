@@ -727,12 +727,24 @@ fn lines(text: &str) -> impl Fn(usize) -> usize {
 /// type panics on a remainder by zero or an integer overflow, which a hostile file must not turn
 /// into a crash of indexing or of the server.
 fn evaluated(expr: &Expression, ctx: &Context) -> Option<Value> {
-    quiet(|| {
+    evaluation(expr, ctx).0
+}
+
+/// `evaluated`, and whether arithmetic left it unresolved (`Exact`): a value Terraform has
+/// that Meada cannot write exactly, rather than none.
+fn evaluation(expr: &Expression, ctx: &Context) -> (Option<Value>, bool) {
+    let mut exact = Exact {
+        ctx,
+        left: 0,
+        inexact: false,
+    };
+    let value = quiet(|| {
         let mut expr = expr.clone();
-        Exact { ctx, left: 0 }.visit_expr_mut(&mut expr);
+        exact.visit_expr_mut(&mut expr);
         hcl::Expression::from(expr).evaluate(ctx).ok()
     })
-    .flatten()
+    .flatten();
+    (value, exact.inexact)
 }
 
 /// Puts each integer `+ - * / %` and negation's exact value in place before `hcl-rs` evaluates:
@@ -745,6 +757,8 @@ fn evaluated(expr: &Expression, ctx: &Context) -> Option<Value> {
 struct Exact<'a, 'c> {
     ctx: &'a Context<'c>,
     left: usize,
+    /// Whether an operation became the undefined name.
+    inexact: bool,
 }
 
 impl VisitMut for Exact<'_, '_> {
@@ -797,7 +811,10 @@ impl VisitMut for Exact<'_, '_> {
         });
         *expr = match number {
             Some(n) => Expression::from(n),
-            None => Expression::from(hcl_edit::Ident::new("meada_inexact")),
+            None => {
+                self.inexact = true;
+                Expression::from(hcl_edit::Ident::new("meada_inexact"))
+            }
         };
     }
 }
@@ -884,7 +901,8 @@ fn read_var_file(path: &str, src: &[u8], module: &mut Module) {
 /// The values the var file at `path` gives, each with its line; `None` for a file past
 /// `MAX_BYTES`, not `shallow`, with HCL objects past their width or that does not parse. A value
 /// that is no constant (Terraform refuses it) is left out; one past `EVAL_COST_MAX`, the file's
-/// own `EVAL_WORK_MAX` or `EVAL_VALUE_MAX` is given but unresolved. A JSON var file's strings are
+/// own `EVAL_WORK_MAX` or `EVAL_VALUE_MAX`, or whose arithmetic is inexact (`Exact`), is given
+/// but unresolved. A JSON var file's strings are
 /// literals, as Terraform reads them, each at the line of its key (the last one, as its value,
 /// when a key repeats).
 fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>, usize)>> {
@@ -920,9 +938,12 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
             let spend = cost.saturating_add(widths(&a.value));
             let value = if cost <= EVAL_COST_MAX && spend <= work {
                 work -= spend;
-                match evaluated(&a.value, &Context::new()) {
-                    Some(v) => (size(&v) <= EVAL_VALUE_MAX).then_some(v),
-                    None => continue,
+                match evaluation(&a.value, &Context::new()) {
+                    (Some(v), _) => (size(&v) <= EVAL_VALUE_MAX).then_some(v),
+                    // Terraform has a value Meada cannot write exactly (`7 / 2`): the default
+                    // must not stand in for it.
+                    (None, true) => None,
+                    (None, false) => continue,
                 }
             } else {
                 work = work.saturating_sub(EVAL_COST_MAX.min(cost));
@@ -3721,7 +3742,8 @@ mod tests {
     /// indexing. Integer arithmetic is exact, as Terraform's: a result past `u64` or below `i64`,
     /// a division with a remainder or by zero and arithmetic on a fraction stay unresolved rather
     /// than print `hcl-rs`'s cast, wrapped or float result as an exact name; a `for` variable's
-    /// arithmetic still evaluates.
+    /// arithmetic still evaluates. A var file's value is given but unresolved: the variable's
+    /// default does not stand in for it.
     #[test]
     fn arithmetic_the_evaluator_cannot_do_leaves_the_value_unresolved() {
         let list = [
@@ -3729,9 +3751,15 @@ mod tests {
                 "main.tf",
                 concat!(
                     "variable \"n\" {\n  default = 1\n}\n",
+                    "variable \"k\" {\n  default = 9\n}\n",
+                    "variable \"f\" {\n  default = 9\n}\n",
+                    "variable \"b\" {\n  default = 9\n}\n",
                     "resource \"a\" \"rem\" { name = \"orders-${5 % 0}\" }\n",
                     "resource \"a\" \"sub\" { name = substr(\"abc\", 1, 9223372036854775807) }\n",
                     "resource \"a\" \"var\" { name = \"q-${var.n}\" }\n",
+                    "resource \"a\" \"vk\" { name = \"q-${var.k}\" }\n",
+                    "resource \"a\" \"vf\" { name = \"q-${var.f}\" }\n",
+                    "resource \"a\" \"vb\" { name = \"q-${var.b}\" }\n",
                     "resource \"a\" \"neg\" { name = \"orders-${0 - 18446744073709551615}\" }\n",
                     "resource \"a\" \"wrap\" { name = \"orders-${9223372036854775807 * 3}\" }\n",
                     "resource \"a\" \"div\" { name = \"orders-${5 / 0}\" }\n",
@@ -3743,14 +3771,20 @@ mod tests {
                     "resource \"a\" \"loop\" { name = join(\"-\", [for x in [1, 2] : x + 1]) }\n",
                 ),
             ),
-            ("terraform.tfvars", "n = 7 % 0\n"),
+            (
+                "terraform.tfvars",
+                "n = 7 % 0\nk = 7 / 2\nf = 0.1 + 0.2\nb = 0 - 18446744073709551615\n",
+            ),
         ];
         assert_eq!(
             names(&list),
             [
                 "a.rem ~ \"orders-*\"",
                 "a.sub = \"bc\"",
-                "a.var = \"q-1\" [var.n main.tf:1]",
+                "a.var ~ \"q-*\" [var.n terraform.tfvars:1 tfvars]",
+                "a.vk ~ \"q-*\" [var.k terraform.tfvars:2 tfvars]",
+                "a.vf ~ \"q-*\" [var.f terraform.tfvars:3 tfvars]",
+                "a.vb ~ \"q-*\" [var.b terraform.tfvars:4 tfvars]",
                 "a.neg ~ \"orders-*\"",
                 "a.wrap ~ \"orders-*\"",
                 "a.div ~ \"orders-*\"",

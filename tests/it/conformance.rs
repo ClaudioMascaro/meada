@@ -3425,9 +3425,9 @@ fn kotlin_context_lists_callers_by_receiver_type() {
 fn kotlin_hostile_scope_function_nesting_remains_bounded() {
     let repo = fixture_repo("kotlin_scopes_depth", "conformance-kotlin", Some(ORIGIN));
     let mut nested = String::from("package hostile\nclass Box { fun size() = 0 }\n");
-    nested.push_str("fun deep(box: Box) {\n");
+    nested.push_str("fun other() = 0\nfun deep(box: Box) {\n");
     for _ in 0..300 {
-        nested.push_str("box.apply {\n");
+        nested.push_str("box.apply {\nother()\n");
     }
     nested.push_str("size()\n");
     nested.push_str(&"}\n".repeat(300));
@@ -3437,14 +3437,21 @@ fn kotlin_hostile_scope_function_nesting_remains_bounded() {
         ".apply { }".repeat(300)
     );
     std::fs::write(repo.join("Nested.kt"), nested + &chain).unwrap();
-    let json: Value =
-        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let started = std::time::Instant::now();
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let took = started.elapsed();
+    let json: Value = serde_json::from_str(&export).unwrap();
     let size: Vec<&Value> = (json["calls"].as_array().unwrap().iter())
         .filter(|c| c["span"]["path"] == "Nested.kt")
         .filter(|c| c["id"].as_str().unwrap().contains("::(anonymous).size#"))
         .collect();
     // The innermost call is past the depth where lambdas are scopes: a name match.
     assert!(size.iter().any(|c| c["level"] == "inferred"), "{size:?}");
+    // A name read or called in each lambda looked for a local or local function around it at
+    // every level, from every level: cubic in the depth, over 100 s here in debug; about 12 s
+    // with one climb per lookup.
+    eprintln!("kotlin scope functions, 300 deep: {took:?}");
+    assert!(took < std::time::Duration::from_secs(30), "{took:?}");
 }
 
 /// Thousands of `apply` lambdas on one class index in time linear in their number: a lambda's

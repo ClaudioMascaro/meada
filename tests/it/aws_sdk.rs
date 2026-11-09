@@ -580,7 +580,8 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
 
 /// ADR 0026: an EventBridge entry without `EventBusName` sends to `default`, and an SNS phone
 /// publish names no topic, in Java, Go and C# as in TypeScript and Python. A request whose
-/// fields Meada cannot all see still publishes somewhere, so it keeps an unresolved side.
+/// fields Meada cannot all see (a `toBuilder()`, a helper's result, a factory of the
+/// repository's own named `builder`) still publishes somewhere, so it keeps an unresolved side.
 #[test]
 fn sdk_omitted_bus_is_default_and_phone_publishes_name_no_topic() {
     let repo = fixture_repo("aws_sdk_defaults", "aws-sdk-defaults", None);
@@ -609,6 +610,8 @@ fn sdk_omitted_bus_is_default_and_phone_publishes_name_no_topic() {
             ("channel::eventbridge::default", "defaults.go"),
             ("channel::eventbridge::default", "defaults.go"),
             ("channel::sns", "Defaults.java"),
+            ("channel::sns", "Defaults.java"),
+            ("channel::sns", "defaults.go"),
             ("channel::sns", "defaults.go"),
             ("channel::sns::alerts-cs", "Defaults.cs"),
             ("channel::sns::alerts-go", "defaults.go"),

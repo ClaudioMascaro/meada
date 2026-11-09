@@ -39,3 +39,9 @@ func unseen(ctx context.Context) {
 	client := sns.NewFromConfig(cfg)
 	client.Publish(ctx, input())
 }
+
+func helper(ctx context.Context) {
+	cfg, _ := config.LoadDefaultConfig(ctx)
+	client := sns.NewFromConfig(cfg)
+	client.Publish(ctx, builder())
+}
