@@ -755,7 +755,8 @@ fn evaluation(expr: &Expression, ctx: &Context) -> (Option<Value>, bool) {
 /// become an undefined name (`undefined`), so the value stays unresolved. An operand that does
 /// not evaluate in `ctx` (a `for` variable) turns its operation, and every operation around it,
 /// into a call of `meada_exact`, which does the same arithmetic as `hcl-rs` evaluates, so no
-/// operand is evaluated twice.
+/// operand is evaluated twice. A number literal `hcl-rs` would print otherwise than Terraform
+/// (`printed_as_written`) becomes the undefined name too.
 ///
 /// It also puts each object literal's keys in lexical order, the order Terraform walks an object
 /// in, where `hcl-rs` keeps the written one. A `for` over a collection holding an object whose
@@ -789,6 +790,13 @@ impl VisitMut for Exact<'_, '_> {
             // function.
             Expression::FuncCall(f) if f.name.name.as_str() == "meada_exact" => {
                 *expr = undefined();
+                return;
+            }
+            Expression::Number(n) => {
+                if !(n.as_repr()).is_some_and(|written| printed_as_written(n.value(), written)) {
+                    self.inexact = true;
+                    *expr = undefined();
+                }
                 return;
             }
             Expression::Object(object) => {
@@ -1024,7 +1032,7 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
         let keys = keys.into_inner();
         for (name, value) in map {
             let at = keys.get(&name).copied().unwrap_or(1);
-            let value = (size(&value) <= EVAL_VALUE_MAX).then_some(value);
+            let value = (size(&value) <= EVAL_VALUE_MAX && !float(&value)).then_some(value);
             values.push((name, value, at));
         }
     } else {
@@ -1220,6 +1228,50 @@ fn lexical(v: Value) -> Value {
         }
         Value::Array(items) => Value::Array(items.into_iter().map(lexical).collect()),
         v => v,
+    }
+}
+
+/// Whether `n`, written `written`, prints as Terraform prints it: Terraform reads a number with
+/// 512 bits and prints its decimal, `hcl-rs` reads a 64-bit float past `i64::MIN..=u64::MAX` or
+/// with a fraction and prints its shortest form, with an exponent past 1e16 or below 1e-5.
+fn printed_as_written(n: &hcl::Number, written: &str) -> bool {
+    let shown = n.to_string();
+    !shown.contains('e') && decimal(&shown).is_some_and(|d| decimal(written) == Some(d))
+}
+
+/// A decimal `[-+]digits[.digits][e[-+]digits]` as its sign, its digits with no leading or
+/// trailing zero and the power of ten they are multiplied by.
+fn decimal(text: &str) -> Option<(bool, String, i64)> {
+    let (negative, text) = match text.strip_prefix('-') {
+        // `hcl-edit` reads `- 1` as one literal.
+        Some(t) => (true, t.trim_start()),
+        None => (false, text.strip_prefix('+').unwrap_or(text)),
+    };
+    let (mantissa, power) = text.split_once(['e', 'E']).unwrap_or((text, "0"));
+    let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let digits = format!("{whole}{fraction}");
+    if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let significant = digits.trim_start_matches('0');
+    let kept = significant.trim_end_matches('0');
+    let power = (power.parse::<i64>().ok())
+        .and_then(|p| p.checked_sub(i64::try_from(fraction.len()).ok()?))
+        .and_then(|p| p.checked_add(i64::try_from(significant.len() - kept.len()).ok()?))?;
+    Some(match kept {
+        "" => (false, String::new(), 0),
+        _ => (negative, kept.to_string(), power),
+    })
+}
+
+/// Whether a JSON value holds a number `serde_json` read as a float (a fraction, or past
+/// `i64::MIN..=u64::MAX`): its digits are gone, so it may not be the number Terraform reads.
+fn float(v: &Value) -> bool {
+    match v {
+        Value::Number(n) => n.is_f64(),
+        Value::Array(items) => items.iter().any(float),
+        Value::Object(map) => map.values().any(float),
+        _ => false,
     }
 }
 
@@ -3934,6 +3986,77 @@ mod tests {
                 "a.loopwrap ~ \"orders-*\"",
                 "a.loopbig = \"orders-18446744073709551614\"",
                 "a.shadow ~ \"orders-*\"",
+            ]
+        );
+    }
+
+    /// Terraform reads a number with 512 bits and prints its decimal; `hcl-rs` reads a 64-bit
+    /// float and prints its shortest form, with an exponent past 1e16 or below 1e-5. A number the
+    /// two print differently (past `i64::MIN..=u64::MAX`, more digits than a float holds, an
+    /// exponent) stays unresolved rather than print the float as an exact name, as a literal, a
+    /// `tonumber` and a JSON number alike; one they print alike is exact. A JSON reader keeps no
+    /// digits, so a JSON fraction stays unresolved.
+    #[test]
+    fn a_number_terraform_prints_otherwise_than_a_float_stays_unresolved() {
+        let main = [
+            ("big", "${18446744073709551616}"),
+            ("negbig", "${-18446744073709551615}"),
+            ("low", "${-9223372036854775809}"),
+            ("exp", "${1e20}"),
+            ("tiny", "${0.0000001}"),
+            ("long", "${0.10000000000000000001}"),
+            ("dot", "${9007199254740993.0}"),
+            ("numbig", "${tonumber(\"18446744073709551616\")}"),
+            ("numlong", "${tonumber(\"0.10000000000000000001\")}"),
+            ("half", "${1.5}"),
+            ("tenth", "${0.1}"),
+            ("one", "${1.0}"),
+            ("sci", "${1.5e2}"),
+            ("max", "${18446744073709551615}"),
+            ("min", "${-9223372036854775808}"),
+            ("numhalf", "${tonumber(\"0.5\")}"),
+            ("nummax", "${tonumber(\"18446744073709551615\")}"),
+            ("vj", "${var.j}"),
+            ("vk", "${var.k}"),
+            ("vl", "${var.l}"),
+            ("lj", "${local.j}"),
+        ];
+        let mut tf = String::from("variable \"j\" {}\nvariable \"k\" {}\nvariable \"l\" {}\n");
+        for (name, value) in main {
+            tf += &format!("resource \"a\" \"{name}\" {{ name = \"q-{value}\" }}\n");
+        }
+        let list = [
+            ("main.tf", tf.as_str()),
+            ("locals.tf.json", "{\"locals\": {\"j\": 0.5}}"),
+            (
+                "terraform.tfvars.json",
+                "{\"j\": 0.5, \"k\": 18446744073709551616, \"l\": 7}",
+            ),
+        ];
+        assert_eq!(
+            names(&list),
+            [
+                "a.big ~ \"q-*\"",
+                "a.negbig ~ \"q-*\"",
+                "a.low ~ \"q-*\"",
+                "a.exp ~ \"q-*\"",
+                "a.tiny ~ \"q-*\"",
+                "a.long ~ \"q-*\"",
+                "a.dot ~ \"q-*\"",
+                "a.numbig ~ \"q-*\"",
+                "a.numlong ~ \"q-*\"",
+                "a.half = \"q-1.5\"",
+                "a.tenth = \"q-0.1\"",
+                "a.one = \"q-1\"",
+                "a.sci = \"q-150\"",
+                "a.max = \"q-18446744073709551615\"",
+                "a.min = \"q--9223372036854775808\"",
+                "a.numhalf = \"q-0.5\"",
+                "a.nummax = \"q-18446744073709551615\"",
+                "a.vj ~ \"q-*\" [var.j terraform.tfvars.json:1 tfvars]",
+                "a.vk ~ \"q-*\" [var.k terraform.tfvars.json:1 tfvars]",
+                "a.vl = \"q-7\" [var.l terraform.tfvars.json:1 tfvars]",
+                "a.lj ~ \"q-*\"",
             ]
         );
     }

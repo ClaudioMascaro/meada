@@ -375,7 +375,9 @@ fn tonumber(args: FuncArgs) -> Out {
         Value::Null => Ok(Value::Null),
         Value::Number(n) => Ok(Value::Number(*n)),
         Value::String(s) => (s.parse::<i64>().ok().map(Number::from))
+            .or_else(|| s.parse::<u64>().ok().map(Number::from))
             .or_else(|| s.parse::<f64>().ok().and_then(Number::from_f64))
+            .filter(|n| super::printed_as_written(n, s))
             .map(Value::Number)
             .ok_or_else(|| format!("{s:?} is no number")),
         _ => Err("not a number".into()),

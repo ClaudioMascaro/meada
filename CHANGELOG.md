@@ -546,8 +546,11 @@ All notable changes to Meada are recorded here. The format follows
   integer arithmetic is exact, as Terraform's: a result past `u64` or below `i64`
   (`0 - 18446744073709551615`), a division by zero or with a remainder (`7 / 2`) and arithmetic
   on a fraction leave that part of the name `*`, also on a `for` variable, where the evaluator
-  printed a cast, wrapped or floating-point value as an `exact` name; such a value in a var file
-  is given but unresolved, so the variable's default no longer stands in for it.
+  printed a cast, wrapped or floating-point value as an `exact` name, as did a number literal or
+  `tonumber` past them, with more digits than a float holds or that a float writes with an
+  exponent (`18446744073709551616` printed `1.8446744073709552e19`) and a JSON fraction; such a
+  value in a var file is given but unresolved, so the variable's default no longer stands in for
+  it.
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes

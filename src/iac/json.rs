@@ -365,6 +365,8 @@ impl Expressions {
         match value {
             Value::Null => Expression::null(),
             Value::Bool(b) => (*b).into(),
+            // `serde_json` kept no digits of a float: it may not be the number Terraform reads.
+            Value::Number(n) if n.is_f64() => unknown(),
             Value::Number(n) => n.to_string().parse().unwrap_or_else(|_| unknown()),
             Value::String(s) if literal => s.clone().into(),
             Value::String(s) => self.string(s),
