@@ -147,22 +147,19 @@ async fn pipelined_calls_all_get_a_result() {
         let math = repo.join("src/math.ts");
         let source = std::fs::read_to_string(&math).unwrap();
         std::fs::write(&math, format!("{source}// round {round}\n")).unwrap();
-        let mut sent = tokio::task::JoinSet::new();
+        let mut in_flight = tokio::task::JoinSet::new();
         for (tool, arguments) in calls.iter().cycle().take(9) {
             let peer = client.peer().clone();
             let params = CallToolRequestParams::new(*tool)
                 .with_arguments(arguments.as_object().unwrap().clone());
-            sent.spawn(async move { (params.name.clone(), peer.call_tool(params).await) });
+            in_flight.spawn(async move { (params.name.clone(), peer.call_tool(params).await) });
         }
-        while let Some(reply) = sent.join_next().await {
+        while let Some(reply) = in_flight.join_next().await {
             let (tool, answer) = reply.unwrap();
             let answer = answer.unwrap();
-            assert_ne!(answer.is_error, Some(true), "{tool}: {}", text_of(&answer));
-            assert!(
-                text_of(&answer).contains("sum"),
-                "{tool}: {}",
-                text_of(&answer)
-            );
+            let text = text_of(&answer);
+            assert_ne!(answer.is_error, Some(true), "{tool}: {text}");
+            assert!(text.contains("sum"), "{tool}: {text}");
         }
     }
     client.cancel().await.unwrap();

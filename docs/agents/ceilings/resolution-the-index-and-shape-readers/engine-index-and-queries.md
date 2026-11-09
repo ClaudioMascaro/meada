@@ -96,4 +96,6 @@
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 
-- No `busy_timeout`: two concurrent refreshes of one repository may hit `SQLITE_BUSY` (no marker).
+- Refreshes of one index run one after the other (#704): each takes the write lock first and
+  waits up to the busy timeout (10 s), so a call that waits behind a longer refresh (a first
+  index, a large checkout, a `meada index` beside it) answers `database is locked` (no marker).

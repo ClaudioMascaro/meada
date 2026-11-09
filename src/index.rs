@@ -687,7 +687,8 @@ pub struct Indexed<'a> {
 /// no code row: `Http::declare` reads them at query time.
 ///
 /// Refreshes of one index (MCP calls in flight together, or two processes) run one after the
-/// other: each takes the write lock first and waits up to the busy timeout for it (#704).
+/// other: each takes the write lock first and waits up to the busy timeout for it (#704), so
+/// one that waits behind a longer refresh still fails.
 pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
     refresh_keeping(db, root, identity, serve, true)
 }
@@ -701,10 +702,8 @@ fn refresh_keeping(
     keep: bool,
 ) -> Result<()> {
     let now = SystemTime::now();
-    // Immediate: the write lock is taken first, waiting up to the busy timeout. A deferred
-    // transaction reads first and fails at its first write without waiting when another
-    // connection refreshes too (SQLite skips the busy handler on that upgrade), as pipelined
-    // MCP calls, or two processes on one index, do (#704).
+    // Immediate: a deferred transaction reads first, and SQLite skips the busy handler when
+    // that read lock is upgraded to write while another refresh holds it (#704).
     let tx = Transaction::new_unchecked(db, TransactionBehavior::Immediate)?;
     let known = tx
         .query_row("SELECT identity, configs FROM meta", [], |r| {
