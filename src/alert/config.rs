@@ -1,5 +1,6 @@
 //! Monitoring configuration facts, stored once and read without checkout access by queries.
 
+use super::regexp;
 use crate::document::events::{self, Step, Syntax};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -313,6 +314,11 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
         } else {
             String::new()
         };
+        // Alertmanager loads none of a configuration whose matcher holds a regular expression Go
+        // refuses, so it gives no rule, route or receiver of its own.
+        if refused(doc).is_some() {
+            continue;
+        }
         let object = doc.get("kind").and_then(Value::as_str);
         let monitoring = doc
             .get("apiVersion")
@@ -419,12 +425,9 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
         if path.ends_with(".tf.json") || path.ends_with(".tofu.json") {
             terraform_json(path, doc, d, &spans, &mut out, &mut bytes);
         }
-        let (body, base) = if monitoring && object == Some("AlertmanagerConfig") {
-            (&doc["spec"], "spec.")
-        } else {
-            (doc, "")
-        };
-        if (object.is_none() || (monitoring && object == Some("AlertmanagerConfig")))
+        let routed = alertmanager(doc);
+        let (body, base) = routed.unwrap_or((doc, ""));
+        if routed.is_some()
             && body.get("receivers").is_some_and(Value::is_array)
             && let Some(route) = body.get("route")
         {
@@ -520,6 +523,48 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
         super::forwarding::read(body, d, &mut out, &mut bytes);
     }
     bounded(out)
+}
+/// `doc` as an Alertmanager configuration: its own body, or the spec of a prometheus-operator
+/// `AlertmanagerConfig` with the prefix of its key paths; `None` for any other object.
+fn alertmanager(doc: &Value) -> Option<(&Value, &'static str)> {
+    let monitoring = doc
+        .get("apiVersion")
+        .and_then(Value::as_str)
+        .is_some_and(|v| v.starts_with("monitoring.coreos.com/"));
+    match doc.get("kind").and_then(Value::as_str) {
+        None => Some((doc, "")),
+        Some("AlertmanagerConfig") if monitoring => Some((&doc["spec"], "spec.")),
+        Some(_) => None,
+    }
+}
+
+/// Why Alertmanager refuses to load the configuration `doc`, if one of its route matchers holds a
+/// regular expression Go's `regexp` certainly refuses (`regexp::refusal`). An expression that only
+/// Meada cannot read, or reads past its budgets, is not one.
+pub(super) fn refused(doc: &Value) -> Option<String> {
+    let (body, _) = alertmanager(doc)?;
+    if !body.get("receivers").is_some_and(Value::is_array) {
+        return None;
+    }
+    let mut pending = vec![body.get("route")?];
+    let mut seen = BTreeSet::new();
+    while let Some(route) = pending.pop() {
+        for matcher in matchers(route).iter().flatten() {
+            if matcher.op.regex()
+                && seen.insert(matcher.value.clone())
+                && let Some(code) = regexp::refusal(&matcher.value)
+            {
+                return Some(format!(
+                    "{}{}{:?}: Go's regexp refuses it ({code})",
+                    matcher.key,
+                    matcher.op.text(),
+                    matcher.value
+                ));
+            }
+        }
+        pending.extend(array(route.get("routes")));
+    }
+    None
 }
 pub(super) fn array(value: Option<&Value>) -> &[Value] {
     value
@@ -1008,6 +1053,37 @@ mod tests {
             [r"db\.prod", "say \"hi\"", r"x\y", "l\nm"]
         );
         assert!(expressions(r#"a="open"#).is_none());
+    }
+
+    /// Alertmanager loads none of a configuration with a regex Go refuses, but the objects
+    /// beside it in a manifest bundle are other configurations: only its own document gives no
+    /// route and no receiver (#718).
+    #[test]
+    fn a_document_go_refuses_gives_no_facts_but_its_neighbours_keep_theirs() {
+        let rules = "apiVersion: monitoring.coreos.com/v1\nkind: PrometheusRule\nmetadata: {name: r}\n\
+                     spec:\n  groups:\n    - name: g\n      rules:\n        - alert: Down\n          \
+                     expr: up\n          labels: {support: team-b}\n";
+        let manager = |regex: &str| {
+            format!(
+                "---\napiVersion: monitoring.coreos.com/v1alpha1\nkind: AlertmanagerConfig\n\
+                 metadata: {{name: m}}\nspec:\n  receivers: [{{name: a}}]\n  route:\n    receiver: a\n    \
+                 routes:\n      - receiver: a\n        matchers: [{{name: x, value: '{regex}', matchType: '=~'}}]\n"
+            )
+        };
+        let counts = |regex: &str| {
+            let summary = read(
+                "alerts.yaml",
+                format!("{rules}{}", manager(regex)).as_bytes(),
+            );
+            (summary.rules.len(), summary.routes.len())
+        };
+        assert_eq!(counts("a.*"), (1, 2));
+        assert_eq!(counts("a["), (1, 0));
+        // Past a budget of Meada's own, Go reads it.
+        assert_eq!(
+            counts(&"a".repeat(super::super::ALERT_REGEX_MAX + 1)),
+            (1, 2)
+        );
     }
 
     #[test]

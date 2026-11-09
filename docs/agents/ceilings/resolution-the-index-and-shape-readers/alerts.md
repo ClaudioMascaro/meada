@@ -14,9 +14,35 @@
   an expression may spend depends only on how many scopes and expressions the workspace holds,
   never on the repository asking or the scopes compiled before it. A pass compiles an
   expression once for each share it gets, so the same expression in scopes of as many
-  expressions is compiled once. Larger expressions or automata stay unmatched, as do invalid or
-  unsupported RE2 expressions; `status` shows such a matcher as an orphan with no emitter, not
-  as a limit. Regex matching is anchored to the entire label, tag or event-field value.
+  expressions is compiled once. Larger expressions or automata stay unmatched, as does an
+  expression this module does not read or cannot tell Go refuses (`regexp::refusal` below);
+  `status` shows such a matcher as an orphan with no emitter, not as a limit, and the other
+  routes of its configuration keep linking, since Alertmanager loads a file that Go compiles.
+  Regex matching is anchored to the entire label, tag or event-field value.
+- `regexp::refusal` (`alert/regexp.rs`, #718): a configuration with a matcher regex that Go's
+  `regexp` refuses is one Alertmanager cannot load (`match_re` and `matchers` compile theirs
+  while the file is read; an `AlertmanagerConfig` object is judged alike, as its matchers reach
+  the same Alertmanager), so it is unreadable: its document gives no route, receiver, alert side
+  or link,
+  `meada status` counts the file under `unreadable` in its config files line, and the values
+  of the file stay searchable. Only a syntax error that is established as a `regexp/syntax`
+  error code counts, in the expression as Alertmanager hands it to Go (`^(?:expression)$`, so a
+  `)` that closes the wrapper stands for itself): a group not closed or not opened (`(a`,
+  `a)`), a class not closed (`[a`), `*`, `+` or `?` opening a group or an alternative with no
+  operand (`*prod`), a backward class range (`[z-a]`), a repetition stacked on another (`a**`),
+  a count above 1000, a backward one or a nested product above it (`a{1001}`, `a{2,1}`), an
+  escape Go does not read (`\y`, `\1` to `\9` as a backreference, `\u`), Perl syntax Go lacks
+  (`(?=`, `(?!`, `(?<=`, a flag other than `imsU`, `(?P=`) and an invalid group name. Any other
+  failure to compile keeps its old answer, a matcher left unmatched and the rest linked, as Go
+  may read it: an expression past `ALERT_REGEX_MAX` (never judged, valid or not) or a budget
+  below, a Unicode property name outside the list (the tables follow Go's version), an
+  ambiguous count (`a{01}`, `a{ 1}`), nesting past the 250 of `regex-syntax` where Go allows
+  1000, what `regex-syntax` refuses and Go reads (`(?ii)`, `a{,5}`, `[\d-z]`), and an
+  expression holding `[:` or `\Q`, which `regex_source` reads more leniently than Go. Judged on a
+  `match_re`, a matcher string or object of an Alertmanager document or `AlertmanagerConfig`
+  object, not on incident routes (OpsGenie, PagerDuty); other reasons Alertmanager refuses a
+  file (an unknown receiver, a bad duration) are not read. In a manifest bundle only the
+  document that holds the expression is refused, though the file counts as unreadable.
 - `ALERT_REGEX_SIZE_MAX` (`alert.rs`): 1 MiB per scope for compiled automata and their search
   caches; `ALERT_REGEX_POOL_MAX`: 16 MiB per linking pass, a scope's part being the smaller of
   the two. An automaton of 1 MiB compiles in under 10 ms (release), where an ordinary expression
