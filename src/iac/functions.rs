@@ -5,6 +5,7 @@
 //! of the same name; a case it does not cover (a `replace` pattern, a `format` verb other than
 //! `%s`, `%d`, `%v`, `%q` and `%%`) is an error, which leaves the call unresolved too.
 
+use std::cmp::Ordering;
 use std::collections::HashSet;
 
 use hcl::eval::{Context, FuncArgs, FuncDef, ParamType};
@@ -323,41 +324,40 @@ fn length(args: FuncArgs) -> Out {
     Ok(Value::from(n as u64))
 }
 
-/// Terraform's sets of strings are ordered lexically; any other set keeps its first order.
-/// The distinct elements of a list: strings sorted, as Terraform orders a set of strings, and
-/// any other values in their first order, each kept by `canonical` once.
+/// The distinct elements of a list in the order of cty's sets: strings bytewise, numbers by value,
+/// `false` before `true`, a null last. Strings with numbers or bools make a set of strings. A
+/// number with a bool has no common type, and a set of collections is in hash order: both are
+/// unresolved.
 fn toset(args: FuncArgs) -> Out {
     let list = args[0].as_array().map_or(&[][..], Vec::as_slice);
-    if list.iter().all(Value::is_string) {
-        let mut items = list.to_vec();
-        items.sort_unstable_by(|a, b| string(a).cmp(string(b)));
-        items.dedup();
-        return Ok(Value::Array(items));
+    let (nulls, mut items): (Vec<_>, Vec<_>) = list.iter().cloned().partition(Value::is_null);
+    if items.iter().any(|v| v.is_array() || v.is_object()) {
+        return Err("the order of a set of collections".into());
     }
-    let mut seen = HashSet::new();
-    let items = list.iter().filter(|v| seen.insert(canonical(v)));
-    Ok(Value::Array(items.cloned().collect()))
+    if items.iter().any(Value::is_string) {
+        items = items
+            .iter()
+            .map(|v| Value::String(shown(v).unwrap_or_default()))
+            .collect();
+    } else if items.iter().any(|v| v.as_bool().is_some()) && items.iter().any(Value::is_number) {
+        return Err("a set of numbers and bools".into());
+    }
+    items.sort_unstable_by(order);
+    items.dedup_by(|a, b| order(a, b).is_eq());
+    items.extend(nulls.into_iter().take(1));
+    Ok(Value::Array(items))
 }
 
-/// A text two values share exactly when they are equal: an object's whatever the order of its
-/// keys, as `hcl-rs` compares them, and a number's in its exact digits.
-fn canonical(v: &Value) -> String {
-    match v {
-        Value::Null => "null".into(),
-        Value::Bool(b) => b.to_string(),
-        Value::Number(n) => n.to_string(),
-        Value::String(s) => format!("{s:?}"),
-        Value::Array(items) => {
-            let items: Vec<String> = items.iter().map(canonical).collect();
-            format!("[{}]", items.join(","))
-        }
-        Value::Object(map) => {
-            let mut entries: Vec<String> = (map.iter())
-                .map(|(k, v)| format!("{k:?}:{}", canonical(v)))
-                .collect();
-            entries.sort_unstable();
-            format!("{{{}}}", entries.join(","))
-        }
+/// Two scalars of one type as cty orders them in a set.
+fn order(a: &Value, b: &Value) -> Ordering {
+    let int = |n: &Number| (n.as_i64().map(i128::from)).or_else(|| n.as_u64().map(i128::from));
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => match (int(a), int(b)) {
+            (Some(a), Some(b)) => a.cmp(&b),
+            _ => (a.as_f64().partial_cmp(&b.as_f64())).unwrap_or(Ordering::Equal),
+        },
+        (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
+        _ => string(a).cmp(string(b)),
     }
 }
 

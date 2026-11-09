@@ -122,8 +122,9 @@
   `-var-file` is not read, and a JSON var file's value line is the first occurrence of its key.
   A value cut at `EVAL_DEPTH_MAX` or around a cycle is memoized for its instance, so a shallower
   reader of the same local gets the cut value. A `for_each` over a list of strings expands
-  (`toset` gives a list too, so a list Terraform refuses cannot be told apart), and `toset` over
-  mixed types keeps their first order. An object walks its keys in lexical order, as Terraform
+  (`toset` gives a list too, so a list Terraform refuses cannot be told apart). `toset` orders as
+  cty does (strings bytewise, numbers by value, `false` before `true`, a null last); a set of
+  collections, in cty's hash order, is unresolved. An object walks its keys in lexical order, as Terraform
   does: a value a name binds, a literal whose keys are written as names or strings, a `merge`,
   anything `jsonencode` writes. A `for` whose collection expression contains, anywhere, an object
   whose keys are known only once evaluated (a computed key, a comprehension) is unresolved, even

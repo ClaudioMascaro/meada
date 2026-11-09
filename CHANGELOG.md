@@ -555,6 +555,13 @@ All notable changes to Meada are recorded here. The format follows
   (`18446744073709551616` printed `1.8446744073709552e19`), a JSON number written with a fraction or
   an exponent and a negative zero (`-0`, `0 * -1` printed `0`). Such a value in a var file is given
   but unresolved, so the variable's default no longer stands in for it.
+- Terraform: `toset` orders its elements as Terraform does (numbers by value, `false` before
+  `true`, a null last, strings with numbers or bools as strings), where it kept a number's or a
+  bool's first order: `tolist(toset([10, 9]))[0]` was an `exact` `10` for Terraform's `9`. A set of
+  collections, in Terraform's hash order, and a set of numbers and bools, which Terraform refuses,
+  are `*`.
+- Terraform: a null or a collection interpolated into a name (`"q-${null}"`, `"q-${[1]}"`), which
+  Terraform refuses, is `*`, where it gave the `exact` names `q-null` and `q-[\n  1\n]`.
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes

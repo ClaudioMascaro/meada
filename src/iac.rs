@@ -772,6 +772,25 @@ struct Exact<'a, 'c> {
 }
 
 impl VisitMut for Exact<'_, '_> {
+    /// A template that is one interpolation keeps its value's type, as in HCL; any other
+    /// interpolation shows its value as text (`meada_exact("text", ...)`).
+    fn visit_string_template_mut(&mut self, node: &mut hcl_edit::template::StringTemplate) {
+        if node.len() == 1
+            && let Some(Element::Interpolation(sole)) = node.iter_mut().next()
+        {
+            return self.visit_expr_mut(&mut sole.expr);
+        }
+        visit_mut::visit_string_template_mut(self, node);
+    }
+
+    fn visit_interpolation_mut(&mut self, node: &mut hcl_edit::template::Interpolation) {
+        self.visit_expr_mut(&mut node.expr);
+        let expr = std::mem::replace(&mut node.expr, undefined());
+        let name = hcl_edit::expr::FuncName::new(hcl_edit::Ident::new("meada_exact"));
+        let args = vec![Expression::from("text"), expr];
+        node.expr = Expression::from(hcl_edit::expr::FuncCall::new(name, args.into()));
+    }
+
     fn visit_for_intro_mut(&mut self, node: &mut hcl_edit::expr::ForIntro) {
         let unordered = self.unordered;
         visit_mut::visit_for_intro_mut(self, node);
@@ -914,8 +933,16 @@ fn arithmetic(
 
 /// `meada_exact(operator, operands...)`: the operation `Exact` could not do before evaluating
 /// (`"neg"` for negation), done as exactly, an error where `Exact` writes the undefined name.
+/// `meada_exact("text", value)` is an interpolated value, an error for a null or a collection,
+/// which Terraform cannot show as text where `hcl-rs` prints them.
 fn exact_call(args: hcl::eval::FuncArgs) -> std::result::Result<Value, String> {
     let operator = match args[0].as_str() {
+        Some("text") => {
+            return match &args[1] {
+                Value::Null | Value::Array(_) | Value::Object(_) => Err("no text".into()),
+                v => Ok(v.clone()),
+            };
+        }
         Some("neg") => None,
         Some(o) => Some(o.parse().map_err(|_| "no operator")?),
         None => return Err("no operator".into()),
@@ -3591,7 +3618,7 @@ mod tests {
                 "a.lookup = \"prd\"",
                 "a.keys = \"team\"",
                 "a.values = \"shopab\"",
-                "a.set = \"3\"",
+                "a.set ~ \"*\"",
                 "a.length = \"6-3\"",
                 "a.json = \"{\\\"a\\\":\\\"\\\\u003cb\\\\u003e\\\",\\\"n\\\":[1,true]}\"",
                 "a.pattern ~ \"*\"",
@@ -4100,6 +4127,39 @@ mod tests {
                 "a.lj ~ \"q-*\"",
             ]
         );
+    }
+
+    /// Each case of `tests/terraform-oracle/cases.tsv`, whose last column that directory's oracle
+    /// computes with HashiCorp's HCL and cty libraries: an exact name is the one Terraform gives,
+    /// an expression Terraform rejects has none, and a case marked `=` is exact.
+    #[test]
+    fn exact_names_agree_with_the_terraform_oracle() {
+        let cases: Vec<_> = (include_str!("../tests/terraform-oracle/cases.tsv").lines())
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .map(|line| match line.split('\t').collect::<Vec<_>>()[..] {
+                [must, expression, terraform] => (must == "=", expression, terraform),
+                _ => panic!("not a case: {line}"),
+            })
+            .collect();
+        let tf: String = (cases.iter().enumerate())
+            .map(|(i, (_, e, _))| format!("resource \"a\" \"r{i}\" {{ name = \"q-${{{e}}}\" }}\n"))
+            .collect();
+        let found: HashMap<_, _> = (names(&[("main.tf", &tf)]).into_iter())
+            .filter_map(|line| Some((line.split_once(' ')?.0.to_string(), line)))
+            .collect();
+        let wrong: Vec<_> = (cases.iter().enumerate())
+            .filter_map(|(i, &(must, expression, terraform))| {
+                let line = found.get(&format!("a.r{i}"))?;
+                let exact = line.split_once(" = ").map(|(_, name)| name);
+                let right = match exact {
+                    Some(name) => !terraform.starts_with('!') && name == format!("{terraform:?}"),
+                    None => !must,
+                };
+                (!right).then(|| format!("{expression}: Terraform {terraform}, Meada {line}"))
+            })
+            .collect();
+        assert_eq!(found.len(), cases.len());
+        assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
     /// A var file's value that would make more than `EVAL_COST_MAX` (a `for` in a `for` over two
