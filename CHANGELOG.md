@@ -376,6 +376,11 @@ All notable changes to Meada are recorded here. The format follows
   elements is unresolved (`*`) before it runs, where one 24 KB root took seconds per resource
   and minutes in all. A short template (`"${a}-x"`) in a `for` over 2,000 elements still
   resolves; one of 40 interpolations resolves over 100 elements, no longer over 200 (#714).
+- Terraform static evaluation costs a `for` over a literal list or object as one over any known
+  collection, its elements times the largest one, not the whole literal's size squared: 40
+  inline objects in a `for_each` expand to 40 exact instances, where they gave one `*` node. A
+  `for` in a `for` over two literal lists whose output passes the evaluation ceiling stays `*`
+  (#716).
 - AWS SDK forms in Java, Go and C# follow the ADR 0026 rule TypeScript and Python already
   followed: an EventBridge entry without `EventBusName` produces to `default`, and an SNS
   publish to a phone number or endpoint names no topic. A request Meada cannot see whole (a

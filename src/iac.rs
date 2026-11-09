@@ -1593,10 +1593,27 @@ fn elements(
             most(&mut map.iter().map(|(k, v)| (k.len() + 2).max(size(v)))),
         ),
         Some(v) => (1, size(v)),
-        None => {
-            let c = cost(expr, roots, iters, parsed);
-            (c, c)
-        }
+        // A literal collection is counted as a bound one: its elements, and the most one costs.
+        None => match expr {
+            Expression::Array(items) => (
+                items.len(),
+                most(&mut items.iter().map(|e| cost(e, roots, iters, parsed))),
+            ),
+            Expression::Object(object) => (
+                object.len(),
+                most(&mut object.iter().map(|(k, v)| {
+                    let key = match k {
+                        ObjectKey::Ident(i) => i.as_str().len(),
+                        ObjectKey::Expression(e) => cost(e, roots, iters, parsed),
+                    };
+                    key.max(cost(v.expr(), roots, iters, parsed))
+                })),
+            ),
+            _ => {
+                let c = cost(expr, roots, iters, parsed);
+                (c, c)
+            }
+        },
     }
 }
 
@@ -4347,6 +4364,50 @@ mod tests {
         assert!(got.iter().all(|n| n.contains(" = \"q-s")), "{got:?}");
     }
 
+    /// A `for` over a literal list costs as one over a bound list (its elements times the largest
+    /// one), not its whole size squared: forty inline objects expand.
+    #[test]
+    fn a_for_over_a_literal_list_of_objects_expands() {
+        let items: Vec<String> = (0..40)
+            .map(|i| format!("{{ name = \"s{i:02}\", size = {i} }}"))
+            .collect();
+        let main = format!(
+            concat!(
+                "resource \"a\" \"q\" {{\n",
+                "  for_each = {{ for o in [{}] : o.name => o }}\n",
+                "  name = \"q-${{each.key}}\"\n}}\n",
+            ),
+            items.join(", ")
+        );
+        let got = names(&[("main.tf", &main)]);
+        let want: Vec<String> = (0..40)
+            .map(|i| format!("a.q[\"s{i:02}\"] = \"q-s{i:02}\""))
+            .collect();
+        assert_eq!(got, want);
+    }
+
+    /// A `for` in a `for` over two literal lists of 400 makes more than `EVAL_COST_MAX`: it stays
+    /// unresolved, before it is evaluated.
+    #[test]
+    fn a_nested_for_over_literal_lists_past_the_cost_ceiling_is_unresolved() {
+        let list = (0..400)
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let main = format!(
+            concat!(
+                "locals {{ x = [for a in [{0}] : [for b in [{0}] : a]] }}\n",
+                "resource \"a\" \"q\" {{ name = \"q-${{length(local.x)}}\" }}\n",
+            ),
+            list
+        );
+        let start = std::time::Instant::now();
+        let got = names(&[("main.tf", &main)]);
+        let took = start.elapsed();
+        assert_eq!(got, ["a.q ~ \"q-*\""]);
+        assert!(took < std::time::Duration::from_secs(20), "{took:?}");
+    }
+
     /// A key bound over `toset(...)` is the element in Terraform, where Meada's set is a list
     /// whose key is the index: unresolved, in a `for` and in a `%{ for }` directive.
     #[test]
@@ -4414,14 +4475,14 @@ mod tests {
             given(tfvars, format!("x = \"{long}\"\n")),
             given("terraform.tfvars.json", format!("{{\"x\": \"{long}\"}}")),
         ];
-        // A `for` in a `for` over two lists of 30 could make about 700,000 bytes (`cost`), which
+        // A `for` in a `for` over two lists of 240 could make about 700,000 bytes (`cost`), which
         // each such value spends before its unknown `z` leaves it out: four times as many as the
         // work holds spend it, and the cheap value after them is given but unresolved.
-        let thirty = (0..30)
+        let many = (0..240)
             .map(|i| i.to_string())
             .collect::<Vec<_>>()
             .join(", ");
-        let costly = format!("[for a in [{thirty}] : [for b in [{thirty}] : z]]");
+        let costly = format!("[for a in [{many}] : [for b in [{many}] : z]]");
         let n = 4 * EVAL_WORK_MAX / EVAL_COST_MAX;
         let values: String = (0..n).map(|i| format!("x{i} = {costly}\n")).collect();
         let values = format!("first = \"ok\"\n{values}last = \"ok\"\n");
