@@ -130,6 +130,7 @@ fn a_java_azure_builder_changed_after_it_is_made_names_no_entity() {
         repo.join("Worker.java"),
         "import com.azure.messaging.servicebus.ServiceBusClientBuilder;\nimport com.azure.messaging.eventhubs.EventHubClientBuilder;\nclass Worker {\n\
          void topic() { var r = new ServiceBusClientBuilder().connectionString(connection).receiver().topicName(\"old-topic\").subscriptionName(\"s\"); r.topicName(\"new-topic\"); r.buildClient().receiveMessages(1); }\n\
+         void chain() { var q = new ServiceBusClientBuilder().connectionString(connection).receiver().queueName(\"old-chain\"); q.receiveMode(mode).queueName(\"new-chain\"); q.buildClient().receiveMessages(1); }\n\
          void group() { var g = new EventHubClientBuilder().connectionString(connection, \"kept-hub\").consumerGroup(\"g\"); g.consumerGroup(\"g2\"); g.buildConsumerClient().receiveFromPartition(\"0\", 1, position); }\n\
          void rebuilt() { var b = new ServiceBusClientBuilder().connectionString(connection).sender().queueName(\"old\"); b.queueName(\"new\"); b.buildClient().sendMessage(message); }\n\
          void kept() { var k = new ServiceBusClientBuilder().connectionString(connection).sender().queueName(\"kept\"); k.buildClient().sendMessage(message); }\n}\n",

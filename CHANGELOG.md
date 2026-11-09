@@ -210,7 +210,7 @@ All notable changes to Meada are recorded here. The format follows
   for all the roots of a repository (its files named `app-config.yaml` first, then the others in
   path order; an include counting its file's bytes, or its value's size when YAML aliases make it
   larger, an include past its root's limit included) are not followed, and a partial that does
-  not parse is parsed once:
+  not parse is parsed once per reading, charged what reading it built:
   their keys stay unread and `meada status` names each include with its reason. `$file` stays
   unread, and a config file past 1 MiB is dropped, not parsed by half. The index schema golden
   changes (it now lists the stored roles), so existing indexes are rebuilt (#689).
@@ -488,14 +488,17 @@ All notable changes to Meada are recorded here. The format follows
 - Images: a module run from a local path (an archive or a directory) in one root no longer drops
   the image another root runs it from, with its environment and provisions; only that root runs
   code without an image.
+- Compose: an override file's `build` with no `context` keeps the base service's context, where
+  it built from the override's directory, and the `!reset` and `!override` tags clear or replace a
+  base value. SAM: a function with no `CodeUri` of its own takes `Globals.Function.CodeUri`.
 - SDK names (GCP and Azure, and AWS in TypeScript): a request field written through a computed
-  key (`{['name']: ..}`) or a spread of another object, or written after the call inside a loop
-  whose next turn calls again, leaves the name unresolved; each gave an `exact` link to the name
-  first written.
+  key (`{['name']: ..}`) or a spread of another object (a spread of a spread too), or written
+  after the call inside a loop statement that also holds the call, leaves the name unresolved;
+  each gave an `exact` link to the name first written.
 - AWS SDK: a request changed after it is made names no resource: a TypeScript command input
   (SQS's too) whose field is assigned again before the `send`; a Java builder held in a local or
-  a `final` field that is set again or handed to another call (`b.topicArn(..)` before
-  `client.publish(b.build())`), also for SQS and Azure Service Bus and Event Hubs builders; and
+  a `final` field that is set again or handed to another call, itself, through a chain off it or
+  through a local holding it (`b.topicArn(..)` before `client.publish(b.build())`), also for SQS and Azure Service Bus and Event Hubs builders; and
   a named entry an inline request holds (an EventBridge entry in C# or Go, an entry builder in
   Java). Each gave an `exact` link and provision to the name first written. A TypeScript field
   read off a local object (`{Bucket: cfg.bucket}`) now names its bucket.

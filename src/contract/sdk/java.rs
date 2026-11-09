@@ -87,9 +87,11 @@ pub(super) fn changed<'a>(
 }
 
 /// Whether the builder `local`, read in `scope` of `path`, is set again outside `range` by a
-/// call `setter` accepts, or handed to a call there: a Java builder changes in place, so the
-/// chain a call reads off it is not what it was given. A local counts in its scope, a `final`
-/// field (a constant) anywhere in its file.
+/// step `setter` accepts, or handed to a call there: a Java builder changes in place, so the
+/// chain a call reads off it is not what it was given. A step counts anywhere in a chain off the
+/// builder (`b.message(..).topicArn(..)`), or off a local holding it or such a chain (a step
+/// returns its builder). A local counts in its scope, a `final` field (a constant) anywhere in
+/// its file.
 pub(crate) fn rebuilt<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -105,14 +107,48 @@ pub(crate) fn rebuilt<'a>(
     } else {
         return false;
     };
+    let named = |name: &str| {
+        name == local
+            || name.strip_prefix("this.") == Some(local)
+            || within
+                .and_then(|s| code.local(path, s, name))
+                .is_some_and(|b| {
+                    matches!(&b.value, Value::Ref(n) if n == local)
+                        || unbuilt(&b.value) && root(&b.value) == Some(local)
+                })
+    };
+    // A step that still returns the builder; `build()` makes the request, which cannot change.
+    fn unbuilt(value: &Value) -> bool {
+        matches!(value, Value::Call(c) if crate::resolve::method(&c.callee) != "build")
+    }
+    let holds = |value: &Value| match value {
+        Value::Ref(name) => named(name),
+        value => unbuilt(value) && root(value).is_some_and(named),
+    };
     code.files()[path].calls.iter().enumerate().any(|(i, c)| {
         within.is_none_or(|s| c.scope == s)
             && !(range.start <= c.range.start && c.range.end <= range.end)
-            && (c.callee.rsplit_once('.').is_some_and(|(head, method)| {
-                (head == local || head.strip_prefix("this.") == Some(local)) && setter(method)
-            }) || code
-                .call(path, i)
-                .is_some_and(|c| (c.args.iter()).any(|a| matches!(a, Value::Ref(n) if n == local))))
+            && code.call(path, i).is_some_and(|call| {
+                let steps = std::iter::successors(
+                    Some((call.callee.as_str(), call.receiver.as_ref())),
+                    |(_, receiver)| match receiver {
+                        Some(Value::Call(next)) => {
+                            Some((next.callee.as_str(), next.receiver.as_deref()))
+                        }
+                        _ => None,
+                    },
+                );
+                let (mut set, mut on) = (false, false);
+                for (callee, receiver) in steps {
+                    set |= setter(crate::resolve::method(callee));
+                    on = match receiver {
+                        Some(Value::Call(_)) => continue,
+                        Some(value) => holds(value),
+                        None => callee.rsplit_once('.').is_some_and(|(head, _)| named(head)),
+                    };
+                }
+                set && on || call.args.iter().any(holds)
+            })
     })
 }
 

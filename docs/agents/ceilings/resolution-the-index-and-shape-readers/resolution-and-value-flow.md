@@ -9,10 +9,14 @@ scalar folding and error/other result bindings remain unknown. These facts follo
 value cache, not the lean index, and reuse the nearest lexical binding query.
 Scoped selector effects (`resolve/mutations.rs`) follow exact aliases and argument frames,
 compare actual read/write call order, and share selection/memo normalization. A write inside a
-loop that also holds the read comes before it (`Facts::loops`: the outermost loop statements of
-TypeScript/JavaScript, Python and Go, a `for`/`while` comprehension or a recursive call not
-among them). A computed key or a spread names its fields once folded: a write to one of them
-changes it. A write Meada cannot tie to one object (through a parameter of a function it finds
+loop that also holds the read comes before it (`Facts::loops`: the outermost `for`, `while` and
+`do` statements of TypeScript/JavaScript, Python and Go; a comprehension, a callback such as
+`forEach`'s and a recursive call are no loop). The rule is lexical: an object made inside the
+loop, or a `break` or `return` right after the write, still names nothing, and a function that
+calls and then writes keeps its name when a loop of its caller calls it. A computed key or a
+spread names its fields once folded, through spreads of spreads: a write to one of them changes
+it. A cycle anywhere in the group (a recursive call through a written parameter, an alias
+cycle) refuses all write knowledge, so every named request object of the group is unresolved. A write Meada cannot tie to one object (through a parameter of a function it finds
 no caller for, which a function value may still receive, or a member path such as
 `cmd.input.Bucket`) changes that field of every object its scope can reach: a module-level
 object anywhere in the file, a function's own object only in that function. Retained write

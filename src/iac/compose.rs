@@ -6,7 +6,9 @@
 //! `docker-compose.yml`, the first that exists) and the override file of the same family
 //! (`compose.override.*`, `docker-compose.override.*`) are one evaluation unit, rooted at the
 //! directory (`.` for the repository root). The override is merged as Compose does for the fields
-//! read: a scalar it sets replaces the base's, the lists add to it.
+//! read: a scalar it sets replaces the base's, the lists add to it, a `build` mapping with no
+//! `context` keeps the base's, and a field tagged `!reset` (gone) or `!override` replaces the
+//! base's.
 //!
 //! `${VAR:-default}` and `${VAR-default}` resolve to the default and mark the field overridable;
 //! `${VAR}`, `$VAR` and the other forms stay in the text as `${VAR}`, the unresolved part. A
@@ -152,7 +154,26 @@ struct Service {
     /// even when it recorded nothing (a context outside the repository).
     image_set: bool,
     build_set: bool,
+    /// Whether `build` names its context (a string, or a mapping with `context`).
+    context_set: bool,
     network_mode: bool,
+    /// The fields tagged `!reset` or `!override`: they replace the base's.
+    replaced: BTreeSet<&'static str>,
+}
+
+/// A service field without its override tag, and whether it had one: `!reset` leaves nothing,
+/// `!override` its value (Compose's merge, https://docs.docker.com/reference/compose-file/merge/).
+fn tagged(value: Option<&Value>) -> (Option<&Value>, bool) {
+    if let Some(Value::Object(map)) = value
+        && let [(key, inner)] = map.iter().collect::<Vec<_>>()[..]
+    {
+        match key.as_str() {
+            "Fn::reset" => return (None, true),
+            "Fn::override" => return (Some(inner), true),
+            _ => {}
+        }
+    }
+    (value, false)
 }
 
 /// Map and list environments share Compose's merge-by-variable rule. Bare names stay unknown.
@@ -414,7 +435,7 @@ fn read(path: &str, src: &[u8]) -> BTreeMap<String, Service> {
     let dir = config_values::parent(path);
     // The first and last line of the scalars under each service.
     let mut spans: BTreeMap<String, (usize, usize)> = BTreeMap::new();
-    let documents = events::read_keyed(Syntax::Yaml, src, false, |scalar| {
+    let documents = events::read_keyed(Syntax::Yaml, src, true, |scalar| {
         if let [Step::Key(top), Step::Key(name), ..] = scalar.path
             && top == "services"
         {
@@ -446,30 +467,38 @@ fn read(path: &str, src: &[u8]) -> BTreeMap<String, Service> {
         let (first, last) = spans.get(name).copied().unwrap_or((1, 1));
         let line = key_line.of(name, first);
         let end = key_line.end_of(line, last);
-        let image = body.get("image").and_then(Value::as_str).map(|s| {
+        let mut replaced = BTreeSet::new();
+        let mut field = |key: &'static str| {
+            let (value, tag) = tagged(body.get(key));
+            if tag {
+                replaced.insert(key);
+            }
+            value
+        };
+        let image = field("image").and_then(Value::as_str).map(|s| {
             let Expanded { text, overridable } = expand(s);
             Resolved { text, overridable }
         });
-        found.insert(
-            name.clone(),
-            Service {
-                path: path.to_string(),
-                line,
-                end_line: end,
-                image,
-                environment: environment(body.get("environment")),
-                build: body.get("build").and_then(|b| context(dir, b)),
-                builds: body
-                    .get("build")
-                    .is_some_and(|b| b.is_object() || b.as_str().is_some_and(|s| !s.is_empty())),
-                depends_on: names(body.get("depends_on"), false),
-                links: names(body.get("links"), true),
-                networks: names(body.get("networks"), false),
-                image_set: body.contains_key("image"),
-                build_set: body.contains_key("build"),
-                network_mode: body.contains_key("network_mode"),
-            },
-        );
+        let build = field("build");
+        let service = Service {
+            path: path.to_string(),
+            line,
+            end_line: end,
+            image,
+            environment: environment(field("environment")),
+            build: build.and_then(|b| context(dir, b)),
+            builds: build
+                .is_some_and(|b| b.is_object() || b.as_str().is_some_and(|s| !s.is_empty())),
+            context_set: build.is_some_and(|b| b.is_string() || b.get("context").is_some()),
+            depends_on: names(field("depends_on"), false),
+            links: names(field("links"), true),
+            networks: names(field("networks"), false),
+            image_set: body.contains_key("image"),
+            build_set: body.contains_key("build"),
+            network_mode: field("network_mode").is_some(),
+            replaced,
+        };
+        found.insert(name.clone(), service);
     }
     found
 }
@@ -483,18 +512,32 @@ fn merge(
     for (name, s) in over {
         match merged.get_mut(&name) {
             Some(m) => {
+                let replaced = |key| s.replaced.contains(key);
                 if s.image_set {
                     m.image = s.image;
                 }
                 if s.build_set {
-                    m.build = s.build;
+                    // A build mapping with no context keeps the context the base builds from.
+                    if s.context_set || replaced("build") || !s.builds || !m.builds {
+                        m.build = s.build;
+                    }
                     m.builds = s.builds;
                 }
+                if replaced("environment") {
+                    m.environment.clear();
+                }
                 m.environment.extend(s.environment);
-                m.network_mode |= s.network_mode;
-                m.depends_on.extend(s.depends_on);
-                m.links.extend(s.links);
-                m.networks.extend(s.networks);
+                m.network_mode = s.network_mode || m.network_mode && !replaced("network_mode");
+                for (key, mine, theirs) in [
+                    ("depends_on", &mut m.depends_on, s.depends_on),
+                    ("links", &mut m.links, s.links),
+                    ("networks", &mut m.networks, s.networks),
+                ] {
+                    if replaced(key) {
+                        mine.clear();
+                    }
+                    mine.extend(theirs);
+                }
             }
             None => {
                 merged.insert(name, s);
@@ -786,6 +829,29 @@ mod tests {
             ("compose.override.yaml", over),
         ]);
         assert!(nodes.iter().all(|n| n.address != "services.cache"));
+    }
+
+    #[test]
+    fn an_override_build_keeps_the_base_context_and_reset_or_override_replace() {
+        // A build mapping with no context merges into the base's build, as Compose merges.
+        let over = "services:\n  web:\n    build: {dockerfile: Dockerfile.dev}\n";
+        let (nodes, _) = unit(&[("p/compose.yaml", BASE), ("p/compose.override.yaml", over)]);
+        let web = nodes.iter().find(|n| n.address == "services.web").unwrap();
+        assert_eq!(web.build.as_ref().map(|b| b.text.as_str()), Some("p/web"));
+        // `!reset` drops the base's field; `!override` replaces a list rather than adding to it.
+        let over = "services:\n  web:\n    image: !reset null\n    build: !reset null\n    depends_on: !override [db]\n    networks: !reset []\n";
+        let (nodes, references) =
+            unit(&[("p/compose.yaml", BASE), ("p/compose.override.yaml", over)]);
+        let web = nodes.iter().find(|n| n.address == "services.web").unwrap();
+        assert!(web.image.is_none() && web.build.is_none());
+        let from: Vec<_> = (references.iter())
+            .filter(|r| r.source == "services.web")
+            .map(|r| format!("{} {}", r.target, r.via.as_deref().unwrap()))
+            .collect();
+        assert_eq!(
+            from,
+            ["services.db depends_on", "services.db networks.default"]
+        );
     }
 
     #[test]

@@ -7064,31 +7064,8 @@ impl<'a> Code<'a> {
                     if changed(k) {
                         return (k.clone(), Value::Unknown);
                     }
-                    // A computed key or a spread names its fields once folded: a write to one
-                    // of them changes it too.
-                    let v = match (
-                        k.as_str(),
-                        self.eval(path, scope, v, frames, depth, fold, wants),
-                    ) {
-                        ("[]", Value::List(mut pair)) => {
-                            let written = matches!(pair.as_slice(), [Value::Str(key), _]
-                                if crate::lang::literal(key).is_some_and(|key| changed(&key)));
-                            if written && let Some(value) = pair.get_mut(1) {
-                                *value = Value::Unknown;
-                            }
-                            Value::List(pair)
-                        }
-                        ("...", Value::Object(fields)) => Value::Object(
-                            (fields.into_iter())
-                                .map(|(f, v)| match changed(&f) {
-                                    true => (f, Value::Unknown),
-                                    false => (f, v),
-                                })
-                                .collect(),
-                        ),
-                        (_, v) => v,
-                    };
-                    (k.clone(), v)
+                    let v = self.eval(path, scope, v, frames, depth, fold, wants);
+                    (k.clone(), unwritten(k, v, &changed))
                 })
                 .collect(),
         )
@@ -7457,6 +7434,35 @@ impl<'a> Code<'a> {
 
 /// `value` with every parameter left in it unknown; with `chain`, inside its calls too, which
 /// only `Expand::Chain` folds (elsewhere a call's arguments are as written).
+/// A computed key (`"[]"`) or a spread (`"..."`) of a folded object, `value` being what it folds
+/// to: it names its fields once folded, a spread's own spreads and computed keys too, so a write
+/// to one of them (`changed`) makes it unknown.
+fn unwritten(key: &str, value: Value, changed: &dyn Fn(&str) -> bool) -> Value {
+    match (key, value) {
+        ("[]", Value::List(mut pair)) => {
+            if let [Value::Str(key), value] = pair.as_mut_slice()
+                && crate::lang::literal(key).is_some_and(|key| changed(&key))
+            {
+                *value = Value::Unknown;
+            }
+            Value::List(pair)
+        }
+        ("...", Value::Object(fields)) => Value::Object(
+            (fields.into_iter())
+                .map(|(field, value)| {
+                    let value = match field.as_str() {
+                        "[]" | "..." => unwritten(&field, value, changed),
+                        named if changed(named) => Value::Unknown,
+                        _ => value,
+                    };
+                    (field, value)
+                })
+                .collect(),
+        ),
+        (_, value) => value,
+    }
+}
+
 fn object_value(value: &Value) -> Option<usize> {
     match value {
         Value::Object(_) => Some(value as *const Value as usize),

@@ -450,8 +450,8 @@ impl Eval<'_> {
             return node;
         }
         let props = &doc["Resources"][id]["Properties"];
-        if let Some(value) = props
-            .get("CodeUri")
+        if let Some(value) = (props.get("CodeUri"))
+            .or_else(|| doc.pointer("/Globals/Function/CodeUri"))
             .filter(|v| v.is_string() || v.is_object())
         {
             let part = self.eval(value, 0);

@@ -620,6 +620,9 @@ export function SpreadAfter() { const client=new SecretManagerServiceClient();co
 export function Loop(ns: string[]) { const client=new SecretManagerServiceClient();const request={name:'projects/review/secrets/stale-loop/versions/latest'};for (const n of ns) { client.accessSecretVersion(request); request.name=n; } }
 export function While(ns: string[]) { const client=new SecretManagerServiceClient();const request={name:'projects/review/secrets/stale-while/versions/latest'};let i=0;while (i<ns.length) { client.accessSecretVersion(request); request.name=ns[i]; i++; } }
 export function Kept() { const client=new SecretManagerServiceClient();const request={name:'projects/review/secrets/kept/versions/latest'};client.accessSecretVersion(request); }
+export function Nested() { const client=new SecretManagerServiceClient();const base={name:'projects/review/secrets/stale-nested/versions/latest'};const mid={...base};const request={...mid};request.name='after';client.accessSecretVersion(request); }
+export function SpreadComputed() { const client=new SecretManagerServiceClient();const inner={['name']:'projects/review/secrets/stale-spreadcomputed/versions/latest'};const request={...inner};request.name='after';client.accessSecretVersion(request); }
+export function NestedKept() { const client=new SecretManagerServiceClient();const base={name:'projects/review/secrets/nestedkept/versions/latest'};const mid={...base};const request={...mid};client.accessSecretVersion(request); }
 "#,
         ),
         (
@@ -637,6 +640,13 @@ def Kept():
     request={'name':'projects/review/secrets/pykept/versions/latest'}
     for n in ns:
         client.access_secret_version(request=request)
+def Nested():
+    client=secretmanager.SecretManagerServiceClient()
+    base={'name':'projects/review/secrets/stale-pynested/versions/latest'}
+    mid={**base}
+    request={**mid}
+    request['name']='after'
+    client.access_secret_version(request=request)
 "#,
         ),
         (
@@ -671,8 +681,12 @@ func Kept(ns []string) { client,err:=secretmanager.NewClient(ctx);request:=&secr
             "resource::gcpsecretmanager",
             "resource::gcpsecretmanager",
             "resource::gcpsecretmanager",
+            "resource::gcpsecretmanager",
+            "resource::gcpsecretmanager",
+            "resource::gcpsecretmanager",
             "resource::gcpsecretmanager::gokept",
             "resource::gcpsecretmanager::kept",
+            "resource::gcpsecretmanager::nestedkept",
             "resource::gcpsecretmanager::pykept",
         ],
         "{text}"

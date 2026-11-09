@@ -451,11 +451,15 @@
   (`lang::MAX_BYTES`, 1 MiB) of included files, each include counting its file again (or its
   value's size when YAML aliases make it larger: a node counts one, and a key or a text its bytes
   besides), and all the roots of one reading (a repository's) parse at most `READING_MAX` (4 MiB)
-  together (an include refused past its root's bound counted as parsed), read with the files named exactly `app-config.yaml` first and then the others, each
+  together, and the file whose parse crosses it besides (an include refused past its root's bound
+  counted as parsed, one that does not parse as its bytes, or as what it built when it holds more
+  than one document), read with the files named exactly `app-config.yaml` first and then the others, each
   group in path order (`config::roots`), the order in which the freshness check asks for partials
   too. A file the reading already read is refused for its size without being read again, so an
   include past a bound costs nothing once its file is known, a file that did not parse is not
-  parsed again, and once the reading is spent no file is read; the include
+  parsed again in that reading (a freshness check and an extraction are a reading each), and once
+  the reading is spent no file is read, every include then named `size` whatever its file (a
+  missing one, a link, one that does not parse); the include
   past a bound, a cycle (a file and key path whose children are being read), an absolute path, a
   path that leaves the repository, a `${` in it, an extension other than `.json`, `.yaml` and `.yml`
   (case-sensitive, as Backstage's), a symbolic link on the way, a file the walk does not see
@@ -489,6 +493,7 @@
   include reading and copying the file again, and take 12 s and 6.3 s; a partial of 335 bytes
   whose aliases expand it to 48 KB, included from 64 keys of each of 100 roots, took 109 s cold and
   34 s per refresh, charged its bytes, and takes 2.5 s and 0.8 s. 400 roots each naming 64
-  distinct such partials took 1,200 s cold, each parsed though its root had no room left; a
+  distinct such partials took 1,200 s cold, each parsed though its root had no room left, and take
+  about 540 s cold and 218 s per refresh, as the same repository without the includes does; a
   partial that does not parse, past the YAML reader's budget, named from 64 keys of each of 400
-  roots took 170 s, parsed again for each include.
+  roots took 170 s, parsed again for each include, and takes 3.4 s cold and 1.5 s per refresh.

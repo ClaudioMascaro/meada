@@ -506,6 +506,10 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
          void helped() { var sns = SnsClient.create(); var h = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old-helped\"); retarget(h); sns.publish(h.build()); }\n\
          private final PublishRequest.Builder field = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old-field\");\n\
          void moved() { field.topicArn(\"arn:aws:sns:us-east-1:123:moved\"); }\n\
+         void chained() { var sns = SnsClient.create(); var c = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old-chained\"); c.message(\"m\").topicArn(\"arn:aws:sns:us-east-1:123:x\"); sns.publish(c.build()); }\n\
+         void derived() { var sns = SnsClient.create(); var d = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old-derived\"); var e = d.message(\"m\"); e.topicArn(\"arn:aws:sns:us-east-1:123:x\"); sns.publish(d.build()); }\n\
+         void aliased() { var sns = SnsClient.create(); var a = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old-aliased\"); var o = a; o.topicArn(\"arn:aws:sns:us-east-1:123:x\"); sns.publish(a.build()); }\n\
+         void passed() { var sns = SnsClient.create(); var p = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:old-passed\"); retarget(p.message(\"m\")); sns.publish(p.build()); }\n\
          void fielded() { var sns = SnsClient.create(); sns.publish(field.build()); }\n\
          private final PublishRequest.Builder base = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:kept-base\");\n\
          void one() { var sns = SnsClient.create(); sns.publish(base.message(\"a\").build()); }\n\

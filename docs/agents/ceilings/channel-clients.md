@@ -98,7 +98,10 @@
   lists, table-keyed maps and supported named/string overloads name sides. A named request
   whose name field is written is opaque, with C# writes followed through receiver aliases, and
   so is a named value an inline request holds on the name's path (an EventBridge entry in a
-  list literal, a Java entry builder a request step takes). Operations not in
+  list literal, a Java entry builder a request step takes). The C# and Go checks go by field name
+  across the group, so a write in an unrelated function makes every named entry of that field
+  opaque, and one opaque entry makes its whole list name nothing. A command a TypeScript variable
+  holds reads its input where it is made, not at the `send`. Operations not in
   the documented table do not. A hierarchy query (`GetParametersByPath`) has no physical
   parameter name and stays unresolved. RDS and ElastiCache control-plane clients establish
   no data uses. Kotlin keeps the earlier typed SQS reader.

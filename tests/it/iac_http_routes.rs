@@ -232,13 +232,21 @@ fn sam_global_handler_resolves_and_explicit_unknown_override_stays_at_the_reposi
         )
         .replace("      Handler: app.orchard\n", "");
     std::fs::write(repo.join("template.yaml"), &global).unwrap();
-    assert_eq!(
-        providers(&repo),
-        json!([
-            {"contract": "http::GET::/orchards/{}", "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"},
-            {"contract": "http::POST::/orchards", "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"}
-        ])
-    );
+    let resolved = json!([
+        {"contract": "http::GET::/orchards/{}", "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"},
+        {"contract": "http::POST::/orchards", "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"}
+    ]);
+    assert_eq!(providers(&repo), resolved);
+    // A global `CodeUri` is where the handler's file lives too.
+    std::fs::write(
+        repo.join("template.yaml"),
+        (global.replace("      CodeUri: runtime/\n", "")).replace(
+            "    Handler: app.orchard\n",
+            "    Handler: app.orchard\n    CodeUri: runtime/\n",
+        ),
+    )
+    .unwrap();
+    assert_eq!(providers(&repo), resolved);
     std::fs::write(
         repo.join("template.yaml"),
         global.replace(

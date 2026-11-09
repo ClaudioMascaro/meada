@@ -188,7 +188,7 @@ pub(super) fn tree<'b>(
     if src.len() > MAX_BYTES {
         return Grafted::default();
     }
-    let Some(mut root) = document(path, src) else {
+    let Ok(mut root) = document(path, src) else {
         return Grafted::default();
     };
     // Backstage's loader transforms the root as it does any value, so a root that is one
@@ -333,11 +333,17 @@ impl Graft<'_, '_> {
             self.reading.charges.insert(path, src.len());
             return Err(Reason::Size);
         }
-        let Some(document) = document(&path, &src) else {
-            self.reading.charges.insert(path.clone(), src.len());
-            self.reading.unreadable.insert(path);
-            self.charge(src.len());
-            return Err(Reason::Unreadable);
+        let document = match document(&path, &src) {
+            Ok(document) => document,
+            Err(spent) => {
+                self.reading.charges.insert(path.clone(), spent);
+                self.reading.unreadable.insert(path);
+                match self.fits(spent) {
+                    true => self.charge(spent),
+                    false => self.reading.grafted += spent,
+                }
+                return Err(Reason::Unreadable);
+            }
         };
         // An alias repeats its anchor's node: a value may graft far more than its file holds.
         let charge = src.len().max(size(&document));
@@ -402,9 +408,14 @@ fn is_transform(value: &Value) -> bool {
 
 /// The one document of the file `path` (`src`), as Backstage's loader parses it: `yaml.parse`
 /// refuses a stream of more than one document. `None` when it does not parse or holds several.
-fn document(path: &str, src: &[u8]) -> Option<Value> {
-    let mut documents = events::read(Syntax::of(path), src, |_| {}).ok()?;
-    (documents.len() <= 1).then(|| documents.pop().unwrap_or(Value::Null))
+/// The one document of a file, or what reading it spent: its bytes when it does not parse, the
+/// size of what it built when it holds more than one document.
+fn document(path: &str, src: &[u8]) -> Result<Value, usize> {
+    let mut documents = events::read(Syntax::of(path), src, |_| {}).map_err(|_| src.len())?;
+    if documents.len() > 1 {
+        return Err(src.len().max(documents.iter().map(size).sum()));
+    }
+    Ok(documents.pop().unwrap_or(Value::Null))
 }
 
 /// The size of `value` as grafted: one for each node, and the bytes of each key and text besides.
@@ -984,6 +995,23 @@ mod tests {
             })
             .collect();
         assert_eq!(grafts, [21, 21, 0, 0]);
+        assert_eq!(reads.get(), INCLUDES + 24);
+
+        // The same bombs as files of two documents do not parse: each is charged what reading
+        // it built, so the reading parses as many of them.
+        let unparsed = format!("{bomb}\n---\n");
+        let files: BTreeMap<&str, &str> = (partials.iter())
+            .map(|p| (p.as_str(), unparsed.as_str()))
+            .collect();
+        let mut reading = Reading::default();
+        reads.set(0);
+        for (path, root) in &roots {
+            let fetch = |p: &str| {
+                reads.set(reads.get() + 1);
+                fetcher(&files)(p)
+            };
+            tree(path, root.as_bytes(), &fetch, &[], &mut reading);
+        }
         assert_eq!(reads.get(), INCLUDES + 24);
     }
 

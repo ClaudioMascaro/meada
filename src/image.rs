@@ -497,7 +497,7 @@ impl ContractKind for Image {
 }
 
 /// Whether `execution` runs a local path for the workload side `consumer` in its root: a module
-/// run from an archive in one root may run an image in another.
+/// run from a local path in one root may run an image in another.
 fn runs_locally(execution: &meada_core::export::Execution, consumer: &Consumer) -> bool {
     execution.workload == consumer.site
         && (consumer.root.as_ref()).is_none_or(|root| *root == execution.root)
