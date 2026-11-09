@@ -108,7 +108,7 @@
   64-bit float holds, or a float it writes with an exponent, past 1e16 or below 1e-5) is
   unresolved too, as a literal or a `tonumber`, and so is a JSON number written with a fraction or
   an exponent or past that range, even `1.0`, in a `.tf.json` or a var file (`serde_json` keeps no
-  digits). `cost`
+  digits). A negative zero (`-0`, `-(0)`, `0 * -1`), `-0` in Terraform, is unresolved. `cost`
   bounds a `for` by the size of what it iterates, so a `for` over a value it cannot size (a
   function's result) is costed as its square and may stay unresolved below the real ceiling.
   The type table selects `bucket` for S3 and `name` for SQS; unlisted types still read

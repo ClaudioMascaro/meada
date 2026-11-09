@@ -548,8 +548,8 @@ All notable changes to Meada are recorded here. The format follows
   on a fraction leave that part of the name `*`, also on a `for` variable, where the evaluator
   printed a cast, wrapped or floating-point value as an `exact` name, as did a number literal or
   `tonumber` past them, with more digits than a float holds or that a float writes with an
-  exponent (`18446744073709551616` printed `1.8446744073709552e19`) and a JSON number written
-  with a fraction or an exponent; such a value in a var file is given but unresolved, so the
+  exponent (`18446744073709551616` printed `1.8446744073709552e19`), a JSON number written
+  with a fraction or an exponent and a negative zero (`-0`, `0 * -1` printed `0`); such a value in a var file is given but unresolved, so the
   variable's default no longer stands in for it.
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching

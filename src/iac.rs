@@ -883,7 +883,7 @@ fn undefined() -> Expression {
 }
 
 /// The exact result of an integer `+ - * / %` (`None` for negation), `None` past
-/// `i64::MIN..=u64::MAX` or for a division with a remainder.
+/// `i64::MIN..=u64::MAX`, for a division with a remainder or for Terraform's negative zero.
 fn arithmetic(
     operator: Option<hcl_edit::expr::BinaryOperator>,
     values: &[i128],
@@ -898,6 +898,15 @@ fn arithmetic(
         (Some(B::Mod), &[a, b]) => a.checked_rem(b),
         _ => None,
     }?;
+    // Terraform's zero keeps a sign: `-(0)`, `0 * -1` and `0 / -1` print `-0`.
+    let negative_zero = match operator {
+        None => true,
+        Some(B::Mul | B::Div) => values.iter().any(|&v| v < 0),
+        _ => false,
+    };
+    if n == 0 && negative_zero {
+        return None;
+    }
     (i64::try_from(n).map(hcl::Number::from))
         .or_else(|_| u64::try_from(n).map(hcl::Number::from))
         .ok()
@@ -1265,8 +1274,9 @@ fn decimal(text: &str) -> Option<(bool, String, i64)> {
     let power = (power.parse::<i64>().ok())
         .and_then(|p| p.checked_sub(i64::try_from(fraction.len()).ok()?))
         .and_then(|p| p.checked_add(i64::try_from(significant.len() - kept.len()).ok()?))?;
+    // Terraform keeps a zero's sign: `-0` prints `-0`.
     Some(match kept {
-        "" => (false, String::new(), 0),
+        "" => (negative, String::new(), 0),
         _ => (negative, kept.to_string(), power),
     })
 }
@@ -4023,6 +4033,13 @@ mod tests {
             ("max", "${18446744073709551615}"),
             ("min", "${-9223372036854775808}"),
             ("comment", "${-/*c*/7}"),
+            ("negzero", "${-0}"),
+            ("commentzero", "${-/*c*/0}"),
+            ("negof", "${-(0)}"),
+            ("mulzero", "${0 * -1}"),
+            ("divzero", "${0 / -1}"),
+            ("zero", "${0 * 1}"),
+            ("subzero", "${0 - 0}"),
             ("numhalf", "${tonumber(\"0.5\")}"),
             ("nummax", "${tonumber(\"18446744073709551615\")}"),
             ("vj", "${var.j}"),
@@ -4066,6 +4083,13 @@ mod tests {
                 "a.max = \"q-18446744073709551615\"",
                 "a.min = \"q--9223372036854775808\"",
                 "a.comment = \"q--7\"",
+                "a.negzero ~ \"q-*\"",
+                "a.commentzero ~ \"q-*\"",
+                "a.negof ~ \"q-*\"",
+                "a.mulzero ~ \"q-*\"",
+                "a.divzero ~ \"q-*\"",
+                "a.zero = \"q-0\"",
+                "a.subzero = \"q-0\"",
                 "a.numhalf = \"q-0.5\"",
                 "a.nummax = \"q-18446744073709551615\"",
                 "a.vj ~ \"q-*\" [var.j terraform.tfvars.json:1 tfvars]",
