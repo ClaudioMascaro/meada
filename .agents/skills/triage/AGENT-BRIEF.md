@@ -44,9 +44,10 @@ When a criterion is a mechanical check (a command, a byte comparison, a count), 
 - **Good:** "`CHANGELOG.md` `[Unreleased]` has no entry that `v1.0.0` already shipped: the `v1.0.0` section is byte-identical to the one in the tag"
 - **Bad:** "Move these nine entries to `v1.0.0`: ..." (the tag held twelve, so the list and the check disagreed)
 
-### Claims checked
+### Claims checked, placements named
 
 - Check each claim in "Current behavior" against current main before writing the brief. A claim taken from an older receipt or run says which commit it was seen on.
+- When the same text goes into more than one file, state its placement in each.
 
 ### Explicit scope boundaries
 
