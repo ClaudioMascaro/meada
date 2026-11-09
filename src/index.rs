@@ -10,7 +10,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ignore::WalkBuilder;
 use rusqlite::config::DbConfig;
-use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, Transaction, params};
+use rusqlite::{
+    Connection, ErrorCode, OpenFlags, OptionalExtension, Transaction, TransactionBehavior, params,
+};
 use serde::Serialize;
 
 use crate::Result;
@@ -683,6 +685,9 @@ pub struct Indexed<'a> {
 /// Documents (spec #21) are refreshed first, the same way, when `serve` is declared; without
 /// a `[serve]` table the repository has none. They hold no code, so an edited document changes
 /// no code row: `Http::declare` reads them at query time.
+///
+/// Refreshes of one index (MCP calls in flight together, or two processes) run one after the
+/// other: each takes the write lock first and waits up to the busy timeout for it (#704).
 pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
     refresh_keeping(db, root, identity, serve, true)
 }
@@ -696,7 +701,11 @@ fn refresh_keeping(
     keep: bool,
 ) -> Result<()> {
     let now = SystemTime::now();
-    let tx = db.unchecked_transaction()?;
+    // Immediate: the write lock is taken first, waiting up to the busy timeout. A deferred
+    // transaction reads first and fails at its first write without waiting when another
+    // connection refreshes too (SQLite skips the busy handler on that upgrade), as pipelined
+    // MCP calls, or two processes on one index, do (#704).
+    let tx = Transaction::new_unchecked(db, TransactionBehavior::Immediate)?;
     let known = tx
         .query_row("SELECT identity, configs FROM meta", [], |r| {
             Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))

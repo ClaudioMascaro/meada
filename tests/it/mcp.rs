@@ -125,6 +125,49 @@ async fn serves_three_tools_over_stdio_within_the_description_budget() {
     client.cancel().await.unwrap();
 }
 
+/// Calls a client sends without waiting for each reply (#704) all get a result: each call
+/// refreshes the index, and a refresh that finds a changed file writes, so pipelined calls
+/// meet one another's writes and must wait for them rather than answer `database is locked`.
+/// Each round changes a file first, so every round's refreshes have something to write.
+#[tokio::test]
+async fn pipelined_calls_all_get_a_result() {
+    let repo = fixture_repo(
+        "mcp_pipelined",
+        "ts-basic",
+        Some("https://example.com/acme/web.git"),
+    );
+    let (transport, _stderr) = server_in(&repo);
+    let client = ().serve(transport).await.unwrap();
+    let calls = [
+        ("search", serde_json::json!({"query": "sum"})),
+        ("context", serde_json::json!({"symbol": "sum"})),
+        ("trace", serde_json::json!({"from": "sum"})),
+    ];
+    for round in 0..3 {
+        let math = repo.join("src/math.ts");
+        let source = std::fs::read_to_string(&math).unwrap();
+        std::fs::write(&math, format!("{source}// round {round}\n")).unwrap();
+        let mut sent = tokio::task::JoinSet::new();
+        for (tool, arguments) in calls.iter().cycle().take(9) {
+            let peer = client.peer().clone();
+            let params = CallToolRequestParams::new(*tool)
+                .with_arguments(arguments.as_object().unwrap().clone());
+            sent.spawn(async move { (params.name.clone(), peer.call_tool(params).await) });
+        }
+        while let Some(reply) = sent.join_next().await {
+            let (tool, answer) = reply.unwrap();
+            let answer = answer.unwrap();
+            assert_ne!(answer.is_error, Some(true), "{tool}: {}", text_of(&answer));
+            assert!(
+                text_of(&answer).contains("sum"),
+                "{tool}: {}",
+                text_of(&answer)
+            );
+        }
+    }
+    client.cancel().await.unwrap();
+}
+
 /// The client's first `file://` root wins over the server's cwd (#192): a client that answers
 /// `roots/list` with another repository, under a directory with a space in its name, gets
 /// answers about that repository.
