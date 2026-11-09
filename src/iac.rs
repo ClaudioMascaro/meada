@@ -463,11 +463,45 @@ impl Named {
     }
 }
 
+/// What a variable's declared `type` does to the value it receives (Terraform converts a value
+/// to the type).
+#[derive(Clone, Copy, PartialEq)]
+enum Declared {
+    /// `set(...)`: a set.
+    Set,
+    /// `any`: the value keeps its own type.
+    Any,
+    /// Any other type (`list(...)`, `tuple(...)`, `map(...)`, `object(...)`, a primitive): the
+    /// value is converted, so it is no set.
+    Other,
+}
+
+impl Declared {
+    /// The declared type written as the constraint `text` (the form a Terraform JSON file gives).
+    fn text(text: &str) -> Declared {
+        let text = text.trim();
+        match (text, text.starts_with("set(")) {
+            (_, true) => Declared::Set,
+            ("any", _) => Declared::Any,
+            _ => Declared::Other,
+        }
+    }
+
+    /// The declared type written as the expression `expr`.
+    fn expr(expr: &Expression) -> Declared {
+        match expr {
+            Expression::FuncCall(f) if f.name.name.as_str() == "set" => Declared::Set,
+            Expression::Variable(v) if v.as_str() == "any" => Declared::Any,
+            _ => Declared::Other,
+        }
+    }
+}
+
 /// A `variable` block: its default, whether it is sensitive, and where it is declared.
 struct Variable {
     default: Option<Expression>,
-    /// Whether its `type` is `set(...)`.
-    set: bool,
+    /// What its declared `type` does to the value it receives; `None` without a `type`.
+    ty: Option<Declared>,
     sensitive: bool,
     path: String,
     line: usize,
@@ -495,11 +529,12 @@ impl Module {
             return;
         };
         variable.sensitive |= declared.sensitive;
-        variable.set |= declared.set;
+        // An override block's `type` replaces the declared one; without one the declared stays.
+        variable.ty = variable.ty.or(declared.ty);
         // An override block without a default keeps the declared one, and where it is.
         if overriding && variable.default.is_none() {
             declared.sensitive = variable.sensitive;
-            declared.set = variable.set;
+            declared.ty = variable.ty;
         } else {
             *declared = variable;
         }
@@ -1218,7 +1253,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
             ("variable", [name]) => {
                 let variable = Variable {
                     default: attr("default").cloned(),
-                    set: matches!(attr("type"), Some(Expression::FuncCall(f)) if f.name.name.as_str() == "set"),
+                    ty: attr("type").map(Declared::expr),
                     sensitive: crate::config_values::hcl::is_sensitive(attr("sensitive")),
                     path: path.to_string(),
                     line: line(b.span().map_or(0, |s| s.start)),
@@ -2038,9 +2073,11 @@ impl<'m> Eval<'m> {
         let (scope, expr) = match &key.1 {
             Name::Local(n) => (at, module.locals.get(n).map(|l| &l.expr)),
             Name::Var(n) => match (module.variables.get(n), self.instances[at].parent) {
-                (Some(v), _) if v.set => {
-                    self.sets.insert(key, true);
-                    return true;
+                // A declared type converts the value: only `any`, or none, keeps the set.
+                (Some(v), _) if matches!(v.ty, Some(Declared::Set | Declared::Other)) => {
+                    let set = v.ty == Some(Declared::Set);
+                    self.sets.insert(key, set);
+                    return set;
                 }
                 (Some(_), Some((caller, block))) => match block.args.get(n) {
                     Some(arg) => (caller, Some(&arg.expr)),
@@ -4829,6 +4866,51 @@ mod tests {
             "resource \"a\" \"b\" { name = \"q-${local.a}\" }\n",
         );
         assert_eq!(names(&[("main.tf", cycle)]), ["a.b ~ \"q-*-x\""]);
+    }
+
+    /// A variable's declared `type` converts what it receives: a `list(...)` given a set (or a
+    /// local holding one) holds a list, whose key is the index, where `any` or no type keeps the
+    /// caller's set.
+    #[test]
+    fn a_variable_typed_as_a_list_given_a_set_keeps_its_index_key() {
+        let module = |ty: &str| {
+            format!(
+                "variable \"s\" {{\n{ty}}}\nresource \"a\" \"q\" {{\n  for_each = {{for k, v in var.s : k => v}}\n  name = \"queue-${{each.key}}\"\n}}\n"
+            )
+        };
+        let call = |arg: &str, ty: &str| {
+            let main = format!(
+                "locals {{ t = toset([\"x\"]) }}\nmodule \"m\" {{\n  source = \"./m\"\n  s = {arg}\n}}\n"
+            );
+            names(&[("main.tf", &main), ("m/main.tf", &module(ty))])
+        };
+        let list = ["module.m", "module.m.a.q[\"0\"] = \"queue-0\""];
+        assert_eq!(call("toset([\"x\"])", "  type = list(string)\n"), list);
+        assert_eq!(call("local.t", "  type = list(any)\n"), list);
+        // Only a list-like declared type converts: `any` and no type keep the set.
+        let unresolved = ["module.m", "module.m.a.q ~ \"queue-*\""];
+        assert_eq!(call("local.t", "  type = any\n"), unresolved);
+        assert_eq!(call("local.t", ""), unresolved);
+        assert_eq!(call("local.t", "  type = set(string)\n"), unresolved);
+    }
+
+    /// An override file's `type` replaces the declared one, as Terraform merges a variable: a set
+    /// retyped as a list holds a list, and an override without a `type` keeps the set.
+    #[test]
+    fn an_override_retyping_a_set_variable_as_a_list_keeps_its_index_key() {
+        let main = concat!(
+            "variable \"s\" {\n  type = set(string)\n  default = [\"x\"]\n}\n",
+            "resource \"a\" \"q\" {\n  for_each = {for k, v in var.s : k => v}\n  name = \"queue-${each.key}\"\n}\n",
+        );
+        let over = |body: &str| {
+            let over = format!("variable \"s\" {{\n{body}}}\n");
+            names(&[("main.tf", main), ("override.tf", &over)])
+        };
+        assert_eq!(
+            over("  type = list(string)\n"),
+            ["a.q[\"0\"] = \"queue-0\" [var.s main.tf:1]"]
+        );
+        assert_eq!(over("  description = \"d\"\n"), ["a.q ~ \"queue-*\""]);
     }
 
     /// Whether a name holds a set stops at `EVAL_DEPTH_MAX` too: a hostile chain of locals naming
