@@ -16,6 +16,7 @@ SHA = re.compile(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}")
 CLOUD = "snapshot valkey generation-pointer refresh-lock oidc github-app postgres directory ui workspaces proposals accounts".split()
 DEPLOY_SCRIPTS = {"scripts/compose-check", "scripts/helm-check", "scripts/container-smoke", "scripts/ui-tarball"}
 CHANGELOG_ITEM_LINES = 10  # one Unreleased item per change: a longer one is several changes
+VERIFIER_SCRIPTS = ".claude/skills/verify-blackbox/scripts/"  # harness tooling, self-tested, never product
 DEPLOY_WORKFLOWS = {f".github/workflows/{name}.yml" for name in ("compose", "helm", "container", "release")}
 
 
@@ -55,7 +56,8 @@ def light(path):
                         "scripts/check", "scripts/prove-ci"}
             or (path.startswith((".agents/skills/", ".claude/skills/"))
                 and p.suffix in {".md", ".json", ".yaml", ".yml", ".toml"})
-            or path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/")))
+            or path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/",
+                                VERIFIER_SCRIPTS)))
 
 
 def proof_driver(path):
@@ -276,6 +278,9 @@ def static(args, paths, tree):
             run("node", "--check", name)
         elif suffix in {".sh", ".bash"} or (not suffix and path.read_bytes()[:100].startswith((b"#!/bin/sh", b"#!/bin/bash", b"#!/usr/bin/env bash"))):
             run("bash" if suffix == ".bash" or b"bash" in path.read_bytes().splitlines()[0] else "sh", "-n", name)
+    for script in sorted({p for p in paths if p.startswith(VERIFIER_SCRIPTS) and p.endswith(".py")}):
+        if Path(script).exists() and "--selftest" in Path(script).read_text():
+            run(sys.executable, script, "--selftest")
     if any(p.startswith("deploy/helm/") or p == "scripts/helm-check" for p in paths):
         bounded(sys.executable, "scripts/helm-check")
     skill_names = {Path(p).parts[2] for p in paths if p.startswith(".agents/skills/") and len(Path(p).parts) > 2}
@@ -367,6 +372,7 @@ def selftest():
         (["tests/golden/query.txt"], True, True, True),
         ([".claude/skills/prove-meada/scripts/console.py"], False, True, True),
         ([".claude/skills/prove-meada/SKILL.md", ".agents/skills-lock.json"], False, False, False),
+        ([VERIFIER_SCRIPTS + "stage.py"], False, False, False),
     ]
     for paths, product, cli, console in cases:
         found = scopes(paths)
