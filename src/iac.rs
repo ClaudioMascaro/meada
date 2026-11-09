@@ -771,6 +771,12 @@ struct Exact<'a, 'c> {
     unordered: usize,
 }
 
+/// A `for` binding a key over `toset(...)`: Terraform's key is the element, Meada's set a list
+/// keyed by index.
+fn keyed_set(key: bool, collection: &Expression) -> bool {
+    key && matches!(collection, Expression::FuncCall(f) if f.name.name.as_str() == "toset")
+}
+
 impl VisitMut for Exact<'_, '_> {
     /// A template that is one interpolation keeps its value's type, as in HCL; any other
     /// interpolation shows its value as text (`meada_exact("text", ...)`).
@@ -794,8 +800,9 @@ impl VisitMut for Exact<'_, '_> {
     /// `hcl-edit` never visits a `%{ for }` directive's collection: read it as a `for` reads its own.
     fn visit_for_template_expr_mut(&mut self, node: &mut hcl_edit::template::ForTemplateExpr) {
         let unordered = self.unordered;
+        let keyed = keyed_set(node.key_var.is_some(), &node.collection_expr);
         self.visit_expr_mut(&mut node.collection_expr);
-        if self.unordered > unordered {
+        if self.unordered > unordered || keyed {
             self.inexact = true;
             node.collection_expr = undefined();
         }
@@ -804,8 +811,9 @@ impl VisitMut for Exact<'_, '_> {
 
     fn visit_for_intro_mut(&mut self, node: &mut hcl_edit::expr::ForIntro) {
         let unordered = self.unordered;
+        let keyed = keyed_set(node.key_var.is_some(), &node.collection_expr);
         visit_mut::visit_for_intro_mut(self, node);
-        if self.unordered > unordered {
+        if self.unordered > unordered || keyed {
             self.inexact = true;
             node.collection_expr = undefined();
         }
@@ -4281,6 +4289,21 @@ mod tests {
         let got = names(&[("main.tf", main), ("terraform.tfvars", &tfvars)]);
         assert_eq!(got.len(), 40, "{got:?}");
         assert!(got.iter().all(|n| n.contains(" = \"q-s")), "{got:?}");
+    }
+
+    /// A key bound over `toset(...)` is the element in Terraform, where Meada's set is a list
+    /// whose key is the index: unresolved, in a `for` and in a `%{ for }` directive.
+    #[test]
+    fn a_key_over_a_set_is_unresolved() {
+        let main = concat!(
+            "resource \"a\" \"q\" {\n",
+            "  for_each = {for k, v in toset([\"x\", \"y\"]) : k => v}\n",
+            "  name = \"q-${each.key}\"\n}\n",
+            "resource \"a\" \"t\" { name = \"t-%{for k, v in toset([\"x\"])}${k}%{endfor}\" }\n",
+            "resource \"a\" \"v\" { name = \"v-${[for v in toset([\"y\", \"x\"]) : v][0]}\" }\n",
+        );
+        let got = names(&[("main.tf", main)]);
+        assert_eq!(got, ["a.q ~ \"q-*\"", "a.t ~ \"t-*\"", "a.v = \"v-x\""]);
     }
 
     /// A `for` over a conversion of an expanded argument (`var.l...`) costs as before: the list it

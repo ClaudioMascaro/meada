@@ -575,6 +575,8 @@ All notable changes to Meada are recorded here. The format follows
 - Terraform: a `for` over `tolist`, `toset` or `tomap` (`{for o in tolist(var.items) : o.name =>
   o}`) costs as a `for` over its argument, so forty objects from a var file expand where the
   estimate, the argument's size squared, left the resource `*` past about a kilobyte.
+- Terraform: a `for` or `%{ for }` binding a key over `toset(...)` (`for k, v in toset(x)`) is
+  `*`, where the key was the index (`q-0`) and Terraform's is the element.
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes
