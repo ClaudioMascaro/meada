@@ -191,7 +191,11 @@ within 24 KiB. Other areas keep their existing 64 KiB budget until split:
   `docs/agents/ceilings.md`), with its value and its reason; it is not repeated in the map.
 - A value the index now stores (a table, a column, a field of a stored summary) joins the list
   "Stored values" in `docs/agents/map/indexing/stored-values.md`, the detail of the invariant "The index holds
-  no source text and no values of code, apart from ..." in the map.
+  no source text and no values of code, apart from ..." in the map. A diff that adds a form to a
+  stored field and leaves `tests/golden/schema.txt` unchanged is a finding
+  (`docs/agents/map/seams.md`: a change to what is stored re-blesses it). The golden is built
+  from the samples under `tests/fixtures/schema/` (`src/index.rs`), so the fix is a sample there
+  that carries the new form, added or extended in the diff, and a re-blessed golden that shows it.
 - A kind's rule lives in its own files behind `ContractKind`. The engine, the items, the
   decisions, the trace, the entry points and the extraction loop of the index writer ask the seam
   (`contract::kind_of`, `shown`, `serves`, `place` and the other free functions) and import no
