@@ -5,7 +5,7 @@ for the change. Read the relevant detail pages, not every leaf of an area. This 
 within 8 KiB; its relocated details stay within 24 KiB (`tests/it/docs.rs`). The code wins over
 the map. Terms are `GLOSSARY.md`'s; decisions are in `docs/adr/`.
 
-A new module, seam or invariant gets a route here and detail in `map/`. A limit goes to the
+A new module, seam or invariant gets a route here and detail in `map/`. A new module needs both: its name on a line below, and its own line in that area file (`every_module_has_a_line_in_the_map_naming_its_area_file`, `tests/it/docs.rs`). A limit goes to the
 relevant part of [ceilings.md](ceilings.md). Full module descriptions remain in the
 [core catalogue](map/overview/crates.md) and [binary catalogue](map/overview/modules-src.md).
 
