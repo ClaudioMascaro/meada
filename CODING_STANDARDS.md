@@ -130,8 +130,10 @@ indexing carries on.
   unit test feeds it an input past the limit.
 - A manifest or configuration reader reads a file of `lang::MAX_BYTES` built to explode (many
   keys, deep nesting, wide fan-out) in bounded time and bounded memory, and returns a bounded
-  size; a value is copied after it is charged, never before. A new reader adds its row to
-  `probes` in `src/package/hostile.rs`, which also bounds the heap each row holds (`HEAP`).
+  size; a value is copied after it is charged, never before. A new reader, or a reader that
+  gains a table or key, adds or extends its row in `probes` in `src/package/hostile.rs` (which
+  also bounds the heap each row holds, `HEAP`), so the probe exercises the new keys at
+  `lang::MAX_BYTES`, including a scan of every entry for each entry.
 
 ## Service deadlines
 
