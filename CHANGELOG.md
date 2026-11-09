@@ -106,17 +106,17 @@ All notable changes to Meada are recorded here. The format follows
   hierarchy queries stay unresolved. Release level: minor, meada and meada-core 1.4.0 (#660).
 - AWS SDK use sides in TypeScript, JavaScript (SDK v3) and Python (boto3): SNS publishes,
   EventBridge event entries and Kinesis record writes produce channel sides; S3 and DynamoDB
-  operations write or read resource sides; SSM and Secrets Manager operations read resources.
-  Batch and transaction inputs retain each named resource. Both client and operation origins
-  must be the SDK's; name-matched hops and hidden client names produce no side. Literal names
-  and supported ARNs join provisioners at `exact`; environment reads stay unresolved and name
-  their variable through `via: env:NAME`, without reading the process environment. SDK providers
-  gain an optional `via`, absent on existing providers; format remains 1. Existing declared
-  resource sides retain `declared`. Older indexes rebuild. Release level: minor, meada and
-  meada-core 1.4.0 (#659).
-  Complete Python factory evidence rejects opaque or missing returns and unawaited coroutine
-  or generator objects, preserves exact arguments, class fields and awaited aliases, and
-  shares bounded constructor traversal with existing message clients.
+  operations write or read resource sides; SSM and Secrets Manager operations read resources. Batch
+  and transaction inputs retain each named resource. Both client and operation origins must be the
+  SDK's; name-matched hops and hidden client names produce no side. Complete Python factory evidence
+  rejects opaque or missing returns and unawaited coroutine or generator objects, preserves exact
+  arguments, class fields and awaited aliases, and shares bounded constructor traversal with
+  existing message clients (#659).
+- AWS SDK use sides: literal names and supported ARNs join provisioners at `exact`; environment
+  reads stay unresolved and name their variable through `via: env:NAME`, without reading the process
+  environment. SDK providers gain an optional `via`, absent on existing providers; format remains 1.
+  Existing declared resource sides retain `declared`. Older indexes rebuild. Release level: minor,
+  meada and meada-core 1.4.0 (#659).
 - Config values naming AWS resources become directionless use sides (#661): recognized ARNs,
   SQS queue URLs and S3 URIs are exact; plain names under final `queue`, `topic`, `bucket` and
   `table` keys are inferred. Each key links only to provisioners and counts for scoped orphans;
@@ -158,33 +158,33 @@ All notable changes to Meada are recorded here. The format follows
 - Config values (ADR 0025): every scalar of every `*.yaml`, `*.yml` and `*.json` file the walk
   visits, and of the YAML and JSON files under the CI configuration at the root (`.github/`,
   `.gitlab-ci.yml`, `.gitlab/`, `.circleci/`, `.buildkite/`, `.drone.yml`), is indexed with its
-  file, key path (jq style, the document index first in a file of several documents), value,
-  type and line. `search` finds them with the new kind `value` (exact, then prefix, then
-  substring, over values and key paths), and the default search answers with them only when no
-  symbol and no contract matches. A value over 1 KiB is stored cut, marked `(cut)`; a Kubernetes
-  `Secret`'s `data` and `stringData` are stored as `redacted`. Lockfiles and files that do not
-  parse are skipped, and `meada status` counts the config files read and skipped and the values
-  redacted. Values stay out of `meada export`. The index schema changes, so existing indexes are
-  rebuilt (#639).
+  file, key path (jq style, the document index first in a file of several documents), value, type
+  and line. `search` finds them with the new kind `value` (exact, then prefix, then substring, over
+  values and key paths), and the default search answers with them only when no symbol and no
+  contract matches (#639).
+- Config values: a value over 1 KiB is stored cut, marked `(cut)`; a Kubernetes `Secret`'s `data`
+  and `stringData` are stored as `redacted`. Lockfiles and files that do not parse are skipped, and
+  `meada status` counts the config files read and skipped and the values redacted. Values stay out
+  of `meada export`. The index schema changes, so existing indexes are rebuilt (#639).
 - `search` with the kind `value` serves substring matches from an FTS5 trigram table beside the
   B-trees that already serve exact and prefix matches, instead of scanning every row; a query
   under three characters still scans, with the same answer. The table holds about four times the
   text of the key paths and values (21 MB for 5 MB on this repository). The index schema
   changes, so existing indexes are rebuilt (#647).
-- Terraform and OpenTofu config values (ADR 0025): `*.tf`, `*.tofu`, `*.tfvars` and
-  `*.auto.tfvars` files are read with `hcl-edit` and `hcl-rs`, and `*.tf.json`, `*.tofu.json`
-  and `*.tfvars.json` through the JSON reader, so `search` with the kind `value` finds a team
-  name in an OpsGenie routing rule or a queue name in Terraform. The key path runs over the
-  block's type and labels and the attribute's name (`resource.aws_sqs_queue.orders.name`), a
-  repeated block `[n]`; a literal keeps its type, and an expression or a template is stored as
-  written under the type `expression` or `template`. A `.tofu` file shadows the `.tf` file of
-  the same name. The `default` of a `variable` with `sensitive = true` (or `"true"`) and every
-  value a `.tfvars` file gives a variable of that name are stored as `redacted`, and so is a
-  default another file of its directory marks sensitive when that directory holds an override
-  file (`override.tf`, `*_override.tf`), which Terraform merges into the others; such a default
-  never reaches the index, also when only the override file changes. There, a `.tf` file a
-  `.tofu` one hides counts as one that does not parse, since Terraform reads it. A file that
-  does not parse is skipped and counted by `meada status` (#640).
+- Terraform and OpenTofu config values (ADR 0025): `*.tf`, `*.tofu`, `*.tfvars` and `*.auto.tfvars`
+  files are read with `hcl-edit` and `hcl-rs`, and `*.tf.json`, `*.tofu.json` and `*.tfvars.json`
+  through the JSON reader, so `search` with the kind `value` finds a team name in an OpsGenie
+  routing rule or a queue name in Terraform. The key path runs over the block's type and labels and
+  the attribute's name (`resource.aws_sqs_queue.orders.name`), a repeated block `[n]`; a literal
+  keeps its type, and an expression or a template is stored as written under the type `expression`
+  or `template`. A `.tofu` file shadows the `.tf` file of the same name (#640).
+- Terraform and OpenTofu config values: the `default` of a `variable` with `sensitive = true` (or
+  `"true"`) and every value a `.tfvars` file gives a variable of that name are stored as `redacted`,
+  and so is a default another file of its directory marks sensitive when that directory holds an
+  override file (`override.tf`, `*_override.tf`), which Terraform merges into the others; such a
+  default never reaches the index, also when only the override file changes. There, a `.tf` file a
+  `.tofu` one hides counts as one that does not parse, since Terraform reads it. A file that does
+  not parse is skipped and counted by `meada status` (#640).
 - A Go struct field that keeps a base URL (`c.base`) carries the environment read every
   composite literal of the repository that sets it gives it, directly or through a constructor's
   parameter whose callers in the repository all pass that read, so a method that reads the field,
@@ -200,23 +200,24 @@ All notable changes to Meada are recorded here. The format follows
   the constructor reads, a Backstage `config.getString` through `app-config*.yaml` included, and
   links through `base_url_env`. A public mutable field, a second or conditional write, a write
   outside the constructor, a constructor parameter and a JavaScript file stay unknown (#688).
-- Backstage's `app-config*.yaml` follows `$include` and reads `$env`: a block moved to a partial
-  (`{ $include: ./partials/acme.yaml }`, or `./partials/acme.yaml#api` for one key path of it)
-  and a value written `{ $env: API_URL }` are read as if inline, so a `config.getString` through
-  them links through `base_url_env`. The path resolves against the including file's directory,
-  only `.json`, `.yaml` and `.yml` files are read, and includes nest from their own directory. A
-  partial is a config input of the index, so editing it alone changes the answer on the next
-  refresh. An absolute path, one that leaves the repository, a symbolic link, a `${` in the path,
-  another extension, a missing file or key path, a sibling key, a cycle, a depth past 8, more
-  than 64 includes from one root, more than 1 MiB grafted into one root and more than 4 MiB parsed
-  for all the roots of a repository (its files named `app-config.yaml` first, then the others in
-  path order; an include counting its file's bytes, or its value's size when YAML aliases make it
-  larger, an include past its root's limit included) are not followed, and a partial that does
-  not parse is parsed once per reading, charged its bytes or, holding several documents, what
-  reading them built:
-  their keys stay unread and `meada status` names each include with its reason. `$file` stays
-  unread, and a config file past 1 MiB is dropped, not parsed by half. The index schema golden
-  changes (it now lists the stored roles), so existing indexes are rebuilt (#689).
+- Backstage's `app-config*.yaml` follows `$include` and reads `$env`: a block moved to a partial (`{
+  $include: ./partials/acme.yaml }`, or `./partials/acme.yaml#api` for one key path of it) and a
+  value written `{ $env: API_URL }` are read as if inline, so a `config.getString` through them
+  links through `base_url_env`. The path resolves against the including file's directory, only
+  `.json`, `.yaml` and `.yml` files are read, and includes nest from their own directory. A partial
+  is a config input of the index, so editing it alone changes the answer on the next refresh. The
+  index schema golden changes (it now lists the stored roles), so existing indexes are rebuilt
+  (#689).
+- Backstage `$include` limits: an absolute path, one that leaves the repository, a symbolic link, a
+  `${` in the path, another extension, a missing file or key path, a sibling key, a cycle, a depth
+  past 8, more than 64 includes from one root, more than 1 MiB grafted into one root and more than 4
+  MiB parsed for all the roots of a repository (its files named `app-config.yaml` first, then the
+  others in path order; an include counting its file's bytes, or its value's size when YAML aliases
+  make it larger, an include past its root's limit included) are not followed (#689).
+- Backstage partials that do not parse: such a partial is parsed once per reading, charged its bytes
+  or, holding several documents, what reading them built: their keys stay unread and `meada status`
+  names each include with its reason. `$file` stays unread, and a config file past 1 MiB is dropped,
+  not parsed by half (#689).
 - Backstage proxy endpoints are read wherever Backstage's proxy backend reads them: under
   `proxy.endpoints`, and, when no `app-config*.yaml` has that key, as the keys of `proxy` that
   start with `/` (the legacy shape, accepted from before Backstage 1.17). A string value is
@@ -226,19 +227,19 @@ All notable changes to Meada are recorded here. The format follows
   `endpoints` is read. A `getBaseUrl('proxy')` call plus `/inventory/clusters` through any of
   them is `http::GET::/clusters`, linked through `base_url_env` like an object `target`. A
   minor bump (#690).
-- IaC nodes (ADR 0025): every Terraform and OpenTofu `resource`, `data` block and `module` call
-  of a `*.tf` or `*.tofu` file is a node with an address (`<type>.<name>`, `data.<type>.<name>`,
+- IaC nodes (ADR 0025): every Terraform and OpenTofu `resource`, `data` block and `module` call of a
+  `*.tf` or `*.tofu` file is a node with an address (`<type>.<name>`, `data.<type>.<name>`,
   `module.<name>`), a type, a file, its lines and the root module that roots its evaluation (a
-  directory no other one calls as a local module). A local module's blocks are instantiated once
-  per call under the call's address (`module.orders.aws_sqs_queue.this`), and a literal `count`
-  or `for_each` gives one node per `[key]`. Override files (`override.tf`, `*_override.tf`) merge
-  into the blocks of their directory, as Terraform applies them. The references between nodes are
-  stored like calls,
-  followed through `var`, `local` and module outputs. `search` finds the nodes with the new kind
-  `iac` (by address, type or physical name; the default search leaves them out), `context` on an
-  address shows the type, the physical name, the references both ways and the config values,
-  and `trace` walks the references down and up. Nodes stay out of `meada export`; the index
-  schema changes, so existing indexes are rebuilt (#649).
+  directory no other one calls as a local module). A local module's blocks are instantiated once per
+  call under the call's address (`module.orders.aws_sqs_queue.this`), and a literal `count` or
+  `for_each` gives one node per `[key]`. Override files (`override.tf`, `*_override.tf`) merge into
+  the blocks of their directory, as Terraform applies them (#649).
+- IaC nodes: the references between nodes are stored like calls, followed through `var`, `local` and
+  module outputs. `search` finds the nodes with the new kind `iac` (by address, type or physical
+  name; the default search leaves them out), `context` on an address shows the type, the physical
+  name, the references both ways and the config values, and `trace` walks the references down and
+  up. Nodes stay out of `meada export`; the index schema changes, so existing indexes are rebuilt
+  (#649).
 - Compose services as IaC nodes: a Compose file (`compose.yaml`, `compose.yml`,
   `docker-compose.yaml`, `docker-compose.yml`) with its override file in the same directory is one
   evaluation unit, rooted at the directory, and each service is a node `services.<name>` of type
@@ -248,45 +249,47 @@ All notable changes to Meada are recorded here. The format follows
   context (a path inside the repository, from its root) for the image contract, and `context`
   shows both. `search` kind `iac`, `context` and `trace` answer for them. The index schema
   changes, so existing indexes are rebuilt; release level minor (#652).
-- CloudFormation and SAM templates as IaC nodes (ADR 0025): a YAML file (the short-form tags
-  `!Ref`, `!Sub`, `!GetAtt`, `!Join` and the rest are read) or a JSON file with a `Resources`
-  mapping that carries `AWSTemplateFormatVersion` or the SAM transform
-  (`AWS::Serverless-2016-10-31`) is one evaluation unit, rooted at the template's path, and each
-  resource is a node addressed by its logical id, its type (`AWS::SQS::Queue`,
-  `AWS::Serverless::Function`) the node's type. `Ref`, `Fn::GetAtt` (with the attribute in the
-  `via`), the variables of `Fn::Sub` and `DependsOn` are references. The physical name of the
-  types the contract kinds will read (queues, topics, buckets, tables, functions, streams,
-  secrets and a few more) is evaluated within the template: a parameter's default (marked
-  overridable), `Ref`, `Fn::Sub`, `Fn::GetAtt` and `Fn::Join`; a pseudo parameter, an import and
-  any other function are unresolved parts and the name a pattern. A parameter with `NoEcho` has
-  its default stored as `redacted` among the config values and used for no name. `search` kind
-  `iac`, `context` and `trace` answer for them; a changed template is evaluated again alone. The
-  index schema changes, so existing indexes are rebuilt; release level minor (#653).
-- Serverless Framework services as IaC nodes (ADR 0025): a `serverless.yml`, `serverless.yaml` or
-  `serverless.json` with a `service` is one evaluation unit, rooted at its path. Each function is
-  a node `functions.<name>` of type `Serverless::Function`, named by its `name` or
-  `<service>-<stage>-<function>`, with its handler and events (`http GET /orders`, `sqs
-  Queue.Arn`, `schedule rate(5 minutes)`) recorded and shown by `context`, and a reference to each
-  resource its body names with `Ref`, `Fn::GetAtt` or `Fn::Sub`. The `resources` section is read as
-  CloudFormation: each resource is a node at its logical id. `${self:...}` resolves to the value
-  at its path and the default of `${opt:...}` resolves and is marked overridable; `${env:...}`,
-  `${ssm:...}` and the other sources are unresolved parts, a `*` in a name and `${...}` in a
-  recorded text. `search` kind `iac`, `context` and `trace` answer for them; a changed service is
+- CloudFormation and SAM templates as IaC nodes (ADR 0025): a YAML file (the short-form tags `!Ref`,
+  `!Sub`, `!GetAtt`, `!Join` and the rest are read) or a JSON file with a `Resources` mapping that
+  carries `AWSTemplateFormatVersion` or the SAM transform (`AWS::Serverless-2016-10-31`) is one
+  evaluation unit, rooted at the template's path, and each resource is a node addressed by its
+  logical id, its type (`AWS::SQS::Queue`, `AWS::Serverless::Function`) the node's type. `Ref`,
+  `Fn::GetAtt` (with the attribute in the `via`), the variables of `Fn::Sub` and `DependsOn` are
+  references. `search` kind `iac`, `context` and `trace` answer for them; a changed template is
   evaluated again alone. The index schema changes, so existing indexes are rebuilt; release level
-  minor (#654).
+  minor (#653).
+- CloudFormation and SAM physical names: the physical name of the types the contract kinds will read
+  (queues, topics, buckets, tables, functions, streams, secrets and a few more) is evaluated within
+  the template: a parameter's default (marked overridable), `Ref`, `Fn::Sub`, `Fn::GetAtt` and
+  `Fn::Join`; a pseudo parameter, an import and any other function are unresolved parts and the name
+  a pattern. A parameter with `NoEcho` has its default stored as `redacted` among the config values
+  and used for no name (#653).
+- Serverless Framework services as IaC nodes (ADR 0025): a `serverless.yml`, `serverless.yaml` or
+  `serverless.json` with a `service` is one evaluation unit, rooted at its path. Each function is a
+  node `functions.<name>` of type `Serverless::Function`, named by its `name` or
+  `<service>-<stage>-<function>`, with its handler and events (`http GET /orders`, `sqs Queue.Arn`,
+  `schedule rate(5 minutes)`) recorded and shown by `context`, and a reference to each resource its
+  body names with `Ref`, `Fn::GetAtt` or `Fn::Sub`. The `resources` section is read as
+  CloudFormation: each resource is a node at its logical id (#654).
+- Serverless Framework variables: `${self:...}` resolves to the value at its path and the default of
+  `${opt:...}` resolves and is marked overridable; `${env:...}`, `${ssm:...}` and the other sources
+  are unresolved parts, a `*` in a name and `${...}` in a recorded text. `search` kind `iac`,
+  `context` and `trace` answer for them; a changed service is evaluated again alone. The index
+  schema changes, so existing indexes are rebuilt; release level minor (#654).
 - Kubernetes objects and Kustomize overlays as IaC nodes (ADR 0025): every YAML or JSON document
   with an `apiVersion`, a `kind` and a `metadata.name` is a node addressed
   `<Kind>[.<group>]/<namespace>/<name>` (no namespace for a cluster-scoped kind). Each directory
   with a `kustomization.yaml` that no other names as a base is an overlay and an evaluation unit:
   its `resources`, `bases` and `components` inside the repository are instantiated under it, each
-  node labelled by the overlay, with `namePrefix`, `nameSuffix`, `namespace` and `images` applied.
-  A base stays inside the repository (a `..` that stays inside is followed; a remote base, one
-  above the root, through a symlink, in a cycle or past 16 levels is not), and `meada status`
-  counts the entries not followed. References: a Service to the workloads its selector matches, a
-  workload to the ConfigMaps and Secrets of its `env`, `envFrom` and volumes and to its service
-  account, an Ingress to its backend Services, in one namespace and one unit. `search` with the
-  kind `iac`, `context` (with the images of a workload) and `trace` answer for them as for
-  Terraform's nodes. The index schema changes, so existing indexes are rebuilt (#651).
+  node labelled by the overlay, with `namePrefix`, `nameSuffix`, `namespace` and `images` applied
+  (#651).
+- Kustomize bases and Kubernetes references: a base stays inside the repository (a `..` that stays
+  inside is followed; a remote base, one above the root, through a symlink, in a cycle or past 16
+  levels is not), and `meada status` counts the entries not followed. A Service references the
+  workloads its selector matches, a workload the ConfigMaps and Secrets of its `env`, `envFrom` and
+  volumes and its service account, an Ingress its backend Services, in one namespace and one unit.
+  `search` with the kind `iac`, `context` (with the images of a workload) and `trace` answer for
+  them as for Terraform's nodes. The index schema changes, so existing indexes are rebuilt (#651).
 - Crossplane compositions, claims and managed resources (ADR 0025): among the Kubernetes nodes,
   `context` names what each object is to Crossplane on a new `role:` line (a composite resource
   definition, a composition, a claim or a composite resource of a kind an XRD of the repository
@@ -294,31 +297,30 @@ All notable changes to Meada are recorded here. The format follows
   kinds have no namespace. Each resource a composition creates from a literal `base`
   (`spec.resources`, or a function patch-and-transform pipeline step) is a node
   `<composition>/<resource>` of the base's kind, named by its `crossplane.io/external-name`
-  annotation or `metadata.name`; a managed resource is named by its external name. References,
-  in one unit: a claim to the XRD of its composite kind, a composite resource to its XRD, a
-  `compositionRef` to its composition, an XRD to its default and enforced composition, a
-  composition to the XRD it composes and to each resource it creates, and a created or managed
+  annotation or `metadata.name`; a managed resource is named by its external name (#655).
+- Crossplane references, in one unit: a claim to the XRD of its composite kind, a composite resource
+  to its XRD, a `compositionRef` to its composition, an XRD to its default and enforced composition,
+  a composition to the XRD it composes and to each resource it creates, and a created or managed
   resource to the XRD or `CustomResourceDefinition` of its kind. Patches and functions are not
-  evaluated: a name a patch sets, or a base with no name, is the pattern `*`, and a step running
-  any other function creates no node. The index schema changes, so existing indexes are rebuilt;
-  release level minor (#655).
+  evaluated: a name a patch sets, or a base with no name, is the pattern `*`, and a step running any
+  other function creates no node. The index schema changes, so existing indexes are rebuilt; release
+  level minor (#655).
 - Static evaluation of Terraform names (ADR 0025): an IaC node's physical name (its `name` argument)
   and each `count` and `for_each` are evaluated with `hcl-rs`'s evaluator and Meada's pure functions
   (string, collection and conversion functions and `jsonencode`), from variable defaults, the root's
   `terraform.tfvars`, `*.auto.tfvars` and their JSON forms, locals, local module inputs and outputs
   per call, `each` and `count.index`, without running Terraform or reaching the network, so a
-  `for_each` over a variable gives one node per instance. Data sources, resource attributes,
-  registry modules, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_` and sensitive variables
-  (marked by any of their blocks, override files included, and every variable of a directory
-  holding an override file and a Terraform file that does not read or a `.tofu` file hides)
-  are never evaluated: such a
-  part of a
-  name is a `*` and the name a pattern, shown as `pattern "orders-*"` by `search` and `(pattern)`
-  by `context`, and linked by nothing yet. `context` lists
-  under `overridable:` the root variables a name went through, by their default or a var file. A
-  changed Terraform file or var file evaluates again only the root modules whose unit holds it. A
-  value over 64 KiB, an expression that could make over 1 MiB and a root's evaluation past 64 MiB
-  stay unresolved. The index schema changes, so existing indexes are rebuilt (#650).
+  `for_each` over a variable gives one node per instance. `context` lists under `overridable:` the
+  root variables a name went through, by their default or a var file. A changed Terraform file or
+  var file evaluates again only the root modules whose unit holds it. The index schema changes, so
+  existing indexes are rebuilt (#650).
+- Terraform names never evaluated: data sources, resource attributes, registry modules,
+  `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_` and sensitive variables (marked by any of
+  their blocks, override files included, and every variable of a directory holding an override file
+  and a Terraform file that does not read or a `.tofu` file hides): such a part of a name is a `*`
+  and the name a pattern, shown as `pattern "orders-*"` by `search` and `(pattern)` by `context`,
+  and linked by nothing yet. A value over 64 KiB, an expression that could make over 1 MiB and a
+  root's evaluation past 64 MiB stay unresolved (#650).
 - TypeScript consumers through `new URL(x)`: `new URL(x)` with one argument is `x` (unless the file
   declares a `URL` or imports one from a relative path), and `u.toString()`, `u.href`, `String(u)`
   and `` `${u}` `` pass the URL through, in a constant or built in place, so a `fetch` or a client
@@ -329,18 +331,19 @@ All notable changes to Meada are recorded here. The format follows
   another name holding it, or with the target in parentheses or an assertion, as does such a
   write to a sealed field set where it is declared or in its constructor
   (`this.url.pathname = ..`) (#685).
-- TypeScript consumers through `new URL(reference, base)`: the two arguments read as the join
-  the WHATWG URL Standard defines (RFC 3986 section 5.2 for these references), so an absolute
-  reference is itself, `//host/x` takes its host, `/orders` replaces the base's path and
-  `orders` joins the base's directory (`https://h/api/` keeps `api`, `https://h/api` does not).
-  Over a base read from the environment (or a hole) an absolute path keeps the base as its lead,
-  so `/orders` is `http::GET::/orders` with `via env:API_URL`; a relative reference, one that
-  starts with a read, and a query or a fragment alone stay unresolved, and a parameter on either
-  side is resolved at the call sites. A base is placed only when its scheme leads it, so a
-  proxy's `${X}/fetch/https://api.example.com/` is an opaque base, not a link to that host, and
-  every reference loses its dot segments. Swift's `URL(string:relativeTo:)` over a literal base
-  goes through the same resolver and follows the same rules; over a base read from the
-  environment it stays unresolved (#686).
+- TypeScript consumers through `new URL(reference, base)`: the two arguments read as the join the
+  WHATWG URL Standard defines (RFC 3986 section 5.2 for these references), so an absolute reference
+  is itself, `//host/x` takes its host, `/orders` replaces the base's path and `orders` joins the
+  base's directory (`https://h/api/` keeps `api`, `https://h/api` does not). Over a base read from
+  the environment (or a hole) an absolute path keeps the base as its lead, so `/orders` is
+  `http::GET::/orders` with `via env:API_URL`; a relative reference, one that starts with a read,
+  and a query or a fragment alone stay unresolved, and a parameter on either side is resolved at the
+  call sites (#686).
+- `new URL(reference, base)` bases: a base is placed only when its scheme leads it, so a proxy's
+  `${X}/fetch/https://api.example.com/` is an opaque base, not a link to that host, and every
+  reference loses its dot segments. Swift's `URL(string:relativeTo:)` over a literal base goes
+  through the same resolver and follows the same rules; over a base read from the environment it
+  stays unresolved (#686).
 
 ### Changed
 
@@ -537,20 +540,21 @@ All notable changes to Meada are recorded here. The format follows
 - Images: a module run from a local path (an archive or a directory) in one root no longer drops
   the image another root runs it from, with its environment and provisions; only that root runs
   code without an image.
-- Terraform: `split(",", "")` gives one empty element (a `count` over its length made no node),
-  an object walks its keys in lexical order, whether a variable or local binds it or the
+- Terraform: `split(",", "")` gives one empty element (a `count` over its length made no node), and
+  an IaC name pattern needs three letters or digits besides its wildcards (`*.*.*.*` matched any
+  dotted name).
+- Terraform: an object walks its keys in lexical order, whether a variable or local binds it or the
   expression builds it (a literal, a `merge`): a `for` over it or a `jsonencode` of it gave an
   `exact` name in written order, and a `for` whose collection contains an object whose keys are
-  known only once evaluated (a computed key, a comprehension) is now `*`; an IaC name pattern
-  needs three letters or digits besides its wildcards (`*.*.*.*` matched any dotted name), and
-  integer arithmetic is exact, as Terraform's: a result past `u64` or below `i64`
-  (`0 - 18446744073709551615`), a division by zero or with a remainder (`7 / 2`) and arithmetic
-  on a fraction leave that part of the name `*`, also on a `for` variable, where the evaluator
-  printed a cast, wrapped or floating-point value as an `exact` name, as did a number literal or
-  `tonumber` past them, with more digits than a float holds or that a float writes with an
-  exponent (`18446744073709551616` printed `1.8446744073709552e19`), a JSON number written
-  with a fraction or an exponent and a negative zero (`-0`, `0 * -1` printed `0`); such a value in a var file is given but unresolved, so the
-  variable's default no longer stands in for it.
+  known only once evaluated (a computed key, a comprehension) is now `*`.
+- Terraform: integer arithmetic is exact, as Terraform's: a result past `u64` or below `i64` (`0 -
+  18446744073709551615`), a division by zero or with a remainder (`7 / 2`) and arithmetic on a
+  fraction leave that part of the name `*`, also on a `for` variable, where the evaluator printed a
+  cast, wrapped or floating-point value as an `exact` name. So do a number literal or `tonumber`
+  past them, with more digits than a float holds or that a float writes with an exponent
+  (`18446744073709551616` printed `1.8446744073709552e19`), a JSON number written with a fraction or
+  an exponent and a negative zero (`-0`, `0 * -1` printed `0`). Such a value in a var file is given
+  but unresolved, so the variable's default no longer stands in for it.
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes

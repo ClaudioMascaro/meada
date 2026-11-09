@@ -15,6 +15,7 @@ FLAGS = "routine product e2e cli console accounts deploy container goldens".spli
 SHA = re.compile(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}")
 CLOUD = "snapshot valkey generation-pointer refresh-lock oidc github-app postgres directory ui workspaces proposals accounts".split()
 DEPLOY_SCRIPTS = {"scripts/compose-check", "scripts/helm-check", "scripts/container-smoke", "scripts/ui-tarball"}
+CHANGELOG_ITEM_LINES = 10  # one Unreleased item per change: a longer one is several changes
 DEPLOY_WORKFLOWS = {f".github/workflows/{name}.yml" for name in ("compose", "helm", "container", "release")}
 
 
@@ -202,6 +203,23 @@ def rust_tests(source, destination):
     bounded(str(destination), "--test-threads=2")
 
 
+def long_changelog_items(text):
+    """The first line of each `## [Unreleased]` item past `CHANGELOG_ITEM_LINES` lines."""
+    items, item, unreleased = [], None, False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            unreleased = line.startswith("## [Unreleased]")
+            item = None
+        elif unreleased and line.startswith("- "):
+            item = [line]
+            items.append(item)
+        elif unreleased and item is not None and line.startswith("  "):
+            item.append(line)
+        else:
+            item = None
+    return [item[0] for item in items if len(item) > CHANGELOG_ITEM_LINES]
+
+
 def static(args, paths, tree):
     checked = [p for p in paths if not fixture(p)]
     if checked:
@@ -211,6 +229,11 @@ def static(args, paths, tree):
         patch = git("diff", "--no-ext-diff", "--no-renames", "-U0", *args, "--", *markdown)
         if any(line.startswith("+") and not line.startswith("+++") and "\u2014" in line for line in patch.splitlines()):
             raise RuntimeError("added Markdown contains an em dash; use a comma, colon or parentheses")
+    if "CHANGELOG.md" in paths:
+        long = long_changelog_items(Path("CHANGELOG.md").read_text())
+        if long:
+            raise RuntimeError(f"CHANGELOG.md: split each Unreleased item past {CHANGELOG_ITEM_LINES} "
+                               "lines into one item per change: " + "; ".join(i[:60] for i in long))
     root = Path.cwd().resolve()
     for name in paths:
         if fixture(name):
@@ -340,6 +363,9 @@ def selftest():
     assert scopes(["Dockerfile"])["container"]
     assert "accounts" in cloud_features(["src/ui/accounts/administration.rs"])
     assert "generation-pointer" in cloud_features(["src/snapshot/generations.rs"])
+    item = "- one change\n" + "  more\n" * CHANGELOG_ITEM_LINES
+    assert long_changelog_items("## [Unreleased]\n### Fixed\n" + item + "- short\n## [1.0.0]\n" + item * 2) == ["- one change"]
+    assert long_changelog_items("## [Unreleased]\n- short\n  wrapped\n") == []
     path = os.environ.get("PATH", "")
     with tempfile.TemporaryDirectory(prefix="meada-check-path-") as empty:
         os.environ["PATH"] = os.pathsep.join([empty, os.path.dirname(shutil.which("true"))])
