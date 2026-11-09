@@ -210,7 +210,7 @@ def cmd_api(a):
         (d / f"{name}.export.json").write_bytes(body)
         equal = cli.returncode == 0 and status == 200 and export_equal(body, cli.stdout)
         differences += not equal
-        lines.append(f"{name}: export {status}, {'byte-equal to' if equal else 'DIFFERS from'} CLI export (without commit and dirty) on the same manifest/repo "
+        lines.append(f"{name}: export {status}, {'equal to' if equal else 'DIFFERS from'} CLI export (without commit and dirty) on the same manifest/repo "
                      f"(CLI exit {cli.returncode}; all fields retained; {d}/{name}.export.json)")
     verdict = "checks passed" if not differences else f"differences found: {differences}"
     (d / "api.md").write_text(f"# console.py api\n\n{verdict}\n\n" + "\n".join(f"- {l}" for l in lines) + "\n")
