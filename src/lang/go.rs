@@ -236,11 +236,34 @@ impl Walk<'_> {
     }
 
     /// Records the writes to `targets`: a name assigned again in `scope`, and the field name of
-    /// a selector, which any package may write (`config.Base = ..`).
+    /// a selector, which any package may write (`config.Base = ..`). `*p = ..` replaces every
+    /// field of what `p` points at, so `p` holds no one value either.
     fn write(&mut self, scope: &str, targets: &[Node], keeps: Keep, range: Range<usize>) {
         for target in targets {
             let name = match target.kind() {
                 "identifier" => text(*target, self.src),
+                "unary_expression"
+                    if (target.child_by_field_name("operator"))
+                        .is_some_and(|o| text(o, self.src) == "*") =>
+                {
+                    match target.child_by_field_name("operand") {
+                        Some(p) if p.kind() == "identifier" => {
+                            if self.facts.member_writes.is_some() {
+                                self.facts.member_write(
+                                    super::MemberWrite {
+                                        scope: scope.into(),
+                                        object: text(p, self.src).into(),
+                                        field: None,
+                                        range: range.clone(),
+                                    },
+                                    &mut self.write_bytes,
+                                );
+                            }
+                            text(p, self.src)
+                        }
+                        _ => continue,
+                    }
+                }
                 "selector_expression" => {
                     let Some(field) = target.child_by_field_name("field") else {
                         continue;

@@ -98,7 +98,10 @@
   stand in for it), and one that is no constant is left out, as Terraform refuses it. A var file
   that does not read (past `MAX_BYTES`, with HCL objects past `OBJECT_WORK_MAX`, or broken) may
   give any variable: each is unresolved unless a file Terraform loads after it gives the value;
-  `WIDTH_MAX` (`iac/functions.rs`: a `format` width of 256; past it the call is unresolved). `cost`
+  `WIDTH_MAX` (`iac/functions.rs`: a `format` width of 256; past it the call is unresolved).
+  `iac::Exact` puts integer arithmetic's exact value in place first; a result outside
+  `i64::MIN..=u64::MAX`, a division with a remainder (`7 / 2`, 3.5 in Terraform) and arithmetic on a
+  fraction are unresolved, and an operation on a `for` variable is left to `hcl-rs`. `cost`
   bounds a `for` by the size of what it iterates, so a `for` over a value it cannot size (a
   function's result) is costed as its square and may stay unresolved below the real ceiling.
   The type table selects `bucket` for S3 and `name` for SQS; unlisted types still read

@@ -363,8 +363,8 @@ Las lecturas del entorno mediante alias de importación en Go y C# conservan el 
 | Servicio | Operaciones y dirección |
 | --- | --- |
 | SQS | `SendMessage`, `SendMessageBatch` producen; `ReceiveMessage` consume, mediante `QueueUrl` |
-| SNS | `Publish`, `PublishBatch` producen, mediante `TopicArn` |
-| EventBridge | `PutEvents` produce en cada `Entries[].EventBusName` |
+| SNS | `Publish`, `PublishBatch` producen, mediante `TopicArn`; una publicación a un teléfono o endpoint no nombra ningún tema |
+| EventBridge | `PutEvents` produce en cada `Entries[].EventBusName`, `default` si se omite |
 | Kinesis | `PutRecord`, `PutRecords` producen, mediante `StreamName` |
 | S3 | `PutObject`, `DeleteObject` escriben; `GetObject`, `HeadObject`, `ListObjects`, `ListObjectsV2` leen, mediante el bucket |
 | DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem` escriben; `GetItem`, `Query`, `Scan`, `BatchGetItem` leen, mediante `TableName` o todas las claves de `RequestItems` |
@@ -530,14 +530,14 @@ de nombre, u oculto por un parámetro, `catch`, desestructuración u otro bindin
 | SNS | `Publish`, `PublishBatch` | | `TopicArn` |
 | EventBridge | `PutEvents` | | `Entries[].EventBusName`, `default` si se omite |
 | Kinesis | `PutRecord`, `PutRecords` | | `StreamARN` o `StreamName` |
-| S3 | `PutObject` | `GetObject` | `Bucket` |
+| S3 | `PutObject`, `DeleteObject` | `GetObject`, `HeadObject`, `ListObjects`, `ListObjectsV2` | `Bucket` |
 | DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `TransactWriteItems` | `GetItem`, `Query`, `Scan`, `BatchGetItem`, `TransactGetItems` | `TableName`, claves de `RequestItems`, o tablas de `TransactItems` |
-| SSM | | `GetParameter`, `GetParameters`, `GetParametersByPath` | `Name`, `Names`, `Path` |
-| Secrets Manager | | `GetSecretValue`, `BatchGetSecretValue` | `SecretId`, `SecretIdList` |
+| SSM | `PutParameter`, `DeleteParameter`, `DeleteParameters` | `GetParameter`, `GetParameters`, `GetParametersByPath` | `Name`, `Names`, `Path` |
+| Secrets Manager | `PutSecretValue`, `UpdateSecret`, `CreateSecret`, `DeleteSecret` | `GetSecretValue`, `BatchGetSecretValue` | `SecretId`, `SecretIdList`, `Name` (`CreateSecret`) |
 
 En JavaScript cada operación tiene el sufijo `Command`; boto3 usa snake case
-(`put_object`, `get_secret_value`). SNS, EventBridge y Kinesis son productores; S3 y DynamoDB
-usan los lados escritor y lector de recursos. Los nombres literales y ARN compatibles se unen
+(`put_object`, `get_secret_value`). SNS, EventBridge y Kinesis son productores; S3, DynamoDB,
+SSM y Secrets Manager usan los lados escritor y lector de recursos. Los nombres literales y ARN compatibles se unen
 a la infraestructura por nombre físico, sin cuenta ni región. Los lados SDK literales se unen
 en `exact`, incluso a otros lados SDK del mismo repositorio; un lado declarado en `meada.toml`
 conserva `declared`. Los valores de infraestructura sustituibles siguen dando `inferred`.

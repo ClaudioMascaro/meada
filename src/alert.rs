@@ -190,31 +190,15 @@ impl ContractKind for Alert {
                         .is_some_and(|c| !crate::contract::unresolved(c)))
         });
     }
+    /// Never called: `workspace_links` derives every alert link at once.
     fn link(
         &self,
-        consumer: &Consumer,
+        _: &Consumer,
         _: &Repository,
-        providers: &[(&Repository, &Provider)],
-        exports: &[Export],
+        _: &[(&Repository, &Provider)],
+        _: &[Export],
     ) -> Vec<Link> {
-        let level = if consumer
-            .via
-            .as_deref()
-            .is_some_and(|via| via != "alert matcher =")
-        {
-            Level::Inferred
-        } else {
-            Level::Exact
-        };
-        linked(exports, providers.iter().map(|(_, p)| *p))
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|link| {
-                link.consumer == consumer.site
-                    && consumer.contract.as_deref() == Some(&link.contract)
-                    && link.level == level
-            })
-            .collect()
+        Vec::new()
     }
     fn workspace_links(
         &self,

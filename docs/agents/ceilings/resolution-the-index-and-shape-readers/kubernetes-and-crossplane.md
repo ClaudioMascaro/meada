@@ -47,7 +47,9 @@ routing. No partial alias table may select a shorter mount.
   `patchesStrategicMerge`, `patchesJson6902`, the files they name are no objects), generators,
   `commonLabels`, `labels`, `replacements`, `helmCharts` and the object a `kind: List` holds
   are not applied or read. A ConfigMap or Secret reference is renamed with its target at each
-  stage, so one to a generator's resolves to nothing. A Service reference, and a
+  stage, so one to a generator's resolves to nothing. A Service reference's port is not checked
+  against the ports the Service declares, so an Ingress backend or route to a port it lacks still
+  reaches it. A Service reference, and a
   `serviceAccountName` of the kinds Kustomize renames (`ACCOUNT_RENAMED`), resolves once the tree
   is built, among the objects of the referrer's namespace (none and `default` alike) a stage
   renamed or moved from the name as written, by their outermost prefix and suffix stages

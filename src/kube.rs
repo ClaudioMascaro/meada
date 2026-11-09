@@ -759,6 +759,7 @@ fn remote(entry: &str) -> bool {
         || entry.contains("?ref=")
         || entry.starts_with("github.com/")
         || entry.starts_with("gitlab.com/")
+        || entry.starts_with("bitbucket.org/")
 }
 
 impl<'m> Eval<'m> {
@@ -2274,7 +2275,7 @@ mod tests {
             (
                 "o/kustomization.yaml",
                 "resources:\n  - github.com/acme/shared//kube?ref=v1\n  - https://example.com/x.yaml\n  \
-                 - ../../../etc\n  - /abs\n  - gone.yaml\n  - ../a/b/../../o/self.yaml\n",
+                 - bitbucket.org/acme/shared//kube\n  - ../../../etc\n  - /abs\n  - gone.yaml\n  - ../a/b/../../o/self.yaml\n",
             ),
             (
                 "o/self.yaml",
@@ -2289,6 +2290,7 @@ mod tests {
             [
                 ("github.com/acme/shared//kube?ref=v1", "remote"),
                 ("https://example.com/x.yaml", "remote"),
+                ("bitbucket.org/acme/shared//kube", "remote"),
                 ("../../../etc", "outside"),
                 ("/abs", "outside"),
                 ("gone.yaml", "missing"),

@@ -363,6 +363,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- AWS SDK forms in Java, Go and C# follow the ADR 0026 rule TypeScript and Python already
+  followed: an EventBridge entry without `EventBusName` produces to `default`, and an SNS
+  publish to a phone number or endpoint names no topic. A request Meada cannot see whole (a
+  builder from `toBuilder()`, a helper's result) keeps its unresolved side. TypeScript and
+  Python now read the S3, SSM and Secrets Manager operations Java, Go and C# read
+  (`DeleteObject`, `HeadObject`, `ListObjects`, `ListObjectsV2`, `PutParameter`,
+  `DeleteParameter`, `DeleteParameters`, `PutSecretValue`, `UpdateSecret`, `CreateSecret`,
+  `DeleteSecret`); DynamoDB transactions stay TypeScript and Python only (#660).
 - `snapshot publish` no longer publishes the old graph under a new commit when only a contract
   configuration or a path its summary looked at changed (a removed Lambda `worker.zip`, a
   Compose build context): the index is fresh only while all of them are as it read them.
@@ -523,8 +531,12 @@ All notable changes to Meada are recorded here. The format follows
   code without an image.
 - Terraform: `split(",", "")` gives one empty element (a `count` over its length made no node),
   a value a variable or local binds walks its object keys in lexical order (a `for` over it or a
-  `jsonencode` of it gave an `exact` name in written order), and an IaC name pattern needs three
-  letters or digits besides its wildcards (`*.*.*.*` matched any dotted name).
+  `jsonencode` of it gave an `exact` name in written order), an IaC name pattern needs three
+  letters or digits besides its wildcards (`*.*.*.*` matched any dotted name), and integer
+  arithmetic is exact, as Terraform's: a result past `u64` or below `i64`
+  (`0 - 18446744073709551615`), a division by zero or with a remainder (`7 / 2`) and arithmetic
+  on a fraction leave that part of the name `*`, where the evaluator printed a cast, wrapped or
+  floating-point value as an `exact` name.
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes
@@ -533,7 +545,11 @@ All notable changes to Meada are recorded here. The format follows
   `status` orphan.
 - Compose: an override file's `build` with no `context` keeps the base service's context, where
   it built from the override's directory, and the `!reset` and `!override` tags clear or replace a
-  base value. SAM: a function with no `CodeUri` of its own takes `Globals.Function.CodeUri`.
+  base value. A `build` context Docker reads as a git repository (`git@github.com:a/b.git`,
+  `github.com/a/b`) is no local directory, so it runs no code of the repository. SAM: a
+  function with no `CodeUri` of its own takes `Globals.Function.CodeUri`. Kustomize: a
+  `bitbucket.org/` base is remote, as `github.com/` and `gitlab.com/` ones are, where one without
+  `?ref` counted as missing.
 - SDK names (GCP and Azure, and AWS in TypeScript): a request field written through a computed
   key (`{['name']: ..}`) or a spread of another object (a spread of a spread too), or written
   after the call inside a loop statement that also holds the call, leaves the name unresolved;
@@ -543,7 +559,8 @@ All notable changes to Meada are recorded here. The format follows
   a `final` field that is set again or handed to another call, itself, through a chain off it or
   through a local holding it (`b.topicArn(..)` before `client.publish(b.build())`), also for SQS and Azure Service Bus and Event Hubs builders; and
   a named entry an inline request holds (an EventBridge entry in C# or Go, an entry builder in
-  Java). Each gave an `exact` link and provision to the name first written. A TypeScript field
+  Java); and a Go request replaced whole through its pointer (`*input = sqs.SendMessageInput{..}`).
+  Each gave an `exact` link and provision to the name first written. A TypeScript field
   read off a local object (`{Bucket: cfg.bucket}`) now names its bucket.
 - TypeScript and JavaScript: a generator (`function*` and `async function*`, declared or as an
   expression, a `*method()` of a class or an object) returns its iterator, so a `return new

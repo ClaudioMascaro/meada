@@ -2,14 +2,16 @@ import { SNSClient, PublishCommand, PublishBatchCommand } from '@aws-sdk/client-
 import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge';
 import { KinesisClient, PutRecordCommand, PutRecordsCommand } from '@aws-sdk/client-kinesis';
 import { DynamoDBClient, PutItemCommand, UpdateItemCommand, DeleteItemCommand, GetItemCommand, QueryCommand, ScanCommand, BatchWriteItemCommand, BatchGetItemCommand, TransactWriteItemsCommand, TransactGetItemsCommand } from '@aws-sdk/client-dynamodb';
-import { SSMClient, GetParameterCommand, GetParametersCommand, GetParametersByPathCommand } from '@aws-sdk/client-ssm';
-import { SecretsManagerClient, GetSecretValueCommand, BatchGetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import { SSMClient, GetParameterCommand, GetParametersCommand, GetParametersByPathCommand, PutParameterCommand, DeleteParameterCommand, DeleteParametersCommand } from '@aws-sdk/client-ssm';
+import { SecretsManagerClient, GetSecretValueCommand, BatchGetSecretValueCommand, PutSecretValueCommand, UpdateSecretCommand, CreateSecretCommand, DeleteSecretCommand } from '@aws-sdk/client-secrets-manager';
+import { S3Client, DeleteObjectCommand, HeadObjectCommand, ListObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 const sns = new SNSClient({});
 const bus = new EventBridgeClient({});
 const stream = new KinesisClient({});
 const db = new DynamoDBClient({});
 const ssm = new SSMClient({});
 const secrets = new SecretsManagerClient({});
+const s3 = new S3Client({});
 export async function run() {
   await sns.send(new PublishCommand({ TopicArn: 'arn:aws:sns:us-east-1:123456789012:alerts' }));
   await sns.send(new PublishBatchCommand({ TopicArn: 'arn:aws:sns:us-east-1:123456789012:alerts' }));
@@ -31,4 +33,15 @@ export async function run() {
   await ssm.send(new GetParametersByPathCommand({ Path: '/orders/' }));
   await secrets.send(new GetSecretValueCommand({ SecretId: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:orders/token-AbCd12' }));
   await secrets.send(new BatchGetSecretValueCommand({ SecretIdList: ['orders/a', 'orders/b'] }));
+  await s3.send(new DeleteObjectCommand({ Bucket: 'orders-bucket', Key: 'k' }));
+  await s3.send(new HeadObjectCommand({ Bucket: 'orders-bucket', Key: 'k' }));
+  await s3.send(new ListObjectsCommand({ Bucket: 'orders-bucket' }));
+  await s3.send(new ListObjectsV2Command({ Bucket: 'orders-bucket' }));
+  await ssm.send(new PutParameterCommand({ Name: '/orders/token', Value: 'v' }));
+  await ssm.send(new DeleteParameterCommand({ Name: '/orders/old' }));
+  await ssm.send(new DeleteParametersCommand({ Names: ['/orders/a', '/orders/b'] }));
+  await secrets.send(new PutSecretValueCommand({ SecretId: 'orders/token', SecretString: 'v' }));
+  await secrets.send(new UpdateSecretCommand({ SecretId: 'orders/token' }));
+  await secrets.send(new CreateSecretCommand({ Name: 'orders/new' }));
+  await secrets.send(new DeleteSecretCommand({ SecretId: 'orders/old' }));
 }

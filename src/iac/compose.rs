@@ -258,7 +258,7 @@ fn context(dir: &str, build: &Value) -> Option<Resolved> {
         _ => return None,
     };
     let Expanded { text, overridable } = expand(written);
-    if text.contains('$') || text.contains("://") || text.starts_with(['/', '~', '\\']) {
+    if text.contains('$') || remote(&text) || text.starts_with(['/', '~', '\\']) {
         return None;
     }
     let local = match text.starts_with("./") || text.starts_with("../") {
@@ -268,6 +268,11 @@ fn context(dir: &str, build: &Value) -> Option<Resolved> {
     let path = local_source(dir, &local)?;
     let text = if path.is_empty() { ".".into() } else { path };
     Some(Resolved { text, overridable })
+}
+
+/// A build context Docker reads as a URL or a git repository, never as a directory.
+pub(crate) fn remote(context: &str) -> bool {
+    context.contains("://") || context.starts_with("git@") || context.starts_with("github.com/")
 }
 
 /// `value` with every YAML merge key (`<<: *anchor`, or a list of anchors) resolved, wherever it
@@ -868,6 +873,10 @@ mod tests {
         assert_eq!(build("../.."), None);
         assert_eq!(build("/abs"), None);
         assert_eq!(build("https://github.com/a/b.git"), None);
+        // Docker reads these as git repositories, not as directories.
+        assert_eq!(build("git@github.com:a/b.git"), None);
+        assert_eq!(build("github.com/a/b"), None);
+        assert_eq!(build("git://h/a/b.git"), None);
         assert_eq!(build("${DIR}/app"), None);
         assert_eq!(build("${DIR:-app}"), Some("x/app".into()));
     }

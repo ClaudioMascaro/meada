@@ -201,16 +201,22 @@ pub(crate) fn extract<'a>(
                         return Some(vec![Name::default()]);
                     };
                     let values = request(call, keywords, operation.field, language)?;
-                    values
-                        .iter()
-                        .map(|v| {
-                            if changed {
-                                Some(Name::default())
-                            } else {
-                                name(code, path, Some(v), service.kind, &aliases)
-                            }
-                        })
-                        .collect::<Option<Vec<_>>>()
+                    let mut names = Vec::new();
+                    for value in &values {
+                        names.push(match (changed, value) {
+                            (true, _) => Name::default(),
+                            (false, Some(v)) => name(code, path, Some(v), service.kind, &aliases)?,
+                            // ADR 0026: an entry without a bus sends to `default`; an SNS
+                            // phone or endpoint publish names no topic.
+                            (false, None) if service.kind == "eventbridge" => Name {
+                                literal: Some("default".into()),
+                                env: None,
+                            },
+                            (false, None) if service.kind == "sns" => continue,
+                            (false, None) => Name::default(),
+                        });
+                    }
+                    Some(names)
                 };
                 let injected = (language == Language::Java)
                     .then_some(&inject as &crate::resolve::Inject<'a, '_>);
@@ -347,12 +353,13 @@ fn opaque<'a>(
 
 /// Read scalar fields, name lists, event entries and table-keyed batch requests. Each value is
 /// visited once; every path here is a short constant supplied by the kind, never source text.
+/// `None` is a field a request Meada sees whole leaves out.
 fn request<'v>(
     call: &'v crate::lang::Invocation,
     keywords: &'v crate::resolve::Keywords,
     path: &str,
     language: Language,
-) -> Option<Vec<Value>> {
+) -> Option<Vec<Option<Value>>> {
     let (head, tail) = path
         .split_once('.')
         .map_or((path, None), |(h, t)| (h, Some(t)));
@@ -361,14 +368,23 @@ fn request<'v>(
         Language::Go => go::names(call, head.trim_end_matches("[]")),
         Language::Csharp => csharp::names(call, keywords, head.trim_end_matches("[]")),
     }?;
+    let whole = match language {
+        Language::Java => call.args.first(),
+        Language::Go => call.args.get(1),
+        Language::Csharp => (keywords
+            .iter()
+            .find(|(k, _)| k == "request")
+            .map(|(_, v)| v))
+        .or_else(|| call.args.first()),
+    };
     let mut out = Vec::new();
     for value in values {
         let Some(value) = value else {
-            out.push(Value::Unknown);
+            out.push((!whole.is_some_and(complete)).then_some(Value::Unknown));
             continue;
         };
         if tail == Some("*") {
-            out.extend(map_keys(value)?);
+            out.extend(map_keys(value)?.into_iter().map(Some));
             continue;
         }
         let values = if head.ends_with("[]") {
@@ -385,13 +401,32 @@ fn request<'v>(
                     Language::Csharp => csharp::field_of(value, field)?,
                 },
             };
-            out.push(read.cloned().unwrap_or(Value::Unknown));
+            out.push(match read {
+                Some(read) => Some(read.clone()),
+                None => (!complete(value)).then_some(Value::Unknown),
+            });
         }
     }
     if out.is_empty() {
-        out.push(Value::Unknown);
+        out.push(Some(Value::Unknown));
     }
     Some(out)
+}
+
+/// Whether a request value shows every field it sets: a Go or C# literal, or a Java builder
+/// chain started by `builder()`. Only then does a missing field mean the request leaves it out.
+fn complete(value: &Value) -> bool {
+    match value {
+        Value::Object(_) => true,
+        Value::New(_, args) => matches!(args.as_slice(), [Value::Object(_)]),
+        Value::Call(call) => std::iter::successors(Some(call), |s| match s.receiver.as_deref() {
+            Some(Value::Call(next)) => Some(next),
+            _ => None,
+        })
+        .last()
+        .is_some_and(|first| crate::resolve::method(&first.callee) == "builder"),
+        _ => false,
+    }
 }
 
 fn sequence(value: &Value) -> Option<Vec<&Value>> {

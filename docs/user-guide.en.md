@@ -2150,14 +2150,14 @@ or hidden by a parameter, `catch`, destructuring or another binding, contributes
 | SNS | `Publish`, `PublishBatch` | | `TopicArn` |
 | EventBridge | `PutEvents` | | `Entries[].EventBusName`, `default` when omitted |
 | Kinesis | `PutRecord`, `PutRecords` | | `StreamARN` or `StreamName` |
-| S3 | `PutObject` | `GetObject` | `Bucket` |
+| S3 | `PutObject`, `DeleteObject` | `GetObject`, `HeadObject`, `ListObjects`, `ListObjectsV2` | `Bucket` |
 | DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `TransactWriteItems` | `GetItem`, `Query`, `Scan`, `BatchGetItem`, `TransactGetItems` | `TableName`, `RequestItems` keys, or `TransactItems` tables |
-| SSM | | `GetParameter`, `GetParameters`, `GetParametersByPath` | `Name`, `Names`, `Path` |
-| Secrets Manager | | `GetSecretValue`, `BatchGetSecretValue` | `SecretId`, `SecretIdList` |
+| SSM | `PutParameter`, `DeleteParameter`, `DeleteParameters` | `GetParameter`, `GetParameters`, `GetParametersByPath` | `Name`, `Names`, `Path` |
+| Secrets Manager | `PutSecretValue`, `UpdateSecret`, `CreateSecret`, `DeleteSecret` | `GetSecretValue`, `BatchGetSecretValue` | `SecretId`, `SecretIdList`, `Name` (`CreateSecret`) |
 
 In JavaScript each operation above has the `Command` suffix; boto3 uses snake case
-(`put_object`, `get_secret_value`). SNS, EventBridge and Kinesis are producers; S3 and DynamoDB
-use resource writer and reader sides. Literal names and supported ARNs join infrastructure by
+(`put_object`, `get_secret_value`). SNS, EventBridge and Kinesis are producers; S3, DynamoDB,
+SSM and Secrets Manager use resource writer and reader sides. Literal names and supported ARNs join infrastructure by
 physical name, without account or region. Literal SDK sides link at `exact`, including other
 SDK sides in the same repository; a side declared in `meada.toml` keeps `declared`.
 Overridable infrastructure values still weaken a link to `inferred`.

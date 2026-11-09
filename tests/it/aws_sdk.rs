@@ -544,9 +544,11 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
     .unwrap();
     std::fs::write(
         repo.join("entries.go"),
-        "package main\n\nimport (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/aws\"\n\t\"github.com/aws/aws-sdk-go-v2/config\"\n\t\"github.com/aws/aws-sdk-go-v2/service/eventbridge\"\n\t\"github.com/aws/aws-sdk-go-v2/service/eventbridge/types\"\n)\n\n\
+        "package main\n\nimport (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/aws\"\n\t\"github.com/aws/aws-sdk-go-v2/config\"\n\t\"github.com/aws/aws-sdk-go-v2/service/eventbridge\"\n\t\"github.com/aws/aws-sdk-go-v2/service/eventbridge/types\"\n\t\"github.com/aws/aws-sdk-go-v2/service/sqs\"\n)\n\n\
          func send(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tentry := types.PutEventsRequestEntry{EventBusName: aws.String(\"old-bus-go\")}\n\tentry.EventBusName = aws.String(\"new-bus-go\")\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: []types.PutEventsRequestEntry{entry}})\n}\n\n\
-         func kept(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: []types.PutEventsRequestEntry{types.PutEventsRequestEntry{EventBusName: aws.String(\"kept-bus-go\")}}})\n}\n",
+         func kept(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: []types.PutEventsRequestEntry{types.PutEventsRequestEntry{EventBusName: aws.String(\"kept-bus-go\")}}})\n}\n\n\
+         func replaced(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := sqs.NewFromConfig(cfg)\n\tinput := &sqs.SendMessageInput{QueueUrl: aws.String(\"https://sqs.us-east-1.amazonaws.com/1/old-ptr\")}\n\t*input = sqs.SendMessageInput{QueueUrl: aws.String(\"https://sqs.us-east-1.amazonaws.com/1/new-ptr\")}\n\tclient.SendMessage(ctx, input)\n}\n\n\
+         func pointed(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := sqs.NewFromConfig(cfg)\n\tinput := &sqs.SendMessageInput{QueueUrl: aws.String(\"https://sqs.us-east-1.amazonaws.com/1/kept-ptr\")}\n\tclient.SendMessage(ctx, input)\n}\n",
     )
     .unwrap();
     let export: Value =
@@ -566,6 +568,7 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
         "channel::eventbridge::kept-bus-java",
         "channel::eventbridge::kept-bus-cs",
         "channel::eventbridge::kept-bus-go",
+        "channel::sqs::kept-ptr",
         "channel::sqs::kept-queue",
         "channel::sns::kept-base",
         "channel::sns::kept-twice",
@@ -573,6 +576,46 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
     ] {
         assert!(contracts.contains(&kept), "{kept}: {contracts:?}");
     }
+}
+
+/// ADR 0026: an EventBridge entry without `EventBusName` sends to `default`, and an SNS phone
+/// publish names no topic, in Java, Go and C# as in TypeScript and Python. A request whose
+/// fields Meada cannot all see still publishes somewhere, so it keeps an unresolved side.
+#[test]
+fn sdk_omitted_bus_is_default_and_phone_publishes_name_no_topic() {
+    let repo = fixture_repo("aws_sdk_defaults", "aws-sdk-defaults", None);
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut sides = export["providers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["contract"].as_str().unwrap().starts_with("channel::"))
+        .map(|s| {
+            let site = s["site"].as_str().unwrap();
+            let file = ["Defaults.java", "Defaults.cs", "defaults.go"]
+                .into_iter()
+                .find(|f| site.contains(f))
+                .unwrap_or(site);
+            (s["contract"].as_str().unwrap(), file)
+        })
+        .collect::<Vec<_>>();
+    sides.sort();
+    assert_eq!(
+        sides,
+        [
+            ("channel::eventbridge::default", "Defaults.cs"),
+            ("channel::eventbridge::default", "Defaults.java"),
+            ("channel::eventbridge::default", "defaults.go"),
+            ("channel::eventbridge::default", "defaults.go"),
+            ("channel::sns", "Defaults.java"),
+            ("channel::sns", "defaults.go"),
+            ("channel::sns::alerts-cs", "Defaults.cs"),
+            ("channel::sns::alerts-go", "defaults.go"),
+            ("channel::sns::alerts-java", "Defaults.java"),
+        ],
+        "{export}"
+    );
 }
 
 #[test]
@@ -647,8 +690,8 @@ fn aws_sdk_operation_matrix_has_only_the_requested_sides() {
     let export: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
     let providers = export["providers"].as_array().unwrap();
     let consumers = export["consumers"].as_array().unwrap();
-    assert_eq!(providers.len(), 25, "{export}");
-    assert_eq!(consumers.len(), 24, "{export}");
+    assert_eq!(providers.len(), 43, "{export}");
+    assert_eq!(consumers.len(), 30, "{export}");
     let mut actual = Vec::new();
     for (role, sides) in [("writer", providers), ("reader", consumers)] {
         for side in sides {

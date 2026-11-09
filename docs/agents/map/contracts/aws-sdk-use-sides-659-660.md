@@ -29,7 +29,10 @@
   file) names nothing, as does a request a step of which takes such a builder (`entries(e.build())`), in
   SQS's channel form and Azure's builder stages too, where a changed topic receiver keeps an
   unresolved side. The folded Java name reader rejects a value-bound head
-  before considering on-demand type candidates.
+  before considering on-demand type candidates. `request` returns `None` for a field that a
+  request it sees whole (`complete`: a Go or C# literal, a Java chain from `builder()`) leaves
+  out: EventBridge then names `default` and SNS no side (ADR 0026); other kinds and any request
+  it cannot see whole keep an unresolved side.
 
 
 

@@ -151,6 +151,7 @@ pub(super) fn read(
                     .unwrap_or(".");
                 let expanded = crate::iac::compose::expand(written);
                 if !expanded.text.contains(['$', ':', '\\'])
+                    && !crate::iac::compose::remote(&expanded.text)
                     && !expanded.text.starts_with(['/', '~'])
                     && let Some(path) =
                         crate::iac::joined(config_values::parent(path), &expanded.text)

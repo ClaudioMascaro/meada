@@ -44,6 +44,7 @@ use hcl_edit::parser;
 use hcl_edit::structure::{Body, Structure};
 use hcl_edit::template::{Directive, Element, Template};
 use hcl_edit::visit::{self, Visit};
+use hcl_edit::visit_mut::{self, VisitMut};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 
@@ -726,7 +727,94 @@ fn lines(text: &str) -> impl Fn(usize) -> usize {
 /// type panics on a remainder by zero or an integer overflow, which a hostile file must not turn
 /// into a crash of indexing or of the server.
 fn evaluated(expr: &Expression, ctx: &Context) -> Option<Value> {
-    quiet(|| hcl::Expression::from(expr.clone()).evaluate(ctx).ok()).flatten()
+    quiet(|| {
+        let mut expr = expr.clone();
+        Exact { ctx, left: 0 }.visit_expr_mut(&mut expr);
+        hcl::Expression::from(expr).evaluate(ctx).ok()
+    })
+    .flatten()
+}
+
+/// Puts each integer `+ - * / %` and negation's exact value in place before `hcl-rs` evaluates:
+/// its number type casts a large unsigned operand to signed, wraps on overflow and divides by
+/// zero into a float, each of which would print as a wrong exact name. A result past
+/// `i64::MIN..=u64::MAX`, a division with a remainder and arithmetic on a fraction or a non-number
+/// become an undefined name, so the value stays unresolved. An operand that does not evaluate in
+/// `ctx` (a `for` variable) leaves its operation, and every operation around it, to `hcl-rs`,
+/// so no operand is evaluated twice.
+struct Exact<'a, 'c> {
+    ctx: &'a Context<'c>,
+    left: usize,
+}
+
+impl VisitMut for Exact<'_, '_> {
+    fn visit_expr_mut(&mut self, expr: &mut Expression) {
+        use hcl_edit::expr::{BinaryOperator as B, UnaryOperator};
+        let left = self.left;
+        visit_mut::visit_expr_mut(self, expr);
+        let (operator, operands) = match expr {
+            Expression::BinaryOp(op)
+                if matches!(
+                    op.operator.value(),
+                    B::Plus | B::Minus | B::Mul | B::Div | B::Mod
+                ) =>
+            {
+                (Some(*op.operator.value()), vec![&op.lhs_expr, &op.rhs_expr])
+            }
+            Expression::UnaryOp(op) if *op.operator.value() == UnaryOperator::Neg => {
+                (None, vec![&op.expr])
+            }
+            _ => return,
+        };
+        let values = (self.left == left)
+            .then(|| {
+                operands
+                    .iter()
+                    .map(|e| self.integer(e))
+                    .collect::<Option<Vec<_>>>()
+            })
+            .flatten();
+        let Some(values) = values else {
+            self.left += 1;
+            return;
+        };
+        let exact = values
+            .into_iter()
+            .collect::<Option<Vec<i128>>>()
+            .and_then(|v| match (operator, v.as_slice()) {
+                (None, &[a]) => a.checked_neg(),
+                (Some(B::Plus), &[a, b]) => a.checked_add(b),
+                (Some(B::Minus), &[a, b]) => a.checked_sub(b),
+                (Some(B::Mul), &[a, b]) => a.checked_mul(b),
+                (Some(B::Div), &[a, b]) => (b != 0 && a % b == 0).then(|| a / b),
+                (Some(B::Mod), &[a, b]) => a.checked_rem(b),
+                _ => None,
+            });
+        let number = exact.and_then(|n| {
+            (i64::try_from(n).map(hcl::Number::from))
+                .or_else(|_| u64::try_from(n).map(hcl::Number::from))
+                .ok()
+        });
+        *expr = match number {
+            Some(n) => Expression::from(n),
+            None => Expression::from(hcl_edit::Ident::new("meada_inexact")),
+        };
+    }
+}
+
+impl Exact<'_, '_> {
+    /// `None` when `expr` does not evaluate in `ctx`; `Some(None)` for a value that is no integer.
+    fn integer(&self, expr: &Expression) -> Option<Option<i128>> {
+        match hcl::Expression::from(expr.clone())
+            .evaluate(self.ctx)
+            .ok()?
+        {
+            Value::Number(n) if !n.is_f64() => {
+                Some(n.as_i64().map(i128::from).or(n.as_u64().map(i128::from)))
+            }
+            _ => Some(None),
+        }
+    }
 }
 
 thread_local! {
@@ -3630,7 +3718,10 @@ mod tests {
     /// Arithmetic `hcl-rs` cannot do (a remainder by zero, which panics in its number type) leaves
     /// the value unresolved, in a `.tf` file and in a var file alike, and `substr` past
     /// `i64::MAX` takes the rest of the string as Terraform does: a hostile file never stops
-    /// indexing.
+    /// indexing. Integer arithmetic is exact, as Terraform's: a result past `u64` or below `i64`,
+    /// a division with a remainder or by zero and arithmetic on a fraction stay unresolved rather
+    /// than print `hcl-rs`'s cast, wrapped or float result as an exact name; a `for` variable's
+    /// arithmetic still evaluates.
     #[test]
     fn arithmetic_the_evaluator_cannot_do_leaves_the_value_unresolved() {
         let list = [
@@ -3641,6 +3732,15 @@ mod tests {
                     "resource \"a\" \"rem\" { name = \"orders-${5 % 0}\" }\n",
                     "resource \"a\" \"sub\" { name = substr(\"abc\", 1, 9223372036854775807) }\n",
                     "resource \"a\" \"var\" { name = \"q-${var.n}\" }\n",
+                    "resource \"a\" \"neg\" { name = \"orders-${0 - 18446744073709551615}\" }\n",
+                    "resource \"a\" \"wrap\" { name = \"orders-${9223372036854775807 * 3}\" }\n",
+                    "resource \"a\" \"div\" { name = \"orders-${5 / 0}\" }\n",
+                    "resource \"a\" \"half\" { name = \"orders-${7 / 2}\" }\n",
+                    "resource \"a\" \"float\" { name = \"orders-${0.1 + 0.2}\" }\n",
+                    "resource \"a\" \"big\" { name = \"orders-${18446744073709551615 - 1}\" }\n",
+                    "resource \"a\" \"low\" { name = \"orders-${-9223372036854775807 - 1}\" }\n",
+                    "resource \"a\" \"mod\" { name = \"orders-${-7 % 3}\" }\n",
+                    "resource \"a\" \"loop\" { name = join(\"-\", [for x in [1, 2] : x + 1]) }\n",
                 ),
             ),
             ("terraform.tfvars", "n = 7 % 0\n"),
@@ -3651,6 +3751,15 @@ mod tests {
                 "a.rem ~ \"orders-*\"",
                 "a.sub = \"bc\"",
                 "a.var = \"q-1\" [var.n main.tf:1]",
+                "a.neg ~ \"orders-*\"",
+                "a.wrap ~ \"orders-*\"",
+                "a.div ~ \"orders-*\"",
+                "a.half ~ \"orders-*\"",
+                "a.float ~ \"orders-*\"",
+                "a.big = \"orders-18446744073709551614\"",
+                "a.low = \"orders--9223372036854775808\"",
+                "a.mod = \"orders--1\"",
+                "a.loop = \"2-3\"",
             ]
         );
     }
