@@ -112,6 +112,8 @@ impl Read<'_> {
             "variable" => {
                 let variable = Variable {
                     default: body.get("default").map(|v| self.expressions.read(v, true)),
+                    set: (body.get("type").and_then(|t| t.as_str()))
+                        .is_some_and(|t| t.trim_start().starts_with("set(")),
                     sensitive: crate::config_values::is_sensitive(body.get("sensitive")),
                     path: self.path.into(),
                     line,

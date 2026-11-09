@@ -130,9 +130,10 @@
   or `tomap` result beside a literal inside another conversion may be exact where Terraform
   converts more to strings, keeps the set's element type or refuses the call. A `for` binding a
   key over a `toset(...)` call, bare, in parentheses or a conditional's branch, is unresolved
-  (Terraform's key is the element, or the index when the other branch is a list); over a set
-  held in a local or a variable, or reached through an attribute, an index or another call, its
-  key is the index. A
+  (Terraform's key is the element, or the index when the other branch is a list), and so is one
+  over a local or a variable that is such a call, another such name or a variable declared
+  `type = set(...)`; over a set reached through an attribute, an index, a module output or
+  another call, its key is the index (#717). A
   null beside a collection is unresolved, but for a `tomap` whose other values share one type.
   `toset` orders as cty
   does (strings bytewise, numbers by value, `false` before `true`, a null last); a set of
