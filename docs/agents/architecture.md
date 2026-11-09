@@ -27,6 +27,8 @@ The binary and deterministic `meada-core`, WASM exports, versioning and grammar 
 Each line names modules and the area that owns their detail. Split area indexes route to the
 relevant topic. The [full catalogue](map/overview/modules-src.md) retains each module's description.
 
+A new module joins the line below that names its area, and its own line goes in that area file (or its topic leaf), beside the lines that start with its first path, never at the end of a file.
+
 - `engine.rs`, `items.rs`, `trace.rs`, `partial.rs`, `drift_view.rs`, `render.rs`, `mcp.rs`, `main.rs`, `msg.rs`, `lib.rs`: queries, rendering, MCP and CLI. [queries](map/queries.md).
 - `workspace.rs`, `config.rs`, `repo.rs`, `index.rs`, `lang/`, `resolve.rs`, `resolve/`, `community.rs`, `entry.rs`: workspace discovery, storage, packs and resolution. [indexing](map/indexing.md).
 - `contract.rs`, `contract/`, `http.rs`, `http/`, `resource.rs`, `resource/`, `resource/via.rs`, `image.rs`, `image/config.rs`, `image/code.rs`, `image/patterns.rs`, `image/environment.rs`, `alert.rs`, `alert/` (labels, incident routing and explicit receiver forwarding), `channel.rs`, `channel/`, `package.rs`, `package/`: contract kinds, library forms and SDK extraction. [contracts](map/contracts.md).
@@ -74,6 +76,12 @@ seams](map/seams.md). Read the relevant extension before changing it.
 ## Tests (`tests/`)
 
 [Harness, goldens and fixtures](map/overview/tests-tests.md), [test subjects](map/tests.md).
+
+- A change under `docs/site/`, to `mkdocs.yml` or under `scripts/docs/` runs the site checks before it is done
+  ([steps](../engineering/documentation-build.md)): `python3 -m venv .venv-docs`, then in it
+  `python -m pip install --require-hashes -r scripts/docs/requirements.txt`,
+  `npm ci --prefix scripts/docs --no-audit --no-fund`, `bounded mkdocs build --strict` and
+  `bounded python scripts/docs/check.py`. The `Documentation` workflow (`.github/workflows/pages.yml`) runs the same on every PR.
 
 ## Split area files
 
