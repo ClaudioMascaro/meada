@@ -21,9 +21,8 @@ Communication to and from subagents should be sparse. Communicate primarily thro
 ## Validation policy
 
 Read `AGENTS.md` before step 1 and carry its gate and E2E policy into each subagent brief.
-Implementers run focused checks and the applicable `scripts/check` gate through `gate --staged`,
-not an unconditional full suite or local product proof. Documentation, instructions and harness
-configuration get pertinent static and self-checks, E2E `N/A` in the validation summary and no
+Implementers run focused checks and the applicable `scripts/check` gate, not an unconditional
+full suite or local product proof. Documentation, instructions and harness configuration get pertinent static and self-checks, E2E `N/A` in the validation summary and no
 proof receipt. E2E preparation and CI evidence follow `AGENTS.md`; pending evidence stays pending.
 
 ## Steps

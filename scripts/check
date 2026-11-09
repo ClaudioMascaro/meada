@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -188,7 +189,9 @@ def local_selection():
 
 
 def bounded(*args):
-    if os.environ.get("GITHUB_ACTIONS") == "true":
+    """Runs a heavy command through the maintainer's low-priority `bounded` runner when it is on
+    PATH, directly otherwise (CI, a fresh cloud session)."""
+    if os.environ.get("GITHUB_ACTIONS") == "true" or not shutil.which("bounded"):
         run(*args)
     else:
         run("bounded", *args)
@@ -337,6 +340,13 @@ def selftest():
     assert scopes(["Dockerfile"])["container"]
     assert "accounts" in cloud_features(["src/ui/accounts/administration.rs"])
     assert "generation-pointer" in cloud_features(["src/snapshot/generations.rs"])
+    path = os.environ.get("PATH", "")
+    with tempfile.TemporaryDirectory(prefix="meada-check-path-") as empty:
+        os.environ["PATH"] = os.pathsep.join([empty, os.path.dirname(shutil.which("true"))])
+        try:
+            bounded("true")  # no `bounded` on PATH: the command runs directly
+        finally:
+            os.environ["PATH"] = path
     old = Path.cwd()
     with tempfile.TemporaryDirectory(prefix="meada-check-selftest-") as tmp:
         os.chdir(tmp)

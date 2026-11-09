@@ -30,12 +30,12 @@ write tools; one index per repository; determinism) live in
 ## Workflow
 
 - Conventional Commits.
-- Local gate before every commit: `gate --staged` delegates to `scripts/check`, selecting checks
-  from the staged diff or, on a clean tree, the last commit. Docs, agent instructions and harness
+- Local gate before every commit: `scripts/check` selects checks from the staged diff or, on a
+  clean tree, the last commit. Docs, agent instructions and harness
   configuration get pertinent static checks and harness self-checks, without rebuilding the
   product, running its full suite or producing a `.prove-it` receipt. Unknown or product paths
   conservatively run the full applicable gate: fmt, clippy and tests, plus the relevant cloud
-  feature checks (ADR 0012). Heavy commands run through `bounded`; see the local workflow policy.
+  feature checks (ADR 0012). Heavy commands run through `bounded` when it is on PATH.
 - Product E2E runs only in GitHub Actions, for a relevant large implementation marked with the
   `e2e` label on a non-draft PR. Locally, `/prove-meada` prepares the scope and answer keys or
   reads CI evidence; it does not build or start the product. Docs-only follow-up commits also
