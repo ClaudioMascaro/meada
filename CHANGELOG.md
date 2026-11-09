@@ -564,6 +564,10 @@ All notable changes to Meada are recorded here. The format follows
   Terraform refuses, is `*`, where it gave the `exact` names `q-null` and `q-[\n  1\n]`.
 - Terraform: arithmetic on a `for` variable in a `.tfvars` file (`[for x in [1, 2] : x * 2][1]`)
   resolves, as Terraform evaluates it, where the value was given but unresolved.
+- Terraform: a `%{ for }` directive's collection is read as any other expression, where its keys
+  kept their written order and a number its float text (`%{for k, v in {b = 1, a = 2}}` gave
+  `b1a2`, Terraform `a2b1`); a negative zero there is `*`. An object of several keys inside a var
+  file's template no longer drops the value for the variable's default.
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes

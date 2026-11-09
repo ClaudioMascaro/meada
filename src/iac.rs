@@ -791,6 +791,17 @@ impl VisitMut for Exact<'_, '_> {
         node.expr = Expression::from(hcl_edit::expr::FuncCall::new(name, args.into()));
     }
 
+    /// `hcl-edit` never visits a `%{ for }` directive's collection: read it as a `for` reads its own.
+    fn visit_for_template_expr_mut(&mut self, node: &mut hcl_edit::template::ForTemplateExpr) {
+        let unordered = self.unordered;
+        self.visit_expr_mut(&mut node.collection_expr);
+        if self.unordered > unordered {
+            self.inexact = true;
+            node.collection_expr = undefined();
+        }
+        visit_mut::visit_for_template_expr_mut(self, node);
+    }
+
     fn visit_for_intro_mut(&mut self, node: &mut hcl_edit::expr::ForIntro) {
         let unordered = self.unordered;
         visit_mut::visit_for_intro_mut(self, node);
@@ -840,6 +851,11 @@ impl VisitMut for Exact<'_, '_> {
                         let mut keyed: Vec<_> = keys.into_iter().zip(entries).collect();
                         keyed.sort_by(|a, b| a.0.cmp(&b.0));
                         entries = keyed.into_iter().map(|(_, e)| e).collect();
+                        // `hcl-rs` keeps a template as its text: each entry ends in a comma, so
+                        // the reordered object still parses there.
+                        for (_, value) in &mut entries {
+                            value.set_terminator(hcl_edit::expr::ObjectValueTerminator::Comma);
+                        }
                     }
                     None => self.unordered += 1,
                 }
@@ -4142,11 +4158,19 @@ mod tests {
             "variable \"b\" {}\n",
             "variable \"c\" {\n  default = \"dev\"\n}\n",
             "variable \"d\" {\n  default = \"dev\"\n}\n",
+            "variable \"e\" {}\n",
+            "variable \"f\" {\n  default = \"dev\"\n}\n",
+            "variable \"g\" {}\n",
+            "variable \"h\" {}\n",
             "resource \"a\" \"env\" { name = \"orders-${var.env}\" }\n",
             "resource \"a\" \"n\" { name = var.n }\n",
             "resource \"a\" \"b\" { name = \"q-${var.b}\" }\n",
             "resource \"a\" \"c\" { name = var.c }\n",
             "resource \"a\" \"d\" { name = var.d }\n",
+            "resource \"a\" \"e\" { name = var.e }\n",
+            "resource \"a\" \"f\" { name = var.f }\n",
+            "resource \"a\" \"g\" { name = \"q-${var.g}\" }\n",
+            "resource \"a\" \"h\" { name = var.h }\n",
         );
         let tfvars = concat!(
             "env = \"prd-${\"eu\"}\"\n",
@@ -4154,6 +4178,12 @@ mod tests {
             "b = [for x in [1, 2] : x * 2][1]\n",
             "c = \"pre-${null}\"\n",
             "d = upper(\"x\")\n",
+            // A `%{ for }` directive's collection is read as any other expression: its keys in
+            // lexical order, no call of the file's own, a negative zero unresolved.
+            "e = \"%{for k, v in {b = 1, a = 2}}${k}${v}%{endfor}\"\n",
+            "f = \"%{for x in [meada_exact(\"+\", 1, 2)]}${x}%{endfor}\"\n",
+            "g = \"${{b = 1, a = 2}[\"a\"]}\"\n",
+            "h = \"%{for x in [-0]}${x}%{endfor}\"\n",
         );
         assert_eq!(
             names(&[("main.tf", main), ("terraform.tfvars", tfvars)]),
@@ -4163,6 +4193,10 @@ mod tests {
                 "a.b = \"q-4\" [var.b terraform.tfvars:3 tfvars]",
                 "a.c = \"dev\" [var.c main.tf:6]",
                 "a.d = \"dev\" [var.d main.tf:9]",
+                "a.e = \"a2b1\" [var.e terraform.tfvars:6 tfvars]",
+                "a.f = \"dev\" [var.f main.tf:13]",
+                "a.g = \"q-2\" [var.g terraform.tfvars:8 tfvars]",
+                "a.h ~ \"*\" [var.h terraform.tfvars:9 tfvars]",
             ]
         );
     }
