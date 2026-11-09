@@ -86,6 +86,15 @@ that changes only part of the path leaves the rest comparing the code with itsel
 `community` and `duplicate`, the contract-site spans, the `context` community line and the trace
 starts could not fail. No tool checks this; a PR without the mutation is a review finding.
 
+## Check tests
+
+A test that checks a rule over files, data or output (a docs check, a lint, a validator) ships
+with one case that makes it fail: a fixture that breaks the rule or a mutation of the input. The
+PR names that case and the test it turned red. A check that scans a set must also fail when the
+set is empty. #581 shipped a check with no negative fixture test of the failure path, and the
+review proved it by hand-mutating `docs/agents/map/core.md`; #595 got its `> 0` guard only after
+review. No tool checks this; a PR without the failing case is a review finding.
+
 ## Hostile input
 
 A reader of a file the repository holds (a provider document, a config, a source file) treats
