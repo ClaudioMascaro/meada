@@ -99,7 +99,9 @@ indexing carries on.
   depth limit stays cheap. A unit test feeds such a chain and bounds its time, as the
   `*_in_linear_time` tests do. Its input is sized so the linear path runs in under a twentieth
   of the bound in a local debug build (CI runners are several times slower and run the suites in
-  parallel), and the implementer reports the measured time. A new language pack adds its row
+  parallel), and is also large enough that a quadratic variant of the code under test exceeds
+  the bound. The implementer reports the measured time, and the PR says which mutation was
+  tried and how long it took. A new language pack adds its row
   to `chained` in `tests/it/hostile.rs`, which feeds every pack a chain of locals on call
   results.
 - Expansion (aliases, `$ref`s, variable substitution) is charged to a budget per file, and
@@ -151,7 +153,8 @@ implemented, or reported as blocked.
 A change users can see (a language, a framework, a contract kind, a command or MCP behavior)
 updates, in the same PR, the documentation capabilities page (`docs/site/pt/capabilities.md`,
 with its `en` and `es` equivalents as `AGENTS.md` requires), the relevant guide or reference,
-and `CHANGELOG.md` under its unreleased version.
+and `CHANGELOG.md` under its unreleased version. A change to what a pack or reader links
+updates `docs/site/*/capabilities.md` and `docs/user-guide{,.en,.es}.md` together.
 
 A change to what the code relies on updates the repository map (`docs/agents/architecture.md`)
 in the same change. Each kind of update goes to one place, and the map stays an index within its
