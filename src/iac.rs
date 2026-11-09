@@ -793,6 +793,12 @@ impl VisitMut for Exact<'_, '_> {
             }
             Expression::Object(object) => {
                 let mut entries: Vec<_> = std::mem::take(object).into_iter().collect();
+                // `hcl-edit` visits no key: a computed one is evaluated as any other expression.
+                for (key, _) in &mut entries {
+                    if let ObjectKey::Expression(key) = key {
+                        self.visit_expr_mut(key);
+                    }
+                }
                 let keys: Option<Vec<String>> = (entries.iter())
                     .map(|(k, _)| match k {
                         ObjectKey::Ident(i) => Some(i.as_str().to_string()),
@@ -3496,6 +3502,11 @@ mod tests {
             // Nor can a file bind the name that stands for what Meada cannot evaluate.
             "resource \"a\" \"shadowcall\" { name = [for meada_inexact in [\"x\"] : meada_exact(\"+\", 1, 2)][0] }\n",
             "resource \"a\" \"shadowfor\" { name = [for meada_inexact in [[\"y\"]] : [for k, v in { (local.svc) = 1 } : v][0]][0] }\n",
+            // An object's computed key is evaluated as any other expression.
+            "resource \"a\" \"keyarith\" { name = keys({ (0 - 18446744073709551615) = 1 })[0] }\n",
+            "resource \"a\" \"keyinject\" { name = keys({ (meada_exact(\"+\", 1, 2)) = 1 })[0] }\n",
+            "resource \"a\" \"keyfor\" { name = [for x in [0] : keys({ (x - 18446744073709551615) = 1 })[0]][0] }\n",
+            "resource \"a\" \"keyok\" { name = keys({ (\"k-${2 * 3}\") = 1 })[0] }\n",
         );
         assert_eq!(
             names(&[("main.tf", text)]),
@@ -3532,6 +3543,10 @@ mod tests {
                 "a.inject ~ \"inj-*\"",
                 "a.shadowcall ~ \"*\"",
                 "a.shadowfor ~ \"*\"",
+                "a.keyarith ~ \"*\"",
+                "a.keyinject ~ \"*\"",
+                "a.keyfor ~ \"*\"",
+                "a.keyok = \"k-6\"",
             ]
         );
     }
