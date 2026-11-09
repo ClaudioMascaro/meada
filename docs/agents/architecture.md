@@ -75,6 +75,12 @@ seams](map/seams.md). Read the relevant extension before changing it.
 
 [Harness, goldens and fixtures](map/overview/tests-tests.md), [test subjects](map/tests.md).
 
+- A change under `docs/site/`, to `mkdocs.yml` or under `scripts/docs/` runs the site checks before it is done
+  ([steps](../engineering/documentation-build.md)): `python3 -m venv .venv-docs`, then in it
+  `python -m pip install --require-hashes -r scripts/docs/requirements.txt`,
+  `npm ci --prefix scripts/docs --no-audit --no-fund`, `mkdocs build --strict` and
+  `python scripts/docs/check.py`. The `Documentation` workflow (`.github/workflows/pages.yml`) runs the same on every PR.
+
 ## Split area files
 
 [Navigation and byte budgets](map/overview/split-area-files.md). Prepare meaningful `## `
