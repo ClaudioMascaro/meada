@@ -65,7 +65,9 @@ pub(crate) fn root(value: &Value) -> Option<&str> {
 }
 
 /// Whether the request `value` reads a builder `rebuilt` outside `range`: its own chain
-/// (`b.message(..).build()`) or one a step takes (`entries(e.build())`).
+/// (`b.message(..).build()`) or one a step takes (`entries(e.build())`). A named value
+/// (`Put p = pb.build()`) is what its declaration built, so only what happened to its builder up
+/// to that `.build()` counts: a value built before the builder is set again is a copy.
 pub(super) fn changed<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -74,16 +76,65 @@ pub(super) fn changed<'a>(
     range: &std::ops::Range<usize>,
     setter: &dyn Fn(&str) -> bool,
 ) -> bool {
-    let Value::Call(top) = value else {
-        return false;
+    let mut walk = Walk {
+        code,
+        path,
+        scope,
+        setter,
+        seen: std::collections::HashSet::new(),
     };
-    root(value).is_some_and(|b| rebuilt(code, path, scope, b, range, setter))
-        || std::iter::successors(Some(top), |c| match c.receiver.as_deref() {
-            Some(Value::Call(next)) => Some(next),
-            _ => None,
-        })
-        .flat_map(|c| &c.args)
-        .any(|a| changed(code, path, scope, a, range, setter))
+    walk.value(value, range, usize::MAX)
+}
+
+/// The named values and builders one `changed` question has followed.
+struct Walk<'a, 'c> {
+    code: &'c Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    setter: &'c dyn Fn(&str) -> bool,
+    seen: std::collections::HashSet<*const crate::lang::Bound>,
+}
+
+impl<'a> Walk<'a, '_> {
+    /// Whether `value`, made outside `range`, reads a builder set again before `until`.
+    fn value(&mut self, value: &'a Value, range: &std::ops::Range<usize>, until: usize) -> bool {
+        match value {
+            Value::Ref(name) => self.named(name, range, until),
+            Value::Call(top) => {
+                root(value).is_some_and(|b| {
+                    rebuilt_until(self.code, self.path, self.scope, b, range, until, self.setter)
+                        // The builder was made from values of its own.
+                        || self.named(b, range, until)
+                }) || std::iter::successors(Some(top), |c| match c.receiver.as_deref() {
+                    Some(Value::Call(next)) => Some(next),
+                    _ => None,
+                })
+                .flat_map(|c| &c.args)
+                .any(|a| self.value(a, range, until))
+            }
+            _ => false,
+        }
+    }
+
+    /// Whether the local `name` was declared from a builder set again before its own `.build()`.
+    /// Each local is judged once; a chain of them past `EVAL_DEPTH` is not followed, so the name
+    /// stays unresolved.
+    fn named(&mut self, name: &str, range: &std::ops::Range<usize>, until: usize) -> bool {
+        let Some(bound) = self.code.local(self.path, self.scope, name) else {
+            return false;
+        };
+        if !self.seen.insert(bound) {
+            return false;
+        }
+        if self.seen.len() > crate::resolve::EVAL_DEPTH {
+            return true;
+        }
+        match &bound.value {
+            Value::Call(made) => self.value(&bound.value, &made.range, made.range.start),
+            alias @ Value::Ref(_) => self.value(alias, range, until),
+            _ => false,
+        }
+    }
 }
 
 /// Whether the builder `local`, read in `scope` of `path`, is set again outside `range` by a
@@ -98,6 +149,21 @@ pub(crate) fn rebuilt<'a>(
     scope: &'a str,
     local: &'a str,
     range: &std::ops::Range<usize>,
+    setter: &dyn Fn(&str) -> bool,
+) -> bool {
+    rebuilt_until(code, path, scope, local, range, usize::MAX, setter)
+}
+
+/// `rebuilt`, counting only the calls that end by `until`: a local's builder set again after the
+/// value was built does not change that value. A `final` field is set from any method, so its
+/// order in the file says nothing and `until` does not apply.
+fn rebuilt_until<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    scope: &'a str,
+    local: &'a str,
+    range: &std::ops::Range<usize>,
+    until: usize,
     setter: &dyn Fn(&str) -> bool,
 ) -> bool {
     let within = if code.local(path, scope, local).is_some() {
@@ -130,7 +196,7 @@ pub(crate) fn rebuilt<'a>(
         value => unbuilt(value) && root(value).is_some_and(named),
     };
     code.files()[path].calls.iter().enumerate().any(|(i, c)| {
-        within.is_none_or(|s| c.scope == s)
+        within.is_none_or(|s| c.scope == s && c.range.end <= until)
             && !(range.start <= c.range.start && c.range.end <= range.end)
             && code.call(path, i).is_some_and(|call| {
                 let steps = std::iter::successors(

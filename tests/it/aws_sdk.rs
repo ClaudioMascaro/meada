@@ -926,6 +926,176 @@ fn dynamodb_transaction_entries_changed_after_they_are_made_name_no_table() {
     );
 }
 
+/// A Java builder set again before its `.build()` names no table when the built value is held in
+/// a named local first (F1 of #719; `PutItemRequest` named the old table before): the check
+/// judges the builder by what happened to it up to the `.build()`. A value built before the
+/// builder is set again is an immutable copy and keeps its table.
+#[test]
+fn java_builders_set_again_before_a_named_build_name_no_table() {
+    let repo = fixture_repo("aws_sdk_named_builds", "aws-sdk-controls", None);
+    std::fs::write(
+        repo.join("Named.java"),
+        r#"import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
+import software.amazon.awssdk.services.dynamodb.model.Get;
+import software.amazon.awssdk.services.dynamodb.model.Put;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactGetItem;
+import software.amazon.awssdk.services.dynamodb.model.TransactGetItemsRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
+
+class Named {
+    void put() {
+        var db = DynamoDbClient.create();
+        var pb = Put.builder().tableName("put-old"); pb.tableName("put-new");
+        Put p = pb.build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p).build()).build());
+    }
+    void check() {
+        var db = DynamoDbClient.create();
+        var cb = ConditionCheck.builder().tableName("check-old"); cb.tableName("check-new");
+        ConditionCheck cc = cb.build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().conditionCheck(cc).build()).build());
+    }
+    void get() {
+        var db = DynamoDbClient.create();
+        var gb = Get.builder().tableName("get-old"); gb.tableName("get-new");
+        Get g = gb.build();
+        db.transactGetItems(TransactGetItemsRequest.builder().transactItems(TransactGetItem.builder().get(g).build()).build());
+    }
+    void item() {
+        var db = DynamoDbClient.create();
+        var ib = TransactWriteItem.builder().put(Put.builder().tableName("item-old").build()); ib.put(Put.builder().tableName("item-new").build());
+        var item = ib.build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(item).build());
+    }
+    void request() {
+        var db = DynamoDbClient.create();
+        var rb = TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(Put.builder().tableName("request-old").build()).build());
+        rb.transactItems(TransactWriteItem.builder().put(Put.builder().tableName("request-new").build()).build());
+        var req = rb.build();
+        db.transactWriteItems(req);
+    }
+    void conditional(boolean prod) {
+        var db = DynamoDbClient.create();
+        var pb = Put.builder().tableName("conditional-old"); if (prod) pb.tableName("conditional-new");
+        Put p = pb.build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p).build()).build());
+    }
+    void plain() {
+        var db = DynamoDbClient.create();
+        var pb = PutItemRequest.builder().tableName("plain-old"); pb.tableName("plain-new");
+        PutItemRequest req = pb.build();
+        db.putItem(req);
+    }
+    void copy() {
+        var db = DynamoDbClient.create();
+        var pb = Put.builder().tableName("copy");
+        Put p = pb.build();
+        pb.tableName("copy-new");
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p).build()).build());
+    }
+    void copyPlain() {
+        var db = DynamoDbClient.create();
+        var pb = PutItemRequest.builder().tableName("copy-plain");
+        PutItemRequest req = pb.build();
+        pb.tableName("copy-plain-new");
+        db.putItem(req);
+    }
+    void nested() {
+        var db = DynamoDbClient.create();
+        var ib = TransactWriteItem.builder().put(Put.builder().tableName("nested-old").build()); ib.put(Put.builder().tableName("nested-new").build());
+        var item = ib.build();
+        var rb = TransactWriteItemsRequest.builder().transactItems(item);
+        db.transactWriteItems(rb.build());
+    }
+    void alias() {
+        var db = DynamoDbClient.create();
+        var pb = Put.builder().tableName("alias-old"); pb.tableName("alias-new");
+        Put p = pb.build();
+        Put q = p;
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(q).build()).build());
+    }
+    void clean() {
+        var db = DynamoDbClient.create();
+        var pb = Put.builder().tableName("clean");
+        Put p = pb.build();
+        var item = TransactWriteItem.builder().put(p).build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(item).build());
+    }
+}
+"#,
+    )
+    .unwrap();
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut sides: Vec<_> = [("writer", "providers"), ("reader", "consumers")]
+        .iter()
+        .flat_map(|(role, sides)| {
+            export[sides].as_array().unwrap().iter().map(move |s| {
+                // `Named.conditional(boolean)::db.transactWriteItems#0` or the reader's method.
+                let scope = s["site"].as_str().unwrap().split("::").nth(2).unwrap();
+                let method = scope.split('(').next().unwrap().rsplit('.').next().unwrap();
+                format!("{method} {role} {}", s["contract"].as_str().unwrap())
+            })
+        })
+        .collect();
+    sides.sort();
+    assert_eq!(
+        sides,
+        [
+            "alias writer resource::dynamodb",
+            "check reader resource::dynamodb",
+            "clean writer resource::dynamodb::clean",
+            "conditional writer resource::dynamodb",
+            "copy writer resource::dynamodb::copy",
+            "copyPlain writer resource::dynamodb::copy-plain",
+            "get reader resource::dynamodb",
+            "item writer resource::dynamodb",
+            "nested writer resource::dynamodb",
+            "plain writer resource::dynamodb",
+            "put writer resource::dynamodb",
+            "request writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
+/// A crafted chain of named values stays bounded: past the shared evaluation depth it is not
+/// followed, and the table stays unresolved rather than naming a literal it did not check.
+#[test]
+fn java_named_builds_chained_past_the_evaluation_depth_stay_unresolved() {
+    let repo = fixture_repo("aws_sdk_named_chain", "aws-sdk-controls", None);
+    let mut body = String::from(
+        "import software.amazon.awssdk.services.dynamodb.DynamoDbClient;\n\
+         import software.amazon.awssdk.services.dynamodb.model.Put;\n\
+         import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;\n\
+         class Chain {\n void send(DynamoDbClient db) {\n\
+         var pb = PutItemRequest.builder().tableName(\"chained\");\n\
+         PutItemRequest v0 = pb.build();\n",
+    );
+    for n in 1..=20_000 {
+        body += &format!(" PutItemRequest v{n} = v{};\n", n - 1);
+    }
+    body += " db.putItem(v20000);\n }\n}\n";
+    std::fs::write(repo.join("Chain.java"), body).unwrap();
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let contracts: Vec<_> = export["providers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["contract"].as_str().unwrap())
+        .collect();
+    assert!(
+        contracts
+            .iter()
+            .all(|c| *c != "resource::dynamodb::chained"),
+        "{export}"
+    );
+}
+
 #[test]
 fn hidden_aws_client_and_command_names_never_feed_contracts() {
     let typescript = [

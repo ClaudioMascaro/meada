@@ -28,8 +28,13 @@
   (`contract/sdk/java.rs` `rebuilt`; a `final` field is matched by name in every class of its
   file) names nothing, as does a request a step of which takes such a builder (`entries(e.build())`), in
   SQS's channel form and Azure's builder stages too, where a changed topic receiver keeps an
-  unresolved side. The folded Java name reader rejects a value-bound head
-  before considering on-demand type candidates. `request` returns `None` for a field that a
+  unresolved side. A named value (`Put p = pb.build()`, then `put(p)` or `putItem(req)`) is judged
+  where it was built (`Walk` in `contract/sdk/java.rs`): only what happens to its builder before
+  that `.build()` counts, with the builder's own named parts, so a builder set again afterwards
+  leaves the built copy its table. Past `EVAL_DEPTH` named values the walk stops and the name
+  stays unresolved; Java records no loops, so a set after the build in a loop is not seen. The
+  folded Java name reader rejects a value-bound head before considering on-demand type
+  candidates. `request` returns `None` for a field that a
   request it sees whole (`complete`: a Go or C# literal, a Java chain from `builder()`) leaves
   out: EventBridge then names `default` and SNS no side (ADR 0026); other kinds and any request
   it cannot see whole keep an unresolved side.

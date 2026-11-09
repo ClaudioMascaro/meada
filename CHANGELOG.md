@@ -376,6 +376,11 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Java AWS SDK request held in a named local no longer names the table (or topic, bucket,
+  queue) its builder had before it was set again and built: `var req = b.build()` after
+  `b.tableName("other")` was an `exact` side of the old name. The check follows a named value to
+  its `.build()` and judges the builder up to there; a value built first keeps its name, as an
+  immutable copy does (#719).
 - AWS SDK forms in Java, Go and C# follow the ADR 0026 rule TypeScript and Python already
   followed: an EventBridge entry without `EventBusName` produces to `default`, and an SNS
   publish to a phone number or endpoint names no topic. A request Meada cannot see whole (a
