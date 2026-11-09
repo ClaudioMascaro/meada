@@ -786,6 +786,11 @@ fn is_set(expr: &Expression, named: &mut dyn FnMut(&Ref) -> bool) -> bool {
     match expr {
         Expression::FuncCall(f) => f.name.name.as_str() == "toset",
         Expression::Parenthesis(p) => is_set(p.inner(), named),
+        // A lone interpolation (`"${toset(...)}"`) keeps its value's type.
+        Expression::StringTemplate(t) if t.len() == 1 => match t.iter().next() {
+            Some(Element::Interpolation(i)) => is_set(&i.expr, named),
+            _ => false,
+        },
         Expression::Conditional(c) => is_set(&c.true_expr, named) || is_set(&c.false_expr, named),
         Expression::Traversal(t) => match &t.expr {
             Expression::Variable(root) if t.operators.len() == 1 => {
@@ -2019,10 +2024,13 @@ impl<'m> Eval<'m> {
 
     /// Whether the local or variable `name` of the instance `at` holds a set (`is_set`), following
     /// a name that is another name, or a variable declared `type = set(...)`. A cycle holds none.
-    fn holds_set(&mut self, at: usize, name: Name) -> bool {
+    fn holds_set(&mut self, at: usize, name: Name, depth: usize) -> bool {
         let key = (at, name);
         if let Some(&found) = self.sets.get(&key) {
             return found;
+        }
+        if depth > EVAL_DEPTH_MAX {
+            return false;
         }
         self.sets.insert(key.clone(), false);
         let modules = self.modules;
@@ -2045,8 +2053,8 @@ impl<'m> Eval<'m> {
         };
         let found = expr.is_some_and(|expr| {
             is_set(expr, &mut |r| match r {
-                Ref::Var(n) => self.holds_set(scope, Name::Var(n.clone())),
-                Ref::Local(n) => self.holds_set(scope, Name::Local(n.clone())),
+                Ref::Var(n) => self.holds_set(scope, Name::Var(n.clone()), depth + 1),
+                Ref::Local(n) => self.holds_set(scope, Name::Local(n.clone()), depth + 1),
                 Ref::Block { .. } => false,
             })
         });
@@ -2170,7 +2178,7 @@ impl<'m> Eval<'m> {
                 _ => None,
             };
             if let (Some(held), Some(via)) = (held, r.via())
-                && self.holds_set(at, held)
+                && self.holds_set(at, held, depth)
             {
                 sets.insert(via);
             }
@@ -4421,6 +4429,10 @@ mod tests {
         );
         assert_eq!(case("  s = (toset([\"x\"]))\n", ""), ["a.q ~ \"q-*\""]);
         assert_eq!(
+            case("  t = toset([\"x\"])\n  s = \"${local.t}\"\n", ""),
+            ["a.q ~ \"q-*\""]
+        );
+        assert_eq!(
             case("  s = true ? toset([\"x\"]) : []\n", ""),
             ["a.q ~ \"q-*\""]
         );
@@ -4456,6 +4468,10 @@ mod tests {
             ),
             ["a.q ~ \"q-*\""]
         );
+        let json = r#"{"variable": {"s": {"type": "set(string)", "default": ["x"]}},
+            "resource": {"a": {"q": {"for_each": "${{for k, v in var.s : k => v}}",
+            "name": "q-${each.key}"}}}}"#;
+        assert_eq!(names(&[("main.tf.json", json)]), ["a.q ~ \"q-*\""]);
         assert_eq!(
             var("  default = [\"x\"]\n", &[]),
             ["a.q[\"0\"] = \"q-0\" [var.s main.tf:1]"]
@@ -4813,6 +4829,22 @@ mod tests {
             "resource \"a\" \"b\" { name = \"q-${local.a}\" }\n",
         );
         assert_eq!(names(&[("main.tf", cycle)]), ["a.b ~ \"q-*-x\""]);
+    }
+
+    /// Whether a name holds a set stops at `EVAL_DEPTH_MAX` too: a hostile chain of locals naming
+    /// each other, with a keyed `for` at its end, is unresolved and does not overflow the stack.
+    #[test]
+    fn a_long_chain_of_locals_named_for_a_set_stops_at_the_depth() {
+        let n = 20_000;
+        let mut text = String::from("locals {\n  l0 = toset([\"x\"])\n");
+        for i in 1..n {
+            text += &format!("  l{i} = local.l{}\n", i - 1);
+        }
+        text += &format!(
+            "}}\nresource \"a\" \"q\" {{\n  for_each = {{for k, v in local.l{} : k => v}}\n  name = \"q-${{each.key}}\"\n}}\n",
+            n - 1
+        );
+        assert_eq!(names(&[("main.tf", &text)]), ["a.q ~ \"q-*\""]);
     }
 
     /// A name passed down local modules resolves at every level up to `MODULE_DEPTH_MAX`; the
