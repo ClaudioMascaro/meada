@@ -320,10 +320,7 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
             continue;
         }
         let object = doc.get("kind").and_then(Value::as_str);
-        let monitoring = doc
-            .get("apiVersion")
-            .and_then(Value::as_str)
-            .is_some_and(|v| v.starts_with("monitoring.coreos.com/"));
+        let monitoring = monitoring(doc);
         let (body, base) = if monitoring && object == Some("PrometheusRule") {
             (&doc["spec"], "spec.")
         } else {
@@ -524,16 +521,19 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
     }
     bounded(out)
 }
+/// Whether `doc` is a prometheus-operator object.
+fn monitoring(doc: &Value) -> bool {
+    doc.get("apiVersion")
+        .and_then(Value::as_str)
+        .is_some_and(|v| v.starts_with("monitoring.coreos.com/"))
+}
+
 /// `doc` as an Alertmanager configuration: its own body, or the spec of a prometheus-operator
 /// `AlertmanagerConfig` with the prefix of its key paths; `None` for any other object.
 fn alertmanager(doc: &Value) -> Option<(&Value, &'static str)> {
-    let monitoring = doc
-        .get("apiVersion")
-        .and_then(Value::as_str)
-        .is_some_and(|v| v.starts_with("monitoring.coreos.com/"));
     match doc.get("kind").and_then(Value::as_str) {
         None => Some((doc, "")),
-        Some("AlertmanagerConfig") if monitoring => Some((&doc["spec"], "spec.")),
+        Some("AlertmanagerConfig") if monitoring(doc) => Some((&doc["spec"], "spec.")),
         Some(_) => None,
     }
 }
@@ -546,21 +546,48 @@ pub(super) fn refused(doc: &Value) -> Option<String> {
     if !body.get("receivers").is_some_and(Value::is_array) {
         return None;
     }
-    let mut pending = vec![body.get("route")?];
+    let route = body.get("route")?;
+    // Alertmanager compiles the matchers of its inhibit rules as it does those of its routes.
+    let inhibits = ["inhibit_rules", "inhibitRules"]
+        .into_iter()
+        .flat_map(|field| array(body.get(field)))
+        .flat_map(|rule| {
+            ["source", "target"].into_iter().flat_map(move |side| {
+                let name = |suffix| format!("{side}{suffix}");
+                [
+                    matchers_in(
+                        rule,
+                        [&name("_match"), &name("_match_re")],
+                        &name("_matchers"),
+                    ),
+                    matchers_in(rule, ["", ""], &name("Match")),
+                ]
+            })
+        });
+    let mut pending = vec![route];
     let mut seen = BTreeSet::new();
-    while let Some(route) = pending.pop() {
-        for matcher in matchers(route).iter().flatten() {
-            if matcher.op.regex()
-                && seen.insert(matcher.value.clone())
-                && let Some(code) = regexp::refusal(&matcher.value)
-            {
-                return Some(format!(
-                    "{}{}{:?}: Go's regexp refuses it ({code})",
-                    matcher.key,
-                    matcher.op.text(),
-                    matcher.value
-                ));
+    let mut check = |found: Option<Vec<Matcher>>| {
+        found.into_iter().flatten().find_map(|matcher| {
+            if !matcher.op.regex() || !seen.insert(matcher.value.clone()) {
+                return None;
             }
+            let code = regexp::refusal(&matcher.value)?;
+            Some(format!(
+                "{}{}{:?}: Go's regexp refuses it ({code})",
+                matcher.key,
+                matcher.op.text(),
+                matcher.value
+            ))
+        })
+    };
+    for found in inhibits {
+        if let Some(why) = check(found) {
+            return Some(why);
+        }
+    }
+    while let Some(route) = pending.pop() {
+        if let Some(why) = check(matchers(route)) {
+            return Some(why);
         }
         pending.extend(array(route.get("routes")));
     }
@@ -579,8 +606,13 @@ fn grafana_name(rule: &Value) -> Option<&str> {
     rule.get("title")?.as_str()
 }
 fn matchers(route: &Value) -> Option<Vec<Matcher>> {
+    matchers_in(route, ["match", "match_re"], "matchers")
+}
+/// The matchers `route` writes in the maps `equal` and `regex` (names to values) and in the list
+/// `list` (strings, or objects with a `name`, a `value` and a `matchType` or `regex`).
+fn matchers_in(route: &Value, [equal, regex]: [&str; 2], list: &str) -> Option<Vec<Matcher>> {
     let mut out = Vec::new();
-    for (field, op) in [("match", Op::Equal), ("match_re", Op::Regex)] {
+    for (field, op) in [(equal, Op::Equal), (regex, Op::Regex)] {
         if let Some(value) = route.get(field) {
             for (key, value) in value.as_object()? {
                 out.push(Matcher {
@@ -594,7 +626,7 @@ fn matchers(route: &Value) -> Option<Vec<Matcher>> {
             }
         }
     }
-    if let Some(value) = route.get("matchers") {
+    if let Some(value) = route.get(list) {
         for value in value.as_array()? {
             if let Some(text) = value.as_str() {
                 out.extend(expressions(text)?);
@@ -712,8 +744,11 @@ fn token(text: &str) -> Option<String> {
         }
         Some(out)
     } else {
+        // Alertmanager's classic parser unescapes `\\` in an unquoted value too, which this does
+        // not: such a value is not read, and so cannot refuse a file by what Go never sees.
         (!text.is_empty()
             && !text.contains(['"', '=', '!', '{', '}'])
+            && !text.contains("\\\\")
             && !text.chars().any(char::is_whitespace))
         .then(|| text.into())
     }
@@ -1084,6 +1119,61 @@ mod tests {
             counts(&"a".repeat(super::super::ALERT_REGEX_MAX + 1)),
             (1, 2)
         );
+    }
+
+    /// Alertmanager compiles the regexes of its inhibit rules too, and unescapes `\\` in an
+    /// unquoted matcher value, which a regex judged as written would read differently.
+    #[test]
+    fn inhibit_rule_regexes_refuse_a_configuration_and_unquoted_escapes_are_not_judged() {
+        let refused = |text: &str| {
+            let docs = events::read(Syntax::Yaml, text.as_bytes(), |_| {}).unwrap();
+            docs.iter().filter_map(refused).count()
+        };
+        let config = |route: &str, inhibit: &str| {
+            format!("route: {{receiver: a{route}}}\nreceivers: [{{name: a}}]\n{inhibit}")
+        };
+        assert_eq!(refused(&config("", "")), 0);
+        for inhibit in [
+            "inhibit_rules: [{source_match_re: {x: 'a['}}]",
+            "inhibit_rules: [{target_matchers: ['x=~\"(a\"']}]",
+            "inhibit_rules: [{source_matchers: ['x=~*a']}]",
+        ] {
+            assert_eq!(refused(&config("", inhibit)), 1, "{inhibit}");
+        }
+        let operator = "apiVersion: monitoring.coreos.com/v1alpha1\nkind: AlertmanagerConfig\n\
+                        spec:\n  receivers: [{name: a}]\n  route: {receiver: a}\n";
+        let inhibit = "  inhibitRules: [{targetMatch: [{name: x, value: 'a(', matchType: '=~'}]}]";
+        assert_eq!(refused(&format!("{operator}{inhibit}\n")), 1);
+        assert_eq!(
+            refused(&format!("{operator}{}\n", inhibit.replace("a(", "a"))),
+            0
+        );
+        // A valid regex among inhibit rules, and equality values that are no regex.
+        assert_eq!(
+            refused(&config(
+                "",
+                "inhibit_rules: [{source_match: {x: 'a('}, target_match_re: {y: 'b+'}}]"
+            )),
+            0
+        );
+        // `\\(` is a literal backslash and a group for Go as written, and `\(` once unescaped.
+        let unquoted = config(", routes: [{receiver: a, matchers: ['x=~a\\\\(b']}]", "");
+        assert_eq!(refused(&unquoted), 0);
+        assert!(
+            read("alertmanager.yaml", unquoted.as_bytes()).routes[1..]
+                .iter()
+                .all(|r| !r.valid)
+        );
+        // Quoted, `\\` is unescaped as Alertmanager does: `a\\(b` reaches Go as `a\(b`, which is valid,
+        // and `a\\\\(b` as `a\\(b`, which is not.
+        let quoted = |value: &str| {
+            config(
+                &format!(", routes: [{{receiver: a, matchers: ['x=~\"{value}\"']}}]"),
+                "",
+            )
+        };
+        assert_eq!(refused(&quoted(r"a\\(b")), 0);
+        assert_eq!(refused(&quoted(r"a\\\\(b")), 1);
     }
 
     #[test]

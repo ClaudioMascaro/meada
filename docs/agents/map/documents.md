@@ -105,7 +105,8 @@ this file, and a change to these modules updates it.
   `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `packages.lock.json`) is `Outcome::Lockfile`, a file
   past `lang::MAX_BYTES`, one `events::read` cannot read, one of more than `DOCUMENTS_MAX`
   documents and one whose rows pass the stored budget are `Outcome::Unreadable {line, reason}`
-  with no row; otherwise every scalar but a null is a `Row {key, value, kind, line, cut}`
+  with no row (an Alertmanager configuration with a regex Go refuses, `alert::refused` #718, is
+  `Unreadable` too, keeping its rows); otherwise every scalar but a null is a `Row {key, value, kind, line, cut}`
   (`kind` `string`, `number` or `boolean`, the value cut at `VALUE_MAX` on a character
   boundary), and `Outcome::Read {values, redacted}`. `key_path(steps)` renders ADR
   0025's grammar (dots, `[n]`, `["..."]` by `serde_json` escaping for a key that is not

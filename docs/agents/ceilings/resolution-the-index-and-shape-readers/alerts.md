@@ -23,9 +23,8 @@
   `regexp` refuses is one Alertmanager cannot load (`match_re` and `matchers` compile theirs
   while the file is read; an `AlertmanagerConfig` object is judged alike, as its matchers reach
   the same Alertmanager), so it is unreadable: its document gives no route, receiver, alert side
-  or link,
-  `meada status` counts the file under `unreadable` in its config files line, and the values
-  of the file stay searchable. Only a syntax error that is established as a `regexp/syntax`
+  or link, `meada status` counts the file under `unreadable` in its config files line, and the
+  values of the file stay searchable. Only a syntax error that is established as a `regexp/syntax`
   error code counts, in the expression as Alertmanager hands it to Go (`^(?:expression)$`, so a
   `)` that closes the wrapper stands for itself): a group not closed or not opened (`(a`,
   `a)`), a class not closed (`[a`), `*`, `+` or `?` opening a group or an alternative with no
@@ -40,9 +39,12 @@
   1000, what `regex-syntax` refuses and Go reads (`(?ii)`, `a{,5}`, `[\d-z]`), and an
   expression holding `[:` or `\Q`, which `regex_source` reads more leniently than Go. Judged on a
   `match_re`, a matcher string or object of an Alertmanager document or `AlertmanagerConfig`
-  object, not on incident routes (OpsGenie, PagerDuty); other reasons Alertmanager refuses a
-  file (an unknown receiver, a bad duration) are not read. In a manifest bundle only the
-  document that holds the expression is refused, though the file counts as unreadable.
+  object, routes and inhibit rules alike (`source_match_re`, `target_matchers`, `sourceMatch`),
+  not on incident routes (OpsGenie, PagerDuty); other reasons Alertmanager refuses a file (an
+  unknown receiver, a bad duration) are not read. An unquoted matcher string value holding
+  two backslashes is not read at all (the classic parser unescapes them, which this does not),
+  so its route is uninterpretable and the value can refuse nothing. In a manifest bundle only
+  the document that holds the expression is refused, though the file counts as unreadable.
 - `ALERT_REGEX_SIZE_MAX` (`alert.rs`): 1 MiB per scope for compiled automata and their search
   caches; `ALERT_REGEX_POOL_MAX`: 16 MiB per linking pass, a scope's part being the smaller of
   the two. An automaton of 1 MiB compiles in under 10 ms (release), where an ordinary expression

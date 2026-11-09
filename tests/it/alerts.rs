@@ -632,12 +632,13 @@ fn an_alertmanager_config_with_a_regex_go_refuses_is_unreadable_and_links_nothin
     let found = engine.search("(unclosed", Some("value"), None).unwrap();
     assert!(found.contains("alertmanager.yaml"), "{found}");
 
-    // Each form that reaches Go: `match_re`, a matcher of an `AlertmanagerConfig` object, and a
-    // regex among valid routes deeper in the tree.
+    // Each form that reaches Go: `match_re`, a matcher of an `AlertmanagerConfig` object, a
+    // regex deeper in the tree and one in an inhibit rule, beside valid routes.
     for config in [
         r#"{"route":{"receiver":"a","routes":[{"receiver":"b","match":{"support":"team-b"}},{"receiver":"c","match_re":{"x":"*prod"}}]},"receivers":[{"name":"a"}]}"#,
         r#"{"apiVersion":"monitoring.coreos.com/v1alpha1","kind":"AlertmanagerConfig","metadata":{"name":"m"},"spec":{"receivers":[{"name":"a"}],"route":{"receiver":"a","routes":[{"receiver":"a","matchers":[{"name":"support","value":"team-b"}]},{"receiver":"a","matchers":[{"name":"x","value":"a[","matchType":"=~"}]}]}}}"#,
         r#"{"route":{"receiver":"a","routes":[{"receiver":"b","routes":[{"receiver":"c","matchers":["x!~\"a)\""]}],"match":{"support":"team-b"}}]},"receivers":[{"name":"a"}]}"#,
+        r#"{"route":{"receiver":"a","routes":[{"receiver":"b","match":{"support":"team-b"}}]},"receivers":[{"name":"a"}],"inhibit_rules":[{"source_matchers":["severity=critical"],"target_match_re":{"x":"*prod"}}]}"#,
     ] {
         std::fs::write(repo.join("alertmanager.yaml"), config).unwrap();
         let export = export();
