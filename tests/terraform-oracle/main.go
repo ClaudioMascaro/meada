@@ -8,13 +8,15 @@
 // <terraform>, an error (`!<summary>`) allows none, and a row marked `=` must be exact.
 //
 // The functions are the ones Terraform takes as they are from cty's stdlib, plus the to*
-// conversions, which Terraform makes with cty's convert package. Terraform's own functions
+// conversions, which Terraform makes with cty's convert package. modules.go does the same for
+// the cases of modules/. Terraform's own functions
 // (length, lookup, coalesce, replace, ...) are absent, so a case calling one reads as an error.
 package main
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
@@ -123,4 +125,10 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("%d of %d lines rewritten\n", changed, len(lines))
+	n, total, err := moduleCases(filepath.Dir(path))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Printf("%d of %d module cases rewritten\n", n, total)
 }

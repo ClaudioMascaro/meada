@@ -3158,6 +3158,8 @@ pub(crate) fn trace(
 mod tests {
     use super::*;
 
+    mod oracle;
+
     fn files(list: &[(&str, &str)]) -> Vec<(String, Vec<u8>)> {
         (list.iter())
             .map(|(p, t)| (p.to_string(), t.as_bytes().to_vec()))
