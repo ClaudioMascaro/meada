@@ -2655,3 +2655,27 @@ fn an_edit_of_what_a_file_exports_keeps_no_group() {
 
     assert!(refreshed.contains("bulling.example.com"), "{refreshed}");
 }
+
+/// A refresh with nothing changed summarizes no contract configuration again (every YAML, JSON
+/// and Terraform file was, on every query); one whose input moved without its bytes changing (the
+/// handler a SAM template names, removed) is summarized again, and the export is the cold one.
+#[test]
+fn a_refresh_summarizes_again_only_the_configurations_whose_inputs_moved() {
+    let remove = |repo: &Path| fs::remove_file(repo.join("runtime/app.ts")).unwrap();
+    let repo = fixture_repo("fresh_summaries", "iac-http-sam", ORIGIN);
+    age(&repo);
+    let started = meada::contract_summaries();
+    let before = Engine::open(&repo).unwrap().export().unwrap();
+    assert!(meada::contract_summaries() > started);
+    let started = meada::contract_summaries();
+    assert_eq!(Engine::open(&repo).unwrap().export().unwrap(), before);
+    assert_eq!(meada::contract_summaries() - started, 0);
+
+    remove(&repo);
+    let started = meada::contract_summaries();
+    let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+    assert_eq!(meada::contract_summaries() - started, 1);
+    assert_ne!(refreshed, before);
+    let expected = cold_export("fresh_summaries_cold", "iac-http-sam", ORIGIN, remove);
+    assert_eq!(refreshed, expected);
+}

@@ -65,12 +65,17 @@ pub fn note(shown: usize, total: usize, budget: usize) -> String {
 /// tokens, and how many lines it kept. `cap` is below the budget's bytes when the caller
 /// appends lines of its own.
 pub fn cut(lines: &[String], cap: usize, budget: usize) -> (usize, String) {
+    cut_of(lines, lines.len(), cap, budget)
+}
+
+/// `cut` for the leading `lines` of `total`: when fewer, they already pass `cap`.
+pub fn cut_of(lines: &[String], total: usize, cap: usize, budget: usize) -> (usize, String) {
     let all: usize = lines.iter().map(|l| line_bytes(l)).sum();
-    let note = |shown: usize| note(shown, lines.len(), budget);
+    let note = |shown: usize| note(shown, total, budget);
     let mut shown = lines.len();
     if all > cap {
         // The note's length depends on `shown`'s digits: reserve for the widest.
-        let room = cap.saturating_sub(note(lines.len()).len());
+        let room = cap.saturating_sub(note(total).len());
         let mut used = 0;
         shown = lines
             .iter()
@@ -84,7 +89,7 @@ pub fn cut(lines: &[String], cap: usize, budget: usize) -> (usize, String) {
         .iter()
         .flat_map(|l| [l.as_str(), "\n"])
         .collect();
-    if shown < lines.len() {
+    if shown < total {
         out.push_str(&note(shown));
     }
     (shown, out)

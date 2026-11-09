@@ -948,3 +948,32 @@ fn image_levels_and_names_follow_defaults_registries_and_unresolved_names() {
     assert!(!status.contains("orphan image::*"), "{status}");
     assert!(!status.contains("unresolved"), "{status}");
 }
+
+#[test]
+fn a_helm_values_file_is_a_yaml_file_named_with_the_word_values() {
+    let deploy = fixture_repo(
+        "images_values_names",
+        "image-deploy",
+        Some("https://example.com/acme/deploy.git"),
+    );
+    for (name, repository) in [
+        ("prod-values.yaml", "acme/billing"),
+        ("values.prod.yml", "acme/ledger"),
+        ("valuesets.yaml", "acme/stock"),
+    ] {
+        std::fs::write(
+            deploy.join(name),
+            format!("image:\n  repository: {repository}\n"),
+        )
+        .unwrap();
+    }
+    let export: serde_json::Value =
+        serde_json::from_str(&Engine::open(&deploy).unwrap().export().unwrap()).unwrap();
+    let helm: Vec<&str> = (export["consumers"].as_array().unwrap().iter())
+        .filter(|c| c["site"].as_str().unwrap().ends_with("::image.repository"))
+        .filter_map(|c| c["contract"].as_str())
+        .collect();
+    assert!(helm.contains(&"image::docker.io/acme/billing"), "{export}");
+    assert!(helm.contains(&"image::docker.io/acme/ledger"), "{export}");
+    assert!(!helm.contains(&"image::docker.io/acme/stock"), "{export}");
+}

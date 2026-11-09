@@ -221,8 +221,7 @@ impl Route {
 pub(super) type Spans = BTreeMap<(usize, String), (usize, usize)>;
 
 pub(super) fn is_file(path: &str) -> bool {
-    let name = path.rsplit('/').next().unwrap_or(path);
-    !name.split(['.', '-', '_']).any(|word| word == "values")
+    !crate::config_values::helm_values(path)
         && !path.split('/').any(|part| part == "templates")
         && !crate::config_values::lockfile(path)
         && [".yaml", ".yml", ".json", ".tf", ".tofu"]

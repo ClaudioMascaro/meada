@@ -175,7 +175,7 @@ CREATE TABLE config_files (
 );
 CREATE TABLE contract_configs (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
-    summary TEXT NOT NULL
+    summary TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE config_values (
     id INTEGER PRIMARY KEY, path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
@@ -862,32 +862,42 @@ fn refresh_keeping(
     for node in &configuration_nodes {
         nodes_by_path.entry(&node.path).or_default().push(node);
     }
-    let (contract_configs, _) = config_values::unshadowed(
-        all.iter()
-            .chain(&hidden)
-            .filter(|(p, _)| contract::config_file(p))
-            .cloned()
-            .collect(),
-    );
+    let contract_configs = contract_found(&all, &hidden);
+    let nodes_of = |path: &str| {
+        nodes_by_path
+            .get(path)
+            .map(Vec::as_slice)
+            .unwrap_or_default()
+    };
+    let inputs = stored_inputs(&tx)?;
+    let made = std::cell::RefCell::new(Vec::new());
     refresh_stamped(
         &tx,
         "contract_configs",
         &contract_configs,
         now,
-        |path| Ok(contract::config_reads_paths(path)),
+        |path| Ok(inputs_moved(root, inputs.get(path), nodes_of(path))),
         |abs| read_up_to(abs, lang::MAX_BYTES),
         |path, src| {
-            Ok(serde_json::to_string(&contract::config_summary(
-                path,
-                src,
-                root,
-                nodes_by_path
-                    .get(path)
-                    .map(Vec::as_slice)
-                    .unwrap_or_default(),
-            ))?)
+            SUMMARIES.set(SUMMARIES.get() + 1);
+            let nodes = nodes_of(path);
+            let (summary, probes) =
+                contract::probed(|| contract::config_summary(path, src, root, nodes));
+            let read = Inputs {
+                nodes: nodes_digest(nodes),
+                probes,
+            };
+            made.borrow_mut()
+                .push((path.to_string(), serde_json::to_string(&read)?));
+            Ok(serde_json::to_string(&summary)?)
         },
     )?;
+    for (path, read) in made.into_inner() {
+        tx.execute(
+            "UPDATE contract_configs SET inputs = ?2 WHERE path = ?1",
+            params![path, read],
+        )?;
+    }
     // The packages decide which files keep the shapes of what they export (issue #175).
     let manifest_rows = manifest_rows(&tx)?;
     let Packs {
@@ -1849,7 +1859,8 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
         read(abs).is_ok_and(|src| blake3::hash(&src).to_hex().as_str() == hash)
     };
     let all = walk(root);
-    let (config_files, shadowed) = configs_found(&all, &hidden_ci(root));
+    let hidden = hidden_ci(root);
+    let (config_files, shadowed) = configs_found(&all, &hidden);
     let tables = [
         (
             "documents",
@@ -1858,6 +1869,11 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
         ),
         ("manifests", manifests_found(&all), lang::MAX_BYTES),
         ("config_files", config_files.clone(), lang::MAX_BYTES),
+        (
+            "contract_configs",
+            contract_found(&all, &hidden),
+            lang::MAX_BYTES,
+        ),
     ];
     for (table, found, max) in tables {
         let read = |abs: &Path| read_up_to(abs, max);
@@ -1879,6 +1895,23 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
             }
         }
         if seen != stored.len() {
+            return Ok(false);
+        }
+    }
+    // A contract configuration whose summary read a path or IaC nodes that moved is summarized
+    // again, its bytes unchanged.
+    let nodes = iac::nodes(db)?;
+    let mut nodes_by_path = BTreeMap::<&str, Vec<&iac::Node>>::new();
+    for node in &nodes {
+        nodes_by_path.entry(&node.path).or_default().push(node);
+    }
+    let contract_configs = contract_found(&all, &hidden);
+    let inputs = stored_inputs(db)?;
+    for (path, _) in &contract_configs {
+        let nodes = nodes_by_path.get(path.as_str()).map(Vec::as_slice);
+        if inputs.contains_key(path)
+            && inputs_moved(root, inputs.get(path), nodes.unwrap_or_default())
+        {
             return Ok(false);
         }
     }
@@ -2170,7 +2203,10 @@ fn refresh_stamped(
         }
         let summary = summarize(path, &src)?;
         tx.execute(
-            &format!("INSERT OR REPLACE INTO {table} VALUES (?1, ?2, ?3, ?4, ?5)"),
+            &format!(
+                "INSERT OR REPLACE INTO {table} (path, hash, mtime, size, summary) \
+                 VALUES (?1, ?2, ?3, ?4, ?5)"
+            ),
             params![path, hash, mtime, size, summary],
         )?;
     }
@@ -2184,6 +2220,48 @@ fn refresh_stamped(
         )?;
     }
     Ok(gone)
+}
+
+/// The configuration files a contract kind reads (`contract::config_file`), hidden CI ones too.
+fn contract_found(
+    all: &[(String, PathBuf)],
+    hidden: &[(String, PathBuf)],
+) -> Vec<(String, PathBuf)> {
+    let found = (all.iter().chain(hidden)).filter(|(p, _)| contract::config_file(p));
+    config_values::unshadowed(found.cloned().collect()).0
+}
+
+/// What a contract configuration's summary read beside the file's bytes (`contract_configs.inputs`):
+/// the BLAKE3 of the IaC nodes evaluated for it and what was at each path it probed.
+#[derive(Serialize, serde::Deserialize)]
+struct Inputs {
+    nodes: String,
+    probes: BTreeMap<String, contract::Probe>,
+}
+
+/// The `inputs` of every `contract_configs` row, by path.
+fn stored_inputs(db: &Connection) -> Result<HashMap<String, String>> {
+    Ok(db
+        .prepare("SELECT path, inputs FROM contract_configs")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
+/// The BLAKE3 of `nodes` as `Debug` writes them: every field, no map of unordered keys.
+fn nodes_digest(nodes: &[&iac::Node]) -> String {
+    blake3::hash(format!("{nodes:?}").as_bytes())
+        .to_hex()
+        .to_string()
+}
+
+/// Whether a contract configuration's summary may differ with its bytes unchanged: its IaC nodes
+/// or what is at a path it probed moved since `inputs` was recorded, or none was.
+fn inputs_moved(root: &Path, inputs: Option<&String>, nodes: &[&iac::Node]) -> bool {
+    let Some(Ok(read)) = inputs.map(|i| serde_json::from_str::<Inputs>(i)) else {
+        return true;
+    };
+    read.nodes != nodes_digest(nodes)
+        || (read.probes.iter()).any(|(rel, was)| contract::probe(root, rel) != *was)
 }
 
 /// The size and mtime (nanoseconds) of the file at `abs`, and whether that mtime is old
@@ -2202,6 +2280,15 @@ thread_local! {
     static REVERSED_WALK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The files this thread's refreshes parsed for their values, past the values cache.
     static VALUE_PARSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// The contract configurations this thread's refreshes summarized.
+    static SUMMARIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// How many contract configurations this thread's refreshes have summarized (`contract_configs`).
+/// Test-only: no command, option or setting reads it.
+#[doc(hidden)]
+pub fn contract_summaries() -> usize {
+    SUMMARIES.get()
 }
 
 /// How many files this thread's refreshes have parsed for their values (`valued`), past the
@@ -4188,7 +4275,10 @@ mod tests {
         a.set_modified(later).unwrap();
         assert!(is_fresh(REPO));
 
-        let edits: [(&str, Option<&str>); 8] = [
+        let sam = "Transform: AWS::Serverless-2016-10-31\nResources:\n  Worker:\n    Type: \
+                   AWS::Serverless::Function\n    Properties:\n      CodeUri: worker.zip\n      \
+                   Handler: index.handler\n      Runtime: nodejs20.x\n";
+        let edits: [(&str, Option<&str>); 11] = [
             ("a.ts", Some("export function b() {}\n")),
             ("b.ts", Some("export const c = 1;\n")),
             ("b.ts", None),
@@ -4202,6 +4292,11 @@ mod tests {
             // defaults of its directory are read again when it comes or goes.
             ("main.tf", Some("variable \"x\" {}\n")),
             ("main.tf", None),
+            // A path a template's summary reads changes it with no stamped file changing: the
+            // archive a SAM function's `CodeUri` names comes and goes.
+            ("template.yaml", Some(sam)),
+            ("worker.zip", Some("PK")),
+            ("worker.zip", None),
         ];
         for (file, content) in edits {
             match content {

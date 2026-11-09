@@ -611,7 +611,7 @@ impl Engine {
     /// `search_processes`); `drift` lists the fields consumers read that a route lacks (see
     /// `search_drift`); `duplicate` lists the symbols whose span text is the same in two or more
     /// places of the workspace, in groups (`search_duplicates`); `value` lists the config values
-    /// whose value or key path matches (`config_values::hits`), which with no `kind` answer only
+    /// whose value or key path matches (`config_values::matches`), which with no `kind` answer only
     /// when no symbol and no contract does; `iac` lists the IaC nodes whose address, type or
     /// physical name matches (`iac::hits`), never part of the answer with no `kind`; `ambiguous`
     /// and `unresolved` list the open items whose enclosing symbol or call expression matches,
@@ -646,8 +646,7 @@ impl Engine {
         }
         if kind == Some("value") {
             self.refresh()?;
-            let hits = self.value_hits(&query.to_lowercase())?;
-            return Ok(search::answer(query, hits, budget));
+            return self.search_values(query, budget);
         }
         if kind == Some("iac") {
             self.refresh()?;
@@ -791,7 +790,7 @@ impl Engine {
         }
         // With no kind, config values answer only when no symbol and no contract does (ADR 0025).
         if kind.is_none() && hits.is_empty() {
-            hits = self.value_hits(&needle)?;
+            return self.search_values(query, budget);
         }
         Ok(search::answer(query, hits, budget))
     }
@@ -804,14 +803,22 @@ impl Engine {
             .collect()
     }
 
-    /// The config values (#639) of every repository whose value or key path matches `needle`,
-    /// lowercased, as `config_values::hits` gives them.
-    fn value_hits(&self, needle: &str) -> Result<Vec<Hit>> {
+    /// The config values (#639) of every repository whose value or key path matches `query`,
+    /// lowercased, as `config_values::matches` finds them, each row read only when shown.
+    fn search_values(&self, query: &str, budget: Option<usize>) -> Result<String> {
+        let indexes = self.indexes();
         let mut hits = Vec::new();
-        for (identity, db) in self.indexes() {
-            hits.extend(config_values::hits(identity, db, needle)?);
+        for (n, (identity, db)) in indexes.iter().enumerate() {
+            let found = config_values::matches(identity, db, &query.to_lowercase())?;
+            hits.extend(
+                found
+                    .into_iter()
+                    .map(|(rank, key, rowid)| (rank, key, (n, rowid))),
+            );
         }
-        Ok(hits)
+        search::answer_by(query, hits, budget, |&(n, rowid)| {
+            config_values::line(indexes[n].0, indexes[n].1, rowid)
+        })
     }
 
     /// The documents read (spec #21) whose path or `info.title` matches `query`, one line each,

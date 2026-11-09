@@ -339,7 +339,7 @@ All notable changes to Meada are recorded here. The format follows
   side is resolved at the call sites. A base is placed only when its scheme leads it, so a
   proxy's `${X}/fetch/https://api.example.com/` is an opaque base, not a link to that host, and
   every reference loses its dot segments. Swift's `URL(string:relativeTo:)` goes through the
-  same resolver, with its answers unchanged (#686).
+  same resolver and follows the same rules (#686).
 
 ### Changed
 
@@ -354,8 +354,21 @@ All notable changes to Meada are recorded here. The format follows
   writes communities again only when the call graph moved, and the actix-web reader skips the
   lookups whose answer it does not use: on this repository a one-line edit of a Rust file
   refreshes in 1.0 s instead of 1.5 s, with the same index (#610).
+- A refresh summarizes a contract configuration again only when its bytes, the IaC nodes it
+  read or a path it looked at changed: 60 ConfigMaps of 290 KB refresh with no change in 0.01 s
+  instead of 4.5 s (debug build), and a removed or added Lambda handler or Compose build path
+  still moves its answer.
+- `search` with the kind `value` reads only the rows its answer shows, so a broad query such as
+  `e` no longer formats every matching value before the budget cuts it.
 
 ### Fixed
+
+- `snapshot publish` no longer publishes the old graph under a new commit when only a contract
+  configuration or a path its summary looked at changed (a removed Lambda `worker.zip`, a
+  Compose build context): the index is fresh only while all of them are as it read them.
+- An image's Helm values file is any YAML file with a `values` word in its name, as for alerts,
+  so `prod-values.yaml` and `values.prod.yml` declare image consumers and `valuesets.yaml` does
+  not.
 
 - Python: an import inside a function names its library in that function again, so
   `from requests import get` and `import requests as r` there are HTTP consumers, and

@@ -89,7 +89,8 @@ environment reads; the architecture map keeps the lead of the first:
   `Code::field_read` folds (#687): the one environment read every Go composite literal that sets
   it gives (`Code::field_values`), a constructor's parameter climbed through its exact callers
   with its own `wants`, so the constructor is never a wrapper of the walk that reads the field
-  (`Code::name_matched` refuses one a name match or a same-named method's call may reach);
+  (`Code::name_matched` refuses one an inexact resolution reaches, and a method whose name
+  another definition shares, called or not);
   a memo per field (`Code::field_reads`, `Unknown` while it is folded) and `FIELD_DEPTH` bound it.
   `jvm/spring.rs` is the JVM packs' injector (Spring's `@Value`, `spring::inject`, which is
   given the annotation with what it marks, and nothing for `Injected::Param`), and

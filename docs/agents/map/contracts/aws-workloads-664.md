@@ -31,8 +31,8 @@ its independently known images; overwritten entries and temporary map keys consu
 
 `ContractKind::config_summary` receives neutral `ConfigFacts`, grouped by file once after IaC
 evaluation. `image/code.rs` checks evaluated direct paths during indexing, including existence
-and every symlink component. `config_reads_paths` rechecks them when only a variable, module or
-filesystem path changed. Queries use the stored summary. Compose keeps its earlier path
+and every symlink component, each through `contract::probe`: a refresh summarizes the file again
+when only a variable, a module or what is at a probed path changed. Queries use the stored summary. Compose keeps its earlier path
 normalization; new AWS paths reject raw parent components before joining.
 
 The shared cloud fact slots are `Node.provisioned: Option<Projection>` and `Node.ingress`.

@@ -47,7 +47,8 @@ fn legacy_file(path: &str) -> bool {
             name,
             "skaffold.yaml" | "skaffold.yml" | "pom.xml" | "build.gradle" | "build.gradle.kts"
         )
-        || (name.starts_with("values") && (name.ends_with(".yaml") || name.ends_with(".yml")))
+        || (crate::config_values::helm_values(name)
+            && (name.ends_with(".yaml") || name.ends_with(".yml")))
 }
 
 fn builder(out: &mut Summary, image: &str, at: &str, inferred: bool) {
@@ -71,17 +72,22 @@ fn builder(out: &mut Summary, image: &str, at: &str, inferred: bool) {
 /// Configuration-derived code paths must exist and traverse no symbolic link. The lexical
 /// normalization is the same as the Compose reader's: `..` may stay inside the repository.
 fn safe(root: &Path, path: &str) -> bool {
-    let mut at = root.to_path_buf();
+    use crate::contract::{Probe, probe};
+    let (mut at, mut last) = (String::new(), Probe::Dir);
     for step in path.split('/').filter(|p| !p.is_empty() && *p != ".") {
         if matches!(step, "..") || step.contains(['\\', ':']) {
             return false;
         }
-        at.push(step);
-        if !std::fs::symlink_metadata(&at).is_ok_and(|m| !m.file_type().is_symlink()) {
+        if !at.is_empty() {
+            at.push('/');
+        }
+        at.push_str(step);
+        last = probe(root, &at);
+        if matches!(last, Probe::Missing | Probe::Link) {
             return false;
         }
     }
-    at.is_dir()
+    last == Probe::Dir
 }
 
 pub(super) fn read(
@@ -156,7 +162,7 @@ pub(super) fn read(
             }
         }
     }
-    if name.starts_with("values")
+    if crate::config_values::helm_values(name)
         && let Some(written) = doc.get("image")
         && let Some(repository) = written.get("repository").and_then(Value::as_str)
         && let Some(image) = evaluated(&match (written.get("registry").and_then(Value::as_str))

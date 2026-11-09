@@ -406,7 +406,7 @@
   that starts with a read or a hole, a query or a fragment alone (they keep a path the join does
   not place, even over a literal base), a base with its authority half opaque (`https://${H}` is
   read; `${H}:8080` is not), a `..` that would remove a segment holding a part that is not text,
-  and a base or reference that is itself a `new URL`. A parameter on either side is resolved at
+  and a base or reference that is itself a two-argument `new URL`. A parameter on either side is resolved at
   the call sites, where the pieces are joined again. `.href`, `toString()` and `String(u)` of a
   two-argument `new URL` are not read.
 - Backstage proxy endpoints (#616, `http/ts/config.rs`): a `fetch` URL whose leading literal text

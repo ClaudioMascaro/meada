@@ -81,8 +81,7 @@
   make no provisioner.
   `iac/pattern.rs`: `PATTERN_LITERAL_MIN` (3 letters or digits; separators are no evidence), `PATTERN_SEGMENTS` (`-_./`)
   and `PATTERN_TEXT_MAX` (1,024 bytes for either name): a pattern outside these bounds matches
-  nothing. Literal characters include written separators. Tests reject anchors below three
-  characters, wildcard boundaries outside those four separators, and text above the byte
+  nothing. Tests reject anchors below three letters or digits, wildcard boundaries outside those four separators, and text above the byte
   ceiling. These bounds keep the evidence meaningful and the matching work bounded.
   `crate::iac::provision::links` scans contract sides for each provisioner;
   IaC traces hydrate all provisioned sides before following the selected node's references.

@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::Result;
-use crate::contract::Hit;
 use crate::document::events::{self, Step, Syntax};
 use crate::lang;
 use crate::msg::Msg;
@@ -35,6 +34,13 @@ const LOCKFILES: [&str; 4] = [
 /// A YAML/JSON dependency lockfile is not application configuration.
 pub(crate) fn lockfile(path: &str) -> bool {
     LOCKFILES.contains(&path.rsplit('/').next().unwrap_or(path))
+}
+
+/// A Helm values file by its name: one of its words (split at `.`, `-` and `_`) is `values`,
+/// as `values.yaml`, `values-prod.yaml` and `prod.values.yml` are.
+pub(crate) fn helm_values(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    name.split(['.', '-', '_']).any(|word| word == "values")
 }
 
 /// The hidden entries of the repository root read although hidden (ADR 0025): the CI
@@ -812,14 +818,35 @@ pub(crate) fn forget(tx: &Transaction, path: &str) -> Result<()> {
 }
 
 /// The values of `db` (repository `identity`) whose lowercased value or key path is `needle`,
-/// starts with it or holds it, as `search` hits: `<identity> <path>:<line> <key path> = <value>`,
-/// a string quoted as JSON, a cut one followed by `(cut)` and a secret one `redacted`, ordered
+/// starts with it or holds it, as `search` hits whose payload is the row `line` shows, ordered
 /// by rank, then repository, path, line and key path. The B-trees on the lowercased key path
 /// and value serve exact and prefix, and the trigram table `config_search` serves substring
 /// (ADR 0025, #647); a query under three characters is answered by a scan, which is also what
-/// the trigram path must agree with, byte for byte.
-pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<Hit>> {
-    hits_by(identity, db, needle, true)
+/// the trigram path must agree with, byte for byte. No value is read here: an answer reads
+/// only the rows it shows.
+pub(crate) fn matches(identity: &str, db: &Connection, needle: &str) -> Result<Vec<Match>> {
+    matches_by(identity, db, needle, true)
+}
+
+/// A matching value before it is shown: its rank, the key `matches` orders by and its rowid.
+pub(crate) type Match = (u8, String, i64);
+
+/// The `search` line of the value at `rowid`: `<identity> <path>:<line> <key path> = <value>`,
+/// a string quoted as JSON, a cut one followed by `(cut)` and a secret one `redacted`.
+pub(crate) fn line(identity: &str, db: &Connection, rowid: i64) -> Result<String> {
+    let row = "SELECT path, key, value, type, line, cut FROM config_values WHERE rowid = ?1";
+    let (path, key, value, kind, line, cut): (String, String, Option<String>, String, i64, bool) =
+        db.query_row(row, [rowid], |r| {
+            Ok((
+                r.get(0)?,
+                r.get(1)?,
+                r.get(2)?,
+                r.get(3)?,
+                r.get(4)?,
+                r.get(5)?,
+            ))
+        })?;
+    shown(identity, &path, line, &key, value.as_deref(), &kind, cut)
 }
 
 /// The characters in a trigram: a query of fewer cannot be matched in `config_search`.
@@ -834,10 +861,10 @@ fn trigram_filter() -> String {
     format!("id IN (SELECT rowid FROM config_search WHERE config_search MATCH ?2) AND ({SCAN})")
 }
 
-/// `hits`, the substring rank answered by the trigram table when `indexed` and the query is
+/// `matches`, the substring rank answered by the trigram table when `indexed` and the query is
 /// long enough, else by a scan.
-fn hits_by(identity: &str, db: &Connection, needle: &str, indexed: bool) -> Result<Vec<Hit>> {
-    const ROW: &str = "SELECT rowid, path, key, value, type, line, cut FROM config_values WHERE";
+fn matches_by(identity: &str, db: &Connection, needle: &str, indexed: bool) -> Result<Vec<Match>> {
+    const ROW: &str = "SELECT rowid, path, key, line FROM config_values WHERE";
     // A key path or value that starts with `needle` sorts from it up to the least text above
     // all of them, as SQLite compares text by its UTF-8 bytes; with none, up to the end.
     let past = successor(needle);
@@ -861,7 +888,7 @@ fn hits_by(identity: &str, db: &Connection, needle: &str, indexed: bool) -> Resu
         (1, prefix, &prefix_args),
         (2, &substring, &substring_args),
     ];
-    let mut found: BTreeMap<i64, Hit> = BTreeMap::new();
+    let mut found: BTreeMap<i64, (u8, String)> = BTreeMap::new();
     for (rank, filter, args) in searches {
         let mut statement = db.prepare(&format!("{ROW} {filter}"))?;
         let mut rows = statement.query(rusqlite::params_from_iter(args))?;
@@ -870,17 +897,14 @@ fn hits_by(identity: &str, db: &Connection, needle: &str, indexed: bool) -> Resu
             if found.contains_key(&rowid) {
                 continue;
             }
-            let (path, key, value): (String, String, Option<String>) =
-                (r.get(1)?, r.get(2)?, r.get(3)?);
-            let (kind, line, cut): (String, i64, bool) = (r.get(4)?, r.get(5)?, r.get(6)?);
-            let text = shown(identity, &path, line, &key, value.as_deref(), &kind, cut)?;
-            found.insert(
-                rowid,
-                (rank, format!("{identity} {path} {line:010} {key}"), text),
-            );
+            let (path, key, line): (String, String, i64) = (r.get(1)?, r.get(2)?, r.get(3)?);
+            found.insert(rowid, (rank, format!("{identity} {path} {line:010} {key}")));
         }
     }
-    Ok(found.into_values().collect())
+    Ok(found
+        .into_iter()
+        .map(|(rowid, (rank, key))| (rank, key, rowid))
+        .collect())
 }
 
 /// `<identity> <path>:<line> <key path> = <value>`: a string quoted as JSON, an expression or a
@@ -1447,8 +1471,8 @@ mod tests {
         ];
         for (query, found) in queries {
             let query = query.to_lowercase();
-            let indexed = hits_by("acme/app", &db, &query, true).unwrap();
-            let scanned = hits_by("acme/app", &db, &query, false).unwrap();
+            let indexed = matches_by("acme/app", &db, &query, true).unwrap();
+            let scanned = matches_by("acme/app", &db, &query, false).unwrap();
             assert_eq!(indexed, scanned, "{query:?}");
             assert_eq!(!indexed.is_empty(), found, "{query:?}");
         }
@@ -1462,9 +1486,12 @@ mod tests {
             [],
         )
         .unwrap();
-        let indexed = hits_by("acme/app", &db, "queue", true).unwrap();
+        let indexed = matches_by("acme/app", &db, "queue", true).unwrap();
         assert_eq!(indexed.len(), 10);
-        assert_eq!(indexed, hits_by("acme/app", &db, "queue", false).unwrap());
+        assert_eq!(
+            indexed,
+            matches_by("acme/app", &db, "queue", false).unwrap()
+        );
         // The substring rank asks the trigram table (a scan would not name it).
         let mut statement = db
             .prepare(&format!(

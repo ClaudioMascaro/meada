@@ -63,9 +63,6 @@ impl ContractKind for Image {
     fn config_file(&self, path: &str) -> bool {
         config::is_file(path)
     }
-    fn config_reads_paths(&self, path: &str) -> bool {
-        crate::iac::is_source(path) || crate::iac::cloudformation::is_source(path)
-    }
     fn config_summary(
         &self,
         path: &str,

@@ -1,5 +1,6 @@
 //! Direct workload paths are checked during indexing. Queries use only these stored facts.
 
+use crate::contract::{Probe, probe};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::path::Path;
@@ -19,17 +20,21 @@ fn safe(root: &Path, path: &str) -> bool {
     if path.starts_with(['/', '~']) || path.contains(['\\', ':', '$', '*']) {
         return false;
     }
-    let mut at = root.to_path_buf();
+    let (mut at, mut last) = (String::new(), Probe::Dir);
     for step in path.split('/').filter(|p| !p.is_empty() && *p != ".") {
         if step == ".." {
             return false;
         }
-        at.push(step);
-        if !std::fs::symlink_metadata(&at).is_ok_and(|m| !m.file_type().is_symlink()) {
+        if !at.is_empty() {
+            at.push('/');
+        }
+        at.push_str(step);
+        last = probe(root, &at);
+        if matches!(last, Probe::Missing | Probe::Link) {
             return false;
         }
     }
-    at.is_dir() || at.is_file()
+    matches!(last, Probe::Dir | Probe::File)
 }
 
 /// Only an unambiguous existing file gives a handler source. Archives are never opened.
@@ -49,7 +54,7 @@ fn module(root: &Path, base: &str, handler: &str, only: Option<&str>) -> Option<
             let path = format!("{module}.{extension}");
             if only.is_none_or(|only| only == path)
                 && safe(root, &path)
-                && root.join(&path).is_file()
+                && probe(root, &path) == Probe::File
             {
                 candidates.insert(path);
             }
@@ -81,7 +86,7 @@ pub(crate) fn checked_handler(
     }
     let path = if node.ty == "Serverless::Function" {
         code.path
-    } else if root.join(&code.path).is_dir() {
+    } else if probe(root, &code.path) == Probe::Dir {
         module(root, &code.path, &handler.text, None)?
     } else {
         module(
@@ -132,7 +137,7 @@ pub(super) fn checked(root: &Path, node: &crate::iac::Node, room: usize) -> Opti
     }
     let file_only = code.is_some_and(|code| code.file)
         || crate::iac::types::workload_of(node).is_some_and(|workload| workload.code_file);
-    if file_only && !root.join(path.as_ref()).is_file() {
+    if file_only && probe(root, &path) != Probe::File {
         return None;
     }
     Some(Code {

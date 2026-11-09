@@ -7,10 +7,13 @@ builder. Only one simple literal ko command is read; multiline and compound shel
 stay absent. The recognized command has one `--bare`, at most one literal target and no other
 flags; an explicit shell is `bash` or `sh`. No process environment is read. Configuration
 facts enter the stamped `contract_configs` table through `ContractKind::config_file` and
-`config_summary`; `config_reads_paths` rechecks Compose paths when only the tree changed.
+`config_summary`; each row keeps what its summary read beside the bytes (`inputs`: the IaC nodes'
+digest and every path `contract::probe` looked at), and a refresh summarizes it again only when
+one of them moved.
 
 The kind declares repository-level providers with `at`, workload consumers from stored Compose
-and Kubernetes images, and Helm `image.repository` consumers. `iac/types.toml` marks workload
+and Kubernetes images, and Helm `image.repository` consumers from a YAML file with a `values`
+word in its name (`config_values::helm_values`, the rule alert files use). `iac/types.toml` marks workload
 types. Image normalization expands Docker Hub names, removes tags/digests and lowercases names.
 Unknown interpolations remain patterns; the IaC pattern matcher enforces the existing literal
 and segment ceilings. A literal name is exact, defaults and Helm values inferred (a Helm

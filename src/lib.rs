@@ -33,7 +33,7 @@ mod iac;
 mod image;
 mod index;
 #[doc(hidden)]
-pub use index::{value_parses, with_busy_timeout, with_reversed_walk};
+pub use index::{contract_summaries, value_parses, with_busy_timeout, with_reversed_walk};
 mod items;
 mod jvm;
 mod kube;

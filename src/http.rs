@@ -631,10 +631,6 @@ impl ContractKind for Http {
         iac::is_file(path)
     }
 
-    fn config_reads_paths(&self, path: &str) -> bool {
-        iac::is_file(path)
-    }
-
     fn config_summary(
         &self,
         path: &str,

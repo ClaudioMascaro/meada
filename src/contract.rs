@@ -272,12 +272,10 @@ pub trait ContractKind {
     fn config_file(&self, _path: &str) -> bool {
         false
     }
-    /// A path dependency can change without the configuration file's bytes changing.
-    fn config_reads_paths(&self, _path: &str) -> bool {
-        false
-    }
 
-    /// Stored facts of one configuration file, bounded by the shared per-file ceiling.
+    /// Stored facts of one configuration file, bounded by the shared per-file ceiling. A path it
+    /// reads goes through `contract::probe`, so a refresh summarizes the file again when what is
+    /// there changes, as when its bytes or the IaC nodes it is given do.
     fn config_summary(
         &self,
         _path: &str,
@@ -645,8 +643,49 @@ pub(crate) fn workspace_steps(exports: &mut [Export], repositories: &[Repository
 pub(crate) fn config_file(path: &str) -> bool {
     KINDS.iter().any(|k| k.config_file(path))
 }
-pub(crate) fn config_reads_paths(path: &str) -> bool {
-    KINDS.iter().any(|k| k.config_reads_paths(path))
+
+/// What is at a path of the repository, read without following a symbolic link: the one fact a
+/// configuration summary takes from the disk beside the file's bytes and its IaC nodes.
+#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(crate) enum Probe {
+    Missing,
+    Link,
+    Dir,
+    File,
+    Other,
+}
+
+thread_local! {
+    /// The paths the summary being made probed (`probed`), none outside one.
+    static PROBES: std::cell::RefCell<Option<std::collections::BTreeMap<String, Probe>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// What `rel` is under `root`, recorded for the summary `probed` is making.
+pub(crate) fn probe(root: &std::path::Path, rel: &str) -> Probe {
+    let found = match std::fs::symlink_metadata(root.join(rel)) {
+        Err(_) => Probe::Missing,
+        Ok(m) if m.file_type().is_symlink() => Probe::Link,
+        Ok(m) if m.is_dir() => Probe::Dir,
+        Ok(m) if m.is_file() => Probe::File,
+        Ok(_) => Probe::Other,
+    };
+    PROBES.with_borrow_mut(|probes| {
+        if let Some(probes) = probes {
+            probes.insert(rel.to_string(), found);
+        }
+    });
+    found
+}
+
+/// What `summarize` returns, with every path it probed and what was there: a refresh summarizes
+/// the file again only when one of them, its bytes or its nodes changed.
+pub(crate) fn probed<T>(
+    summarize: impl FnOnce() -> T,
+) -> (T, std::collections::BTreeMap<String, Probe>) {
+    let outer = PROBES.replace(Some(Default::default()));
+    let value = summarize();
+    (value, PROBES.replace(outer).unwrap_or_default())
 }
 
 pub(crate) fn config_summary(

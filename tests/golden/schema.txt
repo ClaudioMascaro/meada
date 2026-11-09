@@ -46,7 +46,7 @@ CREATE TABLE config_files (
 );
 CREATE TABLE contract_configs (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
-    summary TEXT NOT NULL
+    summary TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE config_values (
     id INTEGER PRIMARY KEY, path TEXT NOT NULL, key TEXT NOT NULL, value TEXT, type TEXT NOT NULL, line INTEGER NOT NULL,
