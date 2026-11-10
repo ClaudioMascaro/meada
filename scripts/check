@@ -548,6 +548,14 @@ def selftest():
             git("branch", "-q", "--unset-upstream")
             git("update-ref", "refs/remotes/origin/main", "pushed")
             assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]  # no upstream: origin/main
+            # An upstream whose branch is gone, and a detached HEAD, fall back to origin/main too.
+            git("branch", "-q", "pushed2", "HEAD~2")
+            git("branch", "-q", "--set-upstream-to=pushed2")
+            git("update-ref", "refs/remotes/origin/main", "HEAD~1")
+            git("branch", "-q", "-D", "pushed2")
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md"]  # upstream gone: origin/main
+            git("checkout", "-q", "--detach")
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md"]  # detached HEAD: origin/main
         finally:
             os.chdir(old)
     print("scripts/check selftest: path policy and disposable Git/event cases passed.")
