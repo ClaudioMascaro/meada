@@ -471,7 +471,8 @@ impl Named {
 enum Declared {
     /// `set(T)`: the elements converted to `T`, then sorted and deduplicated.
     Set(Elem),
-    /// `list(T)`: the elements converted to `T`, in their order.
+    /// `list(T)`: a set that came before it (an override retyping a declared set) becomes a list
+    /// of `T` in its order; a value no set touched stays as it is.
     List(Elem),
     /// `any`: the value keeps its own type.
     Any,
@@ -523,10 +524,13 @@ fn converted_through(mut value: Value, steps: &[Declared]) -> Option<Value> {
                 value = functions::to_set(&value, elem).ok()?;
                 set = true;
             }
-            Declared::List(elem) => {
+            // A list converts only a set that came before it (an override retyping a declared
+            // set); a value no set has touched stays as it is, whatever its elements are.
+            Declared::List(elem) if set => {
                 value = functions::to_list(&value, elem).ok()?;
                 set = false;
             }
+            Declared::List(_) => {}
             Declared::Any => {}
             Declared::Other if set => return None,
             Declared::Other => {}
@@ -3255,6 +3259,7 @@ mod tests {
 
     mod oracle;
     mod retype;
+    mod shapes;
 
     fn files(list: &[(&str, &str)]) -> Vec<(String, Vec<u8>)> {
         (list.iter())
