@@ -59,6 +59,9 @@ fn resource(key: &str) -> String {
     )
 }
 
+/// A source: its label, its files and the prefix of its instances' addresses.
+type Source<'a> = (&'a str, Vec<(&'a str, &'a str)>, String);
+
 const WANT: [&str; 2] = ["a.obj[\"a\"] = \"obj-a\"", "a.obj[\"b\"] = \"obj-b\""];
 
 #[test]
@@ -81,7 +84,7 @@ fn a_declared_list_of_collections_gives_its_keys_from_every_source() {
             }}}
         })
         .to_string();
-        let rows: Vec<(&str, Vec<(&str, &str)>, String)> = vec![
+        let rows: Vec<Source> = vec![
             ("default", vec![("main.tf", &with_default)], String::new()),
             (
                 "terraform.tfvars",
