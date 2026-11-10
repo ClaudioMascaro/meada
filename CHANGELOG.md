@@ -374,9 +374,11 @@ All notable changes to Meada are recorded here. The format follows
 - Terraform static evaluation charges the template text `hcl-rs` parses again at each
   evaluation in a `for`, not only the bytes an expression makes: a template in a `for` over
   thousands of elements is unresolved (`*`) before it runs, where one 24 KB root took seconds
-  per resource and minutes in all. A refused expression no longer spends its root's work. A
-  short template (`"${a}-x"`) in a `for` over 2,000 elements still resolves; one of 40
-  interpolations resolves over 100 elements, no longer over 200 (#714).
+  per resource and minutes in all. A read such as `var.x[0]` in a `for` is charged the copy of
+  `var` it makes each time. A refused expression spends only the bytes it went through, not the
+  1 MiB it would have made, and a literal name stays exact once the work is spent. A short
+  template (`"${a}-x"`) in a `for` over 2,000 elements still resolves; one of 40 interpolations
+  resolves over 100 elements, no longer over 200 (#714).
 - AWS SDK forms in Java, Go and C# follow the ADR 0026 rule TypeScript and Python already
   followed: an EventBridge entry without `EventBusName` produces to `default`, and an SNS
   publish to a phone number or endpoint names no topic. A request Meada cannot see whole (a

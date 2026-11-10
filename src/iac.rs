@@ -105,7 +105,7 @@ const EVAL_VALUE_MAX: usize = 64 << 10;
 /// The cost one expression may have at most (`cost`, an upper bound of its evaluation steps: a
 /// byte made or `TEMPLATE_PARSE_COST` of a template's text parsed again in a `for`) for `hcl-rs`
 /// to evaluate it; past it the expression is unresolved, but for its template parts, and spends
-/// none of the work.
+/// only the bytes it went through to decide.
 // ponytail: a `for` over a map of a few hundred entries costs a few hundred KiB; 1 MiB stops a
 // `for` inside a `for` over wide lists, and a template in a `for` before it takes a second.
 const EVAL_COST_MAX: usize = 1 << 20;
@@ -1137,7 +1137,7 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
                     (None, false) => continue,
                 }
             } else {
-                // Refused, it evaluates nothing: it spends nothing either.
+                // Refused, it evaluates nothing and copied nothing (a var file binds no name).
                 None
             };
             let at = line(a.span().map_or(0, |s| s.start));
@@ -1418,18 +1418,28 @@ fn unshadowed<'v>(
     }
 }
 
+/// What evaluating the traversal `t` copies before it reads: `hcl-rs` clones its root object
+/// whole, once per evaluation, so in a `for` (`iters`) that copy counts once per element.
+fn copied(t: &Traversal, roots: &Map<String, Value>, iters: &[(String, usize)]) -> usize {
+    match &t.expr {
+        Expression::Variable(v) if !iters.is_empty() => roots.get(v.as_str()).map_or(0, size),
+        _ => 0,
+    }
+}
+
 /// The steps evaluating `expr` takes at most (`cost`), its variables bound to `roots`: the bytes
-/// it makes and the template text `hcl-rs` parses on the way.
+/// it makes and the steps that make none (template text parsed again, root objects copied).
 fn steps(expr: &Expression, roots: &Map<String, Value>) -> usize {
-    let mut parsed = 0;
-    let made = cost(expr, roots, &mut Vec::new(), &mut parsed);
-    made.saturating_add(parsed).max(1)
+    let mut overhead = 0;
+    let made = cost(expr, roots, &mut Vec::new(), &mut overhead);
+    made.saturating_add(overhead).max(1)
 }
 
 /// An upper bound of the bytes evaluating `expr` makes, its variables bound to `roots` and the
 /// iterator variables of the `for` around it to `iters` (a name and the most one element holds);
-/// `parsed` grows by `TEMPLATE_PARSE_COST` a byte of each template's text each time it is
-/// evaluated in a `for`, kept apart so an element count estimated from the bytes does not multiply it. A
+/// `overhead` grows by the steps that make no bytes each time they run in a `for`: parsing a
+/// template again (`TEMPLATE_PARSE_COST` a byte of its text) and copying the root object a
+/// traversal reads (`hcl-rs` clones `var`, `local`, ... whole to evaluate `var.x[0]`), kept apart so an element count estimated from the bytes does not multiply it. A
 /// product (a `for`, `formatlist`, `join`, `replace`) multiplies, a function that may grow its
 /// input (a `format` width, `jsonencode`'s escapes, `split`'s quotes, a case change) grows it, and
 /// anything else adds up.
@@ -1437,58 +1447,61 @@ fn cost(
     expr: &Expression,
     roots: &Map<String, Value>,
     iters: &mut Vec<(String, usize)>,
-    parsed: &mut usize,
+    overhead: &mut usize,
 ) -> usize {
     let add = |a: usize, b: usize| a.saturating_add(b);
     match expr {
         Expression::Null(_) | Expression::Bool(_) | Expression::Number(_) => 8,
         Expression::String(s) => s.len() + 2,
         Expression::Array(items) => (items.iter())
-            .map(|e| cost(e, roots, iters, parsed))
+            .map(|e| cost(e, roots, iters, overhead))
             .fold(2, add),
         Expression::Object(object) => (object.iter())
             .map(|(k, v)| {
                 let key = match k {
                     ObjectKey::Ident(i) => i.as_str().len(),
-                    ObjectKey::Expression(e) => cost(e, roots, iters, parsed),
+                    ObjectKey::Expression(e) => cost(e, roots, iters, overhead),
                 };
-                add(key, cost(v.expr(), roots, iters, parsed))
+                add(key, cost(v.expr(), roots, iters, overhead))
             })
             .fold(2, add),
         Expression::StringTemplate(t) => {
-            *parsed = add(*parsed, parse_cost(t.span(), t, iters));
-            template_cost(t, roots, iters, parsed)
+            *overhead = add(*overhead, parse_cost(t.span(), t, iters));
+            template_cost(t, roots, iters, overhead)
         }
         Expression::HeredocTemplate(h) => {
-            *parsed = add(*parsed, parse_cost(h.span(), &h.template, iters));
-            template_cost(&h.template, roots, iters, parsed)
+            *overhead = add(*overhead, parse_cost(h.span(), &h.template, iters));
+            template_cost(&h.template, roots, iters, overhead)
         }
-        Expression::Parenthesis(p) => cost(p.inner(), roots, iters, parsed),
+        Expression::Parenthesis(p) => cost(p.inner(), roots, iters, overhead),
         Expression::Variable(v) => match iters.iter().rev().find(|(n, _)| n == v.as_str()) {
             Some((_, n)) => *n,
             None => roots.get(v.as_str()).map_or(8, size),
         },
         Expression::Traversal(t) => {
             let indices = (t.operators.iter()).filter_map(|o| match o.value() {
-                TraversalOperator::Index(e) => Some(cost(e, roots, iters, parsed)),
+                TraversalOperator::Index(e) => Some(cost(e, roots, iters, overhead)),
                 _ => None,
             });
             let indices = indices.collect::<Vec<_>>().into_iter().fold(0, add);
             let base = match unshadowed(t, roots, iters) {
-                Some(v) => size(v),
-                None => cost(&t.expr, roots, iters, parsed),
+                Some(v) => {
+                    *overhead = add(*overhead, copied(t, roots, iters));
+                    size(v)
+                }
+                None => cost(&t.expr, roots, iters, overhead),
             };
             add(base, indices)
         }
         Expression::Conditional(c) => [&c.cond_expr, &c.true_expr, &c.false_expr]
             .into_iter()
-            .map(|e| cost(e, roots, iters, parsed))
+            .map(|e| cost(e, roots, iters, overhead))
             .fold(0, add),
         Expression::FuncCall(f) => {
             let args: Vec<usize> = f
                 .args
                 .iter()
-                .map(|e| cost(e, roots, iters, parsed))
+                .map(|e| cost(e, roots, iters, overhead))
                 .collect();
             let sum = args.iter().copied().fold(8, add);
             match f.name.name.as_str() {
@@ -1500,14 +1513,14 @@ fn cost(
                 _ => sum,
             }
         }
-        Expression::UnaryOp(u) => add(cost(&u.expr, roots, iters, parsed), 8),
+        Expression::UnaryOp(u) => add(cost(&u.expr, roots, iters, overhead), 8),
         Expression::BinaryOp(b) => add(
-            cost(&b.lhs_expr, roots, iters, parsed),
-            cost(&b.rhs_expr, roots, iters, parsed),
+            cost(&b.lhs_expr, roots, iters, overhead),
+            cost(&b.rhs_expr, roots, iters, overhead),
         ),
         Expression::ForExpr(f) => {
             let intro = &f.intro;
-            let (n, each) = elements(&intro.collection_expr, roots, iters, parsed);
+            let (n, each) = elements(&intro.collection_expr, roots, iters, overhead);
             let vars = [intro.key_var.as_ref(), Some(&intro.value_var)];
             let depth = iters.len();
             iters.extend(
@@ -1515,14 +1528,14 @@ fn cost(
                     .flatten()
                     .map(|v| (v.as_str().to_string(), each)),
             );
-            let before = std::mem::take(parsed);
+            let before = std::mem::take(overhead);
             let body = [f.key_expr.as_ref(), Some(&f.value_expr)]
                 .into_iter()
                 .chain([f.cond.as_ref().map(|c| &c.expr)])
                 .flatten()
-                .map(|e| cost(e, roots, iters, parsed))
+                .map(|e| cost(e, roots, iters, overhead))
                 .fold(4, add);
-            *parsed = add(before, n.saturating_mul(*parsed));
+            *overhead = add(before, n.saturating_mul(*overhead));
             iters.truncate(depth);
             n.saturating_mul(body)
         }
@@ -1531,7 +1544,7 @@ fn cost(
 
 /// What parsing the template `t` again costs at one evaluation in a `for` (`iters`), its text
 /// spanning `span` (a template built rather than read has none, so its text is written out).
-/// Outside every `for` it is parsed once, in time its file's size already bounds: nothing.
+/// Outside every `for` it is overhead once, in time its file's size already bounds: nothing.
 fn parse_cost(span: Option<Range<usize>>, t: &Template, iters: &[(String, usize)]) -> usize {
     if iters.is_empty() {
         return 0;
@@ -1544,25 +1557,25 @@ fn template_cost(
     t: &Template,
     roots: &Map<String, Value>,
     iters: &mut Vec<(String, usize)>,
-    parsed: &mut usize,
+    overhead: &mut usize,
 ) -> usize {
     let mut total = 0usize;
     for e in t.iter() {
         let part = match e {
             Element::Literal(s) => s.value().len(),
-            Element::Interpolation(i) => cost(&i.expr, roots, iters, parsed),
+            Element::Interpolation(i) => cost(&i.expr, roots, iters, overhead),
             Element::Directive(d) => match d.as_ref() {
                 Directive::If(d) => {
-                    let branches = template_cost(&d.if_expr.template, roots, iters, parsed)
+                    let branches = template_cost(&d.if_expr.template, roots, iters, overhead)
                         .saturating_add(
                             (d.else_expr.as_ref())
-                                .map_or(0, |e| template_cost(&e.template, roots, iters, parsed)),
+                                .map_or(0, |e| template_cost(&e.template, roots, iters, overhead)),
                         );
-                    cost(&d.if_expr.cond_expr, roots, iters, parsed).saturating_add(branches)
+                    cost(&d.if_expr.cond_expr, roots, iters, overhead).saturating_add(branches)
                 }
                 Directive::For(d) => {
                     let f = &d.for_expr;
-                    let (n, each) = elements(&f.collection_expr, roots, iters, parsed);
+                    let (n, each) = elements(&f.collection_expr, roots, iters, overhead);
                     let depth = iters.len();
                     let vars = [f.key_var.as_ref(), Some(&f.value_var)];
                     iters.extend(
@@ -1570,9 +1583,9 @@ fn template_cost(
                             .flatten()
                             .map(|v| (v.as_str().to_string(), each)),
                     );
-                    let before = std::mem::take(parsed);
-                    let body = template_cost(&f.template, roots, iters, parsed);
-                    *parsed = before.saturating_add(n.saturating_mul(*parsed));
+                    let before = std::mem::take(overhead);
+                    let body = template_cost(&f.template, roots, iters, overhead);
+                    *overhead = before.saturating_add(n.saturating_mul(*overhead));
                     iters.truncate(depth);
                     n.saturating_mul(body)
                 }
@@ -1589,7 +1602,7 @@ fn elements(
     expr: &Expression,
     roots: &Map<String, Value>,
     iters: &mut Vec<(String, usize)>,
-    parsed: &mut usize,
+    overhead: &mut usize,
 ) -> (usize, usize) {
     if let Expression::FuncCall(f) = expr
         && matches!(f.name.name.as_str(), "tolist" | "toset" | "tomap")
@@ -1600,11 +1613,31 @@ fn elements(
         // A conversion keeps its argument's elements (a number made a string adds its quotes).
         // Another argument or an expanded one (`x...`), which `hcl-rs` evaluates before it
         // refuses the call, is costed as any call.
-        return elements(arg, roots, iters, parsed);
+        return elements(arg, roots, iters, overhead);
+    }
+    match expr {
+        Expression::Parenthesis(p) => return elements(p.inner(), roots, iters, overhead),
+        Expression::Conditional(c) => {
+            // As many as the larger branch gives; the condition makes no element.
+            let cond = cost(&c.cond_expr, roots, iters, overhead);
+            *overhead = overhead.saturating_add(cond);
+            let (a, x) = elements(&c.true_expr, roots, iters, overhead);
+            let (b, y) = elements(&c.false_expr, roots, iters, overhead);
+            return (a.max(b), x.max(y));
+        }
+        _ => {}
     }
     let found = match expr {
-        Expression::Traversal(t) => unshadowed(t, roots, iters),
-        Expression::Variable(v) if !shadowed(v.as_str(), iters) => roots.get(v.as_str()),
+        Expression::Traversal(t) => unshadowed(t, roots, iters).inspect(|_| {
+            *overhead = overhead.saturating_add(copied(t, roots, iters));
+        }),
+        Expression::Variable(v) if !shadowed(v.as_str(), iters) => {
+            roots.get(v.as_str()).inspect(|root| {
+                if !iters.is_empty() {
+                    *overhead = overhead.saturating_add(size(root));
+                }
+            })
+        }
         _ => None,
     };
     let most = |sizes: &mut dyn Iterator<Item = usize>| sizes.max().unwrap_or(0);
@@ -1616,7 +1649,7 @@ fn elements(
         ),
         Some(v) => (1, size(v)),
         None => {
-            let c = cost(expr, roots, iters, parsed);
+            let c = cost(expr, roots, iters, overhead);
             (c, c)
         }
     }
@@ -2160,13 +2193,29 @@ impl<'m> Eval<'m> {
         expr: &'m Expression,
         depth: usize,
     ) -> Evaluated {
-        if depth > EVAL_DEPTH_MAX || self.work == 0 {
+        if depth > EVAL_DEPTH_MAX {
+            return Evaluated::unknown();
+        }
+        if let Expression::String(s) = expr {
+            // Nothing to evaluate: a literal stays known once the work is spent.
+            return Evaluated {
+                val: Val::Known(Value::from(s.value().as_str())),
+                through: BTreeSet::new(),
+            };
+        }
+        if self.work == 0 {
             return Evaluated::unknown();
         }
         let mut through = BTreeSet::new();
         let (mut vars, mut locals, mut mods) = (Map::new(), Map::new(), Map::new());
         let mut outputs: BTreeMap<String, (BTreeSet<String>, Vec<Option<Key>>)> = BTreeMap::new();
-        for r in refs_of(expr) {
+        let refs = refs_of(expr);
+        let mut seen = HashSet::new();
+        for r in refs.iter().cloned() {
+            if matches!(r, Ref::Var(_) | Ref::Local(_)) && !seen.insert(r.clone()) {
+                // Read twice, a name is copied once.
+                continue;
+            }
             let (map, name, found) = match r {
                 Ref::Var(n) => (&mut vars, n.clone(), self.name(at, Name::Var(n), depth)),
                 Ref::Local(n) => (&mut locals, n.clone(), self.name(at, Name::Local(n), depth)),
@@ -2241,8 +2290,15 @@ impl<'m> Eval<'m> {
                 }
                 _ => {}
             }
+        } else {
+            // Refused, it spends the bytes it went through to decide, not what it would have
+            // made: at most its roots once copied and once ordered (`lexical`), then once read
+            // and once copied in `cost` per name it reads. The parts `partial` evaluates pass
+            // this gate themselves.
+            let roots = (roots.values().map(size)).fold(0, usize::saturating_add);
+            let reads = refs.len().saturating_add(1).saturating_mul(2);
+            self.work = self.work.saturating_sub(roots.saturating_mul(reads));
         }
-        // A refused expression spends nothing: the parts `partial` evaluates pass this gate.
         self.partial(at, each, expr, depth)
     }
 
@@ -4517,7 +4573,7 @@ mod tests {
     /// are charged too, so at `m = 8000, k = 40` (9.6 s in a debug build before) it is unresolved
     /// before it runs, alone or 64 times in a root, with no resource left out; over 100 elements
     /// it still resolves. Measured on 2026-11-09 in a debug build: 0.35 s for the whole test.
-    /// (The literal `q-` of each stays: a refused expression spends none of the root's work.)
+    /// (The literal `q-` of each stays: a refusal spends what it went through, not 1 MiB.)
     #[test]
     fn a_template_in_a_wide_for_is_bounded_by_its_steps() {
         let body = "${a}".repeat(40);
@@ -4603,6 +4659,101 @@ mod tests {
         );
     }
 
+    /// `hcl-rs` copies the root object of a traversal (`var`, `local`, `each`, `module`) whole
+    /// at each evaluation, so `var.items[0]` in a `for` over `var.items` takes time in the square
+    /// of its elements: each copy counts once per element, through any root, and such a name
+    /// is refused before it runs. Measured on 2026-11-10 in a debug build, 34.96 s at 21,000
+    /// elements before.
+    #[test]
+    fn a_traversal_in_a_for_body_counts_the_root_it_copies() {
+        let items = |m: usize| vec!["\"a\""; m].join(", ");
+        let timed = |list: &[(&str, &str)]| {
+            let start = std::time::Instant::now();
+            let got = names(list);
+            (got, start.elapsed())
+        };
+        let refused = |got: &[String]| got.iter().all(|s| s.ends_with(" ~ \"q-*\""));
+        let tfvars = |m: usize| format!("items = [{}]\n", items(m));
+        let resource = |i: usize, reads: &str, from: &str| {
+            format!(
+                "resource \"a\" \"r{i}\" {{\n  name = \"q-${{length([for a in {from} : {reads}[0]])}}\"\n}}\n"
+            )
+        };
+        let one = format!(
+            "variable \"items\" {{}}\n{}",
+            resource(0, "var.items", "var.items")
+        );
+        let big = tfvars(21_000);
+        let (got, took) = timed(&[("main.tf", &one), ("terraform.tfvars", &big)]);
+        assert!(refused(&got) && got.len() == 1, "{got:?}");
+        assert!(took < std::time::Duration::from_secs(1), "one: {took:?}");
+        let eight: String = (0..8)
+            .map(|i| resource(i, "var.items", "var.items"))
+            .collect();
+        let eight = format!("variable \"items\" {{}}\n{eight}");
+        let (got, took) = timed(&[("main.tf", &eight), ("terraform.tfvars", &tfvars(10_000))]);
+        assert!(refused(&got) && got.len() == 8, "{got:?}");
+        assert!(took < std::time::Duration::from_secs(2), "eight: {took:?}");
+        let local = format!(
+            "variable \"items\" {{}}\nlocals {{\n  x = var.items\n}}\n{}",
+            resource(0, "local.x", "local.x")
+        );
+        let each = String::from(
+            "variable \"items\" {}\nresource \"a\" \"r0\" {\n  for_each = { k = var.items }\n  name = \"q-${length([for a in each.value : each.value[0]])}\"\n}\n",
+        );
+        let module = format!(
+            "variable \"items\" {{}}\nmodule \"m\" {{\n  source = \"./m\"\n  items = var.items\n}}\n{}",
+            resource(0, "module.m.o", "module.m.o")
+        );
+        let child = "variable \"items\" {}\noutput \"o\" { value = var.items }\n";
+        for main in [&local, &each, &module] {
+            let (got, took) = timed(&[
+                ("main.tf", main),
+                ("terraform.tfvars", &big),
+                ("m/main.tf", child),
+            ]);
+            let got: Vec<String> = got.into_iter().filter(|s| s.starts_with("a.")).collect();
+            assert!(refused(&got) && got.len() == 1, "{got:?}");
+            assert!(took < std::time::Duration::from_secs(1), "{main}: {took:?}");
+        }
+    }
+
+    /// The collection of a `for` in a `for` body counts its own elements whatever root it is
+    /// read through (a local, a module output, a map key, `each.value`), and a conditional or a
+    /// parenthesis counts the larger branch: each product of two lists of 25 resolves.
+    #[test]
+    fn a_for_in_a_for_body_reads_its_collection_through_any_root() {
+        let l = (0..25)
+            .map(|i| format!("\"{i}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let name = |from: &str, inner: &str| {
+            format!("q-${{length([for a in {from} : [for b in {inner} : \"${{a}}${{b}}\"]])}}")
+        };
+        let child = "variable \"l\" {}\noutput \"o\" { value = var.l }\n";
+        let head = format!(
+            "variable \"l\" {{ default = [{l}] }}\nvariable \"m\" {{ default = {{ k = [{l}] }} }}\nlocals {{\n  x = var.l\n}}\nmodule \"c\" {{\n  source = \"./c\"\n  l = var.l\n}}\n"
+        );
+        let body = [
+            ("local", name("var.l", "local.x")),
+            ("module", name("var.l", "module.c.o")),
+            ("key", name("var.l", "var.m[\"k\"]")),
+            ("cond", name("var.l", "(true ? var.l : [])")),
+        ];
+        let mut main = head.clone();
+        for (n, name) in &body {
+            main += &format!("resource \"a\" \"{n}\" {{ name = \"{name}\" }}\n");
+        }
+        main += &format!(
+            "resource \"a\" \"each\" {{\n  for_each = {{ k = var.l }}\n  name = \"{}\"\n}}\n",
+            name("each.value", "each.value")
+        );
+        let got = names(&[("main.tf", &main), ("c/main.tf", child)]);
+        let resolved = (got.iter()).filter(|s| s.contains(" = \"q-25\"")).count();
+        // Five names and the module call's node.
+        assert_eq!((got.len(), resolved), (6, 5), "{got:?}");
+    }
+
     /// A template outside every `for` is parsed once, in time its file's size bounds: it is not
     /// charged per byte of its text, so one of 33 KB resolves.
     #[test]
@@ -4617,11 +4768,42 @@ mod tests {
         );
     }
 
-    /// A refused expression evaluates nothing, so it spends none of the root's `EVAL_WORK_MAX`:
-    /// after 32 refusals, which each spent `EVAL_COST_MAX` before, a constant name still
-    /// resolves.
+    /// Each refusal spends the bytes it went through (copying and reading `var.items`), so a
+    /// root of 9,999 refused names over 21,000 elements stops evaluating once that work is
+    /// spent, and the constant name after them stays exact. Measured on 2026-11-10 in a debug
+    /// build: 2.7 s, three times the same root named by constants (0.87 s) and about what
+    /// 2214c81 takes (2.27 s), where copying without spending took 82 s; the bound is five times.
     #[test]
-    fn a_refused_expression_spends_none_of_the_root_work() {
+    fn refusals_over_a_wide_variable_spend_the_root_work_they_copy() {
+        let items = vec!["\"a\""; 21_000].join(", ");
+        let tfvars = format!("items = [{items}]\n");
+        let root = |name: &str| {
+            let r: String = (0..9999)
+                .map(|i| format!("resource \"a\" \"r{i}\" {{ name = \"{name}\" }}\n"))
+                .collect();
+            let main = format!(
+                "variable \"items\" {{}}\n{r}resource \"a\" \"z\" {{ name = \"constant\" }}\n"
+            );
+            let start = std::time::Instant::now();
+            let (nodes, _) = evaluate(&files(&[("main.tf", &main), ("terraform.tfvars", &tfvars)]));
+            (nodes, start.elapsed())
+        };
+        let (_, constants) = root("constant");
+        let (nodes, refused) = root("q-${length([for a in var.items : [for b in var.items : a]])}");
+        let z = nodes.iter().find(|n| n.address == "a.z");
+        assert_eq!(nodes.len(), 10_000);
+        assert_eq!(
+            z.map(|n| (n.name.as_deref(), n.pattern)),
+            Some((Some("constant"), false))
+        );
+        assert!(refused < 5 * constants, "{refused:?} against {constants:?}");
+    }
+
+    /// A refused expression spends only the bytes it went through to decide, not the
+    /// `EVAL_COST_MAX` it would have made, which 32 refusals once spent whole: a constant name
+    /// after them still resolves.
+    #[test]
+    fn a_refused_expression_spends_what_it_went_through() {
         let items = vec!["\"a\""; 8000].join(", ");
         let body = "${a}".repeat(40);
         let refused: String = (0..32)
