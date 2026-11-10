@@ -11,9 +11,10 @@ pub(super) struct Code {
     pub root: String,
     pub path: String,
     pub reason: String,
-    /// Whether the path went through a value a deployer can override.
+    /// Whether the execution is `inferred`: the path went through a value a deployer can
+    /// override, or a Compose build's Dockerfile was not read (#744).
     #[serde(default)]
-    pub overridable: bool,
+    pub inferred: bool,
 }
 
 fn safe(root: &Path, path: &str) -> bool {
@@ -145,7 +146,7 @@ pub(super) fn checked(root: &Path, node: &crate::iac::Node, room: usize) -> Opti
         root: node.root.clone(),
         path: path.into_owned(),
         reason: format!("{source} {}#{}{suffix}", node.path, node.block),
-        overridable: [&node.build, &node.handler]
+        inferred: [&node.build, &node.handler]
             .iter()
             .any(|r| r.as_ref().is_some_and(|r| r.overridable)),
     })

@@ -1116,6 +1116,7 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
                 image: None,
                 build: None,
                 build_image: false,
+                dockerfile: None,
                 role: None,
                 handler,
                 events,

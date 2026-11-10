@@ -161,7 +161,8 @@ keyed by its prefix, with path, hash, mtime and size, and `inputs`: the stored I
 digest and every path `contract::probe` looked at, so a refresh summarizes the row again when
 one of them moved even though its own bytes did not. The image summary contains normalized
 builder names (patterns included), their config locations and overridable flags, Helm runner
-names with key paths and lines, and the safe local Compose build paths. It holds no source
+names with key paths and lines, and the paths the local Compose builds take from their contexts
+(#744). It holds no source
 text, commands, arbitrary environment values or base-image configuration. It follows the same
 walk, ignore rules and per-file byte ceiling as the other configurations. Queries read these
 facts, stored IaC nodes and evaluated Kubernetes images, including in server mode.
@@ -169,6 +170,13 @@ facts, stored IaC nodes and evaluated Kubernetes images, including in server mod
 `iac_nodes.build_image` records whether a Compose service configures a build, independently
 of whether `build` is a safe local context. This retains remote-context publishing evidence
 without permitting a direct code path through it. The flag follows Compose override semantics.
+
+`iac_nodes.dockerfile` (#744) is the JSON of the Dockerfile reference a Compose build names
+(`iac::Dockerfile`: its `dockerfile` path or `dockerfile_inline` text, an overridable flag and
+whether it is inline; NULL when the build names none, and elsewhere). It follows the same override
+merge as the context. The Dockerfile's own bytes are not stored: the image summary keeps the
+paths it took, and `inputs.reads` (path or `dir/` to BLAKE3 fingerprint) makes a refresh
+summarize again when one changes.
 
 
 Python's stored `Def::asynchronous` marks a coroutine-producing definition, and stored

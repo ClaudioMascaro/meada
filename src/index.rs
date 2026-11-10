@@ -115,7 +115,8 @@ pub(crate) fn schema_version() -> i32 {
 /// label of its root module, its type, physical name as static evaluation resolves it (#650),
 /// whether that is a `pattern`, the `overridable` values it went through as JSON, file, first and
 /// last line, the key path of its block and, for a Compose service (#652), its image and build
-/// context with a flag each for a default that gave it, and for a Kubernetes object what it is
+/// context with a flag each for a default that gave it, its `dockerfile` (#744: the `dockerfile` path
+/// or the `dockerfile_inline` text, as JSON), and for a Kubernetes object what it is
 /// to Crossplane, its `role` (#655)) and `iac_references` each reference
 /// between two nodes of one root (`iac::Reference`). The Terraform ones are rewritten root by
 /// root (`iac::refresh`) for the roots whose evaluation unit holds a Terraform file, var file or
@@ -195,7 +196,7 @@ CREATE TABLE iac_nodes (
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
     subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
-    ingress TEXT NOT NULL, routes TEXT NOT NULL
+    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -881,11 +882,12 @@ fn refresh_keeping(
         |path, src| {
             SUMMARIES.set(SUMMARIES.get() + 1);
             let nodes = nodes_of(path);
-            let (summary, probes) =
+            let (summary, seen) =
                 contract::probed(|| contract::config_summary(path, src, root, nodes));
             let read = Inputs {
                 nodes: nodes_digest(nodes),
-                probes,
+                probes: seen.probes,
+                reads: seen.reads,
             };
             made.borrow_mut()
                 .push((path.to_string(), serde_json::to_string(&read)?));
@@ -2232,11 +2234,14 @@ fn contract_found(
 }
 
 /// What a contract configuration's summary read beside the file's bytes (`contract_configs.inputs`):
-/// the BLAKE3 of the IaC nodes evaluated for it and what was at each path it probed.
+/// the BLAKE3 of the IaC nodes evaluated for it, what was at each path it probed and the
+/// fingerprint of each file it read or directory it listed (`contract::fingerprint`, #744).
 #[derive(Serialize, serde::Deserialize)]
 struct Inputs {
     nodes: String,
     probes: BTreeMap<String, contract::Probe>,
+    #[serde(default)]
+    reads: BTreeMap<String, String>,
 }
 
 /// The `inputs` of every `contract_configs` row, by path.
@@ -2254,14 +2259,16 @@ fn nodes_digest(nodes: &[&iac::Node]) -> String {
         .to_string()
 }
 
-/// Whether a contract configuration's summary may differ with its bytes unchanged: its IaC nodes
-/// or what is at a path it probed moved since `inputs` was recorded, or none was.
+/// Whether a contract configuration's summary may differ with its bytes unchanged: its IaC nodes,
+/// what is at a path it probed or what a file it read or a directory it listed holds moved since
+/// `inputs` was recorded, or none was.
 fn inputs_moved(root: &Path, inputs: Option<&String>, nodes: &[&iac::Node]) -> bool {
     let Some(Ok(read)) = inputs.map(|i| serde_json::from_str::<Inputs>(i)) else {
         return true;
     };
     read.nodes != nodes_digest(nodes)
         || (read.probes.iter()).any(|(rel, was)| contract::probe(root, rel) != *was)
+        || (read.reads.iter()).any(|(key, was)| contract::fingerprint(root, key) != *was)
 }
 
 /// The size and mtime (nanoseconds) of the file at `abs`, and whether that mtime is old
@@ -4179,6 +4186,24 @@ mod tests {
         actual += "\nsample.provision.tf\n";
         actual += &format!("{:#?}\n", crate::iac::evaluate(&[("main.tf".into(), src)]));
 
+        // The Compose services of a unit with the Dockerfile each build names (#744), and the
+        // executions a summary stores for them: the paths one Dockerfile takes from its context,
+        // and the whole context of a build whose Dockerfile is not there.
+        let src = fs::read(tests.join("fixtures/schema/sample.compose.yaml")).unwrap();
+        actual += "\nsample.compose.yaml\n";
+        let files = [("compose.yaml".to_string(), src.clone())];
+        let (nodes, references) = crate::iac::evaluate(&files);
+        actual += &format!("{:#?}\n", (&nodes, &references));
+        let nodes: Vec<_> = nodes.iter().collect();
+        actual += &serde_json::to_string_pretty(&crate::contract::config_summary(
+            "compose.yaml",
+            &src,
+            &tests.join("fixtures/schema"),
+            &nodes,
+        ))
+        .unwrap();
+        actual += "\n";
+
         // Alert rule and route summaries (#672) invalidate indexes from earlier extractors.
         let src = fs::read(tests.join("fixtures/schema/sample.alert.yaml")).unwrap();
         actual += "\nsample.alert.yaml\n";
@@ -4279,7 +4304,7 @@ mod tests {
                    AWS::Serverless::Function\n    Properties:\n      CodeUri: worker.zip\n      \
                    Handler: index.handler\n      Runtime: nodejs20.x\n";
         let handler = sam.replace("worker.zip", "worker/");
-        let edits: [(&str, Option<&str>); 17] = [
+        let edits: [(&str, Option<&str>); 20] = [
             ("a.ts", Some("export function b() {}\n")),
             ("b.ts", Some("export const c = 1;\n")),
             ("b.ts", None),
@@ -4308,6 +4333,10 @@ mod tests {
                 Some("services:\n  api:\n    build: ./app\n"),
             ),
             ("app/", Some("")),
+            // The Dockerfile a build names is read too: its text, not only its path, is an input.
+            ("app/Dockerfile", Some("FROM x\nCOPY . .\n")),
+            ("app/Dockerfile", Some("FROM x\nCOPY src .\n")),
+            ("app/Dockerfile", None),
             ("app/", None),
         ];
         for (file, content) in edits {

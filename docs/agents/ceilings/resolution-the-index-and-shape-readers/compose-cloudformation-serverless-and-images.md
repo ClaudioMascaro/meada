@@ -75,12 +75,14 @@
   the network in name order) and adds `DEFAULT_DEPTH_MAX` (8 defaults inside each other; a deeper
   one is left unresolved). Only the four Compose names and their `.override` files are read (no
   `-f` list, `include:`, `extends:`, `COMPOSE_FILE`, profiles or `.env` file: a variable's value
-  never comes from the environment), only `image`, `build`, `environment`, `depends_on`, `links` and `networks`
-  are read, a service's lines end at its last scalar, and a service with no
+  never comes from the environment), only `image`, `build` (with its `dockerfile` and `dockerfile_inline`), `environment`,
+  `depends_on`, `links` and `networks` are read, a service's lines end at its last scalar, and a service with no
   `networks:` is on `default`, so a project of thousands of such services reaches
   `ROOT_STORED_MAX` through its shared-network references. A build context is judged by its text: a path inside the repository that is a symlink out of
   it is recorded (no file is touched), so the image contract must check it before reading a
-  Dockerfile there. A service with a `network_mode` is on no `default` network. A YAML merge key
+  Dockerfile there (#744, `image/dockerfile.rs`). The `build` keys `dockerfile` and
+  `dockerfile_inline` are read too; the inline text counts against the unit's `ROOT_STORED_MAX`
+  with the rest of the node, and `additional_contexts` is not read. A service with a `network_mode` is on no `default` network. A YAML merge key
   (`<<: *anchor`) is followed at any depth and through chains of anchors. A service in an override file but no base file has the
   override's path. An override merges as Compose does: a `build` with no `context` keeps the
   base's, lists add to the base's, and `!reset` (clear) or `!override` (replace) on a read key
@@ -95,6 +97,24 @@
   The orphan rows of `status` (`scope_status`) and the workspace's pattern pass
   (`patterns::prepare`) compare every image builder with every runner, with no index: 4,000
   patterns took 54.6 s for a `status` in a debug build.
+
+- `PATHS_MAX`, `WORK_MAX` (`image/dockerfile.rs`) and `LIST_MAX` (`contract.rs`, #744): a Compose
+  build runs the paths its Dockerfile takes from the context. A Dockerfile naming more than
+  `PATHS_MAX` (256) sources, or matching more paths than that, is not read; the wildcard sources of
+  one Dockerfile examine at most `WORK_MAX` (16,384) directory entries (a `*/*/*/*` source walks
+  the tree, so past it the Dockerfile is not read); a directory past `LIST_MAX` (4,096) entries is
+  not listed, so a wildcard through it leaves the Dockerfile unread. "Not read" is the fallback of
+  ADR 0026: the whole context at `inferred`, the reason naming the cause. The fallback is also the
+  answer for every form the reader does not parse: a source or mount with a variable, a quote or
+  an escape, a source that climbs out of the context, an `# escape=` parser directive other than
+  `\` (the other directives change nothing it reads), a Dockerfile behind a symlink or longer
+  than `lang::MAX_BYTES`, a flag with a quoted value or one it does not list, an instruction it
+  does not list, a heredoc with no end, and a Dockerfile outside the repository. A source that
+  names nothing on disk is skipped (the build would fail), `.dockerignore` is not read (a path may
+  cover files the image excludes, never fewer), `ONBUILD` instructions are ignored, and a path
+  nested in another taken path is kept. The
+  fallback's executions are stored in the room `IMAGE_STORED_MAX` leaves; past it a build gives
+  none, as every other direct-code fact does.
 
 - `ENVIRONMENT_BYTES_MAX` (`iac/environment.rs`, #663): one `lang::MAX_BYTES` (1 MiB) of
   environment expansion per workload, charging overwritten entries too so repeated `envFrom`
