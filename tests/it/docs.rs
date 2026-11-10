@@ -445,6 +445,24 @@ fn module_leads(map: &str) -> Vec<(String, Vec<String>)> {
 }
 
 #[test]
+fn every_ui_module_is_named_in_the_console_frontend_map() {
+    // Tests under `ui/tests` are out of scope; stale symbol names stay a review judgement.
+    let docs: String = (agents_markdown().into_iter())
+        .filter(|(p, _)| p.ends_with("architecture.md") || p.contains("/map/"))
+        .map(|(_, text)| text)
+        .collect();
+    let unnamed: Vec<String> = (fs::read_dir("ui/src").unwrap())
+        .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+        .filter(|n| n.ends_with(".ts") || n.ends_with(".tsx"))
+        .filter(|n| !docs.contains(&format!("`{n}`")))
+        .collect();
+    assert!(
+        unnamed.is_empty(),
+        "ui/src files with no backticked name under docs/agents: {unnamed:?}"
+    );
+}
+
+#[test]
 fn every_module_has_a_line_in_the_map_naming_its_area_file() {
     let map = fs::read_to_string("docs/agents/architecture.md").unwrap();
     // Module lines sit under Crates and Modules, before the Console frontend pointer.
