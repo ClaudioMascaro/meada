@@ -101,16 +101,19 @@
   unresolved, but for a literal name that fits `EVAL_VALUE_MAX`. A refusal spends an upper
   bound of the bytes it went through to decide, never more than `EVAL_COST_MAX`: its own text,
   and the size of its roots times two plus twice its reads of a root (`var`, `local`, `module`,
-  `each`, `count`; a resource it names is none), so 9,999
-  refusals over a 21,000-element variable stop evaluating after about 90 and take 2.3 s in a
-  debug build, and a long expression refused in each instance of a `count` stops once its text
-  has spent the work. The steps it charges bound a root of
+  `each`, `count`; a resource it names is none), so 9,999 refusals over a 21,000-element
+  variable stop evaluating after about 90 and take 2.3 s in process (4.3 s for a cold index of
+  that root, where main took 4.2 s), debug, and a long expression refused in each instance of a
+  `count` stops once its text has spent the work. The steps it charges bound a root of
   expressions near the ceiling: 80 resources took 16.6 s in a debug build. It does not charge
   what no step counts: a template outside every `for` is parsed again once per `count` or
   `for_each` instance (10,000 interpolations: 0.72 s at `count = 1`, 4.41 s at 10, 48.4 s at 100,
-  debug), one 1 MiB template of 130,000 interpolations took 8.8 s, and the work is per root, not
-  per repository (20 roots of 80 resources near the ceiling took 234.75 s; both measured by a
-  black-box verifier on a debug build);
+  debug), one 1 MiB template of 130,000 interpolations took 8.8 s, the work is per root, not per
+  repository (20 roots of 80 resources near the ceiling took 234.75 s; both measured by a
+  black-box verifier on a debug build), and the estimate itself is charged nothing: it reads a
+  bound value's size at each read of it, so an expression it then accepts pays that again per
+  instance (20,000 reads of a 21,000-element variable in a `for` over an empty collection: 2.6 s
+  at `count = 1`, 17.1 s at 10, debug);
   converting an object literal for `hcl-rs` also spends the square of its keys, so a wide local
   evaluated in many module instances stops there; their nodes stay, named `*`). A var file's
   values are bounded the same way, each file with an `EVAL_WORK_MAX` of its own: a value past
