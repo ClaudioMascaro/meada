@@ -21,8 +21,9 @@ add the case to `cases.tsv` (one expression) or a directory under `modules/` (a 
 module argument, an override file) and run `go run .` there.
 
 When Meada emulates a tool that has a fork reading the same files (Terraform and OpenTofu), a
-rule is checked against both. Where they differ Meada follows Terraform (#740) and the
-difference is recorded as a ceiling.
+rule is checked against both. Where they differ Meada follows Terraform (#740), an exception
+to "certain or absent" (the fork's reader may be right), and the difference is recorded as a
+ceiling.
 
 ## Exactly N, only X
 
