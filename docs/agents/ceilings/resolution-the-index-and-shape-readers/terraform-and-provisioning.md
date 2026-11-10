@@ -177,12 +177,14 @@
   paths during queries; existing code rendering may read source for line displays.
 - Meada reads a directory as Terraform does, and OpenTofu 1.13 and later differ (#740; the
   maintainer chose Terraform). Terraform converts a variable's default to the type its own block
-  declares and again to the type an override file gives; OpenTofu 1.13+ converts it once, to
-  the final type. For a default `["b", "a", "a"]` under `type = set(string)` Meada names what
-  Terraform creates, which OpenTofu 1.13+ does not: an override `type = list(string)` (Terraform
-  `0-a`, `1-b`; OpenTofu `0-b`, `1-a`, `2-a`), `type = any` (the set, `a-a`, `b-b`; OpenTofu index
-  keys), `type = tuple([string, string])` over `["b", "a"]` (Terraform rejects it, OpenTofu
-  `0-b`, `1-a`), an `a_override.tf` giving the default and a `b_override.tf` retyping it, and a
-  child module called without the argument with the override in its directory. The same default
-  with no override, a restated `set(string)`, an override giving `type` and `default` together
-  and a var file's value name the same in both. OpenTofu 1.12 and earlier behave as Terraform.
+  declares and again to the type an override file gives; OpenTofu 1.13+ converts it once, to the
+  final type. Meada follows Terraform in each row below and OpenTofu 1.13+ differs in each,
+  under `type = set(string)` with a default `["b", "a", "a"]` (in the pair of override files,
+  over a declared default `["x"]`): an override `type = list(string)` (Terraform `0-a`, `1-b`;
+  OpenTofu `0-b`, `1-a`, `2-a`), `type = any` (the set, `a-a`, `b-b`; OpenTofu index keys),
+  `type = tuple([string, string])` over `["b", "a"]` (Terraform rejects it, so Meada names
+  nothing; OpenTofu `0-b`, `1-a`), an `a_override.tf` giving the default and a `b_override.tf`
+  retyping it, and a child module called without the argument with the override in its
+  directory. The same default with no override, a restated `set(string)`, an override giving
+  `type` and `default` together and a var file's value name the same in both. OpenTofu 1.13.9
+  was run; that 1.12 and earlier behave as Terraform is read from the source, not run.
