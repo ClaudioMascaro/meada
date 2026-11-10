@@ -550,12 +550,19 @@ impl Module {
             return;
         };
         variable.sensitive |= declared.sensitive;
+        // Terraform converts a default to the type its block declares, and again to the type an
+        // override gives; OpenTofu 1.13 and later convert it once, to the final one. A default
+        // the declared set type produced is therefore unknown under an override's `type`.
+        let retyped = overriding && variable.ty.is_some() && declared.ty == Some(Declared::Set);
         // An override block's `type` replaces the declared one; without one the declared stays.
         variable.ty = variable.ty.or(declared.ty);
         // An override block without a default keeps the declared one, and where it is.
         if overriding && variable.default.is_none() {
             declared.sensitive = variable.sensitive;
             declared.ty = variable.ty;
+            if retyped {
+                declared.default = None;
+            }
         } else {
             *declared = variable;
         }
@@ -3181,6 +3188,7 @@ mod tests {
     use super::*;
 
     mod oracle;
+    mod retype;
 
     fn files(list: &[(&str, &str)]) -> Vec<(String, Vec<u8>)> {
         (list.iter())
@@ -4924,7 +4932,8 @@ mod tests {
     }
 
     /// An override file's `type` replaces the declared one, as Terraform merges a variable: a set
-    /// retyped as a list holds a list, and an override without a `type` keeps the set.
+    /// retyped as a list holds a list when the override gives the default too, and an override
+    /// without a `type` keeps the set. A retyped set's own default is unresolved (#740, `retype`).
     #[test]
     fn an_override_retyping_a_set_variable_as_a_list_keeps_its_index_key() {
         let main = concat!(
@@ -4936,9 +4945,10 @@ mod tests {
             names(&[("main.tf", main), ("override.tf", &over)])
         };
         assert_eq!(
-            over("  type = list(string)\n"),
-            ["a.q[\"0\"] = \"queue-0\" [var.s main.tf:1]"]
+            over("  type = list(string)\n  default = [\"x\"]\n"),
+            ["a.q[\"0\"] = \"queue-0\" [var.s override.tf:1]"]
         );
+        assert_eq!(over("  type = list(string)\n"), ["a.q ~ \"queue-*\""]);
         assert_eq!(over("  description = \"d\"\n"), ["a.q ~ \"queue-*\""]);
     }
 
