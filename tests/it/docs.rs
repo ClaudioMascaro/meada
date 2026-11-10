@@ -538,7 +538,8 @@ fn a_module_lead_is_what_a_bullet_with_an_area_link_names_before_its_colon() {
 #[test]
 fn changelog_union_merge_keeps_both_bullets() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("changelog-union");
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("changelog-union-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     fs::copy(root.join(".gitattributes"), dir.join(".gitattributes")).unwrap();
@@ -567,6 +568,88 @@ fn changelog_union_merge_keeps_both_bullets() {
         "{merged}"
     );
     assert!(!merged.contains("<<<<<<<"), "{merged}");
+}
+
+/// Problems of a changelog: a `###` heading twice in one `## [...]` section (what a
+/// `merge=union` of two branches that each opened it leaves), and an `[Unreleased]` bullet that
+/// names no issue (`#n`) on any of its lines, or repeats an earlier bullet of the section.
+fn changelog_problems(text: &str) -> Vec<String> {
+    let has_issue = |bullet: &str| {
+        bullet
+            .split('#')
+            .skip(1)
+            .any(|rest| rest.starts_with(|c: char| c.is_ascii_digit()))
+    };
+    let mut problems = Vec::new();
+    let (mut section, mut headings, mut bullet) = (String::new(), BTreeSet::new(), String::new());
+    let mut seen = BTreeSet::new();
+    let end_bullet = |section: &str,
+                      bullet: &mut String,
+                      seen: &mut BTreeSet<String>,
+                      problems: &mut Vec<String>| {
+        if section.contains("[Unreleased]") && !bullet.is_empty() {
+            if !has_issue(bullet) {
+                problems.push(format!(
+                    "{section}: the bullet {bullet:?} names no issue (#n)"
+                ));
+            }
+            if !seen.insert(bullet.clone()) {
+                problems.push(format!("{section}: the bullet {bullet:?} appears twice"));
+            }
+        }
+        bullet.clear();
+    };
+    for line in text.lines().map(str::trim_end) {
+        if line.is_empty() || line.starts_with("- ") || line.starts_with('#') {
+            end_bullet(&section, &mut bullet, &mut seen, &mut problems);
+        }
+        if line.starts_with("## ") {
+            (section, headings, seen) = (line.to_string(), BTreeSet::new(), BTreeSet::new());
+        } else if line.starts_with("### ") {
+            if !headings.insert(line.to_string()) {
+                problems.push(format!("{section}: the heading `{line}` appears twice"));
+            }
+        } else if line.starts_with("- ") || (line.starts_with(' ') && !bullet.is_empty()) {
+            bullet.push_str(line.trim());
+            bullet.push(' ');
+        }
+    }
+    end_bullet(&section, &mut bullet, &mut seen, &mut problems);
+    problems
+}
+
+#[test]
+fn the_changelog_has_one_heading_of_each_kind_per_section_and_an_issue_on_every_unreleased_bullet()
+{
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let text = fs::read_to_string(root.join("CHANGELOG.md")).unwrap();
+    let problems = changelog_problems(&text);
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+#[test]
+fn a_repeated_heading_or_an_unreleased_bullet_without_an_issue_is_a_problem() {
+    let ok = "## [Unreleased]\n\n### Added\n\n- one\n  more (#1)\n\n### Fixed\n\n- two (#2)\n\n\
+              ## [1.0.0]\n\n### Fixed\n\n- old, no issue\n";
+    assert_eq!(changelog_problems(ok), Vec::<String>::new());
+    let twice = format!("{ok}\n### Fixed\n\n- again\n");
+    assert_eq!(
+        changelog_problems(&twice),
+        ["## [1.0.0]: the heading `### Fixed` appears twice"]
+    );
+    let bare = "## [Unreleased]\n\n### Fixed\n\n- a (#1)\n- b\n  still none\n### Fixed\n";
+    let found = changelog_problems(bare);
+    assert_eq!(found.len(), 2, "{found:?}");
+    assert!(found[0].contains("b still none ") && found[0].contains("[Unreleased]"));
+    assert!(found[1].contains("### Fixed") && found[1].contains("[Unreleased]"));
+    let copied = "## [Unreleased]\n\n### Added\n\n- a\n  (#1)\n\n### Fixed\n\n- a\n  (#1)\n\n## [1.0.0]\n\n- a (#1)\n- a (#1)\n";
+    let found = changelog_problems(copied);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].contains("a (#1) ") && found[0].contains("appears twice"));
+    let same = "## [Unreleased]\n\n### Added\n\n- a\n  (#1)\n\n- a\n  (#1)\n";
+    let found = changelog_problems(same);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].contains("a (#1) ") && found[0].contains("appears twice"));
 }
 
 #[test]

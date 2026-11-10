@@ -8,8 +8,8 @@ use hcl_edit::template::{Element, Template};
 use serde_json::Value;
 
 use super::{
-    Block, Kind, Module, Named, ROOT_STORED_MAX, Variable, assign, name_argument, refs_of,
-    subscription,
+    Block, Declared, Kind, Module, Named, ROOT_STORED_MAX, Variable, assign, name_argument,
+    refs_of, subscription,
 };
 use crate::config_values;
 use crate::document::events::{self, Step};
@@ -112,6 +112,7 @@ impl Read<'_> {
             "variable" => {
                 let variable = Variable {
                     default: body.get("default").map(|v| self.expressions.read(v, true)),
+                    ty: (body.get("type").and_then(|t| t.as_str())).map(Declared::text),
                     sensitive: crate::config_values::is_sensitive(body.get("sensitive")),
                     path: self.path.into(),
                     line,

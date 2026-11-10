@@ -3,7 +3,9 @@
 #   build.sh <label> <rev> <run> [features]
 # <rev> is `.` for this working tree (uncommitted changes included) or a commit, built in a
 # detached worktree under <run>. Build the head first: the base build reuses the same target
-# directory, so the crates.io dependencies compile once. PROVE_CARGO overrides `cargo` (a build
+# directory, so the crates.io dependencies compile once. A base build in its worktree leaves
+# meada-core artifacts that cargo can mistake for the head's, so the head build touches the
+# local crates' sources first: they rebuild, the dependency cache stays. PROVE_CARGO overrides `cargo` (a build
 # queue wrapper, for example).
 set -euo pipefail
 label=$1 rev=$2 run=$3 features=${4:-}
@@ -17,6 +19,7 @@ export CARGO_PROFILE_DEV_OPT_LEVEL=1
 args=(build --locked --target-dir "$target")
 [ -n "$features" ] && args+=(--features "$features")
 if [ "$rev" = . ]; then
+  find "$root/src" "$root/meada-core/src" -name '*.rs' -exec touch {} +
   (cd "$root" && "${cargo[@]}" "${args[@]}")
   from="working tree at $(git -C "$root" rev-parse HEAD), uncommitted: $(git -C "$root" status --porcelain | grep -c . || true) path(s)"
 else

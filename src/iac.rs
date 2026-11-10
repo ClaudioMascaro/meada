@@ -474,9 +474,45 @@ impl Named {
     }
 }
 
+/// What a variable's declared `type` does to the value it receives (Terraform converts a value
+/// to the type).
+#[derive(Clone, Copy, PartialEq)]
+enum Declared {
+    /// `set(...)`: a set.
+    Set,
+    /// `any`: the value keeps its own type.
+    Any,
+    /// Any other type (`list(...)`, `tuple(...)`, `map(...)`, `object(...)`, a primitive): the
+    /// value is converted, so it is no set.
+    Other,
+}
+
+impl Declared {
+    /// The declared type written as the constraint `text` (the form a Terraform JSON file gives).
+    fn text(text: &str) -> Declared {
+        let text = text.trim();
+        match (text, text.starts_with("set(")) {
+            (_, true) => Declared::Set,
+            ("any", _) => Declared::Any,
+            _ => Declared::Other,
+        }
+    }
+
+    /// The declared type written as the expression `expr`.
+    fn expr(expr: &Expression) -> Declared {
+        match expr {
+            Expression::FuncCall(f) if f.name.name.as_str() == "set" => Declared::Set,
+            Expression::Variable(v) if v.as_str() == "any" => Declared::Any,
+            _ => Declared::Other,
+        }
+    }
+}
+
 /// A `variable` block: its default, whether it is sensitive, and where it is declared.
 struct Variable {
     default: Option<Expression>,
+    /// What its declared `type` does to the value it receives; `None` without a `type`.
+    ty: Option<Declared>,
     sensitive: bool,
     path: String,
     line: usize,
@@ -504,9 +540,12 @@ impl Module {
             return;
         };
         variable.sensitive |= declared.sensitive;
+        // An override block's `type` replaces the declared one; without one the declared stays.
+        variable.ty = variable.ty.or(declared.ty);
         // An override block without a default keeps the declared one, and where it is.
         if overriding && variable.default.is_none() {
             declared.sensitive = variable.sensitive;
+            declared.ty = variable.ty;
         } else {
             *declared = variable;
         }
@@ -737,15 +776,17 @@ fn lines(text: &str) -> impl Fn(usize) -> usize {
 /// `expr` as `hcl-rs` evaluates it in `ctx`, `None` when it fails or panics: the library's number
 /// type panics on a remainder by zero or an integer overflow, which a hostile file must not turn
 /// into a crash of indexing or of the server.
-fn evaluated(expr: &Expression, ctx: &Context) -> Option<Value> {
-    evaluation(expr, ctx).0
+fn evaluated(expr: &Expression, ctx: &Context, sets: &BTreeSet<String>) -> Option<Value> {
+    evaluation(expr, ctx, sets).0
 }
 
 /// `evaluated`, and whether arithmetic left it unresolved (`Exact`): a value Terraform has
-/// that Meada cannot write exactly, rather than none.
-fn evaluation(expr: &Expression, ctx: &Context) -> (Option<Value>, bool) {
+/// that Meada cannot write exactly, rather than none. `sets` are the references (`local.x`,
+/// `var.x`) in `expr` that hold a set.
+fn evaluation(expr: &Expression, ctx: &Context, sets: &BTreeSet<String>) -> (Option<Value>, bool) {
     let mut exact = Exact {
         ctx,
+        sets,
         left: 0,
         inexact: false,
         unordered: 0,
@@ -775,6 +816,8 @@ fn evaluation(expr: &Expression, ctx: &Context) -> (Option<Value>, bool) {
 /// name too.
 struct Exact<'a, 'c> {
     ctx: &'a Context<'c>,
+    /// The references in the expression that hold a set (`holds_set`).
+    sets: &'a BTreeSet<String>,
     left: usize,
     /// Whether an operation became the undefined name, or a call that may fail as one.
     inexact: bool,
@@ -782,14 +825,39 @@ struct Exact<'a, 'c> {
     unordered: usize,
 }
 
-/// A `for` binding a key over `toset(...)`: Terraform's key is the element, Meada's set a list
-/// keyed by index.
-fn keyed_set(key: bool, collection: &Expression) -> bool {
-    key && match collection {
+/// Whether `expr` is a set: a `toset(...)` call, in parentheses or in a conditional's branch, or
+/// a reference `named` says holds one (`local.x` or `var.x` alone, not an attribute or an index
+/// of it).
+fn is_set(expr: &Expression, named: &mut dyn FnMut(&Ref) -> bool) -> bool {
+    match expr {
         Expression::FuncCall(f) => f.name.name.as_str() == "toset",
-        Expression::Parenthesis(p) => keyed_set(key, p.inner()),
-        Expression::Conditional(c) => keyed_set(key, &c.true_expr) || keyed_set(key, &c.false_expr),
+        Expression::Parenthesis(p) => is_set(p.inner(), named),
+        // A lone interpolation (`"${toset(...)}"`) keeps its value's type.
+        Expression::StringTemplate(t) if t.len() == 1 => match t.iter().next() {
+            Some(Element::Interpolation(i)) => is_set(&i.expr, named),
+            _ => false,
+        },
+        Expression::Conditional(c) => is_set(&c.true_expr, named) || is_set(&c.false_expr, named),
+        Expression::Traversal(t) => match &t.expr {
+            Expression::Variable(root) if t.operators.len() == 1 => {
+                let ops: Vec<&TraversalOperator> = t.operators.iter().map(|o| o.value()).collect();
+                reference(root.as_str(), &ops)
+                    .is_some_and(|r| matches!(r, Ref::Var(_) | Ref::Local(_)) && named(&r))
+            }
+            _ => false,
+        },
         _ => false,
+    }
+}
+
+impl Exact<'_, '_> {
+    /// A `for` binding a key over a set: Terraform's key is the element, Meada's set a list keyed
+    /// by index. `toset(...)` and the references in `sets` are sets; a set that arrives any other
+    /// way (an attribute, an index, another call) is a ceiling until #717.
+    fn keyed_set(&self, key: bool, collection: &Expression) -> bool {
+        key && is_set(collection, &mut |r| {
+            r.via().is_some_and(|v| self.sets.contains(&v))
+        })
     }
 }
 
@@ -816,7 +884,7 @@ impl VisitMut for Exact<'_, '_> {
     /// `hcl-edit` never visits a `%{ for }` directive's collection: read it as a `for` reads its own.
     fn visit_for_template_expr_mut(&mut self, node: &mut hcl_edit::template::ForTemplateExpr) {
         let unordered = self.unordered;
-        let keyed = keyed_set(node.key_var.is_some(), &node.collection_expr);
+        let keyed = self.keyed_set(node.key_var.is_some(), &node.collection_expr);
         self.visit_expr_mut(&mut node.collection_expr);
         if self.unordered > unordered || keyed {
             self.inexact = true;
@@ -827,7 +895,7 @@ impl VisitMut for Exact<'_, '_> {
 
     fn visit_for_intro_mut(&mut self, node: &mut hcl_edit::expr::ForIntro) {
         let unordered = self.unordered;
-        let keyed = keyed_set(node.key_var.is_some(), &node.collection_expr);
+        let keyed = self.keyed_set(node.key_var.is_some(), &node.collection_expr);
         visit_mut::visit_for_intro_mut(self, node);
         if self.unordered > unordered || keyed {
             self.inexact = true;
@@ -1129,7 +1197,7 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
             let spend = cost.saturating_add(widths(&a.value));
             let value = if cost <= EVAL_COST_MAX && spend <= work {
                 work -= spend;
-                match evaluation(&a.value, &ctx) {
+                match evaluation(&a.value, &ctx, &BTreeSet::new()) {
                     (Some(v), _) => (size(&v) <= EVAL_VALUE_MAX).then_some(v),
                     // Terraform has a value Meada cannot write exactly (`7 / 2`): the default
                     // must not stand in for it.
@@ -1196,6 +1264,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
             ("variable", [name]) => {
                 let variable = Variable {
                     default: attr("default").cloned(),
+                    ty: attr("type").map(Declared::expr),
                     sensitive: crate::config_values::hcl::is_sensitive(attr("sensitive")),
                     path: path.to_string(),
                     line: line(b.span().map_or(0, |s| s.start)),
@@ -1728,6 +1797,8 @@ struct Eval<'m> {
     ctx: Context<'static>,
     /// The value of each name of an instance, once evaluated.
     values: HashMap<(usize, Name), Evaluated>,
+    /// Whether each name of an instance holds a set, once known (`holds_set`).
+    sets: HashMap<(usize, Name), bool>,
     /// The names being evaluated: one met again closes a cycle and is unresolved.
     evaluating: HashSet<(usize, Name)>,
     /// Whether module outputs may be read: not while the instances are made, since a module
@@ -1764,6 +1835,7 @@ impl<'m> Eval<'m> {
             open: HashSet::new(),
             ctx,
             values: HashMap::new(),
+            sets: HashMap::new(),
             evaluating: HashSet::new(),
             outputs: false,
             work: 0,
@@ -2091,6 +2163,48 @@ impl<'m> Eval<'m> {
         found
     }
 
+    /// Whether the local or variable `name` of the instance `at` holds a set (`is_set`), following
+    /// a name that is another name, or a variable declared `type = set(...)`. A cycle holds none.
+    fn holds_set(&mut self, at: usize, name: Name, depth: usize) -> bool {
+        let key = (at, name);
+        if let Some(&found) = self.sets.get(&key) {
+            return found;
+        }
+        if depth > EVAL_DEPTH_MAX {
+            return false;
+        }
+        self.sets.insert(key.clone(), false);
+        let modules = self.modules;
+        let module = &modules[self.instances[at].dir];
+        let (scope, expr) = match &key.1 {
+            Name::Local(n) => (at, module.locals.get(n).map(|l| &l.expr)),
+            Name::Var(n) => match (module.variables.get(n), self.instances[at].parent) {
+                // A declared type converts the value: only `any`, or none, keeps the set.
+                (Some(v), _) if matches!(v.ty, Some(Declared::Set | Declared::Other)) => {
+                    let set = v.ty == Some(Declared::Set);
+                    self.sets.insert(key, set);
+                    return set;
+                }
+                (Some(_), Some((caller, block))) => match block.args.get(n) {
+                    Some(arg) => (caller, Some(&arg.expr)),
+                    None => (at, module.variables[n].default.as_ref()),
+                },
+                (Some(v), None) => (at, v.default.as_ref()),
+                (None, _) => (at, None),
+            },
+            Name::Output(_) => (at, None),
+        };
+        let found = expr.is_some_and(|expr| {
+            is_set(expr, &mut |r| match r {
+                Ref::Var(n) => self.holds_set(scope, Name::Var(n.clone()), depth + 1),
+                Ref::Local(n) => self.holds_set(scope, Name::Local(n.clone()), depth + 1),
+                Ref::Block { .. } => false,
+            })
+        });
+        self.sets.insert(key, found);
+        found
+    }
+
     /// The value of `var.<n>` in the instance `at`: in a module called locally, the call's
     /// argument evaluated in the caller (else the variable's default, which the repository
     /// fixes); in a root, the value its var files give or else its default, either of which a
@@ -2208,10 +2322,22 @@ impl<'m> Eval<'m> {
         }
         let mut through = BTreeSet::new();
         let (mut vars, mut locals, mut mods) = (Map::new(), Map::new(), Map::new());
+        let mut sets = BTreeSet::new();
         let mut outputs: BTreeMap<String, (BTreeSet<String>, Vec<Option<Key>>)> = BTreeMap::new();
         let refs = refs_of(expr);
         let mut seen = HashSet::new();
         for r in refs.iter().cloned() {
+            let held = match &r {
+                Ref::Var(n) => Some(Name::Var(n.clone())),
+                Ref::Local(n) => Some(Name::Local(n.clone())),
+                _ => None,
+            };
+            // Every read is checked for a set (#731), even one copied once below.
+            if let (Some(held), Some(via)) = (held, r.via())
+                && self.holds_set(at, held, depth)
+            {
+                sets.insert(via);
+            }
             if matches!(r, Ref::Var(_) | Ref::Local(_)) && !seen.insert(r.clone()) {
                 // Read twice, a name is copied once.
                 continue;
@@ -2281,7 +2407,7 @@ impl<'m> Eval<'m> {
             for (name, v) in roots {
                 self.ctx.declare_var(name, v);
             }
-            match evaluated(expr, &self.ctx) {
+            match evaluated(expr, &self.ctx, &sets) {
                 Some(v) if size(&v) <= EVAL_VALUE_MAX => {
                     return Evaluated {
                         val: Val::Known(v),
@@ -4450,6 +4576,103 @@ mod tests {
         assert_eq!(got, want);
     }
 
+    /// A key bound over a set held in a local or a variable is the element in Terraform too: the
+    /// same `for` is unresolved through a chain of locals, parentheses, a conditional, a variable
+    /// typed `set(...)` (default or var file) and in a `%{ for }` directive, while a list keeps its
+    /// index and a `for` binding only the value is as before.
+    #[test]
+    fn a_key_over_a_named_set_is_unresolved() {
+        let each = "  for_each = {for k, v in local.s : k => v}\n  name = \"q-${each.key}\"\n}\n";
+        let q = format!("resource \"a\" \"q\" {{\n{each}");
+        let case = |locals: &str, extra: &str| {
+            let main = format!("locals {{\n{locals}}}\n{extra}{q}");
+            names(&[("main.tf", &main)])
+        };
+        assert_eq!(case("  s = toset([\"x\"])\n", ""), ["a.q ~ \"q-*\""]);
+        assert_eq!(
+            case("  t = toset([\"x\"])\n  s = local.t\n", ""),
+            ["a.q ~ \"q-*\""]
+        );
+        assert_eq!(case("  s = (toset([\"x\"]))\n", ""), ["a.q ~ \"q-*\""]);
+        assert_eq!(
+            case("  t = toset([\"x\"])\n  s = \"${local.t}\"\n", ""),
+            ["a.q ~ \"q-*\""]
+        );
+        assert_eq!(
+            case("  s = true ? toset([\"x\"]) : []\n", ""),
+            ["a.q ~ \"q-*\""]
+        );
+        assert_eq!(
+            case(
+                "  s = toset([\"x\"])\n",
+                "resource \"a\" \"d\" { name = \"d-%{for k, v in local.s}${k}%{endfor}\" }\n"
+            ),
+            ["a.d ~ \"d-*\"", "a.q ~ \"q-*\""]
+        );
+        // A list keeps its index, and a `for` binding only the value is as before.
+        assert_eq!(case("  s = [\"x\"]\n", ""), ["a.q[\"0\"] = \"q-0\""]);
+        let value = "resource \"a\" \"v\" { name = \"v-${[for v in local.s : v][0]}\" }\n";
+        assert_eq!(
+            case("  s = toset([\"x\"])\n", value),
+            ["a.v = \"v-x\"", "a.q ~ \"q-*\""]
+        );
+        let var = |decl: &str, files: &[(&str, &str)]| {
+            let main = format!(
+                "variable \"s\" {{\n{decl}}}\n{}",
+                q.replace("local.s", "var.s")
+            );
+            let mut all = vec![("main.tf", main.as_str())];
+            all.extend_from_slice(files);
+            names(&all)
+        };
+        let typed = "  type = set(string)\n  default = [\"x\"]\n";
+        assert_eq!(var(typed, &[]), ["a.q ~ \"q-*\""]);
+        assert_eq!(
+            var(
+                "  type = set(string)\n",
+                &[("terraform.tfvars", "s = [\"x\"]\n")]
+            ),
+            ["a.q ~ \"q-*\""]
+        );
+        let json = r#"{"variable": {"s": {"type": "set(string)", "default": ["x"]}},
+            "resource": {"a": {"q": {"for_each": "${{for k, v in var.s : k => v}}",
+            "name": "q-${each.key}"}}}}"#;
+        assert_eq!(names(&[("main.tf.json", json)]), ["a.q ~ \"q-*\""]);
+        assert_eq!(
+            var("  default = [\"x\"]\n", &[]),
+            ["a.q[\"0\"] = \"q-0\" [var.s main.tf:1]"]
+        );
+    }
+
+    /// A name read twice in one expression is copied once, and each read is still checked for a
+    /// set (#731): a key bound over a set held in a local is unresolved whether the `for` reads
+    /// it first or after another read of it, and a list read twice keeps its index.
+    #[test]
+    fn a_key_over_a_named_set_read_twice_is_unresolved() {
+        let case = |s: &str, for_each: &str| {
+            let main = format!(
+                "locals {{\n  s = {s}\n}}\nresource \"a\" \"q\" {{\n  for_each = {for_each}\n  name = \"q-${{each.key}}\"\n}}\n"
+            );
+            names(&[("main.tf", &main)])
+        };
+        let first = "{for k, v in local.s : k => v if length(local.s) > 0}";
+        let after = "length(local.s) > 0 ? {for k, v in local.s : k => v} : {}";
+        assert_eq!(
+            [
+                case("toset([\"x\"])", first),
+                case("toset([\"x\"])", after),
+                case("[\"x\"]", first),
+                case("[\"x\"]", after),
+            ],
+            [
+                vec!["a.q ~ \"q-*\"".to_string()],
+                vec!["a.q ~ \"q-*\"".to_string()],
+                vec!["a.q[\"0\"] = \"q-0\"".to_string()],
+                vec!["a.q[\"0\"] = \"q-0\"".to_string()],
+            ]
+        );
+    }
+
     /// A `for` over a conversion of an expanded argument (`var.l...`) costs as before: the list it
     /// expands is no element count, and a costly body over its 200 strings stays unresolved.
     #[test]
@@ -4867,7 +5090,11 @@ mod tests {
         ] {
             let expr = parser::parse_expr(text).unwrap();
             let start = std::time::Instant::now();
-            assert_eq!(evaluated(&expr, &ctx), Some(expected), "{text}");
+            assert_eq!(
+                evaluated(&expr, &ctx, &BTreeSet::new()),
+                Some(expected),
+                "{text}"
+            );
             took.push(start.elapsed());
         }
         let bound = std::time::Duration::from_secs(2);
@@ -5057,6 +5284,67 @@ mod tests {
             "resource \"a\" \"b\" { name = \"q-${local.a}\" }\n",
         );
         assert_eq!(names(&[("main.tf", cycle)]), ["a.b ~ \"q-*-x\""]);
+    }
+
+    /// A variable's declared `type` converts what it receives: a `list(...)` given a set (or a
+    /// local holding one) holds a list, whose key is the index, where `any` or no type keeps the
+    /// caller's set.
+    #[test]
+    fn a_variable_typed_as_a_list_given_a_set_keeps_its_index_key() {
+        let module = |ty: &str| {
+            format!(
+                "variable \"s\" {{\n{ty}}}\nresource \"a\" \"q\" {{\n  for_each = {{for k, v in var.s : k => v}}\n  name = \"queue-${{each.key}}\"\n}}\n"
+            )
+        };
+        let call = |arg: &str, ty: &str| {
+            let main = format!(
+                "locals {{ t = toset([\"x\"]) }}\nmodule \"m\" {{\n  source = \"./m\"\n  s = {arg}\n}}\n"
+            );
+            names(&[("main.tf", &main), ("m/main.tf", &module(ty))])
+        };
+        let list = ["module.m", "module.m.a.q[\"0\"] = \"queue-0\""];
+        assert_eq!(call("toset([\"x\"])", "  type = list(string)\n"), list);
+        assert_eq!(call("local.t", "  type = list(any)\n"), list);
+        // Only a list-like declared type converts: `any` and no type keep the set.
+        let unresolved = ["module.m", "module.m.a.q ~ \"queue-*\""];
+        assert_eq!(call("local.t", "  type = any\n"), unresolved);
+        assert_eq!(call("local.t", ""), unresolved);
+        assert_eq!(call("local.t", "  type = set(string)\n"), unresolved);
+    }
+
+    /// An override file's `type` replaces the declared one, as Terraform merges a variable: a set
+    /// retyped as a list holds a list, and an override without a `type` keeps the set.
+    #[test]
+    fn an_override_retyping_a_set_variable_as_a_list_keeps_its_index_key() {
+        let main = concat!(
+            "variable \"s\" {\n  type = set(string)\n  default = [\"x\"]\n}\n",
+            "resource \"a\" \"q\" {\n  for_each = {for k, v in var.s : k => v}\n  name = \"queue-${each.key}\"\n}\n",
+        );
+        let over = |body: &str| {
+            let over = format!("variable \"s\" {{\n{body}}}\n");
+            names(&[("main.tf", main), ("override.tf", &over)])
+        };
+        assert_eq!(
+            over("  type = list(string)\n"),
+            ["a.q[\"0\"] = \"queue-0\" [var.s main.tf:1]"]
+        );
+        assert_eq!(over("  description = \"d\"\n"), ["a.q ~ \"queue-*\""]);
+    }
+
+    /// Whether a name holds a set stops at `EVAL_DEPTH_MAX` too: a hostile chain of locals naming
+    /// each other, with a keyed `for` at its end, is unresolved and does not overflow the stack.
+    #[test]
+    fn a_long_chain_of_locals_named_for_a_set_stops_at_the_depth() {
+        let n = 20_000;
+        let mut text = String::from("locals {\n  l0 = toset([\"x\"])\n");
+        for i in 1..n {
+            text += &format!("  l{i} = local.l{}\n", i - 1);
+        }
+        text += &format!(
+            "}}\nresource \"a\" \"q\" {{\n  for_each = {{for k, v in local.l{} : k => v}}\n  name = \"q-${{each.key}}\"\n}}\n",
+            n - 1
+        );
+        assert_eq!(names(&[("main.tf", &text)]), ["a.q ~ \"q-*\""]);
     }
 
     /// A name passed down local modules resolves at every level up to `MODULE_DEPTH_MAX`; the
