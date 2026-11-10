@@ -154,6 +154,20 @@ forever.
 - A header with more than one form (`Retry-After`: delay-seconds or HTTP-date) is parsed in every
   form or read by presence.
 
+## Waits inside one process
+
+Work that waits for other work of its own process (a refresh in flight on another thread) waits
+with no timer: on a `Condvar`, a channel or a join, or, where the wait goes through a timed
+mechanism (SQLite's busy handler), for as long as that work is in flight. A timeout bounds only
+a wait on another process or a service, whose progress this process cannot see.
+
+In #704 the calls of one `meada mcp` server waited for its own refresh on SQLite's 10 s busy
+timeout: a refresh longer than the timer failed every call behind it. One fix moved the
+refreshes to a `Condvar` (`FLIGHTS` in `src/index.rs`) but left the statements of a call's open
+and queries on the timer, and the same reply came back until they got a busy handler that waits
+while a refresh is in flight (`wait`). A wait that breaks this is a review finding; the ones
+#704 left are in the ceilings entry "Concurrent refreshes of one index (#704)".
+
 ## One decision, one function
 
 A decision that more than one surface makes (console, node, CLI, browser), such as access,
@@ -186,6 +200,11 @@ Check each claim a diff adds at its source, never against the ticket's wording:
   or guards the artefact (for a `docs/agents` file, the test in `tests/it/docs.rs` that names
   it). "Re-bless" with no producer found, or a sentence placed where that test expects other
   text, is a finding.
+- A cause or a cost (a doc, a ceilings entry or a PR body saying why a run failed, or how much a
+  change costs) is traced to the run or the test that isolates it: the verifier's report, a
+  measurement with its commit, build, case and numbers. One that nothing isolates is worded as
+  a reading of the code. A draft of #704's PR body, and its ceilings entry, gave as fact the
+  cause of a failed run whose report named two candidate paths and confirmed neither.
 - A reference the diff moves or reflows still sits next to the thing it names.
 - A change to a skill or a harness script searches the skill's own texts for the behaviour it
   changes; a ticket premise they contradict is a finding.

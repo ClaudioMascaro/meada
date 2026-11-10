@@ -108,11 +108,12 @@
   in flight: one statement that reads for longer fails the run, and the calls that share it,
   with `database is locked`. And `wait` is a plain function that knows no connection: a run in
   flight on any index of the process extends the wait, so a statement behind another process's
-  lock waits until the runs of its own process end, then fails as before. Its timer runs while
+  lock waits until the runs of its own process end, then fails as before (its timer runs while
   it waits for a run of its own process too: past 10 s it gets one try more when the run ends,
-  so a lock another process takes right then fails it at once, however short (a connection
-  taking the write lock for 0.3 s at a time after a refresh that held it for 13 s: every call
-  `database is locked`, in one run of four). The calls in flight
+  so a lock another process takes right then fails it at once, however short).
+  Measured once, cause not isolated: with a connection taking the write lock for 0.3 s at a
+  time after a refresh that held it for 13 s, every call answered `database is locked` in one
+  run of four, and which statement failed was not observed (#757). The calls in flight
   are not bounded: each holds its own connections while it waits, and all of them query at once
   when the run ends, on top of what the run allocated (under a 2 GiB cap, debug build, Meada's
   own checkout: the server is killed with 100 calls in flight when nothing changed, with 16 to
