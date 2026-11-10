@@ -17,7 +17,8 @@ Where Meada emulates another tool through a library (Terraform through `hcl-rs`)
 library represents otherwise than the tool (precision, a zero's sign, a set's order, how a null
 or a collection shows as text) is converted exactly or left unresolved. For Terraform,
 `tests/terraform-oracle/` computes the tool's own answer with HashiCorp's HCL and cty libraries:
-add the case to `cases.tsv` and run `go run .` there.
+add the case to `cases.tsv` (one expression) or a directory under `modules/` (a variable, a
+module argument, an override file) and run `go run .` there.
 
 ## Exactly N, only X
 
