@@ -100,13 +100,29 @@
   comes meanwhile waits for it with no timer, then shares the next run: a batch after a change
   costs about one refresh more than an unchanged one, whatever its size (debug build, 4 cores:
   Meada's own checkout, 50 calls 21 s against 15 s, 200 calls 70 s against 64 s; 5,000 files,
-  500 calls 11.0 s against 9.2 to 10.9 s), and no call of the process fails however long the
-  refresh takes, nor while the tree keeps changing. Across processes (two servers, a CLI command
-  beside a server) the wait is SQLite's: a refresh with nothing to write takes no write lock, and
-  one with something to write waits up to the busy timeout (10 s) for another process's writer
-  to commit, then walks again (after three such waits it takes the write lock first); a writer's
-  commit waits up to 10 s too, for the read lock each other process's refresh in flight holds
-  during its walk (one walk per process). A client sees `database is locked` on the calls of the
-  process whose wait passes 10 s: the one behind another process's writer that holds the lock
-  longer (a first index of a large checkout, `meada index` beside it), or the writer itself
-  when the other processes' walks outlast it (no marker).
+  500 calls 11.0 s against 9.2 to 10.9 s). A statement of another call that meets the run's
+  lock (the first read of an open, a query, `forget`'s write) waits for the run, past the busy
+  timeout (`wait` in `index.rs`): no call fails on a timer while a refresh of its process is in
+  flight, however long it takes, nor while the tree keeps changing. Two things stay on the 10 s
+  timer in one process. The run's own commit waits that long for the reads the other calls have
+  in flight: one statement that reads for longer fails the run, and the calls that share it,
+  with `database is locked`. And `wait` is a plain function that knows no connection: a run in
+  flight on any index of the process extends the wait, so a statement behind another process's
+  lock waits until the runs of its own process end, then fails as before. The calls in flight
+  are not bounded: each holds its own connections while it waits, and all of them query at once
+  when the run ends (under a 2 GiB cap, debug build, Meada's own checkout: the server is killed
+  with 86 calls in flight after a change, and with 100 when nothing changed).
+  Across processes (two servers, a CLI command beside a server) the wait is SQLite's: a refresh
+  with nothing to write takes no write lock, and one with something to write waits up to the
+  busy timeout (10 s) for another process's writer to commit, then walks again; after
+  `DEFERRED_ATTEMPTS` such waits it takes the write lock first and holds it through its walk. A
+  writer's commit waits up to 10 s too, for the read lock each other process's refresh in flight
+  holds during its walk (one walk per process). The calls of a process wait behind its run
+  through all of that, with no timer (three waits of 10 s, a walk per attempt and the commit's
+  10 s at most), may span two runs, and share a failed run's error. A client sees `database is
+  locked` on the calls of the process whose wait passes 10 s: the one behind another process's
+  writer that holds the lock longer (`meada index` or another server writing a large change to
+  an existing index; a missing index is built beside it and renamed, holding no lock on it), or
+  the writer itself when the other processes' walks outlast it. Two servers on Meada's own
+  checkout after one change, 20 calls each: one such reply per server, at 10.4 s, the other
+  server's run lasting about 23 s.
