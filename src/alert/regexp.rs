@@ -13,6 +13,118 @@ use std::sync::{Arc, LazyLock};
 // ponytail: Go/RE2 rejects counted repetitions, including nested products, above 1000.
 const RE2_REPEAT_MAX: u32 = 1000;
 
+// The `regexp/syntax` error codes (`ErrorCode`, whose value is this text) that Go's `regexp`
+// answers a syntax error with and `refusal` can establish; any other failure is not known to be
+// a refusal.
+const MISSING_PAREN: &str = "missing closing )";
+const UNEXPECTED_PAREN: &str = "unexpected )";
+const MISSING_BRACKET: &str = "missing closing ]";
+const MISSING_REPEAT: &str = "missing argument to repetition operator";
+const CHAR_RANGE: &str = "invalid character class range";
+const REPEAT_SIZE: &str = "invalid repeat count";
+const REPEAT_OP: &str = "invalid nested repetition operator";
+const ESCAPE: &str = "invalid escape sequence";
+const PERL_OP: &str = "invalid or unsupported Perl syntax";
+const NAMED_CAPTURE: &str = "invalid named capture";
+
+/// `None`, noting in `refusal` that Go's `regexp` refuses the expression with error code `code`.
+fn refuse<T>(refusal: &mut Option<&'static str>, code: &'static str) -> Option<T> {
+    *refusal = Some(code);
+    None
+}
+
+/// The `regexp/syntax` error code with which Go's `regexp` certainly refuses `pattern`, which
+/// makes Alertmanager refuse the whole configuration holding it. Alertmanager hands Go the text
+/// `^(?:pattern)$`, and so does this, so that a `)` of the pattern that closes the wrapper does
+/// not stand alone.
+///
+/// `None` when Go compiles it or when this cannot tell: a pattern past `ALERT_REGEX_MAX` (valid
+/// or not), a Unicode property outside the list (the tables follow Go's version), an ambiguous
+/// count (`a{01}`), a nesting past the 250 of `regex-syntax` where Go allows 1000, a failure of
+/// `regex-syntax` that Go does not share (`(?ii)`, `a{,5}`, `[\d-z]` are valid for Go), and
+/// whatever `compile` leaves unmatched for its budgets. A failure is a refusal only if Go's
+/// parser refuses what it names, for each class of the error codes above. The ignored test
+/// `refusal_agrees_with_go` checks it against Go.
+pub(super) fn refusal(pattern: &str) -> Option<&'static str> {
+    // `regex_source` reads a `[:` more leniently than Go (`[[:]` is no POSIX class for Go) and
+    // drops a `\Q\E` that Go counts between two operators, leaving the rest misread.
+    if pattern.len() > ALERT_REGEX_MAX || pattern.contains("[:") || pattern.contains("\\Q") {
+        return None;
+    }
+    let mut refusal = None;
+    let Some(source) = regex_source(&format!("^(?:{pattern})$"), &mut refusal) else {
+        return refusal;
+    };
+    let error = match ast::parse::Parser::new().parse(&source) {
+        Ok(ast) => return re2_ast(&ast).err(),
+        Err(error) => error,
+    };
+    use ast::ErrorKind::*;
+    Some(match error.kind() {
+        GroupUnclosed => MISSING_PAREN,
+        GroupUnopened => UNEXPECTED_PAREN,
+        ClassUnclosed => MISSING_BRACKET,
+        // Go reads `(?` as a group of flags, which repeats nothing and lets a repetition after
+        // it repeat what came before, and `{` as text unless it forms a count: only `*`, `+`
+        // and `?` right after the start of a group or an alternative, past any groups of flags,
+        // lack an operand for certain.
+        RepetitionMissing => {
+            let at = error.span().start.offset;
+            let mut before = source.get(..at)?;
+            while let Some(flags) = before.strip_suffix(')') {
+                let Some(open) = flags.trim_end_matches(FLAGS).strip_suffix("(?") else {
+                    break;
+                };
+                before = open;
+            }
+            let operator = source.get(at..)?.chars().next();
+            let lacks = match before.chars().next_back() {
+                Some('(') => matches!(operator, Some('*' | '+')),
+                _ => matches!(operator, Some('*' | '+' | '?')),
+            };
+            if !lacks || !opens(before) {
+                return None;
+            }
+            MISSING_REPEAT
+        }
+        ClassRangeInvalid => CHAR_RANGE,
+        RepetitionCountInvalid => REPEAT_SIZE,
+        EscapeUnrecognized | UnsupportedBackreference => ESCAPE,
+        FlagDanglingNegation | FlagRepeatedNegation { .. } => PERL_OP,
+        _ => return None,
+    })
+}
+
+/// The flags of a group of flags.
+const FLAGS: [char; 5] = ['i', 'm', 's', 'U', '-'];
+
+/// Whether `text` ends where a group or an alternative starts: a `|`, or a `(`, `(?flags:`,
+/// `(?P<name>` or `(?<name>`, none escaped. Where a literal could end instead (`>`, `:`), the
+/// whole opener is required.
+fn opens(text: &str) -> bool {
+    let unescaped = |head: &str| (head.len() - head.trim_end_matches('\\').len()).is_multiple_of(2);
+    let head = if let Some(head) = text.strip_suffix(['|', '(']) {
+        head
+    } else if let Some(head) = text.strip_suffix(':') {
+        match head.trim_end_matches(FLAGS).strip_suffix("(?") {
+            Some(head) => head,
+            None => return false,
+        }
+    } else if let Some(name) = text.strip_suffix('>') {
+        let name = name.trim_end_matches(|c: char| c.is_ascii_alphanumeric() || c == '_');
+        match name
+            .strip_suffix("(?P<")
+            .or_else(|| name.strip_suffix("(?<"))
+        {
+            Some(head) => head,
+            None => return false,
+        }
+    } else {
+        return false;
+    };
+    unescaped(head)
+}
+
 /// An expression compiled within its part of the ceilings, and its automaton positions (each
 /// character, dot or class and each state that reads none, once per copy its counted repetitions
 /// make) by the byte offsets of a value each may start at: matching takes at most a step per
@@ -152,9 +264,9 @@ fn compile(pattern: &str, scopes: usize, shares: usize) -> Option<Compiled> {
     if pattern.len() > ALERT_REGEX_MAX {
         return None;
     }
-    let pattern = regex_source(pattern)?;
+    let pattern = regex_source(pattern, &mut None)?;
     let ast = ast::parse::Parser::new().parse(&pattern).ok()?;
-    re2_ast(&ast)?;
+    re2_ast(&ast).ok()?;
     let shares = shares.max(1);
     let parts = scopes.saturating_mul(shares);
     let (insensitive, classes) = shape(&ast);
@@ -396,7 +508,10 @@ fn class(text: &str) -> Option<ClassUnicode> {
 
 /// Alertmanager uses Go's RE2 syntax: Perl classes and word boundaries are ASCII,
 /// while ordinary characters and Unicode classes still operate on Unicode text.
-fn regex_source(pattern: &str) -> Option<String> {
+///
+/// `None` for what it cannot read; when Go's `regexp` certainly refuses it too, `refusal` also
+/// names the `regexp/syntax` error code (see `refusal`).
+fn regex_source(pattern: &str, refusal: &mut Option<&'static str>) -> Option<String> {
     let mut out = String::new();
     let mut chars = pattern.chars().peekable();
     let mut class = false;
@@ -438,7 +553,7 @@ fn regex_source(pattern: &str) -> Option<String> {
                 if chars.peek() == Some(&'P') {
                     out.push(chars.next()?);
                     if chars.peek() != Some(&'<') {
-                        return None;
+                        return refuse(refusal, PERL_OP);
                     }
                 }
                 if chars.peek() == Some(&'<') {
@@ -446,16 +561,18 @@ fn regex_source(pattern: &str) -> Option<String> {
                     // Validate the original spelling before translating any escapes.
                     let start = out.len();
                     loop {
+                        // Go names a group up to the first `>`: a name that is empty or holds
+                        // another character than a letter, digit or `_` is refused.
                         let ch = chars.next()?;
                         if ch == '>' {
                             if out.len() == start {
-                                return None;
+                                return refuse(refusal, NAMED_CAPTURE);
                             }
                             out.push(ch);
                             break;
                         }
                         if !ch.is_ascii_alphanumeric() && ch != '_' {
-                            return None;
+                            return refuse(refusal, NAMED_CAPTURE);
                         }
                         out.push(ch);
                     }
@@ -465,7 +582,7 @@ fn regex_source(pattern: &str) -> Option<String> {
                             break;
                         }
                         if !matches!(flag, 'i' | 'm' | 's' | 'U' | '-') {
-                            return None;
+                            return refuse(refusal, PERL_OP);
                         }
                         out.push(chars.next()?);
                     }
@@ -529,7 +646,10 @@ fn regex_source(pattern: &str) -> Option<String> {
                     chars.next();
                     let mut name = String::new();
                     loop {
-                        let ch = chars.next()?;
+                        // Go reads `\p{` to the closing brace and names no class without it.
+                        let Some(ch) = chars.next() else {
+                            return refuse(refusal, CHAR_RANGE);
+                        };
                         if ch == '}' {
                             break;
                         }
@@ -553,8 +673,9 @@ fn regex_source(pattern: &str) -> Option<String> {
                 out.push_str(&format!("\\{escaped}{{{name}}}"));
             }
             '0'..='7' => {
+                // A lone `\1` to `\7` is a backreference, which Go does not read.
                 if escaped != '0' && !chars.peek().is_some_and(|c| ('0'..='7').contains(c)) {
-                    return None;
+                    return refuse(refusal, ESCAPE);
                 }
                 let mut octal = escaped.to_digit(8)?;
                 for _ in 0..2 {
@@ -582,8 +703,8 @@ fn regex_source(pattern: &str) -> Option<String> {
                 out.push_str(&regex::escape(&literal));
             }
             'b' | 'B' if !class => out.push_str(&format!("(?-u:\\{escaped})")),
-            // These Rust escapes are not RE2 escapes. Unsupported syntax stays unmatched.
-            'u' | 'U' => return None,
+            // These Rust escapes are not RE2 escapes, which Go refuses.
+            'u' | 'U' => return refuse(refusal, ESCAPE),
             _ => {
                 out.push('\\');
                 out.push(escaped);
@@ -594,8 +715,8 @@ fn regex_source(pattern: &str) -> Option<String> {
 }
 
 /// Go bounds each nested counted-repeat product and refuses a repetition operator stacked on
-/// another (`a**`, `a{2}*`).
-fn re2_ast(ast: &Ast) -> Option<()> {
+/// another (`a**`, `a{2}*`): the code it refuses with.
+fn re2_ast(ast: &Ast) -> Result<(), &'static str> {
     let mut pending = vec![(ast, 1u32)];
     while let Some((ast, parent)) = pending.pop() {
         match ast {
@@ -608,10 +729,12 @@ fn re2_ast(ast: &Ast) -> Option<()> {
                     ) => *n,
                     _ => 1,
                 };
-                let product = parent.checked_mul(copies)?;
-                let stacked = matches!(*repetition.ast, Ast::Repetition(_));
-                if stacked || copies > RE2_REPEAT_MAX || product > RE2_REPEAT_MAX {
-                    return None;
+                let product = parent.checked_mul(copies).ok_or(REPEAT_SIZE)?;
+                if matches!(*repetition.ast, Ast::Repetition(_)) {
+                    return Err(REPEAT_OP);
+                }
+                if copies > RE2_REPEAT_MAX || product > RE2_REPEAT_MAX {
+                    return Err(REPEAT_SIZE);
                 }
                 pending.push((&repetition.ast, product));
             }
@@ -625,7 +748,7 @@ fn re2_ast(ast: &Ast) -> Option<()> {
             _ => {}
         }
     }
-    Some(())
+    Ok(())
 }
 
 fn unicode_property(name: &str) -> bool {
@@ -873,7 +996,7 @@ mod tests {
     /// every cased code point.
     #[test]
     fn a_bracket_of_characters_and_classes_visits_what_its_classes_fold_to() {
-        let pattern = regex_source(r"(?i)[\w-]").unwrap();
+        let pattern = regex_source(r"(?i)[\w-]", &mut None).unwrap();
         let ast = ast::parse::Parser::new().parse(&pattern).unwrap();
         assert_eq!(folds(&pattern, &ast, usize::MAX), Some(52 + 54));
     }
@@ -901,5 +1024,366 @@ mod tests {
             ],
             [100_300, 13, 4, 12, 31, 125, 1, 3020, 110].map(Some)
         );
+    }
+
+    /// Each class of expression `refusal` names, all refused by Go's `regexp/syntax` with the
+    /// error code beside it, as `regexp.Compile("^(?:" + pattern + ")$")` (Go 1.24; the wrapper
+    /// Alertmanager puts around a `match_re` and a matcher value).
+    #[test]
+    fn go_refuses_these_classes_of_syntax_error_with_the_code_named() {
+        for (code, patterns) in [
+            (MISSING_PAREN, ["(unclosed", "team-(a|b", "(?i"].as_slice()),
+            (UNEXPECTED_PAREN, &["team-a)", "a))"]),
+            (MISSING_BRACKET, &["[", "team-[a-z"]),
+            (
+                MISSING_REPEAT,
+                &[
+                    "*prod*",
+                    "+x",
+                    "a|*",
+                    "(?:*)",
+                    "(+)",
+                    "(?i:?)",
+                    // Right after a group name, or after groups of flags.
+                    "(?P<n>*a)",
+                    "(?<n>+a)",
+                    "(?P<n>?a)",
+                    "(?i)+a",
+                    "a|(?i)*b",
+                    "((?i)+a)",
+                    "(?i)(?s)*a",
+                ],
+            ),
+            (CHAR_RANGE, &["[z-a]", "(?i)[a-Z]", r"\p{Han"]),
+            (
+                REPEAT_SIZE,
+                &[
+                    "x{2,1}",
+                    "x{1001}",
+                    "x{1,1001}",
+                    "(?:a{40}){40}",
+                    "a{100000000}",
+                ],
+            ),
+            (REPEAT_OP, &["a**", "a{2}*", "a*??"]),
+            (ESCAPE, &[r"\y", r"\8", r"\1", r"\u0041", r"\U0001F600"]),
+            (
+                PERL_OP,
+                &["(?x:a)", "(?=a)", "(?!a)", "(?P=n)", "(?i-)", "(?-)"],
+            ),
+            (
+                NAMED_CAPTURE,
+                &["(?P<a.b>x)", "(?P<>x)", "(?P<n", "(?<é>x)"],
+            ),
+        ] {
+            for pattern in patterns {
+                assert_eq!(refusal(pattern), Some(code), "{pattern}");
+                assert!(compile(pattern, 1, 1).is_none(), "{pattern}");
+            }
+        }
+    }
+
+    /// What `refusal` leaves alone because Go compiles it, or because this cannot tell. None of
+    /// it refuses a configuration: a pattern past `ALERT_REGEX_MAX` (valid, or not), one past the
+    /// automaton budgets, syntax this module does not read, and what `regex-syntax` refuses and
+    /// Go reads, so that a `compile` that answers `None` is no proof of a refusal. Go's own
+    /// answer is in each comment.
+    #[test]
+    fn what_go_accepts_or_this_cannot_tell_is_no_refusal() {
+        let deep = format!("{}a{}", "(".repeat(300), ")".repeat(300));
+        let many = r"\pL".repeat(ALERT_REGEX_CLASSES_MAX + 1);
+        for (why, pattern) in [
+            // Past the budgets of Meada, valid for Go; invalid for Go, but never judged past
+            // `ALERT_REGEX_MAX`.
+            ("regex bytes", "a".repeat(ALERT_REGEX_MAX + 1)),
+            ("regex bytes", format!("({}", "a".repeat(ALERT_REGEX_MAX))),
+            ("classes", many),
+            ("automaton", "x{1000}".repeat(1000)),
+            // Valid for Go, which allows 1000 nested groups where `regex-syntax` allows 250.
+            ("nesting", deep),
+            // Valid for Go, and read differently by `regex-syntax`.
+            ("count text", "a{,5}".into()),
+            ("count text", "a{01}".into()),
+            ("count text", "a{ 1}".into()),
+            ("repeated flag", "(?ii)a".into()),
+            ("class then dash", r"[\d-z]".into()),
+            ("class in class", "[t[e]]eam-b".into()),
+            ("empty flags", "(?)".into()),
+            ("flags then repeat", "a(?i)*".into()),
+            ("flags after an operand", "(a)(?i)+".into()),
+            ("flags after an anchor", "^(?i)+".into()),
+            ("flags after an escape", r"\\(?i)+a".into()),
+            ("a bracket of flags", "(?i)[(?i)]+".into()),
+            ("an operand named like a group end", ">*".into()),
+            ("an escaped angle", r"a|\>*".into()),
+            ("an empty named group", "(?P<n>)*".into()),
+            // A literal that looks like the start of a group, before a group of flags.
+            ("flags after a literal", ">(?i)*".into()),
+            ("flags after a colon", "a:(?i)*".into()),
+            ("flags after an escaped paren", r"\((?i)+".into()),
+            ("flags after an escaped bar", r"\|(?i)*".into()),
+            ("brace text", "{x".into()),
+            // The wrapper's `)` closes a group this one opens, and its own `)` is left over.
+            ("closing the wrapper", "a)(b".into()),
+            ("POSIX class", "[[:alpha:]]".into()),
+            ("POSIX look-alike", "[[:]".into()),
+            // Refused by Go, but not told apart here: a Unicode property name follows Go's
+            // version, and `[:` and `\Q` are read more leniently than Go does.
+            ("property name", r"\p{Alphabetic}".into()),
+            ("quoted tail", r"\Qteam".into()),
+            ("POSIX tail", "([[:alpha:]]".into()),
+        ] {
+            assert_eq!(refusal(&pattern), None, "{why}");
+        }
+        // `compile` answers `None` for these as well.
+        assert!(compile("a{,5}", 1, 1).is_none());
+        assert!(compile(&"a".repeat(ALERT_REGEX_MAX + 1), 1, 1).is_none());
+    }
+
+    /// `refusal` against Go's own `regexp.Compile`, on a generated corpus (#718). A pattern it
+    /// judges refused that Go compiles, with either wrapper Alertmanager uses, fails the test:
+    /// it would drop the links of a configuration Alertmanager loads. A pattern Go refuses and
+    /// `refusal` leaves unjudged is only reported, per Go error code with the shortest example:
+    /// a code marked `named` is a class the ceilings entry names, so a miss there is a position
+    /// that class does not cover yet.
+    ///
+    /// Run it after a change to `refusal` or `regex_source`; it needs `go` on PATH and no
+    /// network. `MEADA_REGEXP_ORACLE_N` sets the corpus size (200,000) and
+    /// `MEADA_REGEXP_ORACLE_SEED` its seed (1). `scripts/regexp-oracle.go` is the oracle.
+    #[test]
+    #[ignore = "needs Go: cargo test --lib alert::regexp::tests::refusal_agrees_with_go -- --ignored --nocapture"]
+    fn refusal_agrees_with_go() {
+        let setting = |name: &str, default: u64| -> u64 {
+            std::env::var(name)
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(default)
+        };
+        let patterns = corpus(
+            setting("MEADA_REGEXP_ORACLE_N", 200_000) as usize,
+            setting("MEADA_REGEXP_ORACLE_SEED", 1),
+        );
+        let dir = std::env::temp_dir().join(format!("meada-regexp-oracle-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (input, output) = (dir.join("patterns.json"), dir.join("go.json"));
+        std::fs::write(&input, serde_json::to_vec(&patterns).unwrap()).unwrap();
+        let run = std::process::Command::new("go")
+            .args(["run", "scripts/regexp-oracle.go"])
+            .args([&input, &output])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .env("GOTOOLCHAIN", "local")
+            .status()
+            .expect("this check needs `go` on PATH");
+        assert!(run.success(), "scripts/regexp-oracle.go failed");
+        let go: Vec<[String; 2]> =
+            serde_json::from_slice(&std::fs::read(&output).unwrap()).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(go.len(), patterns.len());
+
+        let named = [
+            MISSING_PAREN,
+            UNEXPECTED_PAREN,
+            MISSING_BRACKET,
+            MISSING_REPEAT,
+            CHAR_RANGE,
+            REPEAT_SIZE,
+            REPEAT_OP,
+            ESCAPE,
+            PERL_OP,
+            NAMED_CAPTURE,
+        ];
+        let (mut judged, mut wrappers) = (0, 0);
+        let mut false_refusals = Vec::new();
+        let mut unjudged = std::collections::BTreeMap::<&str, (usize, &str)>::new();
+        for (pattern, errors) in patterns.iter().zip(&go) {
+            wrappers += usize::from(errors[0].is_empty() != errors[1].is_empty());
+            let refused = errors.iter().all(|error| !error.is_empty());
+            match (refusal(pattern), refused) {
+                (Some(code), false) => false_refusals.push((pattern, code)),
+                (Some(_), true) => judged += 1,
+                (None, true) => {
+                    // "error parsing regexp: <code>: `<expression>`"
+                    let message = errors[0].strip_prefix("error parsing regexp: ");
+                    let code = message
+                        .and_then(|m| m.split(": `").next())
+                        .unwrap_or(&errors[0]);
+                    let miss = unjudged.entry(code).or_insert((0, pattern));
+                    miss.0 += 1;
+                    if pattern.len() < miss.1.len() {
+                        miss.1 = pattern;
+                    }
+                }
+                (None, false) => {}
+            }
+        }
+        println!(
+            "{} patterns, {judged} judged refused, {wrappers} told apart by the wrappers",
+            patterns.len()
+        );
+        for (code, (count, example)) in &unjudged {
+            let class = if named.contains(code) {
+                "named"
+            } else {
+                "other"
+            };
+            println!("unjudged, {class}: {code}: {count}, shortest {example:?}");
+        }
+        false_refusals.sort_by_key(|(pattern, _)| pattern.len());
+        assert!(
+            judged > 0,
+            "no pattern was judged refused: the corpus or the oracle is off"
+        );
+        assert!(
+            false_refusals.is_empty(),
+            "refusal judges refused what Go compiles ({} patterns), shortest first: {:?}",
+            false_refusals.len(),
+            &false_refusals[..false_refusals.len().min(20)]
+        );
+    }
+
+    /// `count` patterns of one to nine of the tokens Go's parser tells apart (groups, flags,
+    /// names, classes, escapes, operators, counts), from `seed`: the same corpus every run.
+    fn corpus(count: usize, seed: u64) -> Vec<String> {
+        const TOKENS: &[&str] = &[
+            "a",
+            "b",
+            "x",
+            "-",
+            "_",
+            "é",
+            "0",
+            "1",
+            "8",
+            " ",
+            ">",
+            "<",
+            "(",
+            ")",
+            "[",
+            "]",
+            "[^",
+            "[]",
+            "{",
+            "}",
+            "*",
+            "+",
+            "?",
+            "|",
+            "^",
+            "$",
+            ".",
+            ":",
+            ",",
+            "=",
+            "!",
+            r"\",
+            r"\\",
+            r"\(",
+            r"\)",
+            r"\[",
+            r"\]",
+            r"\.",
+            r"\*",
+            r"\-",
+            r"\<",
+            r"\>",
+            r"\d",
+            r"\D",
+            r"\w",
+            r"\s",
+            r"\b",
+            r"\B",
+            r"\A",
+            r"\z",
+            r"\C",
+            r"\a",
+            r"\f",
+            r"\n",
+            r"\y",
+            r"\x41",
+            r"\x{41}",
+            r"\x{",
+            r"\x4",
+            r"\u0041",
+            r"\0",
+            r"\1",
+            r"\8",
+            r"\12",
+            r"\Q",
+            r"\E",
+            r"\p",
+            r"\pL",
+            r"\PL",
+            r"\p{L}",
+            r"\p{^L}",
+            r"\p{Han}",
+            r"\p{Foo}",
+            r"\p{",
+            r"\pX",
+            "(?",
+            "(?:",
+            "(?i)",
+            "(?i:",
+            "(?-i)",
+            "(?i-s)",
+            "(?i-)",
+            "(?-)",
+            "(?)",
+            "(?P<n>",
+            "(?P<",
+            "(?P=n)",
+            "(?<n>",
+            "(?<",
+            "(?<=",
+            "(?=",
+            "(?!",
+            "(?#",
+            "(?>",
+            "(?x)",
+            "(?ii)",
+            "{2}",
+            "{1,2}",
+            "{2,1}",
+            "{,2}",
+            "{2,}",
+            "{1001}",
+            "{01}",
+            "{ 1}",
+            "{99999999999}",
+            "[a-z]",
+            "[z-a]",
+            "[a-]",
+            "[a--]",
+            r"[a-\d]",
+            r"[\d-z]",
+            "[[:alpha:]]",
+            "[[:foo:]]",
+            "[[:]",
+            r"[\b]",
+            r"[\Q]",
+            "a*",
+            "a+",
+            "a?",
+            "a*?",
+            "a**",
+            "a*+",
+            "a{2}*",
+            "(a)",
+            "(a|b)",
+            "()",
+        ];
+        let mut state = seed | 1;
+        let mut below = |bound: usize| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state % bound as u64) as usize
+        };
+        let mut patterns = Vec::with_capacity(count);
+        for _ in 0..count {
+            let length = 1 + below(9);
+            patterns.push((0..length).map(|_| TOKENS[below(TOKENS.len())]).collect());
+        }
+        patterns
     }
 }

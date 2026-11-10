@@ -348,10 +348,10 @@ All notable changes to Meada are recorded here. The format follows
 ### Changed
 
 - Development and test builds optimize the main `meada` package at level 1 to reduce the
-  resident code footprint of the expanded indexing and contract readers.
+  resident code footprint of the expanded indexing and contract readers (#711).
 - Kotlin: a name read or called in a lambda looks for a local or local function of the code
   around it in one climb, not one from every enclosing lambda: a file of 300 nested `apply`
-  blocks indexes in about 12 s instead of over 100 s (debug build), with the same answers.
+  blocks indexes in about 12 s instead of over 100 s (debug build), with the same answers (#711).
 
 - A refresh reads the values of the files it did not change from a values cache beside the index
   (`values.db`, ADR 0027) instead of parsing them again: on this repository, a one-line edit of a
@@ -364,10 +364,10 @@ All notable changes to Meada are recorded here. The format follows
 - A refresh summarizes a contract configuration again only when its bytes, the IaC nodes it
   read or a path it looked at changed: 60 ConfigMaps of 290 KB refresh with no change in 0.01 s
   instead of 4.5 s (debug build), and a removed or added Lambda handler or Compose build path
-  still moves its answer.
+  still moves its answer (#711).
 - `search` with the kind `value` reads the value of only the rows its answer shows (each match
   keeps just its sort key), so a broad query such as `e` no longer formats every matching value
-  before the budget cuts it.
+  before the budget cuts it (#711).
 
 ### Fixed
 
@@ -388,6 +388,12 @@ All notable changes to Meada are recorded here. The format follows
   once, to the final type, and name other instances; Meada follows Terraform (#740), except for a
   variable declared in a `.tofu` file, which Terraform does not read: it is unresolved where the
   two conversions differ.
+- An Alertmanager configuration with a matcher regex Go's `regexp` refuses (an unclosed
+  group, a leading `*`, a backward range, a lookahead) is unreadable, as Alertmanager refuses
+  to load it: it gives no alert side or link, where its valid routes kept an `exact` link,
+  and `meada status` counts the file under `unreadable`. Only a syntax error established as
+  a `regexp/syntax` error code counts; an expression past Meada's own budgets or syntax it
+  does not read stays unmatched with the other routes linked (#718).
 - AWS SDK forms in Java, Go and C# follow the ADR 0026 rule TypeScript and Python already
   followed: an EventBridge entry without `EventBusName` produces to `default`, and an SNS
   publish to a phone number or endpoint names no topic. A request Meada cannot see whole (a
@@ -399,16 +405,16 @@ All notable changes to Meada are recorded here. The format follows
   `DeleteSecret`); DynamoDB transactions stay TypeScript and Python only (#660).
 - `snapshot publish` no longer publishes the old graph under a new commit when only a contract
   configuration or a path its summary looked at changed (a removed Lambda `worker.zip`, a
-  Compose build context): the index is fresh only while all of them are as it read them.
+  Compose build context): the index is fresh only while all of them are as it read them (#711).
 - An image's Helm values file is any YAML file with a `values` word in its name, as for alerts,
   so `prod-values.yaml` declares image consumers, as `values.prod.yml` already did, and
-  `valuesets.yaml` does not.
+  `valuesets.yaml` does not (#711).
 
 - Python: an import inside a function names its library in that function again, so
   `from requests import get` and `import requests as r` there are HTTP consumers, and
   `import json as requests` there hides the module's `requests` (#668).
 - Python framework and Go router tables retain stable identities in optimized builds, so
-  Flask blueprints keep their mounted routes and standard Go mux matching stays consistent.
+  Flask blueprints keep their mounted routes and standard Go mux matching stays consistent (#711).
 
 - TypeScript and JavaScript URL consumers respect lexical bindings and writes of `String`
   (#683). A callback named `String` no longer invents a route or host, and a local binding
@@ -417,7 +423,7 @@ All notable changes to Meada are recorded here. The format follows
 
 - Image runners and links retain each evaluation root when Kustomize overlays reuse the same
   workload and normalized image. Repeated image evidence within one workload and root still
-  collapses to one side.
+  collapses to one side (#711).
 - A symbol's `context` shows the level, reason and provider of inferred HTTP call links whose
   recorded environment base selects a declared `base_url_env` peer, including through fields
   and Backstage config partials. Editing only a partial refreshes that explanation (#683).
@@ -463,9 +469,9 @@ All notable changes to Meada are recorded here. The format follows
   included) and byte offset it may start at, or the bytes it reads for a comparison, against a
   ceiling of 2^26 steps per pass apart from the evaluation ceiling, so that label stops before
   matching and `status` reports the evaluation limit, while route visits and evaluations count as
-  before.
+  before (#711).
 - Alerts: a regular expression Go refuses for a repetition operator stacked on another (`a**`,
-  `a{2}*`) no longer links.
+  `a{2}*`) no longer links (#711).
 - Alerts: an AlertmanagerConfig route links `inferred`, since prometheus-operator also matches
   the alert's namespace, which Meada does not read (its consumers say `(AlertmanagerConfig
   namespace)`); a Grafana rule group repeated with `count` or `for_each` declares no rule (it may
@@ -524,12 +530,12 @@ All notable changes to Meada are recorded here. The format follows
 - prove-meada scripts: the console page checks sign in again when a route lands on the sign-in page
   and fail the route that stays there, the Helm overlays `values-identity.yaml` and
   `values-workspaces.yaml` render in their stack (as `scripts/helm-check` does) instead of failing
-  alone, and `console.py start --bin` resolves a relative path against the caller's directory.
+  alone, and `console.py start --bin` resolves a relative path against the caller's directory (#679).
 - `meada export`, `meada status` and the other commands that print their result once done no
   longer panic when the reader closes its end early (`meada export | head -1`, `| true`): the rest
   of the output is dropped and the command ends as it would, where it panicked with "failed
   printing to stdout: Broken pipe (os error 32)" and exited 101. `meada decide` and `meada mcp`,
-  which never panicked, still stop with a "Broken pipe" error and exit 1.
+  which never panicked, still stop with a "Broken pipe" error and exit 1 (#711).
 - Kustomize: with two bases of their own `namePrefix` that write the same names, a Deployment no
   longer references the other base's ServiceAccount, nor an Ingress the other base's Service. A
   Service reference, and a `serviceAccountName` of the kinds Kustomize renames (Pod, Deployment,
@@ -539,31 +545,31 @@ All notable changes to Meada are recorded here. The format follows
   whose prefix and suffix stages end as the referrer's; with none left, the object called by the
   name as written, a final name included, and with several (a tree Kustomize refuses), none.
   Another kind's account, or the deprecated `serviceAccount`, which Kustomize leaves alone, names
-  the account called so. An empty `namespace` in a kustomization no longer sets one.
+  the account called so. An empty `namespace` in a kustomization no longer sets one (#711).
 - Ingress: a path Meada cannot read as a literal prefix (`/store/(.*)`, `/api/*`) no longer drops
   out of the routing table, where a shorter rule then claimed its URLs; it is an unread mount at
   its literal head cut at its last slash. A `use-regex` annotation or a missing `pathType` also
   leaves the path unread, and so does a path left out (an ImplementationSpecific catch-all); a
   table past its ceilings (64 rules, read or not) leaves every host of the Ingress unread, not
-  only the hosts read before the cut.
+  only the hosts read before the cut (#711).
 - Kustomize `components` change what the kustomization that lists them holds, its bases'
   objects included, as Kustomize applies them; they were instantiated as one more base, so a
   component's `images` rule never retagged the overlay's workloads. Each object a component is
   handed counts against the 50,000 entries one overlay walks, so components reaching one another
-  along many paths, or many objects through a long list of them, stop there.
+  along many paths, or many objects through a long list of them, stop there (#711).
 - HTTP: overlays that repeat one Ingress or Service per environment no longer make a route to a
   single provider `ambiguous`; distinct providers, or a route as long that reaches no code,
-  still do. A decision recorded for such a route is now stale; `meada decide --prune` removes it.
+  still do. A decision recorded for such a route is now stale; `meada decide --prune` removes it (#711).
 - Images: a module run from a local path (an archive or a directory) in one root no longer drops
   the image another root runs it from, with its environment and provisions; only that root runs
-  code without an image.
+  code without an image (#711).
 - Terraform: `split(",", "")` gives one empty element (a `count` over its length made no node), and
   an IaC name pattern needs three letters or digits besides its wildcards (`*.*.*.*` matched any
-  dotted name).
+  dotted name) (#711).
 - Terraform: an object walks its keys in lexical order, whether a variable or local binds it or the
   expression builds it (a literal, a `merge`): a `for` over it or a `jsonencode` of it gave an
   `exact` name in written order, and a `for` whose collection contains an object whose keys are
-  known only once evaluated (a computed key, a comprehension) is now `*`.
+  known only once evaluated (a computed key, a comprehension) is now `*` (#711).
 - Terraform: integer arithmetic is exact, as Terraform's: a result past `u64` or below `i64` (`0 -
   18446744073709551615`), a division by zero or with a remainder (`7 / 2`) and arithmetic on a
   fraction leave that part of the name `*`, also on a `for` variable, where the evaluator printed a
@@ -571,46 +577,46 @@ All notable changes to Meada are recorded here. The format follows
   past them, with more digits than a float holds or that a float writes with an exponent
   (`18446744073709551616` printed `1.8446744073709552e19`), a JSON number written with a fraction or
   an exponent and a negative zero (`-0`, `0 * -1` printed `0`). Such a value in a var file is given
-  but unresolved, so the variable's default no longer stands in for it.
+  but unresolved, so the variable's default no longer stands in for it (#711).
 - Terraform: `toset` orders its elements as Terraform does (numbers by value, `false` before
   `true`, a null last, strings with numbers or bools as strings), where it kept a number's or a
   bool's first order: `tolist(toset([10, 9]))[0]` was an `exact` `10` for Terraform's `9`. A set of
   collections, in Terraform's hash order, and a set of numbers and bools, which Terraform refuses,
-  are `*`.
+  are `*` (#711).
 - Terraform: a null or a collection interpolated into a name (`"q-${null}"`, `"q-${[1]}"`), which
-  Terraform refuses, is `*`, where it gave the `exact` names `q-null` and `q-[\n  1\n]`.
+  Terraform refuses, is `*`, where it gave the `exact` names `q-null` and `q-[\n  1\n]` (#711).
 - Terraform: arithmetic on a `for` variable in a `.tfvars` file (`[for x in [1, 2] : x * 2][1]`)
-  resolves, as Terraform evaluates it, where the value was given but unresolved.
+  resolves, as Terraform evaluates it, where the value was given but unresolved (#711).
 - Terraform: a `%{ for }` directive's collection is read as any other expression, where its keys
   kept their written order and a number its float text (`%{for k, v in {b = 1, a = 2}}` gave
   `b1a2`, Terraform `a2b1`); a negative zero there is `*`. An object of several keys inside a var
-  file's template, with or without line comments, no longer drops the value for the default.
+  file's template, with or without line comments, no longer drops the value for the default (#711).
 - Terraform: `tolist` and `tomap` convert their elements to one type, as Terraform does, where
   they kept each element's type: `jsonencode(tolist(["a", 1]))` gave an `exact` `["a",1]` for
   Terraform's `["a","1"]`; collections unify as cty does (`[[1], ["a"]]` to `[["1"],["a"]]`). A
-  number with a bool and a list's null beside a collection, which Terraform refuses, are `*`.
+  number with a bool and a list's null beside a collection, which Terraform refuses, are `*` (#711).
 - Terraform: a `for` over `tolist`, `toset` or `tomap` (`{for o in tolist(var.items) : o.name =>
   o}`) costs as a `for` over its argument, so forty objects from a var file expand where the
-  estimate, the argument's size squared, left the resource `*` past about a kilobyte.
+  estimate, the argument's size squared, left the resource `*` past about a kilobyte (#711).
 - Terraform: a `for` or `%{ for }` binding a key over `toset(...)` (`for k, v in toset(x)`) is
-  `*`, where the key was the index (`q-0`) and Terraform's is the element.
+  `*`, where the key was the index (`q-0`) and Terraform's is the element (#711).
 - Images: a direct path that went through a value a deployer can override (`${CTX:-./app}`)
   runs code `inferred`, not `exact`; a repository's literal image and its own pattern matching
   the same runner are one link, not two `ambiguous` ones; a Helm `image.registry` prefixes
   `image.repository` (a templated one as an unresolved segment), where the runner named a Docker
   Hub image; and an unresolved image name (`image::*`, from `docker/metadata-action`) is no
-  `status` orphan.
+  `status` orphan (#711).
 - Compose: an override file's `build` with no `context` keeps the base service's context, where
   it built from the override's directory, and the `!reset` and `!override` tags clear or replace a
   base value. A `build` context Docker reads as a git repository (`git@github.com:a/b.git`,
   `github.com/a/b`) is no local directory, so it runs no code of the repository. SAM: a
   function with no `CodeUri` of its own takes `Globals.Function.CodeUri`. Kustomize: a
   `bitbucket.org/` base is remote, as `github.com/` and `gitlab.com/` ones are, where one without
-  `?ref` counted as missing.
+  `?ref` counted as missing (#711).
 - SDK names (GCP and Azure, and AWS in TypeScript): a request field written through a computed
   key (`{['name']: ..}`) or a spread of another object (a spread of a spread too), or written
   after the call inside a loop statement that also holds the call, leaves the name unresolved;
-  each gave an `exact` link to the name first written.
+  each gave an `exact` link to the name first written (#711).
 - AWS SDK: a request changed after it is made names no resource: a TypeScript command input
   (SQS's too) whose field is assigned again before the `send`; a Java builder held in a local or
   a `final` field that is set again or handed to another call, itself, through a chain off it or
@@ -618,12 +624,12 @@ All notable changes to Meada are recorded here. The format follows
   a named entry an inline request holds (an EventBridge entry in C# or Go, an entry builder in
   Java); and a Go request replaced whole through its pointer (`*input = sqs.SendMessageInput{..}`).
   Each gave an `exact` link and provision to the name first written. A TypeScript field
-  read off a local object (`{Bucket: cfg.bucket}`) now names its bucket.
+  read off a local object (`{Bucket: cfg.bucket}`) now names its bucket (#711).
 - TypeScript and JavaScript: a generator (`function*` and `async function*`, declared or as an
   expression, a `*method()` of a class or an object) returns its iterator, so a `return new
   Storage()` in one no longer makes it a client factory; it gave an SDK resource (Pub/Sub, Cloud
   Storage, Azure Service Bus and Blob) and an `exact` provision to code that never holds the
-  client.
+  client (#711).
 
 ## [1.2.0] - 2026-11-04
 

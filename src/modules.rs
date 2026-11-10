@@ -259,8 +259,10 @@ pub fn block_on<T>(run: impl Future<Output = T>) -> std::io::Result<T> {
     Ok(out)
 }
 
-/// `ask`'s answer within `bound`, else the `timeout` message of `bound` in milliseconds: what a
-/// `meada status` line waits for a service.
+/// Runs `ask` to completion on its own short-lived runtime and returns its answer within `bound`,
+/// else the `timeout` message of `bound` in milliseconds. It bounds any async call to an external
+/// service (Valkey, the store, a `meada status` probe) on a request path, in a poll or in a job;
+/// see "Service deadlines" in `CODING_STANDARDS.md`.
 #[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 pub fn within<T>(
     bound: std::time::Duration,

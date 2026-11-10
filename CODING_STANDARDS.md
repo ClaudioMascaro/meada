@@ -192,6 +192,25 @@ the browser decides too.
 A Known ceiling bounds only what the spec and the ticket leave out: every item they ask for is
 implemented, or reported as blocked.
 
+A documented class (a ceilings entry, a doc comment, a test name) is worded as narrowly as its
+tests: it lists the syntactic positions they cover, or they cover every position its wording
+names. #718 wrote "`*`, `+` or `?` with no operand" for three tested positions; after a group
+name or a group of flags Alertmanager refused the file and Meada kept its links `exact`.
+
+## Claims the diff adds
+
+Check each claim a diff adds at its source, never against the ticket's wording:
+
+- A citation (a file, a constant, a test, "X derives from Y") is opened and confirmed at the
+  cited place.
+- A rule is checked by asking which action clears it: read the code or the test that produces
+  or guards the artefact (for a `docs/agents` file, the test in `tests/it/docs.rs` that names
+  it). "Re-bless" with no producer found, or a sentence placed where that test expects other
+  text, is a finding.
+- A reference the diff moves or reflows still sits next to the thing it names.
+- A change to a skill or a harness script searches the skill's own texts for the behaviour it
+  changes; a ticket premise they contradict is a finding.
+
 ## Docs move with the capability
 
 A change users can see (a language, a framework, a contract kind, a command or MCP behavior)

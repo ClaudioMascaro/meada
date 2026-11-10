@@ -558,6 +558,142 @@ fn uninterpretable_route_matchers_do_not_guess_a_destination() {
     }
 }
 
+/// Alertmanager compiles every matcher regex while it reads its file (`matchers` and `match_re`
+/// alike) and loads none of it when Go's `regexp` refuses one (#718): Meada links nothing from
+/// such a file and counts it as unreadable, as it does for a file it cannot parse.
+#[test]
+fn an_alertmanager_config_with_a_regex_go_refuses_is_unreadable_and_links_nothing() {
+    use meada::engine::{Direction, Start};
+    let repo = fixture_repo(
+        "alerts_go_refuses",
+        "alert-monitoring",
+        Some("https://example.com/acme/monitoring.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+    let write = |route: &str| {
+        let config = format!(
+            "route:\n  receiver: fallback\n  routes:\n    - receiver: team-b\n      matchers:\n        - \
+             support=\"team-b\"\n{route}receivers:\n  - name: fallback\n  - name: team-b\n  - name: broken\n"
+        );
+        std::fs::write(repo.join("alertmanager.yaml"), config).unwrap();
+    };
+    let broken = |regex: &str| {
+        format!("    - receiver: broken\n      matchers:\n        - other=~\"{regex}\"\n")
+    };
+    let status = || {
+        let (_, lines) = engine.status_report().unwrap();
+        lines.into_iter().flatten().collect::<Vec<_>>().join("\n")
+    };
+    let export =
+        || -> serde_json::Value { serde_json::from_str(&engine.export().unwrap()).unwrap() };
+    let configs =
+        |line: &str| format!("config files: 2 read, 0 skipped (lockfiles: 0, unreadable: 0){line}");
+
+    // The same configuration with the regex fixed links as before.
+    write(&broken("(closed)"));
+    let linked = export();
+    assert_eq!(linked["links"].as_array().unwrap().len(), 1, "{linked}");
+    assert_eq!(linked["links"][0]["level"], "exact");
+    assert_eq!(linked["consumers"].as_array().unwrap().len(), 2, "{linked}");
+    let report = status();
+    assert!(report.contains(&configs("; values")), "{report}");
+    assert!(
+        report.contains("orphan alert::other::(closed): no emitter"),
+        "{report}"
+    );
+
+    // The issue's repro: the route that would link `support=team-b` is not loaded either.
+    write(&broken("(unclosed"));
+    let refused = export();
+    assert!(
+        refused["consumers"].as_array().unwrap().is_empty(),
+        "{refused}"
+    );
+    assert!(refused["links"].as_array().unwrap().is_empty(), "{refused}");
+    let context = engine.context("alert::alertname::ApiDown", None).unwrap();
+    assert!(!context.contains("alertmanager.yaml"), "{context}");
+    let context = engine.context("alert::support::team-b", None).unwrap();
+    assert!(context.contains("no matcher in the workspace"), "{context}");
+    let down = engine
+        .trace(
+            Start::From("rules.yaml::groups[0].rules[0]"),
+            Direction::Down,
+            None,
+        )
+        .unwrap();
+    assert!(!down.contains("alertmanager.yaml"), "{down}");
+    let report = status();
+    assert!(
+        report.contains("config files: 1 read, 1 skipped (lockfiles: 0, unreadable: 1)"),
+        "{report}"
+    );
+    assert!(!report.contains("orphan alert::other::"), "{report}");
+    // Its values stay searchable.
+    let found = engine.search("(unclosed", Some("value"), None).unwrap();
+    assert!(found.contains("alertmanager.yaml"), "{found}");
+
+    // Each form that reaches Go: `match_re`, a matcher of an `AlertmanagerConfig` object, a
+    // regex deeper in the tree and one in an inhibit rule, beside valid routes.
+    for config in [
+        r#"{"route":{"receiver":"a","routes":[{"receiver":"b","match":{"support":"team-b"}},{"receiver":"c","match_re":{"x":"*prod"}}]},"receivers":[{"name":"a"}]}"#,
+        r#"{"apiVersion":"monitoring.coreos.com/v1alpha1","kind":"AlertmanagerConfig","metadata":{"name":"m"},"spec":{"receivers":[{"name":"a"}],"route":{"receiver":"a","routes":[{"receiver":"a","matchers":[{"name":"support","value":"team-b"}]},{"receiver":"a","matchers":[{"name":"x","value":"a[","matchType":"=~"}]}]}}}"#,
+        r#"{"route":{"receiver":"a","routes":[{"receiver":"b","routes":[{"receiver":"c","matchers":["x!~\"a)\""]}],"match":{"support":"team-b"}}]},"receivers":[{"name":"a"}]}"#,
+        r#"{"route":{"receiver":"a","routes":[{"receiver":"b","match":{"support":"team-b"}},{"receiver":"c","match_re":{"x":"(?P<n>*a)"}}]},"receivers":[{"name":"a"}]}"#,
+        r#"{"route":{"receiver":"a","routes":[{"receiver":"b","match":{"support":"team-b"}}]},"receivers":[{"name":"a"}],"inhibit_rules":[{"source_matchers":["severity=critical"],"target_match_re":{"x":"*prod"}}]}"#,
+    ] {
+        std::fs::write(repo.join("alertmanager.yaml"), config).unwrap();
+        let export = export();
+        assert!(
+            export["consumers"].as_array().unwrap().is_empty(),
+            "{config}: {export}"
+        );
+        assert!(
+            export["links"].as_array().unwrap().is_empty(),
+            "{config}: {export}"
+        );
+    }
+}
+
+/// An expression Meada leaves unmatched for its own budgets is valid for Alertmanager: the
+/// other routes of the file keep linking at `exact` (#718).
+#[test]
+fn a_regex_past_the_budgets_leaves_the_other_routes_of_its_config_linked() {
+    let repo = fixture_repo(
+        "alerts_regex_past_budgets",
+        "alert-monitoring",
+        Some("https://example.com/acme/monitoring.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+    for (budget, regex) in [
+        ("source length", "a".repeat(4097)),
+        ("automaton", "x{1000}".repeat(80)),
+        ("case folding", format!("(?i){}", r"\p{Any}".repeat(4))),
+    ] {
+        let config = serde_json::json!({
+            "route": {"receiver": "fallback", "routes": [
+                {"receiver": "team-b", "match": {"support": "team-b"}},
+                {"receiver": "big", "match_re": {"other": regex}},
+            ]},
+            "receivers": [{"name": "fallback"}, {"name": "team-b"}, {"name": "big"}]
+        });
+        std::fs::write(repo.join("alertmanager.yaml"), config.to_string()).unwrap();
+        let text = engine.export().unwrap();
+        let export: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(
+            export["consumers"].as_array().unwrap().len(),
+            2,
+            "{budget}: {text}"
+        );
+        let links = export["links"].as_array().unwrap();
+        assert_eq!(links.len(), 1, "{budget}: {text}");
+        assert_eq!(links[0]["contract"], "alert::support::team-b", "{budget}");
+        assert_eq!(links[0]["level"], "exact", "{budget}");
+        let (_, lines) = engine.status_report().unwrap();
+        let report = lines.into_iter().flatten().collect::<Vec<_>>().join("\n");
+        assert!(report.contains("unreadable: 0"), "{budget}: {report}");
+    }
+}
+
 #[test]
 fn alert_places_do_not_change_search_locations_of_other_kinds() {
     let repo = fixture_repo(
