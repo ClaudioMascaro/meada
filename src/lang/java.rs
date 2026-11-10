@@ -8,8 +8,8 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Annotated, Binds, Bound, Call, Class, Const, Def, Export, Facts, Import, Imported, Invocation,
-    Kind, LanguagePack, Layout, Marked, Modules, Param, Part, Receiver, children, field_write,
-    named, text, wildcard,
+    Kind, LanguagePack, Layout, Marked, Mentioned, Modules, Param, Part, Receiver, children,
+    field_write, named, text, wildcard,
 };
 use crate::{Result, qualify};
 
@@ -229,6 +229,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // file assigns holds no one value, so its bound is dropped (`Facts::bound`).
     let mut initialized: Vec<Bound> = Vec::new();
     let mut reassigned: Vec<(String, String)> = Vec::new();
+    let mut rebound: Vec<Bound> = Vec::new();
+    // The method or constructor of each scope, and the names of the `final` fields: where their
+    // mentions are counted (`Facts::mentioned`).
+    let mut bodies: Vec<(String, Node)> = Vec::new();
+    let mut final_fields: BTreeSet<String> = BTreeSet::new();
     let mut seen = Declared::new(tree.root_node());
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
@@ -309,6 +314,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 name.to_string()
             };
             inner = Rc::new(qualify(&scope, &signature_name));
+            if kind == Kind::Method {
+                bodies.push((inner.as_ref().clone(), node));
+            }
             if node.kind() == "constructor_declaration" {
                 let names: Vec<&str> = parameters.iter().map(|(n, _, _)| n.as_str()).collect();
                 assignments(node, src, &scope, &inner, &names, &mut assigned);
@@ -628,6 +636,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             {
                 for declaration in named(node).filter(|n| n.kind() == "variable_declarator") {
                     if let Some(name) = declaration.child_by_field_name("name") {
+                        final_fields.insert(text(name, src).to_string());
                         let name = qualify(&scope, text(name, src));
                         facts.statics.push(name.clone());
                         facts.consts.push(Const {
@@ -648,6 +657,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             {
                 for declaration in named(node).filter(|n| n.kind() == "variable_declarator") {
                     if let Some(name) = declaration.child_by_field_name("name") {
+                        final_fields.insert(text(name, src).to_string());
                         let initial = declaration.child_by_field_name("value");
                         let initial = initial.map(|n| value(n, src, 0));
                         finals.push((scope.as_ref().clone(), text(name, src).into(), initial));
@@ -664,6 +674,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 };
                 if let Some(n) = left.filter(|n| n.kind() == "identifier") {
                     reassigned.push((scope.as_ref().clone(), text(n, src).to_string()));
+                    if let Some(right) = node.child_by_field_name("right") {
+                        rebound.push(Bound {
+                            scope: scope.as_ref().clone(),
+                            within: scope.as_ref().clone(),
+                            name: text(n, src).to_string(),
+                            value: value(right, src, 0),
+                        });
+                    }
                 }
                 let write = match left {
                     Some(n) if n.kind() == "identifier" => {
@@ -840,14 +858,50 @@ fn parse(src: &[u8]) -> Result<Facts> {
     let field_hides = |name: &str, scope: &str| {
         (fields.get(name)).is_some_and(|at| at.iter().any(|at| encloses(at, scope)))
     };
-    facts.bound = (initialized.into_iter())
-        .filter(|b| {
-            declared.get(&(b.scope.as_str(), b.name.as_str())) == Some(&1)
-                && !reassigned.contains(&(b.scope.clone(), b.name.clone()))
-                && !unknown_writes.contains(&b.name)
-                && !field_hides(&b.name, &b.scope)
-        })
-        .collect();
+    let (kept, dropped): (Vec<Bound>, Vec<Bound>) = initialized.into_iter().partition(|b| {
+        declared.get(&(b.scope.as_str(), b.name.as_str())) == Some(&1)
+            && !reassigned.contains(&(b.scope.clone(), b.name.clone()))
+            && !unknown_writes.contains(&b.name)
+            && !field_hides(&b.name, &b.scope)
+    });
+    facts.bound = kept;
+    rebound.extend(dropped);
+    facts.assigned = rebound;
+    let mut named_in: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for b in &facts.bound {
+        named_in.entry(&b.scope).or_default().push(&b.name);
+    }
+    for (scope, body) in &bodies {
+        let Some(names) = named_in.get(scope.as_str()) else {
+            continue;
+        };
+        for (name, count) in names.iter().zip(mentions(*body, src, names)) {
+            facts.mentioned.push(Mentioned {
+                scope: scope.clone(),
+                name: name.to_string(),
+                count,
+            });
+        }
+    }
+    let fields: Vec<&str> = final_fields.iter().map(String::as_str).collect();
+    for (name, count) in fields.iter().zip(mentions(tree.root_node(), src, &fields)) {
+        facts.mentioned.push(Mentioned {
+            scope: String::new(),
+            name: name.to_string(),
+            count,
+        });
+    }
+    // A lambda runs as often as its caller calls it: a loop of its own.
+    facts.loops = super::outermost(
+        tree.root_node(),
+        &[
+            "for_statement",
+            "enhanced_for_statement",
+            "while_statement",
+            "do_statement",
+            "lambda_expression",
+        ],
+    );
     for mut local in locals {
         if let Class::Result(n) = local.class {
             local.class = call_at(&results[n]).map_or(Class::Unknown, Class::Result);
@@ -1105,6 +1159,24 @@ fn declares(parent: Node, sibling: Node, src: &[u8], out: &mut dyn FnMut(&str)) 
         }
         _ => {}
     }
+}
+
+/// How often each of `names` is written as an identifier under `root`, in the order given.
+fn mentions(root: Node, src: &[u8], names: &[&str]) -> Vec<u32> {
+    let index: BTreeMap<&str, usize> = names.iter().enumerate().map(|(n, s)| (*s, n)).collect();
+    let mut counts = vec![0; names.len()];
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if node.kind() == "identifier" {
+            if let Some(&n) = index.get(text(node, src)) {
+                counts[n] += 1;
+            }
+            continue;
+        }
+        let mut cursor = node.walk();
+        stack.extend(node.children(&mut cursor));
+    }
+    counts
 }
 
 fn modifiers(node: Node<'_>) -> Vec<&str> {

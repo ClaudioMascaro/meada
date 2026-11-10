@@ -575,6 +575,20 @@ pub struct Facts {
     /// the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub bound: Vec<Bound>,
+    /// What the file assigns to a name besides the initializer `bound` keeps: each value assigned
+    /// to a bare name (`b = a.f()`), and the initializer of a local `bound` drops because the name
+    /// holds no one value (assigned again, declared twice, hidden by a field). A reader that must
+    /// see every use of a value (Java builders, which change in place) reads what these name.
+    /// Not kept in the index (see `Call::args`).
+    #[serde(default, skip_serializing_if = "lean")]
+    pub assigned: Vec<Bound>,
+    /// How many times the file writes the name of each local `bound` keeps, in the body of its
+    /// scope, and of each `final` field, in the whole file (scope `""`): every identifier of that
+    /// spelling, whatever it is part of. A reader that must see every use of a value compares it
+    /// with the uses it reads; one more is a use its model of the syntax does not show (a cast, a
+    /// ternary, a return). Not kept in the index (see `Call::args`).
+    #[serde(default, skip_serializing_if = "lean")]
+    pub mentioned: Vec<Mentioned>,
     /// A stable first binding of a multiple-result call (Go). This is a result projection,
     /// not a scalar constant: only a reader proving that call's result may follow it.
     /// Not kept in the lean index, like the bound values above.
@@ -663,6 +677,14 @@ pub fn base(setting: &str) -> &str {
 /// What `LanguagePack::extend` added to a `setting`.
 pub fn extra(setting: &str) -> &str {
     setting.split_once('\n').map_or("", |(_, extra)| extra)
+}
+
+/// How many times `name` is written in `scope` (`Facts::mentioned`).
+#[derive(Serialize, Deserialize)]
+pub struct Mentioned {
+    pub scope: String,
+    pub name: String,
+    pub count: u32,
 }
 
 /// The value a name bound in `scope` holds, written in `within` (`Facts::bound`).

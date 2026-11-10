@@ -1096,6 +1096,54 @@ fn java_named_builds_chained_past_the_evaluation_depth_stay_unresolved() {
     );
 }
 
+/// A name is exact only when every mention of its builder, by any name, is a form the reader
+/// follows (R3 of #719): a method that runs caller code, a consumer copy, an alias at any depth
+/// (reassigned or not), a field builder reached through an alias. Each other mention is a change
+/// the reader cannot follow, and the side is unresolved. The builders left alone keep their table.
+#[test]
+fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
+    let repo = fixture_repo("aws_sdk_builder_forms", "aws-sdk-builders", None);
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut sides: Vec<_> = [("writer", "providers"), ("reader", "consumers")]
+        .iter()
+        .flat_map(|(role, sides)| {
+            export[sides].as_array().unwrap().iter().map(move |s| {
+                let scope = s["site"].as_str().unwrap().split("::").nth(2).unwrap();
+                let method = scope.split('(').next().unwrap().rsplit('.').next().unwrap();
+                format!("{method} {role} {}", s["contract"].as_str().unwrap())
+            })
+        })
+        .collect();
+    sides.sort();
+    assert_eq!(
+        sides,
+        [
+            "afterLoop writer resource::dynamodb::after-loop",
+            "apply writer resource::dynamodb",
+            "arrayAlias writer resource::dynamodb",
+            "castAlias writer resource::dynamodb",
+            "checkApply reader resource::dynamodb",
+            "copyInline writer resource::dynamodb",
+            "copyNamed writer resource::dynamodb",
+            "deep writer resource::dynamodb",
+            "fieldAlias writer resource::dynamodb",
+            "fromAlias writer resource::dynamodb",
+            "lambdaLater writer resource::dynamodb",
+            "loopFresh writer resource::dynamodb::loop-fresh",
+            "loopLater writer resource::dynamodb",
+            "otherMember writer resource::dynamodb::other-member",
+            "plainDeep writer resource::dynamodb",
+            "reassigned writer resource::dynamodb",
+            "requestReassigned writer resource::dynamodb",
+            "restarted writer resource::dynamodb::restarted",
+            "supplierAlias writer resource::dynamodb",
+            "ternaryAlias writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
 #[test]
 fn hidden_aws_client_and_command_names_never_feed_contracts() {
     let typescript = [

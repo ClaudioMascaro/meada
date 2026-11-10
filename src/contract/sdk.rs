@@ -162,6 +162,7 @@ pub(crate) fn extract<'a>(
     };
     let mut found = Vec::new();
     let written = std::cell::OnceCell::new();
+    let builders = java::Builders::default();
     let configs = std::cell::OnceCell::new();
     let inject = |code: &Code<'a>, path: &'a str, on: crate::resolve::Injected<'a>| {
         let indexed = indexed?;
@@ -197,8 +198,15 @@ pub(crate) fn extract<'a>(
                 {
                     continue;
                 }
-                let changed =
-                    changed_request(code, path, index, operation.field, language, &written);
+                let changed = changed_request(
+                    code,
+                    path,
+                    index,
+                    operation.field,
+                    language,
+                    &written,
+                    &builders,
+                );
                 let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
                     let [Value::Call(call)] = args else {
                         return Some(vec![Name::default()]);
@@ -270,6 +278,7 @@ fn changed_request<'a>(
     selector: &str,
     language: Language,
     written: &std::cell::OnceCell<BTreeSet<&'a str>>,
+    builders: &java::Builders<'a>,
 ) -> bool {
     let Some(call) = code.call(path, index) else {
         return false;
@@ -289,8 +298,9 @@ fn changed_request<'a>(
                     })
                 })
             };
-            return (call.args.first())
-                .is_some_and(|r| java::changed(code, path, &call.scope, r, &call.range, &setter));
+            return (call.args.first()).is_some_and(|r| {
+                java::changed(code, path, &call.scope, r, &call.range, &setter, builders)
+            });
         }
     };
     // Follow the name's path through the request as written: a named value met on it changes

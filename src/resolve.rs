@@ -5536,6 +5536,17 @@ impl<'a> Code<'a> {
         self.full(path).map_or(&[], |f| f.bound.as_slice())
     }
 
+    /// How often `path` writes the names of its locals and `final` fields (`Facts::mentioned`).
+    pub fn mentioned(&self, path: &'a str) -> &'a [crate::lang::Mentioned] {
+        self.full(path).map_or(&[], |f| f.mentioned.as_slice())
+    }
+
+    /// Every value `path` assigns to a bare name, and every initializer `bindings` drops
+    /// (`Facts::assigned`), in source order: a reader that needs every use of a value reads them.
+    pub fn assigned(&self, path: &'a str) -> &'a [Bound] {
+        self.full(path).map_or(&[], |f| f.assigned.as_slice())
+    }
+
     /// Every bound of `name` in exactly `scope` of `path`, in source order (`Facts::bound`):
     /// the packs that record a name once per assignment (C#'s `name=`) are read whole here.
     pub fn bounds(&self, path: &'a str, scope: &'a str, name: &str) -> Vec<&'a Bound> {

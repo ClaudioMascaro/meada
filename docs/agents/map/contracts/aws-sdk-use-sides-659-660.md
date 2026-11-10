@@ -28,11 +28,20 @@
   (`contract/sdk/java.rs` `rebuilt`; a `final` field is matched by name in every class of its
   file) names nothing, as does a request a step of which takes such a builder (`entries(e.build())`), in
   SQS's channel form and Azure's builder stages too, where a changed topic receiver keeps an
-  unresolved side. A named value (`Put p = pb.build()`, then `put(p)` or `putItem(req)`) is judged
-  where it was built (`Walk` in `contract/sdk/java.rs`): only what happens to its builder before
-  that `.build()` counts, with the builder's own named parts, so a builder set again afterwards
-  leaves the built copy its table. Past `EVAL_DEPTH` named values the walk stops and the name
-  stays unresolved; Java records no loops, so a set after the build in a loop is not seen. The
+  unresolved side. A Java builder changes in place, so `contract/sdk/java.rs`
+  (`Builders`, read once per file, then a lookup per value) names a table only when every mention
+  of its builder is a form the reader follows: a setter (a member of the name's path changes it,
+  any other does not), `.build()` and `Object`'s methods. Any other mention is a change it cannot
+  follow, and the side is unresolved: the builder handed to a call or captured, the receiver of
+  `applyMutation` or of `copy` with a consumer, the right side of an initializer or an
+  assignment (an alias, at any depth; `Facts::assigned` keeps the initializers `bound` drops),
+  and a write of its name the syntax model does not show (`Facts::mentioned` counts identifiers
+  against the calls made on it: a cast, a ternary, an array element, a lambda that returns it).
+  A named value (`Put p = pb.build()`) is judged where it was built: a mention after the build
+  does not change the copy, except in a loop or lambda the builder outlives (`Facts::loops`).
+  The question is asked per request call, so one entry the reader cannot follow leaves every
+  entry of that request unresolved. Past `EVAL_DEPTH` nested named values the name stays
+  unresolved, and `field_of` stops at a step that runs caller code. The
   folded Java name reader rejects a value-bound head before considering on-demand type
   candidates. `request` returns `None` for a field that a
   request it sees whole (`complete`: a Go or C# literal, a Java chain from `builder()`) leaves
