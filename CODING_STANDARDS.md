@@ -171,6 +171,11 @@ the browser decides too.
 A Known ceiling bounds only what the spec and the ticket leave out: every item they ask for is
 implemented, or reported as blocked.
 
+A documented class (a ceilings entry, a doc comment, a test name) is worded as narrowly as its
+tests: it lists the syntactic positions they cover, or they cover every position its wording
+names. #718 wrote "`*`, `+` or `?` with no operand" for three tested positions; after a group
+name or a group of flags Alertmanager refused the file and Meada kept its links `exact`.
+
 ## Claims the diff adds
 
 Check each claim a diff adds at its source, never against the ticket's wording:
