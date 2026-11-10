@@ -543,7 +543,8 @@ def selftest():
             commit_file("src/main.rs")
             commit_file("docs/notes.md")
             assert local_selection()[1] == ["docs/notes.md"]  # a clean tree alone checks the last commit
-            assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]
+            git("update-ref", "refs/remotes/origin/main", "HEAD~1")
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]  # the upstream wins
             git("branch", "-q", "--unset-upstream")
             git("update-ref", "refs/remotes/origin/main", "pushed")
             assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]  # no upstream: origin/main
@@ -559,7 +560,7 @@ def main():
     mode.add_argument("--ci", action="store_true")
     mode.add_argument("--static", action="store_true")
     parser.add_argument("--unpushed", action="store_true",
-                        help="check every commit not yet on the branch's upstream (the push gate)")
+                        help="check every commit not yet on the branch's upstream, or on origin/main without one (the push gate)")
     parser.add_argument("--scope", action="append", metavar="NAME",
                         help="run only the product tests whose path holds NAME (repeatable)")
     options = parser.parse_args()

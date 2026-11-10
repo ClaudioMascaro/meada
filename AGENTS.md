@@ -31,7 +31,7 @@ write tools; one index per repository; determinism) live in
 
 - Conventional Commits.
 - Local gate before every push: `scripts/check --unpushed` checks every commit not yet on the
-  branch's upstream (`scripts/check` alone: the staged diff or, on a clean tree, the last
+  branch's upstream, or on `origin/main` without one (`scripts/check` alone: the staged diff or, on a clean tree, the last
   commit). Docs, agent instructions and harness configuration get pertinent static checks and
   harness self-checks, without rebuilding the product, running its full suite or producing a
   `.prove-it` receipt. Unknown or product paths conservatively run the full applicable gate:
