@@ -86,7 +86,9 @@ pub(crate) enum Outcome {
     },
     /// A lockfile, skipped by name.
     Lockfile,
-    /// Skipped: it does not parse, or passes a ceiling, at `line`.
+    /// Skipped: it does not parse, or passes a ceiling, at `line`; or it is an Alertmanager
+    /// configuration with a regular expression Go refuses (`alert::refused`), whose values it
+    /// still keeps.
     Unreadable { line: usize, reason: String },
 }
 
@@ -721,6 +723,11 @@ pub(crate) fn read_with(
             },
         )
         .collect();
+    // An Alertmanager configuration Go's `regexp` refuses is one Alertmanager cannot load; its
+    // values stay searchable.
+    if let Some(reason) = crate::alert::refused(path, &documents) {
+        return (Outcome::Unreadable { line: 1, reason }, rows);
+    }
     let values = rows.len();
     let sensitive = sensitive.iter().cloned().collect();
     (

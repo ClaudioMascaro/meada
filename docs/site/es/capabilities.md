@@ -681,6 +681,15 @@ archivos de configuración y objetos `AlertmanagerConfig`. La igualdad crea un e
 Una condición negada (`!=`, `!~`) solo filtra la ruta: no crea lado ni enlace para el valor
 que excluye.
 
+Una expresión regular que el `regexp` de Go no compila (un grupo `(` sin cerrar, un `*` al
+inicio, un rango invertido `[z-a]`, un lookahead `(?=`) hace que Alertmanager rechace la
+configuración entera, así que Meada lee esa configuración, o ese objeto `AlertmanagerConfig`,
+como ilegible: no crea lado de alerta ni enlace y `meada status` cuenta el archivo en
+`ilegibles`. La misma configuración con la expresión corregida enlaza con normalidad. Una
+expresión que Meada deja sin correspondencia solo por sus propios límites, o porque no lee la
+sintaxis, vale para Alertmanager hasta donde Meada sabe: su matcher aparece como huérfano y
+las demás rutas siguen enlazando.
+
 `search` con kind `alert` encuentra el contrato; `context` en la ruta muestra su receiver,
 y `trace` recorre de la regla a la ruta y de vuelta. `meada export` incluye emisores,
 matchers y enlaces. `meada status` solo lista huérfanos cuando el ámbito visible contiene
