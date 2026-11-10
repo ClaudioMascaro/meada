@@ -1210,6 +1210,48 @@ fn every_stage_and_every_bind_mount_with_no_from_is_run() {
 }
 
 #[test]
+fn a_continued_dockerfile_line_runs_the_sources_docker_reads() {
+    // Docker keeps the blanks of a continued line and ends a line only at a lone backslash.
+    let repo = repo(
+        "images_dockerfile_continuation",
+        &[
+            (
+                "compose.yaml",
+                "services:\n  split:\n    build: {context: ., dockerfile: docker/Dockerfile}\n  \
+                 named:\n    build: {context: ., dockerfile: docker/Named}\n  \
+                 doubled:\n    build: {context: ., dockerfile: docker/Doubled}\n",
+            ),
+            (
+                "docker/Dockerfile",
+                "FROM x\nCOPY backend\\\n     frontend ./\n",
+            ),
+            (
+                "docker/Named",
+                "FROM x\nCOPY package.json\\\n     bun.lock ./\n",
+            ),
+            (
+                "docker/Doubled",
+                "FROM x\nRUN echo a\\\\\nCOPY frontend ./f\n",
+            ),
+            ("backend/a.py", "def a(): pass\n"),
+            ("frontend/b.ts", "export const b = 1;\n"),
+            ("package.json", "{}\n"),
+            ("bun.lock", "\n"),
+        ],
+    );
+    assert_eq!(
+        runs(&export(&repo)),
+        [
+            run("services.doubled", "frontend", "exact"),
+            run("services.named", "bun.lock", "exact"),
+            run("services.named", "package.json", "exact"),
+            run("services.split", "backend", "exact"),
+            run("services.split", "frontend", "exact"),
+        ]
+    );
+}
+
+#[test]
 fn a_wildcard_source_runs_exactly_the_files_it_matches() {
     let repo = repo(
         "images_dockerfile_wildcard",

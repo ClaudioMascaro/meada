@@ -53,23 +53,35 @@ pub(super) fn sources(text: &str) -> Result<Vec<String>, Unread> {
         if piece.is_empty() || piece.starts_with('#') {
             continue;
         }
-        // A trailing backslash joins the next line that is neither blank nor a comment.
+        // A continuing line joins the next one that is neither blank nor a comment, which keeps
+        // its leading blanks: `COPY a\` and `  b ./` are the words `a` and `b`.
         let mut logical = String::new();
-        while let Some(head) = piece.trim_end().strip_suffix('\\') {
+        while let Some(head) = continued(piece) {
             logical.push_str(head);
             piece = "";
             for next in lines.by_ref() {
-                let next = next.trim_start();
-                if !(next.is_empty() || next.starts_with('#')) {
+                let bare = next.trim_start();
+                if !(bare.is_empty() || bare.starts_with('#')) {
                     piece = next;
                     break;
                 }
             }
         }
-        logical.push_str(piece.trim_end());
-        instruction(&logical, &mut lines, &mut found)?;
+        logical.push_str(piece);
+        let logical = logical.trim();
+        if !logical.is_empty() {
+            instruction(logical, &mut lines, &mut found)?;
+        }
     }
     Ok(found)
+}
+
+/// A line without the backslash that continues it, as Docker's parser reads the default escape
+/// (`([^\\])\\[ \t]*$|^\\[ \t]*$`): a backslash, and the blanks after it, ends the line, unless
+/// another backslash precedes it (`\\` is a complete line).
+fn continued(line: &str) -> Option<&str> {
+    let head = line.trim_end_matches([' ', '\t']).strip_suffix('\\')?;
+    (!head.ends_with('\\')).then_some(head)
 }
 
 fn instruction(
@@ -584,6 +596,44 @@ mod tests {
         // A backslash at the end of the file ends the instruction.
         assert_eq!(ok("COPY a /b \\"), ["a"]);
         assert_eq!(ok("\u{feff}COPY a /b"), ["a"]);
+    }
+
+    // Docker's parser (buildkit `parser.go`) keeps the leading blanks of a continued line, so
+    // the words on either side of the join stay apart.
+    #[test]
+    fn a_continued_line_keeps_its_leading_blanks_so_two_sources_stay_two() {
+        assert_eq!(
+            ok("FROM x\nCOPY backend\\\n     frontend ./\n"),
+            ["backend", "frontend"]
+        );
+        assert_eq!(
+            ok("COPY backend \\\n\tfrontend ./"),
+            ["backend", "frontend"]
+        );
+    }
+
+    #[test]
+    fn a_file_name_cut_by_a_continuation_is_still_two_sources() {
+        assert_eq!(
+            ok("COPY package.json\\\n     bun.lock ./\n"),
+            ["package.json", "bun.lock"]
+        );
+        // The blanks after the backslash end the line as the backslash does.
+        assert_eq!(ok("COPY a.json\\ \t\n  b.lock ./\n"), ["a.json", "b.lock"]);
+    }
+
+    // The continuation is a backslash at the end of the line that no backslash precedes
+    // (`([^\\])\\[ \t]*$|^\\[ \t]*$`): a line ending in `\\` is complete.
+    #[test]
+    fn a_line_ending_in_two_backslashes_does_not_continue() {
+        assert_eq!(
+            ok("FROM x\nRUN echo a\\\\\nCOPY frontend ./f\n"),
+            ["frontend"]
+        );
+        // A backslash alone on its line continues, with nothing to add.
+        assert_eq!(ok("COPY a \\\n\\\n  b /d\n"), ["a", "b"]);
+        assert_eq!(ok("\\\n  COPY a /d\n"), ["a"]);
+        assert_eq!(ok("COPY a /d\n\\"), ["a"]);
     }
 
     #[test]
