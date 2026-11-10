@@ -91,6 +91,12 @@ that changes only part of the path leaves the rest comparing the code with itsel
 `community` and `duplicate`, the contract-site spans, the `context` community line and the trace
 starts could not fail. No tool checks this; a PR without the mutation is a review finding.
 
+A case for a conversion boundary (a declared type, a module argument, an override) uses a value
+the conversion changes (unsorted, with a duplicate) and a name that depends on the value; a rule
+the oracle models by hand names its source, the file and function of the emulated tool, where
+the model lives. In #720 and #740 one-element defaults hid a set's sort and duplicates, and an
+override rule modelled from the same reading as the code agreed with it.
+
 Code that skips, caches or narrows work (a kept group, a fast path, a cache hit) also carries
 one test that goes red when the path is forced off (it keeps nothing, caches nothing), because
 equivalence tests pass with the optimization disabled: the answer is right, only slow. In #391
