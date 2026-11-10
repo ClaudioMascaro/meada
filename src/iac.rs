@@ -585,11 +585,12 @@ fn converted_once(value: Value, ty: Option<Declared>) -> Option<Value> {
 /// only OpenTofu reads (`.tofu`, `.tofu.json`) is one Terraform does not read whole, and OpenTofu
 /// 1.13 and later convert the default once, to the final type, where 1.12 and earlier convert it
 /// as Terraform does: the default is unresolved where the two hold other elements, or another
-/// kind of collection, so that no tool's answer is taken for certain. A default that an override
-/// file only OpenTofu reads gave, over a declaration Terraform reads, is Terraform's to ignore:
-/// unresolved too.
+/// kind of collection, so that no tool's answer is taken for certain. An override in such a file
+/// is merged as OpenTofu merges it, also over a declaration Terraform reads.
 fn declared_default(found: Evaluated, variable: &Variable) -> Evaluated {
-    if let (true, Val::Known(v), [_, ..]) = (variable.opentofu, &found.val, &variable.through[..]) {
+    // Only a set type converts a value here, so a default no set type touches is one value.
+    let set = (variable.through.iter()).any(|t| matches!(t, Declared::Set(_)));
+    if let (true, true, Val::Known(v)) = (variable.opentofu, set, &found.val) {
         let (twice, once) = (
             converted_through(v.clone(), &variable.through),
             converted_once(v.clone(), variable.ty),
@@ -601,12 +602,6 @@ fn declared_default(found: Evaluated, variable: &Variable) -> Evaluated {
                 through: found.through,
             };
         }
-    }
-    if variable.opentofu_default {
-        return Evaluated {
-            val: Val::Unknown,
-            through: found.through,
-        };
     }
     declared(found, &variable.through)
 }
@@ -623,10 +618,6 @@ struct Variable {
     /// Whether any of its blocks, declaring or overriding, is in a file only OpenTofu reads
     /// (`.tofu`, `.tofu.json`).
     opentofu: bool,
-    /// Whether its declaring block is in such a file.
-    declared_in_opentofu: bool,
-    /// Whether its default comes from such an override file over a declaration Terraform reads.
-    opentofu_default: bool,
     sensitive: bool,
     path: String,
     line: usize,
@@ -652,19 +643,14 @@ impl Module {
                 // A default is converted to the type its block declares when it is decoded.
                 variable.through = variable.default.iter().flat_map(|_| variable.ty).collect();
                 variable.opentofu = config_values::only_opentofu(&variable.path);
-                variable.declared_in_opentofu = variable.opentofu;
                 self.variables.insert(name.to_string(), variable);
             }
             return;
         };
         variable.sensitive |= declared.sensitive;
         // Any block in a file only OpenTofu reads, whatever the order the blocks come in.
-        let tofu = config_values::only_opentofu(&variable.path);
-        variable.opentofu = declared.opentofu | tofu;
+        variable.opentofu = declared.opentofu | config_values::only_opentofu(&variable.path);
         declared.opentofu = variable.opentofu;
-        variable.declared_in_opentofu = declared.declared_in_opentofu;
-        variable.opentofu_default = declared.opentofu_default
-            || (overriding && tofu && variable.default.is_some() && !declared.declared_in_opentofu);
         // An override block's `type` replaces the declared one; without one the declared stays.
         let (own, merged) = (variable.ty, variable.ty.or(declared.ty));
         // An override block without a default keeps the declared one, and where it is.
@@ -1400,8 +1386,6 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
                     ty: attr("type").map(Declared::expr),
                     through: Vec::new(),
                     opentofu: false,
-                    declared_in_opentofu: false,
-                    opentofu_default: false,
                     sensitive: crate::config_values::hcl::is_sensitive(attr("sensitive")),
                     path: path.to_string(),
                     line: line(b.span().map_or(0, |s| s.start)),

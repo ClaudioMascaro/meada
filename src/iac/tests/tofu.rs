@@ -253,11 +253,23 @@ fn a_declaration_terraform_reads_retyped_by_a_file_only_opentofu_reads_is_compar
             ],
             UNRESOLVED,
         ),
-        // Terraform keeps the declared default, OpenTofu takes the override's.
+        // The override's own default, of the final type: one value under both conversions, read
+        // as OpenTofu reads it (Terraform ignores the override, a ceiling).
         (
             "an override.tofu giving its own default",
             vec![("main.tf", &main), ("override.tofu", own)],
-            UNRESOLVED,
+            "f-0-b, f-1-a, f-2-a",
+        ),
+        (
+            "an override.tofu giving only a default",
+            vec![
+                ("main.tf", &main),
+                (
+                    "override.tofu",
+                    "variable \"s\" {\n  default = [\"c\"]\n}\n",
+                ),
+            ],
+            "f-0-c",
         ),
         // The two rules give one set.
         (
@@ -268,6 +280,151 @@ fn a_declaration_terraform_reads_retyped_by_a_file_only_opentofu_reads_is_compar
     ];
     for (row, files, want) in rows {
         assert_eq!(answer(&files), want, "{row}");
+    }
+}
+
+/// A default no set type touches is converted by neither rule, so a block in a file only OpenTofu
+/// reads changes nothing: it names what the same variable names in `.tf` files, whatever its
+/// elements are written as. Terraform v1.17.1 (the files renamed) and OpenTofu v1.13.9 agree on
+/// every row.
+#[test]
+fn a_default_no_set_type_touches_is_exact_with_a_block_only_opentofu_reads() {
+    let variable = |ty: &str, default: &str| {
+        let ty = match ty {
+            "" => String::new(),
+            ty => format!("  type = {ty}\n"),
+        };
+        format!("variable \"s\" {{\n{ty}  default = {default}\n}}\n")
+    };
+    let read = |ty: &str, default: &str| format!("{}{READ}", variable(ty, default));
+    let numbers = read("list(string)", "[10, 9, 10]");
+    let strings = read("list(string)", "[\"10\", \"9\", \"10\"]");
+    let list = read("list(string)", "[\"b\", \"a\", \"a\"]");
+    let untyped = read("", "[\"b\", \"a\", \"a\"]");
+    let tuple = read("tuple([string, number])", "[\"b\", 1]");
+    let objects = format!(
+        "{}resource \"a\" \"f\" {{\n  for_each = toset([for k, v in var.s : \"${{k}}-${{v.name}}\"])\n  name = \"f-${{each.value}}\"\n}}\n",
+        variable(
+            "list(object({ name = string }))",
+            "[{ name = \"b\" }, { name = \"a\" }, { name = \"a\" }]"
+        )
+    );
+    let same = variable("", "[10, 9, 10]");
+    let rows: Vec<Row> = vec![
+        (
+            "numbers in a list(string), main.tofu",
+            vec![("main.tofu", &numbers)],
+            "f-0-10, f-1-9, f-2-10",
+        ),
+        (
+            "numeric strings in a list(number), main.tofu.json",
+            vec![
+                (
+                    "main.tofu.json",
+                    r#"{"variable": {"s": {"type": "list(number)", "default": ["10", "9"]}}}"#,
+                ),
+                ("read.tf", READ),
+            ],
+            "f-0-10, f-1-9",
+        ),
+        (
+            "a list of objects, main.tofu",
+            vec![("main.tofu", &objects)],
+            "f-0-b, f-1-a, f-2-a",
+        ),
+        (
+            "an override.tofu giving only a default",
+            vec![("main.tofu", &numbers), ("override.tofu", &same)],
+            "f-0-10, f-1-9, f-2-10",
+        ),
+        (
+            "an override.tf giving only a default",
+            vec![("main.tofu", &numbers), ("override.tf", &same)],
+            "f-0-10, f-1-9, f-2-10",
+        ),
+        (
+            "a list(string) in main.tf retyped list(number) by override.tofu",
+            vec![
+                ("main.tf", &strings),
+                (
+                    "override.tofu",
+                    "variable \"s\" {\n  type = list(number)\n}\n",
+                ),
+            ],
+            "f-0-10, f-1-9, f-2-10",
+        ),
+        (
+            "a list in main.tf, the same default in override.tofu",
+            vec![
+                ("main.tf", &list),
+                (
+                    "override.tofu",
+                    "variable \"s\" {\n  default = [\"b\", \"a\", \"a\"]\n}\n",
+                ),
+            ],
+            "f-0-b, f-1-a, f-2-a",
+        ),
+        (
+            "untyped in main.tf, the same default in override.tofu.json",
+            vec![
+                ("main.tf", &untyped),
+                (
+                    "override.tofu.json",
+                    r#"{"variable": {"s": {"default": ["b", "a", "a"]}}}"#,
+                ),
+            ],
+            "f-0-b, f-1-a, f-2-a",
+        ),
+        (
+            "a tuple in main.tf, the same default in override.tofu",
+            vec![
+                ("main.tf", &tuple),
+                (
+                    "override.tofu",
+                    "variable \"s\" {\n  default = [\"b\", 1]\n}\n",
+                ),
+            ],
+            "f-0-b, f-1-1",
+        ),
+    ];
+    for (row, files, want) in rows {
+        assert_eq!(answer(&files), want, "{row}");
+    }
+}
+
+/// The last block that gives a default decides it: one an override file Terraform reads gives
+/// after a `.tofu` override's is the default of both tools (`0-d`, `1-e` in each).
+#[test]
+fn a_default_a_later_override_gives_replaces_the_one_an_opentofu_override_gave() {
+    let main = format!("{DECLARED}{READ}");
+    let first = "variable \"s\" {\n  default = [\"c\"]\n}\n";
+    let last = "variable \"s\" {\n  default = [\"e\", \"d\", \"d\"]\n}\n";
+    let rows: Vec<(&str, Vec<(&str, &str)>)> = vec![
+        (
+            "a_override.tofu, then b_override.tf",
+            vec![
+                ("main.tf", &main),
+                ("a_override.tofu", first),
+                ("b_override.tf", last),
+            ],
+        ),
+        (
+            "a_override.tofu.json, then b_override.tf.json",
+            vec![
+                ("main.tf", &main),
+                (
+                    "a_override.tofu.json",
+                    r#"{"variable": {"s": {"default": ["c"]}}}"#,
+                ),
+                (
+                    "b_override.tf.json",
+                    r#"{"variable": {"s": {"default": ["e", "d", "d"]}}}"#,
+                ),
+            ],
+        ),
+    ];
+    for (row, files) in rows {
+        assert_eq!(answer(&files), "f-0-d, f-1-e", "{row}");
     }
 }
 
