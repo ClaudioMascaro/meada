@@ -97,6 +97,10 @@ the oracle models by hand names its source, the file and function of the emulate
 the model lives. In #720 and #740 one-element defaults hid a set's sort and duplicates, and an
 override rule modelled from the same reading as the code agreed with it.
 
+A new test that compares Meada with an oracle is mutated on its expected side too (add an exact
+line the oracle does not give, drop one) and seen to fail, not only the code under test: in #720
+the verdict skipped the exact lines beside a pattern line, and no mutation of the fix could show it.
+
 Code that skips, caches or narrows work (a kept group, a fast path, a cache hit) also carries
 one test that goes red when the path is forced off (it keeps nothing, caches nothing), because
 equivalence tests pass with the optimization disabled: the answer is right, only slow. In #391
