@@ -533,3 +533,10 @@ Config uses (#661) appear in the contracts view's separate optional uses column,
 plus `at`; the graph never puts them in provider or consumer columns. Provisioning rows retain
 those uses' repository-level side and key locator, while existing directed links keep their
 own view. WASM `parseExport` retains the optional `uses` and provisioning `at` fields.
+
+Frontend modules that the page sections above reach only by their symbols: `api.ts` (the typed
+client and `ApiError`), `core.ts` (the WebAssembly `meada-core` loader and re-exports),
+`commands.ts` (`shellQuote` for the copy-as-command text), `actions-i18n.ts` (copy of the
+generation actions), `catalog.ts` and `catalog-i18n.ts` (the repository catalog's DTOs and copy),
+`named.ts` and `named-i18n.ts` (the named-workspace DTOs and copy), `named-core.ts` (the one parser
+of the `named*` core results) and `WorkspaceVersions.tsx` (a workspace's version list and diff).
