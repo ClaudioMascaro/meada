@@ -1,7 +1,8 @@
 //! The module cases of `tests/terraform-oracle/modules/`: directories of Terraform files whose
 //! `for_each` keys (`want`) the oracle computes with HashiCorp's libraries and Terraform's rules
 //! at the boundaries a name crosses (a variable's declared type, a module argument, an override
-//! file). An exact name must be the one Terraform gives, and a case marked `=` must be exact.
+//! file). An exact name must be the one Terraform gives, a case marked `=` must be exact and one
+//! marked `*` (Terraform and OpenTofu differ) unresolved.
 
 use super::*;
 use std::path::Path;
@@ -53,9 +54,9 @@ fn module_cases_agree_with_the_terraform_oracle() {
 
 /// Whether Meada's lines for `a.q` agree with Terraform's `keys` (`!` and a reason: it refuses; no
 /// key: no instance). Every exact line must be a name Terraform gives; a line that is a pattern
-/// leaves the others partial, and `must` `=` allows none.
+/// leaves the others partial, `must` `=` allows none and `*` allows no exact line.
 fn judge(must: &str, keys: &str, lines: &[String]) -> bool {
-    assert!(matches!(must, "=" | "~"), "not a marker: {must:?}");
+    assert!(matches!(must, "=" | "~" | "*"), "not a marker: {must:?}");
     let mut expected: Vec<String> = (keys
         .split(',')
         .filter(|k| !k.is_empty() && !keys.starts_with('!')))
@@ -68,6 +69,10 @@ fn judge(must: &str, keys: &str, lines: &[String]) -> bool {
     exact.sort();
     let pattern = lines.iter().any(|l| l.contains(" ~ "));
     let given = exact.iter().all(|name| expected.iter().any(|e| e == name));
+    // `*`: Terraform and OpenTofu differ, so no name is certain: a pattern line and no exact one.
+    if must == "*" {
+        return pattern && exact.is_empty();
+    }
     given
         && match pattern {
             true => must != "=",
@@ -98,6 +103,14 @@ fn a_case_is_judged_on_every_exact_line_it_gives() {
     // An instance missing from an all-exact answer fails.
     assert!(!judge("=", "x,y", &lines(&["a.q[\"x\"] = \"queue-x\""])));
     assert!(!judge("=", "x", &[]));
+}
+
+#[test]
+fn a_case_where_the_tools_differ_must_be_unresolved() {
+    let exact = ["a.q[\"0a\"] = \"queue-0a\"".to_string()];
+    let pattern = ["a.q ~ \"queue-*\"".to_string()];
+    assert!(!judge("*", "0a", &exact) && !judge("*", "0a", &[]));
+    assert!(judge("*", "0a", &pattern));
 }
 
 #[test]

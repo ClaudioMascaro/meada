@@ -18,7 +18,10 @@ import (
 // local module `m/` that the root calls as `module "m" { source = "./m" ... }`. Its `want` file is
 // `<must>\t<keys>`: the keys of the `for_each` of the resource `a.q` (the one in `m/` when the
 // root has none), sorted and joined by commas, which `go run .` rewrites; `=` means Meada must
-// answer them exactly, `~` that it may leave them unresolved. `!` and a reason stand for keys
+// answer them exactly, `~` that it may leave them unresolved, `*` that it must (Terraform and
+// OpenTofu differ there: OpenTofu 1.13 and later convert a default once, to the final type, where
+// Terraform and OpenTofu 1.12 and earlier convert it to the type of the block that declares it
+// and again to the final one; the keys are Terraform's). `!` and a reason stand for keys
 // Terraform refuses; `-` stands for no key at all. The test in src/iac/tests/oracle.rs indexes
 // the directory's files.
 //
@@ -304,8 +307,8 @@ func moduleCases(dir string) (changed, total int, err error) {
 			return 0, 0, err
 		}
 		cols := strings.Split(strings.TrimSuffix(string(text), "\n"), "\t")
-		if len(cols) != 2 || (cols[0] != "=" && cols[0] != "~") {
-			return 0, 0, fmt.Errorf("%s: want `=` or `~` and the keys, tab-separated", want)
+		if len(cols) != 2 || (cols[0] != "=" && cols[0] != "~" && cols[0] != "*") {
+			return 0, 0, fmt.Errorf("%s: want `=`, `~` or `*` and the keys, tab-separated", want)
 		}
 		total++
 		got, err := moduleKeys(filepath.Dir(want))
