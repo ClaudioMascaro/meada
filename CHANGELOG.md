@@ -375,9 +375,11 @@ All notable changes to Meada are recorded here. The format follows
   `toset(...)`, a chain of locals, a variable declared `type = set(...)`) is unresolved
   instead of answering the index as an exact key, as it already was over a written `toset(...)`
   (#720). A set reached through an attribute, an index or another call stays a ceiling (#717).
-- Terraform: the default of a variable declared `type = set(...)` is a set (sorted, without
-  duplicates) as Terraform makes it when it decodes the block, so `tolist(var.s)` over a default
-  `["b", "a", "a"]` no longer gives three exact instances (#720).
+- Terraform: a value that enters a variable declared `set(T)` (its default, a var file's value, a
+  module argument, an override's default) is converted to elements of type `T`, then sorted and
+  deduplicated as cty does, so `tolist(var.s)`, `length(var.s)` and `join` over `["b", "a", "a"]`
+  see `a`, `b`, and a `set(string)` of `[10, 9]` keeps the strings `"10"` and `"9"` in string
+  order. An element Meada cannot convert with certainty leaves the value unresolved (#720).
 - Terraform: an override file that replaces the `type` of a variable whose own block declares a
   set type now names what Terraform creates: the default is converted to the set first, then to
   the new type (`list(string)` gives the set's elements in set order, `any` and `set(string)`

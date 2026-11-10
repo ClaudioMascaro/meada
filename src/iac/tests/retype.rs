@@ -180,3 +180,117 @@ fn an_untyped_default_retyped_as_a_list_keeps_its_order() {
     let got = answer(main, "var.s", &[("override.tf", &list)]);
     assert_eq!(got, "queue-0-b, queue-1-a, queue-2-a");
 }
+
+/// A value that enters a variable declared `set(T)` is converted to `T`, then sorted and
+/// deduplicated as cty does, from whichever source: Terraform v1.17.1 and OpenTofu v1.13.9 agree
+/// on every row.
+#[test]
+fn a_value_entering_a_declared_set_is_converted_to_its_element_type() {
+    let by = |main: &str| answer(main, "tolist(var.s)", &[]);
+    let set = |ty: &str, default: &str| {
+        format!("variable \"s\" {{\n  type = set({ty})\n  default = {default}\n}}\n")
+    };
+    assert_eq!(by(&set("string", "[10, 9]")), "queue-0-10, queue-1-9");
+    assert_eq!(by(&set("number", "[2, \"10\"]")), "queue-0-2, queue-1-10");
+    assert_eq!(
+        by(&set("number", "[\"10\", \"9\"]")),
+        "queue-0-9, queue-1-10"
+    );
+    let list = "variable \"s\" {\n  type = list(string)\n  default = [\"10\", \"9\"]\n}\n";
+    let number = over("  type = set(number)\n");
+    assert_eq!(
+        answer(list, "tolist(var.s)", &[("override.tf", &number)]),
+        "queue-0-9, queue-1-10"
+    );
+    // An element Meada cannot convert with certainty leaves the value unresolved.
+    assert_eq!(by(&set("number", "[\"x\"]")), UNRESOLVED);
+    assert_eq!(by(&set("set(string)", "[[\"a\"]]")), UNRESOLVED);
+}
+
+/// The default, a var file's value and a module argument of a declared `set(string)` are one set,
+/// read by `tolist`, by `length` as a `count`, by `join` and by `for_each`.
+#[test]
+fn every_source_of_a_declared_set_is_sorted_and_deduplicated() {
+    let value = "[\"b\", \"a\", \"a\"]";
+    let readers: [(&str, &str, &[&str]); 4] = [
+        (
+            "tolist",
+            "resource \"a\" \"q\" {\n  for_each = {for k, v in tolist(var.s) : k => v}\n  name = \"queue-${each.key}-${each.value}\"\n}\n",
+            &["q[\"0\"] = \"queue-0-a\"", "q[\"1\"] = \"queue-1-b\""],
+        ),
+        (
+            "length",
+            "resource \"a\" \"q\" {\n  count = length(var.s)\n  name = \"queue-${count.index}\"\n}\n",
+            &["q[0] = \"queue-0\"", "q[1] = \"queue-1\""],
+        ),
+        (
+            "join",
+            "resource \"a\" \"q\" {\n  name = \"queue-${join(\"-\", var.s)}\"\n}\n",
+            &["q = \"queue-a-b\""],
+        ),
+        (
+            "for_each",
+            "resource \"a\" \"q\" {\n  for_each = var.s\n  name = \"queue-${each.key}\"\n}\n",
+            &["q[\"a\"] = \"queue-a\"", "q[\"b\"] = \"queue-b\""],
+        ),
+    ];
+    let variable = "variable \"s\" {\n  type = set(string)\n}\n";
+    let with_default =
+        format!("variable \"s\" {{\n  type = set(string)\n  default = {value}\n}}\n");
+    let sources = [
+        ("default", "", ""),
+        ("terraform.tfvars", variable, "terraform.tfvars"),
+        ("x.auto.tfvars", variable, "x.auto.tfvars"),
+        ("module argument", variable, "module"),
+    ];
+    for (source, declaration, file) in sources {
+        for (reader, resource, want) in readers {
+            let (prefix, main, more): (&str, String, Vec<(String, String)>) = match source {
+                "default" => ("", format!("{with_default}{resource}"), vec![]),
+                "module argument" => (
+                    "module.m.",
+                    format!("module \"m\" {{\n  source = \"./m\"\n  s = {value}\n}}\n"),
+                    vec![("m/main.tf".into(), format!("{declaration}{resource}"))],
+                ),
+                _ => (
+                    "",
+                    format!("{declaration}{resource}"),
+                    vec![(file.into(), format!("s = {value}\n"))],
+                ),
+            };
+            let mut list = vec![("main.tf", main.as_str())];
+            list.extend(more.iter().map(|(p, t)| (p.as_str(), t.as_str())));
+            let got: Vec<String> = (names(&list).into_iter())
+                .filter(|n| n.starts_with(&format!("{prefix}a.")))
+                .map(|n| n.split(" [").next().unwrap().to_string())
+                .collect();
+            let want: Vec<String> = want.iter().map(|w| format!("{prefix}a.{w}")).collect();
+            assert_eq!(got, want, "{source} read by {reader}");
+        }
+    }
+}
+
+/// An argument reaches a declared set through a `list(string)` variable of the module between: the
+/// list keeps its order and the set sorts it.
+#[test]
+fn an_argument_passed_through_a_list_variable_is_converted_by_the_declared_set() {
+    let outer = "module \"m\" {\n  source = \"./m\"\n  l = [\"b\", \"a\", \"a\"]\n}\n";
+    let mid = "variable \"l\" {\n  type = list(string)\n}\nmodule \"n\" {\n  source = \"./n\"\n  s = var.l\n}\n";
+    let inner = format!(
+        "{}resource \"a\" \"q\" {{\n  for_each = {{for k, v in tolist(var.s) : k => v}}\n  name = \"queue-${{each.key}}-${{each.value}}\"\n}}\n",
+        "variable \"s\" {\n  type = set(string)\n}\n"
+    );
+    let got = names(&[
+        ("main.tf", outer),
+        ("m/main.tf", mid),
+        ("m/n/main.tf", &inner),
+    ]);
+    let got: Vec<&str> = got.iter().map(|n| n.split(" [").next().unwrap()).collect();
+    assert_eq!(
+        got[got.len() - 2..],
+        [
+            "module.m.module.n.a.q[\"0\"] = \"queue-0-a\"",
+            "module.m.module.n.a.q[\"1\"] = \"queue-1-b\""
+        ]
+    );
+}

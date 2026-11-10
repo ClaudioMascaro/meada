@@ -221,7 +221,8 @@ this file, and a change to these modules updates it.
   pure functions when `cost` (an upper bound of its bytes) fits `EVAL_COST_MAX` and the root's
   `EVAL_WORK_MAX`; else `Eval::partial` keeps a template's resolved parts and puts `*` for the rest.
   A name's value crosses boundaries that change it in Terraform: a variable's declared `type`
-  converts what it receives (`Declared`; `any` keeps the value), a module argument is evaluated
+  converts what it receives where every source passes (`Eval::var`, `converted_through`: a
+  `set(T)` converts its elements to `T`, sorts and deduplicates them; `any` keeps the value), a module argument is evaluated
   in the caller, an override file's `type` and `default` replace the declared ones (`Module::declare`: Terraform
   converts the default to the declaring block's type and again to the override's, which Meada
   follows; OpenTofu 1.13+ converts once, a ceiling), a var file's value replaces the default. Check each against Terraform's rule when a change decides on a
