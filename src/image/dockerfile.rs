@@ -26,7 +26,8 @@ const WORK_MAX: usize = 16_384;
 /// context, each normalized from the context root (`.` for the whole of it) with a wildcard still
 /// in it. `COPY --from`, `ADD` of a URL or a git repository, a heredoc and every other mount read
 /// nothing from the context. An error says why the Dockerfile is not read: a source with a
-/// variable, a `# escape=` directive, a flag or an instruction this reader does not know.
+/// variable or a `**` under `--parents`, a `# escape=` directive, a flag or an instruction this
+/// reader does not know.
 pub(super) fn sources(text: &str) -> Result<Vec<String>, Unread> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     for line in text.lines() {
@@ -102,10 +103,13 @@ fn instruction(
     if found.len() > PATHS_MAX {
         return Err("more sources than the reader keeps");
     }
-    if matches!(word.as_str(), "RUN" | "COPY" | "ADD" | "ONBUILD") {
+    if line.contains("<<") && takes_heredocs(&word, args)? {
         // The lines of each heredoc are its body, up to its delimiter, not instructions.
-        for (delimiter, tabs) in heredocs(args) {
-            let ends = |l: &str| (if tabs { l.trim_start_matches('\t') } else { l }) == delimiter;
+        for (delimiter, tabs) in heredocs(line)? {
+            let ends = |l: &str| {
+                let l = l.trim_end_matches('\r');
+                (if tabs { l.trim_start_matches('\t') } else { l }) == delimiter
+            };
             if !lines.by_ref().any(ends) {
                 return Err("a heredoc with no end");
             }
@@ -114,19 +118,115 @@ fn instruction(
     Ok(())
 }
 
-/// The heredocs an instruction opens, in order: each delimiter, and whether `<<-` strips the tabs
-/// before it. A word is one when it is `<<` (after an optional file descriptor), an optional `-`
-/// and a name, as Docker's parser reads it.
-fn heredocs(args: &str) -> Vec<(String, bool)> {
-    args.split_whitespace()
-        .filter_map(|word| {
-            let rest = word.trim_start_matches(|c: char| c.is_ascii_digit());
-            let rest = rest.strip_prefix("<<").filter(|r| !r.starts_with('<'))?;
-            let (tabs, name) = rest.strip_prefix('-').map_or((false, rest), |n| (true, n));
-            let name = name.trim_matches(['"', '\'']);
-            (!name.is_empty()).then(|| (name.to_string(), tabs))
-        })
-        .collect()
+/// Whether Docker reads heredocs after an instruction (`canContainHeredoc`): `RUN`, `COPY` or
+/// `ADD`, also as the instruction of an `ONBUILD`, in shell form rather than a JSON list.
+fn takes_heredocs(word: &str, args: &str) -> Result<bool, Unread> {
+    let (word, args) = match word {
+        "ONBUILD" => {
+            let (word, args) = args.split_once(char::is_whitespace).unwrap_or((args, ""));
+            (word.to_ascii_uppercase(), args.trim())
+        }
+        _ => (word.to_string(), args),
+    };
+    Ok(matches!(word.as_str(), "RUN" | "COPY" | "ADD")
+        && serde_json::from_str::<Vec<String>>(flags(args)?.1).is_err())
+}
+
+/// The heredocs a line opens, in order: each delimiter, and whether `<<-` strips the tabs before
+/// it, from the words Docker's shell lexer splits the line into (`heredocsFromLine`).
+fn heredocs(line: &str) -> Result<Vec<(String, bool)>, Unread> {
+    let words = words(line)?.unwrap_or_default();
+    Ok(words.iter().filter_map(|word| heredoc(word)).collect())
+}
+
+/// The name a word opens a heredoc with, and whether `<<-` strips its tabs, as Docker's parser
+/// reads it: `^(\d*)<<(-?)\s*([^<]*)$`, then the name as one word without its quotes and escapes.
+fn heredoc(word: &str) -> Option<(String, bool)> {
+    let rest = word.trim_start_matches(|c: char| c.is_ascii_digit());
+    let rest = rest.strip_prefix("<<")?;
+    let (tabs, rest) = rest.strip_prefix('-').map_or((false, rest), |r| (true, r));
+    let rest = rest.trim_start_matches(['\t', '\n', '\x0c', '\r', ' ']);
+    if rest.contains('<') {
+        return None;
+    }
+    let (mut name, mut quote, mut chars) = (String::new(), None, rest.chars().peekable());
+    while let Some(c) = chars.next() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (None, '\'' | '"') => quote = Some(c),
+            (None, '\\') => name.extend(chars.next()),
+            (Some('"'), '\\') => name.push(
+                chars
+                    .next_if(|e| matches!(e, '"' | '$' | '\\'))
+                    .unwrap_or(c),
+            ),
+            (None, c) if c.is_whitespace() => return None,
+            (_, c) => name.push(c),
+        }
+    }
+    (quote.is_none() && !name.is_empty()).then_some((name, tabs))
+}
+
+/// The words Docker's shell lexer splits a line into to find its heredocs, keeping quotes, escapes
+/// and unset variables as written: a blank ends a word unless it is quoted, escaped or right after
+/// `<<`. `None` when the lexer fails on the line, which then opens no heredoc.
+fn words(line: &str) -> Result<Option<Vec<String>>, Unread> {
+    let (mut out, mut word, mut chars) = (Vec::new(), String::new(), line.chars().peekable());
+    while let Some(c) = chars.next() {
+        if c.is_whitespace() {
+            if !word.is_empty() {
+                out.push(std::mem::take(&mut word));
+            }
+            continue;
+        }
+        word.push(c);
+        match c {
+            '\\' => word.extend(chars.next()),
+            '\'' | '"' => loop {
+                let Some(q) = chars.next() else {
+                    return Ok(None);
+                };
+                word.push(q);
+                match q {
+                    _ if q == c => break,
+                    '\\' if c == '"' => word.extend(chars.next()),
+                    '$' if c == '"' => variable(&mut chars, &mut word)?,
+                    _ => {}
+                }
+            },
+            '$' => variable(&mut chars, &mut word)?,
+            '<' if chars.next_if_eq(&'<').is_some() => {
+                word.push('<');
+                word.extend(std::iter::from_fn(|| {
+                    chars.next_if(|b| matches!(b, ' ' | '\t' | '\r'))
+                }));
+            }
+            _ => {}
+        }
+    }
+    out.extend((!word.is_empty()).then_some(word));
+    Ok(Some(out))
+}
+
+/// A `$` on a heredoc's line: Docker keeps `$name` and `${name}` as written, and splits the other
+/// `${...}` forms (`${a:-b c}`) into words of their own or fails on them.
+fn variable(
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    word: &mut String,
+) -> Result<(), Unread> {
+    if chars.next_if_eq(&'{').is_none() {
+        return Ok(());
+    }
+    let name: String =
+        std::iter::from_fn(|| chars.next_if(|c| c.is_ascii_alphanumeric() || *c == '_')).collect();
+    let plain = name.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_');
+    if !plain || chars.next_if_eq(&'}').is_none() {
+        return Err("a variable form this reader does not expand");
+    }
+    word.push('{');
+    word.push_str(&name);
+    word.push('}');
+    Ok(())
 }
 
 /// The `--name=value` flags of an instruction, as (lowercase name, value) pairs.
@@ -149,12 +249,13 @@ fn flags(mut args: &str) -> Result<(Flags, &str), Unread> {
 
 fn copy(add: bool, args: &str, found: &mut Vec<String>) -> Result<(), Unread> {
     let (flags, args) = flags(args)?;
-    let mut from = false;
-    for (name, _) in &flags {
+    let (mut from, mut parents) = (false, false);
+    for (name, value) in &flags {
         match name.as_str() {
-            "from" => from = true,
-            "chown" | "chmod" | "link" | "parents" | "exclude" | "keep-git-dir" | "checksum"
-            | "unpack" => {}
+            // `--from=` copies from the context.
+            "from" => from = !value.is_empty(),
+            "parents" => parents = !value.eq_ignore_ascii_case("false"),
+            "chown" | "chmod" | "link" | "exclude" | "keep-git-dir" | "checksum" | "unpack" => {}
             _ => return Err("a COPY or ADD flag this reader does not know"),
         }
     }
@@ -166,25 +267,35 @@ fn copy(add: bool, args: &str, found: &mut Vec<String>) -> Result<(), Unread> {
     };
     for source in sources.iter().filter(|_| !from) {
         let remote = add && (source.contains("://") || source.starts_with("git@"));
-        if !(remote || source.starts_with("<<")) {
-            found.push(normalize(source)?);
+        if remote || heredoc(source).is_some() {
+            continue;
         }
+        // Under `--parents` Docker matches with its pattern matcher, where `**` crosses directories.
+        if parents && source.contains("**") {
+            return Err("a ** wildcard with --parents");
+        }
+        found.push(normalize(source)?);
     }
     Ok(())
 }
 
 fn run(args: &str, found: &mut Vec<String>) -> Result<(), Unread> {
     for (_, value) in flags(args)?.0.iter().filter(|(name, _)| name == "mount") {
-        let (mut kind, mut source, mut from) = ("bind", ".", false);
+        // buildkit's `parseMount` reads the keys and the type in any case; `from=` is the context.
+        let (mut kind, mut source, mut from) = (String::from("bind"), ".", "");
         for option in value.split(',') {
-            match option.split_once('=') {
-                Some(("type", v)) => kind = v,
-                Some(("source" | "src", v)) => source = v,
-                Some(("from", _)) => from = true,
+            let (key, v) = option.split_once('=').unwrap_or((option, ""));
+            match key.to_ascii_lowercase().as_str() {
+                "type" => kind = v.to_ascii_lowercase(),
+                "source" | "src" => source = v,
+                "from" => from = v,
                 _ => {}
             }
         }
-        if kind == "bind" && !from {
+        if kind.contains('$') {
+            return Err("a mount type with a variable");
+        }
+        if kind == "bind" && from.is_empty() {
             found.push(normalize(source)?);
         }
     }
@@ -259,8 +370,9 @@ fn compile(segment: &str) -> Option<Vec<Tok>> {
     Some(out)
 }
 
-/// Whether `name` is matched whole by `tokens`: linear in the name and the pattern, however many
-/// stars it holds.
+/// Whether `name` is matched whole by `tokens`. A mismatch restarts from the last star only, one
+/// character on, so it costs at most the name's length times the pattern's, however many stars
+/// the pattern holds; `name` is one directory entry, which file systems cap at 255 bytes.
 fn fits(tokens: &[Tok], name: &str) -> bool {
     let name: Vec<char> = name.chars().collect();
     let one = |t: &Tok, c: char| match t {
@@ -588,6 +700,104 @@ mod tests {
         assert_eq!(unread("RUN <<EOF\nCOPY a b\n"), "a heredoc with no end");
     }
 
+    // Docker finds heredocs in the words its shell lexer splits the line into
+    // (`heredocsFromLine`), and only after `RUN`, `COPY` or `ADD` in shell form, also as the
+    // instruction of an `ONBUILD`. Must catch lines Docker reads as instructions skipped as the
+    // body of a heredoc it does not open.
+    #[test]
+    fn a_double_angle_docker_does_not_read_as_a_heredoc_opens_none() {
+        let text = "FROM x\nRUN echo 'use <<EOF here'\nCOPY backend /app\nRUN cat <<EOF >/x\nEOF\n";
+        assert_eq!(ok(text), ["backend"]);
+        for line in [
+            "RUN echo \"a <<EOF\"",
+            "RUN echo a\\ <<EOF",
+            "RUN [\"sh\", \"-c\", \"cat <<EOF\"]",
+            "RUN --network=none [\"cat\", \"<<EOF\"]",
+            "ONBUILD ENV note <<EOF",
+            "ONBUILD RUN [\"cat\", \"<<EOF\"]",
+            "RUN echo 'open <<EOF",
+        ] {
+            assert_eq!(
+                ok(&format!("{line}\nCOPY a /b\nRUN true\n")),
+                ["a"],
+                "{line}"
+            );
+        }
+        // Its end would be an instruction, read as Docker reads it.
+        assert_eq!(
+            ok("ONBUILD ENV note <<'RUN true'\nCOPY a /b\nRUN true\n"),
+            ["a"]
+        );
+        // A COPY source is a heredoc only as Docker reads one: `<<<x` is a path.
+        assert_eq!(ok("COPY <<<x /d"), ["<<<x"]);
+    }
+
+    // What Docker does open: blanks after `<<`, a name with its quotes and escapes removed, more
+    // than one heredoc on a line, and one under `ONBUILD`.
+    #[test]
+    fn a_heredoc_ends_at_its_name_as_docker_lexes_it() {
+        assert_eq!(ok("RUN cat << EOF\nCOPY no /x\nEOF\nCOPY a /b\n"), ["a"]);
+        assert_eq!(
+            ok("RUN cat <<E\"O\"F 3<<'X Y'\nCOPY no /x\nEOF\nCOPY no /y\nX Y\nCOPY a /b\n"),
+            ["a"]
+        );
+        assert_eq!(ok("ONBUILD RUN <<EOF\nCOPY no /x\nEOF\nCOPY a /b\n"), ["a"]);
+        assert_eq!(
+            ok("COPY <<EOF ${DIR}/f\nCOPY no /x\nEOF\nCOPY a /b\n"),
+            ["a"]
+        );
+        // Docker splits `${a:-b c}` into words of its own, which this reader does not.
+        assert_eq!(
+            unread("RUN echo ${X:-a <<EOF b}\nCOPY a /b\n"),
+            "a variable form this reader does not expand"
+        );
+    }
+
+    // buildkit's `parseMount` reads the keys and the type in any case, and a mount `from` an empty
+    // name is of the context, as is `COPY --from=`. Must catch a bind mount Docker makes read as
+    // none.
+    #[test]
+    fn a_mount_is_read_in_any_case_and_an_empty_from_is_the_context() {
+        assert_eq!(
+            ok("RUN --mount=type=BIND,source=backend,target=/b make"),
+            ["backend"]
+        );
+        assert_eq!(ok("RUN --mount=TYPE=Bind,SRC=lib,target=/l make"), ["lib"]);
+        assert_eq!(ok("RUN --mount=Source=lib,target=/l make"), ["lib"]);
+        assert_eq!(
+            ok("RUN --mount=type=bind,from=,source=x,target=/x make"),
+            ["x"]
+        );
+        assert_eq!(ok("COPY --from= src /x"), ["src"]);
+        assert_eq!(
+            ok("RUN --mount=type=CACHE,target=/c --mount=type=bind,FROM=b,target=/s make"),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            unread("RUN --mount=type=${KIND},source=src,target=/s make"),
+            "a mount type with a variable"
+        );
+    }
+
+    // Under `--parents` Docker matches a source with its pattern matcher, where `**` crosses any
+    // number of directories; without it, `filepath.Match` reads `**` as one `*`. Must catch `**`
+    // read as one segment under `--parents`.
+    #[test]
+    fn a_double_star_under_parents_leaves_the_dockerfile_unread() {
+        for text in [
+            "COPY --parents ./src/**/*.py /app/",
+            "COPY --parents=TRUE src/a**.py /app/",
+        ] {
+            assert_eq!(unread(text), "a ** wildcard with --parents", "{text}");
+        }
+        assert_eq!(ok("COPY src/**/*.py /app/"), ["src/**/*.py"]);
+        assert_eq!(
+            ok("COPY --parents=false src/**/*.py /app/"),
+            ["src/**/*.py"]
+        );
+        assert_eq!(ok("COPY --parents ./src/*/x.py /app/"), ["src/*/x.py"]);
+    }
+
     #[test]
     fn continuations_comments_and_case_do_not_hide_a_source() {
         let text =
@@ -728,11 +938,12 @@ mod tests {
         }
     }
 
+    // A name at the 255-byte cap against five stars: this takes about 20 µs in a local debug
+    // build, and a matcher that tries every split at every star (C(255, 5) of them) 112 s.
     #[test]
-    fn a_pattern_of_many_stars_matches_in_linear_time() {
-        let pattern = "*a".repeat(40) + "b";
-        let name = "a".repeat(2000);
-        let tokens = compile(&pattern).unwrap();
+    fn a_wildcard_costs_at_most_the_name_times_the_pattern() {
+        let tokens = compile(&("*a".repeat(5) + "b")).unwrap();
+        let name = "a".repeat(255);
         let start = std::time::Instant::now();
         assert!(!fits(&tokens, &name));
         assert!(fits(&tokens, &(name + "b")));

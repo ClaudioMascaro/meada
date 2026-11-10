@@ -106,8 +106,11 @@
   not listed, so a wildcard through it leaves the Dockerfile unread. "Not read" is the fallback of
   ADR 0026: the whole context at `inferred`, the reason naming the cause. The fallback is also the
   answer for every form the reader does not parse: a source or mount with a variable, a quote or
-  an escape, a source that climbs out of the context, an `# escape=` parser directive other than
-  `\` (the other directives change nothing it reads), a Dockerfile behind a symlink or longer
+  an escape, a mount type with a variable, a `**` source under `COPY --parents` (Docker's pattern
+  matcher lets it cross directories), a `${...}` other than `${name}` on a line with `<<` (Docker
+  splits it into words of its own), a source that climbs out of the context, an `# escape=`
+  parser directive other than `\` (the other directives change nothing it reads), a Dockerfile
+  behind a symlink or longer
   than `lang::MAX_BYTES`, a flag with a quoted value or one it does not list, an instruction it
   does not list, a heredoc with no end, and a Dockerfile outside the repository. A source that
   names nothing on disk is skipped (the build would fail), `.dockerignore` is not read (a path may

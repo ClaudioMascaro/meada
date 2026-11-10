@@ -1252,6 +1252,50 @@ fn a_continued_dockerfile_line_runs_the_sources_docker_reads() {
 }
 
 #[test]
+fn a_dockerfile_form_docker_reads_another_way_runs_no_fewer_paths() {
+    // Each form below made the build run fewer paths than the image takes, at `exact`.
+    let repo = repo(
+        "images_dockerfile_docker_forms",
+        &[
+            (
+                "compose.yaml",
+                "services:\n  parents:\n    build: {context: p, dockerfile: Parents}\n  \
+                 stars:\n    build: {context: p, dockerfile: Stars}\n  \
+                 quoted:\n    build: q\n  \
+                 mount:\n    build: m\n",
+            ),
+            ("p/Parents", "FROM x\nCOPY --parents ./src/**/*.py /app/\n"),
+            ("p/Stars", "FROM x\nCOPY src/**/*.py /app/\n"),
+            ("p/src/a.py", "def a(): pass\n"),
+            ("p/src/x/b.py", "def b(): pass\n"),
+            ("p/src/x/y/c.py", "def c(): pass\n"),
+            (
+                "q/Dockerfile",
+                "FROM x\nRUN echo 'use <<EOF here'\nCOPY backend /app\nRUN cat <<EOF >/x\nEOF\n",
+            ),
+            ("q/backend/a.py", "def a(): pass\n"),
+            (
+                "m/Dockerfile",
+                "FROM x\nRUN --mount=type=BIND,source=backend,target=/b make\n",
+            ),
+            ("m/backend/a.py", "def a(): pass\n"),
+        ],
+    );
+    assert_eq!(
+        runs(&export(&repo)),
+        [
+            run("services.mount", "m/backend", "exact"),
+            // `**` crosses directories under `--parents`: the whole context, as for a Dockerfile
+            // not read.
+            run("services.parents", "p", "inferred"),
+            run("services.quoted", "q/backend", "exact"),
+            // Without `--parents`, Docker's `filepath.Match` reads `**` as one segment.
+            run("services.stars", "p/src/x/b.py", "exact"),
+        ]
+    );
+}
+
+#[test]
 fn a_wildcard_source_runs_exactly_the_files_it_matches() {
     let repo = repo(
         "images_dockerfile_wildcard",
