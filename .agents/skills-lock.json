@@ -86,7 +86,7 @@
     "implement": {
       "path": "skills/engineering/implement",
       "upstreamTree": "4804b466ab26c9b9d8d42917547db133d1f20a9f",
-      "tree": "9556e54930f231fb902912260ce5044bd6596b02"
+      "tree": "ffffdefb3c3c9d709e81db2bb458ba6fe1a1489e"
     },
     "implement-spec": {
       "path": "skills/engineering/implement-spec",
@@ -180,12 +180,12 @@
     "to-tickets": {
       "path": "skills/engineering/to-tickets",
       "upstreamTree": "2dee20ad722a31c04ededf9f2d83842473573045",
-      "tree": "285b340742eb724777ddba45b40e8777bf94d11d"
+      "tree": "312d4a2aa8e108ecd0dfcc15f86e10033cc3c8bf"
     },
     "triage": {
       "path": "skills/engineering/triage",
       "upstreamTree": "4cb951d62ecccaed601cdc5f9a1b7b3d8a799635",
-      "tree": "c61672a8c5061cfe052d2d6b5215e20941baef5c"
+      "tree": "a46c2ce1959042461d552a74e7fb8a66cdb7ef5c"
     },
     "wait-what": {
       "path": "skills/productivity/wait-what",

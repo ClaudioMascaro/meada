@@ -16,6 +16,15 @@ mod regexp;
 use config::{Matcher, Op, Route, Rule, Stream};
 pub struct Alert;
 
+/// Why Alertmanager refuses to load a configuration the file at `path` holds, if it does: a
+/// matcher holds a regular expression Go cannot compile. `meada status` counts such a file as
+/// unreadable (`config_values`), and it gives no alert side or link.
+pub(crate) fn refused(path: &str, documents: &[Value]) -> Option<String> {
+    config::is_file(path)
+        .then(|| documents.iter().find_map(config::refused))
+        .flatten()
+}
+
 // ponytail: regex source length bounds compilation input; `ALERT_SCAN_MAX` bounds matching.
 const ALERT_REGEX_MAX: usize = 4096;
 /// The bytes the automata and search caches of one routing scope may take, shared equally by
@@ -1438,6 +1447,21 @@ mod tests {
         assert!(regex(&"a".repeat(ALERT_REGEX_MAX + 1)).is_none());
         assert!(regex("a{100000000}").is_none());
         assert!(regex("[").is_none());
+    }
+
+    /// An expression Meada leaves unmatched for its own budgets compiles in Go, so it is no
+    /// refusal of the configuration that holds it (#718): the source length, the automaton and
+    /// case folding, here as far as one expression of `ALERT_REGEX_MAX` bytes goes.
+    #[test]
+    fn an_expression_past_a_budget_is_valid_for_go_and_no_refusal() {
+        for pattern in [
+            "a".repeat(ALERT_REGEX_MAX + 1),
+            "x{1000}".repeat(80),
+            format!("(?i){}", r"\p{Any}".repeat(4)),
+        ] {
+            assert!(regex(&pattern).is_none(), "{}", &pattern[..20]);
+            assert_eq!(regexp::refusal(&pattern), None, "{}", &pattern[..20]);
+        }
     }
 
     /// Folding the case of `\p{Any}` visits each of its 1,112,064 code points: three fit
