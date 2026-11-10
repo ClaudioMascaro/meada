@@ -7,6 +7,10 @@
 
 use super::*;
 
+/// A row: its label, the declaring file, the `for_each` collection, the override files and the
+/// expected answer.
+type Row<'a> = (&'a str, String, &'a str, Vec<(&'a str, &'a str)>, &'a str);
+
 const UNRESOLVED: &str = "unresolved";
 
 /// The instances of a `for_each` over `source`, named by key and value, as `queue-<key>-<value>`
@@ -48,7 +52,7 @@ fn an_override_retyping_a_declared_set_converts_the_default_as_terraform_does() 
     let any = over("  type = any\n");
     let set = over("  type = set(string)\n");
     let only = over("  default = [\"b\", \"a\", \"a\"]\n");
-    let rows: [(&str, String, &str, Vec<(&str, &str)>, &str); 12] = [
+    let rows: [Row; 12] = [
         (
             "no override, read by tolist",
             dup.clone(),
