@@ -16,10 +16,15 @@ const UNRESOLVED: &str = "unresolved";
 /// The instances of a `for_each` over `source`, named by key and value, as `queue-<key>-<value>`
 /// joined by `, `, or `unresolved` when Meada gives no exact name; `main` and the files `more`.
 fn answer(main: &str, source: &str, more: &[(&str, &str)]) -> String {
+    answer_in("main.tf", main, source, more)
+}
+
+/// `answer` for a declaring file named `file`.
+fn answer_in(file: &str, main: &str, source: &str, more: &[(&str, &str)]) -> String {
     let main = format!(
         "{main}resource \"a\" \"q\" {{\n  for_each = {{for k, v in {source} : k => v}}\n  name = \"queue-${{each.key}}-${{each.value}}\"\n}}\n"
     );
-    let mut list = vec![("main.tf", main.as_str())];
+    let mut list = vec![(file, main.as_str())];
     list.extend_from_slice(more);
     let found: Vec<String> = (names(&list).into_iter())
         .filter(|n| n.starts_with("a.q"))
@@ -293,4 +298,44 @@ fn an_argument_passed_through_a_list_variable_is_converted_by_the_declared_set()
             "module.m.module.n.a.q[\"1\"] = \"queue-1-b\""
         ]
     );
+}
+
+/// A root variable declared as a set and retyped to `any` takes a var file's value as written:
+/// the value is converted once, to `any`, so it is a tuple and `for` keys it by index. The
+/// default is still a set, converted by the declaring block first.
+#[test]
+fn a_var_file_value_of_a_set_retyped_to_any_is_converted_once() {
+    let any = over("  type = any\n");
+    let list = over("  type = list(string)\n");
+    let json = ("terraform.tfvars.json", "{\"s\": [\"b\", \"a\", \"a\"]}\n");
+    let files = [
+        ("terraform.tfvars", "s = [\"b\", \"a\", \"a\"]\n"),
+        ("x.auto.tfvars", "s = [\"b\", \"a\", \"a\"]\n"),
+        json,
+        ("x.auto.tfvars.json", json.1),
+    ];
+    for file in ["main.tf", "main.tofu"] {
+        for (vars, content) in files {
+            for (label, override_file) in [("any", &any), ("list", &list)] {
+                let got = answer_in(
+                    file,
+                    &declared("[\"x\"]"),
+                    "var.s",
+                    &[("override.tf", override_file), (vars, content)],
+                );
+                assert_eq!(
+                    got, "queue-0-b, queue-1-a, queue-2-a",
+                    "{file} {vars} retyped to {label}"
+                );
+            }
+        }
+        // The same variable on its default: a set, which `for` keys by element.
+        let on_default = answer_in(
+            file,
+            &declared("[\"x\"]"),
+            "var.s",
+            &[("override.tf", &any)],
+        );
+        assert_eq!(on_default, UNRESOLVED, "{file} default");
+    }
 }
