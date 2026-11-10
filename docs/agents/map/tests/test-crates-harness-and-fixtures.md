@@ -78,6 +78,11 @@
 - `scripts/edges <dir>[=<origin url>] [<peer dir>...]` is the repro harness for reviewing a
   resolution or contract change: it copies the directories as sibling repositories, exports the
   first and lists each call's level and target, its providers, consumers and links (needs `jq`).
+- `scripts/regexp-oracle.go` is Go's side of the `alert::regexp::refusal` check (#718): `cargo test
+  --lib alert::regexp::tests::refusal_agrees_with_go -- --ignored --nocapture` feeds a generated
+  corpus through it (needs `go`, no network) and fails on a pattern `refusal` judges refused that
+  Go compiles; it reports, per Go error code, the Go-refused patterns left unjudged. Run it after
+  a change to `refusal` or `regex_source`.
 
 Reviewing a change to an `*.export.json` golden: `cargo run --example golden_diff` (no argument
 diffs every export golden changed in `origin/main...HEAD`; see `examples/golden_diff.rs` for the

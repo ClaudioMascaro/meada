@@ -43,7 +43,8 @@ fn refuse<T>(refusal: &mut Option<&'static str>, code: &'static str) -> Option<T
 /// count (`a{01}`), a nesting past the 250 of `regex-syntax` where Go allows 1000, a failure of
 /// `regex-syntax` that Go does not share (`(?ii)`, `a{,5}`, `[\d-z]` are valid for Go), and
 /// whatever `compile` leaves unmatched for its budgets. A failure is a refusal only if Go's
-/// parser refuses what it names, for each class of the error codes above.
+/// parser refuses what it names, for each class of the error codes above. The ignored test
+/// `refusal_agrees_with_go` checks it against Go.
 pub(super) fn refusal(pattern: &str) -> Option<&'static str> {
     // `regex_source` reads a `[:` more leniently than Go (`[[:]` is no POSIX class for Go) and
     // drops a `\Q\E` that Go counts between two operators, leaving the rest misread.
@@ -1137,5 +1138,252 @@ mod tests {
         // `compile` answers `None` for these as well.
         assert!(compile("a{,5}", 1, 1).is_none());
         assert!(compile(&"a".repeat(ALERT_REGEX_MAX + 1), 1, 1).is_none());
+    }
+
+    /// `refusal` against Go's own `regexp.Compile`, on a generated corpus (#718). A pattern it
+    /// judges refused that Go compiles, with either wrapper Alertmanager uses, fails the test:
+    /// it would drop the links of a configuration Alertmanager loads. A pattern Go refuses and
+    /// `refusal` leaves unjudged is only reported, per Go error code with the shortest example:
+    /// a code marked `named` is a class the ceilings entry names, so a miss there is a position
+    /// that class does not cover yet.
+    ///
+    /// Run it after a change to `refusal` or `regex_source`; it needs `go` on PATH and no
+    /// network. `MEADA_REGEXP_ORACLE_N` sets the corpus size (200,000) and
+    /// `MEADA_REGEXP_ORACLE_SEED` its seed (1). `scripts/regexp-oracle.go` is the oracle.
+    #[test]
+    #[ignore = "needs Go: cargo test --lib alert::regexp::tests::refusal_agrees_with_go -- --ignored --nocapture"]
+    fn refusal_agrees_with_go() {
+        let setting = |name: &str, default: u64| -> u64 {
+            std::env::var(name)
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(default)
+        };
+        let patterns = corpus(
+            setting("MEADA_REGEXP_ORACLE_N", 200_000) as usize,
+            setting("MEADA_REGEXP_ORACLE_SEED", 1),
+        );
+        let dir = std::env::temp_dir().join(format!("meada-regexp-oracle-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (input, output) = (dir.join("patterns.json"), dir.join("go.json"));
+        std::fs::write(&input, serde_json::to_vec(&patterns).unwrap()).unwrap();
+        let run = std::process::Command::new("go")
+            .args(["run", "scripts/regexp-oracle.go"])
+            .args([&input, &output])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .env("GOTOOLCHAIN", "local")
+            .status()
+            .expect("this check needs `go` on PATH");
+        assert!(run.success(), "scripts/regexp-oracle.go failed");
+        let go: Vec<[String; 2]> =
+            serde_json::from_slice(&std::fs::read(&output).unwrap()).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(go.len(), patterns.len());
+
+        let named = [
+            MISSING_PAREN,
+            UNEXPECTED_PAREN,
+            MISSING_BRACKET,
+            MISSING_REPEAT,
+            CHAR_RANGE,
+            REPEAT_SIZE,
+            REPEAT_OP,
+            ESCAPE,
+            PERL_OP,
+            NAMED_CAPTURE,
+        ];
+        let (mut judged, mut wrappers) = (0, 0);
+        let mut false_refusals = Vec::new();
+        let mut unjudged = std::collections::BTreeMap::<&str, (usize, &str)>::new();
+        for (pattern, errors) in patterns.iter().zip(&go) {
+            wrappers += usize::from(errors[0].is_empty() != errors[1].is_empty());
+            let refused = errors.iter().all(|error| !error.is_empty());
+            match (refusal(pattern), refused) {
+                (Some(code), false) => false_refusals.push((pattern, code)),
+                (Some(_), true) => judged += 1,
+                (None, true) => {
+                    // "error parsing regexp: <code>: `<expression>`"
+                    let message = errors[0].strip_prefix("error parsing regexp: ");
+                    let code = message
+                        .and_then(|m| m.split(": `").next())
+                        .unwrap_or(&errors[0]);
+                    let miss = unjudged.entry(code).or_insert((0, pattern));
+                    miss.0 += 1;
+                    if pattern.len() < miss.1.len() {
+                        miss.1 = pattern;
+                    }
+                }
+                (None, false) => {}
+            }
+        }
+        println!(
+            "{} patterns, {judged} judged refused, {wrappers} told apart by the wrappers",
+            patterns.len()
+        );
+        for (code, (count, example)) in &unjudged {
+            let class = if named.contains(code) {
+                "named"
+            } else {
+                "other"
+            };
+            println!("unjudged, {class}: {code}: {count}, shortest {example:?}");
+        }
+        false_refusals.sort_by_key(|(pattern, _)| pattern.len());
+        assert!(
+            judged > 0,
+            "no pattern was judged refused: the corpus or the oracle is off"
+        );
+        assert!(
+            false_refusals.is_empty(),
+            "refusal judges refused what Go compiles ({} patterns), shortest first: {:?}",
+            false_refusals.len(),
+            &false_refusals[..false_refusals.len().min(20)]
+        );
+    }
+
+    /// `count` patterns of one to nine of the tokens Go's parser tells apart (groups, flags,
+    /// names, classes, escapes, operators, counts), from `seed`: the same corpus every run.
+    fn corpus(count: usize, seed: u64) -> Vec<String> {
+        const TOKENS: &[&str] = &[
+            "a",
+            "b",
+            "x",
+            "-",
+            "_",
+            "é",
+            "0",
+            "1",
+            "8",
+            " ",
+            ">",
+            "<",
+            "(",
+            ")",
+            "[",
+            "]",
+            "[^",
+            "[]",
+            "{",
+            "}",
+            "*",
+            "+",
+            "?",
+            "|",
+            "^",
+            "$",
+            ".",
+            ":",
+            ",",
+            "=",
+            "!",
+            r"\",
+            r"\\",
+            r"\(",
+            r"\)",
+            r"\[",
+            r"\]",
+            r"\.",
+            r"\*",
+            r"\-",
+            r"\<",
+            r"\>",
+            r"\d",
+            r"\D",
+            r"\w",
+            r"\s",
+            r"\b",
+            r"\B",
+            r"\A",
+            r"\z",
+            r"\C",
+            r"\a",
+            r"\f",
+            r"\n",
+            r"\y",
+            r"\x41",
+            r"\x{41}",
+            r"\x{",
+            r"\x4",
+            r"\u0041",
+            r"\0",
+            r"\1",
+            r"\8",
+            r"\12",
+            r"\Q",
+            r"\E",
+            r"\p",
+            r"\pL",
+            r"\PL",
+            r"\p{L}",
+            r"\p{^L}",
+            r"\p{Han}",
+            r"\p{Foo}",
+            r"\p{",
+            r"\pX",
+            "(?",
+            "(?:",
+            "(?i)",
+            "(?i:",
+            "(?-i)",
+            "(?i-s)",
+            "(?i-)",
+            "(?-)",
+            "(?)",
+            "(?P<n>",
+            "(?P<",
+            "(?P=n)",
+            "(?<n>",
+            "(?<",
+            "(?<=",
+            "(?=",
+            "(?!",
+            "(?#",
+            "(?>",
+            "(?x)",
+            "(?ii)",
+            "{2}",
+            "{1,2}",
+            "{2,1}",
+            "{,2}",
+            "{2,}",
+            "{1001}",
+            "{01}",
+            "{ 1}",
+            "{99999999999}",
+            "[a-z]",
+            "[z-a]",
+            "[a-]",
+            "[a--]",
+            r"[a-\d]",
+            r"[\d-z]",
+            "[[:alpha:]]",
+            "[[:foo:]]",
+            "[[:]",
+            r"[\b]",
+            r"[\Q]",
+            "a*",
+            "a+",
+            "a?",
+            "a*?",
+            "a**",
+            "a*+",
+            "a{2}*",
+            "(a)",
+            "(a|b)",
+            "()",
+        ];
+        let mut state = seed | 1;
+        let mut below = |bound: usize| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state % bound as u64) as usize
+        };
+        let mut patterns = Vec::with_capacity(count);
+        for _ in 0..count {
+            let length = 1 + below(9);
+            patterns.push((0..length).map(|_| TOKENS[below(TOKENS.len())]).collect());
+        }
+        patterns
     }
 }
