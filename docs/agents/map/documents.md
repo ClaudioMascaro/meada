@@ -219,8 +219,10 @@ this file, and a change to these modules updates it.
   (`Eval::name`, memoized per instance: `Eval::var` for a call's argument, a var file's value or a
   default, recording an `Overridable` for a root's variable; a local; a module output through
   `Eval::module`) and `each`/`count`, then evaluates it with `hcl-rs` and `functions::declare`'s
-  pure functions when `cost` (an upper bound of its bytes) fits `EVAL_COST_MAX` and the root's
-  `EVAL_WORK_MAX`; else `Eval::partial` keeps a template's resolved parts and puts `*` for the rest.
+  pure functions when `cost` (an upper bound of its steps: bytes made, and in a `for` template
+  text parsed and root objects copied) fits `EVAL_COST_MAX` and the root's `EVAL_WORK_MAX`; else
+  it spends the bytes it went through to decide and `Eval::partial` keeps a template's resolved
+  parts and puts `*` for the rest.
   A name's value crosses boundaries that change it in Terraform: a variable's declared `type`
   converts what it receives where every source passes (`Eval::var`, `converted_through`: a
   `set(T)` converts its elements to `T`, sorts and deduplicates them; `any` keeps the value), a module argument is evaluated

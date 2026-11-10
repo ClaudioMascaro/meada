@@ -371,6 +371,26 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Terraform static evaluation charges the template text `hcl-rs` parses again at each
+  evaluation in a `for`, not only the bytes an expression makes: a template in a `for` over
+  thousands of elements is unresolved (`*`) before it runs, where one 24 KB root took seconds
+  per resource and minutes in all. A read such as `var.x[0]` in a `for` is charged the copy of
+  `var` it makes each time. A refused expression spends the bytes it went through (its text and
+  the roots it read), at most the 1 MiB each one spent before, and a literal name that fits one
+  value stays exact once the work is spent. A short template (`"${a}-x"`) in a `for` over 2,000
+  elements still resolves; one of 40 interpolations resolves over 100 elements, no longer over
+  200 (#714).
+- `meada mcp` over stdio answers calls a client sends without waiting for each reply (#704).
+  Each call refreshes the index, and a refresh failed at its first write with `database is
+  locked` when another call was writing. Now the calls of one server run one refresh at a time
+  and wait for it with no timer, sharing the next run; a call that meets its lock elsewhere
+  (opening the index, querying it) waits for the refresh too, past the 10 s busy timeout. A
+  batch after a change costs about one refresh more than an unchanged one (debug build, Meada's
+  own checkout: 50 calls 21 s against 15 s). Across processes, a refresh with nothing to write
+  takes no write lock and one that meets another process's writer waits for its commit and
+  starts over; a wait past 10 s there still answers `database is locked`, and that server's
+  calls wait behind its refresh as long as it takes.
+
 - Terraform: a `for` binding a key over a set held in a local or a variable (`local.s` from
   `toset(...)`, a chain of locals, a variable declared `type = set(...)`) is unresolved
   instead of answering the index as an exact key, as it already was over a written `toset(...)`

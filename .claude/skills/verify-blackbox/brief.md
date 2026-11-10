@@ -29,8 +29,23 @@ suspects: neighbours, combinations, other file formats, scale>. Then run `fixtur
 <every fixture | fixtures matching a substring>: answers identical unless the claim explains the
 difference.
 
-An answer exact on PREV and unresolved on AFTER is a regression to report, unless the claim names
+An answer exact and right on PREV and unresolved on AFTER is a regression, unless the claim names
 it as the price. For each class the claim or the docs name, look for an input of that class in
-another syntactic position that the change does not handle.
+another syntactic position: outside the claim, what you find there wrong on both binaries is a
+follow-up, never a case of the verdict.
 
-Report a table (case, expected, PREV, AFTER, PASS/FAIL), then follow-ups.
+## Report only
+
+<Cases that never decide the verdict: a declared ceiling, a measurement beside the claim (memory,
+scale, another process), a behaviour change that was not red on PREV every time. Or `None.`>
+
+Run them and give the numbers, with no PASS or FAIL.
+
+## Report
+
+First line `VERDICT: PASS` or `VERDICT: FAIL`. Everything outside `## Report only` decides it: a
+case of the claim (listed, or one you found inside it), what must stay unchanged, a fixture
+difference the claim does not explain, a regression anywhere (PREV right, AFTER wrong). A case
+wrong on both binaries outside the claim is a follow-up. Then a table (case, expected, PREV,
+AFTER, PASS/FAIL or `report only`), then follow-ups, among them every `report only` row where
+AFTER answers wrong.
