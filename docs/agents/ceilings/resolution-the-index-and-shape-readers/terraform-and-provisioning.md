@@ -96,8 +96,8 @@
   clones `var`, `local`, `each` or `module` whole to read `var.x[0]`); a template outside every
   `for` is not charged its parse; a `for` collection counts its own elements through any root,
   a conditional its larger branch; past it `hcl-rs` does not evaluate the expression, only its
-  template parts resolve; measured in a debug build, an expression at the ceiling takes about
-  0.2 s) and `EVAL_WORK_MAX` (64 MiB of cost per root module; past it every value left is
+  template parts resolve; the implementer measured about 0.2 s for an expression at the ceiling
+  (15abf1c0, debug)) and `EVAL_WORK_MAX` (64 MiB of cost per root module; past it every value left is
   unresolved, but for a literal name that fits `EVAL_VALUE_MAX`. A refusal spends an upper
   bound of the bytes it went through to decide, never more than `EVAL_COST_MAX`: its own text,
   and the size of all the roots times two plus twice its reads of a root (`var`, `local`,
@@ -105,18 +105,18 @@
   all the roots as a read of `var` does), so 9,999 refusals over a 21,000-element variable stop
   evaluating after 89 and take 2.3 s in process (1bdcc75d; a cold index of that root took
   4.30 s at b045c759 against 4.17 s on main 05585ce4, then 4.46 s at ae8139de against 4.40 s
-  at b045c759, all debug), and a long expression refused in each instance of a
-  `count` stops once its text has spent the work. The steps it charges bound a root of
-  expressions near the ceiling: 80 resources took 16.6 s in a debug build. It does not charge
+  at b045c759, all debug), and a long expression refused in each instance of a `count` stops
+  once its text has spent the work. The steps it charges bound a root of expressions near the
+  ceiling: 80 resources took 16.6 s (the implementer's, 1bdcc75d, debug). It does not charge
   what no step counts: a template outside every `for` is parsed again once per `count` or
-  `for_each` instance (10,000 interpolations: 0.72 s at `count = 1`, 4.41 s at 10, 48.4 s at 100,
-  debug), one 1 MiB template of 130,000 interpolations took 8.8 s, the work is per root, not per
-  repository (20 roots of 80 resources near the ceiling took 234.75 s; both measured by a
-  black-box verifier on a debug build), and the estimate itself is charged nothing: by a reading
-  of `cost`, it sizes a bound value at each read of it, so an expression it then accepts pays
-  that again per instance (ae8139de, debug: 20,000 reads of a 21,000-element variable in a `for`
-  over an empty collection took 2.6 s at `count = 1` and 17.3 s at 10, and 1.7 s and 4.8 s when
-  each read is `var.big[0]`);
+  `for_each` instance (10,000 interpolations: 0.72 s at `count = 1`, 4.41 s at 10, 48.4 s at
+  100, the implementer's, 1bdcc75d, debug), one 1 MiB template of 130,000 interpolations took
+  8.8 s, the work is per root, not per repository (20 roots of 80 resources near the ceiling
+  took 234.75 s; both measured by a black-box verifier on a debug build), and the estimate
+  itself is charged nothing: by a reading of `cost`, it sizes a bound value at each read of it,
+  so an expression it then accepts pays that again per instance (ae8139de, debug, one run each:
+  20,000 reads of a 21,000-element variable in a `for` over an empty collection took 2.6 s at
+  `count = 1` and 17.3 s at 10, and 1.7 s and 4.8 s when each read is `var.big[0]`);
   converting an object literal for `hcl-rs` also spends the square of its keys, so a wide local
   evaluated in many module instances stops there; their nodes stay, named `*`). A var file's
   values are bounded the same way, each file with an `EVAL_WORK_MAX` of its own: a value past
