@@ -572,7 +572,7 @@ fn changelog_union_merge_keeps_both_bullets() {
 
 /// Problems of a changelog: a `###` heading twice in one `## [...]` section (what a
 /// `merge=union` of two branches that each opened it leaves), and an `[Unreleased]` bullet that
-/// names no issue (`#n`) on any of its lines.
+/// names no issue (`#n`) on any of its lines, or repeats an earlier bullet of the section.
 fn changelog_problems(text: &str) -> Vec<String> {
     let has_issue = |bullet: &str| {
         bullet
@@ -582,20 +582,29 @@ fn changelog_problems(text: &str) -> Vec<String> {
     };
     let mut problems = Vec::new();
     let (mut section, mut headings, mut bullet) = (String::new(), BTreeSet::new(), String::new());
-    let end_bullet = |section: &str, bullet: &mut String, problems: &mut Vec<String>| {
-        if section.contains("[Unreleased]") && !bullet.is_empty() && !has_issue(bullet) {
-            problems.push(format!(
-                "{section}: the bullet {bullet:?} names no issue (#n)"
-            ));
+    let mut seen = BTreeSet::new();
+    let end_bullet = |section: &str,
+                      bullet: &mut String,
+                      seen: &mut BTreeSet<String>,
+                      problems: &mut Vec<String>| {
+        if section.contains("[Unreleased]") && !bullet.is_empty() {
+            if !has_issue(bullet) {
+                problems.push(format!(
+                    "{section}: the bullet {bullet:?} names no issue (#n)"
+                ));
+            }
+            if !seen.insert(bullet.clone()) {
+                problems.push(format!("{section}: the bullet {bullet:?} appears twice"));
+            }
         }
         bullet.clear();
     };
     for line in text.lines().map(str::trim_end) {
         if line.is_empty() || line.starts_with("- ") || line.starts_with('#') {
-            end_bullet(&section, &mut bullet, &mut problems);
+            end_bullet(&section, &mut bullet, &mut seen, &mut problems);
         }
         if line.starts_with("## ") {
-            (section, headings) = (line.to_string(), BTreeSet::new());
+            (section, headings, seen) = (line.to_string(), BTreeSet::new(), BTreeSet::new());
         } else if line.starts_with("### ") {
             if !headings.insert(line.to_string()) {
                 problems.push(format!("{section}: the heading `{line}` appears twice"));
@@ -605,7 +614,7 @@ fn changelog_problems(text: &str) -> Vec<String> {
             bullet.push(' ');
         }
     }
-    end_bullet(&section, &mut bullet, &mut problems);
+    end_bullet(&section, &mut bullet, &mut seen, &mut problems);
     problems
 }
 
@@ -633,6 +642,14 @@ fn a_repeated_heading_or_an_unreleased_bullet_without_an_issue_is_a_problem() {
     assert_eq!(found.len(), 2, "{found:?}");
     assert!(found[0].contains("b still none ") && found[0].contains("[Unreleased]"));
     assert!(found[1].contains("### Fixed") && found[1].contains("[Unreleased]"));
+    let copied = "## [Unreleased]\n\n### Added\n\n- a\n  (#1)\n\n### Fixed\n\n- a\n  (#1)\n\n## [1.0.0]\n\n- a (#1)\n- a (#1)\n";
+    let found = changelog_problems(copied);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].contains("a (#1) ") && found[0].contains("appears twice"));
+    let same = "## [Unreleased]\n\n### Added\n\n- a\n  (#1)\n\n- a\n  (#1)\n";
+    let found = changelog_problems(same);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].contains("a (#1) ") && found[0].contains("appears twice"));
 }
 
 #[test]
