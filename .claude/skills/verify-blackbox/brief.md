@@ -29,4 +29,15 @@ suspects: neighbours, combinations, other file formats, scale>. Then run `fixtur
 <every fixture | fixtures matching a substring>: answers identical unless the claim explains the
 difference.
 
-Report a table (case, expected, PREV, AFTER, PASS/FAIL), then follow-ups.
+## Report only
+
+<Cases that never decide the verdict: a declared ceiling, a measurement beside the claim (memory,
+scale, another process), a case that was not red on PREV every time. Or `None.`>
+
+Run them and give the numbers, with no PASS or FAIL.
+
+## Report
+
+First line `VERDICT: PASS` or `VERDICT: FAIL`. It is FAIL when a case of the claim fails, or a
+case you found inside the claim. Then a table (case, expected, PREV, AFTER, PASS/FAIL or `report
+only`), then follow-ups.

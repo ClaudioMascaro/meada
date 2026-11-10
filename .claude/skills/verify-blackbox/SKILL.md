@@ -19,8 +19,12 @@ either binary. Its report is development evidence; E2E evidence stays with `prov
 
 3. **Brief.** Copy [`brief.md`](brief.md) to `/tmp/verify/<name>-brief.md` and fill every `<...>`.
    The claim states each behaviour change as a checkable before/after, with the cases you
-   already tested, so the verifier hunts past them. Done when no placeholder remains and every
-   claim names its PREV and AFTER values.
+   already tested, so the verifier hunts past them. Each behaviour change of the claim is a
+   case you saw _red_ on PREV: PREV gave the answer the claim says it gives, in every run you
+   made (three for a case that depends on timing). A case that compares AFTER with PREV ran to
+   its end on PREV. A case that fails either test, a declared ceiling and a measurement beside
+   the claim go under `## Report only`, where no result moves the verdict. Done when no
+   placeholder remains, every claim names its PREV and AFTER values, and each was red on PREV.
 
 4. **Launch.** Agent, `general-purpose`, background, prompt
    `Read /tmp/verify/<name>-brief.md and follow it exactly.` Keep working meanwhile.
