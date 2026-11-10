@@ -384,6 +384,10 @@ All notable changes to Meada are recorded here. The format follows
   ternary). A value built first keeps its name, as an immutable copy does, except in a loop the
   builder outlives. A request is judged whole: one such entry leaves the others unresolved.
   The check reads a file once, so its cost is linear in the calls.
+- A Java AWS SDK request built by a lambda or a class that runs after its builder changed, one
+  its helper assigns again as a parameter, one a caller passes on after its builder changed, a
+  builder field hidden by a local and one set from an initializer or another file name no table
+  either (#719).
 - AWS SDK forms in Java, Go and C# follow the ADR 0026 rule TypeScript and Python already
   followed: an EventBridge entry without `EventBusName` produces to `default`, and an SNS
   publish to a phone number or endpoint names no topic. A request Meada cannot see whole (a

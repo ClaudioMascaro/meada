@@ -1100,6 +1100,10 @@ fn java_named_builds_chained_past_the_evaluation_depth_stay_unresolved() {
 /// follows (R3 of #719): a method that runs caller code, a consumer copy, an alias at any depth
 /// (reassigned or not), a field builder reached through an alias. Each other mention is a change
 /// the reader cannot follow, and the side is unresolved. The builders left alone keep their table.
+/// The same holds for code that runs when its caller says (a lambda, a local or anonymous class),
+/// a parameter assigned in its helper, a request passed to a helper after its builder was set, a
+/// field hidden by a local, a field set in an initializer before another is built from it, and a
+/// field builder another file calls a method on.
 #[test]
 fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     let repo = fixture_repo("aws_sdk_builder_forms", "aws-sdk-builders", None);
@@ -1120,23 +1124,50 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
         sides,
         [
             "afterLoop writer resource::dynamodb::after-loop",
+            "aloneField writer resource::dynamodb::shared-alone",
+            "anonymousClass writer resource::dynamodb",
             "apply writer resource::dynamodb",
             "arrayAlias writer resource::dynamodb",
+            "callCopied writer resource::dynamodb",
+            "callMaybe writer resource::dynamodb",
+            "callPassed writer resource::dynamodb::param-plain",
+            "callRebuilt writer resource::dynamodb",
+            "callReplaced writer resource::dynamodb",
             "castAlias writer resource::dynamodb",
             "checkApply reader resource::dynamodb",
+            "constructorBuilt writer resource::dynamodb",
             "copyInline writer resource::dynamodb",
             "copyNamed writer resource::dynamodb",
             "deep writer resource::dynamodb",
             "fieldAlias writer resource::dynamodb",
+            "fieldInitializer writer resource::dynamodb",
+            "fieldPlain writer resource::dynamodb::field-plain",
             "fromAlias writer resource::dynamodb",
+            "hiddenAlias writer resource::dynamodb",
+            "hiddenNull writer resource::dynamodb",
+            "hiddenParameter writer resource::dynamodb",
+            "hiddenThroughLocal writer resource::dynamodb",
+            "initializerApply writer resource::dynamodb",
+            "initializerBlock writer resource::dynamodb",
+            "lambdaCond writer resource::dynamodb",
+            "lambdaConsumer writer resource::dynamodb",
             "lambdaLater writer resource::dynamodb",
+            "lambdaOwn writer resource::dynamodb::lambda-own",
+            "lambdaRun writer resource::dynamodb",
+            "lambdaStored writer resource::dynamodb",
+            "localClass writer resource::dynamodb",
             "loopFresh writer resource::dynamodb::loop-fresh",
             "loopLater writer resource::dynamodb",
+            "nestedLambda writer resource::dynamodb",
             "otherMember writer resource::dynamodb::other-member",
+            "passedBuiltFirst writer resource::dynamodb::built-first",
+            "passedInline writer resource::dynamodb",
+            "passedSet writer resource::dynamodb",
             "plainDeep writer resource::dynamodb",
             "reassigned writer resource::dynamodb",
             "requestReassigned writer resource::dynamodb",
             "restarted writer resource::dynamodb::restarted",
+            "sharedField writer resource::dynamodb",
             "supplierAlias writer resource::dynamodb",
             "ternaryAlias writer resource::dynamodb",
         ],

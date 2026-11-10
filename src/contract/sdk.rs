@@ -233,7 +233,12 @@ pub(crate) fn extract<'a>(
                     .then_some(&inject as &crate::resolve::Inject<'a, '_>);
                 for expanded in code.expand_with(Expand::Chain(path, index), injected, &read) {
                     let (at, index) = expanded.site;
+                    let passed = language == Language::Java
+                        && passed_changed(code, &expanded.frames, operation.field, &builders);
                     for mut name in expanded.found {
+                        if passed {
+                            name = Name::default();
+                        }
                         if operation.hierarchy {
                             name.literal = None;
                         }
@@ -269,6 +274,47 @@ pub(crate) fn extract<'a>(
     found
 }
 
+/// Whether a step sets a member of the name's path (`topicArn`, `entries`, `eventBusName`).
+fn setter(selector: &str) -> impl Fn(&str) -> bool + '_ {
+    move |method| {
+        selector.split(['.', '|']).any(|member| {
+            let member = member.trim_end_matches("[]");
+            member.get(..1).is_some_and(|head| {
+                method.len() == member.len()
+                    && method[..1] == head.to_ascii_lowercase()
+                    && method[1..] == member[1..]
+            })
+        })
+    }
+}
+
+/// Whether a wrapper's caller passes the request on as a value that changed (Java): the request
+/// the wrapper reads is what its callers hand it, and a call judged where it is made sees only
+/// the parameter. Each argument of each call climbed is judged in the scope of that call.
+fn passed_changed<'a>(
+    code: &Code<'a>,
+    frames: &[crate::resolve::Frame<'a>],
+    selector: &str,
+    builders: &java::Builders<'a>,
+) -> bool {
+    let setter = setter(selector);
+    frames.iter().any(|frame| {
+        (code.call(frame.path, frame.index)).is_some_and(|call| {
+            (call.args.iter()).any(|arg| {
+                java::changed(
+                    code,
+                    frame.path,
+                    &call.scope,
+                    arg,
+                    &call.range,
+                    &setter,
+                    builders,
+                )
+            })
+        })
+    })
+}
+
 /// A named request can change after construction, and so can a named value an inline request
 /// holds on the name's path (an EventBridge entry); inline literals cannot change before the call.
 fn changed_request<'a>(
@@ -287,18 +333,8 @@ fn changed_request<'a>(
         Language::Go => call.args.get(1),
         Language::Csharp => call.keyword("request").or_else(|| call.args.first()),
         Language::Java => {
-            // A step sets a member of the name's path (`topicArn`, `entries`, `eventBusName`).
-            let setter = |method: &str| {
-                selector.split(['.', '|']).any(|member| {
-                    let member = member.trim_end_matches("[]");
-                    member.get(..1).is_some_and(|head| {
-                        method.len() == member.len()
-                            && method[..1] == head.to_ascii_lowercase()
-                            && method[1..] == member[1..]
-                    })
-                })
-            };
             return (call.args.first()).is_some_and(|r| {
+                let setter = setter(selector);
                 java::changed(code, path, &call.scope, r, &call.range, &setter, builders)
             });
         }

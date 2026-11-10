@@ -891,7 +891,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
             count,
         });
     }
-    // A lambda runs as often as its caller calls it: a loop of its own.
     facts.loops = super::outermost(
         tree.root_node(),
         &[
@@ -899,9 +898,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
             "enhanced_for_statement",
             "while_statement",
             "do_statement",
-            "lambda_expression",
         ],
     );
+    facts.deferred = deferred(tree.root_node());
     for mut local in locals {
         if let Class::Result(n) = local.class {
             local.class = call_at(&results[n]).map_or(Class::Unknown, Class::Result);
@@ -1159,6 +1158,45 @@ fn declares(parent: Node, sibling: Node, src: &[u8], out: &mut dyn FnMut(&str)) 
         }
         _ => {}
     }
+}
+
+/// The byte ranges of the lambdas and of the local and anonymous classes under `root`, nested ones
+/// included, in source order (`Facts::deferred`).
+fn deferred(root: Node) -> Vec<Range<usize>> {
+    let mut out = Vec::new();
+    // A node and whether it sits in the body of a method, constructor, initializer or lambda.
+    let mut stack = vec![(root, false)];
+    while let Some((node, inside)) = stack.pop() {
+        let kind = node.kind();
+        let anonymous = kind == "class_body"
+            && node
+                .parent()
+                .is_some_and(|p| p.kind() == "object_creation_expression");
+        let local = inside
+            && matches!(
+                kind,
+                "class_declaration" | "record_declaration" | "enum_declaration"
+            );
+        if kind == "lambda_expression" || anonymous || local {
+            out.push(node.byte_range());
+        }
+        let body = matches!(
+            kind,
+            "method_declaration"
+                | "constructor_declaration"
+                | "compact_constructor_declaration"
+                | "static_initializer"
+                | "lambda_expression"
+        );
+        let mut cursor = node.walk();
+        let children: Vec<Node> = node.children(&mut cursor).collect();
+        for child in children.into_iter().rev() {
+            // An instance initializer is a block straight in a class body.
+            let initializer = kind == "class_body" && child.kind() == "block";
+            stack.push((child, inside || body || initializer));
+        }
+    }
+    out
 }
 
 /// How often each of `names` is written as an identifier under `root`, in the order given.
@@ -1602,6 +1640,28 @@ mod tests {
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
         assert_eq!(facts.budget, None);
         assert!(!facts.defs.is_empty());
+    }
+
+    /// Code that runs when its caller says: every lambda and local or anonymous class, nested ones
+    /// too. A member class, a method and a field initializer without one are not.
+    #[test]
+    fn lambdas_and_local_and_anonymous_classes_are_deferred() {
+        let src = "class C { Runnable f = () -> g(); class M { void m() {} } void h() { \
+            class L { void l() { Runnable n = () -> 1; } } Object o = new Object() { }; \
+            for (int i = 0; i < 2; i++) { run(); } } { Runnable b = () -> 2; } }";
+        let facts = Java.parse("C.java", src.as_bytes()).unwrap();
+        let text: Vec<&str> = (facts.deferred.iter()).map(|r| &src[r.clone()]).collect();
+        assert_eq!(
+            text,
+            [
+                "() -> g()",
+                "class L { void l() { Runnable n = () -> 1; } }",
+                "() -> 1",
+                "{ }",
+                "() -> 2",
+            ]
+        );
+        assert!(facts.loops.len() == 1 && src[facts.loops[0].clone()].starts_with("for"));
     }
 
     #[test]

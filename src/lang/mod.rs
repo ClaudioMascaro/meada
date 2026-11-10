@@ -602,6 +602,11 @@ pub struct Facts {
     /// come before a read it follows in the source (`resolve/mutations.rs`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub loops: Vec<Range<usize>>,
+    /// The byte ranges of every lambda and every local or anonymous class, in source order (Java).
+    /// Their code runs when a caller says, after the statements that follow them in the source: a
+    /// reader of a value changed in place cannot order what they hold against what follows.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deferred: Vec<Range<usize>>,
     /// What the file gives every file of its project, in the pack's spelling, which
     /// `LanguagePack::join` applies to each: C#'s `global using` directives (`A.B`, `static
     /// A.B`, `X = A.B`).

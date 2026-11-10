@@ -75,6 +75,43 @@ pub(crate) fn root(value: &Value) -> Option<&str> {
 #[derive(Default)]
 pub(crate) struct Builders<'a> {
     files: std::cell::RefCell<std::collections::HashMap<&'a str, std::rc::Rc<Uses<'a>>>>,
+    /// The Java files that call a method on each name (the last name before the method), read
+    /// once: a field builder is changed from another file by such a call.
+    callers: std::cell::OnceCell<std::collections::HashMap<&'a str, Vec<&'a str>>>,
+}
+
+impl<'a> Builders<'a> {
+    /// Whether a file other than `path` calls a method on `name`, a name that may be a field.
+    fn called_elsewhere(&self, code: &Code<'a>, path: &str, name: &str) -> bool {
+        let callers = self.callers.get_or_init(|| {
+            let mut callers: std::collections::HashMap<&str, Vec<&str>> = Default::default();
+            for (&file, facts) in code.files() {
+                if !file.ends_with(".java") {
+                    continue;
+                }
+                for call in &facts.calls {
+                    let Some((head, method)) = call.callee.rsplit_once('.') else {
+                        continue;
+                    };
+                    let last = head.rsplit('.').next().unwrap_or(head);
+                    if method != "build" && !last.starts_with('(') {
+                        let files = callers.entry(last).or_default();
+                        if files.last() != Some(&file) {
+                            files.push(file);
+                        }
+                    }
+                }
+            }
+            callers
+        });
+        (callers.get(name)).is_some_and(|files| files.iter().any(|&f| f != path))
+    }
+
+    fn uses(&self, code: &Code<'a>, path: &'a str) -> std::rc::Rc<Uses<'a>> {
+        (self.files.borrow_mut().entry(path))
+            .or_insert_with(|| std::rc::Rc::new(Uses::read(code, path)))
+            .clone()
+    }
 }
 
 // The work of the linear-cost test: every call, mention and followed value, once.
@@ -126,6 +163,9 @@ struct At {
     /// The outermost loop the value is made in: a builder that outlives it is changed by every
     /// mention in it, for the next turn builds from what this one set.
     looped: Option<Range<usize>>,
+    /// The innermost lambda or local or anonymous class the value is made in: it runs when its
+    /// caller says, after whatever follows it in the source.
+    deferred: Option<Range<usize>>,
 }
 
 #[derive(Default)]
@@ -187,8 +227,13 @@ enum Kind<'a> {
 struct Uses<'a> {
     locals: std::collections::HashMap<(&'a str, &'a str), Mentions<'a>>,
     fields: std::collections::HashMap<&'a str, Mentions<'a>>,
-    /// The outermost loops (and lambdas) of the file, in order.
+    /// The outermost loops of the file, in order.
     loops: &'a [Range<usize>],
+    /// Every lambda and local or anonymous class of the file, in order, and the one each is in.
+    deferred: &'a [Range<usize>],
+    parents: Vec<Option<usize>>,
+    /// The locals and parameters the file assigns or declares again: no one builder or value.
+    rewritten: std::collections::HashSet<(&'a str, &'a str)>,
     /// How many times the file writes the name of each local and `final` field (`Facts::mentioned`).
     written: std::collections::HashMap<(&'a str, &'a str), u32>,
 }
@@ -207,13 +252,16 @@ impl<'a> Uses<'a> {
     fn add(&mut self, code: &Code<'a>, path: &'a str, mention: Mention<'a, '_>) {
         work();
         let name = mention.name.strip_prefix("this.").unwrap_or(mention.name);
-        let declared =
-            (code.local(path, mention.scope, name)).map_or(mention.scope, |b| b.scope.as_str());
         let (kind, range, direct) = (mention.kind, mention.range, mention.direct);
-        self.locals
-            .entry((declared, name))
-            .or_default()
-            .add(kind, range, direct);
+        // `this.name` is the field, whatever local hides the bare name.
+        if name.len() == mention.name.len() {
+            let declared =
+                (code.local(path, mention.scope, name)).map_or(mention.scope, |b| b.scope.as_str());
+            self.locals
+                .entry((declared, name))
+                .or_default()
+                .add(kind, range, direct);
+        }
         self.fields
             .entry(name)
             .or_default()
@@ -222,10 +270,26 @@ impl<'a> Uses<'a> {
 
     fn read(code: &Code<'a>, path: &'a str) -> Self {
         let facts = code.files()[path];
+        let mut open: Vec<usize> = Vec::new();
+        let parents = (facts.deferred.iter().enumerate())
+            .map(|(i, d)| {
+                while (open.last()).is_some_and(|&o| facts.deferred[o].end <= d.start) {
+                    open.pop();
+                }
+                let parent = open.last().copied();
+                open.push(i);
+                parent
+            })
+            .collect();
         let mut uses = Self {
             locals: Default::default(),
             fields: Default::default(),
             loops: &facts.loops,
+            deferred: &facts.deferred,
+            parents,
+            rewritten: (code.assigned(path).iter())
+                .map(|b| (b.scope.as_str(), b.name.as_str()))
+                .collect(),
             written: (code.mentioned(path).iter())
                 .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
                 .collect(),
@@ -314,6 +378,7 @@ impl<'a> Uses<'a> {
             range: at.range.clone(),
             later: usize::MAX,
             looped: None,
+            deferred: None,
         };
         self.locals
             .get(&(scope, name))
@@ -345,7 +410,22 @@ impl<'a> Uses<'a> {
             range: range.clone(),
             later: range.end,
             looped,
+            deferred: self.deferred_in(range),
         }
+    }
+
+    /// The innermost lambda or local or anonymous class that holds `range`. Past `EVAL_DEPTH`
+    /// levels out, one that starts after every builder.
+    fn deferred_in(&self, range: &Range<usize>) -> Option<Range<usize>> {
+        let mut at = (self.deferred.partition_point(|d| d.start <= range.start)).checked_sub(1);
+        for _ in 0..crate::resolve::EVAL_DEPTH {
+            let i = at?;
+            if range.end <= self.deferred[i].end {
+                return Some(self.deferred[i].clone());
+            }
+            at = self.parents[i];
+        }
+        at.map(|_| usize::MAX..usize::MAX)
     }
 }
 
@@ -396,15 +476,13 @@ pub(super) fn changed<'a>(
     setter: &dyn Fn(&str) -> bool,
     builders: &Builders<'a>,
 ) -> bool {
-    let uses = (builders.files.borrow_mut().entry(path))
-        .or_insert_with(|| std::rc::Rc::new(Uses::read(code, path)))
-        .clone();
     let mut walk = Walk {
         code,
+        builders,
         path,
         scope,
         setter,
-        uses: &uses,
+        uses: builders.uses(code, path),
         seen: std::collections::HashSet::new(),
         depth: 0,
     };
@@ -412,6 +490,7 @@ pub(super) fn changed<'a>(
         range: range.clone(),
         later: usize::MAX,
         looped: None,
+        deferred: None,
     };
     walk.value(value, &at)
 }
@@ -419,11 +498,13 @@ pub(super) fn changed<'a>(
 /// The named values and builders one `changed` question has followed.
 struct Walk<'a, 'c> {
     code: &'c Code<'a>,
+    builders: &'c Builders<'a>,
+    /// The file and scope the value now followed is written in.
     path: &'a str,
     scope: &'a str,
     setter: &'c dyn Fn(&str) -> bool,
-    uses: &'c Uses<'a>,
-    seen: std::collections::HashSet<*const crate::lang::Bound>,
+    uses: std::rc::Rc<Uses<'a>>,
+    seen: std::collections::HashSet<*const ()>,
     /// How many named values and builders deep the question now is.
     depth: usize,
 }
@@ -446,13 +527,17 @@ impl<'a> Walk<'a, '_> {
         }
     }
 
-    /// Whether the built value in the local `name` was made from a changed builder. Each local is
-    /// judged once, and past `EVAL_DEPTH` nested ones the name stays unresolved.
+    /// Whether the built value in the local or `final` field `name` was made from a changed
+    /// builder, or is a name the file assigns again. Each is judged once, and past `EVAL_DEPTH`
+    /// nested ones the name stays unresolved.
     fn named(&mut self, name: &'a str, at: &At) -> bool {
+        if self.uses.rewritten.contains(&(self.scope, name)) {
+            return true;
+        }
         let Some(bound) = self.code.local(self.path, self.scope, name) else {
-            return false;
+            return self.constant(name, at);
         };
-        if !self.seen.insert(bound) {
+        if !self.seen.insert(std::ptr::from_ref(bound).cast()) {
             return false;
         }
         self.within(|walk| match &bound.value {
@@ -463,6 +548,40 @@ impl<'a> Walk<'a, '_> {
             alias @ Value::Ref(_) => walk.value(alias, at),
             _ => false,
         })
+    }
+
+    /// Whether the `final` field `name` holds what a changed builder built: its initializer runs
+    /// once, when the object is made, in the file the field is written in.
+    fn constant(&mut self, name: &'a str, at: &At) -> bool {
+        let Some((path, scope, value)) = self.code.constant_value(self.path, self.scope, name)
+        else {
+            return false;
+        };
+        if !self.seen.insert(std::ptr::from_ref(value).cast()) {
+            return false;
+        }
+        self.within(|walk| {
+            walk.there(path, scope, |walk| match value {
+                Value::Call(made) => {
+                    let at = walk.uses.made(&made.range);
+                    walk.value(value, &at)
+                }
+                alias @ Value::Ref(_) => walk.value(alias, at),
+                _ => false,
+            })
+        })
+    }
+
+    /// `f` with the file and scope a value is written in.
+    fn there(&mut self, path: &'a str, scope: &'a str, f: impl FnOnce(&mut Self) -> bool) -> bool {
+        let uses = self.builders.uses(self.code, path);
+        let kept = (self.path, self.scope);
+        let before = std::mem::replace(&mut self.uses, uses);
+        (self.path, self.scope) = (path, scope);
+        let changed = f(self);
+        (self.path, self.scope) = kept;
+        self.uses = before;
+        changed
     }
 
     /// `f` one value deeper, or `true` (a change the reader cannot follow) past `EVAL_DEPTH`.
@@ -476,19 +595,35 @@ impl<'a> Walk<'a, '_> {
         changed
     }
 
+    /// Whether `name` is a local or a `final` field: a name that holds a builder or a value.
+    fn holds(&self, name: &'a str) -> bool {
+        self.code.local(self.path, self.scope, name).is_some()
+            || self
+                .code
+                .constant_value(self.path, self.scope, name)
+                .is_some()
+    }
+
     /// Whether the builder `name` was changed as seen from `at`, or is another name of one, or was
     /// made from a changed value.
     fn builder(&mut self, name: &'a str, at: &At) -> bool {
-        let name = name.strip_prefix("this.").unwrap_or(name);
-        let local = self.code.local(self.path, self.scope, name);
+        // `this.name` is the field, whatever local or parameter hides the bare name.
+        let bare = name.strip_prefix("this.");
+        let name = bare.unwrap_or(name);
+        let local = match bare {
+            Some(_) => None,
+            None => self.code.local(self.path, self.scope, name),
+        };
         let field = local.is_none()
-            && self
-                .code
-                .constant_value(self.path, self.scope, name)
-                .is_some();
-        // A type, a parameter or a name the file binds more than once holds no builder to follow.
+            && (bare.is_some()
+                || (self.code.constant_value(self.path, self.scope, name)).is_some());
+        // A type or a parameter holds no builder to follow. A name the file assigns again or
+        // declares twice holds no one builder: a change the reader cannot follow.
         if local.is_none() && !field {
-            return false;
+            return self.uses.rewritten.contains(&(self.scope, name));
+        }
+        if field && self.builders.called_elsewhere(self.code, self.path, name) {
+            return true;
         }
         let scope = local.map_or(self.scope, |b| b.scope.as_str());
         let declared = match local.map(|b| &b.value) {
@@ -496,18 +631,24 @@ impl<'a> Walk<'a, '_> {
             _ => None,
         };
         // A builder declared before the loop its value is made in, set later in that loop, is
-        // set before the next turn builds.
-        let at = match &at.looped {
-            Some(l) if declared.is_none_or(|d| d < l.start) => At {
-                range: at.range.clone(),
-                later: at.later.max(l.end),
-                looped: None,
-            },
-            _ => At {
-                range: at.range.clone(),
-                later: at.later,
-                looped: None,
-            },
+        // set before the next turn builds. One declared outside the lambda or class its value is
+        // made in is set again wherever its caller runs it, later in the source or not.
+        let mut later = at.later;
+        if let Some(l) = &at.looped
+            && declared.is_none_or(|d| d < l.start)
+        {
+            later = later.max(l.end);
+        }
+        if let Some(d) = &at.deferred
+            && declared.is_none_or(|x| x < d.start)
+        {
+            later = usize::MAX;
+        }
+        let at = At {
+            range: at.range.clone(),
+            later,
+            looped: None,
+            deferred: None,
         };
         if self.uses.unseen(scope, name, field)
             || self.uses.changed(scope, name, field, self.setter, &at)
@@ -518,13 +659,32 @@ impl<'a> Walk<'a, '_> {
             // Another name of a builder is a mention of it, at any depth.
             Some(Value::Ref(_)) => true,
             Some(made @ Value::Call(c)) => {
-                root(made).is_some_and(|r| self.code.local(self.path, self.scope, r).is_some())
+                root(made).is_some_and(|r| self.holds(r))
                     || self.within(|walk| {
                         let at = walk.uses.made(&c.range);
                         walk.value(made, &at)
                     })
             }
-            _ => false,
+            Some(_) => false,
+            // A `final` field built from a name, or from another builder.
+            None => {
+                let Some((path, scope, value)) =
+                    self.code.constant_value(self.path, self.scope, name)
+                else {
+                    return false;
+                };
+                match value {
+                    Value::Ref(_) => true,
+                    made @ Value::Call(c) => self.there(path, scope, |walk| {
+                        root(made).is_some_and(|r| walk.holds(r))
+                            || walk.within(|walk| {
+                                let at = walk.uses.made(&c.range);
+                                walk.value(made, &at)
+                            })
+                    }),
+                    _ => false,
+                }
+            }
         }
     }
 }

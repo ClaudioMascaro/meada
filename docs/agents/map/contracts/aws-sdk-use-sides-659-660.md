@@ -38,7 +38,13 @@
   and a write of its name the syntax model does not show (`Facts::mentioned` counts identifiers
   against the calls made on it: a cast, a ternary, an array element, a lambda that returns it).
   A named value (`Put p = pb.build()`) is judged where it was built: a mention after the build
-  does not change the copy, except in a loop or lambda the builder outlives (`Facts::loops`).
+  does not change the copy, except in a loop the builder outlives (`Facts::loops`) and in a
+  lambda or a local or anonymous class declared after the builder (`Facts::deferred`), which
+  runs when its caller says, so a mention anywhere after it counts. A name the file assigns
+  again, such as a parameter its helper assigns, names nothing; `this.name` is the field
+  whatever local hides the bare name; a `final` field built by an initializer, an initializer
+  block or a constructor is judged where it is written, in order; and a helper's request is
+  judged where each caller passes it (`passed_changed`, every argument of every call climbed).
   The question is asked per request call, so one entry the reader cannot follow leaves every
   entry of that request unresolved. Past `EVAL_DEPTH` nested named values the name stays
   unresolved, and `field_of` stops at a step that runs caller code. The
