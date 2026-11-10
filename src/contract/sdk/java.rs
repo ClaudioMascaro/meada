@@ -78,9 +78,48 @@ pub(crate) struct Builders<'a> {
     /// The Java files that call a method on each name (the last name before the method), read
     /// once: a field builder is changed from another file by such a call.
     callers: std::cell::OnceCell<std::collections::HashMap<&'a str, Vec<&'a str>>>,
+    /// The file and the directory of every type the repository's Java files declare, nested ones
+    /// included, with its name: a type of the package or the file shadows the one an import names.
+    types: std::cell::OnceCell<std::collections::HashSet<(&'a str, &'a str)>>,
 }
 
 impl<'a> Builders<'a> {
+    /// Whether `name`, the start of a builder chain, may be a type of the repository or of a
+    /// package other than the SDK's: its setters are then the repository's, not the SDK's. A type
+    /// the file declares beats an import; a type of its directory beats a wildcard import only.
+    fn shadowed(&self, code: &Code<'a>, path: &'a str, name: &str) -> bool {
+        let sdk = |source: &str| source.starts_with("software.amazon.awssdk.");
+        let (package, simple) = name.rsplit_once('.').unwrap_or(("", name));
+        if !package.is_empty() {
+            return !sdk(package) && package.starts_with(|c: char| c.is_ascii_lowercase());
+        }
+        let imported = (code.files()[path].imports.iter()).find(|i| i.local == simple);
+        if imported.is_some_and(|i| !sdk(&i.source)) {
+            return true;
+        }
+        let dir = path.rsplit_once('/').map_or("", |(dir, _)| dir);
+        let types = self.types.get_or_init(|| {
+            let mut types = std::collections::HashSet::new();
+            for (&file, facts) in code.files() {
+                let dir = file.rsplit_once('/').map_or("", |(dir, _)| dir);
+                let classes: Vec<&str> = (facts.defs.iter())
+                    .filter(|d| d.kind == crate::lang::Kind::Class)
+                    .map(|d| d.name.as_str())
+                    .collect();
+                for &class in &classes {
+                    let (outer, name) = class.rsplit_once('.').unwrap_or(("", class));
+                    types.insert((file, name));
+                    // A nested type is the package's only through its outer type.
+                    if !classes.contains(&outer) {
+                        types.insert((dir, name));
+                    }
+                }
+            }
+            types
+        });
+        types.contains(&(path, simple)) || imported.is_none() && types.contains(&(dir, simple))
+    }
+
     /// Whether a file other than `path` calls a method on `name`, a name that may be a field.
     fn called_elsewhere(&self, code: &Code<'a>, path: &str, name: &str) -> bool {
         let callers = self.callers.get_or_init(|| {
@@ -234,6 +273,8 @@ struct Uses<'a> {
     parents: Vec<Option<usize>>,
     /// The locals and parameters the file assigns or declares again: no one builder or value.
     rewritten: std::collections::HashSet<(&'a str, &'a str)>,
+    /// Whether the file reads a field by its name as a string: any field may change.
+    reflective: bool,
     /// How many times the file writes the name of each local and `final` field (`Facts::mentioned`).
     written: std::collections::HashMap<(&'a str, &'a str), u32>,
 }
@@ -290,6 +331,12 @@ impl<'a> Uses<'a> {
             rewritten: (code.assigned(path).iter())
                 .map(|b| (b.scope.as_str(), b.name.as_str()))
                 .collect(),
+            reflective: (facts.calls.iter()).any(|c| {
+                matches!(
+                    crate::resolve::method(&c.callee),
+                    "getDeclaredField" | "getField" | "getDeclaredFields" | "getFields"
+                )
+            }),
             written: (code.mentioned(path).iter())
                 .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
                 .collect(),
@@ -515,13 +562,22 @@ impl<'a> Walk<'a, '_> {
         match value {
             Value::Ref(name) => self.named(name, at),
             Value::Call(top) => {
-                root(value).is_some_and(|b| self.builder(b, at))
-                    || std::iter::successors(Some(top), |c| match c.receiver.as_deref() {
+                let steps = || {
+                    std::iter::successors(Some(top), |c| match c.receiver.as_deref() {
                         Some(Value::Call(next)) => Some(next),
                         _ => None,
                     })
-                    .flat_map(|c| &c.args)
-                    .any(|a| self.value(a, at))
+                };
+                // `applyMutation` hands the builder to caller code, which may keep it and set
+                // it again after any step of the chain.
+                steps().any(|c| crate::resolve::method(&c.callee) == "applyMutation")
+                    || steps()
+                        .last()
+                        .is_some_and(|c| crate::resolve::method(&c.callee) == "builder")
+                        && root(value)
+                            .is_some_and(|t| self.builders.shadowed(self.code, self.path, t))
+                    || root(value).is_some_and(|b| self.builder(b, at))
+                    || steps().flat_map(|c| &c.args).any(|a| self.value(a, at))
             }
             _ => false,
         }
@@ -622,7 +678,9 @@ impl<'a> Walk<'a, '_> {
         if local.is_none() && !field {
             return self.uses.rewritten.contains(&(self.scope, name));
         }
-        if field && self.builders.called_elsewhere(self.code, self.path, name) {
+        if field
+            && (self.uses.reflective || self.builders.called_elsewhere(self.code, self.path, name))
+        {
             return true;
         }
         let scope = local.map_or(self.scope, |b| b.scope.as_str());
@@ -665,6 +723,8 @@ impl<'a> Walk<'a, '_> {
                         walk.value(made, &at)
                     })
             }
+            // Not a builder of the SDK: a type or a variable of the file's own.
+            Some(Value::New(..)) => true,
             Some(_) => false,
             // A `final` field built from a name, or from another builder.
             None => {

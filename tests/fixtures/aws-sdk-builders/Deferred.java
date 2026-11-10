@@ -98,6 +98,26 @@ class Deferred {
         run.run();
     }
 
+    // `applyMutation` gives the builder to caller code, which keeps it and sets it again.
+    private final PutItemRequest.Builder[] leaked = new PutItemRequest.Builder[1];
+
+    void escapedLocal() {
+        PutItemRequest.Builder b = PutItemRequest.builder().applyMutation(x -> leaked[0] = x).tableName("escape-old");
+        leaked[0].tableName("escape-new");
+        var r = b.build();
+        db.putItem(r);
+    }
+
+    void escapedInline() {
+        db.putItem(PutItemRequest.builder().applyMutation(x -> leaked[0] = x).tableName("escape-inline").build());
+    }
+
+    private final PutItemRequest.Builder escapedField = PutItemRequest.builder().applyMutation(x -> leaked[0] = x).tableName("escape-field");
+
+    void escapedFieldBuilt() {
+        db.putItem(escapedField.build());
+    }
+
     // A parameter assigned in the helper is not what the caller passed.
     private void copied(PutItemRequest r) {
         r = r.copy(x -> x.tableName("param-copy-new"));

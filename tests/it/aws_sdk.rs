@@ -1102,8 +1102,10 @@ fn java_named_builds_chained_past_the_evaluation_depth_stay_unresolved() {
 /// the reader cannot follow, and the side is unresolved. The builders left alone keep their table.
 /// The same holds for code that runs when its caller says (a lambda, a local or anonymous class),
 /// a parameter assigned in its helper, a request passed to a helper after its builder was set, a
-/// field hidden by a local, a field set in an initializer before another is built from it, and a
-/// field builder another file calls a method on.
+/// field hidden by a local, a field set in an initializer before another is built from it, a field
+/// builder another file calls a method on or this file reads by name, a builder `applyMutation`
+/// hands to caller code, and a request type that another type of the file, the package or an
+/// import shadows.
 #[test]
 fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     let repo = fixture_repo("aws_sdk_builder_forms", "aws-sdk-builders", None);
@@ -1136,9 +1138,14 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
             "castAlias writer resource::dynamodb",
             "checkApply reader resource::dynamodb",
             "constructorBuilt writer resource::dynamodb",
+            "control writer resource::dynamodb::sdk-control",
             "copyInline writer resource::dynamodb",
             "copyNamed writer resource::dynamodb",
             "deep writer resource::dynamodb",
+            "escapedFieldBuilt writer resource::dynamodb",
+            "escapedInline writer resource::dynamodb",
+            "escapedLocal writer resource::dynamodb",
+            "explicit writer resource::dynamodb::explicit-control",
             "fieldAlias writer resource::dynamodb",
             "fieldInitializer writer resource::dynamodb",
             "fieldPlain writer resource::dynamodb::field-plain",
@@ -1147,6 +1154,7 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
             "hiddenNull writer resource::dynamodb",
             "hiddenParameter writer resource::dynamodb",
             "hiddenThroughLocal writer resource::dynamodb",
+            "imported writer resource::dynamodb",
             "initializerApply writer resource::dynamodb",
             "initializerBlock writer resource::dynamodb",
             "lambdaCond writer resource::dynamodb",
@@ -1158,18 +1166,23 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
             "localClass writer resource::dynamodb",
             "loopFresh writer resource::dynamodb::loop-fresh",
             "loopLater writer resource::dynamodb",
+            "nested writer resource::dynamodb",
             "nestedLambda writer resource::dynamodb",
             "otherMember writer resource::dynamodb::other-member",
+            "packaged writer resource::dynamodb",
             "passedBuiltFirst writer resource::dynamodb::built-first",
             "passedInline writer resource::dynamodb",
             "passedSet writer resource::dynamodb",
             "plainDeep writer resource::dynamodb",
+            "qualified writer resource::dynamodb",
             "reassigned writer resource::dynamodb",
+            "reflected writer resource::dynamodb",
             "requestReassigned writer resource::dynamodb",
             "restarted writer resource::dynamodb::restarted",
             "sharedField writer resource::dynamodb",
             "supplierAlias writer resource::dynamodb",
             "ternaryAlias writer resource::dynamodb",
+            "variable writer resource::dynamodb",
         ],
         "{export}"
     );

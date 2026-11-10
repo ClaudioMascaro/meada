@@ -45,6 +45,10 @@
   whatever local hides the bare name; a `final` field built by an initializer, an initializer
   block or a constructor is judged where it is written, in order; and a helper's request is
   judged where each caller passes it (`passed_changed`, every argument of every call climbed).
+  A chain with `applyMutation` anywhere in it hands its builder to caller code, a file that
+  reads a field by name (`getDeclaredField`) or calls a method on a field builder's name from
+  another file may change it, and a chain that starts at a type another type of its file or
+  directory, an import outside the SDK or a variable shadows is not the SDK's.
   The question is asked per request call, so one entry the reader cannot follow leaves every
   entry of that request unresolved. Past `EVAL_DEPTH` nested named values the name stays
   unresolved, and `field_of` stops at a step that runs caller code. The

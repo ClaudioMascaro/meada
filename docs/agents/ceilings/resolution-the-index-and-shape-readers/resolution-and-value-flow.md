@@ -88,7 +88,9 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   more values than a plain request, so about 1,700 of them in one file spend it, and the calls
   after that have no side (#719). A Java builder held in a `final` field is read in its own
   file, and a call on its name from another Java file leaves it unresolved; one handed to a call
-  or aliased there is not seen, and the field keeps its first name (#719). `EVAL_DEPTH` (256): a value
+  or aliased there, or reached by reflection from there, is not seen, and the field keeps its
+  first name. A request type is the SDK's unless a type of its directory, an import or a
+  variable says otherwise: one of the same package in another source root is not seen (#719). `EVAL_DEPTH` (256): a value
   folded deeper than that, through the items of lists and objects, the constants it names and
   the arguments callers pass, is unknown, and a value traced through more constants,
   parameters and return values than that, each into the next, has no origin.
