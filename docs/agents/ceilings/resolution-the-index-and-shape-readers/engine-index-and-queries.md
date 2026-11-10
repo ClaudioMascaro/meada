@@ -110,8 +110,10 @@
   flight on any index of the process extends the wait, so a statement behind another process's
   lock waits until the runs of its own process end, then fails as before. The calls in flight
   are not bounded: each holds its own connections while it waits, and all of them query at once
-  when the run ends (under a 2 GiB cap, debug build, Meada's own checkout: the server is killed
-  with 86 calls in flight after a change, and with 100 when nothing changed).
+  when the run ends, on top of what the run allocated (under a 2 GiB cap, debug build, Meada's
+  own checkout: the server is killed with 100 calls in flight when nothing changed, with 16 to
+  21 during an edit every 2 s at one call a second (86 at four), and with 11 behind a run that
+  adds 100,000 functions to one file, which alone peaks at about 940 MB).
   Across processes (two servers, a CLI command beside a server) the wait is SQLite's: a refresh
   with nothing to write takes no write lock, and one with something to write waits up to the
   busy timeout (10 s) for another process's writer to commit, then walks again; after

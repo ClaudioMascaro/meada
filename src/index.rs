@@ -378,9 +378,10 @@ fn wait(tries: i32) -> bool {
     true
 }
 
-/// Runs `f` with this thread waiting at most `timeout` for a commit in progress, instead of 10
-/// seconds: its read-only opens, and its statements on a connection opened to write (`wait`).
-/// No option or setting reaches it: tests, and the readiness probe of `status --workspace`.
+/// Runs `f` with `timeout` as this thread's busy timeout, instead of 10 seconds: the most its
+/// read-only opens wait for a commit in progress, and what its statements on a connection opened
+/// to write wait before only a refresh in flight keeps them waiting (`wait`). No option or
+/// setting reaches it: tests, and the readiness probe of `status --workspace`.
 #[doc(hidden)]
 pub fn with_busy_timeout<T>(timeout: Duration, f: impl FnOnce() -> T) -> T {
     struct Restore(Duration);
@@ -525,7 +526,12 @@ fn current(index: &Path) -> Result<Option<Connection>> {
         db => db?,
     };
     db.busy_handler(Some(wait))?;
-    match db.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0)) {
+    let version = db.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0));
+    // SQLite counts the tries it hands `wait` from zero only when a statement runs: the schema
+    // load of this connection's first prepare would go on from the count of the read above,
+    // as the same wait, and fail on its clock. Setting the handler again zeroes the count.
+    db.busy_handler(Some(wait))?;
+    match version {
         Ok(version) => Ok((version == schema_version()).then_some(db)),
         Err(e)
             if matches!(
@@ -4038,6 +4044,40 @@ mod tests {
         assert!(waited >= Duration::from_millis(300), "{waited:?}");
         assert!(run.join().unwrap().is_err());
         drop(blocker);
+    }
+
+    /// A wait that ended takes nothing from the next one (#704): a call whose open waited for
+    /// a lock, and whose first query meets another one a whole busy timeout later, waits for
+    /// it rather than failing at once on the first wait's clock.
+    #[test]
+    fn a_wait_that_ended_takes_nothing_from_the_next_one() {
+        let (dir, index) = index_dir("wait_again");
+        let root = checkout(&dir);
+        drop(open(&index, &root, REPO, &Serve::default()).unwrap());
+        // The write lock on the index, held for 100 ms on a thread of its own.
+        let hold = || {
+            let writer = Connection::open(&index).unwrap();
+            writer.execute_batch("BEGIN EXCLUSIVE").unwrap();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(100));
+                writer.execute_batch("ROLLBACK").unwrap();
+            })
+        };
+        let timeout = Duration::from_secs(1);
+
+        let found = with_busy_timeout(timeout, || {
+            let first = hold();
+            let db = open(&index, &root, REPO, &Serve::default()).map_err(|e| e.to_string())?;
+            first.join().unwrap();
+            std::thread::sleep(timeout);
+            let second = hold();
+            let count = "SELECT count(*) FROM symbols WHERE id LIKE '%::a'";
+            let found = db.query_row(count, [], |r| r.get::<_, i64>(0));
+            second.join().unwrap();
+            found.map_err(|e| e.to_string())
+        });
+
+        assert_eq!(found, Ok(1));
     }
 
     /// A call that comes while a run is in flight waits for the run after it (#704), which
