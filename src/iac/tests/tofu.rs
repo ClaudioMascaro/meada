@@ -8,6 +8,9 @@
 
 use super::*;
 
+/// A row: its label, its files and the expected answer.
+type Row<'a> = (&'a str, Vec<(&'a str, &'a str)>, &'a str);
+
 const UNRESOLVED: &str = "unresolved";
 
 /// The instances of `a.f` (a `for_each` over `tolist(var.s)` keyed `<index>-<element>`) in
@@ -149,7 +152,7 @@ fn a_declaration_only_opentofu_reads_is_exact_where_the_two_conversions_agree() 
     let set = "variable \"s\" {\n  type = set(string)\n}\n";
     let own = "variable \"s\" {\n  type = list(string)\n  default = [\"b\", \"a\", \"a\"]\n}\n";
     let vars = "s = [\"b\", \"a\", \"a\"]\n";
-    let rows: Vec<(&str, Vec<(&str, &str)>, &str)> = vec![
+    let rows: Vec<Row> = vec![
         ("no override", vec![("main.tofu", &main)], TERRAFORM),
         (
             "an override restating the set",
