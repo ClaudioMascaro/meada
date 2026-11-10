@@ -581,7 +581,7 @@ fn changelog_problems(text: &str) -> Vec<String> {
     };
     let mut problems = Vec::new();
     let (mut section, mut headings, mut bullet) = (String::new(), BTreeSet::new(), String::new());
-    let close = |section: &str, bullet: &mut String, problems: &mut Vec<String>| {
+    let end_bullet = |section: &str, bullet: &mut String, problems: &mut Vec<String>| {
         if section.contains("[Unreleased]") && !bullet.is_empty() && !has_issue(bullet) {
             problems.push(format!(
                 "{section}: the bullet {bullet:?} names no issue (#n)"
@@ -589,9 +589,9 @@ fn changelog_problems(text: &str) -> Vec<String> {
         }
         bullet.clear();
     };
-    for line in text.lines() {
-        if line.starts_with("- ") || line.starts_with('#') {
-            close(&section, &mut bullet, &mut problems);
+    for line in text.lines().map(str::trim_end) {
+        if line.is_empty() || line.starts_with("- ") || line.starts_with('#') {
+            end_bullet(&section, &mut bullet, &mut problems);
         }
         if line.starts_with("## ") {
             (section, headings) = (line.to_string(), BTreeSet::new());
@@ -604,7 +604,7 @@ fn changelog_problems(text: &str) -> Vec<String> {
             bullet.push(' ');
         }
     }
-    close(&section, &mut bullet, &mut problems);
+    end_bullet(&section, &mut bullet, &mut problems);
     problems
 }
 
