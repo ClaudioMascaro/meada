@@ -558,6 +558,29 @@ fn declared(found: Evaluated, steps: &[Declared]) -> Evaluated {
     }
 }
 
+/// `found`, the default of `variable`, converted as `declared` does: Terraform converts it to the
+/// type of its declaring block and again to each override's. A declaring block in a file only
+/// OpenTofu reads (Terraform reads none of it) has no Terraform conversion to follow, and OpenTofu
+/// 1.13 and later convert the default once, to the final type, where 1.12 and earlier convert it
+/// as Terraform does: the default is unresolved where the two give another value or another kind
+/// of collection, so that no tool's answer is taken for certain.
+fn declared_default(found: Evaluated, variable: &Variable) -> Evaluated {
+    if let (true, Val::Known(v), [_, ..]) = (variable.opentofu, &found.val, &variable.through[..]) {
+        let once = variable.ty.as_slice();
+        let (twice, single) = (
+            converted_through(v.clone(), &variable.through),
+            converted_through(v.clone(), once),
+        );
+        if twice != single || ends_in_set(&variable.through) != ends_in_set(once) {
+            return Evaluated {
+                val: Val::Unknown,
+                through: found.through,
+            };
+        }
+    }
+    declared(found, &variable.through)
+}
+
 /// A `variable` block: its default, whether it is sensitive, and where it is declared.
 struct Variable {
     default: Option<Expression>,
@@ -567,6 +590,8 @@ struct Variable {
     /// the block that gave the default, then the final type at each override that gives a type or
     /// a default.
     through: Vec<Declared>,
+    /// Whether its declaring block is in a file only OpenTofu reads (`.tofu`, `.tofu.json`).
+    opentofu: bool,
     sensitive: bool,
     path: String,
     line: usize,
@@ -591,11 +616,13 @@ impl Module {
             if !overriding {
                 // A default is converted to the type its block declares when it is decoded.
                 variable.through = variable.default.iter().flat_map(|_| variable.ty).collect();
+                variable.opentofu = config_values::only_opentofu(&variable.path);
                 self.variables.insert(name.to_string(), variable);
             }
             return;
         };
         variable.sensitive |= declared.sensitive;
+        variable.opentofu = declared.opentofu;
         // An override block's `type` replaces the declared one; without one the declared stays.
         let (own, merged) = (variable.ty, variable.ty.or(declared.ty));
         // An override block without a default keeps the declared one, and where it is.
@@ -1330,6 +1357,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
                     default: attr("default").cloned(),
                     ty: attr("type").map(Declared::expr),
                     through: Vec::new(),
+                    opentofu: false,
                     sensitive: crate::config_values::hcl::is_sensitive(attr("sensitive")),
                     path: path.to_string(),
                     line: line(b.span().map_or(0, |s| s.start)),
@@ -2200,7 +2228,7 @@ impl<'m> Eval<'m> {
                 }
                 (None, Some(default)) => {
                     let found = self.value(at, None, default, depth + 1);
-                    declared(found, &variable.through)
+                    declared_default(found, variable)
                 }
                 (None, None) => Evaluated::unknown(),
             };
@@ -2226,7 +2254,7 @@ impl<'m> Eval<'m> {
             (None, Some(default)) => {
                 let found = self.value(at, None, default, depth + 1);
                 (
-                    declared(found, &variable.through),
+                    declared_default(found, variable),
                     &variable.path,
                     variable.line,
                     false,
@@ -3260,6 +3288,7 @@ mod tests {
     mod oracle;
     mod retype;
     mod shapes;
+    mod tofu;
 
     fn files(list: &[(&str, &str)]) -> Vec<(String, Vec<u8>)> {
         (list.iter())

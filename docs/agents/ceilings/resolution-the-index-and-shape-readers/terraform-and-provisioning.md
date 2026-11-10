@@ -182,9 +182,17 @@
   under `type = set(string)` with a default `["b", "a", "a"]` (in the pair of override files,
   over a declared default `["x"]`): an override `type = list(string)` (Terraform `0-a`, `1-b`;
   OpenTofu `0-b`, `1-a`, `2-a`), `type = any` (the set, `a-a`, `b-b`; OpenTofu index keys),
-  `type = tuple([string, string])` over `["b", "a"]` (Terraform rejects it, so Meada names
-  nothing; OpenTofu `0-b`, `1-a`), an `a_override.tf` giving the default and a `b_override.tf`
-  retyping it, and a child module called without the argument with the override in its
-  directory. The same default with no override, a restated `set(string)`, an override giving
-  `type` and `default` together and a var file's value name the same in both. OpenTofu 1.13.9
-  was run; that 1.12 and earlier behave as Terraform is read from the source, not run.
+  `type = tuple([string, string])` over `["b", "a"]` (Terraform rejects it, so Meada gives no
+  exact name; OpenTofu `0-b`, `1-a`), an `a_override.tf` giving the default and a
+  `b_override.tf` retyping it, and a child module called without the argument with the override
+  in its directory. The same default with no override, a restated `set(string)`, an override
+  giving `type` and `default` together and a var file's value name the same in both. OpenTofu
+  1.13.9 was run; that 1.12 and earlier behave as Terraform is read from the source, not run.
+  The exception covers a declaration Terraform reads. A variable whose declaring block is in a
+  `.tofu` or `.tofu.json` file does not exist for Terraform, and OpenTofu 1.8 to 1.12 (read from
+  the source, not run) convert its default as Terraform does where 1.13+ converts once, so no
+  value is certain for the file: with an override that retypes it (in any of `override.tf`,
+  `*_override.tf`, `override.tf.json`, `override.tofu`, `*_override.tofu`, `override.tofu.json`)
+  the default is unresolved where the two conversions give another value or another kind of
+  collection, and exact where they agree (no override, an override restating the set, an
+  override with its own default of the final type, a var file's value).
