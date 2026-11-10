@@ -25,6 +25,10 @@ import (
 // and a reason stand for keys Terraform refuses (a configuration it rejects too); `-` stands for
 // no key at all. The test in src/iac/tests/oracle.rs indexes the directory's files.
 //
+// The override rules are modelled by hand after Terraform's `decodeVariableBlock`
+// (internal/configs/named_values.go) and `Variable.merge` (internal/configs/module_merge.go), and
+// checked against Terraform v1.17.1's `console` for the rows of #740.
+//
 // Modelled, with Terraform's rules: a variable block's default is converted to the type that
 // block declares when it is decoded; an override file's variable block replaces the declared
 // `type` and `default`, and the default is converted again to the final type; a module argument
