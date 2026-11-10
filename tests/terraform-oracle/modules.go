@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,12 +19,11 @@ import (
 // local module `m/` that the root calls as `module "m" { source = "./m" ... }`. Its `want` file is
 // `<must>\t<keys>`: the keys of the `for_each` of the resource `a.q` (the one in `m/` when the
 // root has none), sorted and joined by commas, which `go run .` rewrites; `=` means Meada must
-// answer them exactly, `~` that it may leave them unresolved, `*` that it must (Terraform and
-// OpenTofu differ there: OpenTofu 1.13 and later convert a default once, to the final type, where
-// Terraform and OpenTofu 1.12 and earlier convert it to the type of the block that declares it
-// and again to the final one; the keys are Terraform's). `!` and a reason stand for keys
-// Terraform refuses; `-` stands for no key at all. The test in src/iac/tests/oracle.rs indexes
-// the directory's files.
+// answer them exactly, `~` that it may leave them unresolved. Meada follows Terraform where
+// OpenTofu 1.13 and later differ (they convert a default once, to the final type; Terraform
+// converts it to the type of the block that declares it and again to the final one, #740). `!`
+// and a reason stand for keys Terraform refuses (a configuration it rejects too); `-` stands for
+// no key at all. The test in src/iac/tests/oracle.rs indexes the directory's files.
 //
 // Modelled, with Terraform's rules: a variable block's default is converted to the type that
 // block declares when it is decoded; an override file's variable block replaces the declared
@@ -34,6 +34,11 @@ import (
 // `want`: an override file's resource, module or undeclared variable block, a local that does not
 // evaluate, a module argument the module does not declare, a variable without a value, a second
 // module call or a resource other than `a.q`.
+
+// refused is a configuration Terraform rejects: the case's keys are `!` and the reason.
+type refused struct{ why string }
+
+func (r refused) Error() string { return r.why }
 
 // variable is a declared variable: its type (any without a `type`) and default (cty.NilVal
 // without one), as Terraform keeps them.
@@ -115,7 +120,7 @@ func (m *module) declare(b *hclsyntax.Block, override bool) error {
 		if hasType {
 			var err error
 			if val, err = convert.Convert(val, block.ty); err != nil {
-				return fmt.Errorf("variable %q: its default does not convert: %w", name, err)
+				return refused{fmt.Sprintf("variable %q: its default does not convert: %v", name, err)}
 			}
 		}
 		block.def = val
@@ -139,7 +144,7 @@ func (m *module) declare(b *hclsyntax.Block, override bool) error {
 	if v.def != cty.NilVal {
 		def, err := convert.Convert(v.def, v.ty)
 		if err != nil {
-			return fmt.Errorf("variable %q: its default does not convert to the overriding type: %w", name, err)
+			return refused{fmt.Sprintf("variable %q: its default does not convert to the overriding type: %v", name, err)}
 		}
 		v.def = def
 	}
@@ -250,6 +255,10 @@ func forEachKeys(m *module, ctx *hcl.EvalContext) (keys string, ok bool) {
 // moduleKeys are the keys of the case in `dir`, or `!` and a reason.
 func moduleKeys(dir string) (string, error) {
 	root, err := loadModule(dir)
+	var r refused
+	if errors.As(err, &r) {
+		return "!" + r.why, nil
+	}
 	if err != nil {
 		return "", err
 	}
@@ -269,6 +278,9 @@ func moduleKeys(dir string) (string, error) {
 		return "", fmt.Errorf("no resource a.q and no module m")
 	}
 	child, err := loadModule(filepath.Join(dir, "m"))
+	if errors.As(err, &r) {
+		return "!" + r.why, nil
+	}
 	if err != nil {
 		return "", err
 	}
@@ -307,8 +319,8 @@ func moduleCases(dir string) (changed, total int, err error) {
 			return 0, 0, err
 		}
 		cols := strings.Split(strings.TrimSuffix(string(text), "\n"), "\t")
-		if len(cols) != 2 || (cols[0] != "=" && cols[0] != "~" && cols[0] != "*") {
-			return 0, 0, fmt.Errorf("%s: want `=`, `~` or `*` and the keys, tab-separated", want)
+		if len(cols) != 2 || (cols[0] != "=" && cols[0] != "~") {
+			return 0, 0, fmt.Errorf("%s: want `=` or `~` and the keys, tab-separated", want)
 		}
 		total++
 		got, err := moduleKeys(filepath.Dir(want))

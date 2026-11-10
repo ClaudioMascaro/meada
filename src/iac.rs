@@ -469,10 +469,12 @@ impl Named {
 enum Declared {
     /// `set(...)`: a set.
     Set,
+    /// `list(...)`: a list, which a set converts to (its elements in set order).
+    List,
     /// `any`: the value keeps its own type.
     Any,
-    /// Any other type (`list(...)`, `tuple(...)`, `map(...)`, `object(...)`, a primitive): the
-    /// value is converted, so it is no set.
+    /// Any other type (`tuple(...)`, `map(...)`, `object(...)`, a primitive): the value is
+    /// converted, so it is no set; no set converts to these.
     Other,
 }
 
@@ -480,9 +482,10 @@ impl Declared {
     /// The declared type written as the constraint `text` (the form a Terraform JSON file gives).
     fn text(text: &str) -> Declared {
         let text = text.trim();
-        match (text, text.starts_with("set(")) {
-            (_, true) => Declared::Set,
-            ("any", _) => Declared::Any,
+        match text {
+            _ if text.starts_with("set(") => Declared::Set,
+            _ if text.starts_with("list(") => Declared::List,
+            "any" => Declared::Any,
             _ => Declared::Other,
         }
     }
@@ -491,6 +494,7 @@ impl Declared {
     fn expr(expr: &Expression) -> Declared {
         match expr {
             Expression::FuncCall(f) if f.name.name.as_str() == "set" => Declared::Set,
+            Expression::FuncCall(f) if f.name.name.as_str() == "list" => Declared::List,
             Expression::Variable(v) if v.as_str() == "any" => Declared::Any,
             _ => Declared::Other,
         }
@@ -518,6 +522,23 @@ struct Given {
 }
 
 impl Variable {
+    /// Converts the default, a set, to the type `to` an override gives: a list keeps the set's
+    /// elements in set order, `any` and a set keep the set, and any other type (a tuple, a map)
+    /// is one Terraform rejects: the default is unknown.
+    fn convert_set_to(&mut self, to: Declared) {
+        match to {
+            Declared::Set | Declared::Any => {}
+            Declared::List => {
+                self.default = self.default.take().map(|set| {
+                    let name = hcl_edit::expr::FuncName::new(hcl_edit::Ident::new("tolist"));
+                    let args: Vec<Expression> = vec![set];
+                    Expression::from(hcl_edit::expr::FuncCall::new(name, args.into()))
+                });
+            }
+            Declared::Other => self.default = None,
+        }
+    }
+
     /// Converts its default to its final type where that changes the value: Terraform makes a
     /// set of the default of a `type = set(...)` (sorted, without duplicates) when it decodes the
     /// block, and again when an override gives the type or the default. Written as `toset(...)`,
@@ -550,19 +571,19 @@ impl Module {
             return;
         };
         variable.sensitive |= declared.sensitive;
-        // Terraform converts a default to the type its block declares, and again to the type an
-        // override gives; OpenTofu 1.13 and later convert it once, to the final one. A default
-        // the declared set type produced is therefore unknown under an override's `type`.
-        let retyped = overriding && variable.ty.is_some() && declared.ty == Some(Declared::Set);
+        // The type an override gives, if any: Terraform converts the default to the type its own
+        // block declares and again to this one (OpenTofu 1.13 and later convert it once, to the
+        // final type, and name other instances: a ceiling, #740).
+        let retyped = variable.ty.filter(|_| overriding);
         // An override block's `type` replaces the declared one; without one the declared stays.
         variable.ty = variable.ty.or(declared.ty);
         // An override block without a default keeps the declared one, and where it is.
         if overriding && variable.default.is_none() {
             declared.sensitive = variable.sensitive;
-            declared.ty = variable.ty;
-            if retyped {
-                declared.default = None;
+            if let (Some(to), Some(Declared::Set)) = (retyped, declared.ty) {
+                declared.convert_set_to(to);
             }
+            declared.ty = variable.ty;
         } else {
             *declared = variable;
         }
@@ -2103,7 +2124,9 @@ impl<'m> Eval<'m> {
             Name::Local(n) => (at, module.locals.get(n).map(|l| &l.expr)),
             Name::Var(n) => match (module.variables.get(n), self.instances[at].parent) {
                 // A declared type converts the value: only `any`, or none, keeps the set.
-                (Some(v), _) if matches!(v.ty, Some(Declared::Set | Declared::Other)) => {
+                (Some(v), _)
+                    if matches!(v.ty, Some(Declared::Set | Declared::List | Declared::Other)) =>
+                {
                     let set = v.ty == Some(Declared::Set);
                     self.sets.insert(key, set);
                     return set;
@@ -4932,8 +4955,8 @@ mod tests {
     }
 
     /// An override file's `type` replaces the declared one, as Terraform merges a variable: a set
-    /// retyped as a list holds a list when the override gives the default too, and an override
-    /// without a `type` keeps the set. A retyped set's own default is unresolved (#740, `retype`).
+    /// retyped as a list holds its default as a list, and an override without a `type` keeps the
+    /// set (the many-element rows of #740 are in `retype`).
     #[test]
     fn an_override_retyping_a_set_variable_as_a_list_keeps_its_index_key() {
         let main = concat!(
@@ -4948,7 +4971,10 @@ mod tests {
             over("  type = list(string)\n  default = [\"x\"]\n"),
             ["a.q[\"0\"] = \"queue-0\" [var.s override.tf:1]"]
         );
-        assert_eq!(over("  type = list(string)\n"), ["a.q ~ \"queue-*\""]);
+        assert_eq!(
+            over("  type = list(string)\n"),
+            ["a.q[\"0\"] = \"queue-0\" [var.s main.tf:1]"]
+        );
         assert_eq!(over("  description = \"d\"\n"), ["a.q ~ \"queue-*\""]);
     }
 
