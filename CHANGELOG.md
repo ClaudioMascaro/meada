@@ -379,10 +379,11 @@ All notable changes to Meada are recorded here. The format follows
   duplicates) as Terraform makes it when it decodes the block, so `tolist(var.s)` over a default
   `["b", "a", "a"]` no longer gives three exact instances (#720).
 - Terraform: an override file that replaces the `type` of a variable whose own block declares a
-  set type leaves the default of that block unresolved, whatever the new type. Terraform
-  converts the default to the set and then to the new type, OpenTofu 1.13 and later convert it
-  once, to the final type, so the two name different instances; a default the override gives
-  and a value a var file gives keep their exact names (#740).
+  set type now names what Terraform creates: the default is converted to the set first, then to
+  the new type (`list(string)` gives the set's elements in set order, `any` and `set(string)`
+  keep the set; a default an earlier override gave is converted the same way when a later
+  one retypes it), and one Terraform rejects (a tuple) gets no exact name. OpenTofu 1.13 and later convert the default
+  once, to the final type, and name other instances; Meada follows Terraform (#740).
 - AWS SDK forms in Java, Go and C# follow the ADR 0026 rule TypeScript and Python already
   followed: an EventBridge entry without `EventBusName` produces to `default`, and an SNS
   publish to a phone number or endpoint names no topic. A request Meada cannot see whole (a

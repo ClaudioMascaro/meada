@@ -222,10 +222,9 @@ this file, and a change to these modules updates it.
   `EVAL_WORK_MAX`; else `Eval::partial` keeps a template's resolved parts and puts `*` for the rest.
   A name's value crosses boundaries that change it in Terraform: a variable's declared `type`
   converts what it receives (`Declared`; `any` keeps the value), a module argument is evaluated
-  in the caller, an override file's `type` and `default` replace the declared ones (Terraform converts the
-  default to the declaring block's type and again to the override's, OpenTofu 1.13+ once to the
-  final one, so a set-declared default under an override `type` is unresolved), a var file's
-  value replaces the default. Check each against Terraform's rule when a change decides on a
+  in the caller, an override file's `type` and `default` replace the declared ones (`Module::declare`: Terraform
+  converts the default to the declaring block's type and again to the override's, which Meada
+  follows; OpenTofu 1.13+ converts once, a ceiling), a var file's value replaces the default. Check each against Terraform's rule when a change decides on a
   value's kind (`Eval::holds_set`); `tests/terraform-oracle/modules/` holds cases for the first three.
   `Eval::keys` evaluates `count` and `for_each` while instances are made (no module output read
   yet), and `Eval::root` evaluates the names once every instance exists. `Repository::read` reads
