@@ -674,6 +674,15 @@ expressão regular gera `inferred`. As condições de uma rota são verificadas 
 Uma condição negada (`!=`, `!~`) só filtra a rota: não cria lado nem link para o valor que
 ela exclui.
 
+Uma expressão regular que o `regexp` do Go não compila (um grupo `(` sem fechar, um `*` no
+início, um intervalo invertido `[z-a]`, um lookahead `(?=`) faz o Alertmanager recusar a
+configuração inteira, então o Meada lê essa configuração, ou esse objeto `AlertmanagerConfig`,
+como ilegível: ela não cria lado de alerta nem link, e `meada status` conta o arquivo em
+`ilegíveis`. A mesma configuração com a expressão corrigida gera links normalmente. Uma
+expressão que o Meada deixa sem correspondência só por seus próprios limites, ou por não ler a
+sintaxe, vale para o Alertmanager até onde o Meada sabe: o matcher aparece como órfão e as
+demais rotas continuam gerando links.
+
 `search` com kind `alert` encontra o contrato; `context` na rota mostra seu receiver,
 e `trace` percorre da regra à rota e de volta. `meada export` inclui emissores, matchers
 e links. `meada status` só lista órfãos quando o escopo visível tem os dois lados;

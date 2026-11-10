@@ -546,7 +546,8 @@ async fn run(case: &str, suites: &[Suite], out: &Path) {
 
 #[tokio::test]
 async fn a_public_fixture_run_writes_machine_and_summary_reports() {
-    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("benchmark_smoke_report");
+    let out = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("benchmark_smoke_report-{}", std::process::id()));
     let _ = fs::remove_dir_all(&out);
     run("benchmark_smoke_tools", &[SMOKE], &out).await;
     let report: serde_json::Value =

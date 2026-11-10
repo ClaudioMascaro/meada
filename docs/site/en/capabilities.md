@@ -669,6 +669,15 @@ a regular expression creates an `inferred` link. A route's conditions are checke
 A negated condition (`!=`, `!~`) only filters the route: it creates no side or link for the
 value it excludes.
 
+A regular expression that Go's `regexp` cannot compile (an unclosed group `(`, a leading `*`,
+a backward range `[z-a]`, a lookahead `(?=`) makes Alertmanager refuse the whole
+configuration, so Meada reads that configuration, or that `AlertmanagerConfig` object, as
+unreadable: it creates no alert side or link and `meada status` counts the file under
+`unreadable`. The same configuration with the expression fixed links as usual. An expression
+that Meada leaves unmatched only for its own limits, or because it does not read the syntax,
+is valid as far as Meada knows: its matcher shows as an orphan and the other routes keep
+linking.
+
 `search` with kind `alert` finds the contract; `context` on a route shows its receiver,
 and `trace` walks from a rule to its route and back. `meada export` includes emitters,
 matchers and links. `meada status` lists orphans only when the visible scope has both

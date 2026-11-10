@@ -174,5 +174,6 @@ effective whatever happens to the publication and a grant returns only through a
 set. The Compose and Helm profiles carry the sections (`[catalog]`, `[workspaces]` and the `[ui]`
 block the job then needs, never a node's: `deploy/helm/meada/values-workspaces.yaml`,
 `templates/_workspaces.tpl`, checked by `scripts/helm-check`), and the site's named-workspaces page
-holds the upgrade procedure, the failure table and the acceptance map. The proposal server is not
+(`docs/site/<lang>/named-workspaces.md`, changed with the console's workspace pages and the
+`[workspaces]` profile) holds the upgrade procedure, the failure table and the acceptance map. The proposal server is not
 packaged in either profile. The real-organization measurement (#338) stays open and does not gate S5.

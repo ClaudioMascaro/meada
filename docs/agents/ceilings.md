@@ -5,6 +5,8 @@ a ticket accepted, each with its value and its reason. Detail behind the
 [architecture map](architecture.md); the code wins over this file. A limit marked `ponytail:` in
 `src/` is named in one of the parts below, and `tests/it/docs.rs` checks that it is.
 
+A new entry goes in the part for its area, beside the entries that start with its first path, never at the end of a part.
+
 - [Resolution, the index and shape readers](ceilings/resolution-the-index-and-shape-readers.md)
 - [Language packs](ceilings/language-packs.md)
 - [HTTP routes and clients (JVM, Go, Rust, TS)](ceilings/http-clients-jvm-go-rust-ts.md)
