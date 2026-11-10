@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ignore::WalkBuilder;
@@ -686,13 +687,78 @@ pub struct Indexed<'a> {
 /// a `[serve]` table the repository has none. They hold no code, so an edited document changes
 /// no code row: `Http::declare` reads them at query time.
 ///
-/// Refreshes of one index (MCP calls in flight together, or two processes) share it (#704): one
-/// that finds nothing to write takes no write lock, so it runs beside the others and never
-/// waits on a write lock. One whose first write meets another refresh's lock waits for that
-/// refresh to commit, then starts over and finds what it wrote, so the walks done while the lock
-/// is held follow the changes, not the number of waiting calls (`refresh_keeping`).
+/// Refreshes of one index share it (#704). In one process (MCP calls in flight together) one
+/// runs at a time: a call that comes while another runs waits for it, with no timer, then for
+/// the next run, which starts after it came and so sees the tree as the call found it; the
+/// calls that came meanwhile share that run's outcome. Across processes, one that finds nothing
+/// to write takes no write lock, and one whose first write meets another process's writer waits
+/// up to the busy timeout for that commit, then starts over (`refresh_keeping`).
 pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
-    refresh_keeping(db, root, identity, serve, true)
+    let Some(path) = db.path().filter(|p| !p.is_empty()) else {
+        return refresh_keeping(db, root, identity, serve, true);
+    };
+    let flight = {
+        let mut flights = FLIGHTS.lock().unwrap_or_else(PoisonError::into_inner);
+        flights.entry(PathBuf::from(path)).or_default().clone()
+    };
+    let mut runs = flight.runs.lock().unwrap_or_else(PoisonError::into_inner);
+    let needed = runs.started + 1;
+    while runs.running && runs.finished < needed {
+        runs = flight
+            .done
+            .wait(runs)
+            .unwrap_or_else(PoisonError::into_inner);
+    }
+    if runs.finished >= needed {
+        return runs.failed.clone().map_or(Ok(()), |e| Err(e.into()));
+    }
+    runs.running = true;
+    runs.started += 1;
+    let mut run = Run {
+        flight: &flight,
+        number: runs.started,
+        failed: Some("the refresh in flight stopped".to_string()),
+    };
+    drop(runs);
+    let outcome = refresh_keeping(db, root, identity, serve, true);
+    run.failed = outcome.as_ref().err().map(|e| e.to_string());
+    outcome
+}
+
+/// The refreshes of this process, one per index file it refreshes (`refresh`).
+static FLIGHTS: Mutex<BTreeMap<PathBuf, Arc<Flight>>> = Mutex::new(BTreeMap::new());
+
+/// The runs of one index's refresh in this process, and the waiters' signal.
+#[derive(Default)]
+struct Flight {
+    runs: Mutex<Runs>,
+    done: Condvar,
+}
+
+/// How many runs started and finished, whether one runs now, and the last one's error.
+#[derive(Default)]
+struct Runs {
+    started: u64,
+    finished: u64,
+    running: bool,
+    failed: Option<String>,
+}
+
+/// The run in flight: dropped, even by a panic, it records its outcome and wakes the waiters.
+struct Run<'a> {
+    flight: &'a Flight,
+    number: u64,
+    failed: Option<String>,
+}
+
+impl Drop for Run<'_> {
+    fn drop(&mut self) {
+        let mut runs = (self.flight.runs.lock()).unwrap_or_else(PoisonError::into_inner);
+        runs.running = false;
+        runs.finished = self.number;
+        runs.failed = self.failed.take();
+        self.flight.done.notify_all();
+    }
 }
 
 /// Deferred attempts before a refresh takes the write lock first (`refresh_keeping`).
@@ -1050,7 +1116,8 @@ fn refresh_attempt(
         // over and keeps nothing.
         drop(tx);
         db.execute("DELETE FROM meta", [])?;
-        return refresh(db, root, identity, serve);
+        // Not `refresh`: this call is the run in flight for this index, which it would wait on.
+        return refresh_keeping(db, root, identity, serve, true);
     };
     settle(
         &tx,
@@ -3790,6 +3857,85 @@ mod tests {
         ends.join().unwrap();
         assert!(refreshed.is_ok(), "{refreshed:?}");
         assert_eq!((named(&db, "a"), named(&db, "b")), (0, 1));
+    }
+
+    /// `n` connections to the index at `index` of `root`, each opened with no busy timeout: any
+    /// lock another connection holds fails its statement at once, with no wait.
+    fn unwaiting(index: &Path, root: &Path, n: usize) -> Vec<Connection> {
+        with_busy_timeout(Duration::ZERO, || {
+            (0..n)
+                .map(|_| open(index, root, REPO, &Serve::default()).unwrap())
+                .collect()
+        })
+    }
+
+    /// Refreshes `db` on a thread of its own, its outcome as text.
+    fn refreshing(db: Connection, root: &Path) -> std::thread::JoinHandle<Result<(), String>> {
+        let root = root.to_path_buf();
+        std::thread::spawn(move || {
+            (super::refresh(&db, &root, REPO, &Serve::default())).map_err(|e| e.to_string())
+        })
+    }
+
+    /// Calls in flight together in one process (#704) never fail on a timer: with no busy
+    /// timeout at all, eight refreshes of one index after a change of 200 files all succeed,
+    /// since a call that comes while a run is in flight waits for it, then shares the next run.
+    #[test]
+    fn refreshes_of_one_process_wait_for_the_run_in_flight_with_no_timer() {
+        let (dir, index) = index_dir("refresh_in_flight");
+        let root = checkout(&dir);
+        let dbs = unwaiting(&index, &root, 8);
+        for i in 0..200 {
+            let source = format!("export function f{i}() {{\n  return {i};\n}}\n");
+            fs::write(root.join(format!("f{i}.ts")), source).unwrap();
+        }
+
+        let runs: Vec<_> = dbs.into_iter().map(|db| refreshing(db, &root)).collect();
+        for run in runs {
+            assert_eq!(run.join().unwrap(), Ok(()));
+        }
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        assert_eq!((named(&db, "a"), named(&db, "f199")), (1, 1));
+    }
+
+    /// A tree that keeps changing under the calls of one process (#704): while a file changes
+    /// every few milliseconds, eight connections with no busy timeout refresh ten times each,
+    /// and none fails, since one run at a time writes.
+    #[test]
+    fn a_tree_that_keeps_changing_never_fails_the_refreshes_of_one_process() {
+        let (dir, index) = index_dir("refresh_changing");
+        let root = checkout(&dir);
+        let dbs = unwaiting(&index, &root, 8);
+        let stop = Arc::new(AtomicBool::new(false));
+        let edits = std::thread::spawn({
+            let (root, stop) = (root.clone(), stop.clone());
+            move || {
+                for i in 0.. {
+                    if stop.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    let source = format!("export function c{i}() {{\n  return {i};\n}}\n");
+                    fs::write(root.join("changing.ts"), source).unwrap();
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+            }
+        });
+
+        let runs: Vec<_> = (dbs.into_iter())
+            .map(|db| {
+                let root = root.clone();
+                std::thread::spawn(move || {
+                    (0..10).try_for_each(|_| {
+                        (super::refresh(&db, &root, REPO, &Serve::default()))
+                            .map_err(|e| e.to_string())
+                    })
+                })
+            })
+            .collect();
+        let outcomes: Vec<_> = runs.into_iter().map(|run| run.join().unwrap()).collect();
+        stop.store(true, Ordering::Relaxed);
+        edits.join().unwrap();
+        assert!(outcomes.iter().all(Result::is_ok), "{outcomes:?}");
     }
 
     /// A rebuild (spec #259) builds the new index beside the old one and renames it over it:

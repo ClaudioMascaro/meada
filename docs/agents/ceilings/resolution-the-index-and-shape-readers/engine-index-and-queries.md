@@ -96,9 +96,17 @@
 - `repo.rs`: a path git still quotes (tab, newline or quote in the name) is skipped by
   `uncommitted()`.
 
-- Concurrent refreshes of one index (#704): one that finds nothing to write takes no write lock
-  and never waits on one. One that has something to write and meets another writer waits up to
-  the busy timeout (10 s) for that writer's commit, then walks again; a writer that holds the
-  lock longer (a first index of a large checkout, a `meada index` beside it) still leaves it
-  `database is locked`. After three such waits a refresh takes the write lock first (no
-  marker).
+- Concurrent refreshes of one index (#704). In one process, one runs at a time and a call that
+  comes meanwhile waits for it with no timer, then shares the next run: a batch after a change
+  costs about one refresh more than an unchanged one, whatever its size (debug build, 4 cores:
+  Meada's own checkout, 50 calls 21 s against 15 s, 200 calls 70 s against 64 s; 5,000 files,
+  500 calls 11.0 s against 9.2 to 10.9 s), and no call of the process fails however long the
+  refresh takes, nor while the tree keeps changing. Across processes (two servers, a CLI command
+  beside a server) the wait is SQLite's: a refresh with nothing to write takes no write lock, and
+  one with something to write waits up to the busy timeout (10 s) for another process's writer
+  to commit, then walks again (after three such waits it takes the write lock first); a writer's
+  commit waits up to 10 s too, for the read lock each other process's refresh in flight holds
+  during its walk (one walk per process). A client sees `database is locked` on the calls of the
+  process whose wait passes 10 s: the one behind another process's writer that holds the lock
+  longer (a first index of a large checkout, `meada index` beside it), or the writer itself
+  when the other processes' walks outlast it (no marker).

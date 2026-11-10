@@ -373,9 +373,11 @@ All notable changes to Meada are recorded here. The format follows
 
 - `meada mcp` over stdio answers calls a client sends without waiting for each reply (#704).
   Each call refreshes the index, and a refresh failed at its first write with `database is
-  locked` when another call was writing. Now a refresh with nothing to write takes no write lock,
-  and one that meets another writer waits for its commit and starts over; two processes on one
-  index share it the same way.
+  locked` when another call was writing. Now the calls of one server run one refresh at a time
+  and wait for it with no timer, sharing the next run, so a batch after a change costs about one
+  refresh more than an unchanged one (measured on a debug build, Meada's own checkout: 50 calls
+  21 s against 15 s). Across processes, a refresh with nothing to write takes no write lock and
+  one that meets another process's writer waits for its commit and starts over.
 
 - AWS SDK forms in Java, Go and C# follow the ADR 0026 rule TypeScript and Python already
   followed: an EventBridge entry without `EventBusName` produces to `default`, and an SNS
