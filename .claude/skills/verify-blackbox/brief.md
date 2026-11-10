@@ -32,12 +32,15 @@ difference.
 ## Report only
 
 <Cases that never decide the verdict: a declared ceiling, a measurement beside the claim (memory,
-scale, another process), a case that was not red on PREV every time. Or `None.`>
+scale, another process), a behaviour change that was not red on PREV every time. Or `None.`>
 
 Run them and give the numbers, with no PASS or FAIL.
 
 ## Report
 
-First line `VERDICT: PASS` or `VERDICT: FAIL`. It is FAIL when a case of the claim fails, or a
-case you found inside the claim. Then a table (case, expected, PREV, AFTER, PASS/FAIL or `report
-only`), then follow-ups.
+First line `VERDICT: PASS` or `VERDICT: FAIL`. Everything outside `## Report only` decides it: a
+case of the claim (listed, or one you found inside it), what must stay unchanged, a fixture
+difference the claim does not explain, a regression anywhere (PREV right, AFTER wrong). A case
+wrong on both binaries outside the claim is a follow-up. Then a table (case, expected, PREV,
+AFTER, PASS/FAIL or `report only`), then follow-ups, among them every `report only` row where
+AFTER answers wrong.

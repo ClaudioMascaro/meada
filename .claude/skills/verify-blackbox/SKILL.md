@@ -19,21 +19,24 @@ either binary. Its report is development evidence; E2E evidence stays with `prov
 
 3. **Brief.** Copy [`brief.md`](brief.md) to `/tmp/verify/<name>-brief.md` and fill every `<...>`.
    The claim states each behaviour change as a checkable before/after, with the cases you
-   already tested, so the verifier hunts past them. Each behaviour change of the claim is a
-   case you saw _red_ on PREV: PREV gave the answer the claim says it gives, in every run you
-   made (three for a case that depends on timing). A case that compares AFTER with PREV ran to
-   its end on PREV. A case that fails either test, a declared ceiling and a measurement beside
-   the claim go under `## Report only`, where no result moves the verdict. Done when no
-   placeholder remains, every claim names its PREV and AFTER values, and each was red on PREV.
+   already tested, so the verifier hunts past them. Each behaviour change is a case you saw
+   _red_ on PREV: PREV gave the answer the claim says it gives (a hang or a kill counts), in
+   every run you made (three for a case that depends on timing). A case of the claim that
+   measures AFTER against PREV's number (time, memory) has that number: PREV ran it to its end.
+   Under `## Report only` go a declared ceiling, a measurement beside the claim (memory, scale,
+   another process), and a behaviour change or a measurement that fails its test. What must
+   stay unchanged stays in the claim. Done when no placeholder remains, every claim names its
+   PREV and AFTER values, and each behaviour change was red on PREV.
 
 4. **Launch.** Agent, `general-purpose`, background, prompt
    `Read /tmp/verify/<name>-brief.md and follow it exactly.` Keep working meanwhile.
 
 5. **Hand-back.** First write the report verbatim to `/tmp/verify/<name>/REPORT.md`; the
    transcript is not a durable copy. Then, for each FAIL: reproduce it, fix it test-first, or
-   record it as a ceiling in `docs/agents/ceilings.md`'s topic when the fix is out of reach.
-   Done when every FAIL has a commit or a ceiling, and the PREV directory is deleted (disk is
-   tight; this AFTER becomes the next PREV).
+   record it as a ceiling in `docs/agents/ceilings.md`'s topic when the fix is out of reach. A
+   `report only` row where AFTER answers wrong gets a ceiling or a follow-up issue. Done when
+   every FAIL has a commit or a ceiling, every such row a ceiling or an issue, and the PREV
+   directory is deleted (disk is tight; this AFTER becomes the next PREV).
 
 ## Scripts
 

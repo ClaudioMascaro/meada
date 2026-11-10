@@ -163,7 +163,7 @@ Screenshots are S-tier - when the environment is set up for it and the change is
 
 Execution-based evidence is A-tier. Test results, console output. Show the exact test that now fails and passes, using pseudocode.
 
-Each statement says what it is. A measurement names its run: the commit, the case, the numbers. A cause or a cost that no run or test isolates is a reading of the code, and is written as one.
+Each statement says what it is. A measurement names its run: the commit, the build (debug or release), the case, the numbers. A cause or a cost that no run or test isolates is a reading of the code, and is written as one.
 
 ### Merge Danger
 

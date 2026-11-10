@@ -165,9 +165,8 @@ In #704 the calls of one `meada mcp` server waited for its own refresh on SQLite
 timeout: a refresh longer than the timer failed every call behind it. One fix moved the
 refreshes to a `Condvar` (`FLIGHTS` in `src/index.rs`) but left the statements of a call's open
 and queries on the timer, and the same reply came back until they got a busy handler that waits
-while a refresh is in flight (`wait`). A timer that can fail a wait while the work it waits for
-is in flight in the same process is a review finding; the ones #704 left are in the ceilings
-entry "Concurrent refreshes of one index (#704)".
+while a refresh is in flight (`wait`). A wait that breaks this is a review finding; the ones
+#704 left are in the ceilings entry "Concurrent refreshes of one index (#704)".
 
 ## One decision, one function
 
@@ -203,9 +202,9 @@ Check each claim a diff adds at its source, never against the ticket's wording:
   text, is a finding.
 - A cause or a cost (a doc, a ceilings entry or a PR body saying why a run failed, or how much a
   change costs) is traced to the run or the test that isolates it: the verifier's report, a
-  timing with its build and numbers. One that nothing isolates is worded as a reading of the
-  code. #704's PR body gave as fact the cause of a failed run whose report named two candidate
-  paths and confirmed neither.
+  measurement with its commit, build, case and numbers. One that nothing isolates is worded as
+  a reading of the code. A draft of #704's PR body, and its ceilings entry, gave as fact the
+  cause of a failed run whose report named two candidate paths and confirmed neither.
 - A reference the diff moves or reflows still sits next to the thing it names.
 - A change to a skill or a harness script searches the skill's own texts for the behaviour it
   changes; a ticket premise they contradict is a finding.
