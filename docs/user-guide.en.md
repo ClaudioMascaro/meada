@@ -452,7 +452,8 @@ of type `service`.
 - **Variables**: `${VAR:-default}` resolves to its default and `context` marks it
   `(overridable)`; `${VAR}` stays in the text as an unresolved part, marked `(unresolved)`.
 - **Image and build**: `context` shows the service's `image:` and `build:`, kept for the image
-  contract. A build context is kept as a path inside the repository from its root; an absolute
+  contract, with the Dockerfile the build names (`dockerfile` or `dockerfile_inline`; an override
+  merges them like the other `build` keys). A build context is kept as a path inside the repository from its root; an absolute
   path, a URL, one that climbs out of the root or one with an unresolved part is not.
 - **Queries**: as for Terraform nodes, `search` with `kind = "iac"`, `context` and `trace`.
 
@@ -470,8 +471,13 @@ Helm values `image.repository` and images after Kustomize overrides.
 `search` with `kind = "image"` finds these contracts. Workload `context` shows its image and
 builder repository; `trace` goes down from the workload to code and up from code to workloads.
 Literal names link at `exact`; patterns and overridable values link at `inferred`, with a reason.
-Several candidates stay `ambiguous`. A safe local Compose build context connects the service
-directly to its code at `exact`, even without an image. Paths never cross symbolic links.
+Several candidates stay `ambiguous`. A safe local Compose build connects the service directly to
+the code its Dockerfile takes from the build context (`COPY`, `ADD` and `RUN --mount=type=bind`,
+in every stage) at `exact`, even without an image, or at `inferred` when the context or the
+Dockerfile path went through an overridable value. A Dockerfile Meada cannot read (missing, behind
+a symbolic link, a source with a variable, a form it does not parse) leaves the whole context at
+`inferred`, and the reason says it was not read. `.dockerignore` is not read. Paths never cross
+symbolic links.
 
 `meada status` lists image orphans only when the scope contains both builder and runner. With
 one role, `search` and `context` show `no builder in the workspace` or `no runner in the workspace`.

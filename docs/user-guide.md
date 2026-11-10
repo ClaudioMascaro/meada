@@ -453,7 +453,8 @@ na mesma pasta é lido como um projeto, enraizado na pasta. Cada serviço é um 
 - **Variáveis**: `${VAR:-padrão}` resolve para o padrão e o `context` o marca `(overridable)`;
   `${VAR}` fica no texto como parte não resolvida, marcada `(unresolved)`.
 - **Imagem e build**: o `context` mostra `image:` e `build:` do serviço, guardados para o
-  contrato de imagem. Um contexto de build é guardado como caminho dentro do repositório, a
+  contrato de imagem, com o Dockerfile que o build nomeia (`dockerfile` ou `dockerfile_inline`;
+  um override os mescla como as demais chaves de `build`). Um contexto de build é guardado como caminho dentro do repositório, a
   partir da raiz; caminho absoluto, URL, um que sobe para fora da raiz ou um com parte não
   resolvida não são.
 - **Consultas**: como nos nós Terraform, `search` com `kind = "iac"`, `context` e `trace`.
@@ -472,8 +473,13 @@ opção; um shell explícito deve ser `bash` ou `sh`. Runners vêm de containers
 `search` com `kind = "image"` encontra esses contratos. `context` no workload mostra sua imagem
 e o repositório builder; `trace` desce do workload ao código e sobe do código aos workloads.
 Nomes literais ligam em `exact`; padrões e valores sobrescrevíveis em `inferred`, com o motivo.
-Vários candidatos ficam `ambiguous`. Um contexto Compose local e seguro liga o serviço ao seu
-código diretamente em `exact`, mesmo sem imagem. Caminhos não atravessam links simbólicos.
+Vários candidatos ficam `ambiguous`. Um build Compose local e seguro liga o serviço diretamente
+ao código que o seu Dockerfile copia do contexto (`COPY`, `ADD` e `RUN --mount=type=bind`, em todos
+os estágios), em `exact`, mesmo sem imagem; em `inferred` quando o contexto ou o caminho do
+Dockerfile passou por um valor sobrescrevível. Um Dockerfile que o Meada não lê (ausente, atrás de
+link simbólico, origem com variável, forma que não interpreta) deixa o contexto inteiro em
+`inferred`, e o motivo diz que não foi lido. O `.dockerignore` não é lido. Caminhos não atravessam
+links simbólicos.
 
 `meada status` só lista imagens órfãs quando o escopo contém builder e runner. Com apenas um
 papel, `search` e `context` mostram `no builder in the workspace` ou `no runner in the workspace`.
