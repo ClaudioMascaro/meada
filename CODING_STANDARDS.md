@@ -23,8 +23,9 @@ module argument, an override file) and run `go run .` there.
 When Meada emulates a tool that has a fork reading the same files (Terraform and OpenTofu), a
 rule is checked against both. Where they differ Meada follows Terraform (#740), an exception
 to "certain or absent" (the fork's reader may be right) that covers what Terraform reads: a
-declaration in a file only OpenTofu reads (`.tofu`) has no Terraform answer to follow, and is
-unresolved where the two rules give different values. The difference is recorded as a ceiling.
+variable with a block in a file only OpenTofu reads (`.tofu`, `.tofu.json`), declaring or
+overriding, has no whole Terraform answer to follow, and is unresolved where the two rules
+differ. The difference is recorded as a ceiling.
 
 ## Exactly N, only X
 

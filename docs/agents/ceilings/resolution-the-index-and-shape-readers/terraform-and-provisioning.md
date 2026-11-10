@@ -188,11 +188,17 @@
   in its directory. The same default with no override, a restated `set(string)`, an override
   giving `type` and `default` together and a var file's value name the same in both. OpenTofu
   1.13.9 was run; that 1.12 and earlier behave as Terraform is read from the source, not run.
-  The exception covers a declaration Terraform reads. A variable whose declaring block is in a
-  `.tofu` or `.tofu.json` file does not exist for Terraform, and OpenTofu 1.8 to 1.12 (read from
-  the source, not run) convert its default as Terraform does where 1.13+ converts once, so no
-  value is certain for the file: with an override that retypes it (in any of `override.tf`,
-  `*_override.tf`, `override.tf.json`, `override.tofu`, `*_override.tofu`, `override.tofu.json`)
-  the default is unresolved where the two conversions give another value or another kind of
-  collection, and exact where they agree (no override, an override restating the set, an
-  override with its own default of the final type, a var file's value).
+  The exception covers a variable all of whose blocks Terraform reads (`.tf`, `.tf.json`): it
+  follows Terraform, whatever the override. A variable with a block in a file only OpenTofu
+  reads (`.tofu`, `.tofu.json`), its declaring block or an override file's, is one Terraform
+  does not read whole, and OpenTofu 1.8 to 1.12 (read from the source, not run) convert its
+  default as Terraform does where 1.13+ converts once, so no value is certain for it: when an
+  override retypes it (in any of `override.tf`, `*_override.tf`, `override.tf.json`,
+  `override.tofu`, `*_override.tofu`, `override.tofu.json`) the default is unresolved where the
+  two conversions hold other elements (compared once converted, so `[10, 9]` and `["10", "9"]`
+  are the same under `set(string)`) or another kind of collection, and exact where they agree
+  (no override, an override restating the set, an override with its own default of the final
+  type, a var file's value). A default that a `.tofu` override gave over a declaration Terraform
+  reads is unresolved, as Terraform ignores that override. A module is judged by its own files,
+  whatever calls it: a module of `.tf` files called only from a root written in `.tofu` follows
+  Terraform though Terraform cannot read that root, and OpenTofu's answer differs.

@@ -386,8 +386,8 @@ All notable changes to Meada are recorded here. The format follows
   keep the set; a default an earlier override gave is converted the same way when a later
   one retypes it), and one Terraform rejects (a tuple) gets no exact name. OpenTofu 1.13 and later convert the default
   once, to the final type, and name other instances; Meada follows Terraform (#740), except for a
-  variable declared in a `.tofu` file, which Terraform does not read: it is unresolved where the
-  two conversions differ.
+  variable with a block in a `.tofu` or `.tofu.json` file, which Terraform does not read: it is
+  unresolved where the two conversions differ.
 - An Alertmanager configuration with a matcher regex Go's `regexp` refuses (an unclosed
   group, a leading `*`, a backward range, a lookahead) is unreadable, as Alertmanager refuses
   to load it: it gives no alert side or link, where its valid routes kept an `exact` link,
