@@ -517,6 +517,26 @@ struct Given {
     rank: (u8, String),
 }
 
+impl Variable {
+    /// Converts its default to its final type where that changes the value: Terraform makes a
+    /// set of the default of a `type = set(...)` (sorted, without duplicates) when it decodes the
+    /// block, and again when an override gives the type or the default. Written as `toset(...)`,
+    /// which Meada evaluates as cty does. Another conversion (a number to a string) is not made.
+    fn settle(&mut self) {
+        if self.ty != Some(Declared::Set) {
+            return;
+        }
+        self.default = self.default.take().map(|default| match &default {
+            Expression::FuncCall(f) if f.name.name.as_str() == "toset" => default,
+            _ => {
+                let name = hcl_edit::expr::FuncName::new(hcl_edit::Ident::new("toset"));
+                let args: Vec<Expression> = vec![default];
+                Expression::from(hcl_edit::expr::FuncCall::new(name, args.into()))
+            }
+        });
+    }
+}
+
 impl Module {
     /// Records the `variable` block `variable` of `name`. An override file's (`overriding`) merges
     /// into the declaration, its default replacing the declared one, or with none is left out, as
@@ -524,6 +544,7 @@ impl Module {
     fn declare(&mut self, name: &str, mut variable: Variable, overriding: bool) {
         let Some(declared) = self.variables.get_mut(name) else {
             if !overriding {
+                variable.settle();
                 self.variables.insert(name.to_string(), variable);
             }
             return;
@@ -538,6 +559,7 @@ impl Module {
         } else {
             *declared = variable;
         }
+        declared.settle();
     }
 
     /// Adds the resource, data or module block `block`. An override file's (`overriding`) merges
