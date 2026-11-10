@@ -19,7 +19,7 @@ import (
 // `<must>\t<keys>`: the keys of the `for_each` of the resource `a.q` (the one in `m/` when the
 // root has none), sorted and joined by commas, which `go run .` rewrites; `=` means Meada must
 // answer them exactly, `~` that it may leave them unresolved. `!` and a reason stand for keys
-// Terraform refuses; no key at all is an empty list. The test in src/iac/tests/oracle.rs indexes
+// Terraform refuses; `-` stands for no key at all. The test in src/iac/tests/oracle.rs indexes
 // the directory's files.
 //
 // Modelled, with Terraform's rules: a variable block's default is converted to the type that
@@ -311,6 +311,9 @@ func moduleCases(dir string) (changed, total int, err error) {
 		got, err := moduleKeys(filepath.Dir(want))
 		if err != nil {
 			return 0, 0, fmt.Errorf("%s: %w", filepath.Dir(want), err)
+		}
+		if got == "" {
+			got = "-"
 		}
 		if got != cols[1] {
 			changed++

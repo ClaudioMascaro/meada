@@ -30,6 +30,7 @@ fn module_cases_agree_with_the_terraform_oracle() {
     for case in cases {
         let want = std::fs::read_to_string(case.join("want")).unwrap();
         let (must, keys) = want.trim_end_matches('\n').split_once('\t').unwrap();
+        let keys = if keys == "-" { "" } else { keys };
         let mut list = Vec::new();
         read(&case, "", &mut list);
         let list: Vec<(&str, &str)> = list.iter().map(|(p, t)| (&p[..], &t[..])).collect();
