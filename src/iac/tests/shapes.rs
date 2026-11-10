@@ -219,6 +219,10 @@ fn a_type_without_a_top_level_set_names_what_an_untyped_variable_names() {
         let bare = format!("variable \"x\" {{\n}}\n{read}");
         let vars = format!("x = {value}\n");
         let got = names(&[("main.tf", &declared), ("terraform.tfvars", &vars)]);
+        assert!(
+            got.iter().any(|n| n.contains(" = \"q-")),
+            "{label} by a var file: {got:?}"
+        );
         assert_eq!(
             got,
             names(&[("main.tf", &bare), ("terraform.tfvars", &vars)]),
