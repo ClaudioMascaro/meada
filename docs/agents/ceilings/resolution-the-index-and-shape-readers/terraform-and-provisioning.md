@@ -98,10 +98,12 @@
   a conditional its larger branch; past it `hcl-rs` does not evaluate the expression, only its
   template parts resolve; measured in a debug build, an expression at the ceiling takes about
   0.2 s) and `EVAL_WORK_MAX` (64 MiB of cost per root module; past it every value left is
-  unresolved, but for a literal name. A refusal spends the bytes it went through to decide, at
-  most the size of the roots it read times two plus twice its reads (copied, ordered, then read
-  and copied again per name), so 9,999 refusals over a 21,000-element variable stop evaluating
-  after about 90 and take 2.3 s in a debug build. The steps it charges bound a root of
+  unresolved, but for a literal name that fits `EVAL_VALUE_MAX`. A refusal spends the bytes it
+  went through to decide: its own text, and at most the size of the roots it read times two
+  plus twice its reads (copied, ordered, then read and copied again per name), so 9,999
+  refusals over a 21,000-element variable stop evaluating after about 90 and take 2.3 s in a
+  debug build, and a long expression refused in each instance of a `count` stops once its text
+  has spent the work. The steps it charges bound a root of
   expressions near the ceiling: 80 resources took 16.6 s in a debug build. It does not charge
   what no step counts: a template outside every `for` is parsed again once per `count` or
   `for_each` instance (10,000 interpolations: 0.72 s at `count = 1`, 4.41 s at 10, 48.4 s at 100,

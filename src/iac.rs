@@ -2310,8 +2310,10 @@ impl<'m> Eval<'m> {
         if depth > EVAL_DEPTH_MAX {
             return Evaluated::unknown();
         }
-        if let Expression::String(s) = expr {
-            // Nothing to evaluate: a literal stays known once the work is spent.
+        if let Expression::String(s) = expr
+            && s.len() + 2 <= EVAL_VALUE_MAX
+        {
+            // Nothing to evaluate: a literal that fits stays known once the work is spent.
             return Evaluated {
                 val: Val::Known(Value::from(s.value().as_str())),
                 through: BTreeSet::new(),
@@ -2418,12 +2420,15 @@ impl<'m> Eval<'m> {
             }
         } else {
             // Refused, it spends the bytes it went through to decide, not what it would have
-            // made: at most its roots once copied and once ordered (`lexical`), then once read
-            // and once copied in `cost` per name it reads. The parts `partial` evaluates pass
-            // this gate themselves.
+            // made: its own text, and at most its roots once copied and once ordered
+            // (`lexical`), then once read and once copied in `cost` per name it reads. The
+            // parts `partial` evaluates pass this gate themselves.
             let roots = (roots.values().map(size)).fold(0, usize::saturating_add);
             let reads = refs.len().saturating_add(1).saturating_mul(2);
-            self.work = self.work.saturating_sub(roots.saturating_mul(reads));
+            // An expression built rather than read has no span: its text is written out.
+            let text = (expr.span()).map_or_else(|| expr.to_string().len(), |s| s.len());
+            let spent = roots.saturating_mul(reads).saturating_add(text);
+            self.work = self.work.saturating_sub(spent);
         }
         self.partial(at, each, expr, depth)
     }
@@ -5047,6 +5052,45 @@ mod tests {
             "{got:?}"
         );
         assert!(got.contains(&"a.z = \"constant\"".to_string()), "{got:?}");
+    }
+
+    /// A refusal goes through its own text too, and spends it: an expression holding a 60 KB
+    /// string, refused in each of 1,000 instances, spends the root's work, and a name read
+    /// after them is unresolved. Spending only its roots, a refused expression of any length was
+    /// gone through once per instance: measured on 2026-11-10 in a debug build, 2.2 s for 1,000
+    /// instances of a 120 KB one.
+    #[test]
+    fn refusals_of_a_long_expression_spend_its_text() {
+        let long = "a".repeat(60_000);
+        let list = vec!["1"; 20].join(", ");
+        let main = format!(
+            "variable \"x\" {{ default = \"x\" }}\nresource \"a\" \"r\" {{\n  count = 1000\n  name = \"q-${{length([for a in [{list}] : \"{long}\"])}}\"\n}}\nresource \"a\" \"z\" {{ name = \"q-${{var.x}}\" }}\n"
+        );
+        let got = names(&[("main.tf", &main)]);
+        assert_eq!(got.len(), 1001);
+        assert_eq!(got[0], "a.r[0] ~ \"q-*\"");
+        assert_eq!(got.last().map(String::as_str), Some("a.z ~ \"*\""));
+    }
+
+    /// A literal skips the evaluation, not `EVAL_VALUE_MAX`: one past it is unresolved as any
+    /// value of that size, as a name or read through a local (whose template keeps its literal
+    /// text), and one that fits stays exact.
+    #[test]
+    fn a_literal_past_the_value_ceiling_is_unresolved() {
+        let long = "a".repeat(EVAL_VALUE_MAX);
+        // `size` counts a string's two quotes.
+        let fits = &long[..EVAL_VALUE_MAX - 2];
+        let main = format!(
+            "locals {{\n  l = \"{long}\"\n}}\nresource \"a\" \"long\" {{ name = \"{long}\" }}\nresource \"a\" \"read\" {{ name = \"q-${{local.l}}\" }}\nresource \"a\" \"fits\" {{ name = \"{fits}\" }}\n"
+        );
+        assert_eq!(
+            names(&[("main.tf", &main)]),
+            [
+                "a.long ~ \"*\"".to_string(),
+                "a.read ~ \"q-*\"".to_string(),
+                format!("a.fits = \"{fits}\""),
+            ]
+        );
     }
 
     /// Converting an object literal for `hcl-rs` checks each key against those before it, so
