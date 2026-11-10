@@ -646,6 +646,10 @@ fn a_repeated_heading_or_an_unreleased_bullet_without_an_issue_is_a_problem() {
     let found = changelog_problems(copied);
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(found[0].contains("a (#1) ") && found[0].contains("appears twice"));
+    let same = "## [Unreleased]\n\n### Added\n\n- a\n  (#1)\n\n- a\n  (#1)\n";
+    let found = changelog_problems(same);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].contains("a (#1) ") && found[0].contains("appears twice"));
 }
 
 #[test]
