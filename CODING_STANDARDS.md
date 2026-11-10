@@ -86,6 +86,22 @@ that changes only part of the path leaves the rest comparing the code with itsel
 `community` and `duplicate`, the contract-site spans, the `context` community line and the trace
 starts could not fail. No tool checks this; a PR without the mutation is a review finding.
 
+Code that skips, caches or narrows work (a kept group, a fast path, a cache hit) also carries
+one test that goes red when the path is forced off (it keeps nothing, caches nothing), because
+equivalence tests pass with the optimization disabled: the answer is right, only slow. In #391
+a refresh that kept no group passed every test until `a_refresh_does_not_parse_a_kept_group_again`
+went red with `kept_groups` forced empty. The PR names that mutation and the test it turned red,
+and a PR without them is a review finding, not a mechanical check.
+
+## Check tests
+
+A test that checks a rule over files, data or output (a docs check, a lint, a validator) ships
+with one case that makes it fail: a fixture that breaks the rule or a mutation of the input. The
+PR names that case and the test it turned red. A check that scans a set must also fail when the
+set is empty. #581 shipped a check with no negative fixture test of the failure path, and the
+review proved it by hand-mutating `docs/agents/map/core.md`; #595 got its `> 0` guard only after
+review. No tool checks this; a PR without the failing case is a review finding.
+
 ## Hostile input
 
 A reader of a file the repository holds (a provider document, a config, a source file) treats
@@ -99,7 +115,9 @@ indexing carries on.
   depth limit stays cheap. A unit test feeds such a chain and bounds its time, as the
   `*_in_linear_time` tests do. Its input is sized so the linear path runs in under a twentieth
   of the bound in a local debug build (CI runners are several times slower and run the suites in
-  parallel), and the implementer reports the measured time. A new language pack adds its row
+  parallel), and is also large enough that a quadratic variant of the code under test exceeds
+  the bound. The implementer reports the measured time, and the PR says which mutation was
+  tried and how long it took. A new language pack adds its row
   to `chained` in `tests/it/hostile.rs`, which feeds every pack a chain of locals on call
   results.
 - Expansion (aliases, `$ref`s, variable substitution) is charged to a budget per file, and
@@ -112,8 +130,10 @@ indexing carries on.
   unit test feeds it an input past the limit.
 - A manifest or configuration reader reads a file of `lang::MAX_BYTES` built to explode (many
   keys, deep nesting, wide fan-out) in bounded time and bounded memory, and returns a bounded
-  size; a value is copied after it is charged, never before. A new reader adds its row to
-  `probes` in `src/package/hostile.rs`, which also bounds the heap each row holds (`HEAP`).
+  size; a value is copied after it is charged, never before. A new reader, or a reader that
+  gains a table or key, adds or extends its row in `probes` in `src/package/hostile.rs` (which
+  also bounds the heap each row holds, `HEAP`), so the probe exercises the new keys at
+  `lang::MAX_BYTES`, including a scan of every entry for each entry.
 
 ## Service deadlines
 
@@ -128,6 +148,11 @@ forever.
 - Other async calls (Valkey, the store, status probes) go through `modules::within(bound, ask,
   timeout)`, where `bound` is the duration and `timeout` builds the timeout message.
 - A new service brings its bound with it. A call outside a deadline is a review finding.
+- A new failure answer from a service inside a loop over candidates (installations, credentials,
+  peers) says whether it ends the loop, passes to the next candidate or fails the run, and a test
+  asks the second candidate.
+- A header with more than one form (`Retry-After`: delay-seconds or HTTP-date) is parsed in every
+  form or read by presence.
 
 ## One decision, one function
 
@@ -146,12 +171,27 @@ the browser decides too.
 A Known ceiling bounds only what the spec and the ticket leave out: every item they ask for is
 implemented, or reported as blocked.
 
+## Claims the diff adds
+
+Check each claim a diff adds at its source, never against the ticket's wording:
+
+- A citation (a file, a constant, a test, "X derives from Y") is opened and confirmed at the
+  cited place.
+- A rule is checked by asking which action clears it: read the code or the test that produces
+  or guards the artefact (for a `docs/agents` file, the test in `tests/it/docs.rs` that names
+  it). "Re-bless" with no producer found, or a sentence placed where that test expects other
+  text, is a finding.
+- A reference the diff moves or reflows still sits next to the thing it names.
+- A change to a skill or a harness script searches the skill's own texts for the behaviour it
+  changes; a ticket premise they contradict is a finding.
+
 ## Docs move with the capability
 
 A change users can see (a language, a framework, a contract kind, a command or MCP behavior)
 updates, in the same PR, the documentation capabilities page (`docs/site/pt/capabilities.md`,
 with its `en` and `es` equivalents as `AGENTS.md` requires), the relevant guide or reference,
-and `CHANGELOG.md` under its unreleased version.
+and `CHANGELOG.md` under its unreleased version. A change to what a pack or reader links
+updates `docs/site/*/capabilities.md` and `docs/user-guide{,.en,.es}.md` together.
 
 A change to what the code relies on updates the repository map (`docs/agents/architecture.md`)
 in the same change. Each kind of update goes to one place, and the map stays an index within its
@@ -170,7 +210,11 @@ within 24 KiB. Other areas keep their existing 64 KiB budget until split:
   `docs/agents/ceilings.md`), with its value and its reason; it is not repeated in the map.
 - A value the index now stores (a table, a column, a field of a stored summary) joins the list
   "Stored values" in `docs/agents/map/indexing/stored-values.md`, the detail of the invariant "The index holds
-  no source text and no values of code, apart from ..." in the map.
+  no source text and no values of code, apart from ..." in the map. A diff that adds a form to a
+  stored field and leaves `tests/golden/schema.txt` unchanged is a finding
+  (`docs/agents/map/seams.md`: a change to what is stored re-blesses it). The golden is built
+  from the samples under `tests/fixtures/schema/` (`src/index.rs`), so the fix is a sample there
+  that carries the new form, added or extended in the diff, and a re-blessed golden that shows it.
 - A kind's rule lives in its own files behind `ContractKind`. The engine, the items, the
   decisions, the trace, the entry points and the extraction loop of the index writer ask the seam
   (`contract::kind_of`, `shown`, `serves`, `place` and the other free functions) and import no

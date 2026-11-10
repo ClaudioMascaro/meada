@@ -41,6 +41,16 @@ Give each ticket its **blocking edges**: the other tickets that must complete be
 
 **User-visible capability**: a ticket that adds or changes a user-visible capability (a language, a framework, a contract kind, a command or MCP behavior) lists "the capabilities page in pt, en and es" in its acceptance criteria, naming `docs/site/pt/capabilities.md`, `docs/site/en/capabilities.md` and `docs/site/es/capabilities.md`, as `CODING_STANDARDS.md` ("Docs move with the capability") requires.
 
+**Unread cases**: a criterion for a case the change does not read names the channel that reports it: a `meada status` line, a link reason, a `via`, an entry under `docs/agents/ceilings/`, or the docs. "Keeps today's behaviour, reported as such" without a channel blocks the implementer late.
+
+**Small edits to one section**: two or more docs or rules edits to the same section of one file, each at most a paragraph, are one ticket, with one acceptance criterion per edit. Edits to different sections of one file stay separate tickets with no blocking edge between them.
+
+**Stored shape**: a ticket that changes what the index stores (a new form in a stored field such as `Entry::via` or a `Summary` field, a table, a column) lists, in its acceptance criteria, "a sample of the new form under `tests/fixtures/schema/` and the re-blessed `tests/golden/schema.txt`" as an expected golden change, because the schema version is a hash of that golden (`src/index.rs`, `schema_version`) and `docs/agents/map/seams.md` requires the re-bless. A criterion "every other golden unchanged" says "except `schema.txt`".
+
+**Doc pointers**: a ticket points at a doc by its file and heading text, never by a section number: numbers shift, a heading greps.
+
+**Held state**: a ticket about state held for a session or a process names who holds it. `trace` the constructor's callers (here `Engine::open` from `src/mcp.rs`) and say in the ticket which holder the change covers.
+
 **Release level**: a ticket that changes a crate's release names the semver level ("a minor bump of meada-core"), never the next number. The implementer reads the number from `CHANGELOG.md` and `Cargo.toml`.
 
 **Cited premises**: a ticket that says "today X resolves at level L" cites the test, the fixture or the command output that shows it. A ticket that states a language rule cites the language reference (spec section or official docs). The implementer asserts what the citation shows.

@@ -28,7 +28,8 @@ fn the_deploy_fetch_reads_each_repository_table_by_its_own_keys() {
     let compose = fetch_awk("deploy/compose/fetch-pulled.sh");
     let chart = fetch_awk("deploy/helm/meada/values.yaml");
     assert_eq!(compose, chart, "the two copies of the fetch parse drifted");
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("fetch_parse");
+    let dir =
+        Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("fetch_parse-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("parse.awk"), &compose).unwrap();

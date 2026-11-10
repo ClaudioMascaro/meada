@@ -538,7 +538,8 @@ fn a_module_lead_is_what_a_bullet_with_an_area_link_names_before_its_colon() {
 #[test]
 fn changelog_union_merge_keeps_both_bullets() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("changelog-union");
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("changelog-union-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     fs::copy(root.join(".gitattributes"), dir.join(".gitattributes")).unwrap();

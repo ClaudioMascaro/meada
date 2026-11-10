@@ -19,7 +19,11 @@ A file with a `values` word in its name (`values.yaml`, `prod-values.yaml`, `val
 or under `templates/` is Helm input, not monitoring configuration. A quoted matcher reads
 Alertmanager's escapes (`\n`, `\"`, `\\`); any other backslash stays in the value. An
 AlertmanagerConfig route also matches its own namespace, which is not read: its conditions are
-`inferred`, their consumers' `via` ending in `(AlertmanagerConfig namespace)`.
+`inferred`, their consumers' `via` ending in `(AlertmanagerConfig namespace)`. A route
+configuration with a matcher regex that Go refuses (`regexp::refusal`, #718) is unreadable:
+`config::read` skips its document, and `config_values` stores it as `Outcome::Unreadable` for
+`meada status`, keeping its values. Only a syntax error established as a `regexp/syntax` code
+counts; the rest of a `None` from `compile` (budgets, syntax not read) is no refusal.
 
 `ContractKind::workspace_links` optionally replaces the per-consumer hook for a kind;
 alert uses it to compile each route tree once and evaluate each rule once per tree. Optional

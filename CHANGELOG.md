@@ -371,6 +371,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Terraform: a `for` binding a key over a set held in a local or a variable (`local.s` from
+  `toset(...)`, a chain of locals, a variable declared `type = set(...)`) is unresolved
+  instead of answering the index as an exact key, as it already was over a written `toset(...)`
+  (#720). A set reached through an attribute, an index or another call stays a ceiling (#717).
+- An Alertmanager configuration with a matcher regex Go's `regexp` refuses (an unclosed
+  group, a leading `*`, a backward range, a lookahead) is unreadable, as Alertmanager refuses
+  to load it: it gives no alert side or link, where its valid routes kept an `exact` link,
+  and `meada status` counts the file under `unreadable`. Only a syntax error established as
+  a `regexp/syntax` error code counts; an expression past Meada's own budgets or syntax it
+  does not read stays unmatched with the other routes linked (#718).
 - AWS SDK forms in Java, Go and C# follow the ADR 0026 rule TypeScript and Python already
   followed: an EventBridge entry without `EventBusName` produces to `default`, and an SNS
   publish to a phone number or endpoint names no topic. A request Meada cannot see whole (a
