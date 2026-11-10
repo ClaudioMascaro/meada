@@ -31,14 +31,14 @@ write tools; one index per repository; determinism) live in
 
 - Conventional Commits.
 - Local gate before every push: `scripts/check --unpushed` checks every commit not yet on the
-  branch's upstream, or on `origin/main` without one (`scripts/check` alone: the staged diff or, on a clean tree, the last
-  commit). Docs, agent instructions and harness configuration get pertinent static checks and
-  harness self-checks, without rebuilding the product, running its full suite or producing a
-  `.prove-it` receipt. Unknown or product paths conservatively run the full applicable gate:
-  fmt, clippy and tests, plus the relevant cloud feature checks (ADR 0012). Before each commit
-  in between, `scripts/check --scope <name>` (repeatable) runs fmt, clippy and only the unit and
-  `tests/it` tests whose path holds a name, such as a module (`iac`, `alert`). Heavy commands run
-  through `bounded` when it is on PATH.
+  branch's upstream, or on `origin/main` without one (`scripts/check` alone: the staged diff or,
+  on a clean tree, the last commit). Docs, agent instructions and harness configuration get
+  pertinent static checks and harness self-checks, without rebuilding the product, running its
+  full suite or producing a `.prove-it` receipt. Unknown or product paths conservatively run
+  the full applicable gate: fmt, clippy and tests, plus the relevant cloud feature checks (ADR
+  0012). Before each commit in between, `scripts/check --scope <name>` (repeatable) runs fmt,
+  clippy and only the unit and `tests/it` tests whose path holds a name, such as a module
+  (`iac`, `alert`). Heavy commands run through `bounded` when it is on PATH.
 - Product E2E runs only in GitHub Actions, for a relevant large implementation marked with the
   `e2e` label on a non-draft PR. Locally, `/prove-meada` prepares the scope and answer keys or
   reads CI evidence; it does not build or start the product. Docs-only follow-up commits also
