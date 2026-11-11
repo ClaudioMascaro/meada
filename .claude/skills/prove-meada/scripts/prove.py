@@ -966,6 +966,9 @@ Resources:
     assert key_problems(key, right) == ([], [r for r in key if r not in ("list", "tuple", "tuple-pair")])
     assert key_problems(key, hit("list", "queue-0-b") + "\n" + hit("list", "queue-1-a"))[0]  # #740's wrong names
     assert key_problems(key, hit("tuple", "queue-0-a"))[0] and key_problems(key, hit("zz", "queue-0-a"))[0]
+    unused = lambda line: line + " (no use in the workspace)"  # a provisioner no code reads, as here
+    assert key_problems(key, "\n".join(map(unused, right.splitlines())))[0] == []
+    assert key_problems(key, unused(hit("list", "queue-0-b")))[0]
     print("selftest passed")
 
 
@@ -1263,7 +1266,7 @@ def key_problems(key, answer):
     not wrong (certain or absent). Returns the problems and the absent roots."""
     got = {}
     for line in answer.splitlines():
-        m = re.search(r', name ("(?:[^"\\]|\\.)*"), root (.+)\)$', line)
+        m = re.search(r', name ("(?:[^"\\]|\\.)*"), root ([^)]*)\)', line)  # a note may follow
         if m:
             got.setdefault(m[2], []).append(json.loads(m[1]))
     problems = [f"root {root}: exact {names}, a root the key does not list" for root, names in got.items() if root not in key]
@@ -1621,7 +1624,8 @@ def cmd_iac(a):
         unsure = sorted({n["root"] for n in nodes if n.get("root_unchecked")})
         names_unchecked = sum(1 for n in nodes if n.get("unchecked"))
         report.append(f"Oracle (#650 names): {names_unchecked} names unchecked, roots left out: {unsure}")
-        drop = lambda text: "".join(l + "\n" for l in text.splitlines() if not any(l.endswith(f"root {r})") for r in unsure))
+        drop = lambda text: "".join(l + "\n" for l in text.splitlines()
+                                    if not any(re.search(rf"root {re.escape(r)}\)( \([^()]*\))?$", l) for r in unsure))
         nodes = [n for n in nodes if n["root"] not in unsure]
         report.append(f"Oracle: {len(nodes)} nodes in {len(roots)} roots ({', '.join(roots[:8])}{', ...' if len(roots) > 8 else ''}), "
                       f"{len(references)} references; unreadable: {[f for f, _ in unreadable]}")

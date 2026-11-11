@@ -3,10 +3,13 @@
 Run this flow whenever config-value classification or its callers change:
 
 ```bash
-python3 $S/config_uses.py --base-bin "$RUN/bin/meada-base" \
+python3 $S/config_uses.py --base-bin "$RUN/bin/meada-pre-config" \
   --head-bin "$RUN/bin/meada-head-ui" --run "$RUN/config-uses" --http --ui-dir ui/dist
 ```
 
+The base is a build from before #661 (`6a5eca5853193d205bcf756983b41e9cb16ffa9d`, the manual
+audit's `pre-config`, which `scripts/prove-ci` builds when the flow is selected): the driver
+expects that base's tool catalog, without the `alert` search kind, so the merge-base cannot serve.
 The binary needs the `ui` feature for the final console checks. `--ui-dir` is optional for an
 intermediate CLI/MCP run, but omitting it leaves the console unproven. Reuse the build and
 browser environment from [console.md](console.md); the script never builds, downloads, or

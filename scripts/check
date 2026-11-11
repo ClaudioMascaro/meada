@@ -87,8 +87,11 @@ def scopes(paths):
         if driver:
             if Path(path).name.startswith("console"):
                 out["console"] = out["accounts"] = True
-            elif path.endswith("corpus.tsv") or path.endswith("prove.py"):
+            elif path.endswith("corpus.tsv"):
                 out["cli"] = all_repos = True
+            elif path.endswith("prove.py"):
+                # The console drivers `aws-sdk.py`, `config_uses.py` and `images.py` import it.
+                out["cli"] = out["console"] = all_repos = True
             else:
                 for key in ("cli", "console", "accounts", "deploy", "container", "goldens"):
                     out[key] = True
@@ -375,6 +378,8 @@ def selftest():
         (["examples/split_agents.rs"], True, True, True),
         (["tests/golden/query.txt"], True, True, True),
         ([".claude/skills/prove-meada/scripts/console.py"], False, True, True),
+        ([".claude/skills/prove-meada/scripts/prove.py"], False, True, True),
+        ([".claude/skills/prove-meada/scripts/corpus.tsv"], False, True, False),
         ([".claude/skills/prove-meada/SKILL.md", ".agents/skills-lock.json"], False, False, False),
         ([script + "x.py" for script in HARNESS_SCRIPTS], False, False, False),
     ]

@@ -14,8 +14,12 @@ from unittest.mock import patch
 
 SCRIPTS = Path('.claude/skills/prove-meada/scripts')
 SURFACES = ('cli', 'console', 'accounts', 'deploy', 'container', 'goldens')
-# The base `images.py` compares against: before #662 (`PRE_IMAGE` of a7-a8-audit.py).
-PRE_IMAGE = 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62'
+# Bases from before a feature, as a7-a8-audit.py names them: `images.py` compares against one
+# before #662 (`PRE_IMAGE`), `config_uses.py` against one before #661 (`PRE_CONFIG`).
+HISTORICAL = {'pre_image': 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62',
+              'pre_config': '6a5eca5853193d205bcf756983b41e9cb16ffa9d'}
+# A flow's ceiling, the audit's: one hung driver must not spend the job's 60 minutes.
+FLOW_TIMEOUT = 1200
 VALUES = r'src/(config_values|index\.rs|document/|msg\.rs)'
 IAC = r'src/(iac\.rs|iac/(functions|cloudformation|serverless)\.rs|document/events\.rs|index\.rs|engine\.rs)'
 AWS = r'src/(iac/subscription\.rs|iac/types\.toml|config_values(\.rs|/hcl\.rs)|channel\.rs|document/asyncapi\.rs)'
@@ -30,8 +34,8 @@ SHARED = (r'src/(lang/mod\.rs|resolve\.rs|index\.rs|engine\.rs|trace\.rs|partial
 # The drivers the skill's Scope table names (`.claude/skills/prove-meada/SKILL.md`), each with the
 # paths its row names (None: on every run of its surface; a change to the verifier or to shared
 # core runs them all). `{head}`, `{base}` and `{ui}` are this run's builds: a flow with `{ui}`
-# runs in a console run after the UI build, the others after `cli-mcp`. `{pre_image}` is built
-# only for `images`.
+# runs in a console run after the UI build, the others after `cli-mcp`. A `HISTORICAL` base is built
+# only for a flow that names it (`{pre_image}`, `{pre_config}`), in a console run.
 FLOWS = (
     ('http-iac', None, 'http-iac.py --head-bin {head} --base-bin {base}'),
     ('iac-http-routes', None, 'iac-http-routes.py --head-bin {head} --base-bin {base}'),
@@ -43,7 +47,7 @@ FLOWS = (
     ('serverless-values', IAC, 'prove.py values --head-bin {head} --base-bin {base} --repos a7-sls --http'),
     ('terraform-json', r'src/(iac\.rs|iac/(json|functions|provision)\.rs)', 'terraform-json.py --head-bin {head} --http'),
     ('environment', r'src/(image|kube|iac)/environment\.rs', 'environment.py --head-bin {head}'),
-    ('aws-workloads', r'src/(iac/workload\.rs|image/code\.rs)', 'aws-workloads.py --head-bin {head}'),
+    ('aws-workloads', r'src/(iac/workload(\.rs|/)|image/code\.rs)', 'aws-workloads.py --head-bin {head}'),
     ('provisions', r'src/iac/(provision|types)|meada-core/src/export\.rs', 'provisions.py --head-bin {head}'),
     ('gcp', r'src/(contract|iac)/gcp\.rs', 'gcp.py --head-bin {head}'),
     ('gcp-sdk', r'src/contract/(gcp/)?sdk', 'gcp-sdk.py --head-bin {head} --http'),
@@ -69,7 +73,7 @@ FLOWS = (
     ('aws-sdk', r'src/(channel|resource)/', 'aws-sdk.py --head-bin {head} --base-bin {base} --ui-bin {ui} --ui-dir ui/dist'),
     ('config-uses', r'src/(iac/config_uses\.rs|config_values\.rs|index\.rs|engine\.rs|trace\.rs|contract\.rs|iac/orphans\.rs)'
      r'|meada-core/src/(export|context|search|trace)\.rs|ui/src/(graph\.ts|GraphPage\.tsx)',
-     'config_uses.py --head-bin {ui} --base-bin {base} --http --ui-dir ui/dist'),
+     'config_uses.py --head-bin {ui} --base-bin {pre_config} --http --ui-dir ui/dist'),
     ('images', f'{IMAGES}|{PATTERNS}', 'images.py --head-bin {head} --base-bin {pre_image} --http --public --ui-bin {ui} --ui-dir ui/dist'),
 )
 
@@ -86,7 +90,8 @@ def flow_command(run, flow):
     name, _, template = flow
     out = run / 'flows' / name
     script, *args = template.format(scripts=SCRIPTS, out=out, head=run / 'bin/meada-head', base=run / 'bin/meada-base',
-                                    ui=run / 'bin/meada-head-ui', pre_image=run / 'bin/meada-pre-image').split()
+                                    ui=run / 'bin/meada-head-ui',
+                                    **{key: run / f"bin/meada-{key.replace('_', '-')}" for key in HISTORICAL}).split()
     driver = ['sh', SCRIPTS / script] if script.endswith('.sh') else [sys.executable, SCRIPTS / script]
     return driver + args + ([] if '{out}' in template else ['--run', out])
 
@@ -119,31 +124,40 @@ def capture(run, scope, base, head, repos, paths=()):
     flows = selected(paths)
     ui_flows = [flow for flow in flows if '{ui}' in flow[2]]
 
-    def command(name, args, required=False, compares=False):
+    def command(name, args, required=False, compares=False, timeout=None):
         start = time.monotonic()
         with (run / 'logs' / (name + '.log')).open('w') as log:
-            result = subprocess.run([str(arg) for arg in args], stdout=log, stderr=subprocess.STDOUT)
-        steps.append({'name': name, 'exit_code': result.returncode, 'seconds': round(time.monotonic() - start)})
+            try:
+                code = subprocess.run([str(arg) for arg in args], stdout=log, stderr=subprocess.STDOUT,
+                                      timeout=timeout).returncode
+            except subprocess.TimeoutExpired:
+                code = 124  # as timeout(1), and the audit
+        steps.append({'name': name, 'exit_code': code, 'seconds': round(time.monotonic() - start)})
         # A comparison's exit 1 is a difference from the base: evidence, not a failed capture.
-        if compares and result.returncode == 1:
+        if compares and code == 1:
             steps[-1]['differences'] = True
-        print(f'{name}: exit {result.returncode}', flush=True)
-        if required and result.returncode:
+        print(f'{name}: exit {code}', flush=True)
+        if required and code:
             raise RuntimeError(f'{name} failed; see logs/{name}.log')
 
     def drive(flow):
         # A driver's exit 1 is its answer key disagreeing (or a crash): a failed step for the judge.
-        if '{pre_image}' in flow[2] and any(step['name'] == 'build-pre-image' and step['exit_code'] for step in steps):
-            steps.append({'name': flow[0], 'exit_code': 2, 'blocked': 'build-pre-image failed'})
+        # `prove.py values` and `iac` also exit 1 on a difference from the base, as `cli-mcp` does.
+        failed = [step['name'] for step in steps if step['exit_code'] and step['name'] in
+                  {'build-' + key.replace('_', '-') for key in HISTORICAL if f'{{{key}}}' in flow[2]}]
+        if failed:
+            steps.append({'name': flow[0], 'exit_code': 2, 'blocked': f'{failed[0]} failed'})
         else:
-            command(flow[0], flow_command(run, flow))
+            command(flow[0], flow_command(run, flow), compares=flow[2].startswith('prove.py'), timeout=FLOW_TIMEOUT)
 
     try:
         if scope['cli']:
             command('build-head', [SCRIPTS / 'build.sh', 'head', '.', run], required=True)
             command('build-base', [SCRIPTS / 'build.sh', 'base', base, run], required=True)
-            if scope['console'] and any('{pre_image}' in flow[2] for flow in flows):
-                command('build-pre-image', [SCRIPTS / 'build.sh', 'pre-image', PRE_IMAGE, run])
+            for key, revision in HISTORICAL.items():
+                if scope['console'] and any(f'{{{key}}}' in flow[2] for flow in flows):
+                    label = key.replace('_', '-')
+                    command('build-' + label, [SCRIPTS / 'build.sh', label, revision, run])
             command('cli-mcp', [python, SCRIPTS / 'prove.py', 'run', '--base-bin', run / 'bin/meada-base',
                                '--head-bin', run / 'bin/meada-head', '--repos', repos, '--run', run, '--http'],
                     compares=True)
@@ -202,8 +216,8 @@ def capture(run, scope, base, head, repos, paths=()):
         except OSError as error:
             blocked = blocked or str(error)
         (run / 'console/private.pem').unlink(missing_ok=True)
-        blocked = blocked or next((f"{step['name']} reported BLOCKED" for step in steps
-                                   if step['exit_code'] == 2), None)
+        blocked = blocked or next((f"{step['name']} {'timed out' if step['exit_code'] == 124 else 'reported BLOCKED'}"
+                                   for step in steps if step['exit_code'] in (2, 124)), None)
         failed = blocked is not None or any(step['exit_code'] and not step.get('differences') for step in steps)
         receipt = {
             'base': base, 'head': head, 'surfaces': [name for name in SURFACES if scope[name]],
@@ -214,7 +228,9 @@ def capture(run, scope, base, head, repos, paths=()):
                             'Mutation audits run only through an explicitly requested audit phase.',
                             'A Scope step the skill marks "CI does not run" is the reviewer\'s.'],
         }
-        skipped = [flow[0] for flow in (flows if not scope['cli'] else ui_flows if not scope['console'] else [])]
+        # A flow with no paths of its own goes with its surface: no surface, nothing owed.
+        skipped = [flow[0] for flow in (flows if not scope['cli'] else ui_flows if not scope['console'] else [])
+                   if flow[1] is not None]
         if skipped:
             receipt['not_covered'].append(f'Selected flows whose surface did not run: {", ".join(skipped)}.')
         (run / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
@@ -307,10 +323,15 @@ def selftest():
         assert check in chosen([mutation['file']]), mutation['id']
     # Every driver the Scope table names runs here, and every flow here has its Scope row.
     table = (SCRIPTS.parent / 'SKILL.md').read_text().split('\n## Scope\n', 1)[1].split('\n## Sort the change', 1)[0]
-    named = set(re.findall(r'[\w-]+\.(?:py|sh)\b', ''.join(line for line in table.splitlines(True) if line.startswith('|'))))
-    driven = {flow[2].split()[0] for flow in FLOWS} | {'console.py'}
+    rows = ''.join(line for line in table.splitlines(True) if line.startswith('|'))
+    named = set(re.findall(r'prove\.py [a-z]+|[\w-]+\.(?:py|sh)\b', rows)) - {'prove.py'}
+    # `prove.py run`, `rebless` and `deploy` are the corpus, goldens and deploy steps; `console.py` the console's.
+    driven = {' '.join(flow[2].split()[:2 if flow[2].startswith('prove.py') else 1]) for flow in FLOWS} \
+        | {'prove.py run', 'prove.py rebless', 'prove.py deploy', 'console.py'}
     assert named == driven, f'Scope only: {sorted(named - driven)}; CI only: {sorted(driven - named)}'
-    assert f"PRE_IMAGE = '{PRE_IMAGE}'" in (SCRIPTS / 'a7-a8-audit.py').read_text()
+    audit = (SCRIPTS / 'a7-a8-audit.py').read_text()
+    assert all(f"{key.upper()} = '{revision}'" in audit for key, revision in HISTORICAL.items())
+    assert 'aws-workloads' in chosen(['src/iac/workload/ecs.rs'])  # the row's ECS readers
     a8 = flow_command(Path('/r'), next(flow for flow in FLOWS if flow[0] == 'a8-peers'))
     assert [str(arg) for arg in a8] == ['sh', f'{SCRIPTS}/a8-peers.sh', 'check', '/r/bin/meada-base', '/r/bin/meada-head', '/r/flows/a8-peers']
     # A flow runs with this run's builds; images builds its own base and is BLOCKED without it.
@@ -323,13 +344,21 @@ def selftest():
                 (run / 'head/meada').mkdir(parents=True)
                 (run / 'head/meada/export1.json').write_text('{}')
             argv[Path(args[1]).name] = args
-            return subprocess.CompletedProcess(args, 1 if 'pre-image' in args else 0)
+            if 'image-ko.py' in argv and args is argv['image-ko.py']:
+                raise subprocess.TimeoutExpired(args, FLOW_TIMEOUT)
+            return subprocess.CompletedProcess(args, 1 if 'pre-image' in args or 'values' in args else 0)
         with patch('subprocess.run', side_effect=fake_flows):
-            assert capture(run, scope, 'a' * 40, 'b' * 40, 'meada', ['src/image/builder.rs']) == 2
+            paths = ['src/image/builder.rs', 'src/iac/config_uses.rs', 'src/msg.rs']
+            assert capture(run, scope, 'a' * 40, 'b' * 40, 'meada', paths) == 2
         receipt = json.loads((run / 'receipt.json').read_text())
         names = [step['name'] for step in receipt['steps']]
-        assert names.index('build-pre-image') < names.index('cli-mcp') < names.index('images-mixed') \
-            < names.index('build-console') < names.index('images') < names.index('console-start'), names
+        assert names.index('build-pre-image') < names.index('build-pre-config') < names.index('cli-mcp') \
+            < names.index('images-mixed') < names.index('build-console') < names.index('config-uses') \
+            < names.index('images') < names.index('console-start'), names
+        assert argv['config_uses.py'][4:6] == ['--base-bin', str(run / 'bin/meada-pre-config')], argv['config_uses.py']
+        # `prove.py values`' exit 1 is a difference from the base; a hung driver times out, alone.
+        assert receipt['steps'][names.index('values')]['differences'] and receipt['blocked'] == 'image-ko timed out'
+        assert receipt['steps'][names.index('image-ko')]['exit_code'] == 124
         assert receipt['steps'][names.index('images')] == {'name': 'images', 'exit_code': 2, 'blocked': 'build-pre-image failed'}
         assert receipt['capture'] == 'BLOCKED' and 'images.py' not in argv and 'aws.py' not in argv
         assert argv['images-mixed.py'][-4:] == ['--base-bin', str(run / 'bin/meada-base'), '--run', str(run / 'flows/images-mixed')]

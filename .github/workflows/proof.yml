@@ -481,7 +481,8 @@ jobs:
             ${{ runner.temp }}/prove-meada/bin/*.from
             ${{ runner.temp }}/prove-meada/flows
             !${{ runner.temp }}/prove-meada/flows/**/private.pem
-            !${{ runner.temp }}/prove-meada/flows/**/indexes
+            !${{ runner.temp }}/prove-meada/flows/**/*indexes
+            !${{ runner.temp }}/prove-meada/flows/*/work
             !${{ runner.temp }}/prove-meada/console/private.pem
             !${{ runner.temp }}/prove-meada/console/indexes
             !${{ runner.temp }}/prove-meada/console-api/*/console/private.pem
