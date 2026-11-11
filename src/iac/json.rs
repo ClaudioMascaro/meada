@@ -113,6 +113,8 @@ impl Read<'_> {
                 let variable = Variable {
                     default: body.get("default").map(|v| self.expressions.read(v, true)),
                     ty: (body.get("type").and_then(|t| t.as_str())).map(Declared::text),
+                    through: Vec::new(),
+                    opentofu: false,
                     sensitive: crate::config_values::is_sensitive(body.get("sensitive")),
                     path: self.path.into(),
                     line,

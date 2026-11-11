@@ -398,6 +398,19 @@ All notable changes to Meada are recorded here. The format follows
   `toset(...)`, a chain of locals, a variable declared `type = set(...)`) is unresolved
   instead of answering the index as an exact key, as it already was over a written `toset(...)`
   (#720). A set reached through an attribute, an index or another call stays a ceiling (#717).
+- Terraform: a value that enters a variable declared `set(T)` (its default, a var file's value, a
+  module argument, an override's default) is converted to elements of type `T`, then sorted and
+  deduplicated as cty does, so `tolist(var.s)`, `length(var.s)` and `join` over `["b", "a", "a"]`
+  see `a`, `b`, and a `set(string)` of `[10, 9]` keeps the strings `"10"` and `"9"` in string
+  order. An element Meada cannot convert with certainty leaves the value unresolved (#720).
+- Terraform: an override file that replaces the `type` of a variable whose own block declares a
+  set type now names what Terraform creates: the default is converted to the set first, then to
+  the new type (`list(string)` gives the set's elements in set order, `any` and `set(string)`
+  keep the set; a default an earlier override gave is converted the same way when a later
+  one retypes it), and one Terraform rejects (a tuple) gets no exact name. OpenTofu 1.13 and later convert the default
+  once, to the final type, and name other instances; Meada follows Terraform (#740), except for a
+  variable with a block in a `.tofu` or `.tofu.json` file, which Terraform does not read: it is
+  unresolved where the two conversions differ.
 - An Alertmanager configuration with a matcher regex Go's `regexp` refuses (an unclosed
   group, a leading `*`, a backward range, a lookahead) is unreadable, as Alertmanager refuses
   to load it: it gives no alert side or link, where its valid routes kept an `exact` link,

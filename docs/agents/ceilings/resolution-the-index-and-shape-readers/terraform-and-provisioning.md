@@ -201,3 +201,34 @@
   unique supported local module or explicit source file and an existing stored symbol;
   archives and unsafe/ambiguous paths use the repository. Provider resolution never validates
   paths during queries; existing code rendering may read source for line displays.
+- Meada reads a directory as Terraform does, and OpenTofu 1.13 and later differ (#740; the
+  maintainer chose Terraform). Terraform converts a variable's default to the type its own block
+  declares and again to the type an override file gives; OpenTofu 1.13+ converts it once, to the
+  final type. Meada follows Terraform in each row below and OpenTofu 1.13+ differs in each,
+  under `type = set(string)` with a default `["b", "a", "a"]` (in the pair of override files,
+  over a declared default `["x"]`): an override `type = list(string)` (Terraform `0-a`, `1-b`;
+  OpenTofu `0-b`, `1-a`, `2-a`), `type = any` (the set, `a-a`, `b-b`; OpenTofu index keys),
+  `type = tuple([string, string])` over `["b", "a"]` (Terraform rejects it, so Meada gives no
+  exact name; OpenTofu `0-b`, `1-a`), an `a_override.tf` giving the default and a
+  `b_override.tf` retyping it, and a child module called without the argument with the override
+  in its directory. The same default with no override, a restated `set(string)`, an override
+  giving `type` and `default` together and a var file's value name the same in both. OpenTofu
+  1.13.9 was run; that 1.12 and earlier behave as Terraform is read from the source, not run.
+  The exception covers a variable all of whose blocks Terraform reads (`.tf`, `.tf.json`): it
+  follows Terraform, whatever the override. A variable with a block in a file only OpenTofu
+  reads (`.tofu`, `.tofu.json`), its declaring block or an override file's, is one Terraform
+  does not read whole, and OpenTofu 1.8 to 1.12 (read from the source, not run) convert its
+  default as Terraform does where 1.13+ converts once, so no value is certain for it: when an
+  override retypes it (in any of `override.tf`, `*_override.tf`, `override.tf.json`,
+  `override.tofu`, `*_override.tofu`, `override.tofu.json`) the default is unresolved where the
+  two conversions hold other elements (compared once converted, so `[10, 9]` and `["10", "9"]`
+  are the same under `set(string)`) or another kind of collection, and exact where they agree
+  (no override, an override restating the set, an override with its own default of the final
+  type, a var file's value, and every default no set type touches: Meada converts no other
+  type, so a `list(T)`, a tuple or an untyped default stays as it is written). An override in
+  a file only OpenTofu reads is applied as OpenTofu applies it, also over a declaration
+  Terraform reads, though Terraform ignores that file: `main.tf` with the set above and an
+  `override.tofu` giving `default = ["c"]` names `0-c`, OpenTofu's instance, where Terraform
+  names `0-a` and `1-b`. A module is judged by its own files,
+  whatever calls it: a module of `.tf` files called only from a root written in `.tofu` follows
+  Terraform though Terraform cannot read that root, and OpenTofu's answer differs.

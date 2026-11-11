@@ -29,6 +29,11 @@ suspects: neighbours, combinations, other file formats, scale>. Then run `fixtur
 <every fixture | fixtures matching a substring>: answers identical unless the claim explains the
 difference.
 
+An answer exact and right on PREV and unresolved on AFTER is a regression, unless the claim names
+it as the price. For each class the claim or the docs name, look for an input of that class in
+another syntactic position: outside the claim, what you find there wrong on both binaries is a
+follow-up, never a case of the verdict.
+
 ## Report only
 
 <Cases that never decide the verdict: a declared ceiling, a measurement beside the claim (memory,
