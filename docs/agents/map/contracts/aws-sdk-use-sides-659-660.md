@@ -22,7 +22,7 @@
   group: one `entry.EventBusName = ..` anywhere makes every named entry opaque, and a list holding
   one opaque entry names nothing for its inline entries either. A transaction's path of three
   members adds `held_changed`: a request, a list, an item or an entry held in a name is followed
-  only when the function that declares the name writes it twice, where it is declared and where
+  only when the function that declares the name mentions it twice, where it is declared and where
   the path reads it (`lang::mentioned` fills `Facts::mentioned` for the locals Go keeps as
   constants and the ones C#'s `bound` keeps); a parameter, a field and a package variable are
   never followed. A Java builder held in a local or
@@ -55,7 +55,7 @@
   the file, whatever their order; and a helper's request is judged where each caller passes it
   (`passed_changed`, every argument of every call climbed). A list or an array on a
   transaction's path held in a name (`Arrays.asList`, an array initializer, `new`) changes in
-  place too: `Walk::replaced` follows it only when its method writes the name twice, and each
+  place too: `Walk::replaced` follows it only when its method mentions the name twice, and each
   alias on the way as well; one in a field is never followed, and `List.of` cannot change.
   A chain with `applyMutation` anywhere in it hands its builder to caller code, a file that
   reads a field by name (`getDeclaredField`) or calls a method on a field builder's name from

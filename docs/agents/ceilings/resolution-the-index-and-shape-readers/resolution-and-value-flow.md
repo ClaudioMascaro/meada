@@ -85,22 +85,27 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   past it, that file's values are unknown, the climb stops at its calls and no origin is found
   through it, so a string doubled through forty constants (`const b = a + a`), or a lattice of
   functions each calling or returning the next twice, ends. A DynamoDB transaction call folds
-  more values than a plain request, so about 1,700 of them in one file spend it (with each
-  value held in a name: 1,725 in Java, 1,928 in Go, 2,185 in C#; a hundred calls of 25 inline
-  entries each do not), and every call after that in the file has no side, a plain `PutItem`
-  of a literal table included (#719). A Java builder held in a `final` field is read in its own
+  more values than a plain request, so about 1,700 to 2,200 of them in one file spend it (with
+  each value held in a name, the first 1,725 calls are named in Java, 1,928 in Go, 2,185 in
+  C#; a hundred calls of 25 inline entries each do not), and every call after that in the file
+  has no side, a plain `PutItem` of a literal table included (#719). A Java builder held in a `final` field is read in its own
   file, and a call on its name from another Java file leaves it unresolved; one handed to a call
   or aliased there, or reached by reflection from there, is not seen, and the field keeps its
   first name. A request type is the SDK's unless a type of its directory, an import or a
   variable says otherwise: one of the same package in another source root is not seen (#719).
   A request, a list, an item or an entry on a DynamoDB transaction's path held in a name is
-  followed only when the function that declares the name writes it twice. In Go and C#, one
-  written a third time (logged, read by two requests), one held in a parameter, a field or a
-  package variable, and a C# request filled by property assignments have no table. In Java the
-  rule covers a list or an array: one written a third time or held in a field has no table. A
-  Java local named as a method its function calls is written there too, so a list
-  `transactItems` passed to `transactItems(..)` and a builder `put` built in `.put(put.build())`
-  have no table. A Java list that reaches the request through a wrapper's parameter is not judged:
+  followed only when the function that declares the name mentions it twice. In Go and C#, one
+  mentioned a third time (logged, read by two requests), one held in a parameter, a field or a
+  package variable, one whose name another file writes a field through (`p.TableName = ..` on
+  an unrelated helper's parameter `p`, in any package or class), and a C# request filled by
+  property assignments have no table; nor have Go locals declared together (`p, q := ..`), a
+  Go entry declared in a loop body and a Go request held by value and passed by address. In
+  Java the rule covers a list or an array: one mentioned a third time or held in a field has
+  no table (a `List.of` list cannot change and keeps its tables), and neither has a
+  `new T[]{..}` array or a `new ArrayList<>(..)` copy mentioned twice. A Java local named as a
+  method its function calls is mentioned there too, so a list `transactItems` passed to
+  `transactItems(..)` and a builder `put` built in `.put(put.build())` have no table. A Java
+  list that reaches the request through a wrapper's parameter is not judged:
   one changed in the wrapper, or by the caller before it passes it on, keeps the tables it was
   made with. Outside transactions a list of entries held in a name is not judged in Java, Go
   or C#: an EventBridge entries list with an element replaced keeps its first bus (#719).
