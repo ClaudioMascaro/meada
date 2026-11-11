@@ -958,6 +958,14 @@ Resources:
         assert check_iac_context(identity, 'template.yaml', header, changed, complete), changed
     worker['Properties']['Handler'] = {'Ref': 'RuntimeHandler'}
     assert cfn.sam_code_fields('template.yaml', source, worker) == {'build': 'target/lambda/worker'}
+    # A probe's Terraform key: an exact name must be Terraform's, an absent one is no failure.
+    key = terraform_key(HERE / "a7-tf-set")["aws_sqs_queue"]
+    assert key["list"] == ["queue-0-a", "queue-1-b"] and key["tuple"] == [] and len(key) == 12, key
+    hit = lambda root, name: f'a7-tf-set {root}/main.tf:4 aws_sqs_queue.q["0"] (aws_sqs_queue, name "{name}", root {root})'
+    right = "\n".join([hit("list", "queue-1-b"), hit("list", "queue-0-a"), 'x any/main.tf:4 aws_sqs_queue.q (aws_sqs_queue, pattern "queue-*-*", root any)'])
+    assert key_problems(key, right) == ([], [r for r in key if r not in ("list", "tuple", "tuple-pair")])
+    assert key_problems(key, hit("list", "queue-0-b") + "\n" + hit("list", "queue-1-a"))[0]  # #740's wrong names
+    assert key_problems(key, hit("tuple", "queue-0-a"))[0] and key_problems(key, hit("zz", "queue-0-a"))[0]
     print("selftest passed")
 
 
@@ -1236,6 +1244,33 @@ def check_iac_context(identity, path, want, got, baseline):
     except ValueError as error:
         problems.append(f"invalid values/contract section: {error}; {got_lines[len(want):][:3]}")
     return problems
+
+
+def terraform_key(src):
+    """A probe's own answer key (`terraform-names.tsv`, #740): type -> root -> the names Terraform
+    gives, empty where Terraform rejects the root. Written from the tool, never from Meada."""
+    key = {}
+    path = src / "terraform-names.tsv"
+    for line in path.read_text().splitlines() if path.exists() else []:
+        if line and not line.startswith("#"):
+            root, kind, names = line.split("\t")
+            key.setdefault(kind, {})[root] = [] if names == "rejected" else names.split()
+    return key
+
+
+def key_problems(key, answer):
+    """An exact name must be the key's (a rejected root has none); a root without one is absent,
+    not wrong (certain or absent). Returns the problems and the absent roots."""
+    got = {}
+    for line in answer.splitlines():
+        m = re.search(r', name ("(?:[^"\\]|\\.)*"), root (.+)\)$', line)
+        if m:
+            got.setdefault(m[2], []).append(json.loads(m[1]))
+    problems = [f"root {root}: exact {names}, a root the key does not list" for root, names in got.items() if root not in key]
+    for root, names in key.items():
+        if root in got and sorted(got[root]) != sorted(names):
+            problems.append(f"root {root}: exact {sorted(got[root])}, Terraform {sorted(names) or 'rejects it'}")
+    return problems, [root for root, names in key.items() if names and root not in got]
 
 
 def iac_context_tail(identity, path, lines):
@@ -1630,6 +1665,10 @@ def cmd_iac(a):
         shared = sorted(k for k, c in counts.items() if c > 1)[:2]
         for addr in shared:
             queries.append({"tool": "context", "label": "several", "arguments": {"symbol": addr, "budget": 200000}})
+        # A root the oracle leaves out can still answer to the probe's own Terraform key.
+        for kind, roots_key in terraform_key(src).items():
+            queries.append({"tool": "search", "label": "terraform key", "key": roots_key,
+                            "arguments": {"query": kind, "kind": "iac", "budget": 200000}})
         search("nothing", "zz_prove_no_node", kind="iac", budget=200000)
         for n in sample[:3]:
             search("default search", n["address"], budget=200000)
@@ -1672,6 +1711,9 @@ def cmd_iac(a):
             problems = []
             if label == "NoEcho default":
                 problems = check_value_answer(identity, config_rows, args["query"], got)
+            elif label == "terraform key":
+                problems, absent = key_problems(q["key"], got)
+                label += f" (roots with no exact name: {', '.join(absent) or 'none'})"
             elif q["tool"] == "search" and args.get("kind") == "iac":
                 hits = tf.search_hits(identity, nodes, args["query"])
                 hits = iac_existing_suffixes(hits, b["answers"][i])
