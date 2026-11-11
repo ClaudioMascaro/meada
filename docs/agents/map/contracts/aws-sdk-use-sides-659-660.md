@@ -60,8 +60,9 @@
   place too: `Walk::replaced` follows it only when its method mentions the name twice, and each
   alias on the way as well; one in a field is never followed, and `List.of` cannot change.
   `Walk::passed` leaves unresolved the one argument of `transactItems(..)` that is a name with
-  no value the reader holds (a parameter, itself or through local aliases): the wrapper and
-  each of its callers may change such a list, and no mention count sees both.
+  no value the reader holds (a parameter or an assigned field, itself or through local
+  aliases): the wrapper and each of its callers may change such a list, and no mention count
+  sees both.
   A chain with `applyMutation` anywhere in it hands its builder to caller code, a file that
   reads a field by name (`getDeclaredField`) or calls a method on a field builder's name from
   another file may change it, and a chain that starts at a type another type of its file or
