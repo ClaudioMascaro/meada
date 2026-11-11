@@ -2,6 +2,7 @@
 """Capture the selected prove-meada surfaces in Actions; --selftest runs no product code; --rows PATH...
 prints the flows and Scope rows those paths reach."""
 
+import collections
 import fnmatch
 import itertools
 import json
@@ -280,7 +281,17 @@ def capture(run, scope, base, head, repos, paths=()):
         if owed:
             receipt['not_covered'].append(f'Selected flows that did not run: {", ".join(owed)}.')
         (run / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
-        summary = f"E2E capture: {receipt['capture']}; semantic verdict: UNPROVEN.\nBase: {base}\nHead: {head}\n"
+        # Each nonzero step is in one list, so a reader of the log or the artifact need not count them.
+        exits = collections.Counter(step['exit_code'] for step in steps)
+        summary = (f"E2E capture: {receipt['capture']}; semantic verdict: UNPROVEN.\nBase: {base}\nHead: {head}\n"
+                   f"- Steps: {len(steps)}; {', '.join(f'exit {code}: {exits[code]}' for code in sorted(exits))}\n")
+        summary += ''.join(f"- {label}: {', '.join(step['name'] for step in steps if test(step)) or 'none'}\n"
+                           for label, test in (('Timed out', lambda step: step['exit_code'] == 124),
+                                               ('BLOCKED', lambda step: step['exit_code'] == 2),
+                                               ('Failed', lambda step: step['exit_code'] not in (0, 2, 124)
+                                                and not step.get('differences')),
+                                               ('Differences', lambda step: step.get('differences'))))
+        print(summary, end='', flush=True)
         (run / 'summary.md').write_text(summary)
         if os.environ.get('GITHUB_STEP_SUMMARY'):
             with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
@@ -312,6 +323,10 @@ def selftest():
             assert bool(receipt['steps'][2].get('differences')) == (code == 1), receipt['steps']
             assert receipt['verdict'] == 'UNPROVEN' and receipt['head'] == 'b' * 40
             assert receipt['steps'][-1]['name'] == 'clean'
+            summary, steps = (run / 'summary.md').read_text(), len(receipt['steps'])
+            assert f'- Steps: {steps}; exit 0: {steps - (code != 0)}' in summary, summary
+            lists = {'Differences': 1, 'Failed': 3, 'BLOCKED': 2}
+            assert all((f'- {label}: cli-mcp\n' in summary) == (lists[label] == code) for label in lists), summary
     # `rebless` reports no difference by its exit: its exit 1 is a crash, a failed capture.
     goldens = dict.fromkeys(SURFACES, False)
     goldens['goldens'] = True
@@ -446,6 +461,8 @@ def selftest():
         assert receipt['steps'][names.index('values')]['differences'] and receipt['blocked'] == 'image-ko timed out'
         assert receipt['steps'][names.index('images')] == {'name': 'images', 'exit_code': 2, 'blocked': 'build-pre-image failed'}
         assert receipt['capture'] == 'BLOCKED' and 'images.py' not in argv and 'aws.py' not in argv
+        summary = (run / 'summary.md').read_text()
+        assert f'- Steps: {len(names)}; ' in summary and '- Timed out: image-ko\n' in summary, summary
         assert argv['images-mixed.py'][-4:] == ['--base-bin', str(run / 'bin/meada-base'), '--run', str(run / 'flows/images-mixed')]
         for name in ('http-iac.py', 'iac-http-routes.py'):  # against the merge-base, every run
             assert argv[name][2:6] == ['--head-bin', str(run / 'bin/meada-head'), '--base-bin', str(run / 'bin/meada-base')]
