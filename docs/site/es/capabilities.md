@@ -484,7 +484,7 @@ Toda referencia es `exact` y queda en una unidad, como las de Kubernetes: un cla
 
 ### Compose
 
-Un archivo Compose (`compose.yaml`, `compose.yml`, `docker-compose.yaml` o `docker-compose.yml`) con su archivo de override en la misma carpeta es una unidad de evaluación, con raíz en la carpeta. Cada servicio es un nodo IaC `services.<nombre>` de tipo `service`. `depends_on`, `links` y las redes compartidas (`networks:`; un servicio sin ninguna está en `default`) son referencias, con `via depends_on`, `via links` o `via networks.<nombre>`. `${VAR:-valor}` se resuelve a su valor por defecto y `context` lo marca `(overridable)`; `${VAR}` queda en el texto como parte sin resolver, marcada `(unresolved)`. `context` muestra `image:` y `build:` del servicio, guardados para el contrato de imagen; un contexto de build solo se guarda como ruta dentro del repositorio (una ruta absoluta, una URL, una que sale de la raíz o una con una parte sin resolver no).
+Un archivo Compose (`compose.yaml`, `compose.yml`, `docker-compose.yaml` o `docker-compose.yml`) con su archivo de override en la misma carpeta es una unidad de evaluación, con raíz en la carpeta. Cada servicio es un nodo IaC `services.<nombre>` de tipo `service`. `depends_on`, `links` y las redes compartidas (`networks:`; un servicio sin ninguna está en `default`) son referencias, con `via depends_on`, `via links` o `via networks.<nombre>`. `${VAR:-valor}` se resuelve a su valor por defecto y `context` lo marca `(overridable)`; `${VAR}` queda en el texto como parte sin resolver, marcada `(unresolved)`. `context` muestra `image:` y `build:` del servicio, guardados para el contrato de imagen, con el Dockerfile que nombra el build (`dockerfile` o `dockerfile_inline`); un contexto de build solo se guarda como ruta dentro del repositorio (una ruta absoluta, una URL, una que sale de la raíz o una con una parte sin resolver no).
 
 ### CloudFormation y SAM
 
@@ -569,9 +569,12 @@ overrides de imagen de Kustomize, servicios Compose e `image.repository` de valo
 No se renderizan templates Helm. `context` muestra la imagen y los repositorios constructores;
 `trace` recorre la relación en ambos sentidos hasta las entradas del código. Los overlays que
 usan la misma carga e imagen conservan un ejecutor y su enlace por raíz de evaluación. Las
-evidencias repetidas de esa imagen en una carga y raíz forman un solo lado. Un contexto
-Compose local ejecuta directamente código del mismo repositorio en `exact`, incluso sin
-`image`, dentro de la raíz y sin atravesar enlaces simbólicos.
+evidencias repetidas de esa imagen en una carga y raíz forman un solo lado. Un build
+Compose local ejecuta directamente el código del mismo repositorio que su Dockerfile toma del
+contexto (fuentes de `COPY`, `ADD` y `RUN --mount=type=bind`, en todas las etapas) en `exact`,
+incluso sin `image`, dentro de la raíz y sin atravesar enlaces simbólicos, o en `inferred` cuando
+el contexto o la ruta del Dockerfile pasó por un valor reemplazable. Un Dockerfile que no se puede
+leer deja el contexto entero en `inferred`, y el motivo lo dice. `.dockerignore` no se lee.
 
 Los literales enlazan en `exact`; los defaults Compose y valores Helm, en `inferred`, con su
 origen en el motivo. Las partes no resueltas permanecen patrones y solo corresponden a nombres

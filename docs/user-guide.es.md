@@ -459,7 +459,8 @@ Cada servicio es un nodo IaC `services.<nombre>` de tipo `service`.
 - **Variables**: `${VAR:-valor}` se resuelve a su valor por defecto y `context` lo marca
   `(overridable)`; `${VAR}` queda en el texto como parte sin resolver, marcada `(unresolved)`.
 - **Imagen y build**: `context` muestra `image:` y `build:` del servicio, guardados para el
-  contrato de imagen. Un contexto de build se guarda como ruta dentro del repositorio, desde la
+  contrato de imagen, con el Dockerfile que nombra el build (`dockerfile` o `dockerfile_inline`;
+  un override los combina como las demás claves de `build`). Un contexto de build se guarda como ruta dentro del repositorio, desde la
   raíz; una ruta absoluta, una URL, una que sale de la raíz o una con una parte sin resolver no.
 - **Consultas**: como en los nodos Terraform, `search` con `kind = "iac"`, `context` y `trace`.
 
@@ -477,8 +478,13 @@ Kubernetes, servicios Compose, `image.repository` de values Helm e imágenes tra
 `search` con `kind = "image"` encuentra estos contratos. `context` del workload muestra su imagen
 y el repositorio builder; `trace` baja del workload al código y sube del código a los workloads.
 Los nombres literales enlazan en `exact`; patrones y valores reemplazables en `inferred`, con
-su motivo. Varios candidatos quedan `ambiguous`. Un contexto Compose local seguro conecta el
-servicio directamente con su código en `exact`, incluso sin imagen. Las rutas no cruzan enlaces simbólicos.
+su motivo. Varios candidatos quedan `ambiguous`. Un build Compose local seguro conecta el servicio
+directamente con el código que su Dockerfile toma del contexto (`COPY`, `ADD` y
+`RUN --mount=type=bind`, en todas las etapas) en `exact`, incluso sin imagen, o en `inferred`
+cuando el contexto o la ruta del Dockerfile pasó por un valor reemplazable. Un Dockerfile que
+Meada no puede leer (ausente, tras un enlace simbólico, un origen con variable, una forma que no
+analiza) deja el contexto entero en `inferred`, y el motivo dice que no se leyó. `.dockerignore` no
+se lee. Las rutas no cruzan enlaces simbólicos.
 
 `meada status` solo lista imágenes huérfanas si el ámbito contiene builder y runner. Con un solo
 papel, `search` y `context` muestran `no builder in the workspace` o `no runner in the workspace`.

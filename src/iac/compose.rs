@@ -13,12 +13,16 @@
 //! `${VAR:-default}` and `${VAR-default}` resolve to the default and mark the field overridable;
 //! `${VAR}`, `$VAR` and the other forms stay in the text as `${VAR}`, the unresolved part. A
 //! build context is kept only when it is a path inside the repository, normalized from the root.
+//! A build's `dockerfile` (a path from the context) or `dockerfile_inline` is kept beside it (#744),
+//! merged with the override like the context.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
-use super::{NODES_MAX, Node, REFERENCES_MAX, ROOT_STORED_MAX, Reference, Resolved, local_source};
+use super::{
+    Dockerfile, NODES_MAX, Node, REFERENCES_MAX, ROOT_STORED_MAX, Reference, Resolved, local_source,
+};
 use crate::config_values;
 use crate::document::events::{self, Step, Syntax};
 
@@ -146,6 +150,7 @@ struct Service {
     image: Option<Resolved>,
     build: Option<Resolved>,
     builds: bool,
+    dockerfile: Option<Dockerfile>,
     environment: BTreeMap<String, super::environment::Entry>,
     depends_on: BTreeSet<String>,
     links: BTreeSet<String>,
@@ -156,6 +161,8 @@ struct Service {
     build_set: bool,
     /// Whether `build` names its context (a string, or a mapping with `context`).
     context_set: bool,
+    /// Whether `build` names its Dockerfile (`dockerfile` or `dockerfile_inline`).
+    dockerfile_set: bool,
     network_mode: bool,
     /// The fields tagged `!reset` or `!override`: they replace the base's.
     replaced: BTreeSet<&'static str>,
@@ -268,6 +275,21 @@ fn context(dir: &str, build: &Value) -> Option<Resolved> {
     let path = local_source(dir, &local)?;
     let text = if path.is_empty() { ".".into() } else { path };
     Some(Resolved { text, overridable })
+}
+
+/// The Dockerfile a `build` mapping names, `None` for one that names none (it builds `Dockerfile`
+/// in its context). `dockerfile_inline` is exclusive with `dockerfile`: Compose refuses a project
+/// that sets both, so the inline one is the one read. A value that is no text is an empty one,
+/// which no reader takes for a Dockerfile.
+fn dockerfile(build: &Value) -> Option<Dockerfile> {
+    let inline = build.get("dockerfile_inline");
+    let written = inline.or_else(|| build.get("dockerfile"))?;
+    let Expanded { text, overridable } = expand(written.as_str().unwrap_or(""));
+    Some(Dockerfile {
+        text,
+        overridable,
+        inline: inline.is_some(),
+    })
 }
 
 /// A build context Docker reads as a URL or a git repository, never as a directory.
@@ -494,6 +516,10 @@ fn read(path: &str, src: &[u8]) -> BTreeMap<String, Service> {
             build: build.and_then(|b| context(dir, b)),
             builds: build
                 .is_some_and(|b| b.is_object() || b.as_str().is_some_and(|s| !s.is_empty())),
+            dockerfile: build.and_then(dockerfile),
+            dockerfile_set: build.is_some_and(|b| {
+                b.get("dockerfile").is_some() || b.get("dockerfile_inline").is_some()
+            }),
             context_set: build.is_some_and(|b| b.is_string() || b.get("context").is_some()),
             depends_on: names(field("depends_on"), false),
             links: names(field("links"), true),
@@ -525,6 +551,10 @@ fn merge(
                     // A build mapping with no context keeps the context the base builds from.
                     if s.context_set || replaced("build") || !s.builds || !m.builds {
                         m.build = s.build;
+                    }
+                    // The same for the Dockerfile: one the override does not name stays.
+                    if s.dockerfile_set || replaced("build") || !s.builds || !m.builds {
+                        m.dockerfile = s.dockerfile;
                     }
                     m.builds = s.builds;
                 }
@@ -625,7 +655,8 @@ pub(super) fn evaluate(
             } else {
                 Vec::new()
             };
-            let size = address.len() + image_size + environment_size.unwrap_or(0);
+            let dockerfile_size = s.dockerfile.as_ref().map_or(0, |d| d.text.len());
+            let size = address.len() + image_size + environment_size.unwrap_or(0) + dockerfile_size;
             if !take(size) {
                 break;
             }
@@ -646,6 +677,7 @@ pub(super) fn evaluate(
                 image: s.image.clone(),
                 build: s.build.clone(),
                 build_image: s.builds,
+                dockerfile: s.dockerfile.clone(),
                 role: None,
                 handler: None,
                 events: Vec::new(),
@@ -856,6 +888,74 @@ mod tests {
         assert_eq!(
             from,
             ["services.db depends_on", "services.db networks.default"]
+        );
+    }
+
+    /// The Dockerfile of service `web` as (text, overridable, inline), after the merge of `over`
+    /// into `base`.
+    fn dockerfile_of(base: &str, over: Option<&str>) -> Option<(String, bool, bool)> {
+        let mut files = vec![("p/compose.yaml", base)];
+        files.extend(over.map(|o| ("p/compose.override.yaml", o)));
+        let (nodes, _) = unit(&files);
+        let web = nodes.iter().find(|n| n.address == "services.web").unwrap();
+        (web.dockerfile.as_ref()).map(|d| (d.text.clone(), d.overridable, d.inline))
+    }
+
+    #[test]
+    fn a_build_names_its_dockerfile_or_leaves_the_default() {
+        let build = |b: &str| format!("services:\n  web:\n    build: {b}\n");
+        let of = |b: &str| dockerfile_of(&build(b), None);
+        assert_eq!(of("./web"), None);
+        assert_eq!(
+            of("{context: ., dockerfile: Dockerfile.dev}"),
+            Some(("Dockerfile.dev".into(), false, false))
+        );
+        assert_eq!(
+            of("{context: ., dockerfile: \"${DF:-Dockerfile.dev}\"}"),
+            Some(("Dockerfile.dev".into(), true, false))
+        );
+        assert_eq!(
+            of("{context: ., dockerfile: \"${DF}\"}"),
+            Some(("${DF}".into(), false, false))
+        );
+        // Inline text is the Dockerfile; with both set, the inline one is read.
+        assert_eq!(
+            of("{dockerfile_inline: \"FROM x\"}"),
+            Some(("FROM x".into(), false, true))
+        );
+        assert_eq!(
+            of("{dockerfile: A, dockerfile_inline: \"FROM x\"}"),
+            Some(("FROM x".into(), false, true))
+        );
+        // A value that is no text names no readable Dockerfile.
+        assert_eq!(of("{dockerfile: 7}"), Some((String::new(), false, false)));
+    }
+
+    #[test]
+    fn an_override_changes_the_dockerfile_only_when_it_names_one_or_replaces_the_build() {
+        let base = "services:\n  web:\n    build: {context: ., dockerfile: Dockerfile.base}\n";
+        let over = |build: &str| format!("services:\n  web:\n    build: {build}\n");
+        let of = |o: &str| dockerfile_of(base, Some(&over(o))).map(|d| d.0);
+        assert_eq!(
+            of("{dockerfile: Dockerfile.dev}"),
+            Some("Dockerfile.dev".into())
+        );
+        // A build with no Dockerfile of its own, or with only a context, keeps the base's.
+        assert_eq!(of("{args: {A: b}}"), Some("Dockerfile.base".into()));
+        assert_eq!(of("./other"), Some("Dockerfile.base".into()));
+        // An inline Dockerfile in the override replaces the base's file.
+        assert_eq!(
+            dockerfile_of(base, Some(&over("{dockerfile_inline: \"FROM y\"}"))),
+            Some(("FROM y".into(), false, true))
+        );
+        // `!reset` and `!override` drop the base's Dockerfile with its build.
+        assert_eq!(of("!reset null"), None);
+        assert_eq!(of("!override {context: ../other}"), None);
+        // A service the base does not build takes the override's.
+        let plain = "services:\n  web:\n    image: x\n";
+        assert_eq!(
+            dockerfile_of(plain, Some(&over("{dockerfile: D}"))).map(|d| d.0),
+            Some("D".into())
         );
     }
 

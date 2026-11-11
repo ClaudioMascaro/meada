@@ -1,0 +1,11 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.sample
+  inline:
+    build:
+      context: ./sub
+      dockerfile_inline: |
+        FROM scratch
+        COPY src /app

@@ -173,6 +173,7 @@ fn compose_defaults_and_overrides_resolve_only_code_in_the_build_context() {
     std::fs::remove_dir_all(app.join(".github")).unwrap();
     std::fs::create_dir(app.join("code")).unwrap();
     std::fs::copy(app.join("send.ts"), app.join("code/send.ts")).unwrap();
+    std::fs::write(app.join("code/Dockerfile"), "FROM scratch\nCOPY . .\n").unwrap();
     std::fs::write(app.join("code/queue.py"), "import os\nimport boto3\nqueue = boto3.client('sqs')\ndef publish():\n    queue.send_message(QueueUrl=os.getenv('QUEUE_URL'), MessageBody='x')\ndef receive():\n    return queue.receive_message(QueueUrl=os.getenv('QUEUE_URL'))\n").unwrap();
     std::fs::write(app.join("code/parameter.ts"), "import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';\nconst client = new SSMClient({});\nexport function parameter() { return client.send(new GetParameterCommand({ Name: process.env.PARAMETER })); }\n").unwrap();
     std::fs::write(app.join("compose.yaml"), "services:\n  worker:\n    build: ./code\n    environment:\n      QUEUE_URL: ${QUEUE_URL:-https://sqs.us-east-1.amazonaws.com/123456789012/orders}\n      PARAMETER: /app/key\n").unwrap();

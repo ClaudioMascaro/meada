@@ -478,7 +478,7 @@ Every reference is `exact` and stays in one unit, as Kubernetes ones do: a claim
 
 ### Compose
 
-A Compose file (`compose.yaml`, `compose.yml`, `docker-compose.yaml` or `docker-compose.yml`) with its override file in the same directory is one evaluation unit, rooted at the directory. Each service is an IaC node `services.<name>` of type `service`. `depends_on`, `links` and shared networks (`networks:`; a service with none is on `default`) are references, with `via depends_on`, `via links` or `via networks.<name>`. `${VAR:-default}` resolves to its default and `context` marks it `(overridable)`; `${VAR}` stays in the text as an unresolved part, marked `(unresolved)`. `context` shows the service's `image:` and `build:`, recorded for the image contract; a build context is kept only as a path inside the repository (an absolute path, a URL, one that climbs out of the root or one with an unresolved part is not).
+A Compose file (`compose.yaml`, `compose.yml`, `docker-compose.yaml` or `docker-compose.yml`) with its override file in the same directory is one evaluation unit, rooted at the directory. Each service is an IaC node `services.<name>` of type `service`. `depends_on`, `links` and shared networks (`networks:`; a service with none is on `default`) are references, with `via depends_on`, `via links` or `via networks.<name>`. `${VAR:-default}` resolves to its default and `context` marks it `(overridable)`; `${VAR}` stays in the text as an unresolved part, marked `(unresolved)`. `context` shows the service's `image:` and `build:`, recorded for the image contract, with the Dockerfile the build names (`dockerfile` or `dockerfile_inline`); a build context is kept only as a path inside the repository (an absolute path, a URL, one that climbs out of the root or one with an unresolved part is not).
 
 ### CloudFormation and SAM
 
@@ -562,8 +562,12 @@ overrides, Compose services and Helm values files' `image.repository`. Helm temp
 rendered. `context` shows the image and builder repositories; `trace` crosses the relationship
 both ways, reaching code entry points. Overlays using the same workload and image retain a
 runner and its link per evaluation root. Repeated evidence of that image in one workload and
-root forms one side. A local Compose context directly runs code in the same
-repository at `exact`, even without `image`, inside the root and through no symbolic link.
+root forms one side. A local Compose build directly runs the code in the same
+repository that its Dockerfile takes from the build context (`COPY`, `ADD` and
+`RUN --mount=type=bind` sources, in every stage) at `exact`, even without `image`, inside the root
+and through no symbolic link, or at `inferred` when the context or the Dockerfile path went through
+an overridable value. A Dockerfile that cannot be read leaves the whole context at `inferred`, and
+the reason says so. `.dockerignore` is not read.
 
 Literals link at `exact`; Compose defaults and Helm values at `inferred`, with their source in
 the reason. Unresolved parts remain patterns and match only literal names at segment

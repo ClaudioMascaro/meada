@@ -343,7 +343,7 @@ words:
 | iac role | `role: <text>` | What a Kubernetes object is to Crossplane: `crossplane composite resource definition`, `crossplane composition`, `crossplane claim`, `crossplane composite resource`, `crossplane managed resource` or `crossplane composed resource`. |
 | iac image | `image: <text><iac-mark?>` | A Compose service's image quoted as JSON, or a workload's image contract with its optional missing-builder note. |
 | image builder | `  builder: <repository> [<level>: <reason>]` | A workload's image builder, with its evaluated evidence. |
-| workload code | `code: <repository> <path> [exact]` | A safe same-repository Compose code path. |
+| workload code | `code: <repository> <path> [<level>]` | A same-repository path the workload runs directly, at the level of its execution. |
 | workload environment | `env <container> <environment-name> -> <environment-target>: <environment-value?>` | One environment entry of the workload, with its checked-in source and available value. |
 | alert emitter | `emitter: <contract><orphan-note?>` | A rule's known label. |
 | alert matcher | `matcher: <contract><orphan-note?>` | A route's effective label condition. |

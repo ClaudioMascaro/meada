@@ -257,6 +257,7 @@ fn config_uses_and_workload_images_keep_their_own_edges_on_refresh() {
         "services:\n  orders:\n    build: .\n    image: ghcr.io/acme/orders:local\n",
     )
     .unwrap();
+    fs::write(app.join("Dockerfile"), "FROM scratch\nCOPY . .\n").unwrap();
     fs::write(infra.join("deployment.yaml"), "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: orders\n  namespace: shop\nspec:\n  template:\n    spec:\n      containers:\n        - name: orders\n          image: ghcr.io/acme/orders:v1\n").unwrap();
 
     let engine = Engine::open(&app).unwrap();

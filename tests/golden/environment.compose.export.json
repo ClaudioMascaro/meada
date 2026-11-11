@@ -270,7 +270,7 @@
       "repository": "example.com/acme/app",
       "path": "code",
       "level": "exact",
-      "reason": "Compose build compose.yaml#services.worker.build"
+      "reason": "Compose build compose.yaml#services.worker.build; Dockerfile code/Dockerfile"
     }
   ],
   "links": [

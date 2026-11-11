@@ -9,6 +9,7 @@ use serde_json::Value;
 
 pub(crate) mod code;
 mod config;
+mod dockerfile;
 pub(crate) mod environment;
 mod jib;
 mod patterns;
@@ -160,21 +161,6 @@ impl ContractKind for Image {
                 });
             }
         }
-        for n in &export.iac {
-            if let Some(path) = direct(export, n) {
-                export.executions.push(meada_core::export::Execution {
-                    workload: n.identity(&repo.identity),
-                    root: n.root.clone(),
-                    repository: repo.identity.clone(),
-                    path: path.into(),
-                    level: match n.build.as_ref().is_some_and(|b| b.overridable) {
-                        true => Level::Inferred,
-                        false => Level::Exact,
-                    },
-                    reason: format!("Compose build {}#{}.build", n.path, n.block),
-                });
-            }
-        }
         for (path, summary) in summaries(export) {
             for code in summary.code {
                 export.executions.push(meada_core::export::Execution {
@@ -182,7 +168,7 @@ impl ContractKind for Image {
                     root: code.root,
                     repository: repo.identity.clone(),
                     path: code.path,
-                    level: match code.overridable {
+                    level: match code.inferred {
                         true => Level::Inferred,
                         false => Level::Exact,
                     },
@@ -494,8 +480,10 @@ impl ContractKind for Image {
                         .filter(|x| x.workload == identity && x.root == n.root)
                     {
                         lines.push(format!(
-                            "code: {} {} [exact]",
-                            execution.repository, execution.path
+                            "code: {} {} [{}]",
+                            execution.repository,
+                            execution.path,
+                            execution.level.name()
                         ));
                     }
                 }
@@ -599,16 +587,6 @@ fn summaries(export: &Export) -> Vec<(String, config::Summary)> {
             ))
         })
         .collect()
-}
-
-fn direct<'a>(export: &Export, node: &'a crate::iac::Node) -> Option<&'a str> {
-    let path = node.build.as_ref()?.text.as_str();
-    let summaries = summaries(export);
-    (crate::iac::types::workload("compose", &node.ty).is_some_and(|w| w.code.is_some())
-        && summaries
-            .iter()
-            .any(|(_, s)| s.paths.iter().any(|p| p == path)))
-    .then_some(path)
 }
 
 fn runner(

@@ -644,9 +644,10 @@ pub(crate) fn config_file(path: &str) -> bool {
     KINDS.iter().any(|k| k.config_file(path))
 }
 
-/// What is at a path of the repository, read without following a symbolic link: the one fact a
-/// configuration summary takes from the disk beside the file's bytes and its IaC nodes.
-#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// What is at a path of the repository, read without following a symbolic link: the fact a
+/// configuration summary takes from the disk beside the file's bytes and its IaC nodes, besides the
+/// bytes of a file it reads and the entries of a directory it lists (`Seen::reads`).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub(crate) enum Probe {
     Missing,
     Link,
@@ -655,10 +656,17 @@ pub(crate) enum Probe {
     Other,
 }
 
+/// What a summary read of the repository beside the file's bytes and its IaC nodes: what was at
+/// each path it probed, and the fingerprint of each file it read or directory it listed.
+#[derive(Default)]
+pub(crate) struct Seen {
+    pub probes: std::collections::BTreeMap<String, Probe>,
+    pub reads: std::collections::BTreeMap<String, String>,
+}
+
 thread_local! {
-    /// The paths the summary being made probed (`probed`), none outside one.
-    static PROBES: std::cell::RefCell<Option<std::collections::BTreeMap<String, Probe>>> =
-        const { std::cell::RefCell::new(None) };
+    /// What the summary being made saw (`probed`), none outside one.
+    static SEEN: std::cell::RefCell<Option<Seen>> = const { std::cell::RefCell::new(None) };
 }
 
 /// What `rel` is under `root`, recorded for the summary `probed` is making.
@@ -670,22 +678,109 @@ pub(crate) fn probe(root: &std::path::Path, rel: &str) -> Probe {
         Ok(m) if m.is_file() => Probe::File,
         Ok(_) => Probe::Other,
     };
-    PROBES.with_borrow_mut(|probes| {
-        if let Some(probes) = probes {
-            probes.insert(rel.to_string(), found);
+    SEEN.with_borrow_mut(|seen| {
+        if let Some(seen) = seen {
+            seen.probes.insert(rel.to_string(), found);
         }
     });
     found
 }
 
-/// What `summarize` returns, with every path it probed and what was there: a refresh summarizes
-/// the file again only when one of them, its bytes or its nodes changed.
-pub(crate) fn probed<T>(
-    summarize: impl FnOnce() -> T,
-) -> (T, std::collections::BTreeMap<String, Probe>) {
-    let outer = PROBES.replace(Some(Default::default()));
+/// The entries of a directory a fingerprint covers, past which it is only "large".
+// ponytail: a listing of 4,096 entries names a directory a wildcard source reads; a longer
+// directory is not listed (`list` gives `None`, its fingerprint reads `unread`), so the summary
+// that wanted it falls back before it depends on it.
+pub(crate) const LIST_MAX: usize = 4096;
+
+/// The bytes of the file `rel` under `root`, when it is a file of at most `lang::MAX_BYTES`; the
+/// caller has probed the path. A link, a directory or a longer file is `None`.
+fn load(root: &std::path::Path, rel: &str) -> Option<Vec<u8>> {
+    use std::io::Read;
+    let path = root.join(rel);
+    if !std::fs::symlink_metadata(&path).ok()?.is_file() {
+        return None;
+    }
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .ok()?
+        .take(crate::lang::MAX_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    (bytes.len() <= crate::lang::MAX_BYTES).then_some(bytes)
+}
+
+/// The entries of the directory `rel` (`""` for the root) with what each is, sorted by name, or
+/// `None` for a link, a missing path, one that is no directory or one past `LIST_MAX` entries.
+fn entries(root: &std::path::Path, rel: &str) -> Option<Vec<(String, Probe)>> {
+    let path = root.join(rel);
+    if !std::fs::symlink_metadata(&path).ok()?.is_dir() {
+        return None;
+    }
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(path).ok()? {
+        let entry = entry.ok()?;
+        let kind = match entry.file_type().ok()? {
+            t if t.is_symlink() => Probe::Link,
+            t if t.is_dir() => Probe::Dir,
+            t if t.is_file() => Probe::File,
+            _ => Probe::Other,
+        };
+        out.push((entry.file_name().into_string().ok()?, kind));
+        if out.len() > LIST_MAX {
+            return None;
+        }
+    }
+    out.sort();
+    Some(out)
+}
+
+/// The fingerprint a summary recorded for `key`: a file's path gives the BLAKE3 of its bytes, a
+/// path with a `/` after it (`""` plus it for the root) the BLAKE3 of its entries' names and
+/// kinds. `unread` is what `load` and `entries` refuse.
+pub(crate) fn fingerprint(root: &std::path::Path, key: &str) -> String {
+    let hash = match key.strip_suffix('/') {
+        Some(dir) => entries(root, dir).map(|entries| {
+            let mut hasher = blake3::Hasher::new();
+            for (name, kind) in entries {
+                hasher.update(format!("{name}\0{}\n", kind as u8).as_bytes());
+            }
+            hasher.finalize()
+        }),
+        None => load(root, key).map(|bytes| blake3::hash(&bytes)),
+    };
+    hash.map_or_else(|| "unread".into(), |hash| hash.to_hex().to_string())
+}
+
+/// The bytes of the file `rel` (see `load`), recorded for the summary `probed` is making: a
+/// refresh summarizes it again when they change.
+pub(crate) fn read(root: &std::path::Path, rel: &str) -> Option<Vec<u8>> {
+    let bytes = load(root, rel);
+    SEEN.with_borrow_mut(|seen| {
+        if let Some(seen) = seen {
+            seen.reads.insert(rel.to_string(), fingerprint(root, rel));
+        }
+    });
+    bytes
+}
+
+/// The entries of the directory `rel` (`""` for the root; see `entries`), recorded the same way.
+pub(crate) fn list(root: &std::path::Path, rel: &str) -> Option<Vec<(String, Probe)>> {
+    let listed = entries(root, rel);
+    SEEN.with_borrow_mut(|seen| {
+        if let Some(seen) = seen {
+            seen.reads
+                .insert(format!("{rel}/"), fingerprint(root, &format!("{rel}/")));
+        }
+    });
+    listed
+}
+
+/// What `summarize` returns, with what it saw: a refresh summarizes the file again only when one
+/// of the paths it probed or read, its bytes or its nodes changed.
+pub(crate) fn probed<T>(summarize: impl FnOnce() -> T) -> (T, Seen) {
+    let outer = SEEN.replace(Some(Default::default()));
     let value = summarize();
-    (value, PROBES.replace(outer).unwrap_or_default())
+    (value, SEEN.replace(outer).unwrap_or_default())
 }
 
 pub(crate) fn config_summary(

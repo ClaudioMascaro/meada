@@ -2679,3 +2679,56 @@ fn a_refresh_summarizes_again_only_the_configurations_whose_inputs_moved() {
     let expected = cold_export("fresh_summaries_cold", "iac-http-sam", ORIGIN, remove);
     assert_eq!(refreshed, expected);
 }
+
+/// The Dockerfile a Compose build names is an input of its summary: its text edited, the file
+/// removed (the whole context, inferred) and a file written where none was each summarize the
+/// compose file again, and the refreshed export is the cold one. Touching it to the same bytes
+/// summarizes nothing.
+#[test]
+fn a_changed_dockerfile_summarizes_its_compose_file_again_and_matches_a_cold_export() {
+    let file = "frontend/Dockerfile.playwright";
+    type Edit = fn(&Path);
+    let edits: [(&str, Edit); 3] = [
+        ("edited", |repo| {
+            fs::write(
+                repo.join("frontend/Dockerfile.playwright"),
+                "FROM x\nCOPY backend /b\n",
+            )
+            .unwrap()
+        }),
+        ("removed", |repo| {
+            fs::remove_file(repo.join("frontend/Dockerfile.playwright")).unwrap()
+        }),
+        ("same bytes", |repo| {
+            let path = repo.join("frontend/Dockerfile.playwright");
+            fs::write(&path, fs::read(&path).unwrap()).unwrap()
+        }),
+    ];
+    for (name, edit) in edits {
+        let repo = fixture_repo(
+            &format!("fresh_dockerfile_{name}"),
+            "image-dockerfile",
+            ORIGIN,
+        );
+        age(&repo);
+        let before = Engine::open(&repo).unwrap().export().unwrap();
+        assert!(before.contains(file), "{name}: {before}");
+        edit(&repo);
+        let started = meada::contract_summaries();
+        let refreshed = Engine::open(&repo).unwrap().export().unwrap();
+        let summarized = meada::contract_summaries() - started;
+        if name == "same bytes" {
+            assert_eq!((summarized, &refreshed), (0, &before), "{name}");
+            continue;
+        }
+        assert_eq!(summarized, 1, "{name}");
+        assert_ne!(refreshed, before, "{name}");
+        let cold = cold_export(
+            &format!("fresh_dockerfile_{name}_cold"),
+            "image-dockerfile",
+            ORIGIN,
+            edit,
+        );
+        assert_eq!(refreshed, cold, "{name}");
+    }
+}

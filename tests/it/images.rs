@@ -441,6 +441,7 @@ fn direct_code_paths_need_no_image_and_never_follow_symlinks_on_refresh() {
     std::fs::remove_file(repo.join(".github/workflows/build.yml")).unwrap();
     std::fs::create_dir(repo.join("code")).unwrap();
     std::fs::write(repo.join("code/api.py"), "def handle():\n    return 1\n").unwrap();
+    std::fs::write(repo.join("code/Dockerfile"), "FROM scratch\nCOPY . /app\n").unwrap();
     std::fs::write(
         repo.join("compose.yaml"),
         "services:\n  api:\n    build: ./code\n",
@@ -976,4 +977,476 @@ fn a_helm_values_file_is_a_yaml_file_named_with_the_word_values() {
     assert!(helm.contains(&"image::docker.io/acme/billing"), "{export}");
     assert!(helm.contains(&"image::docker.io/acme/ledger"), "{export}");
     assert!(!helm.contains(&"image::docker.io/acme/stock"), "{export}");
+}
+
+// A Compose build runs what its Dockerfile takes from the context (#744, ADR 0026).
+
+const APP: Option<&str> = Some("https://example.com/acme/app.git");
+
+/// A repository of `image-app` with its Compose file, Dockerfile, workflow and code removed,
+/// holding `files` (path, text) instead.
+fn repo(case: &str, files: &[(&str, &str)]) -> std::path::PathBuf {
+    let repo = fixture_repo(case, "image-app", APP);
+    for gone in ["compose.yaml", "Dockerfile", "orders.py", "meada.toml"] {
+        std::fs::remove_file(repo.join(gone)).unwrap();
+    }
+    std::fs::remove_dir_all(repo.join(".github")).unwrap();
+    for (path, text) in files {
+        write(&repo, path, text);
+    }
+    repo
+}
+
+fn write(repo: &std::path::Path, path: &str, text: &str) {
+    std::fs::create_dir_all(repo.join(path).parent().unwrap()).unwrap();
+    std::fs::write(repo.join(path), text).unwrap();
+}
+
+fn export(repo: &std::path::Path) -> serde_json::Value {
+    serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap()
+}
+
+/// The executions of an export as (workload address, path, level), in the export's order.
+fn runs(export: &serde_json::Value) -> Vec<(String, String, String)> {
+    let text = |x: &serde_json::Value, key: &str| x[key].as_str().unwrap().to_string();
+    (export["executions"].as_array().into_iter().flatten())
+        .map(|x| {
+            let workload = text(x, "workload");
+            let address = workload.rsplit("::").next().unwrap().to_string();
+            (address, text(x, "path"), text(x, "level"))
+        })
+        .collect()
+}
+
+fn run(workload: &str, path: &str, level: &str) -> (String, String, String) {
+    (workload.into(), path.into(), level.into())
+}
+
+/// The reasons of the executions of `workload`, each once.
+fn reasons(export: &serde_json::Value, workload: &str) -> Vec<String> {
+    let mut reasons: Vec<String> = (export["executions"].as_array().into_iter().flatten())
+        .filter(|x| {
+            x["workload"]
+                .as_str()
+                .unwrap()
+                .ends_with(&format!("::{workload}"))
+        })
+        .map(|x| x["reason"].as_str().unwrap().to_string())
+        .collect();
+    reasons.dedup();
+    reasons
+}
+
+#[test]
+fn a_root_context_runs_only_the_paths_its_dockerfile_takes_in_code_and_environment() {
+    use meada::engine::{Direction, Start};
+    let repo = fixture_repo("images_dockerfile_root", "image-dockerfile", APP);
+    let engine = Engine::open(&repo).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    assert_eq!(
+        runs(&parsed),
+        [
+            run("services.playwright", "bun.lock", "exact"),
+            run("services.playwright", "frontend", "exact"),
+            run("services.playwright", "frontend/package.json", "exact"),
+            run("services.playwright", "package.json", "exact"),
+        ]
+    );
+    assert_eq!(
+        reasons(&parsed, "services.playwright"),
+        [
+            "Compose build compose.yaml#services.playwright.build; Dockerfile frontend/Dockerfile.playwright"
+        ]
+    );
+    // Backend code is run by no workload: no line for the service, and its environment read
+    // joins no entry of the service.
+    let up = engine
+        .trace(Start::From("get_password_hash"), Direction::Up, None)
+        .unwrap();
+    assert!(up.contains("create_user"), "{up}");
+    assert!(
+        !up.contains("playwright") && !up.contains("runs code"),
+        "{up}"
+    );
+    let queues: Vec<&serde_json::Value> = (parsed["providers"].as_array().unwrap().iter())
+        .filter(|p| p["contract"].as_str().unwrap().starts_with("channel::"))
+        .collect();
+    assert_eq!(queues.len(), 1, "{parsed}");
+    assert_eq!(queues[0]["contract"], "channel::sqs", "{parsed}");
+    let down = engine
+        .trace(Start::From("services.playwright"), Direction::Down, None)
+        .unwrap();
+    assert!(down.contains("frontend/page.ts"), "{down}");
+    assert!(!down.contains("backend/"), "{down}");
+
+    // The service takes the backend from the next build: its code, its entries and its line.
+    write(
+        &repo,
+        "frontend/Dockerfile.playwright",
+        "FROM node\nCOPY frontend ./frontend\nCOPY backend ./backend\n",
+    );
+    let parsed: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    assert_eq!(
+        runs(&parsed),
+        [
+            run("services.playwright", "backend", "exact"),
+            run("services.playwright", "frontend", "exact"),
+        ]
+    );
+    let queue = (parsed["providers"].as_array().unwrap().iter())
+        .find(|p| p["site"].as_str().unwrap().contains("queue.py"))
+        .unwrap();
+    assert_eq!(queue["contract"], "channel::sqs::jobs", "{parsed}");
+    let up = engine
+        .trace(Start::From("get_password_hash"), Direction::Up, None)
+        .unwrap();
+    assert_eq!(up.matches("runs code").count(), 1, "{up}");
+    assert!(up.contains("services.playwright"), "{up}");
+}
+
+#[test]
+fn a_context_with_copy_dot_runs_the_whole_repository_at_exact() {
+    let repo = fixture_repo("images_dockerfile_dot", "image-app", APP);
+    assert_eq!(runs(&export(&repo)), [run("services.orders", ".", "exact")]);
+}
+
+#[test]
+fn a_dockerfile_the_reader_cannot_read_leaves_the_whole_context_inferred() {
+    let repo = repo(
+        "images_dockerfile_unread",
+        &[
+            (
+                "compose.yaml",
+                "services:\n  missing:\n    build: ./missing\n  variable:\n    build: ./variable\n  \
+                 linked:\n    build: ./linked\n  taking:\n    build: ./taking\n",
+            ),
+            ("missing/a.py", "def a(): pass\n"),
+            ("variable/Dockerfile", "FROM x\nARG SRC\nCOPY ${SRC} /app\n"),
+            ("variable/a.py", "def b(): pass\n"),
+            ("real/Dockerfile", "FROM x\nCOPY a.py /app\n"),
+            ("linked/a.py", "def c(): pass\n"),
+            ("taking/Dockerfile", "FROM x\nRUN make\n"),
+            ("taking/a.py", "def d(): pass\n"),
+        ],
+    );
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("../real/Dockerfile", repo.join("linked/Dockerfile")).unwrap();
+    let parsed = export(&repo);
+    #[cfg(unix)]
+    let linked = [run("services.linked", "linked", "inferred")];
+    #[cfg(not(unix))]
+    let linked = [];
+    assert_eq!(
+        runs(&parsed),
+        [
+            linked.as_slice(),
+            &[
+                run("services.missing", "missing", "inferred"),
+                run("services.variable", "variable", "inferred"),
+            ]
+        ]
+        .concat()
+    );
+    for (workload, why) in [
+        ("services.missing", "missing"),
+        ("services.variable", "a source with a variable"),
+    ] {
+        assert_eq!(reasons(&parsed, workload).len(), 1);
+        assert!(
+            reasons(&parsed, workload)[0].ends_with(&format!("not read: {why}")),
+            "{parsed}"
+        );
+    }
+    #[cfg(unix)]
+    assert!(reasons(&parsed, "services.linked")[0].ends_with("not read: a symbolic link"));
+    // A Dockerfile that takes nothing runs no code directly: the image side stays.
+    assert!(!runs(&parsed).iter().any(|(w, ..)| w == "services.taking"));
+}
+
+#[test]
+fn every_stage_and_every_bind_mount_with_no_from_is_run() {
+    let repo = repo(
+        "images_dockerfile_stages",
+        &[
+            (
+                "compose.yaml",
+                "services:\n  staged:\n    build: ./staged\n  mounted:\n    build: ./mounted\n  \
+                 whole:\n    build: ./whole\n  cached:\n    build: ./cached\n",
+            ),
+            (
+                "staged/Dockerfile",
+                "FROM node AS build\nCOPY web /src/web\nRUN npm run build\nFROM nginx\n\
+                 COPY --from=build /src/web/dist /html\nCOPY --from=other secret /s\n",
+            ),
+            ("staged/web/a.ts", "export const a = 1;\n"),
+            ("staged/secret/b.ts", "export const b = 1;\n"),
+            (
+                "mounted/Dockerfile",
+                "FROM x\nRUN --mount=type=bind,source=src,target=/s --mount=type=bind,from=base,\
+                 source=other,target=/o make\n",
+            ),
+            ("mounted/src/a.py", "def a(): pass\n"),
+            ("mounted/other/b.py", "def b(): pass\n"),
+            (
+                "whole/Dockerfile",
+                "FROM x\nRUN --mount=type=bind,target=/s make\n",
+            ),
+            ("whole/a.py", "def c(): pass\n"),
+            (
+                "cached/Dockerfile",
+                "FROM x\nRUN --mount=type=cache,target=/c --mount=type=secret,id=s make\n",
+            ),
+            ("cached/a.py", "def d(): pass\n"),
+        ],
+    );
+    assert_eq!(
+        runs(&export(&repo)),
+        [
+            run("services.mounted", "mounted/src", "exact"),
+            run("services.staged", "staged/web", "exact"),
+            run("services.whole", "whole", "exact"),
+        ]
+    );
+}
+
+#[test]
+fn a_continued_dockerfile_line_runs_the_sources_docker_reads() {
+    // Docker keeps the blanks of a continued line and ends a line only at a lone backslash.
+    let repo = repo(
+        "images_dockerfile_continuation",
+        &[
+            (
+                "compose.yaml",
+                "services:\n  split:\n    build: {context: ., dockerfile: docker/Dockerfile}\n  \
+                 named:\n    build: {context: ., dockerfile: docker/Named}\n  \
+                 doubled:\n    build: {context: ., dockerfile: docker/Doubled}\n",
+            ),
+            (
+                "docker/Dockerfile",
+                "FROM x\nCOPY backend\\\n     frontend ./\n",
+            ),
+            (
+                "docker/Named",
+                "FROM x\nCOPY package.json\\\n     bun.lock ./\n",
+            ),
+            (
+                "docker/Doubled",
+                "FROM x\nRUN echo a\\\\\nCOPY frontend ./f\n",
+            ),
+            ("backend/a.py", "def a(): pass\n"),
+            ("frontend/b.ts", "export const b = 1;\n"),
+            ("package.json", "{}\n"),
+            ("bun.lock", "\n"),
+        ],
+    );
+    assert_eq!(
+        runs(&export(&repo)),
+        [
+            run("services.doubled", "frontend", "exact"),
+            run("services.named", "bun.lock", "exact"),
+            run("services.named", "package.json", "exact"),
+            run("services.split", "backend", "exact"),
+            run("services.split", "frontend", "exact"),
+        ]
+    );
+}
+
+#[test]
+fn a_dockerfile_form_docker_reads_another_way_runs_no_fewer_paths() {
+    // Each form below made the build run fewer paths than the image takes, at `exact`.
+    let repo = repo(
+        "images_dockerfile_docker_forms",
+        &[
+            (
+                "compose.yaml",
+                "services:\n  parents:\n    build: {context: p, dockerfile: Parents}\n  \
+                 stars:\n    build: {context: p, dockerfile: Stars}\n  \
+                 quoted:\n    build: q\n  \
+                 mount:\n    build: m\n",
+            ),
+            ("p/Parents", "FROM x\nCOPY --parents ./src/**/*.py /app/\n"),
+            ("p/Stars", "FROM x\nCOPY src/**/*.py /app/\n"),
+            ("p/src/a.py", "def a(): pass\n"),
+            ("p/src/x/b.py", "def b(): pass\n"),
+            ("p/src/x/y/c.py", "def c(): pass\n"),
+            (
+                "q/Dockerfile",
+                "FROM x\nRUN echo 'use <<EOF here'\nCOPY backend /app\nRUN cat <<EOF >/x\nEOF\n",
+            ),
+            ("q/backend/a.py", "def a(): pass\n"),
+            (
+                "m/Dockerfile",
+                "FROM x\nRUN --mount=type=BIND,source=backend,target=/b make\n",
+            ),
+            ("m/backend/a.py", "def a(): pass\n"),
+        ],
+    );
+    assert_eq!(
+        runs(&export(&repo)),
+        [
+            run("services.mount", "m/backend", "exact"),
+            // `**` crosses directories under `--parents`: the whole context, as for a Dockerfile
+            // not read.
+            run("services.parents", "p", "inferred"),
+            run("services.quoted", "q/backend", "exact"),
+            // Without `--parents`, Docker's `filepath.Match` reads `**` as one segment.
+            run("services.stars", "p/src/x/b.py", "exact"),
+        ]
+    );
+}
+
+#[test]
+fn a_wildcard_source_runs_exactly_the_files_it_matches() {
+    let repo = repo(
+        "images_dockerfile_wildcard",
+        &[
+            ("compose.yaml", "services:\n  api:\n    build: .\n"),
+            (
+                "Dockerfile",
+                "FROM x\nCOPY app/*.py /srv/\nCOPY lib/v?/[a-b]*.py /lib/\n",
+            ),
+            ("app/a.py", "def a(): pass\n"),
+            ("app/sub/b.py", "def b(): pass\n"),
+            ("app/c.txt", "text\n"),
+            ("lib/v1/a1.py", "def c(): pass\n"),
+            ("lib/v2/b2.py", "def d(): pass\n"),
+            ("lib/v2/c3.py", "def e(): pass\n"),
+            ("lib/v10/a4.py", "def f(): pass\n"),
+        ],
+    );
+    assert_eq!(
+        runs(&export(&repo)),
+        [
+            run("services.api", "app/a.py", "exact"),
+            run("services.api", "lib/v1/a1.py", "exact"),
+            run("services.api", "lib/v2/b2.py", "exact"),
+        ]
+    );
+}
+
+#[test]
+fn compose_builds_with_the_dockerfile_the_service_names_and_an_override_changes() {
+    let repo = repo(
+        "images_dockerfile_named",
+        &[
+            (
+                "compose.yaml",
+                "services:\n  relative:\n    build:\n      context: ./svc\n      dockerfile: docker/Dockerfile.prod\n  \
+                 inline:\n    build:\n      context: ./svc\n      dockerfile_inline: |\n        FROM x\n        \
+                 COPY src /app\n  changed:\n    build:\n      context: ./svc\n      dockerfile: Dockerfile.base\n  \
+                 kept:\n    build:\n      context: ./svc\n      dockerfile: Dockerfile.base\n",
+            ),
+            (
+                "compose.override.yaml",
+                "services:\n  changed:\n    build:\n      dockerfile: Dockerfile.over\n  kept:\n    build: ./svc\n",
+            ),
+            ("svc/docker/Dockerfile.prod", "FROM x\nCOPY prod /p\n"),
+            ("svc/Dockerfile.base", "FROM x\nCOPY base /b\n"),
+            ("svc/Dockerfile.over", "FROM x\nCOPY over /o\n"),
+            ("svc/Dockerfile", "FROM x\nCOPY wrong /w\n"),
+            ("svc/prod/a.py", "def a(): pass\n"),
+            ("svc/src/b.py", "def b(): pass\n"),
+            ("svc/base/c.py", "def c(): pass\n"),
+            ("svc/over/d.py", "def d(): pass\n"),
+            ("svc/wrong/e.py", "def e(): pass\n"),
+        ],
+    );
+    let parsed = export(&repo);
+    assert_eq!(
+        runs(&parsed),
+        [
+            run("services.changed", "svc/over", "exact"),
+            run("services.inline", "svc/src", "exact"),
+            run("services.kept", "svc/base", "exact"),
+            run("services.relative", "svc/prod", "exact"),
+        ]
+    );
+    assert!(
+        reasons(&parsed, "services.relative")[0]
+            .ends_with("; Dockerfile svc/docker/Dockerfile.prod")
+    );
+    assert!(reasons(&parsed, "services.inline")[0].ends_with("; Dockerfile dockerfile_inline"));
+    assert!(reasons(&parsed, "services.changed")[0].ends_with("; Dockerfile svc/Dockerfile.over"));
+}
+
+#[test]
+fn an_overridable_context_or_dockerfile_keeps_its_paths_inferred() {
+    let repo = repo(
+        "images_dockerfile_overridable",
+        &[
+            (
+                "compose.yaml",
+                "services:\n  context:\n    build: ${CTX:-./a}\n  file:\n    build:\n      context: ./b\n      \
+                 dockerfile: ${DF:-Dockerfile.b}\n  plain:\n    build: ./c\n",
+            ),
+            ("a/Dockerfile", "FROM x\nCOPY src /s\n"),
+            ("a/src/a.py", "def a(): pass\n"),
+            ("b/Dockerfile.b", "FROM x\nCOPY src /s\n"),
+            ("b/src/b.py", "def b(): pass\n"),
+            ("c/Dockerfile", "FROM x\nCOPY src /s\n"),
+            ("c/src/c.py", "def c(): pass\n"),
+        ],
+    );
+    assert_eq!(
+        runs(&export(&repo)),
+        [
+            run("services.context", "a/src", "inferred"),
+            run("services.file", "b/src", "inferred"),
+            run("services.plain", "c/src", "exact"),
+        ]
+    );
+    let context = Engine::open(&repo)
+        .unwrap()
+        .context("services.context", None)
+        .unwrap();
+    assert!(
+        context.contains("code: example.com/acme/app a/src [inferred]"),
+        "{context}"
+    );
+}
+
+/// A workload is written once per answer, under the first node it runs: `x` runs leaf and mid, `y`
+/// runs leaf, mid and top, and neither line is written again under mid or top.
+#[test]
+fn an_upward_trace_writes_each_workload_once_under_the_first_node_it_runs() {
+    use meada::engine::{Direction, Start};
+    let repo = repo(
+        "images_dockerfile_trace",
+        &[
+            (
+                "compose.yaml",
+                "services:\n  x:\n    build:\n      context: .\n      dockerfile: Dockerfile.x\n  y:\n    \
+                 build:\n      context: .\n      dockerfile: Dockerfile.y\n",
+            ),
+            ("Dockerfile.x", "FROM x\nCOPY leaf.py mid.py /app/\n"),
+            (
+                "Dockerfile.y",
+                "FROM x\nCOPY mid.py top.py /app/\nCOPY leaf.py /leaf.py\n",
+            ),
+            ("leaf.py", "def leaf():\n    return 1\n"),
+            (
+                "mid.py",
+                "from leaf import leaf\n\n\ndef mid():\n    return leaf()\n",
+            ),
+            (
+                "top.py",
+                "from mid import mid\n\n\ndef top():\n    return mid()\n",
+            ),
+        ],
+    );
+    let up = Engine::open(&repo)
+        .unwrap()
+        .trace(Start::From("leaf"), Direction::Up, None)
+        .unwrap();
+    let lines: Vec<&str> = up.lines().collect();
+    let at = |needle: &str| lines.iter().position(|l| l.contains(needle));
+    assert_eq!(up.matches("runs code").count(), 2, "{up}");
+    for service in ["services.x", "services.y"] {
+        assert_eq!(up.matches(&format!("{service} (root")).count(), 1, "{up}");
+    }
+    // Both run leaf, the first node: both lines are written under it, before its callers.
+    assert!(
+        at("services.x") < at("mid.py:") && at("services.y") < at("mid.py:"),
+        "{up}"
+    );
 }
