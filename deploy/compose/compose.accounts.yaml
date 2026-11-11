@@ -44,7 +44,7 @@ services:
   # The job needs a workspace version and the console needs the job's first generation: this step
   # imports the first one, only while the store has none.
   seed:
-    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.2.0}-cloud
+    image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.3.0}-cloud
     profiles: [console]
     entrypoint: [sh, /etc/meada/seed.sh]
     environment:
