@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""Capture the selected prove-meada surfaces in Actions; --selftest runs no product code."""
+"""Capture the selected prove-meada surfaces in Actions; --selftest runs no product code; --rows PATH...
+prints the flows and Scope rows those paths reach."""
 
+import fnmatch
+import itertools
 import json
 import os
 from pathlib import Path
@@ -13,6 +16,7 @@ from unittest.mock import patch
 
 
 SCRIPTS = Path('.claude/skills/prove-meada/scripts')
+SCOPE = SCRIPTS.parent / 'references/scope.md'
 SURFACES = ('cli', 'console', 'accounts', 'deploy', 'container', 'goldens')
 # Bases from before a feature, as a7-a8-audit.py names them: `images.py` compares against one
 # before #662 (`PRE_IMAGE`), `config_uses.py` against one before #661 (`PRE_CONFIG`).
@@ -34,9 +38,8 @@ SOURCE_KEY = '{scripts}/a7-source-keys/native-hcl-values/'
 # The Scope table's shared core: every answer goes through it, the A7/A8 flows' too.
 SHARED = (r'src/(lang/mod\.rs|resolve\.rs|index\.rs|engine\.rs|trace\.rs|partial\.rs|contract\.rs|community\.rs|entry\.rs'
           r'|items\.rs|drift_view\.rs|render\.rs)|meada-core/src/(render|search|context|trace|shape|drift|export)\.rs')
-# The drivers the skill's Scope table names (`.claude/skills/prove-meada/SKILL.md`), each with the
-# paths its row names (None: on every run of its surface; a change to the verifier or to shared
-# core runs them all). `{head}`, `{base}` and `{ui}` are this run's builds: a flow with `{ui}` runs
+# The drivers the skill's Scope table names (`SCOPE`), each with the paths its row names (None: on
+# every run of its surface; a change to the verifier or to shared core runs them all). `{head}`, `{base}` and `{ui}` are this run's builds: a flow with `{ui}` runs
 # in a console run after the console's API checks, the others after `cli-mcp`. A `HISTORICAL` base is
 # built only for a flow that names it (`{pre_image}`, `{pre_config}`), just before the console's flows.
 FLOWS = (
@@ -86,6 +89,26 @@ def selected(paths):
     every = any(path == 'scripts/prove-ci' or path.startswith(f'{SCRIPTS}/') and not path.endswith('.md')
                 or re.match(SHARED, path) for path in paths)
     return [flow for flow in FLOWS if every or flow[1] is None or any(re.match(flow[1], path) for path in paths)]
+
+
+def scope_table():
+    """The Scope table: its header, its rule, then one line per row."""
+    lines = SCOPE.read_text().splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith('| Changed path'))
+    return list(itertools.takewhile(lambda line: line.startswith('|'), lines[start:]))
+
+
+def rows_for(paths):
+    """The Scope rows whose first cell names one of the paths: a directory, a glob or `{a,b}` choices."""
+    # shortcut: a row's "but" exclusions are not read, so a path can also show a row that excludes it;
+    # CI's selection is `selected()`, these rows are only the reviewer's map.
+    def patterns(cell):
+        for token in re.findall(r'`([^`]+)`', cell):
+            brace = re.fullmatch(r'([^{]*)\{([^}]*)\}(.*)', token)
+            yield from (brace[1] + choice + brace[3] for choice in brace[2].split(',')) if brace else (token,)
+    names = lambda pattern, path: path.startswith(pattern) if pattern.endswith('/') else fnmatch.fnmatchcase(path, pattern)
+    return [row for row in scope_table()[2:]
+            if any(names(pattern, path) for pattern in patterns(row.split(' | ')[0]) for path in paths)]
 
 
 def flow_command(run, flow):
@@ -348,8 +371,7 @@ def selftest():
         == [flow[0] for flow in FLOWS]
     # Each driver a Scope row names runs here as a flow that row's first path selects, so a flow
     # dropped from a script with several (`prove.py values`, `aws.py`) fails too; each flow has a row.
-    table = (SCRIPTS.parent / 'SKILL.md').read_text().split('\n## Scope\n', 1)[1].split('\n## Sort the change', 1)[0]
-    rows = [line for line in table.splitlines() if line.startswith('|') and not line.startswith(('| Changed path', '|---'))]
+    rows = scope_table()[2:]
     drivers = lambda text: [re.sub(r' --(head|base)-bin$', '', name) for name in
                             re.findall(r'prove\.py [a-z]+|[\w-]+\.(?:py|sh)(?: --[a-z-]+)?', text) if name != 'prove.py']
     driver = {flow[0]: drivers(flow[2])[0] for flow in FLOWS}
@@ -370,6 +392,13 @@ def selftest():
     audit = (SCRIPTS / 'a7-a8-audit.py').read_text()
     assert all(f"{key.upper()} = '{revision}'" in audit for key, revision in HISTORICAL.items())
     assert 'aws-workloads' in chosen(['src/iac/workload/ecs.rs'])  # the row's ECS readers
+    # `--rows` reads a row's first cell: a file, a directory, a glob, `{a,b}` choices.
+    first = lambda path: [row.split(' | ')[0] for row in rows_for([path])]
+    assert first('src/contract/gcp.rs')[0].startswith('| `src/contract/gcp.rs`')
+    assert first('src/dotnet/project.rs') == ['| `src/jvm/`, `src/dotnet/`, `src/xml.rs`']
+    assert first('src/lang/kotlin.rs')[0].startswith('| `src/lang/*.rs` but `mod.rs`')
+    assert any(cell.startswith('| `ui/src/{graph,') for cell in first('ui/src/GraphPage.tsx'))
+    assert rows_for(['docs/a.md']) == [] and len(rows) > 30
     a8 = flow_command(Path('/r'), next(flow for flow in FLOWS if flow[0] == 'a8-peers'))
     assert [str(arg) for arg in a8] == ['sh', f'{SCRIPTS}/a8-peers.sh', 'check', '/r/bin/meada-base', '/r/bin/meada-head', '/r/flows/a8-peers']
     # The CLI flows follow `cli-mcp` and the console's its API checks, with this run's builds; images
@@ -453,8 +482,13 @@ def main():
     if sys.argv[1:] == ['--selftest']:
         selftest()
         return 0
+    if sys.argv[1:2] == ['--rows']:
+        rows = rows_for(sys.argv[2:])
+        print('Flows CI runs:', ', '.join(flow[0] for flow in selected(sys.argv[2:])))
+        print('\n'.join(scope_table()[:2] + rows) if rows else 'No Scope row names these paths.')
+        return 0
     if sys.argv[1:]:
-        raise ValueError('usage: scripts/prove-ci [--selftest]')
+        raise ValueError('usage: scripts/prove-ci [--selftest | --rows PATH...]')
     scope = scope_from_env()
     head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
     if head != os.environ['PROVE_HEAD']:
