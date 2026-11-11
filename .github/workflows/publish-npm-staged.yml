@@ -7,6 +7,10 @@ name: Stage npm package
 on:
   workflow_call:
     inputs:
+      # cargo-dist passes the plan to every custom publish job. This one reads the plan from the
+      # release's artifacts instead (plan-dist-manifest.json): as an environment variable it passed
+      # the kernel's 128 KiB limit per string at v1.3.0 (the plan holds the release's CHANGELOG
+      # section twice) and no step of the job could start.
       plan:
         required: true
         type: string
@@ -16,8 +20,6 @@ on:
 jobs:
   stage-npm:
     runs-on: ubuntu-24.04
-    env:
-      PLAN: ${{ inputs.plan }}
     steps:
       - name: Fetch npm packages
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -32,9 +34,11 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - run: npm install --global npm@11.21.0
       - name: Stage npm packages
+        # The assignment, not a `for ... in $(jq ...)`, makes a missing or unreadable plan fail the
+        # step. A package the plan names and the artifacts lack fails in npm.
         run: |
-          for release in $(echo "$PLAN" | jq --compact-output '.releases[] | select([.artifacts[] | endswith("-npm-package.tar.gz")] | any)'); do
-            pkg=$(echo "$release" | jq '.artifacts[] | select(endswith("-npm-package.tar.gz"))' --raw-output)
+          packages=$(jq --raw-output '.releases[].artifacts[] | select(endswith("-npm-package.tar.gz"))' npm/plan-dist-manifest.json)
+          for pkg in $packages; do
             npm stage publish --access public "./npm/${pkg}"
           done
         env:
