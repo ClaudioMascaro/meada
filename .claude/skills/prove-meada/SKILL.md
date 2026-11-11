@@ -15,7 +15,9 @@ alone does not activate E2E. Product execution recipes below run only inside Git
 ## Local preparation and evidence review
 
 1. Read `AGENTS.md` and classify the change. Docs, instructions and harness-only changes stop
-   with E2E `N/A` in the ordinary validation summary, no product run and no proof receipt.
+   with E2E `N/A` in the ordinary validation summary, no product run and no proof receipt. A
+   proof driver (`proof_driver` in `scripts/check`; the Proof workflow is one) is not
+   harness-only: a labelled PR runs its E2E in CI.
 2. For selected E2E, prepare Scope, Sort and Find the spec below. Record base/head SHAs,
    corpus entries, queries, probes, surfaces and independent answer keys for the CI runner.
    A PR must be non-draft and carry `e2e`; external writes still require the user's authorization.

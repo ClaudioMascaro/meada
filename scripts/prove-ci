@@ -86,8 +86,8 @@ FLOWS = (
 
 def selected(paths):
     """The flows the changed paths select, in FLOWS order."""
-    every = any(path == 'scripts/prove-ci' or path.startswith(f'{SCRIPTS}/') and not path.endswith('.md')
-                or re.match(SHARED, path) for path in paths)
+    every = any(path in ('scripts/prove-ci', '.github/workflows/proof.yml') or re.match(SHARED, path)
+                or path.startswith(f'{SCRIPTS}/') and not path.endswith('.md') for path in paths)
     return [flow for flow in FLOWS if every or flow[1] is None or any(re.match(flow[1], path) for path in paths)]
 
 
@@ -362,13 +362,14 @@ def selftest():
     # Flows follow the paths their Scope rows name; the verifier or shared core runs every flow.
     chosen = lambda paths: [flow[0] for flow in selected(paths)]
     always = ['http-iac', 'iac-http-routes', 'console-graph']
-    assert chosen([]) == chosen([f'{SCRIPTS}/a7-tf-set/README.md']) == chosen(['docs/a.md']) == always
+    assert chosen([]) == chosen([f'{SCRIPTS}/a7-tf-set/README.md']) == chosen(['docs/a.md']) \
+        == chosen(['.github/workflows/ci.yml']) == always
     assert {'iac', 'terraform-json', 'values', 'native-hcl-values'} <= set(chosen(['src/iac.rs', 'src/config_values.rs']))
     sdk = set(chosen(['src/contract/sdk/java.rs']))  # PR #753's path
     assert {'aws-sdk-jvm-go-dotnet', 'gcp-sdk'} <= sdk and 'images' not in sdk
     assert {'patterns', 'images'} <= set(chosen(['src/decisions.rs']))  # the patterns row names images.py
     assert chosen(['scripts/prove-ci']) == chosen([f'{SCRIPTS}/http-iac.py']) == chosen(['src/partial.rs']) \
-        == [flow[0] for flow in FLOWS]
+        == chosen(['.github/workflows/proof.yml']) == [flow[0] for flow in FLOWS]
     # Each driver a Scope row names runs here as a flow that row's first path selects, so a flow
     # dropped from a script with several (`prove.py values`, `aws.py`) fails too; each flow has a row.
     rows = scope_table()[2:]
