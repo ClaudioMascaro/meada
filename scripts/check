@@ -300,7 +300,8 @@ def static(args, paths, tree):
             if name in entries:
                 actual = git("rev-parse", f"{tree}:.agents/skills/{name}")
                 if actual != entries[name]["tree"]:
-                    raise RuntimeError(f"{name}: skills-lock.json tree differs from the candidate tree ({actual})")
+                    raise RuntimeError(f"{name}: skills-lock.json tree differs from the candidate tree; "
+                                       f"after staging the edit, set skills.{name}.tree to {actual}")
     with tempfile.TemporaryDirectory(prefix="meada-check-") as tmp:
         tmp = Path(tmp)
         if any(p.startswith(("docs/", "src/", "meada-core/src/")) or p == "tests/it/docs.rs" for p in paths):
