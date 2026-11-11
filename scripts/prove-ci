@@ -18,8 +18,11 @@ SURFACES = ('cli', 'console', 'accounts', 'deploy', 'container', 'goldens')
 # before #662 (`PRE_IMAGE`), `config_uses.py` against one before #661 (`PRE_CONFIG`).
 HISTORICAL = {'pre_image': 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62',
               'pre_config': '6a5eca5853193d205bcf756983b41e9cb16ffa9d'}
-# A flow's ceiling, the audit's: one hung driver must not spend the job's 60 minutes.
+# A flow's ceiling, the audit's: one hung driver must not spend the job's 60 minutes. No flow
+# starts or runs past FLOWS_END into the capture, keeping time for the steps after the flows and
+# the upload inside the job's 60 minutes.
 FLOW_TIMEOUT = 1200
+FLOWS_END = 35 * 60
 VALUES = r'src/(config_values|index\.rs|document/|msg\.rs)'
 IAC = r'src/(iac\.rs|iac/(functions|cloudformation|serverless)\.rs|document/events\.rs|index\.rs|engine\.rs)'
 AWS = r'src/(iac/subscription\.rs|iac/types\.toml|config_values(\.rs|/hcl\.rs)|channel\.rs|document/asyncapi\.rs)'
@@ -123,15 +126,12 @@ def capture(run, scope, base, head, repos, paths=()):
     python = sys.executable
     flows = selected(paths)
     ui_flows = [flow for flow in flows if '{ui}' in flow[2]]
+    end = time.monotonic() + FLOWS_END
 
-    def command(name, args, required=False, compares=False, timeout=None):
+    def command(name, args, required=False, compares=False):
         start = time.monotonic()
         with (run / 'logs' / (name + '.log')).open('w') as log:
-            try:
-                code = subprocess.run([str(arg) for arg in args], stdout=log, stderr=subprocess.STDOUT,
-                                      timeout=timeout).returncode
-            except subprocess.TimeoutExpired:
-                code = 124  # as timeout(1), and the audit
+            code = subprocess.run([str(arg) for arg in args], stdout=log, stderr=subprocess.STDOUT).returncode
         steps.append({'name': name, 'exit_code': code, 'seconds': round(time.monotonic() - start)})
         # A comparison's exit 1 is a difference from the base: evidence, not a failed capture.
         if compares and code == 1:
@@ -142,13 +142,21 @@ def capture(run, scope, base, head, repos, paths=()):
 
     def drive(flow):
         # A driver's exit 1 is its answer key disagreeing (or a crash): a failed step for the judge.
-        # `prove.py values` and `iac` also exit 1 on a difference from the base, as `cli-mcp` does.
+        # `prove.py values` and `iac` exit 1 on a difference from the base, as `cli-mcp` does (and 3
+        # when their answer key rejects an answer).
         failed = [step['name'] for step in steps if step['exit_code'] and step['name'] in
                   {'build-' + key.replace('_', '-') for key in HISTORICAL if f'{{{key}}}' in flow[2]}]
+        left = int(end - time.monotonic())
         if failed:
             steps.append({'name': flow[0], 'exit_code': 2, 'blocked': f'{failed[0]} failed'})
+        elif left < 60:
+            steps.append({'name': flow[0], 'exit_code': 2, 'blocked': 'no time left for flows in this job'})
         else:
-            command(flow[0], flow_command(run, flow), compares=flow[2].startswith('prove.py'), timeout=FLOW_TIMEOUT)
+            # timeout(1) sends TERM to the driver's process group, the `meada` it started too: exit 124.
+            # shortcut: a server a driver starts in its own session (console-graph.py, config_uses.py)
+            # outlives a timed-out driver, idle until the runner's cleanup; stop it here if one ever spins.
+            command(flow[0], ['timeout', min(FLOW_TIMEOUT, left), *flow_command(run, flow)],
+                    compares=flow[2].startswith('prove.py'))
 
     try:
         if scope['cli']:
@@ -321,14 +329,22 @@ def selftest():
         check = {'ssm-values': 'aws-json-values', 'http-services': 'http-iac', 'a8': 'a8-peers'}.get(
             mutation['check'], mutation['check'])
         assert check in chosen([mutation['file']]), mutation['id']
-    # Every driver the Scope table names runs here, and every flow here has its Scope row.
+    # Each driver a Scope row names runs here as a flow that row's first path selects, so a flow
+    # dropped from a script with several (`prove.py values`, `aws.py`) fails too; each flow has a row.
     table = (SCRIPTS.parent / 'SKILL.md').read_text().split('\n## Scope\n', 1)[1].split('\n## Sort the change', 1)[0]
-    rows = ''.join(line for line in table.splitlines(True) if line.startswith('|'))
-    named = set(re.findall(r'prove\.py [a-z]+|[\w-]+\.(?:py|sh)\b', rows)) - {'prove.py'}
+    rows = [line for line in table.splitlines() if line.startswith('|') and not line.startswith(('| Changed path', '|---'))]
+    drivers = lambda text: [re.sub(r' --(head|base)-bin$', '', name) for name in
+                            re.findall(r'prove\.py [a-z]+|[\w-]+\.(?:py|sh)(?: --[a-z-]+)?', text) if name != 'prove.py']
+    driver = {flow[0]: drivers(flow[2])[0] for flow in FLOWS}
     # `prove.py run`, `rebless` and `deploy` are the corpus, goldens and deploy steps; `console.py` the console's.
-    driven = {' '.join(flow[2].split()[:2 if flow[2].startswith('prove.py') else 1]) for flow in FLOWS} \
-        | {'prove.py run', 'prove.py rebless', 'prove.py deploy', 'console.py'}
-    assert named == driven, f'Scope only: {sorted(named - driven)}; CI only: {sorted(driven - named)}'
+    corpus = {'prove.py run', 'prove.py rebless', 'prove.py deploy', 'console.py'}
+    for row in rows:
+        first = re.search(r'`([^`]+)`', row.split(' | ')[0]).group(1)
+        for name in set(drivers(row)) - corpus:
+            assert any(driver[flow[0]] == name and (flow[1] is None or re.match(flow[1], first)) for flow in FLOWS), \
+                f'Scope only: {name} (the row of {first})'
+    named = {name for row in rows for name in drivers(row)}
+    assert set(driver.values()) <= named, f'CI only: {sorted(set(driver.values()) - named)}'
     audit = (SCRIPTS / 'a7-a8-audit.py').read_text()
     assert all(f"{key.upper()} = '{revision}'" in audit for key, revision in HISTORICAL.items())
     assert 'aws-workloads' in chosen(['src/iac/workload/ecs.rs'])  # the row's ECS readers
@@ -338,14 +354,16 @@ def selftest():
     scope = dict.fromkeys(SURFACES, False)
     scope['cli'] = scope['console'] = True
     with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
-        run, argv = Path(temp) / 'proof', {}
+        run, argv, limits = Path(temp) / 'proof', {}, {}
         def fake_flows(args, **kwargs):
+            if args[0] == 'timeout':
+                limits[Path(args[3]).name], args = int(args[1]), args[2:]
             if 'run' in args:
                 (run / 'head/meada').mkdir(parents=True)
                 (run / 'head/meada/export1.json').write_text('{}')
             argv[Path(args[1]).name] = args
-            if 'image-ko.py' in argv and args is argv['image-ko.py']:
-                raise subprocess.TimeoutExpired(args, FLOW_TIMEOUT)
+            if Path(args[1]).name == 'image-ko.py':
+                return subprocess.CompletedProcess(args, 124)  # timeout(1) stopped it
             return subprocess.CompletedProcess(args, 1 if 'pre-image' in args or 'values' in args else 0)
         with patch('subprocess.run', side_effect=fake_flows):
             paths = ['src/image/builder.rs', 'src/iac/config_uses.rs', 'src/msg.rs']
@@ -362,6 +380,22 @@ def selftest():
         assert receipt['steps'][names.index('images')] == {'name': 'images', 'exit_code': 2, 'blocked': 'build-pre-image failed'}
         assert receipt['capture'] == 'BLOCKED' and 'images.py' not in argv and 'aws.py' not in argv
         assert argv['images-mixed.py'][-4:] == ['--base-bin', str(run / 'bin/meada-base'), '--run', str(run / 'flows/images-mixed')]
+        for name in ('http-iac.py', 'iac-http-routes.py'):  # against the merge-base, every run
+            assert argv[name][2:6] == ['--head-bin', str(run / 'bin/meada-head'), '--base-bin', str(run / 'bin/meada-base')]
+        # Flows run under timeout(1), within the ceiling; builds and the console's steps do not.
+        assert 0 < limits['image-ko.py'] <= FLOW_TIMEOUT and not {'build.sh', 'console.py'} & set(limits), limits
+    # With no time left for flows, each selected flow is BLOCKED unrun; the steps after them still run.
+    late = dict.fromkeys(SURFACES, False)
+    late['cli'] = late['goldens'] = True
+    with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True), patch.dict(globals(), FLOWS_END=0), \
+            patch('subprocess.run', return_value=subprocess.CompletedProcess([], 0)) as ran:
+        run = Path(temp) / 'proof'
+        assert capture(run, late, 'a' * 40, 'b' * 40, 'meada', ['src/alert/incident.rs']) == 2
+        receipt = json.loads((run / 'receipt.json').read_text())
+        late_flows = [step['name'] for step in receipt['steps'] if step.get('blocked') == 'no time left for flows in this job']
+        assert late_flows == [flow[0] for flow in selected(['src/alert/incident.rs']) if '{ui}' not in flow[2]], late_flows
+        assert 'alerts' in late_flows and [step['name'] for step in receipt['steps']][-2:] == ['goldens', 'clean']
+        assert receipt['capture'] == 'BLOCKED' and not any(call.args[0][0] == 'timeout' for call in ran.call_args_list)
     print('prove-ci selftest: local guard, capture status, failure retention, cleanup and flow selection passed')
 
 

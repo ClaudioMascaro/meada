@@ -16,7 +16,8 @@ prints "checks passed" or the differences found: the verdict is the checker's, n
 the head for `meada status` and `search` with the kind `value` and compares each answer, line by
 line and in order, with the oracle's; the base binary answers the default search and the export.
 Exit 0: no difference, 1: differences for the checker, 2: a run failed (BLOCKED), 3: a budget
-overrun or a nondeterministic index (`run`), which no expected difference explains.
+overrun or a nondeterministic index (`run`), or an answer the oracle or answer key rejects
+(`values`, `iac`), which no expected difference explains.
 """
 
 import argparse
@@ -969,6 +970,9 @@ Resources:
     unused = lambda line: line + " (no use in the workspace)"  # a provisioner no code reads, as here
     assert key_problems(key, "\n".join(map(unused, right.splitlines())))[0] == []
     assert key_problems(key, unused(hit("list", "queue-0-b")))[0]
+    # A wrong exact name exits 3, never 1: CI records exit 1 as a difference from the base.
+    assert key_failed(key_problems(key, hit("list", "queue-0-b"))[0])
+    assert not key_failed(["differs from base: a symbol's answer must not change", "contract-role extension differs from its base key:\n"])
     print("selftest passed")
 
 
@@ -1230,6 +1234,14 @@ def iac_existing_suffixes(lines, baseline):
     return result
 
 
+# The problems a difference from the base explains; any other is the answer key's (exit 3).
+BASE_PROBLEMS = ("differs from base", "contract-role extension differs from its base key")
+
+
+def key_failed(problems):
+    return any(not p.startswith(BASE_PROBLEMS) for p in problems)
+
+
 def check_iac_context(identity, path, want, got, baseline):
     """Judge the independent node header and all existing contract-role extension bytes."""
     problems, got_lines = [], got.splitlines()
@@ -1451,7 +1463,7 @@ def cmd_values(a):
     os.environ["LANG"] = "C.UTF-8"  # every answer below is read as English: status, `no matches`, refusals
     run = Path(a.run).resolve()
     run.mkdir(parents=True, exist_ok=True)
-    report, differences, blocked = [], 0, False
+    report, differences, hard, blocked = [], 0, 0, False
     for name in a.repos.split(","):
         src = run / "work" / "src" / name
         if not src.exists():
@@ -1504,6 +1516,7 @@ def cmd_values(a):
         got_status = tuple(int(x) for x in m.groups()) if m else None
         if got_status != (want_status if files else None):
             differences += 1
+            hard += 1
             report.append(f"meada status: DIFFERS: head {m.group(0) if m else 'no config line'}; oracle "
                           f"{'%d read, %d skipped (lockfiles: %d, unreadable: %d); values: %d, redacted: %d' % want_status if files else 'no config line'}")
         else:
@@ -1557,6 +1570,7 @@ def cmd_values(a):
                 listed = ans.rsplit(", not `", 1)[0]  # the refusal echoes the unknown kind (`values`) after the list
                 problems = [] if ans.startswith(("TOOL ERROR", "ERROR")) and "`value`" in listed else [f"not refused or `value` not listed: {ans[:200]}"]
             fails += bool(problems)
+            hard += key_failed(problems)
             lines.append(f"  [{'FAIL' if problems else 'PASS'}] {label} {json.dumps(args, ensure_ascii=False)[:160]} ({secs[i]} s)"
                          + "".join(f"\n      {p}" for p in problems))
         differences += fails
@@ -1565,13 +1579,15 @@ def cmd_values(a):
         if a.http:
             line, failed = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
             differences += failed
+            hard += failed
             report.append("MCP HTTP vs stdio (head):\n" + line)
         report.append("")
-    verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}")
+    verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}"
+                                                     + (f", {hard} the answer key rejects" if hard else ""))
     (run / "values.md").write_text(f"# prove.py values\n\n{verdict}\n\n" + "\n".join(report) + "\n")
     print(verdict)
     print(f"full report: {run}/values.md")
-    sys.exit(2 if blocked else 1 if differences else 0)
+    sys.exit(2 if blocked else 3 if hard else 1 if differences else 0)
 
 
 def cmd_iac(a):
@@ -1585,7 +1601,7 @@ def cmd_iac(a):
     os.environ["LANG"] = "C.UTF-8"
     run = Path(a.run).resolve()
     run.mkdir(parents=True, exist_ok=True)
-    report, differences, blocked = [], 0, False
+    report, differences, hard, blocked = [], 0, 0, False
     footer = re.compile(r"chain: (exact|none) \u00b7 0 hops \u00b7 1 repos \u00b7 \d+ tokens\Z")
     for name in a.repos.split(","):
         src = run / "work" / "src" / name
@@ -1756,6 +1772,7 @@ def cmd_iac(a):
                 if not (got.startswith(("TOOL ERROR", "ERROR")) and "`iac`" in listed):
                     problems.append(f"not refused or `iac` not listed: {got[:200]}")
             fails += bool(problems)
+            hard += key_failed(problems)
             lines.append(f"  [{'FAIL' if problems else 'PASS'}] {label} {json.dumps(args, ensure_ascii=False)[:150]} ({secs[i]} s)"
                          + "".join("\n      " + p.replace("\n", "\n      ") for p in problems))
         differences += fails
@@ -1763,13 +1780,15 @@ def cmd_iac(a):
         if a.http:
             line, failed = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
             differences += failed
+            hard += failed
             report.append("MCP HTTP vs stdio (head):\n" + line)
         report.append("")
-    verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}")
+    verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}"
+                                                     + (f", {hard} the answer key rejects" if hard else ""))
     (run / "iac.md").write_text(f"# prove.py iac\n\n{verdict}\n\n" + "\n".join(report) + "\n")
     print(verdict)
     print(f"full report: {run}/iac.md")
-    sys.exit(2 if blocked else 1 if differences else 0)
+    sys.exit(2 if blocked else 3 if hard else 1 if differences else 0)
 
 
 def cmd_clean(a):

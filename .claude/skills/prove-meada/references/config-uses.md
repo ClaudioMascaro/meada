@@ -9,7 +9,8 @@ python3 $S/config_uses.py --base-bin "$RUN/bin/meada-pre-config" \
 
 The base is a build from before #661 (`6a5eca5853193d205bcf756983b41e9cb16ffa9d`, the manual
 audit's `pre-config`, which `scripts/prove-ci` builds when the flow is selected): the driver
-expects that base's tool catalog, without the `alert` search kind, so the merge-base cannot serve.
+compares config uses with a base that has none, and its tool catalog with one before #672's
+`alert` kind, so the merge-base cannot serve.
 The binary needs the `ui` feature for the final console checks. `--ui-dir` is optional for an
 intermediate CLI/MCP run, but omitting it leaves the console unproven. Reuse the build and
 browser environment from [console.md](console.md); the script never builds, downloads, or

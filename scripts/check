@@ -90,8 +90,9 @@ def scopes(paths):
             elif path.endswith("corpus.tsv"):
                 out["cli"] = all_repos = True
             elif path.endswith("prove.py"):
-                # The console drivers `aws-sdk.py`, `config_uses.py` and `images.py` import it.
-                out["cli"] = out["console"] = all_repos = True
+                # Its `run`, `rebless` and `deploy`; the console drivers `aws-sdk.py`, `config_uses.py`
+                # and `images.py` import it.
+                out["cli"] = out["console"] = out["goldens"] = out["deploy"] = all_repos = True
             else:
                 for key in ("cli", "console", "accounts", "deploy", "container", "goldens"):
                     out[key] = True
@@ -387,6 +388,7 @@ def selftest():
         found = scopes(paths)
         assert (found["product"], found["cli"], found["console"]) == (product, cli, console), (paths, found)
     assert scopes(["tests/golden/query.txt"])["goldens"]
+    assert all(scopes([".claude/skills/prove-meada/scripts/prove.py"])[key] for key in ("goldens", "deploy"))
     assert scopes(["ui/src/local.ts"])["accounts"]
     assert scopes(["deploy/compose/console.yml"])["deploy"]
     assert scopes(["Dockerfile"])["container"]
