@@ -279,7 +279,8 @@ def static(args, paths, tree):
                 import yaml
             except ImportError as error:
                 raise RuntimeError("YAML validation requires PyYAML; install scripts/docs/requirements.txt in a venv") from error
-            list(yaml.safe_load_all(path.read_text()))
+            # Compose only: Compose and CloudFormation carry tags (`!reset`, `!Ref`) no constructor knows.
+            list(yaml.compose_all(path.read_text(), Loader=yaml.SafeLoader))
         elif suffix == ".py" or (not suffix and path.read_bytes()[:100].startswith(b"#!/usr/bin/env python")):
             compile(path.read_bytes(), name, "exec")
         elif suffix in {".js", ".mjs"}:
