@@ -100,14 +100,14 @@ def scope_table():
 
 
 def rows_for(paths):
-    """The Scope rows whose first cell names one of the paths: a directory, a glob or `{a,b}` choices."""
+    """The Scope rows whose first cell names one of the paths: a file, a directory, a glob or `{a,b}` choices."""
     # shortcut: a row's "but" exclusions are not read, so a path can also show a row that excludes it;
     # CI's selection is `selected()`, these rows are only the reviewer's map.
     def patterns(cell):
         for token in re.findall(r'`([^`]+)`', cell):
             brace = re.fullmatch(r'([^{]*)\{([^}]*)\}(.*)', token)
             yield from (brace[1] + choice + brace[3] for choice in brace[2].split(',')) if brace else (token,)
-    names = lambda pattern, path: path.startswith(pattern) if pattern.endswith('/') else fnmatch.fnmatchcase(path, pattern)
+    names = lambda pattern, path: fnmatch.fnmatchcase(path, pattern + '*' if pattern.endswith('/') else pattern)
     return [row for row in scope_table()[2:]
             if any(names(pattern, path) for pattern in patterns(row.split(' | ')[0]) for path in paths)]
 
@@ -283,7 +283,8 @@ def capture(run, scope, base, head, repos, paths=()):
         (run / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
         # Each nonzero step is in one list, so a reader of the log or the artifact need not count them.
         exits = collections.Counter(step['exit_code'] for step in steps)
-        summary = (f"E2E capture: {receipt['capture']}; semantic verdict: UNPROVEN.\nBase: {base}\nHead: {head}\n"
+        summary = (f"E2E capture: {receipt['capture']}{f' ({blocked})' if blocked else ''}; semantic verdict: UNPROVEN.\n"
+                   f"Base: {base}\nHead: {head}\n"
                    f"- Steps: {len(steps)}; {', '.join(f'exit {code}: {exits[code]}' for code in sorted(exits))}\n")
         summary += ''.join(f"- {label}: {', '.join(step['name'] for step in steps if test(step)) or 'none'}\n"
                            for label, test in (('Timed out', lambda step: step['exit_code'] == 124),
@@ -343,6 +344,7 @@ def selftest():
                 run = Path(temp) / 'proof'
                 assert capture(run, dict(scope, console=console), 'a' * 40, 'b' * 40, 'meada') == 2
             receipt = json.loads((run / 'receipt.json').read_text())
+            assert (run / 'summary.md').read_text().startswith(f"E2E capture: BLOCKED ({receipt['blocked']}); ")
             # Stopped before the flows: the receipt names each flow its surfaces owed.
             assert receipt['capture'] == 'BLOCKED' and [step['name'] for step in receipt['steps']] \
                 == ['build-head', *(['console-stop'] if console else []), 'clean'], receipt['steps']
@@ -414,6 +416,8 @@ def selftest():
     assert first('src/dotnet/project.rs') == ['| `src/jvm/`, `src/dotnet/`, `src/xml.rs`']
     assert first('src/lang/kotlin.rs')[0].startswith('| `src/lang/*.rs` but `mod.rs`')
     assert any(cell.startswith('| `ui/src/{graph,') for cell in first('ui/src/GraphPage.tsx'))
+    assert first('src/lang/python/queries.scm')[0].startswith('| `src/lang/*.rs` but')  # `src/lang/*/`
+    assert any(cell.startswith('| `src/alert/incident.rs`') for cell in first('src/config.rs'))
     assert rows_for(['docs/a.md']) == [] and len(rows) > 30
     a8 = flow_command(Path('/r'), next(flow for flow in FLOWS if flow[0] == 'a8-peers'))
     assert [str(arg) for arg in a8] == ['sh', f'{SCRIPTS}/a8-peers.sh', 'check', '/r/bin/meada-base', '/r/bin/meada-head', '/r/flows/a8-peers']
@@ -500,9 +504,10 @@ def main():
     if sys.argv[1:] == ['--selftest']:
         selftest()
         return 0
-    if sys.argv[1:2] == ['--rows']:
+    if sys.argv[1:2] == ['--rows'] and sys.argv[2:]:
         rows = rows_for(sys.argv[2:])
-        print('Flows CI runs:', ', '.join(flow[0] for flow in selected(sys.argv[2:])))
+        print('Flows these paths select (CI runs one only when it turns on its surface):',
+              ', '.join(flow[0] for flow in selected(sys.argv[2:])))
         print('\n'.join(scope_table()[:2] + rows) if rows else 'No Scope row names these paths.')
         return 0
     if sys.argv[1:]:

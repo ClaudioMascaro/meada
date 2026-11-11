@@ -52,13 +52,15 @@ merge-base with `scripts/check --ci`; use that selection for the capture and its
 ```bash
 BASE=$PROVE_BASE  # the merge-base selected for this CI run
 HEAD=$PROVE_HEAD  # the exact PR head selected for this CI run
-git diff --name-only "$BASE" "$HEAD"
-scripts/prove-ci --rows $(git diff --name-only "$BASE" "$HEAD")
+git diff --name-only --no-renames "$BASE" "$HEAD"
+scripts/prove-ci --rows $(git diff --name-only --no-renames "$BASE" "$HEAD")
 ```
 
-`--rows` prints the flows CI runs for those paths and the rows of the Scope table that name
-them. The whole table, with what CI runs per row and what it leaves to the reviewer, and how to
-give the capture an input for a new flow, are in [references/scope.md](references/scope.md).
+`--rows` prints the flows those paths select (CI runs one only when it turns on its surface) and
+the Scope table rows that name them. [references/scope.md](references/scope.md) holds the whole
+table, with what CI runs per row and what it leaves to the reviewer, and what no row names:
+docs-only changes, launch config (`Cargo.toml`, `Cargo.lock`, `build.rs`, `rust-toolchain.toml`
+reach every surface) and an input for a new flow.
 
 If the user names a flow instead ("prove trace over HTTP"), prove that flow and skip the diff.
 

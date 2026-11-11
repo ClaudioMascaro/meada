@@ -23,7 +23,7 @@ Infer the repo from `git remote -v`; `gh` does this automatically when run insid
 - **Close**: `gh api -X PATCH repos/<owner>/<repo>/issues/<n> -f state=closed`
 - **Draft PR**: `gh api repos/<owner>/<repo>/pulls -f title=... -f head=<branch> -f base=main -F draft=true -F body=@<file>`, the body carrying `Closes #<n>` lines.
 - **PR body or base**: `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@<file>` (or `-f base=<branch>`).
-- **Check a PR body**: diff its file against `gh api repos/<owner>/<repo>/pulls/<n> --jq .body` (`--jq` ends it with a newline). Where `gh` may only search: `gh api -X GET search/issues -f q='repo:<owner>/<repo> is:pr <title words>' --jq '.items[] | select(.number==<n>) | .body'`. Read state and labels with a `--jq` field query (`.state`, `[.labels[].name]`), the head with `git ls-remote origin refs/pull/<n>/head`, and the files with `git fetch origin pull/<n>/head` and `git diff --name-only`: a whole PR read carries the whole body back.
+- **Check a PR body**: diff its file against `gh api repos/<owner>/<repo>/pulls/<n> --jq .body` (`--jq` ends it with a newline). Where `gh` may only search: `gh api -X GET search/issues -f q='repo:<owner>/<repo> is:pr <title words>' --jq '.items[] | select(.number==<n>) | .body'`. Read state and labels with a `--jq` field query (`.state`, `[.labels[].name]`), the head with `git ls-remote origin refs/pull/<n>/head`, and the files with `git fetch origin <base>`, `git fetch origin pull/<n>/head` and `git diff --name-only --no-renames origin/<base>...FETCH_HEAD`: a whole PR read carries the whole body back.
 - **Ready for review** exists only in GraphQL: leave the PR as draft and say so.
 
 ## Pull requests as a triage surface

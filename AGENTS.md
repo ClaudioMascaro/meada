@@ -76,9 +76,9 @@ Meada indexes this repository too: `.mcp.json` serves it as the `meada` MCP serv
 `context`, `trace`). Reach for it first to find where a symbol lives, who calls it and what a
 change touches, then read the files it names.
 
-- Read `docs/agents/code-graph.md` on a new machine, after a change to a language pack or a
-  contract kind (the server runs the installed binary), and in a worktree or subagent session
-  (which tree it answers about).
+- The index follows the working tree on every query, but the server runs the installed binary:
+  read `docs/agents/code-graph.md` on a new machine, after a change to a language pack or a
+  contract kind, and in a worktree or subagent session (which tree it answers about).
 - Read its answers as Meada's own levels say: `exact` is certain, `inferred` and `ambiguous` are
   name matches, and a missing caller is unproven, since calls inside macros (`assert!`,
   `format!`, `vec!`) are not indexed.
