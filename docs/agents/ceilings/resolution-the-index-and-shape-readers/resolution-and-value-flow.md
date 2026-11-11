@@ -90,7 +90,19 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   file, and a call on its name from another Java file leaves it unresolved; one handed to a call
   or aliased there, or reached by reflection from there, is not seen, and the field keeps its
   first name. A request type is the SDK's unless a type of its directory, an import or a
-  variable says otherwise: one of the same package in another source root is not seen (#719). `EVAL_DEPTH` (256): a value
+  variable says otherwise: one of the same package in another source root is not seen (#719).
+  A request, a list, an item or an entry on a DynamoDB transaction's path held in a name is
+  followed only when the function that declares the name writes it twice. In Go and C#, one
+  written a third time (logged, read by two requests), one held in a parameter, a field or a
+  package variable, and a C# request filled by property assignments have no table. In Java the
+  rule covers a list or an array: one written a third time or held in a field has no table. A
+  Java local named as a method its function calls is written there too, so a list
+  `transactItems` passed to `transactItems(..)` and a builder `put` built in `.put(put.build())`
+  have no table. A Java list that reaches the request through a wrapper's parameter is not judged:
+  one changed in the wrapper, or by the caller before it passes it on, keeps the tables it was
+  made with. Outside transactions a list of entries held in a name is not judged in Java, Go
+  or C#: an EventBridge entries list with an element replaced keeps its first bus (#719).
+  `EVAL_DEPTH` (256): a value
   folded deeper than that, through the items of lists and objects, the constants it names and
   the arguments callers pass, is unknown, and a value traced through more constants,
   parameters and return values than that, each into the next, has no origin.
