@@ -20,6 +20,7 @@ VALUES = r'src/(config_values|index\.rs|document/|msg\.rs)'
 IAC = r'src/(iac\.rs|iac/(functions|cloudformation|serverless)\.rs|document/events\.rs|index\.rs|engine\.rs)'
 AWS = r'src/(iac/subscription\.rs|iac/types\.toml|config_values(\.rs|/hcl\.rs)|channel\.rs|document/asyncapi\.rs)'
 IMAGES = r'src/(image\.rs|image/|iac/types|index\.rs|engine\.rs|trace\.rs|items\.rs)|meada-core/src/export\.rs|ui/src/(graph|GraphPage)'
+PATTERNS = r'src/(iac/(pattern|provision)\.rs|image/patterns\.rs|decisions\.rs)'
 INCIDENTS = r'src/(alert/(incident|forwarding|pcl)\.rs|alert\.rs|config\.rs)'
 A8 = r'src/(lang/(ts|go|mod)|http\.rs|http/(ts|go|join)|resolve\.rs|index\.rs)'
 SOURCE_KEY = '{scripts}/a7-source-keys/native-hcl-values/'
@@ -59,7 +60,7 @@ FLOWS = (
     ('alerts', r'src/alert', 'alerts.py --head-bin {head} --http'),
     ('incident-routing', INCIDENTS, 'incident-routing.py --head-bin {head} --base-bin {base} --http'),
     ('incident-guards', INCIDENTS, 'incident-guards.py --head-bin {head}'),
-    ('patterns', r'src/(iac/(pattern|provision)\.rs|image/patterns\.rs|decisions\.rs)', 'patterns.py --head-bin {head} --http'),
+    ('patterns', PATTERNS, 'patterns.py --head-bin {head} --http'),
     ('azure-sdk', r'src/contract/(azure/sdk|receiver\.rs)', 'azure-sdk.py --head-bin {head} --http'),
     ('azure', r'src/(contract/azure\.rs|iac/azure\.rs|iac/types\.toml)', 'azure.py --head-bin {head} --http'),
     ('a8-peers', A8, 'a8-peers.sh check {base} {head} {out}'),
@@ -69,7 +70,7 @@ FLOWS = (
     ('config-uses', r'src/(iac/config_uses\.rs|config_values\.rs|index\.rs|engine\.rs|trace\.rs|contract\.rs|iac/orphans\.rs)'
      r'|meada-core/src/(export|context|search|trace)\.rs|ui/src/(graph\.ts|GraphPage\.tsx)',
      'config_uses.py --head-bin {ui} --base-bin {base} --http --ui-dir ui/dist'),
-    ('images', IMAGES, 'images.py --head-bin {head} --base-bin {pre_image} --http --public --ui-bin {ui} --ui-dir ui/dist'),
+    ('images', f'{IMAGES}|{PATTERNS}', 'images.py --head-bin {head} --base-bin {pre_image} --http --public --ui-bin {ui} --ui-dir ui/dist'),
 )
 
 
@@ -296,6 +297,7 @@ def selftest():
     assert {'iac', 'terraform-json', 'values', 'native-hcl-values'} <= set(chosen(['src/iac.rs', 'src/config_values.rs']))
     sdk = set(chosen(['src/contract/sdk/java.rs']))  # PR #753's path
     assert {'aws-sdk-jvm-go-dotnet', 'gcp-sdk'} <= sdk and 'images' not in sdk
+    assert {'patterns', 'images'} <= set(chosen(['src/decisions.rs']))  # the patterns row names images.py
     assert chosen(['scripts/prove-ci']) == chosen([f'{SCRIPTS}/http-iac.py']) == chosen(['src/partial.rs']) \
         == [flow[0] for flow in FLOWS]
     # Each bug the audit plans to plant selects the flow that catches it (A7-02: shared core).
