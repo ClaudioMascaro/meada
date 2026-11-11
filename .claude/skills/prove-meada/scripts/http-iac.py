@@ -21,6 +21,11 @@ def main():
     binary = str(Path(args.head_bin).resolve())
     run = Path(args.run).resolve()
     run.mkdir(parents=True, exist_ok=False)
+    # The binaries this evidence came from, as iac-http-routes.py records them.
+    identity = lambda path: {'path': path, 'sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+                             'version': subprocess.check_output([path, '--version'], text=True).strip()}
+    (run / 'binary.json').write_text(json.dumps({**identity(binary), **(
+        {'base': identity(str(Path(args.base_bin).resolve()))} if args.base_bin else {})}, indent=2))
     os.environ['BILLING_URL'] = 'https://process-environment-must-stay-unread.invalid'
     app, infra, server = [run / 'work' / name for name in ('app', 'infra', 'server')]
     for root in (app, infra, server):

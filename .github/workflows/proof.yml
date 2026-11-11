@@ -431,7 +431,7 @@ jobs:
           echo "PROVE_RUN=$RUNNER_TEMP/prove-meada" >> "$GITHUB_ENV"
           echo "PROVE_NODE=$RUNNER_TEMP/prove-node" >> "$GITHUB_ENV"
           python3 -m venv "$RUNNER_TEMP/prove-venv"
-          "$RUNNER_TEMP/prove-venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3
+          "$RUNNER_TEMP/prove-venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3 python-hcl2==8.1.4
       - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
         if: env.PROVE_DEPLOY == 'true'
         with:
@@ -455,49 +455,10 @@ jobs:
         run: |
           docker run -d --name zz-prove-postgres -p 5432:5432 -e POSTGRES_PASSWORD=meada-test postgres:15-alpine
           timeout 60 bash -c 'until docker exec zz-prove-postgres pg_isready -U postgres; do sleep 1; done'
+      # Also the drivers of the skill's Scope rows the change selects (`FLOWS` in scripts/prove-ci).
       - name: Capture selected behavior against the PR base
         id: capture
         run: '"$RUNNER_TEMP/prove-venv/bin/python" scripts/prove-ci'
-      - name: Prove HTTP through Services, Compose and Ingress
-        if: always() && !cancelled() && env.PROVE_CLI == 'true' && steps.capture.outcome != 'skipped'
-        run: |
-          "$RUNNER_TEMP/prove-venv/bin/python" .claude/skills/prove-meada/scripts/http-iac.py \
-            --head-bin "$PROVE_RUN/bin/meada-head" --run .prove-it/runs/ci-http-iac
-      - name: Retain HTTP infrastructure evidence
-        if: always() && env.PROVE_CLI == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: http-infrastructure
-          path: .prove-it/runs/ci-http-iac
-          include-hidden-files: true
-          if-no-files-found: warn
-      - name: Prove HTTP routes declared in IaC
-        if: always() && !cancelled() && env.PROVE_CLI == 'true' && steps.capture.outcome != 'skipped'
-        run: |
-          "$RUNNER_TEMP/prove-venv/bin/python" .claude/skills/prove-meada/scripts/iac-http-routes.py \
-            --head-bin "$PROVE_RUN/bin/meada-head" --run .prove-it/runs/ci-iac-http-routes
-      - name: Retain IaC HTTP route evidence
-        if: always() && env.PROVE_CLI == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: iac-http-routes
-          path: .prove-it/runs/ci-iac-http-routes
-          include-hidden-files: true
-          if-no-files-found: warn
-      - name: Prove the console infrastructure graph
-        if: always() && !cancelled() && env.PROVE_CONSOLE == 'true' && steps.capture.outcome != 'skipped'
-        run: |
-          "$RUNNER_TEMP/prove-venv/bin/python" .claude/skills/prove-meada/scripts/console-graph.py \
-            --head-bin "$PROVE_RUN/bin/meada-head-ui" --ui-dir ui/dist \
-            --run .prove-it/runs/ci-console-graph
-      - name: Retain console graph evidence
-        if: always() && env.PROVE_CONSOLE == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: console-infrastructure-graph
-          path: .prove-it/runs/ci-console-graph
-          include-hidden-files: true
-          if-no-files-found: warn
       - name: Stop the accounts proof database
         if: always() && env.PROVE_ACCOUNTS == 'true'
         run: docker rm -f zz-prove-postgres
@@ -518,6 +479,9 @@ jobs:
             ${{ runner.temp }}/prove-meada/console-api/*/console
             ${{ runner.temp }}/prove-meada/deploy
             ${{ runner.temp }}/prove-meada/bin/*.from
+            ${{ runner.temp }}/prove-meada/flows
+            !${{ runner.temp }}/prove-meada/flows/**/private.pem
+            !${{ runner.temp }}/prove-meada/flows/**/indexes
             !${{ runner.temp }}/prove-meada/console/private.pem
             !${{ runner.temp }}/prove-meada/console/indexes
             !${{ runner.temp }}/prove-meada/console-api/*/console/private.pem

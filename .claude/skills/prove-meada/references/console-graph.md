@@ -12,8 +12,9 @@ Build WASM and the frontend from this tree using the [console recipe](console.md
 optionally `PROVE_CHROMIUM` to an existing Chromium executable. Without it, Playwright uses its
 installed Chromium. These tools remain separate from the product's Node dependencies.
 
-The Proof workflow's `prove-meada` and `proof-a7-a8-ui` jobs install these pinned tools, run
-the built console flow and upload `.prove-it/runs/ci-console-graph`. Follow the root `AGENTS.md` validation policy.
+The Proof workflow's `prove-meada` and `proof-a7-a8-ui` jobs install these pinned tools and run
+the built console flow: the first through `scripts/prove-ci`, under `flows/console-graph` of its
+artifact; the manual second uploads `.prove-it/runs/ci-console-graph`. Follow the root `AGENTS.md` validation policy.
 A CI script pass supplies evidence to the independent checker, not a PROVED
 verdict. The PR Evidence names the reviewed receipt and CI artifact.
 
