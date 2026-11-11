@@ -35,15 +35,17 @@ def main():
         git('init', '-q', cwd=root)
         git('remote', 'add', 'origin', f'https://{prefix}{name}.git', cwd=root)
         write(root, 'meada.toml', f'[[peer]]\nrepo = "{prefix}{peer}"\n')
+    # `minimum` has the three letters or digits a pattern's literal part needs; `short`'s two and a
+    # separator are no evidence, so it links to nothing (#711, #782).
     write(infra, 'main.tf', '''resource "aws_sqs_queue" "messages" { name = "${terraform.workspace}-notifications" }
 resource "aws_s3_bucket" "ledger" { bucket = "ledger-${terraform.workspace}" }
-resource "aws_s3_bucket" "minimum" { bucket = "xy-${terraform.workspace}" }
-resource "aws_s3_bucket" "short" { bucket = "a-${terraform.workspace}" }
+resource "aws_s3_bucket" "minimum" { bucket = "xyz-${terraform.workspace}" }
+resource "aws_s3_bucket" "short" { bucket = "xy-${terraform.workspace}" }
 resource "aws_s3_bucket" "inside" { bucket = "led${terraform.workspace}ger" }
 resource "aws_s3_bucket" "both" { bucket = "both-${terraform.workspace}" }
 ''')
     with (app / 'meada.toml').open('a') as stream:
-        for name in ['ledger-dev', 'ledger-prod', 'xy-dev', 'a-dev', 'ledger', 'both-*']:
+        for name in ['ledger-dev', 'ledger-prod', 'xyz-dev', 'xy-dev', 'ledger', 'both-*']:
             stream.write(f'\n[[resource]]\nkind = "s3"\nid = "{name}"\nrole = "read"\n')
     write(app, 'send.py', '''import boto3
 client = boto3.client("sqs")
@@ -78,7 +80,7 @@ def send():
     expected = {('channel::sqs::west-notifications', 'inferred'),
                 ('resource::s3::ledger-dev', 'ambiguous'),
                 ('resource::s3::ledger-prod', 'ambiguous'),
-                ('resource::s3::xy-dev', 'inferred')}
+                ('resource::s3::xyz-dev', 'inferred')}
     assert len(before['provisions']) == 4, before['provisions']
     assert {(l['contract'], l['level']) for l in before['provisions']} == expected
     assert len(before['links']) == 1 and before['links'][0]['level'] == 'inferred'
@@ -92,7 +94,7 @@ def send():
     assert len(after['provisions']) == 3
     assert {(l['contract'], l['level']) for l in after['provisions']} == {
         ('channel::sqs::west-notifications', 'inferred'),
-        ('resource::s3::ledger-dev', 'decided'), ('resource::s3::xy-dev', 'inferred')}
+        ('resource::s3::ledger-dev', 'decided'), ('resource::s3::xyz-dev', 'inferred')}
     assert 'stale_decisions' not in after
     queries = [
         {'tool': 'context', 'arguments': {'symbol': 'aws_s3_bucket.ledger', 'budget': 12000}},

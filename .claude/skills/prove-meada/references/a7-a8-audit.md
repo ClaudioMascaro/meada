@@ -158,9 +158,10 @@ the required source/spec and receipt judgments are retained.
 4. Run `score --auditor DIR --checks DIR --judgment FILE --output FILE`. Judgment JSON names
    `verdict`, `checker`, `receipt`, a verbatim symptom excerpt in `symptom`, a relative raw
    `evidence` file, `script_names_symptom` and
-   `fresh_blind_checker`. An expected check's exit 1 plus evidence naming the symptom can be a
-   script detection, recorded separately. A blind catch requires the actual fresh checker's
-   BROKEN verdict with the named symptom. PROVED is a miss even when scripts detected it;
+   `fresh_blind_checker`. An expected check's exit 1 (or 3: `prove.py`'s answer key rejects)
+   plus evidence naming the symptom can be a script detection, recorded separately. A blind
+   catch requires the actual fresh checker's BROKEN verdict with the named symptom.
+   PROVED is a miss even when scripts detected it;
    script-only or BLOCKED/UNPROVEN judgments leave the round incomplete. Unrelated BROKEN
    evidence is luck. Aggregate reporting revalidates these judgments rather than trusting
    derived catch flags. Ask a fresh adjudicator when

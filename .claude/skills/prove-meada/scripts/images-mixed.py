@@ -26,7 +26,9 @@ EXPECTED_IMAGE_LINKS = {
     (PREFIX+'infra::compose.yaml::services.registry', 'image::*/mixed-proof/worker', '.', 'inferred', PREFIX+'app'),
 }
 EXPECTED_SUBSCRIPTION = (TOPIC, QUEUE, PREFIX+'infra::main.tf::aws_sns_topic_subscription.route', '.')
-EXPECTED_EXECUTION = (PREFIX+'app::compose.yaml::services.parcel', '.', PREFIX+'app', '.', 'exact')
+# ADR 0026 (#755): the app writes no Dockerfile, so the build runs its whole context at `inferred`
+# and the reason says the Dockerfile was not read (#782).
+EXPECTED_EXECUTION = (PREFIX+'app::compose.yaml::services.parcel', '.', PREFIX+'app', '.', 'inferred')
 rows = []
 
 
@@ -171,6 +173,9 @@ def main(args):
           len(executions)==1 and {
               (r['workload'],r['root'],r['repository'],r['path'],r['level']) for r in executions
           }=={EXPECTED_EXECUTION},executions)
+    check('direct execution reason says the Dockerfile was not read',
+          len(executions)==1 and 'Dockerfile' in executions[0].get('reason', '')
+          and 'not read' in executions[0].get('reason', ''), executions)
     head = HEAD
     root = OUT/'work/head'
     client = Stdio(str(head), root/'app', OUT/'persistent.err')

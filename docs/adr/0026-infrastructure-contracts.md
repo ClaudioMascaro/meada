@@ -137,12 +137,12 @@ execution, context, trace, orphan and export seams and the shared 1.3.0 minor re
 ### Patterns
 
 - A name with an unresolved part (ADR 0025) is a pattern. A pattern links at `inferred` to a
-  literal name on the other side when its literal part has at least three characters and its
-  wildcards fall only on segment boundaries (`-`, `_`, `.`, `/`). Several candidates make it
-  `ambiguous`. A pattern never links to a pattern.
-- Both limits are named ceilings: the length of the literal part (3 characters) and the segment
-  boundaries. Each is listed with the known ceilings, carries the marker and is fed an input past
-  it by a unit test.
+  literal name on the other side when its literal part has at least three letters or digits (a
+  separator is no evidence) and its wildcards fall only on segment boundaries (`-`, `_`, `.`,
+  `/`). Several candidates make it `ambiguous`. A pattern never links to a pattern.
+- Both limits are named ceilings: the length of the literal part (3 letters or digits) and the
+  segment boundaries. Each is listed with the known ceilings, carries the marker and is fed an
+  input past it by a unit test.
 
 ### Workloads and the image kind
 
