@@ -16,7 +16,8 @@ prints "checks passed" or the differences found: the verdict is the checker's, n
 the head for `meada status` and `search` with the kind `value` and compares each answer, line by
 line and in order, with the oracle's; the base binary answers the default search and the export.
 Exit 0: no difference, 1: differences for the checker, 2: a run failed (BLOCKED), 3: a budget
-overrun or a nondeterministic index (`run`), which no expected difference explains.
+overrun or a nondeterministic index (`run`), or an answer the oracle or answer key rejects
+(`values`, `iac`), which no expected difference explains.
 """
 
 import argparse
@@ -958,6 +959,37 @@ Resources:
         assert check_iac_context(identity, 'template.yaml', header, changed, complete), changed
     worker['Properties']['Handler'] = {'Ref': 'RuntimeHandler'}
     assert cfn.sam_code_fields('template.yaml', source, worker) == {'build': 'target/lambda/worker'}
+    # A probe's Terraform key: an exact name must be Terraform's, an absent one is no failure.
+    key = terraform_key(HERE / "a7-tf-set")["aws_sqs_queue"]
+    assert key["list"] == ["queue-0-a", "queue-1-b"] and key["tuple"] == [] and len(key) == 12, key
+    hit = lambda root, name: f'a7-tf-set {root}/main.tf:4 aws_sqs_queue.q["0"] (aws_sqs_queue, name "{name}", root {root})'
+    right = "\n".join([hit("list", "queue-1-b"), hit("list", "queue-0-a"), 'x any/main.tf:4 aws_sqs_queue.q (aws_sqs_queue, pattern "queue-*-*", root any)'])
+    assert key_problems(key, right) == ([], [r for r in key if r not in ("list", "tuple", "tuple-pair")])
+    assert key_problems(key, hit("list", "queue-0-b") + "\n" + hit("list", "queue-1-a"))[0]  # #740's wrong names
+    assert key_problems(key, hit("tuple", "queue-0-a"))[0] and key_problems(key, hit("zz", "queue-0-a"))[0]
+    unused = lambda line: line + " (no use in the workspace)"  # a provisioner no code reads, as here
+    assert key_problems(key, "\n".join(map(unused, right.splitlines())))[0] == []
+    assert key_problems(key, unused(hit("list", "queue-0-b")))[0]
+    # A wrong exact name exits 3, never 1: CI records exit 1 as a difference from the base.
+    assert key_failed(key_problems(key, hit("list", "queue-0-b"))[0])
+    assert not key_failed(["differs from base: a symbol's answer must not change", "contract-role extension differs from its base key:\n"])
+    try:
+        import tf_oracle as tf
+    except ImportError:  # python-hcl2, as `iac` needs it: SKILL.md's Gotchas
+        print("selftest: python-hcl2 missing, the IaC oracle's registry names not checked")
+    else:  # #782: a registry source's call is named by the input #671's type table reads
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = {"q": 'source = "terraform-aws-modules/sqs/aws"\n name = "q"',
+                     "b": 'source = "registry.terraform.io/terraform-aws-modules/s3-bucket/aws"\n bucket = "b"',
+                     "fifo": 'source = "terraform-aws-modules/sqs/aws"\n name = "f"\n fifo_queue = true',
+                     "nameless": 'source = "terraform-aws-modules/lambda/aws"\n handler = "h"',
+                     "gated": 'source = "terraform-aws-modules/s3-bucket/aws"\n bucket = "g"\n putin_khuylo = false',
+                     "local": 'source = "./m"\n name = "x"', "other": 'source = "terraform-aws-modules/vpc/aws"\n name = "v"'}
+            subprocess.run(["git", "init", "-q", tmp], check=True)  # the oracle lists files with git
+            Path(tmp, "main.tf").write_text("".join(f'module "{k}" {{\n {v}\n}}\n' for k, v in calls.items()))
+            got = {n["address"]: "unchecked" if n["unchecked"] else n["name"] for n in tf.evaluate(Path(tmp))[0]}
+        assert got == {"module.q": "q", "module.b": "b", "module.fifo": "unchecked", "module.nameless": "unchecked", "module.gated": "unchecked",
+                       "module.local": None, "module.other": None}, got
     print("selftest passed")
 
 
@@ -1219,6 +1251,18 @@ def iac_existing_suffixes(lines, baseline):
     return result
 
 
+# Problems whose key is the base ("must not change", "as base"): a change may move them on purpose,
+# so they exit 1 for the judge, as `run`'s differences do, and so does `iac`'s status line, keyed on
+# the base and the source's NoEcho defaults. A problem against an independent key (the oracle,
+# Terraform's names, a refusal, transport parity) exits 3, as does an oracle line that keeps an
+# existing node's base annotation (`iac_existing_suffixes`), the one part of the oracle the base sets.
+BASE_PROBLEMS = ("differs from base", "contract-role extension differs from its base key")
+
+
+def key_failed(problems):
+    return any(not p.startswith(BASE_PROBLEMS) for p in problems)
+
+
 def check_iac_context(identity, path, want, got, baseline):
     """Judge the independent node header and all existing contract-role extension bytes."""
     problems, got_lines = [], got.splitlines()
@@ -1236,6 +1280,33 @@ def check_iac_context(identity, path, want, got, baseline):
     except ValueError as error:
         problems.append(f"invalid values/contract section: {error}; {got_lines[len(want):][:3]}")
     return problems
+
+
+def terraform_key(src):
+    """A probe's own answer key (`terraform-names.tsv`, #740): type -> root -> the names Terraform
+    gives, empty where Terraform rejects the root. Written from the tool, never from Meada."""
+    key = {}
+    path = src / "terraform-names.tsv"
+    for line in path.read_text().splitlines() if path.exists() else []:
+        if line and not line.startswith("#"):
+            root, kind, names = line.split("\t")
+            key.setdefault(kind, {})[root] = [] if names == "rejected" else names.split()
+    return key
+
+
+def key_problems(key, answer):
+    """An exact name must be the key's (a rejected root has none); a root without one is absent,
+    not wrong (certain or absent). Returns the problems and the absent roots."""
+    got = {}
+    for line in answer.splitlines():
+        m = re.search(r', name ("(?:[^"\\]|\\.)*"), root ([^)]*)\)', line)  # a note may follow
+        if m:
+            got.setdefault(m[2], []).append(json.loads(m[1]))
+    problems = [f"root {root}: exact {names}, a root the key does not list" for root, names in got.items() if root not in key]
+    for root, names in key.items():
+        if root in got and sorted(got[root]) != sorted(names):
+            problems.append(f"root {root}: exact {sorted(got[root])}, Terraform {sorted(names) or 'rejects it'}")
+    return problems, [root for root, names in key.items() if names and root not in got]
 
 
 def iac_context_tail(identity, path, lines):
@@ -1413,7 +1484,7 @@ def cmd_values(a):
     os.environ["LANG"] = "C.UTF-8"  # every answer below is read as English: status, `no matches`, refusals
     run = Path(a.run).resolve()
     run.mkdir(parents=True, exist_ok=True)
-    report, differences, blocked = [], 0, False
+    report, differences, hard, blocked = [], 0, 0, False
     for name in a.repos.split(","):
         src = run / "work" / "src" / name
         if not src.exists():
@@ -1466,6 +1537,7 @@ def cmd_values(a):
         got_status = tuple(int(x) for x in m.groups()) if m else None
         if got_status != (want_status if files else None):
             differences += 1
+            hard += 1
             report.append(f"meada status: DIFFERS: head {m.group(0) if m else 'no config line'}; oracle "
                           f"{'%d read, %d skipped (lockfiles: %d, unreadable: %d); values: %d, redacted: %d' % want_status if files else 'no config line'}")
         else:
@@ -1519,6 +1591,7 @@ def cmd_values(a):
                 listed = ans.rsplit(", not `", 1)[0]  # the refusal echoes the unknown kind (`values`) after the list
                 problems = [] if ans.startswith(("TOOL ERROR", "ERROR")) and "`value`" in listed else [f"not refused or `value` not listed: {ans[:200]}"]
             fails += bool(problems)
+            hard += key_failed(problems)
             lines.append(f"  [{'FAIL' if problems else 'PASS'}] {label} {json.dumps(args, ensure_ascii=False)[:160]} ({secs[i]} s)"
                          + "".join(f"\n      {p}" for p in problems))
         differences += fails
@@ -1527,13 +1600,15 @@ def cmd_values(a):
         if a.http:
             line, failed = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
             differences += failed
+            hard += failed
             report.append("MCP HTTP vs stdio (head):\n" + line)
         report.append("")
-    verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}")
+    verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}"
+                                                     + (f", {hard} the answer key rejects" if hard else ""))
     (run / "values.md").write_text(f"# prove.py values\n\n{verdict}\n\n" + "\n".join(report) + "\n")
     print(verdict)
     print(f"full report: {run}/values.md")
-    sys.exit(2 if blocked else 1 if differences else 0)
+    sys.exit(2 if blocked else 3 if hard else 1 if differences else 0)
 
 
 def cmd_iac(a):
@@ -1547,7 +1622,7 @@ def cmd_iac(a):
     os.environ["LANG"] = "C.UTF-8"
     run = Path(a.run).resolve()
     run.mkdir(parents=True, exist_ok=True)
-    report, differences, blocked = [], 0, False
+    report, differences, hard, blocked = [], 0, 0, False
     footer = re.compile(r"chain: (exact|none) \u00b7 0 hops \u00b7 1 repos \u00b7 \d+ tokens\Z")
     for name in a.repos.split(","):
         src = run / "work" / "src" / name
@@ -1586,7 +1661,8 @@ def cmd_iac(a):
         unsure = sorted({n["root"] for n in nodes if n.get("root_unchecked")})
         names_unchecked = sum(1 for n in nodes if n.get("unchecked"))
         report.append(f"Oracle (#650 names): {names_unchecked} names unchecked, roots left out: {unsure}")
-        drop = lambda text: "".join(l + "\n" for l in text.splitlines() if not any(l.endswith(f"root {r})") for r in unsure))
+        drop = lambda text: "".join(l + "\n" for l in text.splitlines()
+                                    if not any(re.search(rf"root {re.escape(r)}\)( \([^()]*\))?$", l) for r in unsure))
         nodes = [n for n in nodes if n["root"] not in unsure]
         report.append(f"Oracle: {len(nodes)} nodes in {len(roots)} roots ({', '.join(roots[:8])}{', ...' if len(roots) > 8 else ''}), "
                       f"{len(references)} references; unreadable: {[f for f, _ in unreadable]}")
@@ -1630,6 +1706,10 @@ def cmd_iac(a):
         shared = sorted(k for k, c in counts.items() if c > 1)[:2]
         for addr in shared:
             queries.append({"tool": "context", "label": "several", "arguments": {"symbol": addr, "budget": 200000}})
+        # A root the oracle leaves out can still answer to the probe's own Terraform key.
+        for kind, roots_key in terraform_key(src).items():
+            queries.append({"tool": "search", "label": "terraform key", "key": roots_key,
+                            "arguments": {"query": kind, "kind": "iac", "budget": 200000}})
         search("nothing", "zz_prove_no_node", kind="iac", budget=200000)
         for n in sample[:3]:
             search("default search", n["address"], budget=200000)
@@ -1672,6 +1752,9 @@ def cmd_iac(a):
             problems = []
             if label == "NoEcho default":
                 problems = check_value_answer(identity, config_rows, args["query"], got)
+            elif label == "terraform key":
+                problems, absent = key_problems(q["key"], got)
+                label += f" (roots with no exact name: {', '.join(absent) or 'none'})"
             elif q["tool"] == "search" and args.get("kind") == "iac":
                 hits = tf.search_hits(identity, nodes, args["query"])
                 hits = iac_existing_suffixes(hits, b["answers"][i])
@@ -1710,6 +1793,7 @@ def cmd_iac(a):
                 if not (got.startswith(("TOOL ERROR", "ERROR")) and "`iac`" in listed):
                     problems.append(f"not refused or `iac` not listed: {got[:200]}")
             fails += bool(problems)
+            hard += key_failed(problems)
             lines.append(f"  [{'FAIL' if problems else 'PASS'}] {label} {json.dumps(args, ensure_ascii=False)[:150]} ({secs[i]} s)"
                          + "".join("\n      " + p.replace("\n", "\n      ") for p in problems))
         differences += fails
@@ -1717,13 +1801,15 @@ def cmd_iac(a):
         if a.http:
             line, failed = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
             differences += failed
+            hard += failed
             report.append("MCP HTTP vs stdio (head):\n" + line)
         report.append("")
-    verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}")
+    verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}"
+                                                     + (f", {hard} the answer key rejects" if hard else ""))
     (run / "iac.md").write_text(f"# prove.py iac\n\n{verdict}\n\n" + "\n".join(report) + "\n")
     print(verdict)
     print(f"full report: {run}/iac.md")
-    sys.exit(2 if blocked else 1 if differences else 0)
+    sys.exit(2 if blocked else 3 if hard else 1 if differences else 0)
 
 
 def cmd_clean(a):

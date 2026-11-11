@@ -153,7 +153,9 @@ def main():
         ('aws_lambda_function.image', IMAGE), ('aws_lambda_function.unbuilt', MISSING),
         ('aws_ecs_task_definition.task', IMAGE), ('aws_ecs_task_definition.task', MISSING)]}, consumers
     executions = {(x['workload'].split('::')[-1], x['path'], x['root'], x['level']) for x in initial['infra']['executions']}
-    expected_exec = {('aws_lambda_function.code', 'lambda', '.', 'exact'), ('aws_lambda_function.zip', 'worker.zip', '.', 'exact'),
+    # `filename = var.code_dir` goes through a root variable's default, an overridable value
+    # (ADR 0025), so the Lambda runs that code at `inferred` (ADR 0026, Levels; #782).
+    expected_exec = {('aws_lambda_function.code', 'lambda', '.', 'inferred'), ('aws_lambda_function.zip', 'worker.zip', '.', 'exact'),
                      ('SamWorker', 'sam', 'sam.yaml', 'exact'), ('functions.local', 'functions/send.ts', 'serverless.yml', 'exact')}
     assert executions == expected_exec, executions
     expected_links = {(f'{PREFIX}infra::main.tf::{node}', PREFIX + 'app', 'image::' + IMAGE, '.', 'exact')

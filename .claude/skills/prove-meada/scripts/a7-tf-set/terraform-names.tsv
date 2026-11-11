@@ -1,0 +1,13 @@
+# root	type	names Terraform v1.17.1 gives (#740, the maintainer's 2026-11-09 comment), or rejected
+no-override	aws_sqs_queue	queue-a-a queue-b-b
+tolist	aws_sqs_queue	queue-0-a queue-1-b
+list	aws_sqs_queue	queue-0-a queue-1-b
+list-pair	aws_sqs_queue	queue-0-a queue-1-b
+any	aws_sqs_queue	queue-a-a queue-b-b
+set	aws_sqs_queue	queue-a-a queue-b-b
+tuple	aws_sqs_queue	rejected
+tuple-pair	aws_sqs_queue	rejected
+list-own-default	aws_sqs_queue	queue-0-b queue-1-a queue-2-a
+default-only	aws_sqs_queue	queue-a-a queue-b-b
+default-then-list	aws_sqs_queue	queue-0-a queue-1-b
+declared-list	aws_sqs_queue	queue-a-a queue-b-b

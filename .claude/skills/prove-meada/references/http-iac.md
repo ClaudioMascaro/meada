@@ -29,9 +29,10 @@ in the run directory. The loopback listener is stopped in `finally`.
 Existing non-link, non-process export fields and the direct-host link/process compare against
 the baseline binary when supplied. New process hops must match the source-derived links. Existing gateway and A8 peer flows remain their own Scope rows and must run
 when HTTP shared code changes. Full corpus integration belongs in public CI under AGENTS.md;
-a local run of this bounded flow is a scoped proof, not the whole release proof. The public CI
-`test` job runs this flow after its full Rust suite and retains the `http-infrastructure`
-artifact, including raw MCP captures and source-deleted exports.
+a local run of this bounded flow is a scoped proof, not the whole release proof. The Proof
+workflow's `prove-meada` job runs this flow on every CLI run with the merge-base binary
+(`scripts/prove-ci`) and retains it under `flows/http-iac` of its artifact: `binary.json`, raw
+MCP captures and source-deleted exports.
 
 | Method | Surface | Answer key | Catches | Misses | Setup / run |
 |---|---|---|---|---|---|

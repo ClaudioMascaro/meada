@@ -34,7 +34,7 @@ try {
     fs.writeFileSync(path.join(dir, `graph-${builder ? 'builder-' : ''}${view}.txt`), text);
     await page.screenshot({ path: path.join(dir, `graph-${builder ? 'builder-' : ''}${view}.png`), fullPage: true });
     if (violations.length) throw new Error(view + ': accessibility violations ' + violations.join(', '));
-    if (direct && (!text.includes('src') || !text.includes('exact') || !text.includes('services.worker'))) throw new Error('direct execution rows missing');
+    if (direct && (!text.includes('src') || !text.includes('exact') || !text.includes('inferred') || !text.includes('services.worker'))) throw new Error('direct execution rows missing');
     if (!direct && !text.includes('image::ghcr.io/parcel/worker')) throw new Error(view + ': image contract missing');
     if (builder && !text.includes('.github/workflows/publish.yml#')) throw new Error('builder location missing');
     if (view === 'links' && (!text.includes('example.com/image-proof/app') || !text.includes('inferred') || !text.includes('exact'))) {

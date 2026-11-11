@@ -151,6 +151,18 @@ def main():
         audit.score(argparse.Namespace(auditor=str(checker.parent / 'auditor'), checks=str(observed),
                                        judgment=str(judgment), output=str(scored)))
         assert json.loads(scored.read_text())['script_caught']
+        # Only the judge's word that the script named the symptom makes a detection; exit 3
+        # (`prove.py`'s answer key rejecting) counts as exit 1 does. The last case restores the state.
+        for exit_code, names in ((1, False), (3, True), (1, True)):
+            judged['script_names_symptom'] = names
+            audit.save(judgment, judged)
+            observed_checks = json.loads((observed / 'checks.json').read_text())
+            observed_checks['checks'][0]['exit'] = exit_code
+            audit.save(observed / 'checks.json', observed_checks)
+            audit.score(argparse.Namespace(auditor=str(checker.parent / 'auditor'), checks=str(observed),
+                                           judgment=str(judgment), output=str(scored)))
+            assert json.loads(scored.read_text())['script_caught'] == names, (exit_code, names)
+        checks.append({'check': 'a script detection needs the judge to name it, at exit 1 or 3', 'passed': True})
         audit.save(observed / 'final.json', {
             'phase': 'final clean rerun', 'script_result': 'CHECKS_PASSED',
             'baseline_manifest_sha256': baseline_hash,

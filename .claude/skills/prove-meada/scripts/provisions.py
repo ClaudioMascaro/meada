@@ -140,14 +140,15 @@ resource "aws_s3_bucket" "receipts" { bucket = "receipts" }
     path.write_text(original)
     restored = export(binary, infra)
     assert restored['provisions'] == results['infra']['provisions']
-    # ADR 0026: whole-segment patterns, literal evidence, multiple distinct names.
+    # ADR 0026: whole-segment patterns, literal evidence, multiple distinct names. The literal
+    # part needs three letters or digits; a separator is no evidence (#711, #782).
     write(infra, 'patterns/main.tf', '''resource "aws_s3_bucket" "several" { bucket = "receipts-${terraform.workspace}" }
-resource "aws_s3_bucket" "minimum" { bucket = "ab-${terraform.workspace}" }
-resource "aws_s3_bucket" "short" { bucket = "a-${terraform.workspace}" }
+resource "aws_s3_bucket" "minimum" { bucket = "abc-${terraform.workspace}" }
+resource "aws_s3_bucket" "short" { bucket = "ab-${terraform.workspace}" }
 resource "aws_s3_bucket" "inside" { bucket = "rece${terraform.workspace}ipts" }
 ''')
     with (app / 'meada.toml').open('a') as f:
-        for name in ['receipts-prod', 'receipts-stage', 'ab-prod', 'a-prod']:
+        for name in ['receipts-prod', 'receipts-stage', 'abc-prod', 'ab-prod']:
             f.write(f'\n[[resource]]\nkind = "s3"\nid = "{name}"\nrole = "read"\n')
     patterns = export(binary, infra)
     (run / 'patterns.json').write_text(json.dumps(patterns, indent=2))
@@ -156,7 +157,7 @@ resource "aws_s3_bucket" "inside" { bucket = "rece${terraform.workspace}ipts" }
     assert {(l['contract'], l['level']) for l in reached} == {
         ('resource::s3::receipts-prod', 'ambiguous'),
         ('resource::s3::receipts-stage', 'ambiguous'),
-        ('resource::s3::ab-prod', 'inferred'),
+        ('resource::s3::abc-prod', 'inferred'),
     }, reached
     _, pattern_texts, _ = mcp_answers(binary, infra, [
         {'tool': 'context', 'arguments': {'symbol': 'aws_s3_bucket.several', 'budget': 8000}},
@@ -165,7 +166,7 @@ resource "aws_s3_bucket" "inside" { bucket = "rece${terraform.workspace}ipts" }
     ], run / 'patterns.err')
     (run / 'patterns-stdio.json').write_text(json.dumps(pattern_texts, indent=2))
     assert all(n in pattern_texts[0] for n in ['receipts-prod', 'receipts-stage'])
-    assert 'provisions resource::s3::ab-prod [inferred:' in pattern_texts[1]
+    assert 'provisions resource::s3::abc-prod [inferred:' in pattern_texts[1]
     (run / 'provisions.md').write_text('PASS: 8 links in each export, 4 provisioners, exact/declared/inferred levels, '
         'all sides, 6 stdio/HTTP answers equal, same-size edit removes 2 links and restore returns all 8; '
         '3 pattern links, ambiguity by distinct literal names, short/interior patterns refused.\n')

@@ -345,7 +345,11 @@ type, physical name, file, first and last line, root module) and the references,
   trace), as `docs/reference/output-grammar.md` and #649's ADR section give them.
 - A block's last line is found by matching braces outside strings, comments and heredocs.
 - A physical name is the `name` of a resource or data block as `tf_names.py` evaluates it (#650);
-  a module call has none (its `name` is one of its inputs).
+  a module call has none (its `name` is one of its inputs), except a call to one of the six
+  registry sources of #671's type table (capabilities, "Registry modules"), named by the input
+  that names what the upstream module creates (`name`, `bucket` or `function_name`). Such a call
+  without that input, or setting one that changes the name or whether anything is created (a
+  FIFO suffix, a name prefix, a creation control), is unchecked (#782).
 - `tf_names.py` evaluates literals, templates, `var`, `local`, `each`, `count.index`, module
   outputs, lists, conditionals, `&&`, `||`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `!` and the calls
   `upper`, `lower`, `format` (`%s`, `%d`), `join`, `toset`, `length` and `coalesce`. Any other form is unchecked: a name it
