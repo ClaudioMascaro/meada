@@ -383,6 +383,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A `terraform-aws-modules/s3-bucket/aws` call with `putin_khuylo = false`, or with a value
+  Meada cannot resolve, provisions no bucket: upstream creates it only with
+  `create_bucket && putin_khuylo`, and the Lambda module's call is read the same way (#787).
 - A Java AWS SDK request no longer names a table, topic, bucket or queue its builder had before
   the builder changed (#719). A builder changes in place, so a name is `exact` only when every
   mention of the builder is a form the reader follows: a setter, `.build()`. Any other mention

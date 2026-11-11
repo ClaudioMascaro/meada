@@ -28,8 +28,8 @@ NESTING = 64  # #640: a file nesting brackets deeper is unreadable
 # creates in the upstream module's variables.tf and main.tf. A call without that input, or setting
 # one that changes the name or whether anything is created, leaves the name unchecked: the documents
 # give no name to expect then. Those inputs are each source's own below (a FIFO suffix, a generated
-# prefix, a creation control) and, for all six, `putin_khuylo`, on which lambda (#671's table) and
-# upstream s3-bucket gate creation.
+# prefix, a creation control) and, for all six, `putin_khuylo`, on which lambda and s3-bucket gate
+# creation, upstream and in #671's table (s3-bucket since #787).
 REGISTRY_NAMES = {
     "terraform-aws-modules/sqs/aws": ("name", {"fifo_queue", "use_name_prefix", "create"}),
     "terraform-aws-modules/sns/aws": ("name", {"fifo_topic", "use_name_prefix", "create"}),

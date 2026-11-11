@@ -40,6 +40,21 @@ module "disabled_bucket" {
   bucket = "disabled-assets"
   create_bucket = false
 }
+module "gated_bucket" {
+  source = "terraform-aws-modules/s3-bucket/aws"
+  bucket = "gated-assets"
+  putin_khuylo = false
+}
+module "confirmed_bucket" {
+  source = "terraform-aws-modules/s3-bucket/aws"
+  bucket = "confirmed-assets"
+  putin_khuylo = true
+}
+module "unknown_gate_bucket" {
+  source = "terraform-aws-modules/s3-bucket/aws"
+  bucket = "unconfirmed-assets"
+  putin_khuylo = var.unknown_create
+}
 module "unknown_create" {
   source = "terraform-aws-modules/sqs/aws"
   name = "unconfirmed-parcels"
