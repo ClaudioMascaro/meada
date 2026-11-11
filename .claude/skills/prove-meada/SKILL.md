@@ -69,10 +69,11 @@ pages; `tests/golden/` runs `goldens` (`prove.py rebless` against the base commi
 paths run `prove.py deploy`, `scripts/compose-check` and `scripts/helm-check`. A driver's exit 1
 fails its step, except `prove.py values` and `iac`, whose exit 1 is a difference from the base:
 recorded as evidence, as `cli-mcp`'s is (an answer their key rejects exits 3 and fails it). The
-flows run after the capture's other steps, each under `timeout` for at most 20 minutes, and none
-past 45 minutes into the capture, which keeps the job inside its 60 unless the other steps alone
-take 45: either limit leaves the flow BLOCKED. A row says where CI differs, and names what CI does
-not run and what the reviewer does instead.
+CLI flows run after `cli-mcp`, the console's after its API checks and before its pages. Every step
+but the cleanups runs under `timeout` with what is left of a 45-minute capture, a flow for at most
+20 minutes, so the receipt is written inside the job's 60: a step that times out, or that would
+start with under a minute left, is BLOCKED. A row says where CI differs, and names what CI does not
+run and what the reviewer does instead.
 
 | Changed path | Shared? | Reaches | Flows (corpus entries, `scripts/corpus.tsv`) |
 |---|---|---|---|

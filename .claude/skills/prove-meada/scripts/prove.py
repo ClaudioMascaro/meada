@@ -1235,8 +1235,10 @@ def iac_existing_suffixes(lines, baseline):
 
 
 # Problems whose key is the base ("must not change", "as base"): a change may move them on purpose,
-# so they exit 1 for the judge, as `run`'s differences do. A problem against an independent key (the
-# oracle, Terraform's names, a refusal, transport parity) exits 3.
+# so they exit 1 for the judge, as `run`'s differences do, and so does `iac`'s status line, keyed on
+# the base and the source's NoEcho defaults. A problem against an independent key (the oracle,
+# Terraform's names, a refusal, transport parity) exits 3, as does an oracle line that keeps an
+# existing node's base annotation (`iac_existing_suffixes`), the one part of the oracle the base sets.
 BASE_PROBLEMS = ("differs from base", "contract-role extension differs from its base key")
 
 
