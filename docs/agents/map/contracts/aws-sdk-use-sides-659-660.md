@@ -25,7 +25,9 @@
   only when the function that declares the name mentions it twice, where it is declared and where
   the path reads it (`lang::mentioned` fills `Facts::mentioned` for the locals Go keeps as
   constants and the ones C#'s `bound` keeps); a parameter, a field and a package variable are
-  never followed. A Java builder held in a local or
+  never followed. The rows of a transaction run inside `Code::apart` and trace their clients
+  with an `Origins` of their own, so what they fold is charged to a second per-file budget and
+  the other calls of the file keep theirs. A Java builder held in a local or
   a `final` field that a call outside the request's call sets again (a step setting a member of
   the name's path, before or after the request, anywhere in a chain off the builder or off a
   local holding it: `b.message(..).topicArn(..)`, `var e = b.message(..); e.topicArn(..)`,
@@ -57,6 +59,9 @@
   transaction's path held in a name (`Arrays.asList`, an array initializer, `new`) changes in
   place too: `Walk::replaced` follows it only when its method mentions the name twice, and each
   alias on the way as well; one in a field is never followed, and `List.of` cannot change.
+  `Walk::passed` leaves unresolved the one argument of `transactItems(..)` that is a name with
+  no value the reader holds (a parameter, itself or through local aliases): the wrapper and
+  each of its callers may change such a list, and no mention count sees both.
   A chain with `applyMutation` anywhere in it hands its builder to caller code, a file that
   reads a field by name (`getDeclaredField`) or calls a method on a field builder's name from
   another file may change it, and a chain that starts at a type another type of its file or

@@ -14,8 +14,8 @@ All notable changes to Meada are recorded here. The format follows
   and environment rules of the other names. A list or an array of entries held in a name (in
   Go and C#, a request, an item or an entry too) gives its tables only when its function
   mentions the name twice, where it is declared and where the request reads it: any other
-  mention may change it. Every Java, Go and .NET AWS operation now has a test. Included in the
-  1.4.0 minor release.
+  mention may change it, and one that comes in a parameter gives none. Every Java, Go and .NET
+  AWS operation now has a test. Included in the 1.4.0 minor release.
 - Curated operators and private IaC mappings (#671): 43 explicit Strimzi, RabbitMQ Queue,
   ACK, Config Connector and Crossplane AWS/GCP/Azure types provision existing contracts.
   RabbitMQ Exchange/Binding topology routes real publishes to queues without inventing an
