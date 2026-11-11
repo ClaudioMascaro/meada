@@ -208,9 +208,7 @@ pub(crate) fn extract<'a>(
                     &written,
                     &builders,
                 ) || (language != Language::Java
-                    // A path of three members: a transaction's, new with this rule (#719). The
-                    // shorter paths keep the rule `changed_request` gives them.
-                    && operation.field.matches('.').count() == 2
+                    && transaction(operation.field)
                     && held_changed(code, path, index, operation.field, language, {
                         counts.get_or_init(|| {
                             (code.mentioned(path).iter())
@@ -299,6 +297,13 @@ fn setter(selector: &str) -> impl Fn(&str) -> bool + '_ {
     }
 }
 
+/// Whether the path is a transaction's: three members. Its sides are new with the rule that
+/// follows a request, a list, an item or an entry held in a name by the mentions of that name
+/// (#719); the shorter paths keep the rule they had.
+fn transaction(selector: &str) -> bool {
+    selector.matches('.').count() == 2
+}
+
 /// Whether a wrapper's caller passes the request on as a value that changed (Java): the request
 /// the wrapper reads is what its callers hand it, and a call judged where it is made sees only
 /// the parameter. Each argument of each call climbed is judged in the scope of that call.
@@ -308,7 +313,6 @@ fn passed_changed<'a>(
     selector: &str,
     builders: &java::Builders<'a>,
 ) -> bool {
-    let setter = setter(selector);
     frames.iter().any(|frame| {
         (code.call(frame.path, frame.index)).is_some_and(|call| {
             (call.args.iter()).any(|arg| {
@@ -318,7 +322,7 @@ fn passed_changed<'a>(
                     &call.scope,
                     arg,
                     &call.range,
-                    &setter,
+                    selector,
                     builders,
                 )
             })
@@ -345,8 +349,7 @@ fn changed_request<'a>(
         Language::Csharp => call.keyword("request").or_else(|| call.args.first()),
         Language::Java => {
             return (call.args.first()).is_some_and(|r| {
-                let setter = setter(selector);
-                java::changed(code, path, &call.scope, r, &call.range, &setter, builders)
+                java::changed(code, path, &call.scope, r, &call.range, selector, builders)
             });
         }
     };

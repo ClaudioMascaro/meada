@@ -11,10 +11,11 @@ All notable changes to Meada are recorded here. The format follows
 - DynamoDB transactions in Java, Go and C# (#719): `TransactWriteItems` and `TransactGetItems`
   give sides as they do in JavaScript and Python. Each `Put`, `Update` and `Delete` entry
   writes its own table, each `ConditionCheck` and `Get` entry reads its own, with the literal
-  and environment rules of the other names. In Go and C#, a request, a list, an item or an
-  entry held in a name gives its tables only when its function mentions the name twice, where
-  it is declared and where the request reads it: any other mention may change it. Every Java,
-  Go and .NET AWS operation now has a test. Included in the 1.4.0 minor release.
+  and environment rules of the other names. A list or an array of entries held in a name (in
+  Go and C#, a request, an item or an entry too) gives its tables only when its function
+  mentions the name twice, where it is declared and where the request reads it: any other
+  mention may change it. Every Java, Go and .NET AWS operation now has a test. Included in the
+  1.4.0 minor release.
 - Curated operators and private IaC mappings (#671): 43 explicit Strimzi, RabbitMQ Queue,
   ACK, Config Connector and Crossplane AWS/GCP/Azure types provision existing contracts.
   RabbitMQ Exchange/Binding topology routes real publishes to queues without inventing an
@@ -395,9 +396,7 @@ All notable changes to Meada are recorded here. The format follows
   caller code by `applyMutation` and a request type another type or an import shadows name no
   table either (#719).
 - A Java AWS SDK request whose builder is set again in a loop around the one its value is built
-  in, or inside the request's own expression, and one whose entries are in a list or an array
-  held in a name its method mentions again (`Arrays.asList`, an array, a `new` collection) name
-  no table either (#719).
+  in, or inside the request's own expression, names no table either (#719).
 - Terraform static evaluation charges the template text `hcl-rs` parses again at each
   evaluation in a `for`, not only the bytes an expression makes: a template in a `for` over
   thousands of elements is unresolved (`*`) before it runs, where one 24 KB root took seconds

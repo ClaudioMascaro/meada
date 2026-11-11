@@ -6,6 +6,9 @@ import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
+import software.amazon.awssdk.services.eventbridge.EventBridgeClient;
+import software.amazon.awssdk.services.eventbridge.model.PutEventsRequest;
+import software.amazon.awssdk.services.eventbridge.model.PutEventsRequestEntry;
 
 // Every way a builder or a built value reaches a call. A name is exact only when each mention of
 // its builder is a form the reader follows; the others name no table.
@@ -300,9 +303,9 @@ class Forms {
         db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p).build()).build());
     }
 
-    // A list or an array changes in place through any name that holds it: one is followed only
-    // when its method writes the name twice, where it is declared and where the request reads it.
-    // `List.of` cannot change.
+    // A list or an array changes in place through any name that holds it: on a transaction's
+    // path one is followed only when its method writes the name twice, where it is declared and
+    // where the request reads it. `List.of` cannot change.
     void listPlain() {
         var db = DynamoDbClient.create();
         var items = Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("list-plain").build()).build());
@@ -342,5 +345,13 @@ class Forms {
         TransactWriteItem[] items = { TransactWriteItem.builder().put(Put.builder().tableName("array-set-old").build()).build() };
         items[0] = TransactWriteItem.builder().put(Put.builder().tableName("array-set-new").build()).build();
         db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+
+    // A shorter path keeps the name it had: its lists are not judged.
+    void listOther() {
+        var events = EventBridgeClient.create();
+        var entries = Arrays.asList(PutEventsRequestEntry.builder().eventBusName("list-other").build());
+        System.out.println(entries);
+        events.putEvents(PutEventsRequest.builder().entries(entries).build());
     }
 }

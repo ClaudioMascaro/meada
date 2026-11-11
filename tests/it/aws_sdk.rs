@@ -1186,9 +1186,9 @@ fn java_named_builds_chained_past_the_evaluation_depth_stay_unresolved() {
 /// hands to caller code, and a request type that another type of the file, the package or an
 /// import shadows. A builder set later in a loop around the one its value is made in, in a loop
 /// inside a lambda, or declared in a `for` clause is set before the next turn builds; a setter
-/// inside the request's own expression runs before its `build()`. A list or an array on the
-/// name's path changes in place, so one held in a name is followed only when its method writes
-/// that name twice (`List.of` cannot change).
+/// inside the request's own expression runs before its `build()`. A list or an array on a
+/// transaction's path changes in place, so one held in a name is followed only when its method
+/// writes that name twice (`List.of` cannot change); a shorter path keeps the name it had.
 #[test]
 fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     let repo = fixture_repo("aws_sdk_builder_forms", "aws-sdk-builders", None);
@@ -1250,6 +1250,7 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
             "lambdaStored writer resource::dynamodb",
             "listAlias writer resource::dynamodb",
             "listImmutable writer resource::dynamodb::list-of",
+            "listOther writer channel::eventbridge::list-other",
             "listPlain writer resource::dynamodb::list-plain",
             "listSet writer resource::dynamodb",
             "localClass writer resource::dynamodb",

@@ -53,10 +53,10 @@
   such as a parameter its helper assigns, names nothing; `this.name` is the field whatever
   local hides the bare name; a `final` field builder is judged by every mention of its name in
   the file, whatever their order; and a helper's request is judged where each caller passes it
-  (`passed_changed`, every argument of every call climbed). A list or an array on the name's
-  path held in a name (`Arrays.asList`, an array initializer, `new`) changes in place too:
-  `Walk::replaced` follows it only when its method writes the name twice, and each alias on the
-  way as well; one in a field is never followed, and `List.of` cannot change.
+  (`passed_changed`, every argument of every call climbed). A list or an array on a
+  transaction's path held in a name (`Arrays.asList`, an array initializer, `new`) changes in
+  place too: `Walk::replaced` follows it only when its method writes the name twice, and each
+  alias on the way as well; one in a field is never followed, and `List.of` cannot change.
   A chain with `applyMutation` anywhere in it hands its builder to caller code, a file that
   reads a field by name (`getDeclaredField`) or calls a method on a field builder's name from
   another file may change it, and a chain that starts at a type another type of its file or

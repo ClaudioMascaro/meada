@@ -524,7 +524,7 @@ fn handed<'v>(value: &'v Value, to: &mut dyn FnMut(&'v str)) {
 }
 
 /// Whether the request `value`, made by the call at `range`, reads a builder changed by a mention
-/// the reader cannot follow, or by a setter of a member `setter` accepts, outside `range`. A
+/// the reader cannot follow, or by a setter of a member of the path `selector`, outside `range`. A
 /// named value (`Put p = pb.build()`) is what its declaration built, so only what happened to its
 /// builder before that `.build()` counts: a value built first is an immutable copy.
 pub(super) fn changed<'a>(
@@ -533,15 +533,17 @@ pub(super) fn changed<'a>(
     scope: &'a str,
     value: &'a Value,
     range: &Range<usize>,
-    setter: &dyn Fn(&str) -> bool,
+    selector: &str,
     builders: &Builders<'a>,
 ) -> bool {
+    let setter = super::setter(selector);
     let mut walk = Walk {
         code,
         builders,
         path,
         scope,
-        setter,
+        setter: &setter,
+        lists: super::transaction(selector),
         uses: builders.uses(code, path),
         seen: std::collections::HashSet::new(),
         depth: 0,
@@ -564,6 +566,8 @@ struct Walk<'a, 'c> {
     path: &'a str,
     scope: &'a str,
     setter: &'c dyn Fn(&str) -> bool,
+    /// Whether a list held in a name is judged (`replaced`): on a transaction's path.
+    lists: bool,
     uses: std::rc::Rc<Uses<'a>>,
     /// Each named value judged, with how it was reached (`on`, `shared`).
     seen: std::collections::HashSet<(*const (), bool, bool)>,
@@ -619,17 +623,17 @@ impl<'a> Walk<'a, '_> {
     }
 
     /// Whether a list or an array held in a name may have changed. Either changes in place
-    /// through any name that holds it (`items.set(0, e)`, `items[0] = e`), so one on the name's
-    /// path is followed only when its method writes the name twice, where it is declared and
-    /// where this value reads it, and the same holds for each other name of it on the way. A
-    /// field is written by any method.
+    /// through any name that holds it (`items.set(0, e)`, `items[0] = e`), so one on a
+    /// transaction's path is followed only when its method writes the name twice, where it is
+    /// declared and where this value reads it, and the same holds for each other name of it on
+    /// the way. A field is written by any method.
     fn replaced(&self, value: &Value, sole: bool) -> bool {
         let list = match value {
             Value::List(_) | Value::New(..) => true,
             Value::Call(made) => crate::resolve::method(&made.callee) == "asList",
             _ => false,
         };
-        self.on && list && !(sole && !self.shared)
+        self.lists && self.on && list && !(sole && !self.shared)
     }
 
     /// Whether the built value in the local or `final` field `name` was made from a changed
