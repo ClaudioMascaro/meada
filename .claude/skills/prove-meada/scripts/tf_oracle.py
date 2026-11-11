@@ -26,9 +26,10 @@ NESTING = 64  # #640: a file nesting brackets deeper is unreadable
 # #782: the six registry sources #671's type table reads (docs/site/en/capabilities.md, "Registry
 # modules"; an optional `registry.terraform.io/` prefix), each with the input that names what it
 # creates in the upstream module's variables.tf and main.tf. A call without that input, or setting
-# one that changes the name or whether anything is created (a FIFO suffix, a generated prefix, a
-# creation control, `putin_khuylo` where the upstream module gates creation on it), leaves the name
-# unchecked: the documents give no name to expect then.
+# one that changes the name or whether anything is created, leaves the name unchecked: the documents
+# give no name to expect then. Those inputs are each source's own below (a FIFO suffix, a generated
+# prefix, a creation control) and, for all six, `putin_khuylo`, on which lambda (#671's table) and
+# upstream s3-bucket gate creation.
 REGISTRY_NAMES = {
     "terraform-aws-modules/sqs/aws": ("name", {"fifo_queue", "use_name_prefix", "create"}),
     "terraform-aws-modules/sns/aws": ("name", {"fifo_topic", "use_name_prefix", "create"}),
