@@ -467,6 +467,12 @@ fn registry_modules_create_the_named_resources_and_workloads_and_honor_disabled_
                 "example.com/custom-671-registry/infra::main.tf::module.table".into(),
                 ".".into()
             ),
+            // `putin_khuylo` gates the bucket upstream: `false` or unknown leaves none (#787).
+            (
+                "resource::s3::confirmed-assets".into(),
+                "example.com/custom-671-registry/infra::main.tf::module.confirmed_bucket".into(),
+                ".".into()
+            ),
             (
                 "resource::s3::registered-assets".into(),
                 "example.com/custom-671-registry/infra::main.tf::module.bucket".into(),

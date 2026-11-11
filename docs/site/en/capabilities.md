@@ -811,7 +811,7 @@ Only these six sources are recognized; the optional `registry.terraform.io/` pre
 | --- | --- |
 | `terraform-aws-modules/sqs/aws` | `name`, `fifo_queue`, `use_name_prefix`; `create` |
 | `terraform-aws-modules/sns/aws` | `name`, `fifo_topic`, `use_name_prefix`; `create` |
-| `terraform-aws-modules/s3-bucket/aws` | `bucket`; `create`, `create_bucket` |
+| `terraform-aws-modules/s3-bucket/aws` | `bucket`; `create`, `create_bucket`, `putin_khuylo` |
 | `terraform-aws-modules/dynamodb-table/aws` | `name`; `create`, `create_table` |
 | `terraform-aws-modules/lambda/aws` | `function_name`, `package_type`, `image_uri`, `environment_variables`, `source_path`, `local_existing_package`, `handler`; `create`, `create_function`, `create_package`, `create_layer`, `putin_khuylo` |
 | `terraform-aws-modules/ecs/aws//modules/service` | `name`, `container_definitions` (`name`, `create`, `image`, `environment`, `secrets`); `create`, `create_service`, `create_task_definition` |

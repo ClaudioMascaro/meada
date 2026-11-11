@@ -813,7 +813,7 @@ prefix = "use_name_prefix"
 source = "terraform-aws-modules/s3-bucket/aws"
 entry = "terraform:aws_s3_bucket"
 input = "bucket"
-create = ["create", "create_bucket"]
+create = ["create", "create_bucket", "putin_khuylo"]
 
 [[module]]
 source = "terraform-aws-modules/dynamodb-table/aws"

@@ -6,6 +6,12 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A `terraform-aws-modules/s3-bucket/aws` call with `putin_khuylo = false`, or with a value
+  Meada cannot resolve, provisions no bucket: upstream creates it only with
+  `create_bucket && putin_khuylo`, and the Lambda module's call is read the same way (#787).
+
 ## [1.3.0] - 2026-11-11
 
 A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md):
