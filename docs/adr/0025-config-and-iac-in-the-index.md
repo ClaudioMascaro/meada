@@ -197,7 +197,8 @@ IaC written in general-purpose code (CDK, Pulumi) is out.
 
 ### Static evaluation of Terraform names (#650)
 
-- **What is evaluated.** A node's physical name (its `name` argument; a module call has none) and
+- **What is evaluated.** A node's physical name (its `name` argument; a module call has none
+  unless the type table names the input that holds it, as for #671's registry sources) and
   the `count` and `for_each` of every block and module call, in the instance they belong to,
   with `hcl-rs`'s evaluator and the functions above. Each name an expression reads is bound to
   its value first: `var.<name>`, `local.<name>`, `module.<call>.<output>` (per instance of the
