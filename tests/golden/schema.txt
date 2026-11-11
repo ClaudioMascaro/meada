@@ -66,7 +66,7 @@ CREATE TABLE iac_nodes (
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
     subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
-    ingress TEXT NOT NULL, routes TEXT NOT NULL
+    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3461,6 +3461,7 @@ Output {
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: None,
             handler: None,
             events: [],
@@ -3487,6 +3488,7 @@ Output {
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: None,
             handler: None,
             events: [],
@@ -3536,6 +3538,7 @@ Output {
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: None,
             handler: None,
             events: [],
@@ -3562,6 +3565,7 @@ Output {
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: None,
             handler: None,
             events: [],
@@ -3636,6 +3640,7 @@ Output {
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: Some(
                 "crossplane managed resource",
             ),
@@ -3680,6 +3685,7 @@ Output {
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: Some(
                 "crossplane composite resource definition",
             ),
@@ -3708,6 +3714,7 @@ Output {
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: Some(
                 "crossplane composition",
             ),
@@ -3736,6 +3743,7 @@ Output {
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: Some(
                 "crossplane claim",
             ),
@@ -3764,6 +3772,7 @@ Output {
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: Some(
                 "crossplane composed resource",
             ),
@@ -3806,6 +3815,7 @@ Output {
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: Some(
                 "crossplane composed resource",
             ),
@@ -3899,6 +3909,7 @@ sample.cloudformation.yaml
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: None,
             handler: None,
             events: [],
@@ -3932,6 +3943,7 @@ sample.cloudformation.yaml
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: None,
             handler: None,
             events: [],
@@ -4039,6 +4051,7 @@ sample.serverless.yml
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: None,
             handler: Some(
                 Resolved {
@@ -4098,6 +4111,7 @@ sample.serverless.yml
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: None,
             handler: None,
             events: [],
@@ -4140,6 +4154,7 @@ sample.provision.tf
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: None,
             handler: None,
             events: [],
@@ -4166,6 +4181,7 @@ sample.provision.tf
             image: None,
             build: None,
             build_image: false,
+            dockerfile: None,
             role: None,
             handler: None,
             events: [],
@@ -4179,6 +4195,131 @@ sample.provision.tf
     ],
     [],
 )
+
+sample.compose.yaml
+(
+    [
+        Node {
+            address: "services.api",
+            root: ".",
+            ty: "service",
+            name: None,
+            pattern: false,
+            overridable: [],
+            path: "compose.yaml",
+            line: 2,
+            end_line: 5,
+            block: "services.api",
+            image: None,
+            build: Some(
+                Resolved {
+                    text: ".",
+                    overridable: false,
+                },
+            ),
+            build_image: true,
+            dockerfile: Some(
+                Dockerfile {
+                    text: "Dockerfile.sample",
+                    overridable: false,
+                    inline: false,
+                },
+            ),
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+        Node {
+            address: "services.inline",
+            root: ".",
+            ty: "service",
+            name: None,
+            pattern: false,
+            overridable: [],
+            path: "compose.yaml",
+            line: 6,
+            end_line: 10,
+            block: "services.inline",
+            image: None,
+            build: Some(
+                Resolved {
+                    text: "sub",
+                    overridable: false,
+                },
+            ),
+            build_image: true,
+            dockerfile: Some(
+                Dockerfile {
+                    text: "FROM scratch\nCOPY src /app\n",
+                    overridable: false,
+                    inline: true,
+                },
+            ),
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+        },
+    ],
+    [
+        Reference {
+            root: ".",
+            source: "services.api",
+            target: "services.inline",
+            via: Some(
+                "networks.default",
+            ),
+        },
+        Reference {
+            root: ".",
+            source: "services.inline",
+            target: "services.api",
+            via: Some(
+                "networks.default",
+            ),
+        },
+    ],
+)
+{
+  "alert": {
+    "forwardings": [],
+    "routes": [],
+    "rules": [],
+    "truncated": false
+  },
+  "http": [],
+  "image": {
+    "builders": [],
+    "code": [
+      {
+        "address": "services.api",
+        "inferred": false,
+        "path": "sample.py",
+        "reason": "Compose build compose.yaml#services.api.build; Dockerfile Dockerfile.sample",
+        "root": "."
+      },
+      {
+        "address": "services.api",
+        "inferred": false,
+        "path": "sample.ts",
+        "reason": "Compose build compose.yaml#services.api.build; Dockerfile Dockerfile.sample",
+        "root": "."
+      }
+    ],
+    "runners": []
+  }
+}
 
 sample.alert.yaml
 {
@@ -4288,7 +4429,6 @@ sample.alert.yaml
   "image": {
     "builders": [],
     "code": [],
-    "paths": [],
     "runners": []
   }
 }
@@ -4388,7 +4528,6 @@ sample.incident.tf
   "image": {
     "builders": [],
     "code": [],
-    "paths": [],
     "runners": []
   }
 }

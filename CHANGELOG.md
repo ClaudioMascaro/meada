@@ -127,10 +127,13 @@ All notable changes to Meada are recorded here. The format follows
 - Image contracts (#662): normalized `image::<registry>/<repository>` names connect builders
   in GitHub Actions, Compose, Skaffold, ko and Jib to Kubernetes, Compose and Helm runners,
   including Kustomize image overrides. Context shows builders, trace crosses into code and
-  back, and status reports image orphans only in scopes with both roles. Compose build paths
-  run same-repository code directly at `exact`, without following symlinks. Export format 1
-  adds optional builder `at` locations and direct `executions`; the console graph displays
-  both. Release level: minor for meada and meada-core, included in synchronized 1.4.0.
+  back, and status reports image orphans only in scopes with both roles. A Compose build runs
+  same-repository code directly at `exact`, without following symlinks: the paths its Dockerfile
+  takes from the context (`COPY`, `ADD` and `RUN` bind mounts, in every stage), not the whole of
+  it, and `inferred` when it cannot read one; editing the Dockerfile makes the index stale and an
+  upward `trace` writes each workload once (#744). Export format 1 adds optional builder `at`
+  locations and direct `executions`; the console graph displays both. Release level: minor for
+  meada and meada-core, included in synchronized 1.4.0.
 
 - AWS infrastructure contracts: Terraform/OpenTofu SNS, EventBridge and Kinesis channels;
   DynamoDB, RDS instances and clusters, ElastiCache clusters and replication groups, SSM and

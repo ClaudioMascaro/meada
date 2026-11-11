@@ -29,6 +29,18 @@ and code back to workloads. Same-repository direct paths are exact without an im
 appear in the optional `executions` export array; a direct execution replaces a workload's
 image side in its own root only (`image::runs_locally`). Paths are normalized inside the root and
 cross no symlink; a changed path is rechecked even when the Compose file did not change.
+
+A Compose build is not its whole context (#744, ADR 0026): `image/dockerfile.rs` reads the
+Dockerfile the node names (`Node::dockerfile`, with the build's override merge) while the
+configuration is summarized, and gives one execution per path it takes from the context
+(`COPY`/`ADD` sources and `RUN --mount=type=bind` sources, in every stage; a wildcard is matched
+against the files on disk, listing each directory through `contract::list`). A workload and root
+may therefore have several rows. A Dockerfile it cannot read gives the whole context at
+`inferred`, the reason saying why; one that takes nothing gives no execution, so its image side
+links as any runner's does. The Dockerfile's bytes and the listings are recorded as
+`contract::Seen::reads` fingerprints in the summary's `inputs`, so editing, adding or removing them
+makes the index stale. The shared trace writes each workload and root's `runs code` line once per
+answer (`Walk::executed`).
 `scope_status` and `side_note` implement the two-role orphan rule in the visible workspace; an
 unresolved image name (`image::*`, a `docker/metadata-action` output) is neither role nor orphan,
 so a scope whose only builder or runner it is reports no image orphan at all.

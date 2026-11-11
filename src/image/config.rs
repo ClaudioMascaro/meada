@@ -14,7 +14,6 @@ use std::path::Path;
 pub(super) struct Summary {
     pub builders: Vec<Builder>,
     pub runners: Vec<Runner>,
-    pub paths: Vec<String>,
     #[serde(default)]
     pub code: Vec<super::code::Code>,
     #[serde(skip)]
@@ -69,27 +68,6 @@ fn builder(out: &mut Summary, image: &str, at: &str, inferred: bool) {
     }
 }
 
-/// Configuration-derived code paths must exist and traverse no symbolic link. The lexical
-/// normalization is the same as the Compose reader's: `..` may stay inside the repository.
-fn safe(root: &Path, path: &str) -> bool {
-    use crate::contract::{Probe, probe};
-    let (mut at, mut last) = (String::new(), Probe::Dir);
-    for step in path.split('/').filter(|p| !p.is_empty() && *p != ".") {
-        if matches!(step, "..") || step.contains(['\\', ':']) {
-            return false;
-        }
-        if !at.is_empty() {
-            at.push('/');
-        }
-        at.push_str(step);
-        last = probe(root, &at);
-        if matches!(last, Probe::Missing | Probe::Link) {
-            return false;
-        }
-    }
-    last == Probe::Dir
-}
-
 pub(super) fn read(
     path: &str,
     src: &[u8],
@@ -101,7 +79,12 @@ pub(super) fn read(
         return out;
     }
     for node in facts.nodes {
-        if let Some(code) = super::code::checked(root, node, IMAGE_STORED_MAX - out.bytes) {
+        let room = IMAGE_STORED_MAX - out.bytes;
+        let codes = match super::code::checked(root, node, room) {
+            Some(code) => vec![code],
+            None => super::dockerfile::executions(root, node, room),
+        };
+        for code in codes {
             out.bytes += code.address.len() + code.root.len() + code.path.len() + code.reason.len();
             out.code.push(code);
         }
@@ -135,33 +118,6 @@ pub(super) fn read(
     let name = path.rsplit('/').next().unwrap_or(path);
     if path.starts_with(".github/workflows/") {
         workflow(path, doc, &mut out);
-    }
-    if crate::iac::compose::is_file(path) {
-        for service in doc
-            .get("services")
-            .and_then(Value::as_object)
-            .into_iter()
-            .flatten()
-            .map(|(_, v)| v)
-        {
-            if let Some(build) = service.get("build") {
-                let written = build
-                    .as_str()
-                    .or_else(|| build.get("context").and_then(Value::as_str))
-                    .unwrap_or(".");
-                let expanded = crate::iac::compose::expand(written);
-                if !expanded.text.contains(['$', ':', '\\'])
-                    && !crate::iac::compose::remote(&expanded.text)
-                    && !expanded.text.starts_with(['/', '~'])
-                    && let Some(path) =
-                        crate::iac::joined(config_values::parent(path), &expanded.text)
-                    && safe(root, &path)
-                {
-                    out.paths
-                        .push(if path.is_empty() { ".".into() } else { path });
-                }
-            }
-        }
     }
     if crate::config_values::helm_values(name)
         && let Some(written) = doc.get("image")

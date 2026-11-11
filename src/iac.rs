@@ -164,6 +164,15 @@ pub(crate) struct Resolved {
     pub overridable: bool,
 }
 
+/// The Dockerfile a Compose `build` names (#744): its path relative to the build context, or, with
+/// `inline`, its text (`dockerfile_inline`), after the variables were expanded as for `Resolved`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Dockerfile {
+    pub text: String,
+    pub overridable: bool,
+    pub inline: bool,
+}
+
 /// An evaluated container image and the values a deployer can override that it used.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct WorkloadImage {
@@ -298,6 +307,8 @@ pub(crate) struct Node {
     pub build: Option<Resolved>,
     /// Whether Compose configures a build, including remote contexts.
     pub build_image: bool,
+    /// The Dockerfile a Compose build names (#744); `None` is `Dockerfile` in the context.
+    pub dockerfile: Option<Dockerfile>,
     /// What a Kubernetes object is to Crossplane (#655): `crossplane claim`, `crossplane
     /// composition` and the like; `None` for any other node.
     pub role: Option<String>,
@@ -323,6 +334,7 @@ impl Node {
                 .map(environment::Entry::size)
                 .sum::<usize>()
             + self.build.as_ref().map_or(0, |p| p.text.len())
+            + self.dockerfile.as_ref().map_or(0, |d| d.text.len())
             + self.handler.as_ref().map_or(0, |p| p.text.len())
             + self.provisioned.as_ref().map_or(0, Projection::size)
             + self
@@ -2087,6 +2099,7 @@ impl<'m> Eval<'m> {
                     image: None,
                     build: None,
                     build_image: false,
+                    dockerfile: None,
                     role: None,
                     handler: None,
                     events: Vec::new(),
@@ -2931,7 +2944,7 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
@@ -2969,6 +2982,10 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
                 .transpose()?,
             serde_json::to_string(&n.ingress)?,
             serde_json::to_string(&n.routes)?,
+            n.dockerfile
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()?,
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -2981,7 +2998,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
                        block, image, image_overridable, build, build_overridable, role, \
-                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes";
+                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes, dockerfile";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -3009,6 +3026,9 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         image: resolved(r, 10)?,
         build: resolved(r, 12)?,
         build_image: r.get(18)?,
+        dockerfile: r
+            .get::<_, Option<String>>(25)?
+            .and_then(|s| serde_json::from_str(&s).ok()),
         role: r.get(14)?,
         handler: resolved(r, 15)?,
         events: serde_json::from_str(&r.get::<_, String>(17)?).unwrap_or_default(),

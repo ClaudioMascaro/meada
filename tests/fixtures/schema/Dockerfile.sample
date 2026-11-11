@@ -1,0 +1,3 @@
+FROM scratch
+COPY sample.py /app/
+RUN --mount=type=bind,source=sample.ts,target=/x true

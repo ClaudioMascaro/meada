@@ -197,6 +197,7 @@ impl<'a> Graph<'a> {
             rows: Vec::new(),
             ancestors: Vec::new(),
             expanded: HashSet::new(),
+            executed: HashSet::new(),
         };
         match start {
             Start::Uncommitted => {
@@ -252,6 +253,7 @@ impl<'a> Graph<'a> {
             rows: Vec::new(),
             ancestors: Vec::new(),
             expanded: HashSet::new(),
+            executed: HashSet::new(),
         };
         // The borrowed link endpoints carry the same identity as the IaC node. Entering
         // it uses the ordinary kind-directed traversal; omit the already-rendered root.
@@ -771,6 +773,9 @@ struct Walk<'g, 'a> {
     /// Nodes already followed once; the chain shows them again but does not repeat what
     /// follows them.
     expanded: HashSet<&'a str>,
+    /// The workloads and roots whose `runs code` line the answer wrote (#744): a workload that
+    /// runs several of the nodes reached, or several paths of one, is written once.
+    executed: HashSet<(String, String)>,
 }
 
 impl<'a> Walk<'_, 'a> {
@@ -954,6 +959,9 @@ impl<'a> Walk<'_, 'a> {
                 for node in &export.iac {
                     if node.identity(&export.repository) == execution.workload
                         && node.root == execution.root
+                        && self
+                            .executed
+                            .insert((execution.workload.clone(), execution.root.clone()))
                     {
                         let text = format!(
                             "runs code [{}: {}] {} {}:{} {} (root {})",

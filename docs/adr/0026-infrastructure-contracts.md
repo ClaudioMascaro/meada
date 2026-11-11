@@ -159,8 +159,9 @@ execution, context, trace, orphan and export seams and the shared 1.4.0 minor re
 - Its **runner** side, the consumer, is the workload whose image field names it, including Helm
   values `image.repository` and Kustomize `images`. Levels follow the rule for evaluated names.
 - **Same repository.** A workload defined next to its code (SAM `CodeUri`, a Serverless handler,
-  a Lambda source directory or archive, a Compose build context) runs that code directly, at
-  `exact`, with no image contract between them.
+  a Lambda source directory or archive, a Compose build) runs that code directly, at `exact`,
+  with no image contract between them. A Compose build runs the paths its Dockerfile takes from
+  the context, not the whole context (see "Compose build contexts read through the Dockerfile").
 
 ### Environment entries
 
@@ -574,3 +575,39 @@ not positional count: JS/TS object literals or exact folded objects, and C# veri
 reassigned argument supplies no exact entity; strings retain the topic/subscription form.
 The C# options constructor category is retained in private memo keys, preventing a valid first
 factory call from making a later opaque actual look like options. No new walker is involved.
+
+### Compose build contexts read through the Dockerfile (#744, 2026-11-10)
+
+A build context says what the builder may read, not what the image holds. A Compose service
+built from the repository root ran every symbol of the repository at `exact`, including a service
+whose Dockerfile copies only `frontend/`, and its environment entries scoped every environment
+read in the repository. A Compose build now runs the paths its Dockerfile takes from the context:
+
+- **The Dockerfile** is the one Compose builds with: `build.dockerfile`, relative to the context,
+  or `build.dockerfile_inline`, else `Dockerfile` in the context. An override merges `dockerfile`
+  and `dockerfile_inline` like the other `build` keys, and a Compose node keeps the reference next
+  to its build context.
+- **Paths.** Every `COPY` and `ADD` source read from the context, in every stage (a build stage
+  compiles the code a later stage runs), and every `RUN --mount=type=bind` source with no `from`
+  (with no `source`, the whole context). `COPY --from`, `ADD` of a URL or git repository and a
+  heredoc read nothing from the context. A wildcard source is matched against the repository's
+  files with Docker's rules (`*` does not cross `/`), one path per match, so one workload and
+  root may have several executions.
+- **Levels.** Each path runs at `exact`, or `inferred` when the context or the Dockerfile path
+  went through an overridable value. `COPY . .` keeps the whole context at `exact`.
+- **Fallback.** A Dockerfile Meada cannot read (missing, outside the repository or behind a
+  symlink, a source with a variable, a form the reader does not know) leaves the whole context
+  at `inferred`, and the reason says the Dockerfile was not read. A Dockerfile that reads nothing
+  from the context runs no code directly, and the service's image side links as any runner's does.
+- **`.dockerignore`** is not read: a path may cover files the image excludes, never fewer.
+- **Freshness.** The Dockerfile's bytes, and the listing of each directory a wildcard source
+  opens, are inputs of the Compose file's stored summary, as its build paths are (#711): editing,
+  adding or removing the Dockerfile makes the index stale.
+- **Trace.** Upward, each workload and root that runs code is written once per answer, under the
+  first node it runs.
+
+Lowering a root context to `inferred`, or dropping it, was rejected: the most common Compose
+layout, one service with `build: .` and `COPY . .`, does hold the whole repository, and a
+whole-repository `inferred` execution still widens environment-entry scopes. Reading the
+Dockerfile of a CI image build is a follow-up; the image contract's builder side stays a
+repository.

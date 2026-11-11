@@ -4,7 +4,7 @@ example.com/acme/deploy deployment.yaml:1 Deployment.apps/shop/prod-orders
 chain: exact · 1 hops · 2 repos · 60 tokens
 
 example.com/acme/app orders.py:1 orders
-  runs code [exact: Compose build compose.yaml#services.orders.build] example.com/acme/app compose.yaml:2 services.orders (root .)
+  runs code [exact: Compose build compose.yaml#services.orders.build; Dockerfile Dockerfile] example.com/acme/app compose.yaml:2 services.orders (root .)
   runs code [exact: image::ghcr.io/acme/orders] example.com/acme/deploy deployment.yaml:1 Deployment.apps/shop/prod-orders (root overlays/prod)
   runs code [inferred: image::ghcr.io/acme/orders; image: values.yaml#image.repository (Helm value)] example.com/acme/deploy values.yaml:2 image.repository (root .)
-chain: inferred · 3 hops · 2 repos · 133 tokens
+chain: inferred · 3 hops · 2 repos · 139 tokens
