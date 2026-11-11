@@ -23,6 +23,19 @@ SKIPPED_ROOTS = {"each", "count", "path", "terraform", "self"}
 EVAL_DEPTH = 32  # the ceiling ADR 0025 and docs/agents/ceilings name for names gone through
 MODULE_DEPTH = 16
 NESTING = 64  # #640: a file nesting brackets deeper is unreadable
+# #782: the six registry sources #671's type table reads (docs/site/en/capabilities.md, "Registry
+# modules"; an optional `registry.terraform.io/` prefix), each with the input that names what it
+# creates in the upstream module's variables.tf and main.tf. A call without that input, or setting
+# one that changes the name or whether anything is created (a FIFO suffix, a generated prefix, a
+# creation control), leaves the name unchecked: the documents give no name to expect then.
+REGISTRY_NAMES = {
+    "terraform-aws-modules/sqs/aws": ("name", {"fifo_queue", "use_name_prefix", "create"}),
+    "terraform-aws-modules/sns/aws": ("name", {"fifo_topic", "use_name_prefix", "create"}),
+    "terraform-aws-modules/s3-bucket/aws": ("bucket", {"create", "create_bucket"}),
+    "terraform-aws-modules/dynamodb-table/aws": ("name", {"create", "create_table"}),
+    "terraform-aws-modules/lambda/aws": ("function_name", {"create", "create_function", "create_layer", "putin_khuylo"}),
+    "terraform-aws-modules/ecs/aws//modules/service": ("name", {"create", "create_service"}),
+}
 
 
 def unquote(s):
@@ -209,12 +222,17 @@ def read_repo(repo):
             for name, body in entry.items():
                 name_ = unquote(name) or name
                 first, last = lines_of(text, "module", [name_])
+                source = unquote(body.get("source"))
+                registry = REGISTRY_NAMES.get(source.removeprefix("registry.terraform.io/") if isinstance(source, str) else None)
                 m["blocks"].append({"kind": "module", "type": "module", "name": name_, "path": rel, "line": first, "end": last,
-                                    # a module's `name` is an input, not what it creates
+                                    # a module's `name` is an input, not what it creates, except a
+                                    # registry source's name input (REGISTRY_NAMES)
+                                    "name_raw": body.get(registry[0]) if registry else None,
+                                    "name_unchecked": bool(registry) and (registry[0] not in body or bool(registry[1] & body.keys())),
                                     "count_raw": body.get("count"), "for_each_raw": body.get("for_each"),
                                     "args_raw": {k: v for k, v in body.items() if not k.startswith("__")},
                                     "refs": refs_in(body),
-                                    "source": unquote(body.get("source")),
+                                    "source": source,
                                     "args": {k: refs_in(v) for k, v in body.items() if not k.startswith("__")}})
         for entry in doc.get("output", []):
             for name, body in entry.items():

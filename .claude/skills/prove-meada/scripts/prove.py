@@ -973,6 +973,22 @@ Resources:
     # A wrong exact name exits 3, never 1: CI records exit 1 as a difference from the base.
     assert key_failed(key_problems(key, hit("list", "queue-0-b"))[0])
     assert not key_failed(["differs from base: a symbol's answer must not change", "contract-role extension differs from its base key:\n"])
+    try:
+        import tf_oracle as tf
+    except ImportError:  # python-hcl2, as `iac` needs it: SKILL.md's Gotchas
+        print("selftest: python-hcl2 missing, the IaC oracle's registry names not checked")
+    else:  # #782: a registry source's call is named by the input #671's type table reads
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = {"q": 'source = "terraform-aws-modules/sqs/aws"\n name = "q"',
+                     "b": 'source = "registry.terraform.io/terraform-aws-modules/s3-bucket/aws"\n bucket = "b"',
+                     "fifo": 'source = "terraform-aws-modules/sqs/aws"\n name = "f"\n fifo_queue = true',
+                     "nameless": 'source = "terraform-aws-modules/lambda/aws"\n handler = "h"',
+                     "local": 'source = "./m"\n name = "x"', "other": 'source = "terraform-aws-modules/vpc/aws"\n name = "v"'}
+            subprocess.run(["git", "init", "-q", tmp], check=True)  # the oracle lists files with git
+            Path(tmp, "main.tf").write_text("".join(f'module "{k}" {{\n {v}\n}}\n' for k, v in calls.items()))
+            got = {n["address"]: "unchecked" if n["unchecked"] else n["name"] for n in tf.evaluate(Path(tmp))[0]}
+        assert got == {"module.q": "q", "module.b": "b", "module.fifo": "unchecked", "module.nameless": "unchecked",
+                       "module.local": None, "module.other": None}, got
     print("selftest passed")
 
 

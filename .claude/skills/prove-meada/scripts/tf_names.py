@@ -346,7 +346,9 @@ class Names:
 
     def physical(self, at, each, block):
         """(name, pattern, through) of a block's `name`, or "unchecked"."""
-        if block["kind"] == "module" or block.get("name_raw") is None:
+        if block.get("name_unchecked"):
+            return "unchecked"
+        if block.get("name_raw") is None:  # a module call has none unless its source is a registry one (#782)
             return None, False, ()
         try:
             kind, v, through = self.raw(at, each, block["name_raw"], 0)

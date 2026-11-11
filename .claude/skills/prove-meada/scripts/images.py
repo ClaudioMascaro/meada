@@ -188,6 +188,9 @@ images:
     build: linked-src
 ''')
     write(repos['direct'], 'src/local.py', 'def inside_entry():\n    return 1\n')
+    # ADR 0026 (#755, #782): `COPY . .` keeps worker's whole context at `exact`; `src` holds no
+    # Dockerfile, so noimage runs its context at `inferred` and the reason says it was not read.
+    write(repos['direct'], 'Dockerfile', 'FROM scratch\nCOPY . .\n')
     (repos['direct'] / 'linked-src').symlink_to('src', target_is_directory=True)
     write(repos['builder-only'], '.github/workflows/publish.yml', '''jobs:
   build:
@@ -409,7 +412,8 @@ class Probe:
         self.check('Kubernetes containers literal exact', any('Deployment.apps/proof/parcel' in l['consumer'] and l['level']=='exact' for l in links))
         self.check('Kustomize overridden workload linked', any('prod-overlay' in l['consumer'] and l['contract']=='image::ghcr.io/parcel/worker' for l in links))
         executions = direct.get('executions', [])
-        self.check('direct build root and directory exact', {(x['workload'].split('::')[-1],x['path'],x['level']) for x in executions} == {('services.worker','.','exact'),('services.noimage','src','exact')}, repr(executions))
+        self.check('direct build root exact through its Dockerfile, directory inferred without one', {(x['workload'].split('::')[-1],x['path'],x['level']) for x in executions} == {('services.worker','.','exact'),('services.noimage','src','inferred')}, repr(executions))
+        self.check('direct directory reason says its Dockerfile was not read', any(x['path']=='src' for x in executions) and all('Dockerfile' in x.get('reason','') and 'not read' in x.get('reason','') for x in executions if x['path']=='src'), repr(executions))
         self.check('direct code path uses no image link', not direct['links'])
         self.check('code-only entire export unchanged', exports['base','code-only'] == exports['head','code-only'])
         patterns = exports['head','pattern-deploy']['links']
@@ -446,8 +450,8 @@ class Probe:
             if name=='direct':
                 self.check('direct root workload context identifies exact local code',
                            f'code: {PREFIX}direct . [exact]' in texts[6],texts[6])
-                self.check('direct directory workload context identifies exact local code',
-                           f'code: {PREFIX}direct src [exact]' in texts[7],texts[7])
+                self.check('direct directory workload context identifies inferred local code',
+                           f'code: {PREFIX}direct src [inferred]' in texts[7],texts[7])
                 self.check('direct trace down reaches directory code','src/local.py' in texts[11] and 'inside_entry' in texts[11],texts[11])
                 self.check('direct trace up reaches workload','services.noimage' in texts[12],texts[12])
             if name in ['builder-only', 'runner-only']:
