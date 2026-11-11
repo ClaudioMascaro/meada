@@ -18,7 +18,7 @@ Escolha a linha que combina com o que você já tem. Todos os canais entregam o 
 | Rust | `cargo install meada` | `meada mcp` |
 | Linux ou macOS | o instalador de shell abaixo | `meada mcp` |
 | Qualquer sistema | o arquivo do seu sistema nas [releases do GitHub](https://github.com/ClaudioMascaro/meada/releases), com `meada` no `PATH` | `meada mcp` |
-| Docker | `docker pull ghcr.io/claudiomascaro/meada:1.2.0` | a linha `docker run` em [Conectar um agente](#conectar-um-agente-mcp) |
+| Docker | `docker pull ghcr.io/claudiomascaro/meada:1.3.0` | a linha `docker run` em [Conectar um agente](#conectar-um-agente-mcp) |
 
 ```sh
 # Instalador de shell (Linux e macOS)
@@ -75,7 +75,7 @@ Com Docker (Linux e macOS):
   "mcpServers": {
     "meada": {
       "command": "sh",
-      "args": ["-c", "exec docker run -i --rm --network none --user \"$(id -u):$(id -g)\" -v \"${PWD%/*}:${PWD%/*}\" -w \"$PWD\" ghcr.io/claudiomascaro/meada:1.2.0 mcp"]
+      "args": ["-c", "exec docker run -i --rm --network none --user \"$(id -u):$(id -g)\" -v \"${PWD%/*}:${PWD%/*}\" -w \"$PWD\" ghcr.io/claudiomascaro/meada:1.3.0 mcp"]
     }
   }
 }
@@ -97,7 +97,7 @@ ler os níveis de uma resposta. No Claude Code:
 
 ```sh
 mkdir -p ~/.claude/skills/meada
-curl -fsSL https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.2.0/skills/meada/SKILL.md -o ~/.claude/skills/meada/SKILL.md
+curl -fsSL https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.3.0/skills/meada/SKILL.md -o ~/.claude/skills/meada/SKILL.md
 ```
 
 Outros agentes: veja [Agentes e MCP](https://claudiomascaro.github.io/meada/mcp/#skill-para-agentes).

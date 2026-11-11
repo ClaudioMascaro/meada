@@ -6,6 +6,42 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A `terraform-aws-modules/s3-bucket/aws` call with `putin_khuylo = false`, or with a value
+  Meada cannot resolve, provisions no bucket: upstream creates it only with
+  `create_bucket && putin_khuylo`, and the Lambda module's call is read the same way (#787).
+
+## [1.3.0] - 2026-11-11
+
+A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md):
+infrastructure joins the graph. Config values and IaC nodes (ADR 0025) are read from Terraform and
+OpenTofu (HCL and JSON, with static evaluation of names), Compose, CloudFormation and SAM,
+Serverless Framework, Kubernetes with Kustomize, and Crossplane, and answer to the new `search`
+kinds `value` and `iac` (`image` and `alert` join for their contracts). Infrastructure contracts (ADR 0026) link the code that uses a queue, a
+topic, a bucket, a table, a parameter or a secret to what provisions it on AWS, GCP and Azure,
+through SDK use sides in TypeScript, JavaScript, Python, Java, Go and C#, with orphan reports in
+`meada status`. Image contracts link builders to runners, workloads carry their environments to the
+code they run, alert contracts link rule labels to Alertmanager routes and Datadog
+monitor tags to OpsGenie routing, and HTTP gains route
+providers declared in IaC and base URLs followed through Kubernetes Services, Ingresses and Compose.
+The console graph shows the new roles, a refresh reads unchanged values from a cache beside the
+index (`values.db`, ADR 0027), and `meada mcp` answers calls sent without waiting for each reply
+(#704). The index schema changes, so existing indexes are rebuilt once on first use; export format
+stays 1 and gains optional fields. `meada-core` 1.3.0 gives `ids::VersionEntry` a sixth element and
+`ids::NON_BLOCK_KEYS` a fifth key (`added_by_time`, #454), `authorize::compose_entries` a `now`
+parameter, `manifest::EntryFile` an `added_by_time` field and the export structs new fields.
+Postgres migration 10 needs `meada postgres migrate` before 1.3.0 starts, and 1.2.0 binaries
+refuse the migrated schema. The
+entries below that name a release level were written while this release was in development. The
+tree, the `meada-core` pin, the Dockerfile, the compose defaults and the Helm chart declare `1.3.0`,
+and the `v1.3.0` tag goes on the `release/1.3` branch, cut from this entry's merge on main.
+Publication (crates, the staged npm package, the GitHub draft release) belongs to the maintainer.
+Release notes are available in
+[pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.3.0.md),
+[English](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.3.0.en.md) and
+[Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.3.0.es.md).
+
 ### Added
 
 - DynamoDB transactions in Java, Go and C# (#719): `TransactWriteItems` and `TransactGetItems`
@@ -15,7 +51,7 @@ All notable changes to Meada are recorded here. The format follows
   Go and C#, a request, an item or an entry too) gives its tables only when its function
   mentions the name twice, where it is declared and where the request reads it: any other
   mention may change it, and one that comes in a parameter (in Java, a single entry too) gives
-  none. Every Java, Go and .NET AWS operation now has a test. Included in the 1.4.0 minor
+  none. Every Java, Go and .NET AWS operation now has a test. Included in the 1.3.0 minor
   release.
 - Curated operators and private IaC mappings (#671): 43 explicit Strimzi, RabbitMQ Queue,
   ACK, Config Connector and Crossplane AWS/GCP/Azure types provision existing contracts.
@@ -23,43 +59,43 @@ All notable changes to Meada are recorded here. The format follows
   exchange channel. Six terraform-aws-modules sources read declared resource and Lambda/ECS
   workload inputs; `meada.toml` maps exact/private source prefixes and custom group/kind key
   paths to curated entries. Unknown identities and creation controls remain conservative.
-  This joins the existing 1.4.0 minor development release.
+  This joins the existing 1.3.0 minor development release.
 - IaC HTTP route providers (#666): Terraform/OpenTofu API Gateway HTTP/REST and explicit quick
   create, SAM Api/HttpApi and Serverless http/httpApi events resolve to local handler symbols
   or the repository, with normalized parameters, cross-repository HTTP links and stored
-  path/target evidence. Included in the meada/meada-core 1.4.0 minor release.
+  path/target evidence. Included in the meada/meada-core 1.3.0 minor release.
 - Azure SDK sides in JavaScript/TypeScript, Python, Java, Go and C# (#670): verified
   constructors connect Service Bus and Event Hubs sends/receives, Blob container reads/writes
   and Key Vault secret reads to physical contracts. New subscription receivers retain their
   topic and subscription through exact factories and scoped workload environments. Existing
   C# Service Bus forms keep their identities; resource readers retain each operation site.
-  The bounded inventory joins the shared meada/meada-core 1.4.0 minor release.
+  The bounded inventory joins the shared meada/meada-core 1.3.0 minor release.
 
 - GCP SDK use sides in JavaScript/TypeScript, Python, Java, Go and C# (#668): verified client
   constructors connect Pub/Sub publish and subscription receive, Cloud Storage reads/writes
   and Secret Manager access to their physical contracts. Subscription identities remain
   distinct from topics through scoped workload environment resolution. The documented
-  operation inventory ships in the shared meada 1.4.0 minor release. Scoped request mutations
+  operation inventory ships in the shared meada 1.3.0 minor release. Scoped request mutations
   leave stale names unresolved, typed helpers retain their resource kind through factories,
   and asynchronous factories preserve await state.
 - The console graph has image builder-to-runner and alert emitter-to-matcher views, including
   links within a repository, alongside provisioner sides and provisioning links with roots,
   levels and reasons. A bilingual legend explains each role and keyboard navigation. The
   playground exposes `value`, `iac` and `alert` searches. Release level: minor, included in
-  meada and meada-core 1.4.0 (#675).
+  meada and meada-core 1.3.0 (#675).
 - Datadog Terraform monitor tags join OpsGenie routing conditions through known tag
   forwarding. Selected Alertmanager receivers explicitly transform grouped rule labels
   into OpsGenie tags or PagerDuty v2 custom details; native PagerDuty PCL conditions keep
   their field paths. Equality is exact; regex, prefix and containment are inferred.
   Missing or unread forwarding yields no link, and matching never predicts final team
-  delivery. Included in the existing meada/meada-core 1.4.0 minor release (#673).
+  delivery. Included in the existing meada/meada-core 1.3.0 minor release (#673).
 - AWS workload execution and environments (#664): Terraform/OpenTofu Lambda images and local
   code/archive inputs, SAM CodeUri/Handler/ImageUri with Globals overrides, Serverless handlers
   with provider/function environments, and encoded ECS container images/environments. Known
   resource references retain typed identities; secret and dynamic contents remain unread.
   Context, bidirectional traces and scope-aware image orphans include these workloads; new
   local paths refuse absolute paths, every parent component and symbolic links. Included in
-  the minor development release of meada and meada-core 1.4.0.
+  the minor development release of meada and meada-core 1.3.0.
 
 - Terraform/OpenTofu JSON (`.tf.json`, `.tofu.json`) now creates IaC nodes with source spans,
   references, evaluated names and local module instances. JSON expression and literal rules
@@ -73,37 +109,37 @@ All notable changes to Meada are recorded here. The format follows
   exact config uses; provider-specific typed keys remain inferred. Linux Functions run
   evaluated container images; Linux and Windows Functions run safe local deployment archives, with scoped
   app settings and unresolved Key Vault references. Existing C# topic processors retain
-  their topic identity. This shares the 1.4.0 development release.
+  their topic identity. This shares the 1.3.0 development release.
 
 - HTTP base URLs follow Kubernetes Service DNS names and Compose service names through their
   workloads to the repositories running the providers. Ingress hosts and literal prefixes
   carry public URLs to their Services; rewrites remain unread mounts. Links are inferred and
   name the Service, with workload environment provenance when applicable. A Service or
   Ingress that reaches no code leaves a host to `[serve] hosts`, which still links it `exact`.
-  Included in the minor development release of meada and meada-core 1.4.0 (#665).
+  Included in the minor development release of meada and meada-core 1.3.0 (#665).
 - GCP infrastructure contracts (#667): Terraform/OpenTofu Pub/Sub topics and distinct
   subscription targets, Cloud Storage buckets, Cloud SQL instances and instance-qualified
   databases, and Secret Manager secrets. Structured GCP configuration identifiers are exact;
   provider-specific typed keys remain inferred. Cloud Run v1/v2 services and v2 jobs retain
   container images and scoped environment targets. Provisioning, subscriptions, context,
   trace, scope-aware orphans and export include these kinds and runners. Release level: minor,
-  included in meada and meada-core 1.4.0.
+  included in meada and meada-core 1.3.0.
 - Declared resource `via` locations now accept IaC addresses in every indexed format and
   `<file>#<key path>` with list selectors (`[key=value]`). Sides retain their precise node or
   key for context and trace; removed locations produce the existing stale status diagnostics.
-  Release level: minor, included in meada and meada-core 1.4.0 (#641).
+  Release level: minor, included in meada and meada-core 1.3.0 (#641).
 - Resolve environment reads through the workloads running their code, including Kubernetes ConfigMap references and Compose defaults, with inferred provenance and redacted Secret targets (#663).
 - Alert contracts join Prometheus, Loki, PrometheusRule and Grafana rule labels to Alertmanager
   route matchers, including AlertmanagerConfig. Equality is exact and regular expressions are
   inferred; a negated condition only filters its route, without linking the value it refuses.
   Route context includes the receiver, trace walks both ways, and export and scope-aware
   orphan reports carry the kind. Helm values are not alert emitters. Included in the minor
-  development release of meada and meada-core 1.4.0 (#672).
+  development release of meada and meada-core 1.3.0 (#672).
 - Anchored unresolved names across channel, resource and image contracts (#674): only
   literal counterparts with sufficient anchor evidence and whole-segment wildcards link.
   Several names remain ambiguous open items; human or optional decider choices replay through
   `meada.decisions.toml`, including provisioning links and stale-choice reporting. Release
-  level: minor, included in meada and meada-core 1.4.0.
+  level: minor, included in meada and meada-core 1.3.0.
 
 - Constructor-backed AWS SDK sides in Java 2.x, Go v2 and .NET: SQS, SNS, EventBridge, Kinesis,
   S3, DynamoDB, SSM Parameter Store and Secrets Manager. Literal names and ARNs join
@@ -112,7 +148,7 @@ All notable changes to Meada are recorded here. The format follows
   incomplete origins are rejected, and injected types alone create no SDK side, except SQS,
   whose declared client types keep its earlier forms. .NET named requests and its S3 metadata
   spelling are supported. SDK resource links are exact while declarations remain declared;
-  hierarchy queries stay unresolved. Release level: minor, meada and meada-core 1.4.0 (#660).
+  hierarchy queries stay unresolved. Release level: minor, meada and meada-core 1.3.0 (#660).
 - AWS SDK use sides in TypeScript, JavaScript (SDK v3) and Python (boto3): SNS publishes,
   EventBridge event entries and Kinesis record writes produce channel sides; S3 and DynamoDB
   operations write or read resource sides; SSM and Secrets Manager operations read resources. Batch
@@ -125,14 +161,14 @@ All notable changes to Meada are recorded here. The format follows
   reads stay unresolved and name their variable through `via: env:NAME`, without reading the process
   environment. SDK providers gain an optional `via`, absent on existing providers; format remains 1.
   Existing declared resource sides retain `declared`. Older indexes rebuild. Release level: minor,
-  meada and meada-core 1.4.0 (#659).
+  meada and meada-core 1.3.0 (#659).
 - Config values naming AWS resources become directionless use sides (#661): recognized ARNs,
   SQS queue URLs and S3 URIs are exact; plain names under final `queue`, `topic`, `bucket` and
   `table` keys are inferred. Each key links only to provisioners and counts for scoped orphans;
   bare equal values, redacted/cut values and provisioner name definitions create no use.
   Search, context, trace, export's optional `uses` and the console retain key locations
   without adding producer/consumer or writer/reader links. Release level: minor, meada and
-  meada-core 1.4.0.
+  meada-core 1.3.0.
 - Image contracts (#662): normalized `image::<registry>/<repository>` names connect builders
   in GitHub Actions, Compose, Skaffold, ko and Jib to Kubernetes, Compose and Helm runners,
   including Kustomize image overrides. Context shows builders, trace crosses into code and
@@ -142,7 +178,7 @@ All notable changes to Meada are recorded here. The format follows
   it, and `inferred` when it cannot read one; editing the Dockerfile makes the index stale and an
   upward `trace` writes each workload once (#744). Export format 1 adds optional builder `at`
   locations and direct `executions`; the console graph displays both. Release level: minor for
-  meada and meada-core, included in synchronized 1.4.0.
+  meada and meada-core, included in synchronized 1.3.0.
 
 - AWS infrastructure contracts: Terraform/OpenTofu SNS, EventBridge and Kinesis channels;
   DynamoDB, RDS instances and clusters, ElastiCache clusters and replication groups, SSM and
@@ -383,9 +419,6 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
-- A `terraform-aws-modules/s3-bucket/aws` call with `putin_khuylo = false`, or with a value
-  Meada cannot resolve, provisions no bucket: upstream creates it only with
-  `create_bucket && putin_khuylo`, and the Lambda module's call is read the same way (#787).
 - A Java AWS SDK request no longer names a table, topic, bucket or queue its builder had before
   the builder changed (#719). A builder changes in place, so a name is `exact` only when every
   mention of the builder is a form the reader follows: a setter, `.build()`. Any other mention
@@ -431,13 +464,15 @@ All notable changes to Meada are recorded here. The format follows
   see `a`, `b`, and a `set(string)` of `[10, 9]` keeps the strings `"10"` and `"9"` in string
   order. An element Meada cannot convert with certainty leaves the value unresolved (#720).
 - Terraform: an override file that replaces the `type` of a variable whose own block declares a
-  set type now names what Terraform creates: the default is converted to the set first, then to
-  the new type (`list(string)` gives the set's elements in set order, `any` and `set(string)`
+  set type is now converted as Terraform converts it: the default is converted to the set first,
+  then to the new type (`list(string)` gives the set's elements in set order, `any` and `set(string)`
   keep the set; a default an earlier override gave is converted the same way when a later
   one retypes it), and one Terraform rejects (a tuple) gets no exact name. OpenTofu 1.13 and later convert the default
   once, to the final type, and name other instances; Meada follows Terraform (#740), except for a
   variable with a block in a `.tofu` or `.tofu.json` file, which Terraform does not read: it is
-  unresolved where the two conversions differ.
+  unresolved where the two conversions differ. Known gap: indexed end to end, the four cases tried
+  of a `for_each` over a variable retyped to a list got one pattern name where Terraform creates an
+  instance per element, and none got a wrong exact name; the cause is open (#783).
 - An Alertmanager configuration with a matcher regex Go's `regexp` refuses (an unclosed
   group, a leading `*`, a backward range, a lookahead) is unreadable, as Alertmanager refuses
   to load it: it gives no alert side or link, where its valid routes kept an `exact` link,
@@ -1972,7 +2007,8 @@ and `trace` from the two longest processes. The spec adds about 0.3 MB and 0.03 
 The rise of the single-file reindex since 2026-10-14 predates it (specs #22 and #23), and at
 692 files it is close to its target.
 
-[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.3.0
 [1.2.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.2.0
 [1.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.1.0
 [1.0.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.0.0
