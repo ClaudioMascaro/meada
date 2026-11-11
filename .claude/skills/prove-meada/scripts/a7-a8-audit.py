@@ -551,7 +551,8 @@ def score(args):
     evidence_text = evidence.read_text(errors='replace')
     symptom = judged.get('symptom', '')
     names_symptom = bool(symptom and symptom in evidence_text and re.search(case['evidence'], evidence_text, re.I))
-    script_caught = failed['exit'] in (1, 3) and names_symptom  # 3: `prove.py`'s answer key rejects and judged.get('script_names_symptom') is True
+    # Exit 3 is `prove.py values`/`iac`'s answer key rejecting an answer: a detection, as exit 1 is.
+    script_caught = failed['exit'] in (1, 3) and names_symptom and judged.get('script_names_symptom') is True
     checker_caught = bool(judged.get('verdict') == 'BROKEN' and names_symptom and judged.get('checker') and judged.get('receipt'))
     script_detection = 'caught' if script_caught else \
         'caught by luck' if checks['script_result'] != 'CHECKS_PASSED' else 'missed'

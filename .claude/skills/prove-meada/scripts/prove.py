@@ -1234,7 +1234,9 @@ def iac_existing_suffixes(lines, baseline):
     return result
 
 
-# The problems a difference from the base explains; any other is the answer key's (exit 3).
+# Problems whose key is the base ("must not change", "as base"): a change may move them on purpose,
+# so they exit 1 for the judge, as `run`'s differences do. A problem against an independent key (the
+# oracle, Terraform's names, a refusal, transport parity) exits 3.
 BASE_PROBLEMS = ("differs from base", "contract-role extension differs from its base key")
 
 
