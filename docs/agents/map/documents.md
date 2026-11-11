@@ -219,8 +219,10 @@ this file, and a change to these modules updates it.
   (`Eval::name`, memoized per instance: `Eval::var` for a call's argument, a var file's value or a
   default, recording an `Overridable` for a root's variable; a local; a module output through
   `Eval::module`) and `each`/`count`, then evaluates it with `hcl-rs` and `functions::declare`'s
-  pure functions when `cost` (an upper bound of its bytes) fits `EVAL_COST_MAX` and the root's
-  `EVAL_WORK_MAX`; else `Eval::partial` keeps a template's resolved parts and puts `*` for the rest.
+  pure functions when `cost` (an upper bound of its steps: bytes made, and in a `for` template
+  text parsed and root objects copied) fits `EVAL_COST_MAX` and the root's `EVAL_WORK_MAX`; else
+  it spends the bytes it went through to decide and `Eval::partial` keeps a template's resolved
+  parts and puts `*` for the rest.
   `Eval::keys` evaluates `count` and `for_each` while instances are made (no module output read
   yet), and `Eval::root` evaluates the names once every instance exists. `Repository::read` reads
   the files, `Repository::units` gives each root with the directories of its unit, and `refresh`

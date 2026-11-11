@@ -6,11 +6,15 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use ignore::WalkBuilder;
 use rusqlite::config::DbConfig;
-use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, Transaction, params};
+use rusqlite::{
+    Connection, ErrorCode, OpenFlags, OptionalExtension, Transaction, TransactionBehavior, params,
+};
 use serde::Serialize;
 
 use crate::Result;
@@ -337,11 +341,48 @@ const BUSY_TIMEOUT: Duration = Duration::from_secs(10);
 
 thread_local! {
     static BUSY: std::cell::Cell<Duration> = const { std::cell::Cell::new(BUSY_TIMEOUT) };
+    /// Whether this thread runs a refresh now (`Run`).
+    static RUNNING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// When this thread's wait on a lock began, and whether a refresh of another thread was in
+    /// flight when it last looked (`wait`).
+    static WAITING: std::cell::Cell<(Option<Instant>, bool)> =
+        const { std::cell::Cell::new((None, false)) };
 }
 
-/// Runs `f` with this thread's read-only opens waiting at most `timeout` for a commit in
-/// progress, instead of 10 seconds. No option or setting reaches it: tests, and the readiness
-/// probe of `status --workspace`.
+/// The refreshes in flight in this process, on any index (`Run`).
+static IN_FLIGHT: AtomicUsize = AtomicUsize::new(0);
+
+/// The busy handler of a connection opened to write (`current`, `writable`), called with the
+/// `tries` it already made for the statement: a statement that meets a lock waits for it up to
+/// this thread's busy timeout, and past it for as long as a refresh of another thread of this
+/// process is in flight (#704). That run is what holds the lock: once it spills or commits a
+/// large change its exclusive lock outlasts the timeout, and a call must not fail on a timer
+/// while a refresh of its own process makes progress. A run that just ended left the lock
+/// free, so the statement gets one more try. The thread that runs the refresh keeps the timeout
+/// alone: what it waits on is another process, or a reader that may be waiting on it.
+// ponytail: a run in flight on any index extends the wait, since a plain function knows no
+// connection; a wait on another process's lock then lasts until the runs of this process end.
+fn wait(tries: i32) -> bool {
+    let (since, was) = match WAITING.get() {
+        (Some(since), was) if tries > 0 => (since, was),
+        _ => (Instant::now(), false),
+    };
+    let in_flight = !RUNNING.get() && IN_FLIGHT.load(Ordering::Relaxed) > 0;
+    WAITING.set((Some(since), in_flight));
+    if since.elapsed() >= BUSY.get() && !in_flight {
+        return was;
+    }
+    // Steps that grow to 50 ms, as SQLite's own handler's grow to 100.
+    std::thread::sleep(Duration::from_millis(
+        u64::from(tries.clamp(0, 49).unsigned_abs()) + 1,
+    ));
+    true
+}
+
+/// Runs `f` with `timeout` as this thread's busy timeout, instead of 10 seconds: the most its
+/// read-only opens wait for a commit in progress, and what its statements on a connection opened
+/// to write wait before only a refresh in flight keeps them waiting (`wait`). No option or
+/// setting reaches it: tests, and the readiness probe of `status --workspace`.
 #[doc(hidden)]
 pub fn with_busy_timeout<T>(timeout: Duration, f: impl FnOnce() -> T) -> T {
     struct Restore(Duration);
@@ -477,16 +518,21 @@ pub fn open(index: &Path, root: &Path, identity: &str, serve: &Serve) -> Result<
 /// The index at `index` opened to write, when it has the current schema. Its first read rolls
 /// back the hot journal a writer stopped mid-commit left. An unreadable file counts as a
 /// mismatch (the index's directory is Meada's own); a missing one is not created, so no reader
-/// finds an empty file; a commit in progress past the busy timeout is an error, never a reason
-/// to rebuild.
+/// finds an empty file; a commit in progress past the busy timeout (`wait`) is an error, never
+/// a reason to rebuild.
 fn current(index: &Path) -> Result<Option<Connection>> {
     let flags = OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX;
     let db = match Connection::open_with_flags(index, flags) {
         Err(e) if e.sqlite_error_code() == Some(ErrorCode::CannotOpen) => return Ok(None),
         db => db?,
     };
-    db.busy_timeout(BUSY.get())?;
-    match db.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0)) {
+    db.busy_handler(Some(wait))?;
+    let version = db.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0));
+    // SQLite counts the tries it hands `wait` from zero only when a statement runs: the schema
+    // load of this connection's first prepare would go on from the count of the read above,
+    // as the same wait, and fail on its clock. Setting the handler again zeroes the count.
+    db.busy_handler(Some(wait))?;
+    match version {
         Ok(version) => Ok((version == schema_version()).then_some(db)),
         Err(e)
             if matches!(
@@ -580,11 +626,12 @@ fn rebuild(index: &Path, root: &Path, identity: &str, serve: &Serve) -> Result<C
 }
 
 /// The index at `path` opened to write. Its commits, and its first read, wait up to the busy
-/// timeout for the readers and the commit in progress of other connections (a server's reads,
-/// ADR 0011), rather than failing at once or taking a locked index for one of another schema.
+/// timeout (`wait`) for the readers and the commit in progress of other connections (a server's
+/// reads, ADR 0011), rather than failing at once or taking a locked index for one of another
+/// schema.
 fn writable(path: &Path) -> rusqlite::Result<Connection> {
     let db = Connection::open(path)?;
-    db.busy_timeout(BUSY.get())?;
+    db.busy_handler(Some(wait))?;
     Ok(db)
 }
 
@@ -684,11 +731,98 @@ pub struct Indexed<'a> {
 /// Documents (spec #21) are refreshed first, the same way, when `serve` is declared; without
 /// a `[serve]` table the repository has none. They hold no code, so an edited document changes
 /// no code row: `Http::declare` reads them at query time.
+///
+/// Refreshes of one index share it (#704). In one process (MCP calls in flight together) one
+/// runs at a time: a call that comes while another runs waits for it, with no timer, then for
+/// the next run, which starts after it came and so sees the tree as the call found it; the
+/// calls that came meanwhile share that run's outcome. A statement that meets the run's lock
+/// outside a refresh (an open, a query) waits for the run too (`wait`). Across processes, one
+/// that finds nothing to write takes no write lock, and one whose first write meets another
+/// process's writer waits up to the busy timeout for that commit, then starts over
+/// (`attempts`).
 pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
-    refresh_keeping(db, root, identity, serve, true)
+    let Some(path) = db.path().filter(|p| !p.is_empty()) else {
+        return refresh_keeping(db, root, identity, serve, true);
+    };
+    let flight = {
+        let mut flights = FLIGHTS.lock().unwrap_or_else(PoisonError::into_inner);
+        flights.entry(PathBuf::from(path)).or_default().clone()
+    };
+    let mut runs = flight.runs.lock().unwrap_or_else(PoisonError::into_inner);
+    let needed = runs.started + 1;
+    while runs.running && runs.finished < needed {
+        runs = flight
+            .done
+            .wait(runs)
+            .unwrap_or_else(PoisonError::into_inner);
+    }
+    if runs.finished >= needed {
+        return runs.failed.clone().map_or(Ok(()), |e| Err(e.into()));
+    }
+    runs.running = true;
+    runs.started += 1;
+    IN_FLIGHT.fetch_add(1, Ordering::Relaxed);
+    let mut run = Run {
+        flight: &flight,
+        number: runs.started,
+        failed: Some("the refresh in flight stopped".to_string()),
+        nested: RUNNING.replace(true),
+    };
+    drop(runs);
+    let outcome = refresh_keeping(db, root, identity, serve, true);
+    run.failed = outcome.as_ref().err().map(|e| e.to_string());
+    outcome
 }
 
-/// `refresh`, keeping the rows of the groups nothing changed in when `keep` says so.
+/// The refreshes of this process, one per index file it refreshes (`refresh`).
+static FLIGHTS: Mutex<BTreeMap<PathBuf, Arc<Flight>>> = Mutex::new(BTreeMap::new());
+
+/// The runs of one index's refresh in this process, and the waiters' signal.
+#[derive(Default)]
+struct Flight {
+    runs: Mutex<Runs>,
+    done: Condvar,
+}
+
+/// How many runs started and finished, whether one runs now, and the last one's error.
+#[derive(Default)]
+struct Runs {
+    started: u64,
+    finished: u64,
+    running: bool,
+    failed: Option<String>,
+}
+
+/// The run in flight: dropped, even by a panic, it records its outcome and wakes the waiters,
+/// those of `refresh` and the statements waiting on its lock (`wait`).
+struct Run<'a> {
+    flight: &'a Flight,
+    number: u64,
+    failed: Option<String>,
+    /// Whether this thread already ran a refresh when this one started (a rebuild's).
+    nested: bool,
+}
+
+impl Drop for Run<'_> {
+    fn drop(&mut self) {
+        RUNNING.set(self.nested);
+        IN_FLIGHT.fetch_sub(1, Ordering::Relaxed);
+        let mut runs = (self.flight.runs.lock()).unwrap_or_else(PoisonError::into_inner);
+        runs.running = false;
+        runs.finished = self.number;
+        runs.failed = self.failed.take();
+        self.flight.done.notify_all();
+    }
+}
+
+// ponytail: a refresh another process's writer refuses walks the tree again, up to this many
+// times, before it takes the write lock first and holds it through its walk; a queue of waiting
+// writers would walk once.
+/// Deferred attempts before a refresh takes the write lock first (`attempts`).
+const DEFERRED_ATTEMPTS: usize = 3;
+
+/// `refresh`, keeping the rows of the groups nothing changed in when `keep` says so, in as
+/// many attempts as it takes (`attempts`), each starting from a new walk.
 fn refresh_keeping(
     db: &Connection,
     root: &Path,
@@ -696,8 +830,51 @@ fn refresh_keeping(
     serve: &Serve,
     keep: bool,
 ) -> Result<()> {
+    attempts(db, |behavior| {
+        refresh_attempt(db, root, identity, serve, keep, behavior)
+    })
+}
+
+/// Runs `attempt` on `db` until one is not refused. Each attempt runs in a deferred
+/// transaction. SQLite refuses at once, without the busy timeout, a first write while another
+/// connection holds the write lock (#704); the attempt, rolled back, then waits up to the busy
+/// timeout for the lock to come free (the other refresh committed) and starts over. Past
+/// `DEFERRED_ATTEMPTS`, as when the tree keeps changing under a stream of refreshes, the last
+/// attempt takes the write lock first.
+fn attempts(
+    db: &Connection,
+    mut attempt: impl FnMut(TransactionBehavior) -> Result<()>,
+) -> Result<()> {
+    for _ in 0..DEFERRED_ATTEMPTS {
+        match attempt(TransactionBehavior::Deferred) {
+            Err(e) if busy(&*e) => db.execute_batch("BEGIN IMMEDIATE; ROLLBACK")?,
+            done => return done,
+        }
+    }
+    attempt(TransactionBehavior::Immediate)
+}
+
+/// Whether `e` is SQLite's busy or locked error.
+fn busy(e: &(dyn std::error::Error + 'static)) -> bool {
+    (e.downcast_ref::<rusqlite::Error>()).is_some_and(|e| {
+        matches!(
+            e.sqlite_error_code(),
+            Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
+        )
+    })
+}
+
+/// One attempt of `refresh_keeping`, in a transaction of `behavior`.
+fn refresh_attempt(
+    db: &Connection,
+    root: &Path,
+    identity: &str,
+    serve: &Serve,
+    keep: bool,
+    behavior: TransactionBehavior,
+) -> Result<()> {
     let now = SystemTime::now();
-    let tx = db.unchecked_transaction()?;
+    let tx = Transaction::new_unchecked(db, behavior)?;
     let known = tx
         .query_row("SELECT identity, configs FROM meta", [], |r| {
             Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
@@ -925,10 +1102,13 @@ fn refresh_keeping(
         let src = fs::read(abs)?;
         let hash = blake3::hash(&src).to_hex().to_string();
         if current && known.is_some_and(|k| k.hash == hash) {
-            tx.execute(
-                "UPDATE files SET mtime = ?2, size = ?3 WHERE path = ?1",
-                params![path, mtime, size],
-            )?;
+            // A racy stamp stays racy: an update that changes nothing still takes the write lock.
+            if known.is_some_and(|k| (k.mtime, k.size) != (mtime, size)) {
+                tx.execute(
+                    "UPDATE files SET mtime = ?2, size = ?3 WHERE path = ?1",
+                    params![path, mtime, size],
+                )?;
+            }
             continue;
         }
         // What `extend` added last time is most likely what it adds again.
@@ -991,7 +1171,8 @@ fn refresh_keeping(
         // over and keeps nothing.
         drop(tx);
         db.execute("DELETE FROM meta", [])?;
-        return refresh(db, root, identity, serve);
+        // Not `refresh`: this call is the run in flight for this index, which it would wait on.
+        return refresh_keeping(db, root, identity, serve, true);
     };
     settle(
         &tx,
@@ -2197,10 +2378,13 @@ fn refresh_stamped(
         };
         let hash = blake3::hash(&src).to_hex().to_string();
         if !forced && known.is_some_and(|k| k.hash == hash) {
-            tx.execute(
-                &format!("UPDATE {table} SET mtime = ?2, size = ?3 WHERE path = ?1"),
-                params![path, mtime, size],
-            )?;
+            // As in `refresh`: no update that changes nothing, so no write lock for it.
+            if known.is_some_and(|k| (k.mtime, k.size) != (mtime, size)) {
+                tx.execute(
+                    &format!("UPDATE {table} SET mtime = ?2, size = ?3 WHERE path = ?1"),
+                    params![path, mtime, size],
+                )?;
+            }
             continue;
         }
         let summary = summarize(path, &src)?;
@@ -3683,6 +3867,307 @@ mod tests {
     /// The `files` rows of an index read through `db`.
     fn files(db: &Connection) -> i64 {
         (db.query_row("SELECT count(*) FROM files", [], |r| r.get(0))).unwrap()
+    }
+
+    /// The symbols whose identity ends in `::name` in the index read through `db`.
+    fn named(db: &Connection, name: &str) -> i64 {
+        let count = "SELECT count(*) FROM symbols WHERE id LIKE '%::' || ?1";
+        (db.query_row(count, [name], |r| r.get(0))).unwrap()
+    }
+
+    /// A refresh that finds nothing to write takes no write lock (#704): it answers at once
+    /// while another connection holds the write lock, even with its file's stamp still racy
+    /// (written within `RACY`), where an update that changes nothing would ask for the lock.
+    #[test]
+    fn a_refresh_with_nothing_to_write_runs_while_another_holds_the_write_lock() {
+        use super::refresh;
+        let (dir, index) = index_dir("refresh_beside_a_writer");
+        let root = checkout(&dir);
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        let writer = Connection::open(&index).unwrap();
+        writer.execute_batch("BEGIN IMMEDIATE").unwrap();
+
+        let refreshed = with_busy_timeout(Duration::from_millis(50), || {
+            refresh(&db, &root, REPO, &Serve::default())
+        });
+        assert!(refreshed.is_ok(), "{refreshed:?}");
+        assert_eq!(named(&db, "a"), 1);
+    }
+
+    /// A refresh whose first write meets another connection's write lock waits for it to end,
+    /// then starts over and writes the change it found (#704): no `database is locked`, and no
+    /// answer from the index as it was before the change.
+    #[test]
+    fn a_refresh_that_meets_another_writer_waits_for_it_and_writes_its_change() {
+        use super::refresh;
+        let (dir, index) = index_dir("refresh_after_a_writer");
+        let root = checkout(&dir);
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        fs::write(root.join("a.ts"), "export function b() {\n  return 2;\n}\n").unwrap();
+        let writer = Connection::open(&index).unwrap();
+        writer.execute_batch("BEGIN IMMEDIATE").unwrap();
+        let ends = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            writer.execute_batch("ROLLBACK").unwrap();
+        });
+
+        let refreshed = with_busy_timeout(Duration::from_secs(10), || {
+            refresh(&db, &root, REPO, &Serve::default())
+        });
+        ends.join().unwrap();
+        assert!(refreshed.is_ok(), "{refreshed:?}");
+        assert_eq!((named(&db, "a"), named(&db, "b")), (0, 1));
+    }
+
+    /// `n` connections to the index at `index` of `root`.
+    fn connections(index: &Path, root: &Path, n: usize) -> Vec<Connection> {
+        (0..n)
+            .map(|_| open(index, root, REPO, &Serve::default()).unwrap())
+            .collect()
+    }
+
+    /// Refreshes `db` `times` times on a thread of its own, whose busy timeout is `busy`: with
+    /// none at all, a lock another connection holds fails its statement at once, with no wait.
+    /// The first failure, as text, ends it.
+    fn refreshing(
+        db: Connection,
+        root: &Path,
+        busy: Duration,
+        times: usize,
+    ) -> std::thread::JoinHandle<Result<(), String>> {
+        let root = root.to_path_buf();
+        std::thread::spawn(move || {
+            with_busy_timeout(busy, || {
+                (0..times).try_for_each(|_| {
+                    (super::refresh(&db, &root, REPO, &Serve::default())).map_err(|e| e.to_string())
+                })
+            })
+        })
+    }
+
+    /// A read transaction on the index at `index`, holding its read lock: a commit of another
+    /// connection waits for it to end.
+    fn reader(index: &Path) -> Connection {
+        let db = Connection::open_with_flags(index, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        db.execute_batch("BEGIN").unwrap();
+        files(&db);
+        db
+    }
+
+    /// Waits until a commit holds the index at `index` against new readers, as it does while
+    /// it waits for a read lock to clear and while it writes.
+    fn committing(index: &Path) {
+        let probe = Connection::open_with_flags(index, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        probe.busy_timeout(Duration::ZERO).unwrap();
+        let start = Instant::now();
+        while (probe.query_row("SELECT count(*) FROM files", [], |r| r.get::<_, i64>(0))).is_ok() {
+            assert!(start.elapsed() < Duration::from_secs(10), "no commit began");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+
+    /// A TypeScript file `name.ts` in `root`, holding one function `name`.
+    fn add(root: &Path, name: &str) {
+        let source = format!("export function {name}() {{\n  return 1;\n}}\n");
+        fs::write(root.join(format!("{name}.ts")), source).unwrap();
+    }
+
+    /// Calls in flight together in one process (#704) never fail on a timer: with no busy
+    /// timeout at all, eight refreshes of one index after a change of 200 files all succeed,
+    /// since a call that comes while a run is in flight waits for it, then shares the next run.
+    #[test]
+    fn refreshes_of_one_process_wait_for_the_run_in_flight_with_no_timer() {
+        let (dir, index) = index_dir("refresh_in_flight");
+        let root = checkout(&dir);
+        let dbs = connections(&index, &root, 8);
+        for i in 0..200 {
+            add(&root, &format!("f{i}"));
+        }
+
+        let runs: Vec<_> = (dbs.into_iter())
+            .map(|db| refreshing(db, &root, Duration::ZERO, 1))
+            .collect();
+        for run in runs {
+            assert_eq!(run.join().unwrap(), Ok(()));
+        }
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        assert_eq!((named(&db, "a"), named(&db, "f199")), (1, 1));
+    }
+
+    /// A call that meets the lock of a refresh in flight in its own process waits for that
+    /// refresh, not for the busy timeout (#704): while a run's commit holds the index for
+    /// several timeouts, another call's open, its first read, still answers, after the run.
+    #[test]
+    fn a_call_waits_past_the_busy_timeout_for_the_refresh_in_flight_in_its_process() {
+        let (dir, index) = index_dir("refresh_outlasts_timeout");
+        let root = checkout(&dir);
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        add(&root, "b");
+        let blocker = reader(&index);
+        let run = refreshing(db, &root, Duration::from_secs(10), 1);
+        committing(&index);
+
+        let call = std::thread::spawn({
+            let (index, root) = (index.clone(), root.clone());
+            move || {
+                with_busy_timeout(Duration::from_millis(50), || {
+                    let db = open(&index, &root, REPO, &Serve::default());
+                    db.map(|db| named(&db, "b")).map_err(|e| e.to_string())
+                })
+            }
+        });
+        std::thread::sleep(Duration::from_millis(400));
+        let waiting = !call.is_finished();
+        drop(blocker);
+
+        assert_eq!(run.join().unwrap(), Ok(()));
+        assert_eq!((call.join().unwrap(), waiting), (Ok(1), true));
+    }
+
+    /// The wait past the busy timeout ends with the refreshes in flight: a lock no refresh
+    /// holds, met while one runs on another index, is waited for until that refresh ends, then
+    /// fails as it does with none in flight.
+    #[test]
+    fn a_lock_no_refresh_holds_fails_once_the_refreshes_in_flight_end() {
+        let (dir, index) = index_dir("refresh_elsewhere");
+        let root = checkout(&dir);
+        let writer = open(&index, &root, REPO, &Serve::default()).unwrap();
+        writer.execute_batch("BEGIN EXCLUSIVE").unwrap();
+        let other = dir.join("other").join("index.db");
+        let db = open(&other, &root, REPO, &Serve::default()).unwrap();
+        add(&root, "b");
+        let blocker = reader(&other);
+        // Each attempt's commit waits 300 ms for `blocker`, then the refresh fails.
+        let run = refreshing(db, &root, Duration::from_millis(300), 1);
+        committing(&other);
+
+        let start = Instant::now();
+        let second = with_busy_timeout(Duration::from_millis(50), || {
+            open(&index, &root, REPO, &Serve::default())
+        });
+        let waited = start.elapsed();
+
+        assert!(second.is_err());
+        assert!(waited >= Duration::from_millis(300), "{waited:?}");
+        assert!(run.join().unwrap().is_err());
+        drop(blocker);
+    }
+
+    /// A wait that ended takes nothing from the next one (#704): a call whose open waited for
+    /// a lock, and whose first query meets another one a whole busy timeout later, waits for
+    /// it rather than failing at once on the first wait's clock.
+    #[test]
+    fn a_wait_that_ended_takes_nothing_from_the_next_one() {
+        let (dir, index) = index_dir("wait_again");
+        let root = checkout(&dir);
+        drop(open(&index, &root, REPO, &Serve::default()).unwrap());
+        // The write lock on the index, held for 100 ms on a thread of its own.
+        let hold = || {
+            let writer = Connection::open(&index).unwrap();
+            writer.execute_batch("BEGIN EXCLUSIVE").unwrap();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(100));
+                writer.execute_batch("ROLLBACK").unwrap();
+            })
+        };
+        let timeout = Duration::from_secs(1);
+
+        let found = with_busy_timeout(timeout, || {
+            let first = hold();
+            let db = open(&index, &root, REPO, &Serve::default()).map_err(|e| e.to_string())?;
+            first.join().unwrap();
+            std::thread::sleep(timeout);
+            let second = hold();
+            let count = "SELECT count(*) FROM symbols WHERE id LIKE '%::a'";
+            let found = db.query_row(count, [], |r| r.get::<_, i64>(0));
+            second.join().unwrap();
+            found.map_err(|e| e.to_string())
+        });
+
+        assert_eq!(found, Ok(1));
+    }
+
+    /// A call that comes while a run is in flight waits for the run after it (#704), which
+    /// starts after the call came: it sees a file written while the first run committed, which
+    /// that run, its walk done, never read.
+    #[test]
+    fn a_call_that_comes_during_a_run_answers_from_the_next_run() {
+        let (dir, index) = index_dir("refresh_next_run");
+        let root = checkout(&dir);
+        let mut dbs = connections(&index, &root, 2);
+        add(&root, "b");
+        let blocker = reader(&index);
+        let first = refreshing(dbs.remove(0), &root, Duration::from_secs(10), 1);
+        committing(&index);
+
+        add(&root, "c");
+        let second = refreshing(dbs.remove(0), &root, Duration::from_secs(10), 1);
+        // Time for the second call to find the first run in flight.
+        std::thread::sleep(Duration::from_millis(200));
+        drop(blocker);
+
+        assert_eq!(
+            (first.join().unwrap(), second.join().unwrap()),
+            (Ok(()), Ok(()))
+        );
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        // Read without a refresh of its own: what the second call's run left.
+        assert_eq!((named(&db, "b"), named(&db, "c")), (1, 1));
+    }
+
+    /// A refresh refused `DEFERRED_ATTEMPTS` times in a row (#704), as under a stream of other
+    /// processes' writers, takes the write lock first for one last attempt, whose outcome is
+    /// the refresh's.
+    #[test]
+    fn a_refresh_refused_at_every_deferred_attempt_takes_the_write_lock_first() {
+        let db = Connection::open_in_memory().unwrap();
+        // Whether each attempt took the write lock first.
+        let mut seen = Vec::new();
+
+        let outcome = super::attempts(&db, |behavior| {
+            seen.push(matches!(behavior, rusqlite::TransactionBehavior::Immediate));
+            if seen.len() > super::DEFERRED_ATTEMPTS {
+                return Ok(());
+            }
+            let refused = rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY);
+            Err(rusqlite::Error::SqliteFailure(refused, None).into())
+        });
+
+        assert!(outcome.is_ok(), "{outcome:?}");
+        let deferred = vec![false; super::DEFERRED_ATTEMPTS];
+        assert_eq!(seen, [deferred, vec![true]].concat());
+    }
+
+    /// A tree that keeps changing under the calls of one process (#704): while a file changes
+    /// every few milliseconds, eight connections with no busy timeout refresh ten times each,
+    /// and none fails, since one run at a time writes.
+    #[test]
+    fn a_tree_that_keeps_changing_never_fails_the_refreshes_of_one_process() {
+        let (dir, index) = index_dir("refresh_changing");
+        let root = checkout(&dir);
+        let dbs = connections(&index, &root, 8);
+        let stop = Arc::new(AtomicBool::new(false));
+        let edits = std::thread::spawn({
+            let (root, stop) = (root.clone(), stop.clone());
+            move || {
+                for i in 0.. {
+                    if stop.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    let source = format!("export function c{i}() {{\n  return {i};\n}}\n");
+                    fs::write(root.join("changing.ts"), source).unwrap();
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+            }
+        });
+
+        let runs: Vec<_> = (dbs.into_iter())
+            .map(|db| refreshing(db, &root, Duration::ZERO, 10))
+            .collect();
+        let outcomes: Vec<_> = runs.into_iter().map(|run| run.join().unwrap()).collect();
+        stop.store(true, Ordering::Relaxed);
+        edits.join().unwrap();
+        assert!(outcomes.iter().all(Result::is_ok), "{outcomes:?}");
     }
 
     /// A rebuild (spec #259) builds the new index beside the old one and renames it over it:
