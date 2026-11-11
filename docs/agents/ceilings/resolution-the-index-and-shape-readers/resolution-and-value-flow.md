@@ -85,8 +85,10 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   past it, that file's values are unknown, the climb stops at its calls and no origin is found
   through it, so a string doubled through forty constants (`const b = a + a`), or a lattice of
   functions each calling or returning the next twice, ends. A DynamoDB transaction call folds
-  more values than a plain request, so about 1,700 of them in one file spend it, and the calls
-  after that have no side (#719). A Java builder held in a `final` field is read in its own
+  more values than a plain request, so about 1,700 of them in one file spend it (with each
+  value held in a name: 1,725 in Java, 1,928 in Go, 2,185 in C#; a hundred calls of 25 inline
+  entries each do not), and every call after that in the file has no side, a plain `PutItem`
+  of a literal table included (#719). A Java builder held in a `final` field is read in its own
   file, and a call on its name from another Java file leaves it unresolved; one handed to a call
   or aliased there, or reached by reflection from there, is not seen, and the field keeps its
   first name. A request type is the SDK's unless a type of its directory, an import or a
