@@ -121,7 +121,7 @@ Cloud Run v1 services, v2 services and v2 jobs retain each container's image and
 evaluated in the node's root and instance. Image defaults preserve their overridable evidence.
 Secret references retain their readable target with no resolved value; they do not expose
 contents or infer a resource hidden inside those contents. These rows use the existing image,
-execution, context, trace, orphan and export seams and the shared 1.4.0 minor release.
+execution, context, trace, orphan and export seams and the shared 1.3.0 minor release.
 
 ### Levels
 
@@ -349,7 +349,7 @@ normalized image are evidence of the same candidate. The kind retains the strong
 This slice recognizes literal ko destinations in checked-in CI `KO_DOCKER_REPO` with
 `ko build --bare` or `ko publish --bare`. Other ko naming modes add import-path names or hashes;
 unread commands yield no guessed builder. Base-image settings never publish an image.
-The merged release with #660 synchronizes both crates at 1.4.0; image contracts share that
+The merged release with #660 synchronizes both crates at 1.3.0; image contracts share that
 minor release under Unreleased. ko scripts are read only as single simple commands;
 multiline scripts and unsupported shell syntax yield no guessed builder. A supported command
 has exactly one `--bare`, at most one literal package target and no other flags; a specified
@@ -362,7 +362,7 @@ Replaying one decision preserves every other image side's ambiguity.
 
 ### SDK and image integration (#659 and #662, 2026-11-06)
 
-Combining the SDK and image slices keeps the SDK slice's synchronized 1.4.0 minor release
+Combining the SDK and image slices keeps the SDK slice's synchronized 1.3.0 minor release
 for both crates, and export format 1. The earlier image tier's 1.3.0 release note describes
 its starting tier. Optional provider `via` records SDK provenance while optional `at` records
 image build configuration locations; neither replaces the other.
@@ -464,7 +464,7 @@ Archives are execution locations, never opened and never widened to their parent
 Remote package settings identify no local code. Literal/evaluated app settings and known
 resource attribute targets use the common workload-scoped environment mechanism. Key Vault
 references and secret-content attributes retain no resolved value. This addition shares
-the synchronized 1.4.0 minor release and export format 1.
+the synchronized 1.3.0 minor release and export format 1.
 
 ### GCP SDK forms amendment (2026-11-06, #668)
 
