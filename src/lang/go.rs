@@ -1405,6 +1405,9 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         })
         .collect();
     facts.loops = super::outermost(tree.root_node(), &["for_statement"]);
+    // A local kept as a constant is named `function.name`.
+    let held = (facts.consts.iter()).filter_map(|c| c.name.rsplit_once('.'));
+    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, held);
     Ok(facts)
 }
 
@@ -1519,6 +1522,20 @@ mod tests {
             func f[T any](a *T, b B) {\n\ttype B int\n\tc := C{}\n\t{\n\t\tc := D{}\n\t}\n\
             \td := E{}\n\td, e := g()\n}\n";
         assert!(receivers(src).is_empty());
+    }
+
+    /// `Facts::mentioned`: the identifiers of a function that spell a local it keeps as a
+    /// constant, a function literal inside it included. A package variable gets no count.
+    #[test]
+    fn the_locals_kept_as_constants_are_counted_where_their_function_writes_them() {
+        let facts = facts(
+            "package p\n\nvar shared = T{}\n\nfunc f() {\n\ta := T{}\n\tb := T{}\n\tg(a)\n\t\
+             go func() { g(a) }()\n\tg(b, shared)\n}\n\nfunc h() {\n\ta := T{}\n\tg(a)\n}\n",
+        );
+        let counted: Vec<String> = (facts.mentioned.iter())
+            .map(|m| format!("{} {} {}", m.scope, m.name, m.count))
+            .collect();
+        assert_eq!(counted, ["f a 3", "f b 2", "h a 2"]);
     }
 
     #[test]

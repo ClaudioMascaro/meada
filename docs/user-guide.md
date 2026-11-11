@@ -663,10 +663,11 @@ cliente SQS do SDK (`SqsClient`, `SqsAsyncClient`, `*sqs.Client`, `IAmazonSQS`,
 `AmazonSQSClient`) é um cliente, inclusive injetado; um tipo do repositório com esse nome não é.
 
 Nomes literais e ARNs identificam o contrato; uma leitura do ambiente mantém o lado sem nome
-resolvido e registra a variável, inclusive em produtores. Lotes preservam todos os nomes.
-Leitores pertencem à função que os contém, escritores à chamada da operação, e os vínculos
-SDK são `exact`; declarações de recursos continuam `declared`. Lados sem nome resolvido não
-se vinculam, e `GetParametersByPath` não identifica um parâmetro físico. A tabela de
+resolvido e registra a variável, inclusive em produtores. Lotes e transações do DynamoDB
+(`TransactWriteItems`, `TransactGetItems`) preservam todos os nomes, e um `ConditionCheck` lê
+a sua tabela. Leitores pertencem à função que os contém, escritores à chamada da operação, e
+os vínculos SDK são `exact`; declarações de recursos continuam `declared`. Lados sem nome
+resolvido não se vinculam, e `GetParametersByPath` não identifica um parâmetro físico. A tabela de
 [capacidades](site/pt/capabilities.md) lista as operações e diferenças entre os SDKs.
 
 

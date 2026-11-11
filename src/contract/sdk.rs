@@ -4,7 +4,7 @@
 use super::{Found, Role, Site};
 use crate::lang::{Part, Value, literal};
 use crate::resolve::{Code, Expand};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 mod csharp;
 mod go;
@@ -90,6 +90,10 @@ pub(crate) struct Client {
 /// An operation's direction and the request field naming the contract.
 pub(crate) struct Operation {
     pub method: &'static str,
+    /// The path to the name: `.` descends, `[]` takes every element, `.*` every key of a map.
+    /// A path of three members, `Items[].Put|Update.TableName`, has its middle member name the
+    /// variants an element may set (one member, or `A|B` for either): an element setting none of
+    /// them has no use for this row. A method can have several rows, one per direction.
     pub field: &'static str,
     pub role: Role,
     /// A hierarchy query does not identify one physical resource.
@@ -158,6 +162,7 @@ pub(crate) fn extract<'a>(
     };
     let mut found = Vec::new();
     let written = std::cell::OnceCell::new();
+    let builders = java::Builders::default();
     let configs = std::cell::OnceCell::new();
     let inject = |code: &Code<'a>, path: &'a str, on: crate::resolve::Injected<'a>| {
         let indexed = indexed?;
@@ -170,6 +175,10 @@ pub(crate) fn extract<'a>(
             continue;
         }
         let mut origins = origins::Origins::new(code, language);
+        // A transaction folds a value per entry, and a file of them would spend what its other
+        // calls need: its rows have a budget of their own, here and in `Code::apart`.
+        let mut apart = origins::Origins::new(code, language);
+        let counts = std::cell::OnceCell::new();
         let aliases: BTreeMap<_, _> = if language == Language::Csharp {
             facts
                 .imports
@@ -181,81 +190,162 @@ pub(crate) fn extract<'a>(
         };
         for (index, stored) in facts.calls.iter().enumerate() {
             let method = crate::resolve::method(&stored.callee);
-            for service in services {
-                let Some(operation) = service
-                    .operations
-                    .iter()
-                    .find(|o| language.method(method, o.method))
-                else {
-                    continue;
+            // A method can have several rows: a transaction's entries differ in direction.
+            let operations = services.iter().flat_map(|service| {
+                (service.operations.iter())
+                    .filter(|o| language.method(method, o.method))
+                    .map(move |operation| (service, operation))
+            });
+            for (service, operation) in operations {
+                let transaction = transaction(operation.field);
+                let origins = if transaction {
+                    &mut apart
+                } else {
+                    &mut origins
                 };
-                if !origins.call(path, index, &service.client)
-                    && !origins.declared(path, index, service.declared)
-                {
-                    continue;
-                }
-                let changed =
-                    changed_request(code, path, index, operation.field, language, &written);
-                let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
-                    let [Value::Call(call)] = args else {
-                        return Some(vec![Name::default()]);
-                    };
-                    let values = request(call, keywords, operation.field, language)?;
-                    let mut names = Vec::new();
-                    for value in &values {
-                        names.push(match (changed, value) {
-                            (true, _) => Name::default(),
-                            (false, Some(v)) => name(code, path, Some(v), service.kind, &aliases)?,
-                            // ADR 0026: an entry without a bus sends to `default`; an SNS
-                            // phone or endpoint publish names no topic.
-                            (false, None) if service.kind == "eventbridge" => Name {
-                                literal: Some("default".into()),
-                                env: None,
-                            },
-                            (false, None) if service.kind == "sns" => continue,
-                            (false, None) => Name::default(),
-                        });
+                let mut row = || {
+                    if !origins.call(path, index, &service.client)
+                        && !origins.declared(path, index, service.declared)
+                    {
+                        return;
                     }
-                    Some(names)
-                };
-                let injected = (language == Language::Java)
-                    .then_some(&inject as &crate::resolve::Inject<'a, '_>);
-                for expanded in code.expand_with(Expand::Chain(path, index), injected, &read) {
-                    let (at, index) = expanded.site;
-                    for mut name in expanded.found {
-                        if operation.hierarchy {
-                            name.literal = None;
-                        }
-                        let contract = match &name.literal {
-                            Some(name) => format!("{prefix}::{}::{name}", service.kind),
-                            None => format!("{prefix}::{}", service.kind),
+                    let changed = changed_request(
+                        code,
+                        path,
+                        index,
+                        operation.field,
+                        language,
+                        &written,
+                        &builders,
+                    ) || (language != Language::Java
+                        && transaction
+                        && held_changed(code, path, index, operation.field, language, {
+                            counts.get_or_init(|| {
+                                (code.mentioned(path).iter())
+                                    .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
+                                    .collect()
+                            })
+                        }));
+                    let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
+                        let [Value::Call(call)] = args else {
+                            return Some(vec![Name::default()]);
                         };
-                        found.push(Found {
-                            identity: None,
-                            role: operation.role,
-                            site: if operation.role == Role::Consumer {
-                                Site::Def {
-                                    path: at.into(),
-                                    name: code.files()[at].calls[index].scope.clone(),
+                        let values = request(call, keywords, operation.field, language)?;
+                        let mut names = Vec::new();
+                        for value in &values {
+                            names.push(match (changed, value) {
+                                (true, _) => Name::default(),
+                                (false, Some(v)) => {
+                                    name(code, path, Some(v), service.kind, &aliases)?
                                 }
-                            } else {
-                                Site::Call {
-                                    path: at.into(),
-                                    index,
-                                }
-                            },
-                            contract: Some(contract),
-                            via: name.env.map(|v| format!("env:{v}")),
-                            method: Some(operation.method.into()),
-                            fragments: Vec::new(),
-                            shape: None,
-                        });
+                                // ADR 0026: an entry without a bus sends to `default`; an SNS
+                                // phone or endpoint publish names no topic.
+                                (false, None) if service.kind == "eventbridge" => Name {
+                                    literal: Some("default".into()),
+                                    env: None,
+                                },
+                                (false, None) if service.kind == "sns" => continue,
+                                (false, None) => Name::default(),
+                            });
+                        }
+                        Some(names)
+                    };
+                    let injected = (language == Language::Java)
+                        .then_some(&inject as &crate::resolve::Inject<'a, '_>);
+                    for expanded in code.expand_with(Expand::Chain(path, index), injected, &read) {
+                        let (at, index) = expanded.site;
+                        let passed = language == Language::Java
+                            && passed_changed(code, &expanded.frames, operation.field, &builders);
+                        for mut name in expanded.found {
+                            if passed {
+                                name = Name::default();
+                            }
+                            if operation.hierarchy {
+                                name.literal = None;
+                            }
+                            let contract = match &name.literal {
+                                Some(name) => format!("{prefix}::{}::{name}", service.kind),
+                                None => format!("{prefix}::{}", service.kind),
+                            };
+                            found.push(Found {
+                                identity: None,
+                                role: operation.role,
+                                site: if operation.role == Role::Consumer {
+                                    Site::Def {
+                                        path: at.into(),
+                                        name: code.files()[at].calls[index].scope.clone(),
+                                    }
+                                } else {
+                                    Site::Call {
+                                        path: at.into(),
+                                        index,
+                                    }
+                                },
+                                contract: Some(contract),
+                                via: name.env.map(|v| format!("env:{v}")),
+                                method: Some(operation.method.into()),
+                                fragments: Vec::new(),
+                                shape: None,
+                            });
+                        }
                     }
+                };
+                if transaction {
+                    code.apart(row);
+                } else {
+                    row();
                 }
             }
         }
     }
     found
+}
+
+/// Whether a step sets a member of the name's path (`topicArn`, `entries`, `eventBusName`).
+fn setter(selector: &str) -> impl Fn(&str) -> bool + '_ {
+    move |method| {
+        selector.split(['.', '|']).any(|member| {
+            let member = member.trim_end_matches("[]");
+            member.get(..1).is_some_and(|head| {
+                method.len() == member.len()
+                    && method[..1] == head.to_ascii_lowercase()
+                    && method[1..] == member[1..]
+            })
+        })
+    }
+}
+
+/// Whether the path is a transaction's: three members. Its sides are new with the rule that
+/// follows a request, a list, an item or an entry held in a name by the mentions of that name
+/// (#719); the shorter paths keep the rule they had.
+fn transaction(selector: &str) -> bool {
+    selector.matches('.').count() == 2
+}
+
+/// Whether a wrapper's caller passes the request on as a value that changed (Java): the request
+/// the wrapper reads is what its callers hand it, and a call judged where it is made sees only
+/// the parameter. Each argument of each call climbed is judged in the scope of that call.
+fn passed_changed<'a>(
+    code: &Code<'a>,
+    frames: &[crate::resolve::Frame<'a>],
+    selector: &str,
+    builders: &java::Builders<'a>,
+) -> bool {
+    frames.iter().any(|frame| {
+        (code.call(frame.path, frame.index)).is_some_and(|call| {
+            (call.args.iter()).any(|arg| {
+                java::changed(
+                    code,
+                    frame.path,
+                    &call.scope,
+                    arg,
+                    &call.range,
+                    selector,
+                    builders,
+                )
+            })
+        })
+    })
 }
 
 /// A named request can change after construction, and so can a named value an inline request
@@ -267,6 +357,7 @@ fn changed_request<'a>(
     selector: &str,
     language: Language,
     written: &std::cell::OnceCell<BTreeSet<&'a str>>,
+    builders: &java::Builders<'a>,
 ) -> bool {
     let Some(call) = code.call(path, index) else {
         return false;
@@ -275,44 +366,118 @@ fn changed_request<'a>(
         Language::Go => call.args.get(1),
         Language::Csharp => call.keyword("request").or_else(|| call.args.first()),
         Language::Java => {
-            // A step sets a member of the name's path (`topicArn`, `entries`, `eventBusName`).
-            let setter = |method: &str| {
-                selector.split('.').any(|member| {
-                    let member = member.trim_end_matches("[]");
-                    member.get(..1).is_some_and(|head| {
-                        method.len() == member.len()
-                            && method[..1] == head.to_ascii_lowercase()
-                            && method[1..] == member[1..]
-                    })
-                })
-            };
-            return (call.args.first())
-                .is_some_and(|r| java::changed(code, path, &call.scope, r, &call.range, &setter));
+            return (call.args.first()).is_some_and(|r| {
+                java::changed(code, path, &call.scope, r, &call.range, selector, builders)
+            });
         }
     };
     // Follow the name's path through the request as written: a named value met on it changes
     // when a file writes the member read off it.
     let mut values: Vec<&Value> = request.into_iter().collect();
     for member in selector.split('.') {
-        let field = member.trim_end_matches("[]");
         let mut next = Vec::new();
         for value in values {
-            if let Value::Ref(_) = value {
-                if opaque(code, field, language, written) {
-                    return true;
+            // Each variant of a member is on the path.
+            for field in member.split('|').map(|f| f.trim_end_matches("[]")) {
+                if let Value::Ref(_) = value {
+                    if opaque(code, field, language, written) {
+                        return true;
+                    }
+                    continue;
                 }
+                let inner = match language {
+                    Language::Go => go::field_of(value, field),
+                    _ => csharp::field_of(value, field),
+                };
+                let Some(Some(inner)) = inner else {
+                    continue;
+                };
+                match member.ends_with("[]").then(|| sequence(inner)).flatten() {
+                    Some(items) => next.extend(items),
+                    None => next.push(inner),
+                }
+            }
+        }
+        values = next;
+    }
+    false
+}
+
+/// Whether a name on the path to a transaction entry's table may hold a value that changed (Go
+/// and C#). A request, a list, an item and an entry change in place through any name that holds
+/// them: a write past the first member, an element replaced, `append`, `Add`, a helper. So a
+/// name is followed only when the function that declares it writes it twice, where it is declared
+/// and where the path reads it (`Facts::mentioned`). Any other mention is a change this reader
+/// does not follow, and a name that is no local of a function of the file (a parameter, a field,
+/// a package variable) can change anywhere.
+fn held_changed<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    index: usize,
+    selector: &str,
+    language: Language,
+    counts: &HashMap<(&'a str, &'a str), u32>,
+) -> bool {
+    let Some(call) = code.call(path, index) else {
+        return false;
+    };
+    let request = match language {
+        Language::Go => call.args.get(1),
+        _ => call.keyword("request").or_else(|| call.args.first()),
+    };
+    // What a value on the path is once its names are followed, with the scope it is written in.
+    let held = |mut value: &'a Value, mut scope: &'a str| {
+        for _ in 0..crate::resolve::EVAL_DEPTH {
+            let Value::Ref(name) = value else {
+                return Some((value, scope));
+            };
+            let (declared, written, holds) = match language {
+                Language::Go => {
+                    let (at, within, holds) = code.constant_value(path, scope, name)?;
+                    (at == path).then_some((within, within, holds))?
+                }
+                _ => {
+                    let bound = code.local(path, scope, name)?;
+                    (bound.scope.as_str(), bound.within.as_str(), &bound.value)
+                }
+            };
+            if counts.get(&(declared, name.as_str())) != Some(&2) {
+                return None;
+            }
+            (value, scope) = (holds, written);
+        }
+        None
+    };
+    let mut values: Vec<(&'a Value, &'a str)> =
+        (request.map(|r| (r, call.scope.as_str())).into_iter()).collect();
+    let members: Vec<&str> = selector.split('.').collect();
+    for (at, member) in members.iter().enumerate() {
+        let mut next = Vec::new();
+        for (value, scope) in values {
+            let Some((value, scope)) = held(value, scope) else {
+                return true;
+            };
+            // The last member is the name itself, which `name` reads off the entry.
+            if at + 1 == members.len() {
                 continue;
             }
-            let inner = match language {
-                Language::Go => go::field_of(value, field),
-                _ => csharp::field_of(value, field),
-            };
-            let Some(Some(inner)) = inner else {
-                continue;
-            };
-            match member.ends_with("[]").then(|| sequence(inner)).flatten() {
-                Some(items) => next.extend(items),
-                None => next.push(inner),
+            for field in member.split('|').map(|f| f.trim_end_matches("[]")) {
+                let inner = match language {
+                    Language::Go => go::field_of(value, field),
+                    _ => csharp::field_of(value, field),
+                };
+                let Some(Some(inner)) = inner else {
+                    continue;
+                };
+                if !member.ends_with("[]") {
+                    next.push((inner, scope));
+                    continue;
+                }
+                // The list is a value of its own, followed before its elements.
+                let Some((list, scope)) = held(inner, scope) else {
+                    return true;
+                };
+                next.extend((sequence(list).into_iter().flatten()).map(|item| (item, scope)));
             }
         }
         values = next;
@@ -351,8 +516,8 @@ fn opaque<'a>(
                 .contains(field)
 }
 
-/// Read scalar fields, name lists, event entries and table-keyed batch requests. Each value is
-/// visited once; every path here is a short constant supplied by the kind, never source text.
+/// Read scalar fields, name lists, event entries, table-keyed batch requests and transaction
+/// entries. Each value is visited once; every path here is a short constant supplied by the kind, never source text.
 /// `None` is a field a request Meada sees whole leaves out.
 fn request<'v>(
     call: &'v crate::lang::Invocation,
@@ -377,7 +542,18 @@ fn request<'v>(
             .map(|(_, v)| v))
         .or_else(|| call.args.first()),
     };
+    // `Put|Update.TableName`: the variants an element may set, then the name read off it.
+    let (variants, field) = tail.map_or((None, None), |tail| match tail.rsplit_once('.') {
+        Some((variants, field)) => (Some(variants), Some(field)),
+        None => (None, Some(tail)),
+    });
+    let member = |value: &'v Value, field: &str| match language {
+        Language::Java => Some(java::field_of(value, field)?.first().copied().flatten()),
+        Language::Go => go::field_of(value, field),
+        Language::Csharp => csharp::field_of(value, field),
+    };
     let mut out = Vec::new();
+    let mut skipped = false;
     for value in values {
         let Some(value) = value else {
             out.push((!whole.is_some_and(complete)).then_some(Value::Unknown));
@@ -393,13 +569,30 @@ fn request<'v>(
             vec![value]
         };
         for value in values {
-            let read = match tail {
+            let value = match variants {
+                None => value,
+                Some(variants) => {
+                    let mut set = None;
+                    for variant in variants.split('|') {
+                        set = set.or(member(value, variant)?);
+                    }
+                    match set {
+                        Some(set) => set,
+                        // A whole element that sets none of the variants has no use here.
+                        None if complete(value) => {
+                            skipped = true;
+                            continue;
+                        }
+                        None => {
+                            out.push(Some(Value::Unknown));
+                            continue;
+                        }
+                    }
+                }
+            };
+            let read = match field {
                 None => Some(value),
-                Some(field) => match language {
-                    Language::Java => java::field_of(value, field)?.first().copied().flatten(),
-                    Language::Go => go::field_of(value, field)?,
-                    Language::Csharp => csharp::field_of(value, field)?,
-                },
+                Some(field) => member(value, field)?,
             };
             out.push(match read {
                 Some(read) => Some(read.clone()),
@@ -407,7 +600,7 @@ fn request<'v>(
             });
         }
     }
-    if out.is_empty() {
+    if out.is_empty() && !skipped {
         out.push(Some(Value::Unknown));
     }
     Some(out)
@@ -415,7 +608,8 @@ fn request<'v>(
 
 /// Whether a request value shows every field it sets: a Go or C# literal, or a Java builder
 /// chain started by an SDK request type's `builder()` (`PublishRequest.builder()`, not a
-/// helper or factory of the repository's own named `builder`). Only then does a missing field
+/// helper or factory of the repository's own named `builder`; a transaction entry is built by
+/// `TransactWriteItem.builder()` or `TransactGetItem.builder()`). Only then does a missing field
 /// mean the request leaves it out.
 fn complete(value: &Value) -> bool {
     match value {
@@ -429,7 +623,10 @@ fn complete(value: &Value) -> bool {
         .is_some_and(|first| {
             first.callee.rsplit_once('.').is_some_and(|(ty, method)| {
                 let ty = ty.rsplit('.').next().unwrap_or(ty);
-                method == "builder" && (ty.ends_with("Request") || ty.ends_with("RequestEntry"))
+                method == "builder"
+                    && (ty.ends_with("Request")
+                        || ty.ends_with("RequestEntry")
+                        || matches!(ty, "TransactWriteItem" | "TransactGetItem"))
             })
         }),
         _ => false,

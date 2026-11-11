@@ -714,6 +714,588 @@ fn aws_sdk_operation_matrix_has_only_the_requested_sides() {
     assert_golden("aws-sdk-matrix.sides.txt", &(actual.join("\n") + "\n"));
 }
 
+/// The Java 2.x, Go v2 and .NET operation tables (#719): one call per operation in its own
+/// method, so a reader keeps its own site, and the same sides in all three languages.
+#[test]
+fn aws_sdk_operation_matrix_covers_java_go_and_dotnet() {
+    let repo = fixture_repo(
+        "aws_sdk_matrix_jvm_go_dotnet",
+        "aws-sdk-matrix-jvm-go-dotnet",
+        Some("https://example.com/aws/jvm.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+    let export: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let providers = export["providers"].as_array().unwrap();
+    let consumers = export["consumers"].as_array().unwrap();
+    // Per language: 22 writers and 16 readers, and .NET's blocking `GetObjectMetadata` reader.
+    assert_eq!(providers.len(), 66, "{export}");
+    assert_eq!(consumers.len(), 49, "{export}");
+    let mut actual = Vec::new();
+    let mut by_language: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+        Default::default();
+    for (role, sides) in [("writer", providers), ("reader", consumers)] {
+        for side in sides {
+            let site = side["site"]
+                .as_str()
+                .unwrap()
+                .strip_prefix("example.com/aws/jvm::")
+                .unwrap();
+            let contract = side["contract"].as_str().unwrap();
+            let via = side["via"].as_str().unwrap_or("");
+            actual.push(format!("{role} {site} {contract} {via}"));
+            let (file, _) = site.split_once("::").unwrap();
+            by_language
+                .entry(file.rsplit('.').next().unwrap().into())
+                .or_default()
+                .insert(format!("{role} {contract} {via}"));
+        }
+    }
+    actual.sort();
+    assert_golden(
+        "aws-sdk-matrix-jvm-go-dotnet.sides.txt",
+        &(actual.join("\n") + "\n"),
+    );
+    let sets: Vec<_> = by_language.iter().collect();
+    assert_eq!(
+        sets.iter()
+            .map(|(language, _)| language.as_str())
+            .collect::<Vec<_>>(),
+        ["cs", "go", "java"],
+        "{export}"
+    );
+    assert_eq!(sets[0].1, sets[1].1, "C# and Go name different sides");
+    assert_eq!(sets[1].1, sets[2].1, "Go and Java name different sides");
+    // A hierarchy path is no parameter name: the reader stays unresolved.
+    let by_path: Vec<_> = consumers
+        .iter()
+        .filter(|s| {
+            s["site"]
+                .as_str()
+                .unwrap()
+                .to_lowercase()
+                .contains("getparametersbypath")
+        })
+        .map(|s| s["contract"].as_str().unwrap())
+        .collect();
+    assert_eq!(by_path, ["resource::ssm"; 3], "{export}");
+}
+
+/// A DynamoDB transaction in Java, Go and .NET (#719): each `Put`, `Update` and `Delete` entry
+/// writes its own table, each `ConditionCheck` and `Get` reads its own, and a name that is not a
+/// literal follows the other name arguments: an environment read keeps its variable, a computed
+/// name stays unresolved.
+#[test]
+fn dynamodb_transactions_keep_every_entry_table_and_direction_in_java_go_and_dotnet() {
+    let repo = fixture_repo("aws_sdk_transactions", "aws-sdk-transactions", None);
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut by_language: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+    for (role, sides) in [("writer", "providers"), ("reader", "consumers")] {
+        for side in export[sides].as_array().unwrap() {
+            let site = side["site"].as_str().unwrap();
+            let mut parts = site.split("::").skip(1);
+            let file = parts.next().unwrap();
+            // The enclosing method, spelled `Transactions.write()`, `write` or `Transactions.Write()`.
+            let method = parts.next().unwrap().trim_end_matches("()");
+            let method = method.rsplit('.').next().unwrap().to_lowercase();
+            by_language
+                .entry(file.rsplit('.').next().unwrap().into())
+                .or_default()
+                .push(format!(
+                    "{method} {role} {} {}",
+                    side["contract"].as_str().unwrap(),
+                    side["via"].as_str().unwrap_or("")
+                ));
+        }
+    }
+    let expected = [
+        "computed reader resource::dynamodb ",
+        "computed writer resource::dynamodb ",
+        "fromenvironment reader resource::dynamodb env:CHECKED",
+        "fromenvironment writer resource::dynamodb env:TABLE",
+        "read reader resource::dynamodb::customers ",
+        "read reader resource::dynamodb::orders ",
+        "write reader resource::dynamodb::customers ",
+        "write writer resource::dynamodb::archive ",
+        "write writer resource::dynamodb::orders ",
+        "write writer resource::dynamodb::totals ",
+    ];
+    assert_eq!(by_language.len(), 3, "{export}");
+    for (language, mut sides) in by_language {
+        sides.sort();
+        assert_eq!(sides, expected, "{language}: {export}");
+    }
+}
+
+/// A transaction's request, list, item and entry held in a name change in place through any
+/// name that holds them (Go and C#): a write past the first member, an element replaced, a
+/// method of the list, a helper. A name on the path to an entry's table is followed only when
+/// its function writes it twice, where it is declared and where the path reads it, and every
+/// other mention leaves the transaction's entries unresolved. The same values left alone keep
+/// their tables.
+#[test]
+fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
+    let repo = fixture_repo(
+        "aws_sdk_transactions_named",
+        "aws-sdk-transactions-named",
+        None,
+    );
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut by_language: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+    for (role, sides) in [("writer", "providers"), ("reader", "consumers")] {
+        for side in export[sides].as_array().unwrap() {
+            let mut parts = side["site"].as_str().unwrap().split("::").skip(1);
+            let file = parts.next().unwrap();
+            let method = parts.next().unwrap().trim_end_matches("()");
+            let method = method.rsplit('.').next().unwrap().to_lowercase();
+            by_language
+                .entry(file.rsplit('.').next().unwrap().into())
+                .or_default()
+                .push(format!(
+                    "{method} {role} {}",
+                    side["contract"].as_str().unwrap()
+                ));
+        }
+    }
+    let sides = |language: &str| {
+        let mut sides = by_language[language].clone();
+        sides.sort();
+        sides
+    };
+    assert_eq!(
+        sides("go"),
+        [
+            "elementreplaced writer resource::dynamodb",
+            "entryreplaced writer resource::dynamodb",
+            "getreplaced reader resource::dynamodb",
+            "heldentry writer resource::dynamodb",
+            "itemcopied writer resource::dynamodb",
+            "itemwritten writer resource::dynamodb",
+            "loopwritten writer resource::dynamodb",
+            "plainget reader resource::dynamodb::plain-get",
+            "plainparts writer resource::dynamodb::plain-parts",
+            "plainrequest writer resource::dynamodb::plain-request",
+            "slicehanded writer resource::dynamodb",
+            "slicereplaced writer resource::dynamodb",
+            "slicewritten writer resource::dynamodb",
+            "throughrequest writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+    assert_eq!(
+        sides("cs"),
+        [
+            "elementreplaced writer resource::dynamodb",
+            "getreplaced reader resource::dynamodb",
+            "heldentry writer resource::dynamodb",
+            "itemwritten writer resource::dynamodb",
+            "listhanded writer resource::dynamodb",
+            "listremoved writer resource::dynamodb",
+            "listreplaced writer resource::dynamodb",
+            "listwritten writer resource::dynamodb",
+            "plainget reader resource::dynamodb::plain-get",
+            "plainparts writer resource::dynamodb::plain-parts",
+            "plainrequest writer resource::dynamodb::plain-request",
+            "requestcleared writer resource::dynamodb",
+            "shareditem writer resource::dynamodb",
+            "shareditem writer resource::dynamodb",
+            "throughrequest writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
+/// A transaction entry held in a named value and changed after it is made names no table, as
+/// the other named values on a name's path do (a Java builder is read per builder). The same
+/// entries left alone keep their tables, so the change is what unnamed them.
+#[test]
+fn dynamodb_transaction_entries_changed_after_they_are_made_name_no_table() {
+    let sides = |changed: bool| {
+        let repo = fixture_repo("aws_sdk_transactions_changed", "aws-sdk-controls", None);
+        let (java, go, cs) = if changed {
+            (
+                " if (prod) p.tableName(\"new\");",
+                " p.TableName = aws.String(\"new\")\n",
+                " put.TableName = \"new\";",
+            )
+        } else {
+            ("", "", "")
+        };
+        let java_held = if changed {
+            " if (prod) b.put(Put.builder().tableName(\"other\").build());"
+        } else {
+            ""
+        };
+        let (java_check, go_check, cs_check) = if changed {
+            (
+                " if (prod) c.tableName(\"new\");",
+                " c.TableName = aws.String(\"new\")\n",
+                " check.TableName = \"new\";",
+            )
+        } else {
+            ("", "", "")
+        };
+        std::fs::write(
+            repo.join("Changed.java"),
+            format!("import software.amazon.awssdk.services.dynamodb.DynamoDbClient;\n\
+             import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;\n\
+             import software.amazon.awssdk.services.dynamodb.model.Put;\n\
+             import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;\n\
+             import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;\n\
+             class Changed {{\n\
+             void put(boolean prod) {{ var db = DynamoDbClient.create(); var p = Put.builder().tableName(\"put-java\");{java} db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p.build()).build()).build()); }}\n\
+             void check(boolean prod) {{ var db = DynamoDbClient.create(); var c = ConditionCheck.builder().tableName(\"check-java\");{java_check} db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().conditionCheck(c.build()).build()).build()); }}\n\
+             void held(boolean prod) {{ var db = DynamoDbClient.create(); var b = TransactWriteItem.builder().put(Put.builder().tableName(\"held-java\").build());{java_held} db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(b.build()).build()); }}\n}}\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            repo.join("changed.go"),
+            format!("package application\n\nimport (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/aws\"\n\t\"github.com/aws/aws-sdk-go-v2/service/dynamodb\"\n\t\"github.com/aws/aws-sdk-go-v2/service/dynamodb/types\"\n)\n\n\
+             func put(ctx context.Context) {{\n\tclient := dynamodb.NewFromConfig(cfg)\n\tp := &types.Put{{TableName: aws.String(\"put-go\")}}\n\t{go}client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{{TransactItems: []types.TransactWriteItem{{{{Put: p}}}}}})\n}}\n\n\
+             func check(ctx context.Context) {{\n\tclient := dynamodb.NewFromConfig(cfg)\n\tc := &types.ConditionCheck{{TableName: aws.String(\"check-go\")}}\n\t{go_check}client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{{TransactItems: []types.TransactWriteItem{{{{ConditionCheck: c}}}}}})\n}}\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            repo.join("Changed.cs"),
+            format!("using System.Collections.Generic;\nusing Amazon.DynamoDBv2;\nusing Amazon.DynamoDBv2.Model;\n\
+             class Changed {{\n\
+             async System.Threading.Tasks.Task Put() {{ var db = new AmazonDynamoDBClient(); var put = new Put {{ TableName = \"put-cs\" }};{cs} await db.TransactWriteItemsAsync(new TransactWriteItemsRequest {{ TransactItems = new List<TransactWriteItem> {{ new TransactWriteItem {{ Put = put }} }} }}); }}\n\
+             async System.Threading.Tasks.Task Check() {{ var db = new AmazonDynamoDBClient(); var check = new ConditionCheck {{ TableName = \"check-cs\" }};{cs_check} await db.TransactWriteItemsAsync(new TransactWriteItemsRequest {{ TransactItems = new List<TransactWriteItem> {{ new TransactWriteItem {{ ConditionCheck = check }} }} }}); }}\n}}\n"),
+        )
+        .unwrap();
+        let export: Value =
+            serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+        let mut sides: Vec<_> = [("writer", "providers"), ("reader", "consumers")]
+            .iter()
+            .flat_map(|(role, sides)| {
+                export[sides]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(move |s| format!("{role} {}", s["contract"].as_str().unwrap()))
+            })
+            .collect();
+        sides.sort();
+        sides
+    };
+    assert_eq!(
+        sides(false),
+        [
+            "reader resource::dynamodb::check-cs",
+            "reader resource::dynamodb::check-go",
+            "reader resource::dynamodb::check-java",
+            "writer resource::dynamodb::held-java",
+            "writer resource::dynamodb::put-cs",
+            "writer resource::dynamodb::put-go",
+            "writer resource::dynamodb::put-java",
+        ]
+    );
+    assert_eq!(
+        sides(true),
+        [
+            "reader resource::dynamodb",
+            "reader resource::dynamodb",
+            "reader resource::dynamodb",
+            "writer resource::dynamodb",
+            "writer resource::dynamodb",
+            "writer resource::dynamodb",
+            "writer resource::dynamodb",
+        ]
+    );
+}
+
+/// A Java builder set again before its `.build()` names no table when the built value is held in
+/// a named local first (F1 of #719; `PutItemRequest` named the old table before): the check
+/// judges the builder by what happened to it up to the `.build()`. A value built before the
+/// builder is set again is an immutable copy and keeps its table.
+#[test]
+fn java_builders_set_again_before_a_named_build_name_no_table() {
+    let repo = fixture_repo("aws_sdk_named_builds", "aws-sdk-controls", None);
+    std::fs::write(
+        repo.join("Named.java"),
+        r#"import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
+import software.amazon.awssdk.services.dynamodb.model.Get;
+import software.amazon.awssdk.services.dynamodb.model.Put;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactGetItem;
+import software.amazon.awssdk.services.dynamodb.model.TransactGetItemsRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
+
+class Named {
+    void put() {
+        var db = DynamoDbClient.create();
+        var pb = Put.builder().tableName("put-old"); pb.tableName("put-new");
+        Put p = pb.build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p).build()).build());
+    }
+    void check() {
+        var db = DynamoDbClient.create();
+        var cb = ConditionCheck.builder().tableName("check-old"); cb.tableName("check-new");
+        ConditionCheck cc = cb.build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().conditionCheck(cc).build()).build());
+    }
+    void get() {
+        var db = DynamoDbClient.create();
+        var gb = Get.builder().tableName("get-old"); gb.tableName("get-new");
+        Get g = gb.build();
+        db.transactGetItems(TransactGetItemsRequest.builder().transactItems(TransactGetItem.builder().get(g).build()).build());
+    }
+    void item() {
+        var db = DynamoDbClient.create();
+        var ib = TransactWriteItem.builder().put(Put.builder().tableName("item-old").build()); ib.put(Put.builder().tableName("item-new").build());
+        var item = ib.build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(item).build());
+    }
+    void request() {
+        var db = DynamoDbClient.create();
+        var rb = TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(Put.builder().tableName("request-old").build()).build());
+        rb.transactItems(TransactWriteItem.builder().put(Put.builder().tableName("request-new").build()).build());
+        var req = rb.build();
+        db.transactWriteItems(req);
+    }
+    void conditional(boolean prod) {
+        var db = DynamoDbClient.create();
+        var pb = Put.builder().tableName("conditional-old"); if (prod) pb.tableName("conditional-new");
+        Put p = pb.build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p).build()).build());
+    }
+    void plain() {
+        var db = DynamoDbClient.create();
+        var pb = PutItemRequest.builder().tableName("plain-old"); pb.tableName("plain-new");
+        PutItemRequest req = pb.build();
+        db.putItem(req);
+    }
+    void copy() {
+        var db = DynamoDbClient.create();
+        var pb = Put.builder().tableName("copy");
+        Put p = pb.build();
+        pb.tableName("copy-new");
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p).build()).build());
+    }
+    void copyPlain() {
+        var db = DynamoDbClient.create();
+        var pb = PutItemRequest.builder().tableName("copy-plain");
+        PutItemRequest req = pb.build();
+        pb.tableName("copy-plain-new");
+        db.putItem(req);
+    }
+    void nested() {
+        var db = DynamoDbClient.create();
+        var ib = TransactWriteItem.builder().put(Put.builder().tableName("nested-old").build()); ib.put(Put.builder().tableName("nested-new").build());
+        var item = ib.build();
+        var rb = TransactWriteItemsRequest.builder().transactItems(item);
+        db.transactWriteItems(rb.build());
+    }
+    void alias() {
+        var db = DynamoDbClient.create();
+        var pb = Put.builder().tableName("alias-old"); pb.tableName("alias-new");
+        Put p = pb.build();
+        Put q = p;
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(q).build()).build());
+    }
+    void clean() {
+        var db = DynamoDbClient.create();
+        var pb = Put.builder().tableName("clean");
+        Put p = pb.build();
+        var item = TransactWriteItem.builder().put(p).build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(item).build());
+    }
+}
+"#,
+    )
+    .unwrap();
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut sides: Vec<_> = [("writer", "providers"), ("reader", "consumers")]
+        .iter()
+        .flat_map(|(role, sides)| {
+            export[sides].as_array().unwrap().iter().map(move |s| {
+                // `Named.conditional(boolean)::db.transactWriteItems#0` or the reader's method.
+                let scope = s["site"].as_str().unwrap().split("::").nth(2).unwrap();
+                let method = scope.split('(').next().unwrap().rsplit('.').next().unwrap();
+                format!("{method} {role} {}", s["contract"].as_str().unwrap())
+            })
+        })
+        .collect();
+    sides.sort();
+    assert_eq!(
+        sides,
+        [
+            "alias writer resource::dynamodb",
+            "check reader resource::dynamodb",
+            "clean writer resource::dynamodb::clean",
+            "conditional writer resource::dynamodb",
+            "copy writer resource::dynamodb::copy",
+            "copyPlain writer resource::dynamodb::copy-plain",
+            "get reader resource::dynamodb",
+            "item writer resource::dynamodb",
+            "nested writer resource::dynamodb",
+            "plain writer resource::dynamodb",
+            "put writer resource::dynamodb",
+            "request writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
+/// A crafted chain of named values stays bounded: past the shared evaluation depth it is not
+/// followed, and the table stays unresolved rather than naming a literal it did not check.
+#[test]
+fn java_named_builds_chained_past_the_evaluation_depth_stay_unresolved() {
+    let repo = fixture_repo("aws_sdk_named_chain", "aws-sdk-controls", None);
+    let mut body = String::from(
+        "import software.amazon.awssdk.services.dynamodb.DynamoDbClient;\n\
+         import software.amazon.awssdk.services.dynamodb.model.Put;\n\
+         import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;\n\
+         class Chain {\n void send(DynamoDbClient db) {\n\
+         var pb = PutItemRequest.builder().tableName(\"chained\");\n\
+         PutItemRequest v0 = pb.build();\n",
+    );
+    for n in 1..=20_000 {
+        body += &format!(" PutItemRequest v{n} = v{};\n", n - 1);
+    }
+    body += " db.putItem(v20000);\n }\n}\n";
+    std::fs::write(repo.join("Chain.java"), body).unwrap();
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let contracts: Vec<_> = export["providers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["contract"].as_str().unwrap())
+        .collect();
+    assert!(
+        contracts
+            .iter()
+            .all(|c| *c != "resource::dynamodb::chained"),
+        "{export}"
+    );
+}
+
+/// A name is exact only when every mention of its builder, by any name, is a form the reader
+/// follows (R3 of #719): a method that runs caller code, a consumer copy, an alias at any depth
+/// (reassigned or not), a field builder reached through an alias. Each other mention is a change
+/// the reader cannot follow, and the side is unresolved. The builders left alone keep their table.
+/// The same holds for code that runs when its caller says (a lambda, a local or anonymous class),
+/// a parameter assigned in its helper, a request passed to a helper after its builder was set, a
+/// field hidden by a local, a field set in an initializer before another is built from it, a field
+/// builder another file calls a method on or this file reads by name, a builder `applyMutation`
+/// hands to caller code, and a request type that another type of the file, the package or an
+/// import shadows. A builder set later in a loop around the one its value is made in, in a loop
+/// inside a lambda, or declared in a `for` clause is set before the next turn builds; a setter
+/// inside the request's own expression runs before its `build()`. A list or an array on a
+/// transaction's path changes in place, so one held in a name is followed only when its method
+/// writes that name twice (`List.of` cannot change), and one that comes in a parameter never is;
+/// a shorter path keeps the name it had.
+#[test]
+fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
+    let repo = fixture_repo("aws_sdk_builder_forms", "aws-sdk-builders", None);
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut sides: Vec<_> = [("writer", "providers"), ("reader", "consumers")]
+        .iter()
+        .flat_map(|(role, sides)| {
+            export[sides].as_array().unwrap().iter().map(move |s| {
+                let scope = s["site"].as_str().unwrap().split("::").nth(2).unwrap();
+                let method = scope.split('(').next().unwrap().rsplit('.').next().unwrap();
+                format!("{method} {role} {}", s["contract"].as_str().unwrap())
+            })
+        })
+        .collect();
+    sides.sort();
+    assert_eq!(
+        sides,
+        [
+            "afterLoop writer resource::dynamodb::after-loop",
+            "aloneField writer resource::dynamodb::shared-alone",
+            "anonymousClass writer resource::dynamodb",
+            "apply writer resource::dynamodb",
+            "arrayAlias writer resource::dynamodb",
+            "arrayPlain writer resource::dynamodb::array-plain",
+            "arraySet writer resource::dynamodb",
+            "callCopied writer resource::dynamodb",
+            "callMaybe writer resource::dynamodb",
+            "callPassed writer resource::dynamodb::param-plain",
+            "callRebuilt writer resource::dynamodb",
+            "callReplaced writer resource::dynamodb",
+            "castAlias writer resource::dynamodb",
+            "checkApply reader resource::dynamodb",
+            "constructorBuilt writer resource::dynamodb",
+            "control writer resource::dynamodb::sdk-control",
+            "copyInline writer resource::dynamodb",
+            "copyNamed writer resource::dynamodb",
+            "deep writer resource::dynamodb",
+            "escapedFieldBuilt writer resource::dynamodb",
+            "escapedInline writer resource::dynamodb",
+            "escapedLocal writer resource::dynamodb",
+            "explicit writer resource::dynamodb::explicit-control",
+            "fieldAlias writer resource::dynamodb",
+            "fieldInitializer writer resource::dynamodb",
+            "fieldPlain writer resource::dynamodb::field-plain",
+            "fromAlias writer resource::dynamodb",
+            "hiddenAlias writer resource::dynamodb",
+            "hiddenNull writer resource::dynamodb",
+            "hiddenParameter writer resource::dynamodb",
+            "hiddenThroughLocal writer resource::dynamodb",
+            "imported writer resource::dynamodb",
+            "initializerApply writer resource::dynamodb",
+            "initializerBlock writer resource::dynamodb",
+            "lambdaCond writer resource::dynamodb",
+            "lambdaConsumer writer resource::dynamodb",
+            "lambdaLater writer resource::dynamodb",
+            "lambdaOwn writer resource::dynamodb::lambda-own",
+            "lambdaRun writer resource::dynamodb",
+            "lambdaStored writer resource::dynamodb",
+            "listAlias writer resource::dynamodb",
+            "listImmutable writer resource::dynamodb::list-of",
+            "listOther writer channel::eventbridge::list-other",
+            "listPlain writer resource::dynamodb::list-plain",
+            "listSet writer resource::dynamodb",
+            "localClass writer resource::dynamodb",
+            "loopFresh writer resource::dynamodb::loop-fresh",
+            "loopInLambda writer resource::dynamodb",
+            "loopInit writer resource::dynamodb",
+            "loopInnerAfter writer resource::dynamodb::inner-after",
+            "loopInnerFresh writer resource::dynamodb::inner-fresh",
+            "loopLater writer resource::dynamodb",
+            "loopNested writer resource::dynamodb",
+            "nested writer resource::dynamodb",
+            "nestedLambda writer resource::dynamodb",
+            "otherMember writer resource::dynamodb::other-member",
+            "ownArgument writer resource::dynamodb",
+            "ownChain writer resource::dynamodb::own-chain",
+            "ownEntry writer resource::dynamodb",
+            "ownLambda writer resource::dynamodb",
+            "ownNamed writer resource::dynamodb",
+            "packaged writer resource::dynamodb",
+            "passedBuiltFirst writer resource::dynamodb::built-first",
+            "passedInline writer resource::dynamodb",
+            "passedSet writer resource::dynamodb",
+            "plainDeep writer resource::dynamodb",
+            "qualified writer resource::dynamodb",
+            "reassigned writer resource::dynamodb",
+            "reflected writer resource::dynamodb",
+            "requestReassigned writer resource::dynamodb",
+            "restarted writer resource::dynamodb::restarted",
+            "sharedField writer resource::dynamodb",
+            "supplierAlias writer resource::dynamodb",
+            "ternaryAlias writer resource::dynamodb",
+            "variable writer resource::dynamodb",
+            "wrappedAlias writer resource::dynamodb",
+            "wrappedArray writer resource::dynamodb",
+            "wrappedBoth writer resource::dynamodb::wrapped-first",
+            "wrappedBoth writer resource::dynamodb::wrapped-second",
+            "wrappedCallerSet writer resource::dynamodb",
+            "wrappedPlain writer resource::dynamodb",
+            "wrappedSet writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
 #[test]
 fn hidden_aws_client_and_command_names_never_feed_contracts() {
     let typescript = [
@@ -1072,6 +1654,151 @@ fn aws_origin_chains_and_inline_factories_stay_bounded_at_the_file_size_ceiling(
             "{text}"
         );
         assert_eq!(export["consumers"], serde_json::json!([]));
+    }
+}
+
+/// The transaction calls of a file fold on a budget of their own: however many they are, the
+/// other calls of the file keep the sides they have without them, of every kind (#719).
+#[test]
+fn transaction_calls_leave_the_other_sides_of_their_file_named() {
+    let repeated = |template: &str, count: usize| -> String {
+        (0..count)
+            .map(|k| template.replace("$K", &k.to_string()))
+            .collect()
+    };
+    let java = format!(
+        r#"import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.Put;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.sns.SnsClient;
+import software.amazon.awssdk.services.sns.model.PublishRequest;
+
+class Budget {{
+    void transactions() {{
+        var db = DynamoDbClient.create();
+{}    }}
+    void last() {{
+        var db = DynamoDbClient.create();
+        db.putItem(PutItemRequest.builder().tableName("last").build());
+        var get = GetItemRequest.builder().tableName("get");
+        db.getItem(get.build());
+        var s3 = S3Client.create();
+        s3.putObject(PutObjectRequest.builder().bucket("bucket").build(), RequestBody.empty());
+        var sns = SnsClient.create();
+        sns.publish(PublishRequest.builder().topicArn("topic").build());
+    }}
+}}
+"#,
+        repeated(
+            r#"        var p$K = Put.builder().tableName("t$K");
+        var e$K = p$K.build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(e$K).build()).build());
+"#,
+            2000
+        )
+    );
+    let go = format!(
+        r#"package app
+
+import (
+    "context"
+
+    "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+    "github.com/aws/aws-sdk-go-v2/service/s3"
+    "github.com/aws/aws-sdk-go-v2/service/sns"
+)
+
+var cfg aws.Config
+var client = dynamodb.NewFromConfig(cfg)
+{}
+func last(ctx context.Context) {{
+    client.PutItem(ctx, &dynamodb.PutItemInput{{TableName: aws.String("last")}})
+    in := &dynamodb.GetItemInput{{TableName: aws.String("get")}}
+    client.GetItem(ctx, in)
+    buckets := s3.NewFromConfig(cfg)
+    buckets.PutObject(ctx, &s3.PutObjectInput{{Bucket: aws.String("bucket")}})
+    topics := sns.NewFromConfig(cfg)
+    topics.Publish(ctx, &sns.PublishInput{{TopicArn: aws.String("topic")}})
+}}
+"#,
+        repeated(
+            r#"
+func f$K(ctx context.Context) {
+    p := &types.Put{TableName: aws.String("t$K")}
+    items := []types.TransactWriteItem{{Put: p}}
+    in := &dynamodb.TransactWriteItemsInput{TransactItems: items}
+    client.TransactWriteItems(ctx, in)
+}
+"#,
+            2500
+        )
+    );
+    let csharp = format!(
+        r#"using System.Collections.Generic;
+using System.Threading.Tasks;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
+using Amazon.S3;
+using Amazon.S3.Model;
+using Amazon.SimpleNotificationService;
+using Amazon.SimpleNotificationService.Model;
+
+class Budget {{
+    AmazonDynamoDBClient db = new AmazonDynamoDBClient();
+{}    async Task Last() {{
+        await db.PutItemAsync(new PutItemRequest {{ TableName = "last" }});
+        var get = new GetItemRequest {{ TableName = "get" }};
+        await db.GetItemAsync(get);
+        var s3 = new AmazonS3Client();
+        await s3.PutObjectAsync(new PutObjectRequest {{ BucketName = "bucket" }});
+        var sns = new AmazonSimpleNotificationServiceClient();
+        await sns.PublishAsync(new PublishRequest {{ TopicArn = "topic" }});
+    }}
+}}
+"#,
+        repeated(
+            r#"    async Task F$K() {
+        var p = new Put { TableName = "t$K" };
+        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = p } };
+        var request = new TransactWriteItemsRequest { TransactItems = items };
+        await db.TransactWriteItemsAsync(request);
+    }
+"#,
+            2500
+        )
+    );
+    for (language, file, source) in [
+        ("java", "Budget.java", java),
+        ("go", "budget.go", go),
+        ("csharp", "Budget.cs", csharp),
+    ] {
+        let repo = fixture_repo(
+            &format!("aws_sdk_transaction_budget_{language}"),
+            "aws-sdk-controls",
+            None,
+        );
+        std::fs::write(repo.join(file), source).unwrap();
+        let text = Engine::open(&repo).unwrap().export().unwrap();
+        let export: Value = serde_json::from_str(&text).unwrap();
+        for (sides, contract) in [
+            ("providers", "resource::dynamodb::t0"),
+            ("providers", "resource::dynamodb::last"),
+            ("consumers", "resource::dynamodb::get"),
+            ("providers", "resource::s3::bucket"),
+            ("providers", "channel::sns::topic"),
+        ] {
+            let named =
+                (export[sides].as_array().unwrap().iter()).any(|s| s["contract"] == contract);
+            assert!(named, "{language}: no {contract} in {sides}");
+        }
     }
 }
 

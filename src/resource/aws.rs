@@ -509,6 +509,25 @@ const SERVICES: &[Service] = &[
                 role: Role::Consumer,
                 hierarchy: false,
             },
+            // A `ConditionCheck` reads its table even where the transaction writes others.
+            SdkOperation {
+                method: "TransactWriteItems",
+                field: "TransactItems[].Put|Update|Delete.TableName",
+                role: Role::Provider,
+                hierarchy: false,
+            },
+            SdkOperation {
+                method: "TransactWriteItems",
+                field: "TransactItems[].ConditionCheck.TableName",
+                role: Role::Consumer,
+                hierarchy: false,
+            },
+            SdkOperation {
+                method: "TransactGetItems",
+                field: "TransactItems[].Get.TableName",
+                role: Role::Consumer,
+                hierarchy: false,
+            },
         ],
     },
     Service {

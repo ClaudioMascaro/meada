@@ -575,6 +575,21 @@ pub struct Facts {
     /// the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub bound: Vec<Bound>,
+    /// What the file assigns to a name besides the initializer `bound` keeps: each value assigned
+    /// to a bare name (`b = a.f()`), and the initializer of a local `bound` drops because the name
+    /// holds no one value (assigned again, declared twice, hidden by a field). A reader that must
+    /// see every use of a value (Java builders, which change in place) reads what these name.
+    /// Not kept in the index (see `Call::args`).
+    #[serde(default, skip_serializing_if = "lean")]
+    pub assigned: Vec<Bound>,
+    /// How many times the file writes the name of each local `bound` keeps, in the body of its
+    /// scope, and of each `final` field, in the whole file (scope `""`): every identifier of that
+    /// spelling, whatever it is part of. A reader that must see every use of a value compares it
+    /// with the uses it reads; one more is a use its model of the syntax does not show (a cast, a
+    /// ternary, a return). Java, and for the locals of a function Go (those it keeps as
+    /// constants) and C# (`mentioned`). Not kept in the index (see `Call::args`).
+    #[serde(default, skip_serializing_if = "lean")]
+    pub mentioned: Vec<Mentioned>,
     /// A stable first binding of a multiple-result call (Go). This is a result projection,
     /// not a scalar constant: only a reader proving that call's result may follow it.
     /// Not kept in the lean index, like the bound values above.
@@ -588,6 +603,16 @@ pub struct Facts {
     /// come before a read it follows in the source (`resolve/mutations.rs`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub loops: Vec<Range<usize>>,
+    /// The byte ranges of every lambda and every local or anonymous class, in source order (Java).
+    /// Their code runs when a caller says, after the statements that follow them in the source: a
+    /// reader of a value changed in place cannot order what they hold against what follows.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deferred: Vec<Range<usize>>,
+    /// The byte ranges of the code each loop runs again, nested loops included, in source order
+    /// (Java): the statement, and a `for` from the end of its init clause, which runs once. What
+    /// is declared before one and changed in place is, on each turn, what the turn before left.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub repeated: Vec<Range<usize>>,
     /// What the file gives every file of its project, in the pack's spelling, which
     /// `LanguagePack::join` applies to each: C#'s `global using` directives (`A.B`, `static
     /// A.B`, `X = A.B`).
@@ -665,6 +690,14 @@ pub fn extra(setting: &str) -> &str {
     setting.split_once('\n').map_or("", |(_, extra)| extra)
 }
 
+/// How many times `name` is written in `scope` (`Facts::mentioned`).
+#[derive(Serialize, Deserialize)]
+pub struct Mentioned {
+    pub scope: String,
+    pub name: String,
+    pub count: u32,
+}
+
 /// The value a name bound in `scope` holds, written in `within` (`Facts::bound`).
 #[derive(Serialize, Deserialize)]
 pub struct Bound {
@@ -696,6 +729,60 @@ pub(crate) fn outermost(root: Node, kinds: &[&str]) -> Vec<Range<usize>> {
         stack.extend(children.into_iter().rev());
     }
     out
+}
+
+/// `Facts::mentioned` for the `(scope, name)` locals of a pack whose scopes are its definitions:
+/// how many identifiers written inside the functions named `scope` spell `name`, nested
+/// functions included, in one walk of the file. A name of no function (a field, a package
+/// variable) gets no count: code outside the file may write it. No name gets one in a file that
+/// spells an identifier with an escape (C#'s `\u0061`), which no count compares.
+pub(crate) fn mentioned<'l>(
+    root: Node,
+    src: &[u8],
+    defs: &[Def],
+    locals: impl Iterator<Item = (&'l str, &'l str)>,
+) -> Vec<Mentioned> {
+    let locals: BTreeSet<(&str, &str)> = locals.collect();
+    let mut written: HashMap<&str, Vec<usize>> =
+        locals.iter().map(|&(_, name)| (name, Vec::new())).collect();
+    if written.is_empty() {
+        return Vec::new();
+    }
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if node.kind() == "identifier" {
+            let Some(text) = node.utf8_text(src).ok().filter(|t| !t.contains('\\')) else {
+                return Vec::new();
+            };
+            // C# spells a name that is also a keyword `@name`.
+            if let Some(at) = written.get_mut(text.trim_start_matches('@')) {
+                at.push(node.start_byte());
+            }
+            continue;
+        }
+        let mut cursor = node.walk();
+        stack.extend(node.children(&mut cursor));
+    }
+    written.values_mut().for_each(|at| at.sort_unstable());
+    let mut functions: HashMap<&str, Vec<&Range<usize>>> = HashMap::new();
+    for def in defs {
+        if matches!(def.kind, Kind::Function | Kind::Method | Kind::Inline) {
+            functions.entry(&def.name).or_default().push(&def.range);
+        }
+    }
+    (locals.into_iter())
+        .filter_map(|(scope, name)| {
+            let at = &written[name];
+            let count: usize = (functions.get(scope)?.iter())
+                .map(|r| at.partition_point(|&s| s < r.end) - at.partition_point(|&s| s < r.start))
+                .sum();
+            Some(Mentioned {
+                scope: scope.into(),
+                name: name.into(),
+                count: count.try_into().unwrap_or(u32::MAX),
+            })
+        })
+        .collect()
 }
 
 #[derive(Clone, Serialize, Deserialize)]

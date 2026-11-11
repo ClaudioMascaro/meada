@@ -661,8 +661,10 @@ earlier forms: a field, parameter or typed local declared with the SDK's SQS cli
 injected ones included, while a repository type of that name is not.
 
 Literal names and ARNs identify the contract; an environment read keeps an unresolved side
-and records its variable, including for producers. Batches retain every name. Readers belong
-to their enclosing function, writers to the operation call, and SDK links are `exact`;
+and records its variable, including for producers. Batches and DynamoDB transactions
+(`TransactWriteItems`, `TransactGetItems`) retain every name, and a `ConditionCheck` reads its
+table. Readers belong to their enclosing function, writers to the operation call, and SDK
+links are `exact`;
 resource declarations remain `declared`. Unresolved sides never link, and
 `GetParametersByPath` does not identify a physical parameter. The
 [capabilities table](site/en/capabilities.md) lists operations and differences between SDKs.

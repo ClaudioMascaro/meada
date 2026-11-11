@@ -364,7 +364,7 @@ Environment reads through Go and C# import aliases retain their variable name. A
 | EventBridge | `PutEvents` produces to every `Entries[].EventBusName`, `default` when omitted |
 | Kinesis | `PutRecord`, `PutRecords` produce, through `StreamName` |
 | S3 | `PutObject`, `DeleteObject` write; `GetObject`, `HeadObject`, `ListObjects`, `ListObjectsV2` read, through the bucket |
-| DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem` write; `GetItem`, `Query`, `Scan`, `BatchGetItem` read, through `TableName` or every `RequestItems` key |
+| DynamoDB | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, and the `Put`, `Update` and `Delete` entries of `TransactWriteItems` write; `GetItem`, `Query`, `Scan`, `BatchGetItem`, the `Get` entries of `TransactGetItems` and the `ConditionCheck` entries of `TransactWriteItems` read, through `TableName`, every `RequestItems` key or the `TableName` of every `TransactItems` entry |
 | SSM | `GetParameter`, `GetParameters` read; `PutParameter`, `DeleteParameter`, `DeleteParameters` write, through `Name` or every `Names` entry |
 | Secrets Manager | `GetSecretValue`, `BatchGetSecretValue` read; `PutSecretValue`, `UpdateSecret`, `CreateSecret`, `DeleteSecret` write, through `SecretId`, every `SecretIdList` entry or `Name` |
 

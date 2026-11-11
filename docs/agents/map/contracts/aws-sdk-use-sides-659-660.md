@@ -20,7 +20,14 @@
   across the group to invalidate named request objects even through another receiver alias; Go
   shares the existing field-write index. Both check a named value by its field name across the
   group: one `entry.EventBusName = ..` anywhere makes every named entry opaque, and a list holding
-  one opaque entry names nothing for its inline entries either. A Java builder held in a local or
+  one opaque entry names nothing for its inline entries either. A transaction's path of three
+  members adds `held_changed`: a request, a list, an item or an entry held in a name is followed
+  only when the function that declares the name mentions it twice, where it is declared and where
+  the path reads it (`lang::mentioned` fills `Facts::mentioned` for the locals Go keeps as
+  constants and the ones C#'s `bound` keeps); a parameter, a field and a package variable are
+  never followed. The rows of a transaction run inside `Code::apart` and trace their clients
+  with an `Origins` of their own, so what they fold is charged to a second per-file budget and
+  the other calls of the file keep theirs. A Java builder held in a local or
   a `final` field that a call outside the request's call sets again (a step setting a member of
   the name's path, before or after the request, anywhere in a chain off the builder or off a
   local holding it: `b.message(..).topicArn(..)`, `var e = b.message(..); e.topicArn(..)`,
@@ -28,8 +35,43 @@
   (`contract/sdk/java.rs` `rebuilt`; a `final` field is matched by name in every class of its
   file) names nothing, as does a request a step of which takes such a builder (`entries(e.build())`), in
   SQS's channel form and Azure's builder stages too, where a changed topic receiver keeps an
-  unresolved side. The folded Java name reader rejects a value-bound head
-  before considering on-demand type candidates. `request` returns `None` for a field that a
+  unresolved side. A Java builder changes in place, so `contract/sdk/java.rs`
+  (`Builders`, read once per file, then a lookup per value) names a table only when every mention
+  of its builder is a form the reader follows: a setter (a member of the name's path changes it,
+  any other does not), `.build()` and `Object`'s methods. Any other mention is a change it cannot
+  follow, and the side is unresolved: the builder handed to a call or captured, the receiver of
+  `applyMutation` or of `copy` with a consumer, the right side of an initializer or an
+  assignment (an alias, at any depth; `Facts::assigned` keeps the initializers `bound` drops),
+  and a write of its name the syntax model does not show (`Facts::mentioned` counts identifiers
+  against the calls made on it: a cast, a ternary, an array element, a lambda that returns it).
+  A named value (`Put p = pb.build()`) is judged where it was built: a mention after the build
+  does not change the copy, except in a loop the builder outlives (`Facts::repeated`: every
+  loop, nested ones included, a `for` from the end of its init clause) and in a lambda or a
+  local or anonymous class declared after the builder (`Facts::deferred`), which runs when its
+  caller says, so a mention anywhere after it counts. Only the steps of the chain a value is
+  built by are read in order (they start where the chain does): a mention of the builder
+  inside that expression (an argument or a lambda of one of its steps, another entry of the
+  same request) or around it is a change like one before it. A name the file assigns again,
+  such as a parameter its helper assigns, names nothing; `this.name` is the field whatever
+  local hides the bare name; a `final` field builder is judged by every mention of its name in
+  the file, whatever their order; and a helper's request is judged where each caller passes it
+  (`passed_changed`, every argument of every call climbed). A list or an array on a
+  transaction's path held in a name (`Arrays.asList`, an array initializer, `new`) changes in
+  place too: `Walk::replaced` follows it only when its method mentions the name twice, and each
+  alias on the way as well; one in a field is never followed, and `List.of` cannot change.
+  `Walk::passed` leaves unresolved the one argument of `transactItems(..)` that is a name with
+  no value the reader holds (a parameter or an assigned field, itself or through local
+  aliases): the wrapper and each of its callers may change such a list, and no mention count
+  sees both.
+  A chain with `applyMutation` anywhere in it hands its builder to caller code, a file that
+  reads a field by name (`getDeclaredField`) or calls a method on a field builder's name from
+  another file may change it, and a chain that starts at a type another type of its file or
+  directory, an import outside the SDK or a variable shadows is not the SDK's.
+  The question is asked per request call, so one entry the reader cannot follow leaves every
+  entry of that request unresolved. Past `EVAL_DEPTH` nested named values the name stays
+  unresolved, and `field_of` stops at a step that runs caller code. The
+  folded Java name reader rejects a value-bound head before considering on-demand type
+  candidates. `request` returns `None` for a field that a
   request it sees whole (`complete`: a Go or C# literal, a Java chain from `builder()`) leaves
   out: EventBridge then names `default` and SNS no side (ADR 0026); other kinds and any request
   it cannot see whole keep an unresolved side.
@@ -76,5 +118,11 @@ SDK resource readers link to SDK writers in their repository as well as peers. E
 configuration declarations keep their cross-repository rule and their level.
 
 SSM hierarchy queries stay unresolved instead of naming the path as a parameter; DynamoDB
-transaction condition checks are readers. Computed object keys are syntax facts (`[]` holding
-the key and value), folded by `Code::expand`; batch readers retain literal and environment keys.
+transaction condition checks are readers. Java, Go and .NET read transactions (#719) through
+one `Service` row per direction of a method: `TransactItems[].Put|Update|Delete.TableName`
+writes, `TransactItems[].ConditionCheck.TableName` and `TransactItems[].Get.TableName` read.
+`A|B` before a field's last member names the variants an element may set; `request` skips a
+whole element that sets none of them (a Java chain from `TransactWriteItem.builder()`, a Go or
+C# literal), and one it cannot see whole keeps an unresolved side. Computed object keys are
+syntax facts (`[]` holding the key and value), folded by `Code::expand`; batch readers retain
+literal and environment keys.

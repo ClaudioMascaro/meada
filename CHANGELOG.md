@@ -8,6 +8,15 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- DynamoDB transactions in Java, Go and C# (#719): `TransactWriteItems` and `TransactGetItems`
+  give sides as they do in JavaScript and Python. Each `Put`, `Update` and `Delete` entry
+  writes its own table, each `ConditionCheck` and `Get` entry reads its own, with the literal
+  and environment rules of the other names. A list or an array of entries held in a name (in
+  Go and C#, a request, an item or an entry too) gives its tables only when its function
+  mentions the name twice, where it is declared and where the request reads it: any other
+  mention may change it, and one that comes in a parameter (in Java, a single entry too) gives
+  none. Every Java, Go and .NET AWS operation now has a test. Included in the 1.4.0 minor
+  release.
 - Curated operators and private IaC mappings (#671): 43 explicit Strimzi, RabbitMQ Queue,
   ACK, Config Connector and Crossplane AWS/GCP/Azure types provision existing contracts.
   RabbitMQ Exchange/Binding topology routes real publishes to queues without inventing an
@@ -374,6 +383,21 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A Java AWS SDK request no longer names a table, topic, bucket or queue its builder had before
+  the builder changed (#719). A builder changes in place, so a name is `exact` only when every
+  mention of the builder is a form the reader follows: a setter, `.build()`. Any other mention
+  leaves the side unresolved: the builder handed to a call or captured, `applyMutation`,
+  `copy(consumer)`, an alias at any depth, and a use the reader does not model (a cast, a
+  ternary). A value built first keeps its name, as an immutable copy does, except in a loop the
+  builder outlives. A request is judged whole: one such entry leaves the others unresolved.
+  The check reads a file once, so its cost is linear in the calls.
+- A Java AWS SDK request built by a lambda or a class that runs after its builder changed, one
+  its helper assigns again as a parameter, one a caller passes on after its builder changed, a
+  builder field hidden by a local, one set from an initializer or another file, one handed to
+  caller code by `applyMutation` and a request type another type or an import shadows name no
+  table either (#719).
+- A Java AWS SDK request whose builder is set again in a loop around the one its value is built
+  in, or inside the request's own expression, names no table either (#719).
 - Terraform static evaluation charges the template text `hcl-rs` parses again at each
   evaluation in a `for`, not only the bytes an expression makes: a template in a `for` over
   thousands of elements is unresolved (`*`) before it runs, where one 24 KB root took seconds
