@@ -7,9 +7,10 @@ name: Stage npm package
 on:
   workflow_call:
     inputs:
-      # cargo-dist passes the plan to every custom publish job. This one never reads it: as an
-      # environment variable it passed the kernel's 128 KiB limit per string at v1.3.0 (the plan
-      # holds the release's CHANGELOG section twice) and no step of the job could start.
+      # cargo-dist passes the plan to every custom publish job. This one reads the plan from the
+      # release's artifacts instead (plan-dist-manifest.json): as an environment variable it passed
+      # the kernel's 128 KiB limit per string at v1.3.0 (the plan holds the release's CHANGELOG
+      # section twice) and no step of the job could start.
       plan:
         required: true
         type: string
@@ -33,14 +34,12 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - run: npm install --global npm@11.21.0
       - name: Stage npm packages
-        # The packages are the npm tarballs among the release's artifacts, the same files the plan
-        # names. A release without one stages nothing, as before.
+        # The assignment, not a `for ... in $(jq ...)`, makes a missing or unreadable plan fail the
+        # step. A package the plan names and the artifacts lack fails in npm.
         run: |
-          shopt -s nullglob
-          packages=(npm/*-npm-package.tar.gz)
-          echo "::notice::npm packages to stage: ${packages[*]:-none}"
-          for pkg in "${packages[@]}"; do
-            npm stage publish --access public "./${pkg}"
+          packages=$(jq --raw-output '.releases[].artifacts[] | select(endswith("-npm-package.tar.gz"))' npm/plan-dist-manifest.json)
+          for pkg in $packages; do
+            npm stage publish --access public "./npm/${pkg}"
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
