@@ -19,9 +19,9 @@ or a collection shows as text) is converted exactly or left unresolved. For Terr
 `tests/terraform-oracle/` computes the tool's own answer with HashiCorp's HCL and cty libraries:
 add the case to `cases.tsv` (one expression) or a directory under `modules/` (a variable, a
 module argument, an override file) and run `go run .` there. `recorded.jsonl` beside them holds
-names the tools themselves gave (Terraform and OpenTofu, run by the black-box rounds of #754):
-`want` changes only with the tool run again, and a `mark` that leaves `=` is an exact name lost,
-which the PR names.
+names the tools themselves gave in `console` (Terraform and OpenTofu, run by the black-box rounds
+of #754): `want` changes only with the tool run again, and a `mark` that leaves `=` is an exact
+name lost, which the PR names.
 
 When Meada emulates a tool that has a fork reading the same files (Terraform and OpenTofu), a
 rule is checked against both. Where they differ Meada follows Terraform (#740), an exception
