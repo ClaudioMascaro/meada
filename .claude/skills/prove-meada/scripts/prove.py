@@ -983,11 +983,12 @@ Resources:
                      "b": 'source = "registry.terraform.io/terraform-aws-modules/s3-bucket/aws"\n bucket = "b"',
                      "fifo": 'source = "terraform-aws-modules/sqs/aws"\n name = "f"\n fifo_queue = true',
                      "nameless": 'source = "terraform-aws-modules/lambda/aws"\n handler = "h"',
+                     "gated": 'source = "terraform-aws-modules/s3-bucket/aws"\n bucket = "g"\n putin_khuylo = false',
                      "local": 'source = "./m"\n name = "x"', "other": 'source = "terraform-aws-modules/vpc/aws"\n name = "v"'}
             subprocess.run(["git", "init", "-q", tmp], check=True)  # the oracle lists files with git
             Path(tmp, "main.tf").write_text("".join(f'module "{k}" {{\n {v}\n}}\n' for k, v in calls.items()))
             got = {n["address"]: "unchecked" if n["unchecked"] else n["name"] for n in tf.evaluate(Path(tmp))[0]}
-        assert got == {"module.q": "q", "module.b": "b", "module.fifo": "unchecked", "module.nameless": "unchecked",
+        assert got == {"module.q": "q", "module.b": "b", "module.fifo": "unchecked", "module.nameless": "unchecked", "module.gated": "unchecked",
                        "module.local": None, "module.other": None}, got
     print("selftest passed")
 
