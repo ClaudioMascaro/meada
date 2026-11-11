@@ -90,9 +90,9 @@ _Avoid_: environment, stage, kustomization (the file)
 
 **Pattern**:
 A name with a part static evaluation could not resolve, kept with a wildcard in its place. It
-links `inferred` to a literal name when its literal part has at least three characters and its
-wildcards fall on segment boundaries; it never links to another pattern. Not a binding's routing
-pattern.
+links `inferred` to a literal name when its literal part has at least three letters or digits
+(separators do not count) and its wildcards fall on segment boundaries; it never links to another
+pattern. Not a binding's routing pattern.
 _Avoid_: glob, wildcard name, template
 
 **Overridable value**:

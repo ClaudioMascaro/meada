@@ -565,10 +565,10 @@ las variables y sus orígenes en el motivo. `context` en el bloque lista los lad
 en un productor lista sus provisionadores. `trace` sigue del bloque al código con `down` y del
 código a la infraestructura con `up`. El export conserva `format: 1` y añade `iac_nodes`,
 `provisioners` y `provisions`, omitidos cuando están vacíos. Tipos no listados y bloques data no
-provisionan contratos. Un patrón con al menos tres caracteres literales y comodines en los límites
-de segmentos (`-`, `_`, `.`, `/`) se enlaza a un nombre literal en `inferred`, o `ambiguous` cuando
-coinciden varios nombres. Los patrones nunca se enlazan entre sí. El grafo de la consola muestra
-los provisionadores y sus enlaces propios.
+provisionan contratos. Un patrón con al menos tres letras o dígitos literales (los separadores no
+cuentan) y comodines en los límites de segmentos (`-`, `_`, `.`, `/`) se enlaza a un nombre literal
+en `inferred`, o `ambiguous` cuando coinciden varios nombres. Los patrones nunca se enlazan entre
+sí. El grafo de la consola muestra los provisionadores y sus enlaces propios.
 
 ### GCP y Cloud Run
 
@@ -2217,12 +2217,12 @@ y las operaciones fuera de la tabla no se reconocen por estas formas.
 
 Un canal, recurso o imagen con partes desconocidas conserva un patrón como `*-orders`.
 `${terraform.workspace}-orders` coincide con `prod-orders` en `inferred`: se requieren
-al menos tres caracteres literales y cada `*` debe ocupar segmentos completos delimitados
-por `-`, `_`, `.` o `/`. Un patrón nunca coincide con otro patrón. Varios nombres literales
-compatibles quedan `ambiguous`, todos enumerados, y se convierten en elementos abiertos.
-`meada decide` guarda la elección en `meada.decisions.toml`; el vínculo elegido queda
-`decided`. Las decisiones de aprovisionamiento pertenecen al lado que contiene el patrón
-y conservan su raíz de evaluación.
+al menos tres letras o dígitos literales (los separadores no cuentan) y cada `*` debe ocupar
+segmentos completos delimitados por `-`, `_`, `.` o `/`. Un patrón nunca coincide con otro patrón.
+Varios nombres literales compatibles quedan `ambiguous`, todos enumerados, y se convierten en
+elementos abiertos. `meada decide` guarda la elección en `meada.decisions.toml`; el vínculo elegido
+queda `decided`. Las decisiones de aprovisionamiento pertenecen al lado que contiene el patrón y
+conservan su raíz de evaluación.
 
 Los elementos de claves de configuración usan metadatos del archivo, la línea, la clave y el contrato, también cuando el valor está marcado `redacted` o recortado.
 

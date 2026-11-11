@@ -558,9 +558,10 @@ on a producer it lists provisioners. `trace` follows the block to code with `dow
 infrastructure with `up`. Export keeps `format: 1` and adds `iac_nodes`, `provisioners` and
 `provisions`, omitted when empty. Unlisted types and data blocks do not provision contracts. A
 pattern
-with at least three literal characters and wildcards on segment boundaries (`-`, `_`, `.`, `/`)
-links to a literal name at `inferred`, or `ambiguous` when several names match. Patterns never
-link to patterns. The console graph lists provisioner sides and their separate links.
+with at least three literal letters or digits (separators do not count) and wildcards on segment
+boundaries (`-`, `_`, `.`, `/`) links to a literal name at `inferred`, or `ambiguous` when several
+names match. Patterns never link to patterns. The console graph lists provisioner sides and their
+separate links.
 
 ### GCP and Cloud Run
 
@@ -2183,11 +2184,11 @@ and operations outside this table are not recognized by these forms.
 
 A channel, resource or image with unknown parts retains a pattern such as `*-orders`.
 `${terraform.workspace}-orders` matches `prod-orders` at `inferred`: at least three literal
-characters are required, and each `*` must occupy whole segments bounded by `-`, `_`, `.`
-or `/`. A pattern never matches another pattern. Several matching literal names stay
-`ambiguous`, all listed, and become open items. `meada decide` records the choice in
-`meada.decisions.toml`; the chosen link becomes `decided`. Provisioning decisions belong
-to the side containing the pattern and retain its evaluation root.
+letters or digits are required (separators do not count), and each `*` must occupy whole segments
+bounded by `-`, `_`, `.` or `/`. A pattern never matches another pattern. Several matching literal
+names stay `ambiguous`, all listed, and become open items. `meada decide` records the choice in
+`meada.decisions.toml`; the chosen link becomes `decided`. Provisioning decisions belong to the side
+containing the pattern and retain its evaluation root.
 
 Configuration-key items use file, line, key and contract metadata, including when the value is redacted or cut.
 
