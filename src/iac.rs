@@ -45,6 +45,8 @@ use hcl_edit::parser;
 use hcl_edit::structure::{Body, Structure};
 use hcl_edit::template::{Directive, Element, Template};
 use hcl_edit::visit::{self, Visit};
+
+use self::functions::Elem;
 use hcl_edit::visit_mut::{self, VisitMut};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
@@ -490,12 +492,15 @@ impl Named {
 /// to the type).
 #[derive(Clone, Copy, PartialEq)]
 enum Declared {
-    /// `set(...)`: a set.
-    Set,
+    /// `set(T)`: the elements converted to `T`, then sorted and deduplicated.
+    Set(Elem),
+    /// `list(T)`: a set that came before it (an override retyping a declared set) becomes a list
+    /// of `T` in its order; a value no set touched stays as it is.
+    List(Elem),
     /// `any`: the value keeps its own type.
     Any,
-    /// Any other type (`list(...)`, `tuple(...)`, `map(...)`, `object(...)`, a primitive): the
-    /// value is converted, so it is no set.
+    /// Any other type (`tuple(...)`, `map(...)`, `object(...)`, a primitive): no conversion is
+    /// made, and no set converts to these.
     Other,
 }
 
@@ -503,21 +508,114 @@ impl Declared {
     /// The declared type written as the constraint `text` (the form a Terraform JSON file gives).
     fn text(text: &str) -> Declared {
         let text = text.trim();
-        match (text, text.starts_with("set(")) {
-            (_, true) => Declared::Set,
-            ("any", _) => Declared::Any,
+        let inner = |prefix: &str| {
+            let rest = text.strip_prefix(prefix)?;
+            Some(Elem::named(rest.strip_suffix(')')?))
+        };
+        match (inner("set("), inner("list(")) {
+            (Some(elem), _) => Declared::Set(elem),
+            (_, Some(elem)) => Declared::List(elem),
+            _ if text == "any" => Declared::Any,
             _ => Declared::Other,
         }
     }
 
     /// The declared type written as the expression `expr`.
     fn expr(expr: &Expression) -> Declared {
+        let elem = |f: &hcl_edit::expr::FuncCall| match f.args.iter().next() {
+            Some(Expression::Variable(v)) => Elem::named(v.as_str()),
+            _ => Elem::Other,
+        };
         match expr {
-            Expression::FuncCall(f) if f.name.name.as_str() == "set" => Declared::Set,
+            Expression::FuncCall(f) if f.name.name.as_str() == "set" => Declared::Set(elem(f)),
+            Expression::FuncCall(f) if f.name.name.as_str() == "list" => Declared::List(elem(f)),
             Expression::Variable(v) if v.as_str() == "any" => Declared::Any,
             _ => Declared::Other,
         }
     }
+}
+
+/// `value` converted through the declared types `steps` in turn, as Terraform converts a default
+/// (to the type of the block that declares it, then to each type an override gives). `None`
+/// where Meada cannot make a conversion with certainty, and where a set meets a type no set
+/// converts to (a tuple, a map): Terraform rejects the configuration.
+fn converted_through(mut value: Value, steps: &[Declared]) -> Option<Value> {
+    let mut set = false;
+    for step in steps {
+        match *step {
+            Declared::Set(elem) => {
+                value = functions::to_set(&value, elem).ok()?;
+                set = true;
+            }
+            // A list converts only a set that came before it (an override retyping a declared
+            // set); a value no set has touched stays as it is, whatever its elements are.
+            Declared::List(elem) if set => {
+                value = functions::to_list(&value, elem).ok()?;
+                set = false;
+            }
+            Declared::List(_) => {}
+            Declared::Any => {}
+            Declared::Other if set => return None,
+            Declared::Other => {}
+        }
+    }
+    Some(value)
+}
+
+/// Whether a default converted through `steps` is a set: the last type that is not `any`, which
+/// keeps the value, is one.
+fn ends_in_set(steps: &[Declared]) -> bool {
+    let last = steps.iter().rev().find(|t| **t != Declared::Any);
+    matches!(last, Some(Declared::Set(_)))
+}
+
+/// `found`, a variable's value, converted through the declared types `steps`: unresolved where
+/// Meada cannot make the conversion with certainty.
+fn declared(found: Evaluated, steps: &[Declared]) -> Evaluated {
+    match found.val {
+        Val::Known(v) => Evaluated {
+            val: converted_through(v, steps).map_or(Val::Unknown, Val::Known),
+            through: found.through,
+        },
+        _ => found,
+    }
+}
+
+/// `value` converted once to the type `ty`, as OpenTofu 1.13 and later convert a default: a set
+/// or list converts its elements, any other type keeps the value. `None` where Meada cannot
+/// convert with certainty.
+fn converted_once(value: Value, ty: Option<Declared>) -> Option<Value> {
+    match ty {
+        Some(Declared::Set(elem)) => functions::to_set(&value, elem).ok(),
+        Some(Declared::List(elem)) => functions::to_list(&value, elem).ok(),
+        _ => Some(value),
+    }
+}
+
+/// `found`, the default of `variable`, converted as `declared` does: Terraform converts it to the
+/// type of its declaring block and again to each override's. A variable with a block in a file
+/// only OpenTofu reads (`.tofu`, `.tofu.json`) is one Terraform does not read whole, and OpenTofu
+/// 1.13 and later convert the default once, to the final type, where 1.12 and earlier convert it
+/// as Terraform does: the default is unresolved where the two hold other elements, or another
+/// kind of collection, so that no tool's answer is taken for certain. An override in such a file
+/// is merged as OpenTofu merges it, also over a declaration Terraform reads.
+fn declared_default(found: Evaluated, variable: &Variable) -> Evaluated {
+    // Only a set type converts a value here, so a default no set type touches is one value.
+    let set = (variable.through.iter()).any(|t| matches!(t, Declared::Set(_)));
+    if let (true, true, Val::Known(v)) = (variable.opentofu, set, &found.val) {
+        let (twice, once) = (
+            converted_through(v.clone(), &variable.through),
+            converted_once(v.clone(), variable.ty),
+        );
+        let same_kind = ends_in_set(&variable.through) == ends_in_set(variable.ty.as_slice());
+        if twice != once || !same_kind {
+            return Evaluated {
+                val: Val::Unknown,
+                through: found.through,
+            };
+        }
+    }
+    declared(found, &variable.through)
 }
 
 /// A `variable` block: its default, whether it is sensitive, and where it is declared.
@@ -525,6 +623,13 @@ struct Variable {
     default: Option<Expression>,
     /// What its declared `type` does to the value it receives; `None` without a `type`.
     ty: Option<Declared>,
+    /// The types its default is converted through, in order (`converted_through`): the type of
+    /// the block that gave the default, then the final type at each override that gives a type or
+    /// a default.
+    through: Vec<Declared>,
+    /// Whether any of its blocks, declaring or overriding, is in a file only OpenTofu reads
+    /// (`.tofu`, `.tofu.json`).
+    opentofu: bool,
     sensitive: bool,
     path: String,
     line: usize,
@@ -547,18 +652,32 @@ impl Module {
     fn declare(&mut self, name: &str, mut variable: Variable, overriding: bool) {
         let Some(declared) = self.variables.get_mut(name) else {
             if !overriding {
+                // A default is converted to the type its block declares when it is decoded.
+                variable.through = variable.default.iter().flat_map(|_| variable.ty).collect();
+                variable.opentofu = config_values::only_opentofu(&variable.path);
                 self.variables.insert(name.to_string(), variable);
             }
             return;
         };
         variable.sensitive |= declared.sensitive;
+        // Any block in a file only OpenTofu reads, whatever the order the blocks come in.
+        variable.opentofu = declared.opentofu | config_values::only_opentofu(&variable.path);
+        declared.opentofu = variable.opentofu;
         // An override block's `type` replaces the declared one; without one the declared stays.
-        variable.ty = variable.ty.or(declared.ty);
+        let (own, merged) = (variable.ty, variable.ty.or(declared.ty));
         // An override block without a default keeps the declared one, and where it is.
         if overriding && variable.default.is_none() {
             declared.sensitive = variable.sensitive;
-            declared.ty = variable.ty;
+            // Terraform converts the kept default again to the type the override gives (OpenTofu
+            // 1.13 and later convert once, to the final type, and name other instances: #740).
+            declared.through.extend(own);
+            declared.ty = merged;
         } else {
+            variable.through = own
+                .into_iter()
+                .chain(merged.filter(|_| overriding))
+                .collect();
+            variable.ty = merged;
             *declared = variable;
         }
     }
@@ -1277,6 +1396,8 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
                 let variable = Variable {
                     default: attr("default").cloned(),
                     ty: attr("type").map(Declared::expr),
+                    through: Vec::new(),
+                    opentofu: false,
                     sensitive: crate::config_values::hcl::is_sensitive(attr("sensitive")),
                     path: path.to_string(),
                     line: line(b.span().map_or(0, |s| s.start)),
@@ -2214,31 +2335,41 @@ impl<'m> Eval<'m> {
         self.sets.insert(key.clone(), false);
         let modules = self.modules;
         let module = &modules[self.instances[at].dir];
-        let (scope, expr) = match &key.1 {
-            Name::Local(n) => (at, module.locals.get(n).map(|l| &l.expr)),
+        // `kept`: the default is a set because its conversions made one and `any` kept it.
+        let (scope, expr, kept) = match &key.1 {
+            Name::Local(n) => (at, module.locals.get(n).map(|l| &l.expr), false),
             Name::Var(n) => match (module.variables.get(n), self.instances[at].parent) {
                 // A declared type converts the value: only `any`, or none, keeps the set.
-                (Some(v), _) if matches!(v.ty, Some(Declared::Set | Declared::Other)) => {
-                    let set = v.ty == Some(Declared::Set);
+                (Some(v), _)
+                    if matches!(
+                        v.ty,
+                        Some(Declared::Set(_) | Declared::List(_) | Declared::Other)
+                    ) =>
+                {
+                    let set = matches!(v.ty, Some(Declared::Set(_)));
                     self.sets.insert(key, set);
                     return set;
                 }
-                (Some(_), Some((caller, block))) => match block.args.get(n) {
-                    Some(arg) => (caller, Some(&arg.expr)),
-                    None => (at, module.variables[n].default.as_ref()),
+                (Some(v), Some((caller, block))) => match block.args.get(n) {
+                    Some(arg) => (caller, Some(&arg.expr), false),
+                    None => (at, v.default.as_ref(), ends_in_set(&v.through)),
                 },
-                (Some(v), None) => (at, v.default.as_ref()),
-                (None, _) => (at, None),
+                // A var file's value is a literal converted once, to the final type, so it holds no
+                // set here (a final set is handled above); only a default is converted twice.
+                (Some(_), None) if module.given.contains_key(n) => (at, None, false),
+                (Some(v), None) => (at, v.default.as_ref(), ends_in_set(&v.through)),
+                (None, _) => (at, None, false),
             },
-            Name::Output(_) => (at, None),
+            Name::Output(_) => (at, None, false),
         };
-        let found = expr.is_some_and(|expr| {
-            is_set(expr, &mut |r| match r {
-                Ref::Var(n) => self.holds_set(scope, Name::Var(n.clone()), depth + 1),
-                Ref::Local(n) => self.holds_set(scope, Name::Local(n.clone()), depth + 1),
-                Ref::Block { .. } => false,
-            })
-        });
+        let found = kept
+            || expr.is_some_and(|expr| {
+                is_set(expr, &mut |r| match r {
+                    Ref::Var(n) => self.holds_set(scope, Name::Var(n.clone()), depth + 1),
+                    Ref::Local(n) => self.holds_set(scope, Name::Local(n.clone()), depth + 1),
+                    Ref::Block { .. } => false,
+                })
+            });
         self.sets.insert(key, found);
         found
     }
@@ -2255,8 +2386,14 @@ impl<'m> Eval<'m> {
         if let Some((caller, block)) = self.instances[at].parent {
             let call = self.instances[at].call.clone();
             return match (block.args.get(n), &variable.default) {
-                (Some(arg), _) => self.value(caller, call.as_ref(), &arg.expr, depth + 1),
-                (None, Some(default)) => self.value(at, None, default, depth + 1),
+                (Some(arg), _) => {
+                    let found = self.value(caller, call.as_ref(), &arg.expr, depth + 1);
+                    declared(found, variable.ty.as_slice())
+                }
+                (None, Some(default)) => {
+                    let found = self.value(at, None, default, depth + 1);
+                    declared_default(found, variable)
+                }
                 (None, None) => Evaluated::unknown(),
             };
         }
@@ -2271,11 +2408,21 @@ impl<'m> Eval<'m> {
                     val: given.value.clone().map_or(Val::Unknown, Val::Known),
                     through: BTreeSet::new(),
                 };
-                (found, &given.path, given.line, true)
+                (
+                    declared(found, variable.ty.as_slice()),
+                    &given.path,
+                    given.line,
+                    true,
+                )
             }
             (None, Some(default)) => {
                 let found = self.value(at, None, default, depth + 1);
-                (found, &variable.path, variable.line, false)
+                (
+                    declared_default(found, variable),
+                    &variable.path,
+                    variable.line,
+                    false,
+                )
             }
             (None, None) => return Evaluated::unknown(),
         };
@@ -3341,6 +3488,11 @@ pub(crate) fn trace(
 mod tests {
     use super::*;
 
+    mod oracle;
+    mod retype;
+    mod shapes;
+    mod tofu;
+
     fn files(list: &[(&str, &str)]) -> Vec<(String, Vec<u8>)> {
         (list.iter())
             .map(|(p, t)| (p.to_string(), t.as_bytes().to_vec()))
@@ -3753,7 +3905,12 @@ mod tests {
     }
 
     /// Each node's address and physical name (` = "<name>"`, ` ~ "<pattern>"` for a pattern),
-    /// then each overridable value its name went through.
+    /// then each overridable value its name went through. Expect these forms: an instance key in
+    /// the address (`a.q["0"]` for a `for_each` key, `a.q[0]` for a `count` index), a `[var.s
+    /// main.tf:1]` suffix per overridable variable the name went through, on an exact name or a
+    /// pattern (`[var.n terraform.tfvars:1 tfvars]` for a var file's value), a `module.m` line for
+    /// the call itself beside the nodes inside it, and the evaluator's order of nodes, not the
+    /// files'.
     fn names(list: &[(&str, &str)]) -> Vec<String> {
         let (nodes, _) = evaluate(&files(list));
         (nodes.iter())
@@ -5455,7 +5612,8 @@ mod tests {
     }
 
     /// An override file's `type` replaces the declared one, as Terraform merges a variable: a set
-    /// retyped as a list holds a list, and an override without a `type` keeps the set.
+    /// retyped as a list holds its default as a list, and an override without a `type` keeps the
+    /// set (the many-element rows of #740 are in `retype`).
     #[test]
     fn an_override_retyping_a_set_variable_as_a_list_keeps_its_index_key() {
         let main = concat!(
@@ -5466,6 +5624,10 @@ mod tests {
             let over = format!("variable \"s\" {{\n{body}}}\n");
             names(&[("main.tf", main), ("override.tf", &over)])
         };
+        assert_eq!(
+            over("  type = list(string)\n  default = [\"x\"]\n"),
+            ["a.q[\"0\"] = \"queue-0\" [var.s override.tf:1]"]
+        );
         assert_eq!(
             over("  type = list(string)\n"),
             ["a.q[\"0\"] = \"queue-0\" [var.s main.tf:1]"]

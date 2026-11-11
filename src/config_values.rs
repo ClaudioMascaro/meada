@@ -155,6 +155,11 @@ pub(crate) fn unshadowed<T>(found: Vec<(String, T)>) -> (Vec<(String, T)>, Vec<S
     (kept, hidden.into_iter().map(|(p, _)| p).collect())
 }
 
+/// Whether the Terraform file at `path` is one only OpenTofu reads: a `.tofu` or `.tofu.json` file.
+pub(crate) fn only_opentofu(path: &str) -> bool {
+    path.ends_with(".tofu") || path.ends_with(".tofu.json")
+}
+
 /// The parent directory of `path`, `""` for the root.
 pub(crate) fn parent(path: &str) -> &str {
     path.rsplit_once('/').map_or("", |(dir, _)| dir)

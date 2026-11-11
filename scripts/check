@@ -184,7 +184,10 @@ def local_selection(unpushed=False):
         # Every commit the branch has not pushed: the push gate covers what per-commit scopes skipped.
         if git("diff", "--cached", "--name-only", "-z"):
             raise RuntimeError("staged changes: commit them before checking the unpushed commits")
-        args = [commit(git("merge-base", "HEAD", "@{upstream}")), head]
+        # A branch with no upstream (a fresh cloud session) is compared with origin/main.
+        upstream = subprocess.run(["git", "rev-parse", "--verify", "-q", "@{upstream}"],
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        args = [commit(git("merge-base", "HEAD", "@{upstream}" if upstream.returncode == 0 else "origin/main")), head]
         return args, names(args), head
     args = ["--cached", head]
     paths = names(args)
@@ -540,7 +543,19 @@ def selftest():
             commit_file("src/main.rs")
             commit_file("docs/notes.md")
             assert local_selection()[1] == ["docs/notes.md"]  # a clean tree alone checks the last commit
-            assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]
+            git("update-ref", "refs/remotes/origin/main", "HEAD~1")
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]  # the upstream wins
+            git("branch", "-q", "--unset-upstream")
+            git("update-ref", "refs/remotes/origin/main", "pushed")
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]  # no upstream: origin/main
+            # An upstream whose branch is gone, and a detached HEAD, fall back to origin/main too.
+            git("branch", "-q", "pushed2", "HEAD~2")
+            git("branch", "-q", "--set-upstream-to=pushed2")
+            git("update-ref", "refs/remotes/origin/main", "HEAD~1")
+            git("branch", "-q", "-D", "pushed2")
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md"]  # upstream gone: origin/main
+            git("checkout", "-q", "--detach")
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md"]  # detached HEAD: origin/main
         finally:
             os.chdir(old)
     print("scripts/check selftest: path policy and disposable Git/event cases passed.")
@@ -553,7 +568,7 @@ def main():
     mode.add_argument("--ci", action="store_true")
     mode.add_argument("--static", action="store_true")
     parser.add_argument("--unpushed", action="store_true",
-                        help="check every commit not yet on the branch's upstream (the push gate)")
+                        help="check every commit not yet on the branch's upstream, or on origin/main without one (the push gate)")
     parser.add_argument("--scope", action="append", metavar="NAME",
                         help="run only the product tests whose path holds NAME (repeatable)")
     options = parser.parse_args()

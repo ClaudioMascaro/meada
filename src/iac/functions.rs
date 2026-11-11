@@ -338,14 +338,94 @@ fn length(args: FuncArgs) -> Out {
 /// unresolved.
 fn toset(args: FuncArgs) -> Out {
     let list = args[0].as_array().map_or(&[][..], Vec::as_slice);
-    let (nulls, mut items): (Vec<_>, Vec<_>) = unified(list)?.into_iter().partition(Value::is_null);
+    distinct(unified(list)?).map(Value::Array)
+}
+
+/// `items`, of one type, as a set orders them (`toset`).
+fn distinct(items: Vec<Value>) -> Result<Vec<Value>, String> {
+    let (nulls, mut items): (Vec<_>, Vec<_>) = items.into_iter().partition(Value::is_null);
     if items.iter().any(|v| v.is_array() || v.is_object()) {
         return Err("the order of a set of collections".into());
     }
     items.sort_unstable_by(order);
     items.dedup_by(|a, b| order(a, b).is_eq());
     items.extend(nulls.into_iter().take(1));
-    Ok(Value::Array(items))
+    Ok(items)
+}
+
+/// The element type of a variable's declared `set(...)` or `list(...)`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum Elem {
+    String,
+    Number,
+    Bool,
+    Any,
+    /// A collection or an object: Meada makes no conversion to it.
+    Other,
+}
+
+/// `v`, a list, tuple or set, as the set of `elem` that Terraform makes of it: the elements
+/// converted to `elem`, then sorted and deduplicated as cty does. `Err` where Meada cannot make
+/// the conversion with certainty, and for a value that is no list.
+pub(super) fn to_set(v: &Value, elem: Elem) -> Result<Value, String> {
+    collection(v, elem, distinct)
+}
+
+/// `v` as the list of `elem` that Terraform makes of it: the elements converted, in their order.
+pub(super) fn to_list(v: &Value, elem: Elem) -> Result<Value, String> {
+    collection(v, elem, Ok)
+}
+
+impl Elem {
+    /// The element type written `name` in a `set(...)` or `list(...)` constraint.
+    pub(super) fn named(name: &str) -> Elem {
+        match name.trim() {
+            "string" => Elem::String,
+            "number" => Elem::Number,
+            "bool" => Elem::Bool,
+            "any" => Elem::Any,
+            _ => Elem::Other,
+        }
+    }
+}
+
+fn collection(
+    v: &Value,
+    elem: Elem,
+    shape: fn(Vec<Value>) -> Result<Vec<Value>, String>,
+) -> Result<Value, String> {
+    match v {
+        Value::Null => Ok(Value::Null),
+        Value::Array(items) => {
+            let items = match elem {
+                Elem::Any => unified(items)?,
+                Elem::Other => return Err("an element type Meada does not convert".into()),
+                _ => (items.iter())
+                    .map(|v| scalar_as(v, elem))
+                    .collect::<Result<_, _>>()?,
+            };
+            shape(items).map(Value::Array)
+        }
+        _ => Err("not a list".into()),
+    }
+}
+
+/// A scalar converted to the scalar type `elem`, as cty's `convert` does; a null stays null.
+fn scalar_as(v: &Value, elem: Elem) -> Result<Value, String> {
+    match (elem, v) {
+        (_, Value::Null) => Ok(Value::Null),
+        (Elem::String, Value::String(_))
+        | (Elem::Number, Value::Number(_))
+        | (Elem::Bool, Value::Bool(_)) => Ok(v.clone()),
+        (Elem::String, _) => shown(v)
+            .map(Value::String)
+            .ok_or_else(|| "a collection as a string".into()),
+        (Elem::Number, Value::String(s)) => number(s).map(Value::Number),
+        (Elem::Bool, Value::String(s)) if s == "true" || s == "false" => {
+            Ok(Value::Bool(s == "true"))
+        }
+        _ => Err("an element that does not convert".into()),
+    }
 }
 
 fn tolist(args: FuncArgs) -> Out {
@@ -516,14 +596,18 @@ fn tonumber(args: FuncArgs) -> Out {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Number(n) => Ok(Value::Number(*n)),
-        Value::String(s) => (s.parse::<i64>().ok().map(Number::from))
-            .or_else(|| s.parse::<u64>().ok().map(Number::from))
-            .or_else(|| s.parse::<f64>().ok().and_then(Number::from_f64))
-            .filter(|n| super::printed_as_written(n, s))
-            .map(Value::Number)
-            .ok_or_else(|| format!("{s:?} is no number")),
+        Value::String(s) => number(s).map(Value::Number),
         _ => Err("not a number".into()),
     }
+}
+
+/// The number a string is, if Terraform and Meada print it as it is written.
+fn number(s: &str) -> Result<Number, String> {
+    (s.parse::<i64>().ok().map(Number::from))
+        .or_else(|| s.parse::<u64>().ok().map(Number::from))
+        .or_else(|| s.parse::<f64>().ok().and_then(Number::from_f64))
+        .filter(|n| super::printed_as_written(n, s))
+        .ok_or_else(|| format!("{s:?} is no number"))
 }
 
 /// JSON as Terraform's `jsonencode` writes it: compact, keys in lexical order, `<`, `>` and `&`

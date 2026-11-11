@@ -17,7 +17,15 @@ Where Meada emulates another tool through a library (Terraform through `hcl-rs`)
 library represents otherwise than the tool (precision, a zero's sign, a set's order, how a null
 or a collection shows as text) is converted exactly or left unresolved. For Terraform,
 `tests/terraform-oracle/` computes the tool's own answer with HashiCorp's HCL and cty libraries:
-add the case to `cases.tsv` and run `go run .` there.
+add the case to `cases.tsv` (one expression) or a directory under `modules/` (a variable, a
+module argument, an override file) and run `go run .` there.
+
+When Meada emulates a tool that has a fork reading the same files (Terraform and OpenTofu), a
+rule is checked against both. Where they differ Meada follows Terraform (#740), an exception
+to "certain or absent" (the fork's reader may be right) that covers what Terraform reads: a
+variable with a block in a file only OpenTofu reads (`.tofu`, `.tofu.json`), declaring or
+overriding, has no whole Terraform answer to follow, and is unresolved where the two rules
+differ. The difference is recorded as a ceiling.
 
 ## Exactly N, only X
 
@@ -75,6 +83,10 @@ a review finding.
   or `ambiguous`), never `exact`: #435 typed `?` and `.await` apart, and `f()?.await.port()` with
   `fn f() -> Result<Cfg>` linked `exact` to `Cfg.port`. This is review guidance, not a mechanical
   check.
+- **Same-route negatives.** A check that decides its answer by following routes (a name through
+  locals, a module argument, a declared type, an override) tests the negative case on each
+  route it follows: #720 kept a list exact only in a local, and a typed variable and an override
+  turned a set into a list unseen.
 
 ## Equivalence tests
 
@@ -85,6 +97,16 @@ that changes only part of the path leaves the rest comparing the code with itsel
 `with_every_row` switch changed only `Engine::partial`, so the `search` kinds `symbol`,
 `community` and `duplicate`, the contract-site spans, the `context` community line and the trace
 starts could not fail. No tool checks this; a PR without the mutation is a review finding.
+
+A case for a conversion boundary (a declared type, a module argument, an override) uses a value
+the conversion changes (unsorted, with a duplicate) and a name that depends on the value; a rule
+the oracle models by hand names its source, the file and function of the emulated tool, where
+the model lives. In #720 and #740 one-element defaults hid a set's sort and duplicates, and an
+override rule modelled from the same reading as the code agreed with it.
+
+A new test that compares Meada with an oracle is mutated on its expected side too (add an exact
+line the oracle does not give, drop one) and seen to fail, not only the code under test: in #720
+the verdict skipped the exact lines beside a pattern line, and no mutation of the fix could show it.
 
 Code that skips, caches or narrows work (a kept group, a fast path, a cache hit) also carries
 one test that goes red when the path is forced off (it keeps nothing, caches nothing), because
