@@ -58,11 +58,12 @@ If the user names a flow instead ("prove trace over HTTP"), prove that flow and 
 Follow each changed file to the surfaces and flows it reaches. Internal code counts through its callers: the `meada` MCP (`context`, `trace`) names them.
 
 CI runs this table: `scripts/prove-ci` runs each driver a row names when a path the row names
-changed (`FLOWS` there; a change to the verifier runs them all), with `meada-head`, the merge-base
-`meada-base` and, in a console run, `meada-head-ui` (`BIN`, `BASE`, `UI_BIN` below). Each driver is
-a step of `receipt.json`, its evidence under `flows/<name>` in the `prove-meada-<PR>-<head>`
-artifact. Its self-test fails when a driver named here is not in `FLOWS`. A row says where CI
-differs, and names what CI does not run and what the reviewer does instead.
+changed (`FLOWS` there; a change to the verifier or to shared core runs them all), with
+`meada-head`, the merge-base `meada-base` and, in a console run, `meada-head-ui` (`BIN`, `BASE`,
+`UI_BIN` below). Each driver is a step of `receipt.json`, its evidence under `flows/<name>` in the
+`prove-meada-<PR>-<head>` artifact. Its self-test fails when a driver named here is not in
+`FLOWS`. A row says where CI differs, and names what CI does not run and what the reviewer does
+instead.
 
 | Changed path | Shared? | Reaches | Flows (corpus entries, `scripts/corpus.tsv`) |
 |---|---|---|---|
@@ -73,7 +74,7 @@ differs, and names what CI does not run and what the reviewer does instead.
 | `src/lang/*.rs` but `mod.rs`, `src/lang/*/`, `vendor/tree-sitter-kotlin-ng/` | no | CLI, MCP | index and export of that language: its corpus entry (`rust`, `ts`: meada; python: click; go: pflag; java: petclinic; kotlin: turbine; csharp: serilog; swift: swiftlog) |
 | `src/http.rs`, `src/http/*.rs`, `src/channel*`, `src/package*`, `src/resource.rs`, `src/document/`, `src/literals.rs`, `src/zod.rs`, `src/declared.rs`, `src/names.rs` | yes: contract kinds | CLI, MCP | the providers, consumers and links of the languages the module serves; for `src/document/`, the overlay run: a root `meada.toml` with a `[serve]` table over `tests/fixtures/chain-documents/` (what `common::documented_chain` writes), indexed and exported on the base and on the head, plus a probe for what the change reads (no corpus entry has a `[serve]` table). CI does not run the overlay: the reviewer judges the change's `tests/it` cases over `common::documented_chain` (head only, in the `test` job) against the issue, and names the base comparison under Not covered |
 | `src/jvm/`, `src/dotnet/`, `src/xml.rs` | yes: build readers | CLI, MCP | java and kotlin; csharp |
-| `src/lang/mod.rs`, `src/resolve.rs`, `src/index.rs`, `src/engine.rs`, `src/trace.rs`, `src/partial.rs`, `src/contract.rs`, `src/community.rs`, `src/entry.rs`, `src/items.rs`, `src/drift_view.rs`, `src/render.rs`, `meada-core/src/{render,search,context,trace,shape,drift,export}.rs` | yes: every answer | CLI, MCP stdio and HTTP, console query | every corpus entry (`--repos all`) |
+| `src/lang/mod.rs`, `src/resolve.rs`, `src/index.rs`, `src/engine.rs`, `src/trace.rs`, `src/partial.rs`, `src/contract.rs`, `src/community.rs`, `src/entry.rs`, `src/items.rs`, `src/drift_view.rs`, `src/render.rs`, `meada-core/src/{render,search,context,trace,shape,drift,export}.rs` | yes: every answer | CLI, MCP stdio and HTTP, console query | every corpus entry (`--repos all`), and every driver of this table: the A7/A8 flows answer through this code too (the audit's A7-02 plants a Terraform JSON bug in `src/partial.rs`), so CI runs them all |
 | `src/mcp.rs` | yes: both MCP transports and the console's query | MCP stdio, MCP HTTP, console | `run --http`, the tool list |
 | `src/workspace.rs`, `src/config.rs`, `src/repo.rs` | yes: discovery and server mode | CLI, MCP stdio, MCP HTTP | `--repos all --http` |
 | `src/main.rs`, `src/msg.rs` | yes: the CLI | CLI | every command's exit code and stderr; the `cli.*` goldens (rebless). CI captures index, export, status and MCP; it does not capture the other commands: the reviewer reads their exit codes and stderr in the `cli.*` goldens' diff, which `goldens` re-blesses when they changed |

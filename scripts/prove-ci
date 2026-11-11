@@ -23,10 +23,14 @@ IMAGES = r'src/(image\.rs|image/|iac/types|index\.rs|engine\.rs|trace\.rs|items\
 INCIDENTS = r'src/(alert/(incident|forwarding|pcl)\.rs|alert\.rs|config\.rs)'
 A8 = r'src/(lang/(ts|go|mod)|http\.rs|http/(ts|go|join)|resolve\.rs|index\.rs)'
 SOURCE_KEY = '{scripts}/a7-source-keys/native-hcl-values/'
+# The Scope table's shared core: every answer goes through it, the A7/A8 flows' too.
+SHARED = (r'src/(lang/mod\.rs|resolve\.rs|index\.rs|engine\.rs|trace\.rs|partial\.rs|contract\.rs|community\.rs|entry\.rs'
+          r'|items\.rs|drift_view\.rs|render\.rs)|meada-core/src/(render|search|context|trace|shape|drift|export)\.rs')
 # The drivers the skill's Scope table names (`.claude/skills/prove-meada/SKILL.md`), each with the
-# paths its row names (None: on every run of its surface; any change to the verifier runs them
-# all). `{head}`, `{base}` and `{ui}` are this run's builds: a flow with `{ui}` runs in a console run
-# after the UI build, the others after `cli-mcp`. `{pre_image}` is built only for `images`.
+# paths its row names (None: on every run of its surface; a change to the verifier or to shared
+# core runs them all). `{head}`, `{base}` and `{ui}` are this run's builds: a flow with `{ui}`
+# runs in a console run after the UI build, the others after `cli-mcp`. `{pre_image}` is built
+# only for `images`.
 FLOWS = (
     ('http-iac', None, 'http-iac.py --head-bin {head} --base-bin {base}'),
     ('iac-http-routes', None, 'iac-http-routes.py --head-bin {head} --base-bin {base}'),
@@ -71,9 +75,9 @@ FLOWS = (
 
 def selected(paths):
     """The flows the changed paths select, in FLOWS order."""
-    verifier = any(path == 'scripts/prove-ci' or path.startswith(f'{SCRIPTS}/') and not path.endswith('.md')
-                   for path in paths)
-    return [flow for flow in FLOWS if verifier or flow[1] is None or any(re.match(flow[1], path) for path in paths)]
+    every = any(path == 'scripts/prove-ci' or path.startswith(f'{SCRIPTS}/') and not path.endswith('.md')
+                or re.match(SHARED, path) for path in paths)
+    return [flow for flow in FLOWS if every or flow[1] is None or any(re.match(flow[1], path) for path in paths)]
 
 
 def flow_command(run, flow):
@@ -285,14 +289,20 @@ def selftest():
                 assert (run / 'console-api' / entry / 'head').resolve() == run / 'head'
             assert names.index('console-click-stop') < names.index('console-start')
             assert names[-2:] == ['console-stop', 'clean'] and receipt['verdict'] == 'UNPROVEN'
-    # Flows follow the paths their Scope rows name; a change to the verifier runs every flow.
+    # Flows follow the paths their Scope rows name; the verifier or shared core runs every flow.
     chosen = lambda paths: [flow[0] for flow in selected(paths)]
     always = ['http-iac', 'iac-http-routes', 'console-graph']
     assert chosen([]) == chosen([f'{SCRIPTS}/a7-tf-set/README.md']) == chosen(['docs/a.md']) == always
     assert {'iac', 'terraform-json', 'values', 'native-hcl-values'} <= set(chosen(['src/iac.rs', 'src/config_values.rs']))
     sdk = set(chosen(['src/contract/sdk/java.rs']))  # PR #753's path
     assert {'aws-sdk-jvm-go-dotnet', 'gcp-sdk'} <= sdk and 'images' not in sdk
-    assert chosen(['scripts/prove-ci']) == chosen([f'{SCRIPTS}/http-iac.py']) == [flow[0] for flow in FLOWS]
+    assert chosen(['scripts/prove-ci']) == chosen([f'{SCRIPTS}/http-iac.py']) == chosen(['src/partial.rs']) \
+        == [flow[0] for flow in FLOWS]
+    # Each bug the audit plans to plant selects the flow that catches it (A7-02: shared core).
+    for mutation in json.loads((SCRIPTS / 'a7-a8-mutations.json').read_text()):
+        check = {'ssm-values': 'aws-json-values', 'http-services': 'http-iac', 'a8': 'a8-peers'}.get(
+            mutation['check'], mutation['check'])
+        assert check in chosen([mutation['file']]), mutation['id']
     # Every driver the Scope table names runs here, and every flow here has its Scope row.
     table = (SCRIPTS.parent / 'SKILL.md').read_text().split('\n## Scope\n', 1)[1].split('\n## Sort the change', 1)[0]
     named = set(re.findall(r'[\w-]+\.(?:py|sh)\b', ''.join(line for line in table.splitlines(True) if line.startswith('|'))))
