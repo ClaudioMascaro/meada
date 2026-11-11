@@ -347,9 +347,10 @@ lista os provisionadores. `trace` segue do bloco para o código com `down` e do 
 infraestrutura com `up`. O export mantém `format: 1` e acrescenta `iac_nodes`, `provisioners` e
 `provisions`, omitidos quando vazios. Tipos não listados e blocos `data` não provisionam contratos.
 Um padrão
-com pelo menos três caracteres literais e curingas nos limites de segmentos (`-`, `_`, `.`, `/`)
-se liga a um nome literal em `inferred`, ou `ambiguous` quando vários nomes correspondem. Padrões
-nunca se ligam a padrões. O grafo da console lista os provisionadores e suas ligações próprias.
+com pelo menos três letras ou dígitos literais (separadores não contam) e curingas nos limites de
+segmentos (`-`, `_`, `.`, `/`) se liga a um nome literal em `inferred`, ou `ambiguous` quando vários
+nomes correspondem. Padrões nunca se ligam a padrões. O grafo da console lista os provisionadores e
+suas ligações próprias.
 
 ### SDKs AWS em Java, Go e C#
 
@@ -583,10 +584,10 @@ mostra os contratos de imagem, as ligações e o código das cargas de trabalho.
 
 Um canal, recurso ou imagem com partes desconhecidas preserva um padrão como `*-orders`.
 `${terraform.workspace}-orders` corresponde a `prod-orders` em `inferred`: são necessários
-ao menos três caracteres literais, e cada `*` deve ocupar segmentos inteiros delimitados por
-`-`, `_`, `.` ou `/`. Um padrão nunca corresponde a outro padrão. Vários nomes literais
-compatíveis ficam `ambiguous`, todos listados, e viram itens abertos. `meada decide` grava
-a escolha em `meada.decisions.toml`; o vínculo escolhido fica `decided`. Decisões de
+ao menos três letras ou dígitos literais (separadores não contam), e cada `*` deve ocupar segmentos
+inteiros delimitados por `-`, `_`, `.` ou `/`. Um padrão nunca corresponde a outro padrão. Vários
+nomes literais compatíveis ficam `ambiguous`, todos listados, e viram itens abertos. `meada decide`
+grava a escolha em `meada.decisions.toml`; o vínculo escolhido fica `decided`. Decisões de
 provisionamento pertencem ao lado que contém o padrão e conservam sua raiz de avaliação.
 
 Itens em chaves de configuração usam metadados de arquivo, linha, chave e contrato, inclusive quando o valor é `redacted` ou cortado.
