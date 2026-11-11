@@ -421,16 +421,18 @@ def selftest():
             assert argv[name][2:6] == ['--head-bin', str(run / 'bin/meada-head'), '--base-bin', str(run / 'bin/meada-base')]
         assert limits['build.sh'][-1] == CAPTURE_END - FLOW_TIMEOUT - 10, limits
     # A step with under a minute of the capture left is BLOCKED unrun, and a required one stops the
-    # capture there; the cleanups still run. The first call leaves build-base 60 s, or 59.
+    # capture there; the cleanups still run. Each run moves the clock: http-iac gets the 230 s left, not
+    # its 1200, iac-http-routes runs with 60 s left and alerts gets 59; build-base gets 59 in the second.
     late = dict.fromkeys(SURFACES, False)
     late['cli'] = late['goldens'] = True
     paths = ['src/alert/incident.rs']
     cli_flows = [flow[0] for flow in selected(paths) if '{ui}' not in flow[2]]
-    for first, run_limits, unrun in ((CAPTURE_END - 60, [CAPTURE_END, 60], ['cli-mcp', *cli_flows, 'goldens']),
-                                     (CAPTURE_END - 59, [CAPTURE_END], ['build-base'])):
-        clock = [0.0]
+    for advances, run_limits, unrun in (([CAPTURE_END - 400, 100, 70, 170, 1], [CAPTURE_END, 400, 300, 230, 60],
+                                         ['alerts', 'incident-routing', 'incident-guards', 'goldens']),
+                                        ([CAPTURE_END - 59], [CAPTURE_END], ['build-base'])):
+        clock, advance = [0.0], iter(advances)
         def slow(args, **kwargs):
-            clock[0] += 1 if clock[0] else first
+            clock[0] += next(advance, 1)
             return subprocess.CompletedProcess(args, 0)
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True), \
                 patch('time.monotonic', side_effect=lambda: clock[0]), patch('subprocess.run', side_effect=slow) as ran:
