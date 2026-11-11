@@ -316,11 +316,13 @@ jobs:
           name: meada-ui-${{ github.sha }}
           path: ui/dist
       - name: Install console browser proof tools
+        timeout-minutes: 3
         env:
           PROVE_NODE: ${{ runner.temp }}/console-graph-node
+        # No --with-deps: the runner image has Chromium's libraries, and apt's mirror failed this step (#786).
         run: |
           npm install --prefix "$PROVE_NODE" --no-audit --no-fund playwright-core@1.61.1 axe-core@4.12.1
-          "$PROVE_NODE/node_modules/.bin/playwright-core" install --with-deps chromium
+          "$PROVE_NODE/node_modules/.bin/playwright-core" install chromium
       - name: Prove the console infrastructure graph
         id: console-graph-proof
         env:
@@ -447,9 +449,11 @@ jobs:
           node-version-file: ui/.nvmrc
       - name: Prepare browser proof tools
         if: env.PROVE_CONSOLE == 'true'
+        timeout-minutes: 3
+        # No --with-deps: the runner image has Chromium's libraries, and apt's mirror failed this step (#786).
         run: |
           npm install --prefix "$PROVE_NODE" --no-audit --no-fund playwright-core@1.61.1 axe-core@4.12.1
-          "$PROVE_NODE/node_modules/.bin/playwright-core" install --with-deps chromium
+          "$PROVE_NODE/node_modules/.bin/playwright-core" install chromium
       - name: Start the accounts proof database
         if: env.PROVE_ACCOUNTS == 'true'
         run: |
