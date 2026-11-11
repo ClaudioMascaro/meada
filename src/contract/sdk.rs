@@ -4,7 +4,7 @@
 use super::{Found, Role, Site};
 use crate::lang::{Part, Value, literal};
 use crate::resolve::{Code, Expand};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 mod csharp;
 mod go;
@@ -175,6 +175,7 @@ pub(crate) fn extract<'a>(
             continue;
         }
         let mut origins = origins::Origins::new(code, language);
+        let counts = std::cell::OnceCell::new();
         let aliases: BTreeMap<_, _> = if language == Language::Csharp {
             facts
                 .imports
@@ -206,7 +207,17 @@ pub(crate) fn extract<'a>(
                     language,
                     &written,
                     &builders,
-                );
+                ) || (language != Language::Java
+                    // A path of three members: a transaction's, new with this rule (#719). The
+                    // shorter paths keep the rule `changed_request` gives them.
+                    && operation.field.matches('.').count() == 2
+                    && held_changed(code, path, index, operation.field, language, {
+                        counts.get_or_init(|| {
+                            (code.mentioned(path).iter())
+                                .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
+                                .collect()
+                        })
+                    }));
                 let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
                     let [Value::Call(call)] = args else {
                         return Some(vec![Name::default()]);
@@ -364,6 +375,88 @@ fn changed_request<'a>(
                     Some(items) => next.extend(items),
                     None => next.push(inner),
                 }
+            }
+        }
+        values = next;
+    }
+    false
+}
+
+/// Whether a name on the path to a transaction entry's table may hold a value that changed (Go
+/// and C#). A request, a list, an item and an entry change in place through any name that holds
+/// them: a write past the first member, an element replaced, `append`, `Add`, a helper. So a
+/// name is followed only when the function that declares it writes it twice, where it is declared
+/// and where the path reads it (`Facts::mentioned`). Any other mention is a change this reader
+/// does not follow, and a name that is no local of a function of the file (a parameter, a field,
+/// a package variable) can change anywhere.
+fn held_changed<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    index: usize,
+    selector: &str,
+    language: Language,
+    counts: &HashMap<(&'a str, &'a str), u32>,
+) -> bool {
+    let Some(call) = code.call(path, index) else {
+        return false;
+    };
+    let request = match language {
+        Language::Go => call.args.get(1),
+        _ => call.keyword("request").or_else(|| call.args.first()),
+    };
+    // What a value on the path is once its names are followed, with the scope it is written in.
+    let held = |mut value: &'a Value, mut scope: &'a str| {
+        for _ in 0..crate::resolve::EVAL_DEPTH {
+            let Value::Ref(name) = value else {
+                return Some((value, scope));
+            };
+            let (declared, written, holds) = match language {
+                Language::Go => {
+                    let (at, within, holds) = code.constant_value(path, scope, name)?;
+                    (at == path).then_some((within, within, holds))?
+                }
+                _ => {
+                    let bound = code.local(path, scope, name)?;
+                    (bound.scope.as_str(), bound.within.as_str(), &bound.value)
+                }
+            };
+            if counts.get(&(declared, name.as_str())) != Some(&2) {
+                return None;
+            }
+            (value, scope) = (holds, written);
+        }
+        None
+    };
+    let mut values: Vec<(&'a Value, &'a str)> =
+        (request.map(|r| (r, call.scope.as_str())).into_iter()).collect();
+    let members: Vec<&str> = selector.split('.').collect();
+    for (at, member) in members.iter().enumerate() {
+        let mut next = Vec::new();
+        for (value, scope) in values {
+            let Some((value, scope)) = held(value, scope) else {
+                return true;
+            };
+            // The last member is the name itself, which `name` reads off the entry.
+            if at + 1 == members.len() {
+                continue;
+            }
+            for field in member.split('|').map(|f| f.trim_end_matches("[]")) {
+                let inner = match language {
+                    Language::Go => go::field_of(value, field),
+                    _ => csharp::field_of(value, field),
+                };
+                let Some(Some(inner)) = inner else {
+                    continue;
+                };
+                if !member.ends_with("[]") {
+                    next.push((inner, scope));
+                    continue;
+                }
+                // The list is a value of its own, followed before its elements.
+                let Some((list, scope)) = held(inner, scope) else {
+                    return true;
+                };
+                next.extend((sequence(list).into_iter().flatten()).map(|item| (item, scope)));
             }
         }
         values = next;

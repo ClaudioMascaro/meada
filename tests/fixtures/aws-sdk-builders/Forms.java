@@ -1,3 +1,5 @@
+import java.util.Arrays;
+import java.util.List;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
 import software.amazon.awssdk.services.dynamodb.model.Put;
@@ -151,6 +153,105 @@ class Forms {
         pb.tableName("after-loop-new");
     }
 
+    // A loop inside another loop or inside a lambda, and one whose init clause declares the
+    // builder, build from what their last turn set just the same. A builder made in the innermost
+    // loop, or set only after the loop that builds from it, is not changed.
+    void loopNested(java.util.List<java.util.List<String>> groups) {
+        var db = DynamoDbClient.create();
+        for (var g : groups) {
+            var b = PutItemRequest.builder().tableName("nested-old");
+            for (String n : g) {
+                PutItemRequest r = b.build();
+                db.putItem(r);
+                b.tableName(n);
+            }
+        }
+    }
+
+    void loopInLambda(java.util.List<java.util.List<String>> groups) {
+        var db = DynamoDbClient.create();
+        for (var g : groups) {
+            Runnable run = () -> {
+                var b = PutItemRequest.builder().tableName("in-lambda-old");
+                for (String n : g) {
+                    PutItemRequest r = b.build();
+                    db.putItem(r);
+                    b.tableName(n);
+                }
+            };
+            run.run();
+        }
+    }
+
+    void loopInit(int turns) {
+        var db = DynamoDbClient.create();
+        for (var b = PutItemRequest.builder().tableName("init-old"); turns > 0; turns--) {
+            PutItemRequest r = b.build();
+            db.putItem(r);
+            b.tableName("init-new");
+        }
+    }
+
+    void loopInnerFresh(java.util.List<java.util.List<String>> groups) {
+        var db = DynamoDbClient.create();
+        for (var g : groups) {
+            for (String n : g) {
+                var b = PutItemRequest.builder().tableName("inner-fresh");
+                PutItemRequest r = b.build();
+                b.tableName(n);
+                db.putItem(r);
+            }
+        }
+    }
+
+    void loopInnerAfter(java.util.List<java.util.List<String>> groups) {
+        var db = DynamoDbClient.create();
+        for (var g : groups) {
+            var b = PutItemRequest.builder().tableName("inner-after");
+            for (String n : g) {
+                PutItemRequest r = b.build();
+                db.putItem(r);
+            }
+            b.tableName("inner-after-new");
+        }
+    }
+
+    // A builder set again inside the expression that builds from it: by a lambda a step of the
+    // chain runs, by an argument of a step, by another entry of the same request. Only the steps
+    // of the chain itself are read in order.
+    void ownLambda() {
+        var db = DynamoDbClient.create();
+        var b = PutItemRequest.builder();
+        db.putItem(b.tableName("own-old").overrideConfiguration(o -> b.tableName("own-new")).build());
+    }
+
+    void ownArgument() {
+        var db = DynamoDbClient.create();
+        var b = PutItemRequest.builder().tableName("argument-old");
+        db.putItem(b.returnValues(String.valueOf(b.tableName("argument-new"))).build());
+    }
+
+    void ownNamed() {
+        var db = DynamoDbClient.create();
+        var b = PutItemRequest.builder();
+        PutItemRequest r = b.tableName("named-old").returnValues(String.valueOf(b.tableName("named-new"))).build();
+        db.putItem(r);
+    }
+
+    void ownEntry() {
+        var db = DynamoDbClient.create();
+        var pb = Put.builder().tableName("entry-old");
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(
+            TransactWriteItem.builder().put(pb.tableName("entry-new").build()).build(),
+            TransactWriteItem.builder().put(pb.build()).build()).build());
+    }
+
+    void ownChain() {
+        var db = DynamoDbClient.create();
+        var b = PutItemRequest.builder().tableName("chain-old");
+        db.putItem(b.tableName("own-chain").returnValues("NONE").build());
+    }
+
     void lambdaLater(java.util.List<String> names) {
         var db = DynamoDbClient.create();
         var pb = Put.builder().tableName("lambda-old");
@@ -197,5 +298,49 @@ class Forms {
         all[0].tableName("array-new");
         Put p = pb.build();
         db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(p).build()).build());
+    }
+
+    // A list or an array changes in place through any name that holds it: one is followed only
+    // when its method writes the name twice, where it is declared and where the request reads it.
+    // `List.of` cannot change.
+    void listPlain() {
+        var db = DynamoDbClient.create();
+        var items = Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("list-plain").build()).build());
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+
+    void listSet() {
+        var db = DynamoDbClient.create();
+        var items = Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("list-old").build()).build());
+        items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("list-new").build()).build());
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+
+    void listAlias() {
+        var db = DynamoDbClient.create();
+        var items = Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("alias-old").build()).build());
+        var same = items;
+        same.set(0, TransactWriteItem.builder().put(Put.builder().tableName("alias-new").build()).build());
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(same).build());
+    }
+
+    void listImmutable() {
+        var db = DynamoDbClient.create();
+        var items = List.of(TransactWriteItem.builder().put(Put.builder().tableName("list-of").build()).build());
+        System.out.println(items);
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+
+    void arrayPlain() {
+        var db = DynamoDbClient.create();
+        TransactWriteItem[] items = { TransactWriteItem.builder().put(Put.builder().tableName("array-plain").build()).build() };
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+
+    void arraySet() {
+        var db = DynamoDbClient.create();
+        TransactWriteItem[] items = { TransactWriteItem.builder().put(Put.builder().tableName("array-set-old").build()).build() };
+        items[0] = TransactWriteItem.builder().put(Put.builder().tableName("array-set-new").build()).build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
     }
 }

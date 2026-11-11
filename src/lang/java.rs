@@ -901,6 +901,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         ],
     );
     facts.deferred = deferred(tree.root_node());
+    facts.repeated = repeated(tree.root_node());
     for mut local in locals {
         if let Class::Result(n) = local.class {
             local.class = call_at(&results[n]).map_or(Class::Unknown, Class::Result);
@@ -1196,6 +1197,28 @@ fn deferred(root: Node) -> Vec<Range<usize>> {
             stack.push((child, inside || body || initializer));
         }
     }
+    out
+}
+
+/// The byte ranges of the code each loop under `root` runs again, nested loops included, in
+/// source order (`Facts::repeated`).
+fn repeated(root: Node) -> Vec<Range<usize>> {
+    let mut out = Vec::new();
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        let mut cursor = node.walk();
+        if matches!(
+            node.kind(),
+            "for_statement" | "enhanced_for_statement" | "while_statement" | "do_statement"
+        ) {
+            let init = node.children_by_field_name("init", &mut cursor).last();
+            out.push(init.map_or(node.start_byte(), |i| i.end_byte())..node.end_byte());
+        }
+        stack.extend(node.children(&mut cursor));
+    }
+    // The walk keeps no order, and a loop written in an init clause starts before the range of
+    // the `for` that holds it.
+    out.sort_by_key(|r| r.start);
     out
 }
 
@@ -1662,6 +1685,24 @@ mod tests {
             ]
         );
         assert!(facts.loops.len() == 1 && src[facts.loops[0].clone()].starts_with("for"));
+    }
+
+    /// Every loop, nested ones too, from where each turn starts: a `for` after its init clause.
+    #[test]
+    fn every_loop_is_repeated_from_the_end_of_its_init_clause() {
+        let src = "class C { void h() { for (int i = 0; i < 2; i++) { while (go()) { run(); } } \
+            do { run(); } while (go()); for (var x : xs) { run(); } } }";
+        let facts = Java.parse("C.java", src.as_bytes()).unwrap();
+        let text: Vec<&str> = (facts.repeated.iter()).map(|r| &src[r.clone()]).collect();
+        assert_eq!(
+            text,
+            [
+                " i < 2; i++) { while (go()) { run(); } }",
+                "while (go()) { run(); }",
+                "do { run(); } while (go());",
+                "for (var x : xs) { run(); }",
+            ]
+        );
     }
 
     #[test]

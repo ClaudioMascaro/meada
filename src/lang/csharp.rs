@@ -1422,6 +1422,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
         }
     }
     facts.consts.extend(given);
+    let locals = bound.iter().map(|b| (b.scope.as_str(), b.name.as_str()));
+    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, locals);
     facts.bound = bound;
     facts.bound.extend(through);
     facts.externs = outside.into_iter().collect();
@@ -2278,6 +2280,28 @@ mod tests {
             .filter(|i| i.local.starts_with("@glob"))
             .map(|i| i.source.as_str())
             .collect()
+    }
+
+    /// `Facts::mentioned`: the identifiers of a method that spell a local `bound` keeps, a
+    /// lambda inside it and a verbatim `@name` included. A field gets no count, and no name does
+    /// in a file that spells an identifier with an escape.
+    #[test]
+    fn the_locals_bound_keeps_are_counted_where_their_method_writes_them() {
+        let counted = |body: &str| -> Vec<String> {
+            let src = format!(
+                "class C {{\n    List<int> shared = new List<int>();\n    void F() {{ {body} }}\n    \
+                 void H() {{ var a = new T(); G(a); }}\n}}\n"
+            );
+            let facts = CSharp.parse("C.cs", src.as_bytes()).unwrap();
+            (facts.mentioned.iter())
+                .map(|m| format!("{} {} {}", m.scope, m.name, m.count))
+                .collect()
+        };
+        assert_eq!(
+            counted("var a = new T(); var b = new T(); G(a); Run(() => @a.N = 1); G(b, shared);"),
+            ["C.F() a 3", "C.F() b 2", "C.H() a 2"]
+        );
+        assert!(counted("var a = new T(); G(\\u0061);").is_empty());
     }
 
     #[test]

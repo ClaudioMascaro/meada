@@ -20,7 +20,12 @@
   across the group to invalidate named request objects even through another receiver alias; Go
   shares the existing field-write index. Both check a named value by its field name across the
   group: one `entry.EventBusName = ..` anywhere makes every named entry opaque, and a list holding
-  one opaque entry names nothing for its inline entries either. A Java builder held in a local or
+  one opaque entry names nothing for its inline entries either. A transaction's path of three
+  members adds `held_changed`: a request, a list, an item or an entry held in a name is followed
+  only when the function that declares the name writes it twice, where it is declared and where
+  the path reads it (`lang::mentioned` fills `Facts::mentioned` for the locals Go keeps as
+  constants and the ones C#'s `bound` keeps); a parameter, a field and a package variable are
+  never followed. A Java builder held in a local or
   a `final` field that a call outside the request's call sets again (a step setting a member of
   the name's path, before or after the request, anywhere in a chain off the builder or off a
   local holding it: `b.message(..).topicArn(..)`, `var e = b.message(..); e.topicArn(..)`,
@@ -38,13 +43,20 @@
   and a write of its name the syntax model does not show (`Facts::mentioned` counts identifiers
   against the calls made on it: a cast, a ternary, an array element, a lambda that returns it).
   A named value (`Put p = pb.build()`) is judged where it was built: a mention after the build
-  does not change the copy, except in a loop the builder outlives (`Facts::loops`) and in a
-  lambda or a local or anonymous class declared after the builder (`Facts::deferred`), which
-  runs when its caller says, so a mention anywhere after it counts. A name the file assigns
-  again, such as a parameter its helper assigns, names nothing; `this.name` is the field
-  whatever local hides the bare name; a `final` field built by an initializer, an initializer
-  block or a constructor is judged where it is written, in order; and a helper's request is
-  judged where each caller passes it (`passed_changed`, every argument of every call climbed).
+  does not change the copy, except in a loop the builder outlives (`Facts::repeated`: every
+  loop, nested ones included, a `for` from the end of its init clause) and in a lambda or a
+  local or anonymous class declared after the builder (`Facts::deferred`), which runs when its
+  caller says, so a mention anywhere after it counts. Only the steps of the chain a value is
+  built by are read in order (they start where the chain does): a mention of the builder
+  inside that expression (an argument or a lambda of one of its steps, another entry of the
+  same request) or around it is a change like one before it. A name the file assigns again,
+  such as a parameter its helper assigns, names nothing; `this.name` is the field whatever
+  local hides the bare name; a `final` field builder is judged by every mention of its name in
+  the file, whatever their order; and a helper's request is judged where each caller passes it
+  (`passed_changed`, every argument of every call climbed). A list or an array on the name's
+  path held in a name (`Arrays.asList`, an array initializer, `new`) changes in place too:
+  `Walk::replaced` follows it only when its method writes the name twice, and each alias on the
+  way as well; one in a field is never followed, and `List.of` cannot change.
   A chain with `applyMutation` anywhere in it hands its builder to caller code, a file that
   reads a field by name (`getDeclaredField`) or calls a method on a field builder's name from
   another file may change it, and a chain that starts at a type another type of its file or

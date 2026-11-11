@@ -827,6 +827,85 @@ fn dynamodb_transactions_keep_every_entry_table_and_direction_in_java_go_and_dot
     }
 }
 
+/// A transaction's request, list, item and entry held in a name change in place through any
+/// name that holds them (Go and C#): a write past the first member, an element replaced, a
+/// method of the list, a helper. A name on the path to an entry's table is followed only when
+/// its function writes it twice, where it is declared and where the path reads it, and every
+/// other mention leaves the transaction's entries unresolved. The same values left alone keep
+/// their tables.
+#[test]
+fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
+    let repo = fixture_repo(
+        "aws_sdk_transactions_named",
+        "aws-sdk-transactions-named",
+        None,
+    );
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut by_language: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+    for (role, sides) in [("writer", "providers"), ("reader", "consumers")] {
+        for side in export[sides].as_array().unwrap() {
+            let mut parts = side["site"].as_str().unwrap().split("::").skip(1);
+            let file = parts.next().unwrap();
+            let method = parts.next().unwrap().trim_end_matches("()");
+            let method = method.rsplit('.').next().unwrap().to_lowercase();
+            by_language
+                .entry(file.rsplit('.').next().unwrap().into())
+                .or_default()
+                .push(format!(
+                    "{method} {role} {}",
+                    side["contract"].as_str().unwrap()
+                ));
+        }
+    }
+    let sides = |language: &str| {
+        let mut sides = by_language[language].clone();
+        sides.sort();
+        sides
+    };
+    assert_eq!(
+        sides("go"),
+        [
+            "elementreplaced writer resource::dynamodb",
+            "entryreplaced writer resource::dynamodb",
+            "getreplaced reader resource::dynamodb",
+            "heldentry writer resource::dynamodb",
+            "itemcopied writer resource::dynamodb",
+            "itemwritten writer resource::dynamodb",
+            "loopwritten writer resource::dynamodb",
+            "plainget reader resource::dynamodb::plain-get",
+            "plainparts writer resource::dynamodb::plain-parts",
+            "plainrequest writer resource::dynamodb::plain-request",
+            "slicehanded writer resource::dynamodb",
+            "slicereplaced writer resource::dynamodb",
+            "slicewritten writer resource::dynamodb",
+            "throughrequest writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+    assert_eq!(
+        sides("cs"),
+        [
+            "elementreplaced writer resource::dynamodb",
+            "getreplaced reader resource::dynamodb",
+            "heldentry writer resource::dynamodb",
+            "itemwritten writer resource::dynamodb",
+            "listhanded writer resource::dynamodb",
+            "listremoved writer resource::dynamodb",
+            "listreplaced writer resource::dynamodb",
+            "listwritten writer resource::dynamodb",
+            "plainget reader resource::dynamodb::plain-get",
+            "plainparts writer resource::dynamodb::plain-parts",
+            "plainrequest writer resource::dynamodb::plain-request",
+            "requestcleared writer resource::dynamodb",
+            "shareditem writer resource::dynamodb",
+            "shareditem writer resource::dynamodb",
+            "throughrequest writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
 /// A transaction entry held in a named value and changed after it is made names no table, as
 /// the other named values on a name's path do (a Java builder is read per builder). The same
 /// entries left alone keep their tables, so the change is what unnamed them.
@@ -1105,7 +1184,11 @@ fn java_named_builds_chained_past_the_evaluation_depth_stay_unresolved() {
 /// field hidden by a local, a field set in an initializer before another is built from it, a field
 /// builder another file calls a method on or this file reads by name, a builder `applyMutation`
 /// hands to caller code, and a request type that another type of the file, the package or an
-/// import shadows.
+/// import shadows. A builder set later in a loop around the one its value is made in, in a loop
+/// inside a lambda, or declared in a `for` clause is set before the next turn builds; a setter
+/// inside the request's own expression runs before its `build()`. A list or an array on the
+/// name's path changes in place, so one held in a name is followed only when its method writes
+/// that name twice (`List.of` cannot change).
 #[test]
 fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     let repo = fixture_repo("aws_sdk_builder_forms", "aws-sdk-builders", None);
@@ -1130,6 +1213,8 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
             "anonymousClass writer resource::dynamodb",
             "apply writer resource::dynamodb",
             "arrayAlias writer resource::dynamodb",
+            "arrayPlain writer resource::dynamodb::array-plain",
+            "arraySet writer resource::dynamodb",
             "callCopied writer resource::dynamodb",
             "callMaybe writer resource::dynamodb",
             "callPassed writer resource::dynamodb::param-plain",
@@ -1163,12 +1248,26 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
             "lambdaOwn writer resource::dynamodb::lambda-own",
             "lambdaRun writer resource::dynamodb",
             "lambdaStored writer resource::dynamodb",
+            "listAlias writer resource::dynamodb",
+            "listImmutable writer resource::dynamodb::list-of",
+            "listPlain writer resource::dynamodb::list-plain",
+            "listSet writer resource::dynamodb",
             "localClass writer resource::dynamodb",
             "loopFresh writer resource::dynamodb::loop-fresh",
+            "loopInLambda writer resource::dynamodb",
+            "loopInit writer resource::dynamodb",
+            "loopInnerAfter writer resource::dynamodb::inner-after",
+            "loopInnerFresh writer resource::dynamodb::inner-fresh",
             "loopLater writer resource::dynamodb",
+            "loopNested writer resource::dynamodb",
             "nested writer resource::dynamodb",
             "nestedLambda writer resource::dynamodb",
             "otherMember writer resource::dynamodb::other-member",
+            "ownArgument writer resource::dynamodb",
+            "ownChain writer resource::dynamodb::own-chain",
+            "ownEntry writer resource::dynamodb",
+            "ownLambda writer resource::dynamodb",
+            "ownNamed writer resource::dynamodb",
             "packaged writer resource::dynamodb",
             "passedBuiltFirst writer resource::dynamodb::built-first",
             "passedInline writer resource::dynamodb",

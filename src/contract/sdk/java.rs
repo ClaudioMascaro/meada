@@ -164,47 +164,103 @@ fn work() {
     WORK.with(|w| w.set(w.get() + 1));
 }
 
-/// The source positions of the mentions of one kind: where the first ends, and where each starts
-/// (in order, once the file is read).
+/// The source positions where the mentions of one kind start (in order, once the file is read).
 struct Span {
-    first_end: usize,
     starts: Vec<usize>,
 }
 
 impl Span {
     fn of(range: &Range<usize>) -> Self {
         Self {
-            first_end: range.end,
             starts: vec![range.start],
         }
     }
 
     fn add(&mut self, range: &Range<usize>) {
-        self.first_end = self.first_end.min(range.end);
         self.starts.push(range.start);
     }
 
-    /// Whether a mention lies before `at.range`, or starts after it and before `at.later`.
+    /// Whether a mention that is no step of the chain now followed starts before `at.later`. The
+    /// steps of that chain start where it does. A mention before the chain, inside it (in an
+    /// argument or a lambda of one of its steps) or around it is another use of the builder,
+    /// which the chain's own steps cannot be ordered against.
     fn hits(&self, at: &At) -> bool {
-        self.first_end <= at.range.start || {
-            let next = self.starts.partition_point(|&s| s < at.range.end);
-            self.starts.get(next).is_some_and(|&s| s < at.later)
-        }
+        let other = match self.starts.first() {
+            Some(&first) if first == at.own => {
+                (self.starts).get(self.starts.partition_point(|&s| s <= at.own))
+            }
+            first => first,
+        };
+        other.is_some_and(|&s| s < at.later)
     }
 }
 
 /// Where a value is made, and how far past that a mention still changes it.
+#[derive(Clone)]
 struct At {
     range: Range<usize>,
-    /// A mention starting before this, and after `range`, changes the value: the whole file for a
-    /// request the call itself makes, `range.end` (none) for a value made once.
+    /// A mention starting before this changes the value: the whole file for a request the call
+    /// itself makes, `range.end` for a value made once.
     later: usize,
-    /// The outermost loop the value is made in: a builder that outlives it is changed by every
-    /// mention in it, for the next turn builds from what this one set.
-    looped: Option<Range<usize>>,
-    /// The innermost lambda or local or anonymous class the value is made in: it runs when its
-    /// caller says, after whatever follows it in the source.
-    deferred: Option<Range<usize>>,
+    /// Where the chain now followed starts.
+    own: usize,
+}
+
+impl At {
+    /// Where a value built by the call at `range` is made, once.
+    fn made(range: &Range<usize>) -> Self {
+        Self {
+            range: range.clone(),
+            later: range.end,
+            own: range.start,
+        }
+    }
+}
+
+/// Ranges of one file that hold one another or lie apart, in source order, and the one each is in.
+#[derive(Default)]
+struct Nest<'a> {
+    ranges: &'a [Range<usize>],
+    parents: Vec<Option<usize>>,
+}
+
+impl<'a> Nest<'a> {
+    fn read(ranges: &'a [Range<usize>]) -> Self {
+        let mut open: Vec<usize> = Vec::new();
+        let parents = (ranges.iter().enumerate())
+            .map(|(i, r)| {
+                while (open.last()).is_some_and(|&o| ranges[o].end <= r.start) {
+                    open.pop();
+                }
+                let parent = open.last().copied();
+                open.push(i);
+                parent
+            })
+            .collect();
+        Self { ranges, parents }
+    }
+
+    /// Where the outermost range that holds `range` and starts after `declared` ends: what is
+    /// declared before it outlives each run of its code. Every range that holds `range` counts
+    /// for a name with no declaration to place. Past `EVAL_DEPTH` levels out, the end of the file.
+    fn outlived(&self, range: &Range<usize>, declared: Option<usize>) -> Option<usize> {
+        let mut at = (self.ranges.partition_point(|r| r.start <= range.start)).checked_sub(1);
+        let mut end = None;
+        for _ in 0..crate::resolve::EVAL_DEPTH {
+            let Some(i) = at else {
+                return end;
+            };
+            let held = &self.ranges[i];
+            if range.end <= held.end {
+                if declared.is_some_and(|d| held.start <= d) {
+                    return end;
+                }
+                end = Some(held.end);
+            }
+            at = self.parents[i];
+        }
+        at.map_or(end, |_| Some(usize::MAX))
+    }
 }
 
 #[derive(Default)]
@@ -266,11 +322,10 @@ enum Kind<'a> {
 struct Uses<'a> {
     locals: std::collections::HashMap<(&'a str, &'a str), Mentions<'a>>,
     fields: std::collections::HashMap<&'a str, Mentions<'a>>,
-    /// The outermost loops of the file, in order.
-    loops: &'a [Range<usize>],
-    /// Every lambda and local or anonymous class of the file, in order, and the one each is in.
-    deferred: &'a [Range<usize>],
-    parents: Vec<Option<usize>>,
+    /// The code each loop of the file runs again (`Facts::repeated`).
+    loops: Nest<'a>,
+    /// Every lambda and local or anonymous class of the file (`Facts::deferred`).
+    deferred: Nest<'a>,
     /// The locals and parameters the file assigns or declares again: no one builder or value.
     rewritten: std::collections::HashSet<(&'a str, &'a str)>,
     /// Whether the file reads a field by its name as a string: any field may change.
@@ -311,23 +366,11 @@ impl<'a> Uses<'a> {
 
     fn read(code: &Code<'a>, path: &'a str) -> Self {
         let facts = code.files()[path];
-        let mut open: Vec<usize> = Vec::new();
-        let parents = (facts.deferred.iter().enumerate())
-            .map(|(i, d)| {
-                while (open.last()).is_some_and(|&o| facts.deferred[o].end <= d.start) {
-                    open.pop();
-                }
-                let parent = open.last().copied();
-                open.push(i);
-                parent
-            })
-            .collect();
         let mut uses = Self {
             locals: Default::default(),
             fields: Default::default(),
-            loops: &facts.loops,
-            deferred: &facts.deferred,
-            parents,
+            loops: Nest::read(&facts.repeated),
+            deferred: Nest::read(&facts.deferred),
             rewritten: (code.assigned(path).iter())
                 .map(|b| (b.scope.as_str(), b.name.as_str()))
                 .collect(),
@@ -422,10 +465,8 @@ impl<'a> Uses<'a> {
     ) -> bool {
         // Any method sets a field, whatever the order of the file.
         let anywhere = At {
-            range: at.range.clone(),
             later: usize::MAX,
-            looped: None,
-            deferred: None,
+            ..at.clone()
         };
         self.locals
             .get(&(scope, name))
@@ -445,34 +486,6 @@ impl<'a> Uses<'a> {
         self.written
             .get(&(scope, name))
             .is_none_or(|&written| written > 1 + direct)
-    }
-
-    /// Where a value built by the call at `range` is made: once, unless a loop holds the call.
-    fn made(&self, range: &Range<usize>) -> At {
-        let next = self.loops.partition_point(|l| l.end <= range.start);
-        let looped = (self.loops.get(next))
-            .filter(|l| l.start <= range.start && range.end <= l.end)
-            .cloned();
-        At {
-            range: range.clone(),
-            later: range.end,
-            looped,
-            deferred: self.deferred_in(range),
-        }
-    }
-
-    /// The innermost lambda or local or anonymous class that holds `range`. Past `EVAL_DEPTH`
-    /// levels out, one that starts after every builder.
-    fn deferred_in(&self, range: &Range<usize>) -> Option<Range<usize>> {
-        let mut at = (self.deferred.partition_point(|d| d.start <= range.start)).checked_sub(1);
-        for _ in 0..crate::resolve::EVAL_DEPTH {
-            let i = at?;
-            if range.end <= self.deferred[i].end {
-                return Some(self.deferred[i].clone());
-            }
-            at = self.parents[i];
-        }
-        at.map(|_| usize::MAX..usize::MAX)
     }
 }
 
@@ -532,12 +545,13 @@ pub(super) fn changed<'a>(
         uses: builders.uses(code, path),
         seen: std::collections::HashSet::new(),
         depth: 0,
+        on: false,
+        shared: false,
     };
     let at = At {
         range: range.clone(),
         later: usize::MAX,
-        looped: None,
-        deferred: None,
+        own: usize::MAX,
     };
     walk.value(value, &at)
 }
@@ -551,9 +565,16 @@ struct Walk<'a, 'c> {
     scope: &'a str,
     setter: &'c dyn Fn(&str) -> bool,
     uses: std::rc::Rc<Uses<'a>>,
-    seen: std::collections::HashSet<*const ()>,
+    /// Each named value judged, with how it was reached (`on`, `shared`).
+    seen: std::collections::HashSet<(*const (), bool, bool)>,
     /// How many named values and builders deep the question now is.
     depth: usize,
+    /// Whether the value now followed is on the name's path: an argument of a step that sets a
+    /// member of it (`transactItems(items)`), or an element of a list that is.
+    on: bool,
+    /// Whether another name of a value, met on the way to the value now followed, is written
+    /// more than twice.
+    shared: bool,
 }
 
 impl<'a> Walk<'a, '_> {
@@ -562,6 +583,10 @@ impl<'a> Walk<'a, '_> {
         match value {
             Value::Ref(name) => self.named(name, at),
             Value::Call(top) => {
+                let at = &At {
+                    own: top.range.start,
+                    ..at.clone()
+                };
                 let steps = || {
                     std::iter::successors(Some(top), |c| match c.receiver.as_deref() {
                         Some(Value::Call(next)) => Some(next),
@@ -577,10 +602,34 @@ impl<'a> Walk<'a, '_> {
                         && root(value)
                             .is_some_and(|t| self.builders.shadowed(self.code, self.path, t))
                     || root(value).is_some_and(|b| self.builder(b, at))
-                    || steps().flat_map(|c| &c.args).any(|a| self.value(a, at))
+                    || steps().any(|c| {
+                        // `List.of(..)` and `Arrays.asList(..)` hold what they are given.
+                        let method = crate::resolve::method(&c.callee);
+                        let on =
+                            (self.setter)(method) || self.on && matches!(method, "of" | "asList");
+                        let before = std::mem::replace(&mut self.on, on);
+                        let changed = c.args.iter().any(|a| self.value(a, at));
+                        self.on = before;
+                        changed
+                    })
             }
+            Value::List(items) => items.iter().any(|v| self.value(v, at)),
             _ => false,
         }
+    }
+
+    /// Whether a list or an array held in a name may have changed. Either changes in place
+    /// through any name that holds it (`items.set(0, e)`, `items[0] = e`), so one on the name's
+    /// path is followed only when its method writes the name twice, where it is declared and
+    /// where this value reads it, and the same holds for each other name of it on the way. A
+    /// field is written by any method.
+    fn replaced(&self, value: &Value, sole: bool) -> bool {
+        let list = match value {
+            Value::List(_) | Value::New(..) => true,
+            Value::Call(made) => crate::resolve::method(&made.callee) == "asList",
+            _ => false,
+        };
+        self.on && list && !(sole && !self.shared)
     }
 
     /// Whether the built value in the local or `final` field `name` was made from a changed
@@ -593,15 +642,29 @@ impl<'a> Walk<'a, '_> {
         let Some(bound) = self.code.local(self.path, self.scope, name) else {
             return self.constant(name, at);
         };
-        if !self.seen.insert(std::ptr::from_ref(bound).cast()) {
+        let sole = self.uses.written.get(&(bound.scope.as_str(), name)) == Some(&2);
+        if self.replaced(&bound.value, sole) {
+            return true;
+        }
+        let reached = (std::ptr::from_ref(bound).cast(), self.on, self.shared);
+        if !self.seen.insert(reached) {
             return false;
         }
         self.within(|walk| match &bound.value {
             Value::Call(made) => {
-                let at = walk.uses.made(&made.range);
+                let at = At::made(&made.range);
                 walk.value(&bound.value, &at)
             }
-            alias @ Value::Ref(_) => walk.value(alias, at),
+            alias @ Value::Ref(_) => {
+                let before = walk.shared;
+                walk.shared = before || !sole;
+                let changed = walk.value(alias, at);
+                walk.shared = before;
+                changed
+            }
+            // An array holds what its elements were when it was made, judged as the request's
+            // own: by every mention of their builders.
+            Value::List(items) | Value::New(_, items) => items.iter().any(|v| walk.value(v, at)),
             _ => false,
         })
     }
@@ -613,13 +676,17 @@ impl<'a> Walk<'a, '_> {
         else {
             return false;
         };
-        if !self.seen.insert(std::ptr::from_ref(value).cast()) {
+        if self.replaced(value, false) {
+            return true;
+        }
+        let reached = (std::ptr::from_ref(value).cast(), self.on, self.shared);
+        if !self.seen.insert(reached) {
             return false;
         }
         self.within(|walk| {
             walk.there(path, scope, |walk| match value {
                 Value::Call(made) => {
-                    let at = walk.uses.made(&made.range);
+                    let at = At::made(&made.range);
                     walk.value(value, &at)
                 }
                 alias @ Value::Ref(_) => walk.value(alias, at),
@@ -688,25 +755,19 @@ impl<'a> Walk<'a, '_> {
             Some(Value::Call(c)) => Some(c.range.start),
             _ => None,
         };
-        // A builder declared before the loop its value is made in, set later in that loop, is
-        // set before the next turn builds. One declared outside the lambda or class its value is
-        // made in is set again wherever its caller runs it, later in the source or not.
+        // A builder declared before a loop its value is made in, set later in that loop, is set
+        // before the next turn builds. One declared outside a lambda or class its value is made
+        // in is set again wherever its caller runs it, later in the source or not.
         let mut later = at.later;
-        if let Some(l) = &at.looped
-            && declared.is_none_or(|d| d < l.start)
-        {
-            later = later.max(l.end);
+        if let Some(end) = self.uses.loops.outlived(&at.range, declared) {
+            later = later.max(end);
         }
-        if let Some(d) = &at.deferred
-            && declared.is_none_or(|x| x < d.start)
-        {
+        if (self.uses.deferred.outlived(&at.range, declared)).is_some() {
             later = usize::MAX;
         }
         let at = At {
-            range: at.range.clone(),
             later,
-            looped: None,
-            deferred: None,
+            ..at.clone()
         };
         if self.uses.unseen(scope, name, field)
             || self.uses.changed(scope, name, field, self.setter, &at)
@@ -719,7 +780,7 @@ impl<'a> Walk<'a, '_> {
             Some(made @ Value::Call(c)) => {
                 root(made).is_some_and(|r| self.holds(r))
                     || self.within(|walk| {
-                        let at = walk.uses.made(&c.range);
+                        let at = At::made(&c.range);
                         walk.value(made, &at)
                     })
             }
@@ -738,7 +799,7 @@ impl<'a> Walk<'a, '_> {
                     made @ Value::Call(c) => self.there(path, scope, |walk| {
                         root(made).is_some_and(|r| walk.holds(r))
                             || walk.within(|walk| {
-                                let at = walk.uses.made(&c.range);
+                                let at = At::made(&c.range);
                                 walk.value(made, &at)
                             })
                     }),
