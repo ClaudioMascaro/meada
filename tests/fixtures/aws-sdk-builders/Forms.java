@@ -347,6 +347,67 @@ class Forms {
         db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
     }
 
+    // A list or an array that reaches a transaction through a parameter has no mentions to
+    // count: its caller may change it before the call, and the wrapper before the request.
+    void send(List<TransactWriteItem> items) {
+        var db = DynamoDbClient.create();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+
+    void sendChanged(List<TransactWriteItem> items) {
+        var db = DynamoDbClient.create();
+        items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("wrapped-set-new").build()).build());
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+
+    void sendAlias(List<TransactWriteItem> items) {
+        var db = DynamoDbClient.create();
+        var same = items;
+        same.set(0, TransactWriteItem.builder().put(Put.builder().tableName("wrapped-alias-new").build()).build());
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(same).build());
+    }
+
+    void sendArray(TransactWriteItem[] items) {
+        var db = DynamoDbClient.create();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+
+    // Two entries are no list, and a built entry cannot change.
+    void sendBoth(TransactWriteItem first, TransactWriteItem second) {
+        var db = DynamoDbClient.create();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(first, second).build());
+    }
+
+    void wrappedPlain() {
+        send(Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("wrapped-plain").build()).build()));
+    }
+
+    void wrappedCallerSet() {
+        var items = Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("wrapped-caller-old").build()).build());
+        items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("wrapped-caller-new").build()).build());
+        send(items);
+    }
+
+    void wrappedSet() {
+        sendChanged(Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("wrapped-set-old").build()).build()));
+    }
+
+    void wrappedAlias() {
+        sendAlias(Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("wrapped-alias-old").build()).build()));
+    }
+
+    void wrappedArray() {
+        TransactWriteItem[] items = { TransactWriteItem.builder().put(Put.builder().tableName("wrapped-array-old").build()).build() };
+        items[0] = TransactWriteItem.builder().put(Put.builder().tableName("wrapped-array-new").build()).build();
+        sendArray(items);
+    }
+
+    void wrappedBoth() {
+        sendBoth(
+            TransactWriteItem.builder().put(Put.builder().tableName("wrapped-first").build()).build(),
+            TransactWriteItem.builder().put(Put.builder().tableName("wrapped-second").build()).build());
+    }
+
     // A shorter path keeps the name it had: its lists are not judged.
     void listOther() {
         var events = EventBridgeClient.create();

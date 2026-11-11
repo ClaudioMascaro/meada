@@ -4988,6 +4988,9 @@ pub struct Code<'a> {
     chains: RefCell<HashMap<(&'a str, usize), Option<Tail>>>,
     /// What folding and tracing values has spent of each file's `EVAL_BUDGET`.
     folded: RefCell<HashMap<&'a str, usize>>,
+    /// `folded` and `field_reads` for the work `Code::apart` runs.
+    folded_apart: RefCell<HashMap<&'a str, usize>>,
+    field_reads_apart: RefCell<HashMap<Field<'a>, Value>>,
     /// Each file of `full` by name, built the first time a name is looked up in it.
     by_name: HashMap<&'a str, OnceCell<ByName<'a>>>,
     /// The marker constants of the literals that set each field (`field_values`), by field name
@@ -5167,6 +5170,8 @@ impl<'a> Code<'a> {
             read: RefCell::new(HashSet::new()),
             chains: RefCell::new(HashMap::new()),
             folded: RefCell::new(HashMap::new()),
+            folded_apart: RefCell::new(HashMap::new()),
+            field_reads_apart: RefCell::new(HashMap::new()),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
             literals: OnceCell::new(),
             field_reads: RefCell::new(HashMap::new()),
@@ -5183,6 +5188,20 @@ impl<'a> Code<'a> {
         let spent = folded.entry(file).or_default();
         *spent = spent.saturating_add(cost);
         *spent <= EVAL_BUDGET
+    }
+
+    /// `work` on an `EVAL_BUDGET` of its own for each file, with the field reads it folds kept
+    /// to itself: whatever it spends, every other reader of a file folds what it folds without
+    /// it. Not to be nested.
+    pub(crate) fn apart<T>(&self, work: impl FnOnce() -> T) -> T {
+        let swap = || {
+            self.folded.swap(&self.folded_apart);
+            self.field_reads.swap(&self.field_reads_apart);
+        };
+        swap();
+        let done = work();
+        swap();
+        done
     }
 
     /// The language pack whose files these are.

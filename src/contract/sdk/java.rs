@@ -537,13 +537,15 @@ pub(super) fn changed<'a>(
     builders: &Builders<'a>,
 ) -> bool {
     let setter = super::setter(selector);
+    // The list of a transaction's path is its first member (`TransactItems[]`).
+    let list = super::setter(selector.split('.').next().unwrap_or(selector));
     let mut walk = Walk {
         code,
         builders,
         path,
         scope,
         setter: &setter,
-        lists: super::transaction(selector),
+        lists: super::transaction(selector).then_some(&list),
         uses: builders.uses(code, path),
         seen: std::collections::HashSet::new(),
         depth: 0,
@@ -566,8 +568,9 @@ struct Walk<'a, 'c> {
     path: &'a str,
     scope: &'a str,
     setter: &'c dyn Fn(&str) -> bool,
-    /// Whether a list held in a name is judged (`replaced`): on a transaction's path.
-    lists: bool,
+    /// The step that sets the list of a transaction's path (`transactItems`): on such a path a
+    /// list held in a name is judged (`replaced`, `passed`).
+    lists: Option<&'c dyn Fn(&str) -> bool>,
     uses: std::rc::Rc<Uses<'a>>,
     /// Each named value judged, with how it was reached (`on`, `shared`).
     seen: std::collections::HashSet<(*const (), bool, bool)>,
@@ -607,8 +610,14 @@ impl<'a> Walk<'a, '_> {
                             .is_some_and(|t| self.builders.shadowed(self.code, self.path, t))
                     || root(value).is_some_and(|b| self.builder(b, at))
                     || steps().any(|c| {
-                        // `List.of(..)` and `Arrays.asList(..)` hold what they are given.
                         let method = crate::resolve::method(&c.callee);
+                        if let [sole] = &c.args[..]
+                            && self.lists.is_some_and(|list| list(method))
+                            && self.passed(sole)
+                        {
+                            return true;
+                        }
+                        // `List.of(..)` and `Arrays.asList(..)` hold what they are given.
                         let on =
                             (self.setter)(method) || self.on && matches!(method, "of" | "asList");
                         let before = std::mem::replace(&mut self.on, on);
@@ -633,7 +642,28 @@ impl<'a> Walk<'a, '_> {
             Value::Call(made) => crate::resolve::method(&made.callee) == "asList",
             _ => false,
         };
-        self.lists && self.on && list && !(sole && !self.shared)
+        self.lists.is_some() && self.on && list && !(sole && !self.shared)
+    }
+
+    /// Whether `value`, the one argument of the step that sets the path's list, is a name that
+    /// holds no value the reader knows, itself or through other names of it: a parameter, or a
+    /// field any method assigns. Such a list has no mentions to count: its caller may change it
+    /// before the call, and this function before the request reads it.
+    // ponytail: so a list, an array or one entry that a wrapper takes and passes on unchanged
+    // names no table either; mapping each argument to its parameter would keep it (#772).
+    fn passed(&self, mut value: &'a Value) -> bool {
+        for _ in 0..crate::resolve::EVAL_DEPTH {
+            let Value::Ref(name) = value else {
+                return false;
+            };
+            match self.code.local(self.path, self.scope, name) {
+                Some(bound) => value = &bound.value,
+                None => {
+                    return (self.code.constant_value(self.path, self.scope, name)).is_none();
+                }
+            }
+        }
+        true
     }
 
     /// Whether the built value in the local or `final` field `name` was made from a changed

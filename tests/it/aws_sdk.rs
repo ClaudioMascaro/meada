@@ -1188,7 +1188,8 @@ fn java_named_builds_chained_past_the_evaluation_depth_stay_unresolved() {
 /// inside a lambda, or declared in a `for` clause is set before the next turn builds; a setter
 /// inside the request's own expression runs before its `build()`. A list or an array on a
 /// transaction's path changes in place, so one held in a name is followed only when its method
-/// writes that name twice (`List.of` cannot change); a shorter path keeps the name it had.
+/// writes that name twice (`List.of` cannot change), and one that comes in a parameter never is;
+/// a shorter path keeps the name it had.
 #[test]
 fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     let repo = fixture_repo("aws_sdk_builder_forms", "aws-sdk-builders", None);
@@ -1283,6 +1284,13 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
             "supplierAlias writer resource::dynamodb",
             "ternaryAlias writer resource::dynamodb",
             "variable writer resource::dynamodb",
+            "wrappedAlias writer resource::dynamodb",
+            "wrappedArray writer resource::dynamodb",
+            "wrappedBoth writer resource::dynamodb::wrapped-first",
+            "wrappedBoth writer resource::dynamodb::wrapped-second",
+            "wrappedCallerSet writer resource::dynamodb",
+            "wrappedPlain writer resource::dynamodb",
+            "wrappedSet writer resource::dynamodb",
         ],
         "{export}"
     );
@@ -1646,6 +1654,151 @@ fn aws_origin_chains_and_inline_factories_stay_bounded_at_the_file_size_ceiling(
             "{text}"
         );
         assert_eq!(export["consumers"], serde_json::json!([]));
+    }
+}
+
+/// The transaction calls of a file fold on a budget of their own: however many they are, the
+/// other calls of the file keep the sides they have without them, of every kind (#719).
+#[test]
+fn transaction_calls_leave_the_other_sides_of_their_file_named() {
+    let repeated = |template: &str, count: usize| -> String {
+        (0..count)
+            .map(|k| template.replace("$K", &k.to_string()))
+            .collect()
+    };
+    let java = format!(
+        r#"import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.Put;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.sns.SnsClient;
+import software.amazon.awssdk.services.sns.model.PublishRequest;
+
+class Budget {{
+    void transactions() {{
+        var db = DynamoDbClient.create();
+{}    }}
+    void last() {{
+        var db = DynamoDbClient.create();
+        db.putItem(PutItemRequest.builder().tableName("last").build());
+        var get = GetItemRequest.builder().tableName("get");
+        db.getItem(get.build());
+        var s3 = S3Client.create();
+        s3.putObject(PutObjectRequest.builder().bucket("bucket").build(), RequestBody.empty());
+        var sns = SnsClient.create();
+        sns.publish(PublishRequest.builder().topicArn("topic").build());
+    }}
+}}
+"#,
+        repeated(
+            r#"        var p$K = Put.builder().tableName("t$K");
+        var e$K = p$K.build();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(e$K).build()).build());
+"#,
+            2000
+        )
+    );
+    let go = format!(
+        r#"package app
+
+import (
+    "context"
+
+    "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+    "github.com/aws/aws-sdk-go-v2/service/s3"
+    "github.com/aws/aws-sdk-go-v2/service/sns"
+)
+
+var cfg aws.Config
+var client = dynamodb.NewFromConfig(cfg)
+{}
+func last(ctx context.Context) {{
+    client.PutItem(ctx, &dynamodb.PutItemInput{{TableName: aws.String("last")}})
+    in := &dynamodb.GetItemInput{{TableName: aws.String("get")}}
+    client.GetItem(ctx, in)
+    buckets := s3.NewFromConfig(cfg)
+    buckets.PutObject(ctx, &s3.PutObjectInput{{Bucket: aws.String("bucket")}})
+    topics := sns.NewFromConfig(cfg)
+    topics.Publish(ctx, &sns.PublishInput{{TopicArn: aws.String("topic")}})
+}}
+"#,
+        repeated(
+            r#"
+func f$K(ctx context.Context) {
+    p := &types.Put{TableName: aws.String("t$K")}
+    items := []types.TransactWriteItem{{Put: p}}
+    in := &dynamodb.TransactWriteItemsInput{TransactItems: items}
+    client.TransactWriteItems(ctx, in)
+}
+"#,
+            2500
+        )
+    );
+    let csharp = format!(
+        r#"using System.Collections.Generic;
+using System.Threading.Tasks;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
+using Amazon.S3;
+using Amazon.S3.Model;
+using Amazon.SimpleNotificationService;
+using Amazon.SimpleNotificationService.Model;
+
+class Budget {{
+    AmazonDynamoDBClient db = new AmazonDynamoDBClient();
+{}    async Task Last() {{
+        await db.PutItemAsync(new PutItemRequest {{ TableName = "last" }});
+        var get = new GetItemRequest {{ TableName = "get" }};
+        await db.GetItemAsync(get);
+        var s3 = new AmazonS3Client();
+        await s3.PutObjectAsync(new PutObjectRequest {{ BucketName = "bucket" }});
+        var sns = new AmazonSimpleNotificationServiceClient();
+        await sns.PublishAsync(new PublishRequest {{ TopicArn = "topic" }});
+    }}
+}}
+"#,
+        repeated(
+            r#"    async Task F$K() {
+        var p = new Put { TableName = "t$K" };
+        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = p } };
+        var request = new TransactWriteItemsRequest { TransactItems = items };
+        await db.TransactWriteItemsAsync(request);
+    }
+"#,
+            2500
+        )
+    );
+    for (language, file, source) in [
+        ("java", "Budget.java", java),
+        ("go", "budget.go", go),
+        ("csharp", "Budget.cs", csharp),
+    ] {
+        let repo = fixture_repo(
+            &format!("aws_sdk_transaction_budget_{language}"),
+            "aws-sdk-controls",
+            None,
+        );
+        std::fs::write(repo.join(file), source).unwrap();
+        let text = Engine::open(&repo).unwrap().export().unwrap();
+        let export: Value = serde_json::from_str(&text).unwrap();
+        for (sides, contract) in [
+            ("providers", "resource::dynamodb::t0"),
+            ("providers", "resource::dynamodb::last"),
+            ("consumers", "resource::dynamodb::get"),
+            ("providers", "resource::s3::bucket"),
+            ("providers", "channel::sns::topic"),
+        ] {
+            let named =
+                (export[sides].as_array().unwrap().iter()).any(|s| s["contract"] == contract);
+            assert!(named, "{language}: no {contract} in {sides}");
+        }
     }
 }
 

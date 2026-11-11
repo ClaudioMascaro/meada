@@ -175,6 +175,9 @@ pub(crate) fn extract<'a>(
             continue;
         }
         let mut origins = origins::Origins::new(code, language);
+        // A transaction folds a value per entry, and a file of them would spend what its other
+        // calls need: its rows have a budget of their own, here and in `Code::apart`.
+        let mut apart = origins::Origins::new(code, language);
         let counts = std::cell::OnceCell::new();
         let aliases: BTreeMap<_, _> = if language == Language::Csharp {
             facts
@@ -194,88 +197,103 @@ pub(crate) fn extract<'a>(
                     .map(move |operation| (service, operation))
             });
             for (service, operation) in operations {
-                if !origins.call(path, index, &service.client)
-                    && !origins.declared(path, index, service.declared)
-                {
-                    continue;
-                }
-                let changed = changed_request(
-                    code,
-                    path,
-                    index,
-                    operation.field,
-                    language,
-                    &written,
-                    &builders,
-                ) || (language != Language::Java
-                    && transaction(operation.field)
-                    && held_changed(code, path, index, operation.field, language, {
-                        counts.get_or_init(|| {
-                            (code.mentioned(path).iter())
-                                .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
-                                .collect()
-                        })
-                    }));
-                let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
-                    let [Value::Call(call)] = args else {
-                        return Some(vec![Name::default()]);
-                    };
-                    let values = request(call, keywords, operation.field, language)?;
-                    let mut names = Vec::new();
-                    for value in &values {
-                        names.push(match (changed, value) {
-                            (true, _) => Name::default(),
-                            (false, Some(v)) => name(code, path, Some(v), service.kind, &aliases)?,
-                            // ADR 0026: an entry without a bus sends to `default`; an SNS
-                            // phone or endpoint publish names no topic.
-                            (false, None) if service.kind == "eventbridge" => Name {
-                                literal: Some("default".into()),
-                                env: None,
-                            },
-                            (false, None) if service.kind == "sns" => continue,
-                            (false, None) => Name::default(),
-                        });
-                    }
-                    Some(names)
+                let transaction = transaction(operation.field);
+                let origins = if transaction {
+                    &mut apart
+                } else {
+                    &mut origins
                 };
-                let injected = (language == Language::Java)
-                    .then_some(&inject as &crate::resolve::Inject<'a, '_>);
-                for expanded in code.expand_with(Expand::Chain(path, index), injected, &read) {
-                    let (at, index) = expanded.site;
-                    let passed = language == Language::Java
-                        && passed_changed(code, &expanded.frames, operation.field, &builders);
-                    for mut name in expanded.found {
-                        if passed {
-                            name = Name::default();
-                        }
-                        if operation.hierarchy {
-                            name.literal = None;
-                        }
-                        let contract = match &name.literal {
-                            Some(name) => format!("{prefix}::{}::{name}", service.kind),
-                            None => format!("{prefix}::{}", service.kind),
-                        };
-                        found.push(Found {
-                            identity: None,
-                            role: operation.role,
-                            site: if operation.role == Role::Consumer {
-                                Site::Def {
-                                    path: at.into(),
-                                    name: code.files()[at].calls[index].scope.clone(),
-                                }
-                            } else {
-                                Site::Call {
-                                    path: at.into(),
-                                    index,
-                                }
-                            },
-                            contract: Some(contract),
-                            via: name.env.map(|v| format!("env:{v}")),
-                            method: Some(operation.method.into()),
-                            fragments: Vec::new(),
-                            shape: None,
-                        });
+                let mut row = || {
+                    if !origins.call(path, index, &service.client)
+                        && !origins.declared(path, index, service.declared)
+                    {
+                        return;
                     }
+                    let changed = changed_request(
+                        code,
+                        path,
+                        index,
+                        operation.field,
+                        language,
+                        &written,
+                        &builders,
+                    ) || (language != Language::Java
+                        && transaction
+                        && held_changed(code, path, index, operation.field, language, {
+                            counts.get_or_init(|| {
+                                (code.mentioned(path).iter())
+                                    .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
+                                    .collect()
+                            })
+                        }));
+                    let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
+                        let [Value::Call(call)] = args else {
+                            return Some(vec![Name::default()]);
+                        };
+                        let values = request(call, keywords, operation.field, language)?;
+                        let mut names = Vec::new();
+                        for value in &values {
+                            names.push(match (changed, value) {
+                                (true, _) => Name::default(),
+                                (false, Some(v)) => {
+                                    name(code, path, Some(v), service.kind, &aliases)?
+                                }
+                                // ADR 0026: an entry without a bus sends to `default`; an SNS
+                                // phone or endpoint publish names no topic.
+                                (false, None) if service.kind == "eventbridge" => Name {
+                                    literal: Some("default".into()),
+                                    env: None,
+                                },
+                                (false, None) if service.kind == "sns" => continue,
+                                (false, None) => Name::default(),
+                            });
+                        }
+                        Some(names)
+                    };
+                    let injected = (language == Language::Java)
+                        .then_some(&inject as &crate::resolve::Inject<'a, '_>);
+                    for expanded in code.expand_with(Expand::Chain(path, index), injected, &read) {
+                        let (at, index) = expanded.site;
+                        let passed = language == Language::Java
+                            && passed_changed(code, &expanded.frames, operation.field, &builders);
+                        for mut name in expanded.found {
+                            if passed {
+                                name = Name::default();
+                            }
+                            if operation.hierarchy {
+                                name.literal = None;
+                            }
+                            let contract = match &name.literal {
+                                Some(name) => format!("{prefix}::{}::{name}", service.kind),
+                                None => format!("{prefix}::{}", service.kind),
+                            };
+                            found.push(Found {
+                                identity: None,
+                                role: operation.role,
+                                site: if operation.role == Role::Consumer {
+                                    Site::Def {
+                                        path: at.into(),
+                                        name: code.files()[at].calls[index].scope.clone(),
+                                    }
+                                } else {
+                                    Site::Call {
+                                        path: at.into(),
+                                        index,
+                                    }
+                                },
+                                contract: Some(contract),
+                                via: name.env.map(|v| format!("env:{v}")),
+                                method: Some(operation.method.into()),
+                                fragments: Vec::new(),
+                                shape: None,
+                            });
+                        }
+                    }
+                };
+                if transaction {
+                    code.apart(row);
+                } else {
+                    row();
                 }
             }
         }
