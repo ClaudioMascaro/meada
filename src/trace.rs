@@ -198,6 +198,7 @@ impl<'a> Graph<'a> {
             ancestors: Vec::new(),
             expanded: HashSet::new(),
             executed: HashSet::new(),
+            limit: WALK_DEPTH,
         };
         match start {
             Start::Uncommitted => {
@@ -254,6 +255,8 @@ impl<'a> Graph<'a> {
             ancestors: Vec::new(),
             expanded: HashSet::new(),
             executed: HashSet::new(),
+            // The walk starts at the IaC node, one level above `depth`.
+            limit: depth + WALK_DEPTH - 1,
         };
         // The borrowed link endpoints carry the same identity as the IaC node. Entering
         // it uses the ordinary kind-directed traversal; omit the already-rendered root.
@@ -776,6 +779,8 @@ struct Walk<'g, 'a> {
     /// The workloads and roots whose `runs code` line the answer wrote (#744): a workload that
     /// runs several of the nodes reached, or several paths of one, is written once.
     executed: HashSet<(String, String)>,
+    /// The depth where a branch stops, `WALK_DEPTH` below where the walk starts.
+    limit: usize,
 }
 
 impl<'a> Walk<'_, 'a> {
@@ -803,12 +808,14 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// Writes the line reaching `id`, then follows `id` unless that closes a cycle or repeats
-    /// a node already followed.
+    /// Writes the line reaching `id`, then follows `id` unless that closes a cycle, repeats a
+    /// node already followed or is at the depth limit, where `id` is not counted as followed: a
+    /// shorter path that meets it later follows it.
     fn enter(&mut self, id: &'a str, depth: usize, mut row: Row) {
         let seen = match () {
             _ if self.ancestors.contains(&id) => " (cycle)",
             _ if self.expanded.contains(id) => " (see above)",
+            _ if depth >= self.limit => " (depth limit)",
             _ => "",
         };
         row.text += seen;
@@ -1165,10 +1172,11 @@ enum Via<'a> {
     Link(&'a Link),
 }
 
-/// How deep a process walk follows one branch before it stops and says so.
+/// How deep a walk (a `trace`, a process) follows one branch below where it starts before it
+/// stops and says so.
 // ponytail: a fixed depth keeps the recursion off the stack limit however long a call chain is;
 // a walk with its own stack lifts it.
-const PROCESS_DEPTH: usize = 256;
+const WALK_DEPTH: usize = 256;
 
 /// One step of a process: the structured list `trace` renders and the export carries.
 pub(crate) struct Step<'a> {
@@ -1401,7 +1409,7 @@ impl<'a> Graph<'a> {
     /// position of its repository. Found by walking upstream: the walk inverts `edges`, the one
     /// set of edge rules, so it crosses exactly the calls and links a process expands (decided
     /// links included, ambiguous calls and links not) and membership agrees with the process
-    /// tree, but for chains deeper than `PROCESS_DEPTH`, which only this walk ignores: a node
+    /// tree, but for chains deeper than `WALK_DEPTH`, which only this walk ignores: a node
     /// past depth 256 is no step of the tree, and the limit can hide a node shallower than
     /// that, through `Seen`. E reaches X at depth 255, so X expands and each of its callees, Y
     /// among them, is a `depth-limit` step at 256 whose own callee Z is no step; a later direct
@@ -1506,14 +1514,14 @@ struct Descent<'g, 'a> {
 
 impl<'a> Descent<'_, 'a> {
     /// Writes the step at `id`, then follows `id` unless that closes a cycle, repeats a node
-    /// already followed or is `PROCESS_DEPTH` deep.
+    /// already followed or is `WALK_DEPTH` deep.
     fn enter(&mut self, id: &'a str, depth: usize, via: Via<'a>, level: Option<Level>) {
         let graph = self.graph;
         let mut step = Step::new(depth, graph.repo(id), via, level, id);
         match () {
             _ if self.ancestors.contains(&id) => step = step.marked(Mark::Cycle),
             _ if self.expanded.contains(id) => step = step.marked(Mark::Seen),
-            _ if depth >= PROCESS_DEPTH => step = step.marked(Mark::DepthLimit),
+            _ if depth >= WALK_DEPTH => step = step.marked(Mark::DepthLimit),
             _ => {}
         }
         let seen = step.mark.is_some();
@@ -1675,31 +1683,31 @@ mod tests {
     use crate::index::Span;
     use crate::workspace::Repository;
 
-    #[test]
-    fn a_chain_past_the_depth_limit_ends_at_it() {
-        let id = |n: usize| format!("r::a.ts::f{n}");
+    /// A workspace of one repository `r` whose file `a.ts` defines `names` and makes `calls`,
+    /// `(caller, callee)` by name in source order, each exact.
+    fn repository(names: &[String], calls: &[(String, String)]) -> (Workspace, [Export; 1]) {
+        let id = |name: &str| format!("r::a.ts::{name}");
         let span = || {
             let mut span = Span::default();
             span.path = "a.ts".into();
             span
         };
-        let length = PROCESS_DEPTH + 50;
         let export = Export {
             repository: "r".into(),
-            symbols: (0..=length)
-                .map(|n| {
+            symbols: (names.iter())
+                .map(|name| {
                     let mut symbol = Symbol::default();
-                    symbol.id = id(n);
+                    symbol.id = id(name);
                     symbol.span = span();
                     symbol
                 })
                 .collect(),
-            calls: (0..length)
-                .map(|n| {
+            calls: (calls.iter().enumerate())
+                .map(|(n, (caller, callee))| {
                     let mut call = CallSite::default();
-                    call.id = format!("r::a.ts::f{n}@{n}");
-                    call.caller = id(n);
-                    call.target = Some(id(n + 1));
+                    call.id = format!("{}@{n}", id(caller));
+                    call.caller = id(caller);
+                    call.target = Some(id(callee));
                     call.level = Some(Level::Exact);
                     call.span = span();
                     call
@@ -1717,21 +1725,56 @@ mod tests {
             }],
             missing: Vec::new(),
         };
+        (workspace, [export])
+    }
+
+    #[test]
+    fn a_chain_past_the_depth_limit_ends_at_it() {
+        let f = |n: usize| format!("f{n}");
+        let length = WALK_DEPTH + 50;
+        let names: Vec<String> = (0..=length).map(f).collect();
+        let calls: Vec<_> = (0..length).map(|n| (f(n), f(n + 1))).collect();
+        let (workspace, exports) = repository(&names, &calls);
         let entry = EntryPoint {
-            identity: id(0),
+            identity: "r::a.ts::f0".into(),
             kind: EntryKind::Export,
             label: "f0".into(),
-            site: id(0),
+            site: "r::a.ts::f0".into(),
         };
-        let exports = [export];
         let graph = Graph::new(&workspace, &exports, &[]);
 
         let steps = graph.process(&entry);
 
-        assert_eq!(steps.len(), PROCESS_DEPTH + 1);
+        assert_eq!(steps.len(), WALK_DEPTH + 1);
         let last = steps.last().unwrap();
-        assert_eq!(last.depth, PROCESS_DEPTH);
+        assert_eq!(last.depth, WALK_DEPTH);
         assert!(last.mark == Some(Mark::DepthLimit));
-        assert!(steps[..PROCESS_DEPTH].iter().all(|s| s.mark.is_none()));
+        assert!(steps[..WALK_DEPTH].iter().all(|s| s.mark.is_none()));
+    }
+
+    #[test]
+    fn a_trace_follows_a_node_met_at_the_depth_limit_where_a_shorter_path_meets_it_again() {
+        // `f0` calls `g1`, whose chain meets `x` at the limit, then calls `x` itself.
+        let g = |n: usize| format!("g{n}");
+        let mut names: Vec<String> = (1..WALK_DEPTH).map(g).collect();
+        names.extend(["f0", "x", "y"].map(String::from));
+        let mut calls = vec![("f0".to_string(), g(1))];
+        calls.extend((1..WALK_DEPTH - 1).map(|n| (g(n), g(n + 1))));
+        calls.push((g(WALK_DEPTH - 1), "x".into()));
+        calls.extend([("f0", "x"), ("x", "y")].map(|(a, b)| (a.to_string(), b.to_string())));
+        let (workspace, exports) = repository(&names, &calls);
+        let graph = Graph::new(&workspace, &exports, &[]);
+
+        let answer = graph.answer(
+            Start::From("f0"),
+            None,
+            Direction::Down,
+            Some(usize::MAX / 8),
+        );
+
+        // Nothing hangs from `x` at the limit; one level down it is followed.
+        let limit = format!("{}r a.ts x (depth limit)\n", "  ".repeat(WALK_DEPTH));
+        let tail = format!("{limit}  r a.ts x\n    r a.ts y\nchain: ");
+        assert!(answer.contains(&tail), "{answer}");
     }
 }

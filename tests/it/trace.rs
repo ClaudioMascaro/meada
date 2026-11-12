@@ -265,6 +265,88 @@ fn a_trace_over_budget_says_where_it_stopped_and_keeps_the_footer() {
     assert!(tokens <= 120, "{tokens} tokens");
 }
 
+/// How deep a trace follows one branch below where it starts: `WALK_DEPTH` of `src/trace.rs`,
+/// which this crate cannot see.
+const WALK_DEPTH: usize = 256;
+
+/// `trace` on a thread with the stack of a runtime worker (tokio's 2 MiB), where the MCP server
+/// and the HTTP transport answer: a recursion with no depth limit overflows it and aborts the
+/// process.
+fn trace_on_a_worker(
+    repo: &Path,
+    from: &str,
+    direction: Direction,
+    budget: Option<usize>,
+) -> String {
+    std::thread::scope(|scope| {
+        std::thread::Builder::new()
+            .stack_size(2 << 20)
+            .spawn_scoped(scope, || {
+                let engine = Engine::open(repo).unwrap();
+                engine.trace(Start::From(from), direction, budget).unwrap()
+            })
+            .unwrap()
+            .join()
+            .unwrap()
+    })
+}
+
+#[test]
+fn a_call_chain_past_the_depth_limit_is_cut_there_either_way_and_from_an_iac_node() {
+    let repo = Path::new(env!("CARGO_TARGET_TMPDIR")).join("trace_depth_limit/chain");
+    let _ = fs::remove_dir_all(&repo);
+    fs::create_dir_all(&repo).unwrap();
+    // 5,000 calls, each function calling the next: a debug build without the limit aborted
+    // at about 2,000 hops down and 3,200 up.
+    let last = 5_000;
+    let mut chain: String = (0..last)
+        .map(|n| format!("def f{n}():\n    f{}()\n\n\n", n + 1))
+        .collect();
+    chain += &format!("def f{last}():\n    pass\n");
+    fs::write(repo.join("chain.py"), chain).unwrap();
+    // A Compose service that runs the whole repository, so its trace goes on into the chain.
+    fs::write(
+        repo.join("compose.yaml"),
+        "services:\n  chain:\n    build: .\n",
+    )
+    .unwrap();
+    fs::write(repo.join("Dockerfile"), "FROM python:3.12-slim\nCOPY . .\n").unwrap();
+    common::git(&repo, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    common::git(&repo, &["add", "-A"]);
+    common::git(&repo, &["commit", "-q", "-m", "chain"]);
+    let depth = |line: &str| (line.len() - line.trim_start().len()) / 2;
+    let far = Some(1_000_000);
+    let end = format!("f{last}");
+    let cases = [
+        ("f0", Direction::Down, vec![None, far], "f256"),
+        (end.as_str(), Direction::Up, vec![None, far], "f4744"),
+        // The service, then the line saying it runs the code, then the entry point `f0`.
+        ("services.chain", Direction::Down, vec![far], "f254"),
+    ];
+
+    for (from, direction, budgets, cut) in cases {
+        for budget in budgets {
+            let answer = trace_on_a_worker(&repo, from, direction, budget);
+
+            let deepest = answer.lines().map(depth).max().unwrap();
+            assert!(deepest <= WALK_DEPTH, "{from} {direction:?}: {deepest}");
+            if budget == far {
+                let limits: Vec<&str> = (answer.lines())
+                    .filter(|l| l.ends_with(" (depth limit)"))
+                    .collect();
+                assert_eq!(limits.len(), 1, "{from} {direction:?}: {limits:?}");
+                assert_eq!(depth(limits[0]), WALK_DEPTH, "{from} {direction:?}");
+                assert!(
+                    limits[0].ends_with(&format!(" {cut} (depth limit)")),
+                    "{from} {direction:?}: {}",
+                    limits[0].trim_start()
+                );
+            }
+        }
+    }
+    fs::remove_dir_all(&repo).unwrap();
+}
+
 #[test]
 fn a_missing_peer_closes_the_footer_and_the_rest_of_the_chain_answers() {
     let case = "trace_missing";
