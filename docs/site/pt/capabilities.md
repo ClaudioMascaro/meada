@@ -335,6 +335,16 @@ continua a mostrá-lo com `[inferred]`. Uma linha `no provisioner` termina com o
 entre colchetes, como o `context` o escreve (`[exact]`, `[declared]`), e as linhas `uses` do
 `meada export` trazem `level`.
 
+Um identificador estruturado na lista de recursos de uma declaração de política IAM (`Resource` ou
+`NotResource` de um item de `Statement`, num arquivo de política ou num documento de política
+dentro de um template, e `resources` ou `not_resources` de um bloco `statement` de um
+`aws_iam_policy_document`) é um **policy grant**, não um uso: diz quem pode tocar o recurso, sem
+direção. O `context` do recurso o lista com o papel `policy grant` e o seu lugar; ele não se liga a
+provisionador, não abre escopo de órfãos e nunca vira linha de órfão, e o `meada export` o lista no
+array `policy_grants`, à parte de `uses`. Num documento JSON Schema (com `$schema` na raiz), um
+valor sob `examples`, `default`, `enum` ou `const` documenta uma forma e não é lado nenhum: continua
+sendo um valor de configuração que o `search` acha.
+
 ### Provisionadores Terraform
 
 Um `resource` `aws_sqs_queue` provisiona `channel::sqs::<nome>` pelo argumento `name`;

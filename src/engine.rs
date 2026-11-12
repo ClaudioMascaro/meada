@@ -721,9 +721,8 @@ impl Engine {
                 )
             });
             let mut ranked = Vec::new();
-            let configured = export
-                .config_uses
-                .iter()
+            let configured = (export.config_uses.iter())
+                .chain(&export.policy_grants)
                 .map(|u| (u.contract.clone(), &u.site, None));
             for (contract, site, role) in provided.chain(consumed).chain(configured) {
                 if !contract.starts_with(prefix) {
@@ -748,6 +747,14 @@ impl Engine {
                     None if export.config_uses.iter().any(|u| &u.site == site) => {
                         let u = export.config_uses.iter().find(|u| &u.site == site).unwrap();
                         format!("use {} [{}]", u.place(), u.level.name())
+                    }
+                    None if export.policy_grants.iter().any(|g| &g.site == site) => {
+                        let g = export
+                            .policy_grants
+                            .iter()
+                            .find(|g| &g.site == site)
+                            .unwrap();
+                        format!("policy grant {}", g.place())
                     }
                     None if *site == repo.identity => REPOSITORY_LEVEL.into(),
                     None => match export.document_of(site) {
@@ -1112,6 +1119,17 @@ impl Engine {
                         ),
                         Vec::new(),
                     ));
+                }
+            }
+            for g in &export.policy_grants {
+                if g.contract == contract {
+                    let line = format!(
+                        "{} policy grant {}{}",
+                        export.repository,
+                        g.place(),
+                        orphans.use_note(contract)
+                    );
+                    sides.push((2, line, Vec::new()));
                 }
             }
             for p in &export.provisioners {

@@ -138,6 +138,7 @@ A repository's export is indented JSON ending in a newline, with every list sort
 | `processes` | `entry_point`, `kind` (`route`, `export`, `channel` or `program`), `label`, `steps`. |
 | `stale_decisions` | `call`, `target`, `cause`. |
 | `uses` | `contract`, `site`, `at`, `level` (`exact` or `inferred`). |
+| `policy_grants` | `contract`, `site`, `at`. |
 
 The fields of `shape` (`source`, `fields`, `open`, `scalars`, `declared`, `optional`, `guessed`) and of each step in `steps` (`depth`, `repository`, `level`, `via`, `node`, `reason`, `mark`, `candidates`, `contract`) are part of the format, and so are these values:
 

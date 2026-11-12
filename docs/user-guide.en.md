@@ -545,6 +545,16 @@ name, which is therefore no `no use`, and `context` still shows it with `[inferr
 `no provisioner` line ends with its side's level in brackets, as `context` writes it (`[exact]`,
 `[declared]`), and the `uses` rows of `meada export` carry `level`.
 
+A structured identifier in the resource list of an IAM policy statement (`Resource` or
+`NotResource` of an entry of `Statement`, in a policy file or in a policy document inside a
+template, and `resources` or `not_resources` of a `statement` block of an
+`aws_iam_policy_document`) is a **policy grant**, not a use: it says who may touch the resource,
+with no direction. `context` on the resource lists it with the role `policy grant` and its place;
+it links to no provisioner, opens no orphan scope and is never an orphan line, and `meada export`
+lists it in the `policy_grants` array, apart from `uses`. In a JSON Schema document (one with
+`$schema` at its root), a value under `examples`, `default`, `enum` or `const` documents a shape and
+is no side at all: it stays a config value that `search` finds.
+
 ### Terraform provisioners
 
 An `aws_sqs_queue` resource provisions `channel::sqs::<name>` through its `name` argument;

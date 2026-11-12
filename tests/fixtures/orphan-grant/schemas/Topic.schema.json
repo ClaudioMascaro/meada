@@ -1,0 +1,8 @@
+{ "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "topicArn": { "type": "string", "default": "arn:aws:sns:us-east-1:123456789012:acme-default",
+                  "enum": ["arn:aws:sns:us-east-1:123456789012:acme-one"] },
+    "queueArn": { "const": "arn:aws:sqs:us-east-1:123456789012:acme-const" },
+    "default": { "description": "arn:aws:sqs:us-east-1:123456789012:acme-named" }
+  } }

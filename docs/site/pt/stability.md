@@ -138,6 +138,7 @@ O export de um repositório é JSON indentado e terminado por uma quebra de linh
 | `processes` | `entry_point`, `kind` (`route`, `export`, `channel` ou `program`), `label`, `steps`. |
 | `stale_decisions` | `call`, `target`, `cause`. |
 | `uses` | `contract`, `site`, `at`, `level` (`exact` ou `inferred`). |
+| `policy_grants` | `contract`, `site`, `at`. |
 
 Os campos de `shape` (`source`, `fields`, `open`, `scalars`, `declared`, `optional`, `guessed`) e de cada passo de `steps` (`depth`, `repository`, `level`, `via`, `node`, `reason`, `mark`, `candidates`, `contract`) fazem parte do formato, e os valores abaixo também:
 

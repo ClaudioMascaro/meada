@@ -571,3 +571,115 @@ fn a_use_inferred_from_a_key_name_opens_no_orphan_scope() {
         ["orphan channel::sqs::ghost: no provisioner; config/arn.yaml#target [exact]"]
     );
 }
+
+/// A structured identifier in the resource list of an IAM policy statement is a policy grant, no
+/// use side: it links to nothing, opens no orphan scope and has an export array of its own; a
+/// value under a keyword of a JSON Schema document gives no side and stays a value (ADR 0026,
+/// "Orphan sides", #798).
+#[test]
+fn a_policy_grant_and_a_schema_example_are_no_use_side() {
+    let repo = fixture_repo(
+        "orphan_grant",
+        "orphan-grant",
+        Some("https://example.com/acme/o3.git"),
+    );
+    let orphans = || {
+        let (_, reports) = Engine::open(&repo).unwrap().status_report().unwrap();
+        (reports.into_iter().flatten())
+            .filter(|l| l.starts_with("orphan "))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(orphans(), Vec::<String>::new());
+    let engine = Engine::open(&repo).unwrap();
+    let export: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let rows = |array: &str| -> Vec<(String, String)> {
+        (export[array].as_array().into_iter().flatten())
+            .map(|r| (r["contract"].to_string(), r["at"].to_string()))
+            .collect()
+    };
+    let row = |contract: &str, at: &str| (format!("\"{contract}\""), format!("\"{at}\""));
+    let writer = "infra/writer.tf#data.aws_iam_policy_document.writer.statement";
+    let reader = "infra/main.tf#data.aws_iam_policy_document.reader.statement.resources";
+    let template = "infra/template.yaml#Resources.ReadPolicy.Properties.PolicyDocument.Statement";
+    assert_eq!(
+        rows("policy_grants"),
+        [
+            row(
+                "channel::sns::acme-events",
+                &format!("{writer}[1].resources[0]")
+            ),
+            row(
+                "channel::sqs::acme-dead",
+                &format!("{writer}[0].not_resources[0]")
+            ),
+            row("resource::dynamodb::acme-sessions", &format!("{reader}[1]")),
+            row(
+                "resource::dynamodb::acme-sessions",
+                &format!("{template}[0].Resource[0]")
+            ),
+            row(
+                "resource::s3::acme-exports",
+                "infra/policy.json#Statement[0].Resource[0]"
+            ),
+            row("resource::s3::acme-reports", &format!("{reader}[0]")),
+            row(
+                "resource::s3::acme-vault",
+                "infra/deny.json#Statement.NotResource"
+            ),
+        ]
+    );
+    // A property named `default` holds a subschema, not the keyword's value.
+    assert_eq!(
+        rows("uses"),
+        [row(
+            "channel::sqs::acme-named",
+            "schemas/Topic.schema.json#properties.default.description"
+        )]
+    );
+    assert!(export.get("provisions").is_none(), "{export}");
+    assert_golden(
+        "orphan-grant.context.txt",
+        &engine
+            .context("resource::dynamodb::acme-sessions", None)
+            .unwrap(),
+    );
+    assert_golden(
+        "orphan-grant.search.txt",
+        &engine
+            .search("acme-exports", Some("resource"), None)
+            .unwrap(),
+    );
+    let context = engine.context("channel::sns::orders-events", None).unwrap();
+    assert!(!context.contains("schema.json"), "{context}");
+    let value = engine.search("orders-events", Some("value"), None).unwrap();
+    assert!(value.contains("examples[0].spec.topicArn"), "{value}");
+    // A use of a table nothing provisions opens the scope of DynamoDB tables, and the policy
+    // grants of `acme-sessions` hide no `no use` line.
+    fs::create_dir_all(repo.join("config")).unwrap();
+    fs::write(
+        repo.join("config/app.yaml"),
+        "carts:\n  tableArn: arn:aws:dynamodb:us-east-1:123456789012:table/acme-carts\n",
+    )
+    .unwrap();
+    assert_eq!(
+        orphans(),
+        [
+            "orphan resource::dynamodb::acme-carts: no provisioner; config/app.yaml#carts.tableArn [exact]",
+            "orphan resource::dynamodb::acme-sessions: no use; infra/main.tf:5 aws_dynamodb_table.sessions (root infra)",
+        ]
+    );
+    // `examples` in a document with no `$schema` at its root is any key.
+    fs::write(
+        repo.join("config/examples.json"),
+        r#"{ "examples": [ { "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events" } ] }"#,
+    )
+    .unwrap();
+    let export: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    assert!(
+        (export["uses"].as_array().unwrap().iter())
+            .any(|u| u["contract"] == "channel::sns::orders-events"
+                && u["at"] == "config/examples.json#examples[0].topicArn"
+                && u["level"] == "exact"),
+        "{export}"
+    );
+}
