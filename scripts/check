@@ -287,7 +287,9 @@ def static(args, paths, tree):
             run("node", "--check", name)
         elif suffix in {".sh", ".bash"} or (not suffix and path.read_bytes()[:100].startswith((b"#!/bin/sh", b"#!/bin/bash", b"#!/usr/bin/env bash"))):
             run("bash" if suffix == ".bash" or b"bash" in path.read_bytes().splitlines()[0] else "sh", "-n", name)
-    for script in sorted({p for p in paths if p.startswith(HARNESS_SCRIPTS) and p.endswith(".py")}):
+    # A prove-meada driver with a self-test (`ci.py`) runs it here too: it needs no Meada.
+    selftested = (*HARNESS_SCRIPTS, ".claude/skills/prove-meada/scripts/")
+    for script in sorted({p for p in paths if p.startswith(selftested) and p.endswith(".py")}):
         if Path(script).exists() and "--selftest" in Path(script).read_text():
             run(sys.executable, script, "--selftest")
     if any(p.startswith("deploy/helm/") or p == "scripts/helm-check" for p in paths):

@@ -114,6 +114,7 @@ run and what the reviewer does instead.
 | `src/contract/azure.rs`, `src/iac/azure.rs`, Azure rows in `src/iac/types.toml`, Azure identifier/config and AsyncAPI channel projection | yes: A7 Azure contracts and Functions | CLI export/status, MCP stdio and HTTP | `azure.py --head-bin BIN --run DIR --http`; #669/#642, ADR 0026 and transport parity ([references/azure.md](references/azure.md)); existing C# channel conformance and shared-code scope above |
 | A7 IaC, infrastructure contracts, workloads, HTTP through IaC, alerts, `via` (spec #642; no path yet: each A7 ticket names its own here) | yes: A7 | CLI, MCP stdio and HTTP, console graph | the A7 flow table in [references/config-iac.md](references/config-iac.md): each A7 ticket adds its paths here and its flow there, and its driver to `FLOWS` in `scripts/prove-ci` (no path: nothing for CI to select) |
 | `src/lang/ts.rs`, `src/lang/ts/`, `src/lang/go.rs`, `src/lang/go/`, `src/http.rs`, `src/http/ts.rs`, `src/http/ts/` (`config.rs` and `config/includes.rs`: the Backstage config reader and its `$include`s), `src/http/join.rs`, `src/http/go.rs`, `src/http/go/`, `src/resolve.rs`, `src/lang/mod.rs` and `src/index.rs` (the config inputs: `config_files`, `config_inputs`, `packs_of`, `configs_found`, `configs_digest`) | yes: A8 base URLs (spec #683) | CLI export, MCP stdio and HTTP | A8 peer workspaces: `a8-peers.sh check BASE BIN DIR` and `a8-mcp.py --head-bin BIN --base-bin BASE --run DIR` ([references/peers.md](references/peers.md)), beside the corpus entries the rows above name |
+| `src/iac/actions.rs`, `src/ci.rs`, `src/ci/`, the CI hooks in `src/iac.rs`, `src/iac/config_uses.rs`, `src/index.rs` and `src/engine.rs`, the walk `src/trace.rs` shares with every answer | yes: A9 CI nodes, the CI contract and the shared walk | CLI export/status, MCP stdio and HTTP, console through shared rows | `ci.py --head-bin BIN --base-bin BASE --run DIR --http` and `ci.py --corpus --head-bin BIN --base-bin BASE --run DIR`; #820 and ADR 0028, neutral generated workspaces with a control per case, base parity on every other row and three pinned public repositories ([references/ci.md](references/ci.md)) |
 | `tests/golden/` | answer keys | none, but every changed golden is audited | `prove.py rebless`; canonical bytes: `cargo test -p meada-core --test export every_export_golden_reads_and_writes_back_byte_for_byte` |
 
 A change that only touches docs, instructions, harness configuration or this skill's prose (`SKILL.md`, `references/`; not its `scripts/`) stops at local static and self-checks: E2E `N/A` in the validation summary, no proof receipt. Ordinary unit-test edits do not alone activate E2E. Executable proof drivers, fixtures and goldens follow the CI scope selection when a non-draft PR carries `e2e`; their local checks still follow the applicable gate. A change to launch config (env vars, ports, dependencies, migrations) reaches every surface: smoke test each one. Here that is `Cargo.toml`, `Cargo.lock`, `build.rs`, `rust-toolchain.toml`: run `--repos all --http` and the console in viewer mode.
@@ -206,6 +207,8 @@ Ladder, best first: 1 an old system that does the same job, 2 a snapshot, 3 an i
 | A7 config use sides, typed final keys, directionless provision links, key sites and orphan uses | new | #661/#642 and base ADR 0026; independently generated source-derived whole sets; HTTP/console also copy stdio/CLI | 4 + 1 | `config_uses.py`, [references/config-uses.md](references/config-uses.md) | maintainer spec; fresh independent checker |
 | A8 base URL cases (`a8-cases.tsv`, `landed`) | new | spec #683's expected lines (#684's table) | 4 | `a8-peers.sh check` | the maintainer |
 | The 5 A8 controls and every other field of the peer workspaces' exports | existing | the base binary on the same generated workspaces | 1 | `a8-peers.sh check` | the code before the change |
+| A9 CI nodes, the CI contract with its Git ref and keys, `trace` through an intermediate pipeline, external files, orphans, the absent mark and `ref mismatch` | new | #820 and ADR 0028, through `ci.py`'s own reading of the workspaces it generates, a control per case; HTTP also copies stdio | 4 + 1 | `ci.py`, [references/ci.md](references/ci.md) | the maintainer; the driver reads the files, never Meada |
+| A9: the files the CI reader owns, `uses` lines as config values, `[[resource]] via`, every other row of the A9 workspaces and the pinned CI corpus | existing | the base binary on the same input; allowed: the differences #820 predicts | 1 | `ci.py`, `ci.py --corpus` | the code before the change |
 | A new flow that copies nothing | new | the issue | 4 | Find the spec, at run time | the maintainer |
 
 - **Never edit an answer key to make a check pass.** If the app and the answer key disagree, the verdict is BROKEN; only the user changes an answer key.
@@ -341,6 +344,16 @@ For #674 anchored names, run `python3 $S/patterns.py --head-bin "$RUN/bin/meada-
 **Done looks like**: `peers.md` with every control and landed case `PASS`, every `pending` case `PENDING (as 1.2.0, not counted)` and named so on the receipt, and every workspace "equal to base".
 
 **Could fool you**: a `pending` case passes on 1.2.0's value, so it proves only that nothing moved it; the script reads the export, not the MCP answers. The full list: the reference's "Could fool you".
+
+### A9: CI in the graph (spec #820)
+
+**Drive**: `$S/ci.py --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/ci" --http`: it generates five neutral workspaces under `github.com/acme` (the reproduction of #816, one case per form of `uses`, Git refs, orphans, a repository without `origin`), indexes and exports them with both binaries and checks each case of its `CASES` table. `ci.py --corpus` drives the three pinned repositories of flow `ci` in `scripts/infra.tsv`, alone and as one workspace. The cases, the keys and what could fool it: [references/ci.md](references/ci.md).
+
+**Copies**: nothing for the CI rows, which answer to #820. Every other row answers to the base binary, MCP over HTTP to stdio.
+
+**Done looks like**: for each command, `checks.json` with every check passed and `receipt.md` saying so; from `--corpus`, also `workspace/ci-links.json`.
+
+**Could fool you**: a case proves something only beside its control, so read a failure as the pair; `meada status` is saved as a diff against the base and read by hand. The full list: the reference's "Could fool you".
 
 ### Varies by and deliberate
 
