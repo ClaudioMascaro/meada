@@ -68,7 +68,7 @@ jsonwebtoken = { version = "=11.1.0", optional = true, default-features = false,
     "rust_crypto",
 ] }
 # The values cache's entries (ADR 0027), deflated in the zlib format: pure Rust, and its one
-# dependency (adler2) is the checksum by which a blob that is not this build's reads as a miss.
+# dependency (adler2) computes that format's checksum.
 miniz_oxide = "0.8.9"
 nodejs-semver = "7"
 # The snapshot store's S3 client (ADR 0012), only behind `snapshot`: no default features (no
@@ -268,9 +268,10 @@ opt-level = 1
 # under one account's lock.
 [profile.dev.package.argon2]
 opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+
 # The values cache's deflate at full speed in debug builds too: unoptimised, a cold index of a
 # large repository spends seconds compressing entries that a release build writes in a fraction.
 [profile.dev.package.miniz_oxide]
-opt-level = 3
-[profile.dev.package.blake2]
 opt-level = 3

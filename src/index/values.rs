@@ -28,8 +28,7 @@ pub(crate) const FILE: &str = "values.db";
 // parsed on every refresh, which only a crafted file pays.
 pub(crate) const ENTRY_BYTES: usize = 8 << 20;
 
-/// The deflate level of an entry, zlib's default: on the R1 root it keeps 11.7% of the JSON where
-/// level 1 keeps 15.7% (#839), and either takes a small part of the parses an entry saves.
+/// The deflate level of an entry: zlib's default (ADR 0027's 2026-11-12 amendment says why).
 const LEVEL: u8 = 6;
 
 /// One row per file: its path, the key it was parsed under (`key`) and its facts as JSON,
@@ -76,7 +75,7 @@ impl Values {
         let blob: Vec<u8> = (statement.query_row(params![path, key], |r| r.get(0)))
             .optional()
             .ok()??;
-        stored(&blob)
+        facts_of(&blob)
     }
 
     /// Keeps `facts`, as `path`'s pack parsed it under `key`, to write back (`keep`).
@@ -143,7 +142,7 @@ impl Values {
 /// The facts of a stored entry: `None` for a blob that is no zlib stream, that inflates past
 /// `ENTRY_BYTES` (the inflation stops there, whatever the blob asks for: the cache is a file of
 /// the repository's directory, so a blob is input) or that does not deserialize.
-fn stored(blob: &[u8]) -> Option<Facts> {
+fn facts_of(blob: &[u8]) -> Option<Facts> {
     let json = miniz_oxide::inflate::decompress_to_vec_zlib_with_limit(blob, ENTRY_BYTES).ok()?;
     // ponytail: an entry nested past `serde_json`'s depth (128) does not deserialize, so its
     // file is parsed on every refresh; a deeper limit needs a deserializer without one.
@@ -260,12 +259,15 @@ mod tests {
             json
         };
         let deflate = |json: &[u8]| miniz_oxide::deflate::compress_to_vec_zlib(json, super::LEVEL);
-        assert!(super::stored(&deflate(&json(super::ENTRY_BYTES))).is_some());
+        assert!(super::facts_of(&deflate(&json(super::ENTRY_BYTES))).is_some());
         let past = deflate(&json(super::ENTRY_BYTES + 1));
         assert!(past.len() < 64 << 10, "{} bytes", past.len());
-        assert!(super::stored(&past).is_none());
-        assert!(super::stored(&json(64)).is_none());
-        assert!(super::stored(&noise(7, 4096)).is_none());
+        assert!(super::facts_of(&past).is_none());
+        // The entry an older build wrote: whole JSON that deserializes, only not deflated.
+        let plain = serde_json::to_vec(&Facts::default()).unwrap();
+        assert!(serde_json::from_slice::<Facts>(&plain).is_ok());
+        assert!(super::facts_of(&plain).is_none());
+        assert!(super::facts_of(&noise(7, 4096)).is_none());
     }
 
     /// One `keep` that replaces every entry by one a tenth of its size leaves the file at less
@@ -349,7 +351,7 @@ mod tests {
             };
             parsed += 1;
             let whole = lang::with_values(|| serde_json::to_value(&facts)).unwrap();
-            let back = super::stored(&super::entry(&facts).unwrap()).unwrap();
+            let back = super::facts_of(&super::entry(&facts).unwrap()).unwrap();
             let again = lang::with_values(|| serde_json::to_value(&back)).unwrap();
             assert_eq!(whole, again, "{path}");
             let lean = serde_json::to_value(&facts).unwrap();
