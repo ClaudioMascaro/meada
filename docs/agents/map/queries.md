@@ -54,7 +54,8 @@ this file, and a change to these modules updates it.
   answers `InputRequiredResult` asking for `roots` and the retry carries them (SEP-2322,
   `Root::Ask`); earlier protocols get `roots/list`, waited for `ROOTS_TIMEOUT`, 5 s. A failed
   answer (a retry with `roots` missing or malformed included) gets the last root the client
-  sent, else a tool error,
+  sent, else a tool error (with its root known, a call waits for one of the server's turns,
+  `CALLS_IN_FLIGHT`, #756),
   and in server mode streamable HTTP (`meada mcp --listen`,
   stateless, JSON responses on a hyper listener), one endpoint per repository of the manifest at `/<identity>`, a 404
   listing the identities served elsewhere (with `--generations`, `listen_generations` makes

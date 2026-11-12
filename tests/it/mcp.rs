@@ -165,6 +165,72 @@ async fn pipelined_calls_all_get_a_result() {
     client.cancel().await.unwrap();
 }
 
+/// One stdio server answers at most four calls at once (`CALLS_IN_FLIGHT`, #756), and the others
+/// wait their turn. Twelve calls sent together while another process holds the index under a
+/// commit in progress: the four in flight wait out the busy timeout (10 s) and fail, then the
+/// eight that waited for a turn meet the index free and each answers what it answers alone.
+#[tokio::test]
+async fn calls_past_the_bound_wait_their_turn_and_each_gets_its_own_reply() {
+    let repo = fixture_repo(
+        "mcp_calls_in_flight",
+        "ts-basic",
+        Some("https://example.com/acme/web.git"),
+    );
+    let (transport, _stderr) = server_in(&repo);
+    let client = ().serve(transport).await.unwrap();
+    let calls = [
+        ("search", serde_json::json!({"query": "sum"})),
+        ("search", serde_json::json!({"query": "add"})),
+        ("context", serde_json::json!({"symbol": "sum"})),
+        ("trace", serde_json::json!({"from": "sum"})),
+        (
+            "trace",
+            serde_json::json!({"from": "add", "direction": "up"}),
+        ),
+    ];
+    let params = |n: usize| {
+        let (tool, arguments) = &calls[n % calls.len()];
+        CallToolRequestParams::new(*tool).with_arguments(arguments.as_object().unwrap().clone())
+    };
+    let mut alone = Vec::new();
+    for n in 0..calls.len() {
+        let answer = client.call_tool(params(n)).await.unwrap();
+        alone.push(text_of(&answer).to_string());
+    }
+    let held = rusqlite::Connection::open(repo.join(".meada/index.db")).unwrap();
+    held.execute_batch("BEGIN EXCLUSIVE").unwrap();
+    let release = tokio::spawn(async move {
+        // Past the busy timeout of the first four, well within that of the next ones.
+        tokio::time::sleep(Duration::from_secs(12)).await;
+        held.execute_batch("ROLLBACK").unwrap();
+    });
+
+    let mut in_flight = tokio::task::JoinSet::new();
+    for n in 0..12 {
+        let (peer, params) = (client.peer().clone(), params(n));
+        in_flight.spawn(async move { (n, peer.call_tool(params).await.unwrap()) });
+    }
+    let replies = tokio::time::timeout(Duration::from_secs(120), in_flight.join_all())
+        .await
+        .expect("every call is answered");
+    release.await.unwrap();
+
+    let (locked, answered): (Vec<_>, Vec<_>) =
+        (replies.into_iter()).partition(|(_, answer)| answer.is_error == Some(true));
+    assert_eq!(locked.len(), 4, "{locked:?}");
+    for (n, answer) in &locked {
+        assert!(
+            text_of(answer).contains("locked"),
+            "call {n}: {}",
+            text_of(answer)
+        );
+    }
+    for (n, answer) in &answered {
+        assert_eq!(text_of(answer), alone[n % calls.len()], "call {n}");
+    }
+    client.cancel().await.unwrap();
+}
+
 /// The client's first `file://` root wins over the server's cwd (#192): a client that answers
 /// `roots/list` with another repository, under a directory with a space in its name, gets
 /// answers about that repository.

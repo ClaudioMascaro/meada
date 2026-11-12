@@ -70,12 +70,20 @@
   marker). A route handler Meada could not find (an Express handler passed as a parameter) has
   no entry point.
 
+- `trace.rs` (walks): `WALK_DEPTH` (256) caps the recursion of one branch of every `trace`,
+  down or up, from any start, and of a process: the line at the limit is written, marked
+  `(depth limit)` (a process step `depth-limit`), and nothing hangs from it, so a longer chain is
+  cut. A node cut there is not counted as followed: a shorter path that meets it later follows
+  it. Where an IaC trace continues into code (`Graph::attached_rows`), the limit counts from the
+  IaC node, so code behind a nested IaC node is cut deeper than 256 (the IaC walk keeps its own
+  stack). Without it a debug build (`28f1a4d7`, MCP over stdio, a runtime worker's 2 MiB stack)
+  aborted on a call chain between 1,972 and 1,992 hops down and between 3,144 and 3,164 up, and
+  on a chain of HTTP links between 900 and 1,200 hops down (#732): the limit stays more than
+  seven, twelve and three times under them.
 - `trace.rs` (process walk): an ambiguous call or link is one unexpanded step listing its
   candidates; `inferred` and `decided` links expand. A process is walked down only; `trace`
-  up from `process::...` answers with a note. `PROCESS_DEPTH` (256) caps the recursion of one
-  branch: the step at the limit is marked `depth-limit` (`(depth limit)` in `trace`) and not
-  expanded, so a longer call chain is cut. `Graph::processes_of` (the processes `context` lists)
-  walks upstream with no depth limit, so on chains deeper than `PROCESS_DEPTH` membership and
+  up from `process::...` answers with a note. `Graph::processes_of` (the processes `context` lists)
+  walks upstream with no depth limit, so on chains deeper than `WALK_DEPTH` membership and
   trees can disagree: a node past depth 256 is no step of the tree, and the limit can hide a
   node shallower than that, through `Seen`. E reaches X at depth 255, so X expands and each of
   its callees, Y among them, is a `depth-limit` step at 256 whose own callee Z is no step; a
@@ -113,12 +121,22 @@
   so a lock another process takes right then fails it at once, however short).
   Measured once, cause not isolated: with a connection taking the write lock for 0.3 s at a
   time after a refresh that held it for 13 s, every call answered `database is locked` in one
-  run of four, and which statement failed was not observed (#757). The calls in flight
-  are not bounded: each holds its own connections while it waits, and all of them query at once
-  when the run ends, on top of what the run allocated (under a 2 GiB cap, debug build, Meada's
-  own checkout: the server is killed with 100 calls in flight when nothing changed, with 16 to
-  21 during an edit every 2 s at one call a second (86 at four), and with 11 behind a run that
-  adds 100,000 functions to one file, which alone peaks at about 940 MB).
+  run of four, and which statement failed was not observed (#757). One stdio server answers
+  `CALLS_IN_FLIGHT` (4) calls at once (#756): with its root known (the `roots/list` round trip
+  holds no turn), a call waits for a turn at a fair semaphore, in the order the calls ask for
+  one (rmcp starts a task per request, so two that arrive together may swap), and keeps it
+  through its engine and its answer. A batch holds at most four engines and four answers on top
+  of what the run allocated, and a run's commit waits for the reads of three other calls of its
+  process at most. Four, by the memory one answer holds (about 26 MB waiting on Meada's own
+  checkout, up to about 90 MB after a refresh that added 100,000 functions): four of the
+  largest stay near 360 MB. Before the bound, under a 2 GiB cap, debug build, Meada's
+  own checkout, the server was killed with 100 calls in flight when nothing changed (2,040 MB
+  resident after 20 replies; one run of four survived, at a 2,044 MB peak), with 16 to 21
+  during an edit every 2 s at one call a second (86 at four), and with 11 behind a run that adds
+  100,000 functions to one file, which alone peaks at about 940 MB; with it the 100 calls all
+  answer, in 36 to 38 s, at 249 to 274 MB. The bound costs time where answers are heavy: 30
+  calls after an edit of that checkout took 18.6 s with it and 12.5 s without, at a 485 MB peak
+  against 1,199 MB.
   Across processes (two servers, a CLI command beside a server) the wait is SQLite's: a refresh
   with nothing to write takes no write lock, and one with something to write waits up to the
   busy timeout (10 s) for another process's writer to commit, then walks again; after

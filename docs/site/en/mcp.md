@@ -6,7 +6,8 @@ which then must be inside the repository. If the client fails or does not answer
 within 5 s, the call uses the last root it sent on that connection, or returns an error saying
 so; it never falls back to the server's directory for that (which, for a session in a worktree,
 would be another checkout). An answer with no local root counts as no roots (the server's
-directory). In your agent's configuration (for example Claude Code's `.mcp.json`), in the form of your channel:
+directory). It answers up to four calls at once; the ones that come while four are in progress
+wait their turn. In your agent's configuration (for example Claude Code's `.mcp.json`), in the form of your channel:
 
 === "npx"
 

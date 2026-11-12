@@ -5,8 +5,9 @@ en Claude Code la carpeta de la sesión; sin raíces, sobre la carpeta en la que
 entonces debe estar dentro del repositorio. Si el cliente falla o no responde a `roots/list` en 5 s,
 la llamada usa la última raíz que envió en esa conexión, o devuelve un error que lo dice; nunca
 recurre a la carpeta del servidor por eso (que, en una sesión en un worktree, sería otro
-checkout). Una respuesta sin raíz local vale como sin raíces (la carpeta del servidor). En la
-configuración de tu agente (por ejemplo el `.mcp.json` de Claude Code), en la forma de tu canal:
+checkout). Una respuesta sin raíz local vale como sin raíces (la carpeta del servidor).
+Responde hasta cuatro llamadas a la vez; las que llegan mientras cuatro están en curso esperan
+su turno. En la configuración de tu agente (por ejemplo el `.mcp.json` de Claude Code), en la forma de tu canal:
 
 === "npx"
 
