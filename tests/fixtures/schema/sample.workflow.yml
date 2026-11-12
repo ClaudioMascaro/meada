@@ -1,0 +1,23 @@
+name: Sample
+on:
+  workflow_call:
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux, mac]
+    steps:
+      - uses: actions/checkout@v4
+      - id: login
+        name: Log in
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+        env:
+          MODE: sample
+      - run: make build
+  publish-prd:
+    needs: build
+    uses: acme/workflows/.github/workflows/publish.yml@v1

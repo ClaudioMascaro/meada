@@ -171,6 +171,11 @@ facts, stored IaC nodes and evaluated Kubernetes images, including in server mod
 of whether `build` is a safe local context. This retains remote-context publishing evidence
 without permitting a direct code path through it. The flag follows Compose override semantics.
 
+`iac_nodes.selectors` (#823) is the JSON of what a query names a CI job or a CI step by besides
+its address (`iac::actions::Selectors`: a CI job's id, a CI step's `id`, either one's `uses`, each
+up to `config_values::VALUE_MAX`; NULL for a node that has none, and elsewhere). A CI node's
+`name` column holds its `name`. All of them are scalars the config values already store.
+
 `iac_nodes.dockerfile` (#744) is the JSON of the Dockerfile reference a Compose build names
 (`iac::Dockerfile`: its `dockerfile` path or `dockerfile_inline` text, an overridable flag and
 whether it is inline; NULL when the build names none, and elsewhere). It follows the same override

@@ -152,6 +152,7 @@ The values of `kind`:
 | `duplicate` | symbols with identical text in two or more places, by name or path |
 | `value` | a config value of a YAML or JSON file, by value or key path |
 | `iac` | an IaC node (a Terraform resource, data block or module call, or a Kubernetes object), by address, type or physical name |
+| `ci` | a GitHub Actions pipeline, action, CI job or CI step, by address, type, id, `name` or `uses` |
 | `ambiguous`, `unresolved` | the open items, with the `meada decide` command for each |
 
 Each result is one line: repository, `path:line` and name.

@@ -291,6 +291,23 @@ this file, and a change to these modules updates it.
   and `iac::Owner` keeps each refresh to its own rows: CloudFormation by a type with `::`,
   regardless of filename; among the other types, Terraform and Compose by file name,
   Kubernetes by any other file name.
+- `iac/actions.rs` (#823, ADR 0028): GitHub Actions as IaC nodes, one unit per file (root: its
+  path). `is_file` names a pipeline (a `.yml` or `.yaml` directly under `.github/workflows/`) and
+  an action (`action.yml`, `action.yaml`) by place and name; `evaluate(path, bytes)` reads the
+  first document with `document::events::read_located` (`Spans` keeps the lines of each CI job and
+  CI step as its mapping closes, `iac::compose::KeyLines::end_of` gives the last) and gives the
+  file node `.` (type `workflow` with `jobs`, `action` with `runs`), a node `jobs.<id>` of type
+  `job` and a node `<parent>.steps[<n>]` of type `step`, with the references pipeline to CI job,
+  CI job or composite action to CI step, and CI job to the CI jobs of its `needs`. A CI job's id
+  and a CI job's or CI step's `uses` are `iac::Node::selectors` (`Selectors`), a `name` the node's
+  own. The index calls `refresh(tx, path, src, shadowed)` from the closure that reads a config
+  file and when one leaves; with both action file names in a folder the one that changed has its
+  twin (`twin`) read again, and `shadowed` keeps an `action.yaml` beside an `action.yml` from
+  being the action. `iac::Owner::Actions` (`ROWS`: root equal to path and one of the four types)
+  keeps the Terraform and Kubernetes refreshes off these rows. `hits` renders `search` kind `ci`
+  (address, type, name, `id`, `uses`), `iac::hits` leaves these rows out of kind `iac`, and
+  `names` lets `iac::named` take a file path for a file node and a selector
+  (`jobs.build.steps[id=login]`) for a CI step.
 - `iac/serverless.rs` (#654, ADR 0025): Serverless Framework services as IaC nodes, one unit per
   `serverless.{yml,yaml,json}` (root: its path). `wanted`, `is_file` and `is_service` decide,
   `evaluate(path, bytes)` reads it with `document::events::read_keyed`, expands the file's

@@ -61,6 +61,7 @@ use crate::trace::Direction;
 use meada_core::export::Level;
 use meada_core::trace::{Chain, Row};
 
+pub(crate) mod actions;
 mod attribute;
 mod azure;
 pub(crate) mod cloudformation;
@@ -324,6 +325,8 @@ pub(crate) struct Node {
     pub images: Vec<WorkloadImage>,
     pub provisioned: Option<Projection>,
     pub ingress: Vec<Ingress>,
+    /// What a query names a CI job or a CI step by besides its address (#823).
+    pub selectors: Option<actions::Selectors>,
 }
 
 impl Node {
@@ -2230,6 +2233,7 @@ impl<'m> Eval<'m> {
                     images: Vec::new(),
                     provisioned: None,
                     ingress: Vec::new(),
+                    selectors: None,
                 });
                 let local = (block.source.as_deref())
                     .and_then(|s| local_source(dir, s))
@@ -2995,8 +2999,8 @@ fn terraform_path(column: &str) -> String {
 }
 
 /// Who writes a stored node. The Terraform and Compose nodes (#649, #652), the Kubernetes nodes
-/// (#651) and the CloudFormation nodes (#653) share the tables, and each is rewritten by its own
-/// refresh, so each touches the rows it owns only.
+/// (#651), the CloudFormation nodes (#653) and the GitHub Actions nodes (#823) share the tables,
+/// and each is rewritten by its own refresh, so each touches the rows it owns only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Owner {
     /// A node without `::` in its type, in a Terraform, OpenTofu or Compose file.
@@ -3005,6 +3009,8 @@ pub(crate) enum Owner {
     Kubernetes,
     /// A node whose type has a `::`, regardless of filename: `AWS::SQS::Queue`, `Custom::Name`.
     CloudFormation,
+    /// A pipeline, an action, a CI job or a CI step (`actions::ROWS`), whatever its file's name.
+    Actions,
 }
 
 impl Owner {
@@ -3012,10 +3018,12 @@ impl Owner {
     pub(crate) fn sql(self) -> String {
         let own = terraform_path("path");
         let typed = "type LIKE '%::%'";
+        let ci = actions::ROWS;
         match self {
-            Owner::Terraform => format!("({own} AND NOT {typed})"),
-            Owner::Kubernetes => format!("(NOT {own} AND NOT {typed})"),
+            Owner::Terraform => format!("({own} AND NOT {typed} AND NOT {ci})"),
+            Owner::Kubernetes => format!("(NOT {own} AND NOT {typed} AND NOT {ci})"),
             Owner::CloudFormation => typed.to_string(),
+            Owner::Actions => ci.to_string(),
         }
     }
 }
@@ -3091,7 +3099,7 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
@@ -3133,6 +3141,10 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
                 .as_ref()
                 .map(serde_json::to_string)
                 .transpose()?,
+            n.selectors
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()?,
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -3145,7 +3157,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
                        block, image, image_overridable, build, build_overridable, role, \
-                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes, dockerfile";
+                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes, dockerfile, selectors";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -3189,6 +3201,9 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         subscription: r
             .get::<_, Option<String>>(19)?
             .and_then(|s| serde_json::from_str(&s).ok()),
+        selectors: r
+            .get::<_, Option<String>>(26)?
+            .and_then(|s| serde_json::from_str(&s).ok()),
     })
 }
 
@@ -3217,7 +3232,8 @@ fn at(identity: &str, n: &Node) -> String {
 /// The IaC nodes of `db` (repository `identity`) whose address, type or physical name matches
 /// `needle`, lowercased, as `search` hits: `<identity> <path>:<line> <address> (<type>[, name
 /// "<name>"], root <root>)`, `pattern` in place of `name` for a pattern, ordered by rank, then
-/// repository, path, line, address and root.
+/// repository, path, line, address and root. The nodes of a pipeline or an action answer to the
+/// kind `ci` (`actions::hits`), never here.
 pub(crate) fn hits(
     identity: &str,
     db: &Connection,
@@ -3226,7 +3242,10 @@ pub(crate) fn hits(
 ) -> Result<Vec<Hit>> {
     // ponytail: scans every node of every repository; an indexed lookup waits for a workspace
     // that makes it slow.
-    let mut statement = db.prepare(&format!("SELECT {COLUMNS} FROM iac_nodes"))?;
+    let mut statement = db.prepare(&format!(
+        "SELECT {COLUMNS} FROM iac_nodes WHERE NOT {}",
+        actions::ROWS
+    ))?;
     let mut hits = Vec::new();
     for n in statement.query_map([], row)? {
         let n = n?;
@@ -3258,7 +3277,9 @@ pub(crate) fn hits(
 }
 
 /// The nodes `text` names in `db` (repository `identity`): `<address>`, `<path>::<address>` or
-/// `<identity>::<path>::<address>`, any of them followed by ` (root <root>)` to pick a root.
+/// `<identity>::<path>::<address>`, any of them followed by ` (root <root>)` to pick a root. A
+/// pipeline or an action is also named by its file path, and a CI step by a selector
+/// (`actions::names`).
 pub(crate) fn named(identity: &str, nodes: &[Node], text: &str) -> Vec<Node> {
     let (text, root) = match text
         .strip_suffix(')')
@@ -3271,7 +3292,10 @@ pub(crate) fn named(identity: &str, nodes: &[Node], text: &str) -> Vec<Node> {
         .iter()
         .filter(|n| {
             let path = format!("{}::{}", n.path, n.address);
-            (text == n.address || text == path || text == n.identity(identity))
+            (text == n.address
+                || text == path
+                || text == n.identity(identity)
+                || actions::names(identity, n, text))
                 && root.is_none_or(|r| r == n.root)
         })
         .cloned()

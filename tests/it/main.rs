@@ -15,6 +15,7 @@ mod cargo;
 mod channel_queries;
 mod channels;
 mod channels_jobs;
+mod ci;
 mod cli;
 mod community_queries;
 mod config_uses;

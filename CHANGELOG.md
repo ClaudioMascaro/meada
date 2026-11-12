@@ -6,6 +6,19 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Pipelines, actions, CI jobs and CI steps of GitHub Actions are IaC nodes (ADR 0028). A file
+  directly under `.github/workflows/` that holds `jobs` is a pipeline, and an `action.yml` or
+  `action.yaml` that holds `runs` is an action; each CI job (`jobs.build`) and CI step
+  (`jobs.build.steps[2]`, `runs.steps[0]`) is a node with its lines, its config values and its
+  references: a pipeline to its CI jobs, a CI job or a composite action to its CI steps, a CI job
+  to the ones its `needs` names. `search` finds them with the new kind `ci`, by address, type, id,
+  `name` or `uses`, and `context` explains them, a CI step also by a selector
+  (`jobs.build.steps[id=login]`). The kind `iac`, the default search and `meada export` answer as
+  before. The index schema changes, so existing indexes are rebuilt once on first use. Release
+  level: minor, meada (#823).
+
 ### Fixed
 
 - `trace` stops following a branch 256 levels below its start and marks the line there

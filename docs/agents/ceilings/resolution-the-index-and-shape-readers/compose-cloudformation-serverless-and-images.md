@@ -1,5 +1,21 @@
 # Compose, CloudFormation, Serverless and images
 
+- `iac/actions.rs` (#823, ADR 0028): a pipeline or an action file reuses `NODES_MAX` (the file,
+  then its CI jobs in the order of their ids, each with its CI steps; past it the rest of the file
+  is left out), `REFERENCES_MAX` (per node: a pipeline of more than 64 CI jobs, or a CI job whose
+  `needs` and CI steps pass 64 together, keeps the first ones, `needs` before steps; a CI step past
+  it is still a node `search` finds, with no reference from its CI job) and `ROOT_STORED_MAX` (per
+  file: addresses, names, `id` and `uses`, and references; a CI step's address repeats its CI
+  job's id). A `name`, an `id` or a `uses` longer than `config_values::VALUE_MAX` is kept neither
+  as a name nor as a selector. A CI step's identity is positional (`jobs.build.steps[2]`): a CI
+  step inserted before it renumbers it; `id`, `name` and `uses` are selectors, never identity, and
+  a selector's value is compared whole and case-sensitively. A `strategy.matrix` multiplies
+  nothing: a CI job with one is one node. Only the first YAML document of a file is read. A file
+  past `lang::MAX_BYTES`, one that is not UTF-8 and one the event reader refuses give no node. A
+  CI job or a CI step that came by a YAML alias has no lines of its own: a step sits at its CI
+  job's first line and a job at line 1, since the reader hands a location only where a mapping is
+  written. A pipeline is a file directly under `.github/workflows/`, and with `action.yml` and
+  `action.yaml` in one folder the action is `action.yml`, whatever each of them holds.
 - `iac/serverless.rs` (#654, ADR 0025): a service reuses `NODES_MAX` (functions first, in name
   order, then the resources of its `resources` section, together), `REFERENCES_MAX` (per node) and
   `ROOT_STORED_MAX` (per file, the functions' names, handlers and events counting against it before

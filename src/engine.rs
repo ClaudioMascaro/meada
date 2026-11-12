@@ -660,6 +660,14 @@ impl Engine {
             }
             return Ok(search::answer(query, hits, budget));
         }
+        if kind == Some("ci") {
+            self.refresh()?;
+            let mut hits = Vec::new();
+            for (identity, db) in self.indexes() {
+                hits.extend(iac::actions::hits(identity, db, &query.to_lowercase())?);
+            }
+            return Ok(search::answer(query, hits, budget));
+        }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match (kind, selected) {
             (None, _) => (true, Some(String::new())),
@@ -2020,13 +2028,14 @@ fn status_lines(
 /// The `kind` words of `search` the engine answers itself: the first two come before the kinds'
 /// filter words, the rest after the kinds' own renderers (`document` sits between the two).
 const WORDS_BEFORE: [&str; 2] = ["symbol", "contract"];
-const WORDS_AFTER: [&str; 8] = [
+const WORDS_AFTER: [&str; 9] = [
     "drift",
     "community",
     "process",
     "duplicate",
     "value",
     "iac",
+    "ci",
     "ambiguous",
     "unresolved",
 ];

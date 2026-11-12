@@ -774,7 +774,7 @@ pub(crate) fn key_path(path: &[Step]) -> String {
 }
 
 /// `key`, a key path written without its document, with `[document]` first.
-fn prefixed(document: usize, key: &str) -> String {
+pub(crate) fn prefixed(document: usize, key: &str) -> String {
     match key {
         "." => format!("[{document}]"),
         _ if key.starts_with('[') => format!("[{document}]{key}"),

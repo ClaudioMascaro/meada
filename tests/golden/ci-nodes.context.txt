@@ -1,0 +1,166 @@
+# .github/workflows/ci.yml
+example.com/acme/app .github/workflows/ci.yml:1-37 .
+type: workflow
+name: "CI"
+root: .github/workflows/ci.yml
+overridable: none
+references:
+example.com/acme/app .github/workflows/ci.yml:7 jobs.build
+example.com/acme/app .github/workflows/ci.yml:28 jobs.test
+example.com/acme/app .github/workflows/ci.yml:33 jobs["publish-prd"]
+referenced by: none
+values:
+example.com/acme/app .github/workflows/ci.yml:1 name = "CI"
+example.com/acme/app .github/workflows/ci.yml:5 env.REGISTRY = "ghcr.io"
+example.com/acme/app .github/workflows/ci.yml:8 jobs.build.name = "Build"
+example.com/acme/app .github/workflows/ci.yml:9 jobs.build["runs-on"] = "${{ matrix.os }}"
+example.com/acme/app .github/workflows/ci.yml:12 jobs.build.strategy.matrix.os[0] = "ubuntu-latest"
+example.com/acme/app .github/workflows/ci.yml:12 jobs.build.strategy.matrix.os[1] = "macos-latest"
+example.com/acme/app .github/workflows/ci.yml:14 jobs.build.steps[0].uses = "actions/checkout@v4"
+example.com/acme/app .github/workflows/ci.yml:15 jobs.build.steps[1].id = "login"
+example.com/acme/app .github/workflows/ci.yml:16 jobs.build.steps[1].name = "Log in"
+example.com/acme/app .github/workflows/ci.yml:17 jobs.build.steps[1].uses = "docker/login-action@v3"
+example.com/acme/app .github/workflows/ci.yml:19 jobs.build.steps[1].with.registry = "ghcr.io"
+example.com/acme/app .github/workflows/ci.yml:20 jobs.build.steps[1].with.username = "acme"
+example.com/acme/app .github/workflows/ci.yml:22 jobs.build.steps[1].env.MODE = "release"
+example.com/acme/app .github/workflows/ci.yml:23 jobs.build.steps[2].name = "Compile"
+example.com/acme/app .github/workflows/ci.yml:25 jobs.build.steps[2].run = "make build\nmake check\n"
+example.com/acme/app .github/workflows/ci.yml:29 jobs.test.needs = "build"
+example.com/acme/app .github/workflows/ci.yml:30 jobs.test["runs-on"] = "ubuntu-latest"
+example.com/acme/app .github/workflows/ci.yml:32 jobs.test.steps[0].run = "make test"
+example.com/acme/app .github/workflows/ci.yml:34 jobs["publish-prd"].needs[0] = "build"
+example.com/acme/app .github/workflows/ci.yml:34 jobs["publish-prd"].needs[1] = "test"
+example.com/acme/app .github/workflows/ci.yml:35 jobs["publish-prd"].uses = "acme/workflows/.github/workflows/publish.yml@v1"
+example.com/acme/app .github/workflows/ci.yml:37 jobs["publish-prd"].with.package = "app"
+
+# jobs.build
+example.com/acme/app .github/workflows/ci.yml:7-26 jobs.build
+type: job
+name: "Build"
+root: .github/workflows/ci.yml
+overridable: none
+references:
+example.com/acme/app .github/workflows/ci.yml:14 jobs.build.steps[0]
+example.com/acme/app .github/workflows/ci.yml:15 jobs.build.steps[1]
+example.com/acme/app .github/workflows/ci.yml:23 jobs.build.steps[2]
+referenced by:
+example.com/acme/app .github/workflows/ci.yml:1 .
+example.com/acme/app .github/workflows/ci.yml:28 jobs.test via needs
+example.com/acme/app .github/workflows/ci.yml:33 jobs["publish-prd"] via needs
+values:
+example.com/acme/app .github/workflows/ci.yml:8 jobs.build.name = "Build"
+example.com/acme/app .github/workflows/ci.yml:9 jobs.build["runs-on"] = "${{ matrix.os }}"
+example.com/acme/app .github/workflows/ci.yml:12 jobs.build.strategy.matrix.os[0] = "ubuntu-latest"
+example.com/acme/app .github/workflows/ci.yml:12 jobs.build.strategy.matrix.os[1] = "macos-latest"
+example.com/acme/app .github/workflows/ci.yml:14 jobs.build.steps[0].uses = "actions/checkout@v4"
+example.com/acme/app .github/workflows/ci.yml:15 jobs.build.steps[1].id = "login"
+example.com/acme/app .github/workflows/ci.yml:16 jobs.build.steps[1].name = "Log in"
+example.com/acme/app .github/workflows/ci.yml:17 jobs.build.steps[1].uses = "docker/login-action@v3"
+example.com/acme/app .github/workflows/ci.yml:19 jobs.build.steps[1].with.registry = "ghcr.io"
+example.com/acme/app .github/workflows/ci.yml:20 jobs.build.steps[1].with.username = "acme"
+example.com/acme/app .github/workflows/ci.yml:22 jobs.build.steps[1].env.MODE = "release"
+example.com/acme/app .github/workflows/ci.yml:23 jobs.build.steps[2].name = "Compile"
+example.com/acme/app .github/workflows/ci.yml:25 jobs.build.steps[2].run = "make build\nmake check\n"
+
+# jobs.test
+example.com/acme/app .github/workflows/ci.yml:28-32 jobs.test
+type: job
+name: none
+root: .github/workflows/ci.yml
+overridable: none
+references:
+example.com/acme/app .github/workflows/ci.yml:7 jobs.build via needs
+example.com/acme/app .github/workflows/ci.yml:32 jobs.test.steps[0]
+referenced by:
+example.com/acme/app .github/workflows/ci.yml:1 .
+example.com/acme/app .github/workflows/ci.yml:33 jobs["publish-prd"] via needs
+values:
+example.com/acme/app .github/workflows/ci.yml:29 jobs.test.needs = "build"
+example.com/acme/app .github/workflows/ci.yml:30 jobs.test["runs-on"] = "ubuntu-latest"
+example.com/acme/app .github/workflows/ci.yml:32 jobs.test.steps[0].run = "make test"
+
+# jobs["publish-prd"]
+example.com/acme/app .github/workflows/ci.yml:33-37 jobs["publish-prd"]
+type: job
+name: none
+root: .github/workflows/ci.yml
+overridable: none
+references:
+example.com/acme/app .github/workflows/ci.yml:7 jobs.build via needs
+example.com/acme/app .github/workflows/ci.yml:28 jobs.test via needs
+referenced by:
+example.com/acme/app .github/workflows/ci.yml:1 .
+values:
+example.com/acme/app .github/workflows/ci.yml:34 jobs["publish-prd"].needs[0] = "build"
+example.com/acme/app .github/workflows/ci.yml:34 jobs["publish-prd"].needs[1] = "test"
+example.com/acme/app .github/workflows/ci.yml:35 jobs["publish-prd"].uses = "acme/workflows/.github/workflows/publish.yml@v1"
+example.com/acme/app .github/workflows/ci.yml:37 jobs["publish-prd"].with.package = "app"
+
+# jobs.build.steps[id=login]
+example.com/acme/app .github/workflows/ci.yml:15-22 jobs.build.steps[1]
+type: step
+name: "Log in"
+root: .github/workflows/ci.yml
+overridable: none
+references: none
+referenced by:
+example.com/acme/app .github/workflows/ci.yml:7 jobs.build
+values:
+example.com/acme/app .github/workflows/ci.yml:15 jobs.build.steps[1].id = "login"
+example.com/acme/app .github/workflows/ci.yml:16 jobs.build.steps[1].name = "Log in"
+example.com/acme/app .github/workflows/ci.yml:17 jobs.build.steps[1].uses = "docker/login-action@v3"
+example.com/acme/app .github/workflows/ci.yml:19 jobs.build.steps[1].with.registry = "ghcr.io"
+example.com/acme/app .github/workflows/ci.yml:20 jobs.build.steps[1].with.username = "acme"
+example.com/acme/app .github/workflows/ci.yml:22 jobs.build.steps[1].env.MODE = "release"
+
+# action.yml
+example.com/acme/app action.yml:1-9 .
+type: action
+name: "Root action"
+root: action.yml
+overridable: none
+references:
+example.com/acme/app action.yml:6 runs.steps[0]
+example.com/acme/app action.yml:9 runs.steps[1]
+referenced by: none
+values:
+example.com/acme/app action.yml:1 name = "Root action"
+example.com/acme/app action.yml:2 description = "A composite action at the root of its repository."
+example.com/acme/app action.yml:4 runs.using = "composite"
+example.com/acme/app action.yml:6 runs.steps[0].id = "prepare"
+example.com/acme/app action.yml:7 runs.steps[0].run = "echo prepare"
+example.com/acme/app action.yml:8 runs.steps[0].shell = "bash"
+example.com/acme/app action.yml:9 runs.steps[1].uses = "./tools/setup"
+
+# tools/setup/action.yml
+example.com/acme/app tools/setup/action.yml:1-6 .
+type: action
+name: "Setup"
+root: tools/setup/action.yml
+overridable: none
+references:
+example.com/acme/app tools/setup/action.yml:5 runs.steps[0]
+referenced by: none
+values:
+example.com/acme/app tools/setup/action.yml:1 name = "Setup"
+example.com/acme/app tools/setup/action.yml:3 runs.using = "composite"
+example.com/acme/app tools/setup/action.yml:5 runs.steps[0].run = "echo setup"
+example.com/acme/app tools/setup/action.yml:6 runs.steps[0].shell = "bash"
+
+# tools/only/action.yaml
+example.com/acme/app tools/only/action.yaml:1-4 .
+type: action
+name: "Only yaml"
+root: tools/only/action.yaml
+overridable: none
+references: none
+referenced by: none
+values:
+example.com/acme/app tools/only/action.yaml:1 name = "Only yaml"
+example.com/acme/app tools/only/action.yaml:3 runs.using = "node20"
+example.com/acme/app tools/only/action.yaml:4 runs.main = "index.js"
+
+# runs.steps[0]
+`runs.steps[0]` fits 2 IaC nodes; pass one of:
+example.com/acme/app action.yml:6 runs.steps[0] (root action.yml)
+example.com/acme/app tools/setup/action.yml:5 runs.steps[0] (root tools/setup/action.yml)

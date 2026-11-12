@@ -186,6 +186,22 @@ fn cloudformation_long(name: &str, reference: &str, between: &str) -> usize {
     ))
 }
 
+/// The bytes of the addresses, names, selectors and references the CI nodes of `text`, a lone
+/// pipeline (#823), store.
+fn pipeline(text: String) -> usize {
+    let (nodes, references) =
+        crate::iac::actions::evaluate(".github/workflows/ci.yml", &file(text));
+    let nodes = nodes.iter().map(|n| {
+        let selectors = n.selectors.as_ref().map_or(0, |s| {
+            s.id.as_ref().map_or(0, String::len) + s.uses.as_ref().map_or(0, String::len)
+        });
+        n.address.len() + n.name.as_ref().map_or(0, String::len) + selectors
+    });
+    let references = (references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    nodes.chain(references).sum()
+}
+
 /// The bytes of the addresses, names, handlers, events and references the IaC nodes of `text`, a
 /// lone `serverless.yml` (#654), store.
 fn service(text: String) -> usize {
@@ -1752,6 +1768,49 @@ resource "aws_apigatewayv2_route" "wide" {{
             });
             service(format!(
                 "functions:\n{functions}resources:\n  Resources:\n{resources}"
+            ))
+        }),
+        // GitHub Actions (#823): what one pipeline file's evaluation stores
+        ("pipeline: thousands of steps under long job ids", || {
+            // Each step's address repeats its job's id: a hundred times the bytes written.
+            let steps = "      - run: x\n".repeat(500);
+            let id = "j".repeat(2000);
+            let jobs = fill(1, |i| format!("  {id}{i}:\n    steps:\n{steps}"));
+            pipeline(format!("jobs:\n{jobs}"))
+        }),
+        ("pipeline: flat steps of one job", || {
+            let steps = fill(1, |i| format!("      - id: s{i}\n        uses: a/b@v{i}\n"));
+            pipeline(format!("jobs:\n  build:\n    steps:\n{steps}"))
+        }),
+        ("pipeline: one huge run script beside deep nesting", || {
+            let script = fill(2, |i| format!("          echo line {i}\n"));
+            let deep = (0..100)
+                .map(|i| format!("{}k{i}:\n", " ".repeat(10 + 2 * i)))
+                .collect::<String>();
+            let nested = fill(4, |i| {
+                format!(
+                    "      - id: n{i}\n        with:\n{deep}{}v: 1\n",
+                    " ".repeat(210)
+                )
+            });
+            pipeline(format!(
+                "jobs:\n  build:\n    steps:\n      - run: |\n{script}{nested}"
+            ))
+        }),
+        ("pipeline: every job needs every other", || {
+            let needs = (0..300)
+                .map(|i| format!("j{i}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let jobs = fill(1, |i| format!("  j{i}:\n    needs: [{needs}]\n"));
+            pipeline(format!("jobs:\n{jobs}"))
+        }),
+        ("pipeline: an alias per step and per job", || {
+            let steps = fill(4, |_| "      - *s\n".into());
+            let jobs = fill(4, |i| format!("  j{i}: *j\n"));
+            pipeline(format!(
+                "x-step: &s\n  id: {}\n  run: x\njobs:\n  first: &j\n    steps:\n{steps}{jobs}",
+                "i".repeat(1000)
             ))
         }),
         // Kubernetes and Kustomize (#651): what one repository's evaluation stores

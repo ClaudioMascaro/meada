@@ -1,0 +1,9 @@
+name: Root action
+description: A composite action at the root of its repository.
+runs:
+  using: composite
+  steps:
+    - id: prepare
+      run: echo prepare
+      shell: bash
+    - uses: ./tools/setup

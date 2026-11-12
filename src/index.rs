@@ -200,7 +200,7 @@ CREATE TABLE iac_nodes (
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
     subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
-    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT
+    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT, selectors TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -937,6 +937,23 @@ fn refresh_attempt(
     let terraform = std::cell::RefCell::new(BTreeSet::new());
     // Whether a Kubernetes file changed, appeared or left: its objects are evaluated again.
     let kubernetes = std::cell::Cell::new(false);
+    // A pipeline or an action is its own unit (#823). With both action file names in a folder
+    // the action is `action.yml`, so the one that changed or left has the other read again.
+    let actions = |path: &str, src: Option<&[u8]>| -> Result<()> {
+        if !iac::actions::is_file(path) {
+            return Ok(());
+        }
+        let twin = iac::actions::twin(path).and_then(|twin| {
+            let (_, abs) = configs.iter().find(|(p, _)| *p == twin)?;
+            Some((twin, read_up_to(abs, lang::MAX_BYTES).ok()?))
+        });
+        let shadowed = |path: &str, other: bool| other && path.ends_with(".yaml");
+        iac::actions::refresh(&tx, path, src, shadowed(path, twin.is_some()))?;
+        if let Some((twin, bytes)) = &twin {
+            iac::actions::refresh(&tx, twin, Some(bytes), shadowed(twin, src.is_some()))?;
+        }
+        Ok(())
+    };
     let gone = refresh_stamped(
         &tx,
         "config_files",
@@ -957,6 +974,7 @@ fn refresh_attempt(
             if iac::template_changed(&tx, path, Some(src))? {
                 iac::refresh_template(&tx, path, Some(src))?;
             }
+            actions(path, Some(src))?;
             let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?);
             config_values::store(&tx, path, &rows)?;
             Ok(serde_json::to_string(&outcome)?)
@@ -968,6 +986,7 @@ fn refresh_attempt(
         if iac::template_changed(&tx, path, None)? {
             iac::refresh_template(&tx, path, None)?;
         }
+        actions(path, None)?;
         config_values::forget(&tx, path)?;
     }
     // A Terraform file of a directory holding an override file is read above with every default
@@ -4688,6 +4707,17 @@ mod tests {
         ))
         .unwrap();
         actual += "\n";
+
+        // The CI nodes and references of a pipeline and of a composite action (#823), with the
+        // selectors a CI job and a CI step store.
+        for (name, path) in [
+            ("sample.workflow.yml", ".github/workflows/sample.yml"),
+            ("sample.action.yml", "tools/setup/action.yml"),
+        ] {
+            let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
+            let evaluated = crate::iac::actions::evaluate(path, &src);
+            actual += &format!("\n{name}\n{evaluated:#?}\n");
+        }
 
         // Alert rule and route summaries (#672) invalidate indexes from earlier extractors.
         let src = fs::read(tests.join("fixtures/schema/sample.alert.yaml")).unwrap();

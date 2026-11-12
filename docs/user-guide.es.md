@@ -153,6 +153,7 @@ Los valores de `kind`:
 | `duplicate` | símbolos con texto idéntico en dos o más lugares, por el nombre o por la ruta |
 | `value` | un valor de configuración de un archivo YAML o JSON, por el valor o por la ruta de la clave |
 | `iac` | un nodo IaC (un resource, un bloque data o una llamada de módulo de Terraform, o un objeto Kubernetes), por la dirección, el tipo o el nombre físico |
+| `ci` | un pipeline, una action, un job de CI o un paso de CI de GitHub Actions, por la dirección, el tipo, el id, el `name` o el `uses` |
 | `ambiguous`, `unresolved` | los ítems abiertos, con el comando `meada decide` de cada uno |
 
 Cada resultado es una línea: repositorio, `ruta:línea` y nombre.
