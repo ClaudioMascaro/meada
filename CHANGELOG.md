@@ -15,6 +15,9 @@ All notable changes to Meada are recorded here. The format follows
   refresh no longer fails with `database is locked` when another process writes the index as
   that refresh ends: the time spent behind a refresh of the same process no longer counts toward
   the timeout (#757).
+- A call of `meada mcp` no longer answers from a refresh that read documents by a `[serve]`
+  table older than its own: a call that comes while another call's refresh runs shares the next
+  one only when both read the same table, and runs its own after it otherwise (#758).
 
 ## [1.3.0] - 2026-11-11
 

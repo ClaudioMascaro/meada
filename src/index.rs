@@ -736,11 +736,12 @@ pub struct Indexed<'a> {
 /// Refreshes of one index share it (#704). In one process (MCP calls in flight together) one
 /// runs at a time: a call that comes while another runs waits for it, with no timer, then for
 /// the next run, which starts after it came and so sees the tree as the call found it; the
-/// calls that came meanwhile share that run's outcome. A statement that meets the run's lock
-/// outside a refresh (an open, a query) waits for the run too (`wait`). Across processes, one
-/// that finds nothing to write takes no write lock, and one whose first write meets another
-/// process's writer waits up to the busy timeout for that commit, then starts over
-/// (`attempts`).
+/// calls that came meanwhile share that run's outcome when it found documents by the `[serve]`
+/// table they read, and a call that read another (an edit between two calls) runs its own after
+/// it (#758). A statement that meets the run's lock outside a refresh (an open, a query) waits
+/// for the run too (`wait`). Across processes, one that finds nothing to write takes no write
+/// lock, and one whose first write meets another process's writer waits up to the busy timeout
+/// for that commit, then starts over (`attempts`).
 pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
     let Some(path) = db.path().filter(|p| !p.is_empty()) else {
         return refresh_keeping(db, root, identity, serve, true);
@@ -749,16 +750,21 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         let mut flights = FLIGHTS.lock().unwrap_or_else(PoisonError::into_inner);
         flights.entry(PathBuf::from(path)).or_default().clone()
     };
+    let table = serve.declared.then(|| serve.documents.clone());
     let mut runs = flight.runs.lock().unwrap_or_else(PoisonError::into_inner);
     let needed = runs.started + 1;
-    while runs.running && runs.finished < needed {
+    loop {
+        // A run that started after this call came, by the same `[serve]` table (#758).
+        if runs.finished >= needed && runs.table == table {
+            return runs.failed.clone().map_or(Ok(()), |e| Err(e.into()));
+        }
+        if !runs.running {
+            break;
+        }
         runs = flight
             .done
             .wait(runs)
             .unwrap_or_else(PoisonError::into_inner);
-    }
-    if runs.finished >= needed {
-        return runs.failed.clone().map_or(Ok(()), |e| Err(e.into()));
     }
     runs.running = true;
     runs.started += 1;
@@ -767,6 +773,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         flight: &flight,
         number: runs.started,
         failed: Some("the refresh in flight stopped".to_string()),
+        table,
         nested: RUNNING.replace(true),
     };
     drop(runs);
@@ -785,13 +792,17 @@ struct Flight {
     done: Condvar,
 }
 
-/// How many runs started and finished, whether one runs now, and the last one's error.
+/// How many runs started and finished, whether one runs now, and the last one's error and
+/// `[serve]` table.
 #[derive(Default)]
 struct Runs {
     started: u64,
     finished: u64,
     running: bool,
     failed: Option<String>,
+    /// What the last run found documents by (`documents_found`): `None` without a `[serve]`
+    /// table, else the paths its `documents` lists.
+    table: Option<Vec<String>>,
 }
 
 /// The run in flight: dropped, even by a panic, it records its outcome and wakes the waiters,
@@ -800,6 +811,8 @@ struct Run<'a> {
     flight: &'a Flight,
     number: u64,
     failed: Option<String>,
+    /// The `[serve]` table this run finds documents by (`Runs::table`).
+    table: Option<Vec<String>>,
     /// Whether this thread already ran a refresh when this one started (a rebuild's).
     nested: bool,
 }
@@ -812,6 +825,7 @@ impl Drop for Run<'_> {
         runs.running = false;
         runs.finished = self.number;
         runs.failed = self.failed.take();
+        runs.table = self.table.take();
         self.flight.done.notify_all();
     }
 }
@@ -4155,6 +4169,69 @@ mod tests {
         let db = open(&index, &root, REPO, &Serve::default()).unwrap();
         // Read without a refresh of its own: what the second call's run left.
         assert_eq!((named(&db, "b"), named(&db, "c")), (1, 1));
+    }
+
+    /// A call answers by the `[serve]` table it read (#758), even when the run after the one in
+    /// flight as it came is started by a call that read the table before an edit. In each round
+    /// the older call's second refresh starts that run as its first one ends, on a thread already
+    /// running, while the newer call still waits to wake: it wins that race nearly always, and
+    /// three rounds make the case all but certain.
+    #[test]
+    fn a_call_answers_by_its_own_serve_table_from_a_run_an_older_call_started() {
+        for round in 0..3 {
+            let answers = across_a_serve_edit(&format!("shared_run_serve_{round}"));
+            assert_eq!(answers, (Ok(()), Ok(1)), "round {round}");
+        }
+    }
+
+    /// Two calls in flight together across an edit of `[serve]` that lists `docs/api.yaml`: the
+    /// older one refreshes twice back to back by the table before the edit, and the newer one,
+    /// which comes during the older one's first run, refreshes by the table after it, then counts
+    /// the rows of that document. What each answered.
+    fn across_a_serve_edit(case: &str) -> (Result<(), String>, Result<i64, String>) {
+        let (dir, index) = index_dir(case);
+        let root = checkout(&dir);
+        fs::create_dir_all(root.join("docs")).unwrap();
+        let spec = "openapi: 3.0.0\ninfo:\n  title: api\npaths: {}\n";
+        fs::write(root.join("docs").join("api.yaml"), spec).unwrap();
+        // The table each call read: before the edit it lists no document, after it one.
+        let older = Serve {
+            declared: true,
+            ..Serve::default()
+        };
+        let newer = Serve {
+            documents: vec!["docs/api.yaml".into()],
+            ..older.clone()
+        };
+        let mut dbs = connections(&index, &root, 2);
+        add(&root, "b");
+        let blocker = reader(&index);
+        let first = std::thread::spawn({
+            let (db, root) = (dbs.remove(0), root.clone());
+            move || {
+                with_busy_timeout(Duration::from_secs(10), || {
+                    (0..2).try_for_each(|_| super::refresh(&db, &root, REPO, &older))
+                })
+                .map_err(|e| e.to_string())
+            }
+        });
+        committing(&index);
+
+        let second = std::thread::spawn({
+            let (db, root) = (dbs.remove(0), root.clone());
+            move || {
+                with_busy_timeout(Duration::from_secs(10), || -> crate::Result<i64> {
+                    super::refresh(&db, &root, REPO, &newer)?;
+                    let listed = "SELECT count(*) FROM documents WHERE path = 'docs/api.yaml'";
+                    Ok(db.query_row(listed, [], |r| r.get(0))?)
+                })
+                .map_err(|e| e.to_string())
+            }
+        });
+        // Time for the newer call to find the first run in flight.
+        std::thread::sleep(Duration::from_millis(200));
+        drop(blocker);
+        (first.join().unwrap(), second.join().unwrap())
     }
 
     /// A refresh refused `DEFERRED_ATTEMPTS` times in a row (#704), as under a stream of other
