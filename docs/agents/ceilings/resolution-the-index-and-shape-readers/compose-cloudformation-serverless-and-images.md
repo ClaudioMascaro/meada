@@ -43,7 +43,12 @@
   pipeline of many CI steps shows them only under a larger `budget`. A `uses` with two `@` has
   the ref after the first. `trace` (#825) follows a CI call only between CI nodes of the
   workspace and adds no cap for GitHub's ten levels of nesting: a chain ends at a cycle mark or
-  at the budget, and the walk from an IaC node has no depth limit of its own.
+  at the budget, and the walk from an IaC node has no depth limit of its own. It reads the
+  whole chain before the budget cuts the answer, so a chain of thousands of pipelines costs
+  seconds. A CI job past the 64 references of its pipeline (`REFERENCES_MAX` of
+  `iac/actions.rs`) has no file node above it: `trace` up ends at that CI job, and down from
+  the pipeline never reaches what it calls. A contract identifier is matched as written: one
+  with the owner in another case, or a trailing `/`, starts nothing.
 - `iac/serverless.rs` (#654, ADR 0025): a service reuses `NODES_MAX` (functions first, in name
   order, then the resources of its `resources` section, together), `REFERENCES_MAX` (per node) and
   `ROOT_STORED_MAX` (per file, the functions' names, handlers and events counting against it before
