@@ -41,7 +41,9 @@
   `inherit` reads like the word, and a key that holds `, ` or `; ` like several; `meada export`
   tells them apart. The side lines close `context` on a pipeline, after its values, so a
   pipeline of many CI steps shows them only under a larger `budget`. A `uses` with two `@` has
-  the ref after the first.
+  the ref after the first. `trace` (#825) follows a CI call only between CI nodes of the
+  workspace and adds no cap for GitHub's ten levels of nesting: a chain ends at a cycle mark or
+  at the budget, and the walk from an IaC node has no depth limit of its own.
 - `iac/serverless.rs` (#654, ADR 0025): a service reuses `NODES_MAX` (functions first, in name
   order, then the resources of its `resources` section, together), `REFERENCES_MAX` (per node) and
   `ROOT_STORED_MAX` (per file, the functions' names, handlers and events counting against it before

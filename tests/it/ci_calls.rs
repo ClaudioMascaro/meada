@@ -518,3 +518,152 @@ fn a_key_or_a_ref_with_a_control_character_writes_no_line_of_its_own() {
         .unwrap();
     assert!(!sided(&job), "{job}");
 }
+
+#[test]
+fn trace_up_from_a_reusable_pipeline_reaches_its_callers_through_an_intermediate_pipeline() {
+    let [workflows, wrapper, ..] = reproduction("ci_calls_trace_up");
+    let engine = Engine::open(&workflows).unwrap();
+    let answer = traced(&engine, PUBLISH, Direction::Up);
+    let (at, through) = (indexed(&workflows), indexed(&wrapper));
+    let release = ".github/workflows/release.yml";
+    // Each caller of #820's table, then the pipeline of its file; `acme/wrapper`'s file is a
+    // provider itself, so the chain goes on to `acme/app-c`, which never names `publish.yml`.
+    assert_eq!(
+        chain(&answer),
+        [
+            format!("github.com/acme/workflows {PUBLISH}:1 ."),
+            format!("  →[exact: @main (indexed {at})] github.com/acme/app-a {CI}:12 jobs.publish"),
+            format!("    github.com/acme/app-a {CI}:1 ."),
+            format!(
+                "  →[exact: @v1 (indexed {at})] github.com/acme/app-b {CI}:11 jobs[\"publish-prd\"]"
+            ),
+            format!("    github.com/acme/app-b {CI}:1 ."),
+            format!(
+                "  →[exact: @main (indexed {at})] github.com/acme/app-b {CI}:18 jobs[\"publish-stg\"]"
+            ),
+            format!("    github.com/acme/app-b {CI}:1 . (see above)"),
+            format!(
+                "  →[exact: @main (indexed {at})] github.com/acme/wrapper {release}:5 jobs.release"
+            ),
+            format!("    github.com/acme/wrapper {release}:1 ."),
+            format!(
+                "      →[exact: @main (indexed {through})] github.com/acme/app-c {release}:6 jobs.release"
+            ),
+            format!("        github.com/acme/app-c {release}:1 ."),
+        ],
+        "{answer}"
+    );
+    // The weakest level of the chain, its five links and its five repositories.
+    let footer = answer.lines().last().unwrap();
+    assert!(
+        footer.starts_with("chain: exact · 5 hops · 5 repos · "),
+        "{answer}"
+    );
+}
+
+#[test]
+fn trace_down_from_a_caller_reaches_the_pipeline_it_calls_through_the_intermediate_one() {
+    let [workflows, wrapper, _, _, app_c] = reproduction("ci_calls_trace_down");
+    let engine = Engine::open(&app_c).unwrap();
+    let release = ".github/workflows/release.yml";
+    // `jobs.release` alone fits the CI job of `acme/wrapper` too.
+    let start = format!("github.com/acme/app-c::{release}::jobs.release");
+    let answer = traced(&engine, &start, Direction::Down);
+    let (at, through) = (indexed(&workflows), indexed(&wrapper));
+    assert_eq!(
+        chain(&answer),
+        [
+            format!("github.com/acme/app-c {release}:6 jobs.release"),
+            format!("  →[exact: @main (indexed {through})] github.com/acme/wrapper {release}:1 ."),
+            format!("    github.com/acme/wrapper {release}:5 jobs.release"),
+            format!("      →[exact: @main (indexed {at})] github.com/acme/workflows {PUBLISH}:1 ."),
+            format!("        github.com/acme/workflows {PUBLISH}:15 jobs.publish"),
+            format!("          github.com/acme/workflows {PUBLISH}:18 jobs.publish.steps[0]"),
+            format!("          github.com/acme/workflows {PUBLISH}:19 jobs.publish.steps[1]"),
+        ],
+        "{answer}"
+    );
+    let footer = answer.lines().last().unwrap();
+    assert!(
+        footer.starts_with("chain: exact · 2 hops · 3 repos · "),
+        "{answer}"
+    );
+    assert_golden(
+        "ci-calls.trace.txt",
+        &format!(
+            "{}\n{answer}",
+            traced(&Engine::open(&workflows).unwrap(), PUBLISH, Direction::Up)
+        ),
+    );
+}
+
+#[test]
+fn a_ci_contract_its_pipeline_node_and_its_file_path_start_the_same_chain() {
+    let [workflows, ..] = reproduction("ci_calls_trace_starts");
+    let engine = Engine::open(&workflows).unwrap();
+    let node = format!("github.com/acme/workflows::{PUBLISH}::.");
+    for direction in [Direction::Up, Direction::Down] {
+        let by_path = traced(&engine, PUBLISH, direction);
+        assert!(by_path.lines().count() > 2, "{by_path}");
+        assert_eq!(traced(&engine, CONTRACT, direction), by_path);
+        assert_eq!(traced(&engine, &node, direction), by_path);
+    }
+    // A contract no pipeline of the workspace provides is still no start.
+    let missing = traced(
+        &engine,
+        &CONTRACT.replace("publish", "absent"),
+        Direction::Up,
+    );
+    assert!(
+        missing.contains("is a ci, and a trace starts from"),
+        "{missing}"
+    );
+}
+
+/// Two reusable pipelines that call each other: GitHub refuses the run, the files still exist.
+#[test]
+fn a_cycle_of_ci_calls_ends_at_the_walks_own_cycle_mark() {
+    let [workflows, wrapper, ..] = reproduction("ci_calls_trace_cycle");
+    let looped = |other: &str| {
+        format!(
+            "on: workflow_call\njobs:\n  again:\n    uses: acme/{other}/.github/workflows/loop.yml@main\n"
+        )
+    };
+    fs::write(
+        workflows.join(".github/workflows/loop.yml"),
+        looped("wrapper"),
+    )
+    .unwrap();
+    fs::write(
+        wrapper.join(".github/workflows/loop.yml"),
+        looped("workflows"),
+    )
+    .unwrap();
+    let engine = Engine::open(&workflows).unwrap();
+    let start = "github.com/acme/workflows::.github/workflows/loop.yml";
+    for direction in [Direction::Up, Direction::Down] {
+        let answer = traced(&engine, start, direction);
+        let lines = chain(&answer);
+        // Pipeline, CI job, pipeline, CI job, and the start again: no level past it.
+        assert_eq!(lines.len(), 5, "{answer}");
+        assert!(lines[4].ends_with("loop.yml:1 . (cycle)"), "{answer}");
+        // A budget below the chain cuts it, as it cuts every chain.
+        let cut = engine
+            .trace(Start::From(start), direction, Some(60))
+            .unwrap();
+        assert!(cut.lines().count() < answer.lines().count(), "{cut}");
+    }
+}
+
+/// A sibling that calls the pipeline and that no `meada.toml` names is no part of the workspace.
+#[test]
+fn trace_reaches_a_caller_only_when_the_workspace_holds_its_repository() {
+    let case = "ci_calls_trace_peers";
+    let [workflows, ..] = reproduction(case);
+    let stranger = fixture_repo(case, "ci-app-a", Some("https://github.com/acme/app-a.git"));
+    fs::remove_file(stranger.join("meada.toml")).unwrap();
+    let engine = Engine::open(&workflows).unwrap();
+    let answer = traced(&engine, PUBLISH, Direction::Up);
+    assert!(!answer.contains("acme/app-a"), "{answer}");
+    assert!(answer.contains("acme/app-b"), "{answer}");
+}

@@ -474,7 +474,9 @@
   `ci-app-{a,b,c}` fixtures covers the CI contract: the consumers of a reusable pipeline, the
   shapes of `on`, the identifier's case and host, Git ref reasons, external `uses`, a caller
   alone and with its peer, a hand declaration beside it, refresh equal to a cold index, and
-  export, context, search and status goldens.
+  export, context, search and status goldens. `trace` over CI calls (#825): up from the
+  reusable pipeline through the intermediate one, down from a caller, the three starts, a cycle,
+  a caller outside the workspace and the `ci-calls.trace.txt` golden.
 
 - `patterns.rs` (#674): sibling `pattern-infra`/`pattern-app` fixtures cover channel and
   resource anchors, ambiguous literal names, short/interior and pattern-to-pattern negatives,

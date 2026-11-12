@@ -521,13 +521,13 @@ carries its level with no reason.
 | no overlap | `no symbol overlaps the uncommitted changes` | `changes: uncommitted` found no symbol to start from. |
 | process up | `a process is what its entry point sets in motion: trace it down` | A process traces `down` only. |
 | no process | `` no process `<query>`: pass `process::<entry point identity>` `` | No entry point has that identity. |
-| not a start | ``` `<query>` is a <sided-kind>, and a trace starts from a symbol, a route or a call site: run `context` on it for its <sides>, then trace from one ``` | A contract listed by its sides is no start. |
+| not a start | ``` `<query>` is a <sided-kind>, and a trace starts from a symbol, a route or a call site: run `context` on it for its <sides>, then trace from one ``` | A contract listed by its sides is no start. A CI contract a pipeline of the workspace provides is one: the trace starts at that pipeline's file node. |
 | fits symbols | ``` `<query>` fits <n> symbols; pass one of: ``` | The name fits several symbols, listed after it. |
 | fit symbol | `<node> <identity>` | One of the symbols the name fits, and its identity. |
 | fits call sites | ``` `<query>` fits <n> call sites; pass one of: ``` | The name fits several call sites, listed after it. |
 | fit call site | `<repository> <place> <call-site>` | One of the call sites the name fits. |
 | no start | `` no symbol, route or call site matches `<query>` `` | Nothing to start from. |
-| iac reference | `<indent><repository> <place> <address><via?><repeat?>` | From an IaC node: a node it references (`down`) or that references it (`up`), at its block, within its root module. |
+| iac reference | `<indent><repository> <place> <address><via?><repeat?>` | From an IaC node: a node it references (`down`) or that references it (`up`), at its block, within its root module. A CI call leaves the root module and the repository as a `link` line: `up` from a pipeline to the CI jobs that call it, `down` from a CI job to the pipeline it calls, and the walk goes on through that node's references. |
 | fits iac | ``` `<query>` fits <n> IaC nodes; pass one of: ``` | The address fits several IaC nodes, listed after it. |
 | fit iac | `<repository> <place> <iac-pass>` | One of the IaC nodes the address fits, and what to pass for it. |
 

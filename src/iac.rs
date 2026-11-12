@@ -58,8 +58,8 @@ use crate::document::events::{self, Step, Syntax};
 use crate::lang::MAX_BYTES;
 use crate::render::{rank, section};
 use crate::trace::Direction;
-use meada_core::export::Level;
-use meada_core::trace::{Chain, Row};
+use meada_core::export::{Level, Link};
+use meada_core::trace::{Chain, Row, arrow};
 
 pub(crate) mod actions;
 mod attribute;
@@ -3457,47 +3457,66 @@ pub(crate) fn context(
 /// it references (`Down`) or that reference it (`Up`), depth first, each indented under the one
 /// it hangs from, a node met again on its own branch marked ` (cycle)` and one already followed
 /// ` (see above)`; then the chain footer. A text that fits several nodes lists them.
-pub(crate) fn trace(
+///
+/// `calls` gives the nodes a link joins to a node in the walk's direction, in any repository
+/// (`trace::Graph::node_calls`, a CI call): the walk follows them with the references, before
+/// them, so a chain of calls crosses repositories and goes on through each one's references.
+pub(crate) fn trace<'l>(
     repos: &[(&str, &Connection)],
     exports: &[crate::index::Export],
     text: &str,
     direction: Direction,
     budget: Option<usize>,
     mut attached: impl FnMut(usize, &Node, usize) -> Vec<Row>,
+    mut calls: impl FnMut(usize, &Node) -> Vec<(usize, Node, &'l Link)>,
 ) -> Result<Option<String>> {
     let found = found(exports, text);
     let [(r, start)] = &found[..] else {
         return Ok((!found.is_empty())
             .then(|| crate::render::budgeted(&several(repos, text, &found), budget)));
     };
-    let (identity, db) = repos[*r];
     let mut rows = Vec::new();
-    let mut expanded: HashSet<String> = HashSet::new();
-    let mut path: Vec<String> = Vec::new();
-    // (depth, node, via), popped in walk order.
-    let mut stack: Vec<(usize, Node, Option<String>)> = vec![(0, start.clone(), None)];
-    while let Some((depth, n, via)) = stack.pop() {
+    // A node is itself only within its repository and root: a link leaves both.
+    let mut expanded: HashSet<(usize, String, String)> = HashSet::new();
+    let mut path: Vec<(usize, String, String)> = Vec::new();
+    // (depth, repository, node, the reference's name, the link that reached it), popped in
+    // walk order.
+    let mut stack = vec![(0, *r, start.clone(), None::<String>, None::<&Link>)];
+    while let Some((depth, r, n, via, link)) = stack.pop() {
         path.truncate(depth);
+        let (identity, db) = repos[r];
+        let key = (r, n.root.clone(), n.address.clone());
         let mark = match () {
-            _ if path.contains(&n.address) => " (cycle)",
-            _ if expanded.contains(&n.address) => " (see above)",
+            _ if path.contains(&key) => " (cycle)",
+            _ if expanded.contains(&key) => " (see above)",
             _ => "",
         };
-        let text = format!(
-            "{}{}{mark}",
-            "  ".repeat(depth),
-            reached(identity, &n, &via)
-        );
-        let level = (depth > 0).then_some(Level::Exact);
-        rows.push(Row::call(text, *r, level));
+        let indent = "  ".repeat(depth);
+        rows.push(match link {
+            Some(link) => {
+                let text = format!("{indent}{} {}{mark}", arrow(link), at(identity, &n));
+                let mut row = Row::link(text, r, link);
+                row.text += &std::mem::take(&mut row.end);
+                row
+            }
+            None => {
+                let text = format!("{indent}{}{mark}", reached(identity, &n, &via));
+                Row::call(text, r, (depth > 0).then_some(Level::Exact))
+            }
+        });
         if !mark.is_empty() {
             continue;
         }
-        rows.extend(attached(*r, &n, depth + 1));
-        expanded.insert(n.address.clone());
-        path.push(n.address.clone());
-        let next = references(db, &n, direction)?;
-        stack.extend(next.into_iter().rev().map(|(m, via)| (depth + 1, m, via)));
+        rows.extend(attached(r, &n, depth + 1));
+        expanded.insert(key.clone());
+        path.push(key);
+        let called = calls(r, &n).into_iter();
+        let mut next: Vec<_> = called
+            .map(|(m, node, link)| (depth + 1, m, node, None, Some(link)))
+            .collect();
+        let referenced = references(db, &n, direction)?.into_iter();
+        next.extend(referenced.map(|(node, via)| (depth + 1, r, node, via, None)));
+        stack.extend(next.into_iter().rev());
     }
     let chain = Chain {
         rows,

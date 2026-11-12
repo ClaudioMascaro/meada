@@ -31,3 +31,13 @@ side placed as `context` takes it (`place`). `in_default_search` keeps them out 
 no kind, which answers as before. The kind is not `decidable`: it has no ambiguous link.
 `calls_from_definition` says a CI job calls its pipeline, so `trace` never walks a CI link as
 data going from a writer down to its readers.
+
+`trace` over CI calls (#825) is the IaC reference walk (`iac::trace`), which now takes the
+links a node holds in the walk's direction from `trace::Graph::node_calls`: a link whose
+consumer calls its provider, both ends IaC nodes, the consumers going up and the provider going
+down. It follows them before the node's references and goes on through the reached node's own
+references, in that node's repository, so a chain crosses intermediate reusable pipelines. The
+walk's cycle and repeat marks key a node by repository, root and address. A CI contract
+identifier starts at the node that provides it (`trace::provider_node`, read in
+`Engine::trace` before the start is looked up), so it answers as the pipeline's name does; the
+walk adds no cap for GitHub's ten levels of nesting.

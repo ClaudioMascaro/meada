@@ -572,6 +572,12 @@ impl Engine {
         self.refresh()?;
         let mut partial = self.partial()?;
         let links = self.links(&partial.exports);
+        // A CI contract starts at the pipeline that provides it, as the pipeline's name does.
+        let node = match start {
+            Start::From(from) => trace::provider_node(&partial.exports, from),
+            Start::Uncommitted => None,
+        };
+        let start = node.as_deref().map_or(start, Start::From);
         let changes = match start {
             Start::Uncommitted => Some(repo::uncommitted(&self.root)?),
             Start::From(_) => None,
@@ -623,6 +629,7 @@ impl Engine {
                 direction,
                 budget,
                 |r, n, depth| graph.attached_rows(r, n, depth, direction),
+                |r, n| graph.node_calls(r, n, direction),
             )?
         {
             return Ok(iac);

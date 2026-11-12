@@ -361,6 +361,29 @@ impl<'a> Graph<'a> {
         walk.rows
     }
 
+    /// The IaC nodes a link whose consumer calls its provider (`calls_on_link`, a CI call)
+    /// joins to `node`: the consumers that call it going up, the providers it calls going
+    /// down, each with its repository and the link, in the links' order (#825).
+    pub(crate) fn node_calls(
+        &self,
+        repository: usize,
+        node: &crate::iac::Node,
+        direction: Direction,
+    ) -> Vec<(usize, crate::iac::Node, &'a Link)> {
+        let identity = node.identity(&self.exports[repository].repository);
+        let (links, other): (_, fn(&Link) -> &str) = match direction {
+            Direction::Up => (self.into.get(identity.as_str()), |l| &l.consumer),
+            Direction::Down => (self.out.get(identity.as_str()), |l| &l.provider),
+        };
+        (links.into_iter().flatten())
+            .filter(|link| calls_on_link(link))
+            .filter_map(|&link| {
+                let &(n, reached) = self.iac.get(other(link))?;
+                Some((n, reached.clone(), link))
+            })
+            .collect()
+    }
+
     /// The starts `from` names: the providers of a route, else one symbol, else one call site.
     /// A name that fits several symbols or call sites lists them instead of guessing.
     fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
@@ -563,6 +586,27 @@ pub(crate) fn read_executions(partial: &mut Partial, links: &[Link]) -> Result<(
     }
     read(partial, links, starts, Direction::Down, true)?;
     Ok(())
+}
+
+/// The IaC node that provides the contract `from` names, when the contract's consumers call
+/// their provider (`ContractKind::calls_from_definition`) and no kind starts a trace from it by
+/// itself: a CI contract starts at its pipeline, as the node's own name does (#825).
+pub(crate) fn provider_node(exports: &[Export], from: &str) -> Option<String> {
+    if !contract::calls_from_definition(Some(from)) {
+        return None;
+    }
+    let providers: Vec<(&str, &str)> = (exports.iter())
+        .flat_map(|e| &e.providers)
+        .map(|p| (p.contract.as_str(), p.site.as_str()))
+        .collect();
+    if (contract::KINDS.iter()).any(|kind| !kind.starts(from, &providers).is_empty()) {
+        return None;
+    }
+    exports.iter().find_map(|e| {
+        let site = &e.providers.iter().find(|p| p.contract == from)?.site;
+        let node = |n: &crate::iac::Node| n.identity(&e.repository) == *site;
+        e.iac.iter().any(node).then(|| site.clone())
+    })
 }
 
 /// The nodes `start` names, as `Graph::find` and `Graph::changed` find them, read into

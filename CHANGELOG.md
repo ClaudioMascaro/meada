@@ -28,6 +28,12 @@ All notable changes to Meada are recorded here. The format follows
   optional consumer fields `ref`, `with` and `secrets`. A `uses` whose repository is not in the
   workspace holds no side, so it is never an orphan or an open item. Existing indexes are rebuilt
   once on first use. Release level: minor, meada and meada-core (#824).
+- `trace` follows a chain of CI calls both ways, across repositories and through intermediate
+  reusable pipelines. Up from a reusable pipeline it reaches the CI jobs that call it, the
+  pipeline of each one's file and, when that file is reusable too, its own callers; down from a
+  CI job it reaches the pipeline it calls, with its CI jobs and CI steps. The CI contract
+  identifier, the pipeline's file node and the file's path start the same chain. Every other
+  `trace` answer is unchanged. Release level: minor, meada (#825).
 
 ### Fixed
 
