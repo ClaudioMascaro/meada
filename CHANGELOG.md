@@ -6,6 +6,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The values cache (`values.db`, ADR 0027) stores each entry deflated, and gives back the pages
+  that replaced or dropped entries free once they are most of the file. An existing cache shrinks
+  on the first refresh, which replaces its entries. A stored entry that would inflate past 8 MiB,
+  or that is not deflated, reads as a miss and costs a parse (#839).
+
 ### Fixed
 
 - `trace` stops following a branch 256 levels below its start and marks the line there

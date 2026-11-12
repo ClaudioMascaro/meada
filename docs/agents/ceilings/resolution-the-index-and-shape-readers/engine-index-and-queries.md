@@ -32,15 +32,18 @@
   definitions) that no read set per file captures (#391, #610).
 
 - `index/values.rs`: the values cache holds one entry per file of `valued` (pruned on every
-  extraction), each the file's parse as JSON, values included: on this repository 18.7 MB beside a
-  60.8 MB index, 616 entries, the largest 1.6 MB. An entry is keyed by the file's bytes, setting
+  extraction), each the file's parse as JSON, values included, deflated (#839): on this
+  repository, as plain JSON, 18.7 MB beside a 60.8 MB index, 616 entries, the largest 1.6 MB. An entry is keyed by the file's bytes, setting
   and pack and by Meada's build (version, stored format, the executable's path, size and mtime),
   so a rebuilt or moved binary misses every entry once. An entry is at most `ENTRY_BYTES`
-  (8 MiB) of JSON, so the cache is at most that per `valued` file: a file whose parse serializes
-  past it (a C# read's shared scope is written once per read) is parsed on every refresh. An entry nested past `serde_json`'s depth
+  (8 MiB) of JSON before it is deflated, so the cache is at most that per `valued` file: a file
+  whose parse serializes past it (a C# read's shared scope is written once per read) is parsed on
+  every refresh. A read inflates a stored blob to `ENTRY_BYTES` at most, whatever the blob asks
+  for, so one that would inflate past it is a miss. An entry nested past `serde_json`'s depth
   (128) does not deserialize and is parsed again on every refresh, as is anything else wrong with
-  the cache (unreadable, locked past the busy timeout, a write that failed): a miss costs a parse,
-  never a different index. A changed file is parsed twice per refresh, once for its stored facts
+  the cache (unreadable, locked past the busy timeout, a blob that is no zlib stream, a write that
+  failed): a miss costs a parse, never a different index. An extraction that leaves more than half
+  of the file's pages free vacuums it. A changed file is parsed twice per refresh, once for its stored facts
   and once for its values, since the first parse is under the setting `settle` may still change.
   A refresh that changes nothing or keeps every group leaves the cache as it is. A dev build that changes a kind
   without changing the version keeps the rows an older build gave the groups it does not touch.
