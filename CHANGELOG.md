@@ -24,6 +24,14 @@ All notable changes to Meada are recorded here. The format follows
   template, a Kubernetes object, a document, an alert rule, a workflow, a package manifest),
   keep every value. An existing index is rebuilt on its first open by this version, which drops
   the values those files held (#817).
+- A call of `meada mcp` that waited longer than the busy timeout (10 s) behind another call's
+  refresh no longer fails with `database is locked` when another process writes the index as
+  that refresh ends: the time spent behind a refresh of the same process no longer counts toward
+  the timeout (#757).
+- A call of `meada mcp` no longer answers from a refresh that found documents by a `[serve]`
+  table older than the one in `meada.toml`: a refresh reads the table when it starts, not when
+  its call opened the index, so a call that read the file before an edit no longer writes the
+  index back by the older table (#758).
 
 ## [1.3.0] - 2026-11-11
 

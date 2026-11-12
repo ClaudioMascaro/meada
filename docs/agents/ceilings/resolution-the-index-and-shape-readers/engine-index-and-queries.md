@@ -108,20 +108,19 @@
   comes meanwhile waits for it with no timer, then shares the next run: a batch after a change
   costs about one refresh more than an unchanged one, whatever its size (debug build, 4 cores:
   Meada's own checkout, 50 calls 21 s against 15 s, 200 calls 70 s against 64 s; 5,000 files,
-  500 calls 11.0 s against 9.2 to 10.9 s). A statement of another call that meets the run's
-  lock (the first read of an open, a query, `forget`'s write) waits for the run, past the busy
-  timeout (`wait` in `index.rs`): no call fails on a timer while a refresh of its process is in
-  flight, however long it takes, nor while the tree keeps changing. Two things stay on the 10 s
-  timer in one process. The run's own commit waits that long for the reads the other calls have
+  500 calls 11.0 s against 9.2 to 10.9 s). A run reads the `[serve]` table it finds documents by
+  as each of its attempts starts, whichever call started it (#758). A statement of another call
+  that meets the run's lock (the first read of an open, a query, `forget`'s write) waits for the
+  run, past the busy timeout (`wait` in `index.rs`): no call fails on a timer while a refresh of
+  its process is in flight, however long it takes, nor while the tree keeps changing. Two things
+  stay on the 10 s timer in one process. The run's own commit waits that long for the reads the
+  other calls have
   in flight: one statement that reads for longer fails the run, and the calls that share it,
   with `database is locked`. And `wait` is a plain function that knows no connection: a run in
   flight on any index of the process extends the wait, so a statement behind another process's
-  lock waits until the runs of its own process end, then fails as before (its timer runs while
-  it waits for a run of its own process too: past 10 s it gets one try more when the run ends,
-  so a lock another process takes right then fails it at once, however short).
-  Measured once, cause not isolated: with a connection taking the write lock for 0.3 s at a
-  time after a refresh that held it for 13 s, every call answered `database is locked` in one
-  run of four, and which statement failed was not observed (#757). One stdio server answers
+  lock waits until the runs of its own process end, then a whole busy timeout more before it
+  fails: the time it waits behind a run of its own process does not count, so a short lock
+  another process takes as the run ends is waited for (#757). One stdio server answers
   `CALLS_IN_FLIGHT` (4) calls at once (#756): with its root known (the `roots/list` round trip
   holds no turn), a call waits for a turn at a fair semaphore, in the order the calls ask for
   one (rmcp starts a task per request, so two that arrive together may swap), and keeps it

@@ -282,6 +282,33 @@ fn each_document_gives_its_own_gateway_forms() {
     assert_eq!(link(7), edge);
 }
 
+/// A refresh finds documents by the `[serve]` table on disk (#758): an engine opened before an
+/// edit that lists a document refreshes after one opened after the edit, as one call's refresh
+/// can run between another call's refresh and its query, and the index keeps that document.
+#[test]
+fn a_refresh_by_an_engine_opened_before_a_serve_edit_keeps_the_edited_documents() {
+    let shop = repo(
+        "documents_serve_edit",
+        "shop",
+        &[
+            ("meada.toml", "[serve]\n"),
+            ("spec/contract.yaml", &openapi(&[], &["/listed"])),
+        ],
+    );
+    let older = Engine::open(&shop).unwrap();
+    let edited = "[serve]\ndocuments = [\"spec/contract.yaml\"]\n";
+    fs::write(shop.join("meada.toml"), edited).unwrap();
+    let newer = Engine::open(&shop).unwrap();
+
+    newer.refresh().unwrap();
+    older.refresh().unwrap();
+
+    // What a query of the newer engine reads after its refresh, with no refresh of its own.
+    let db = rusqlite::Connection::open(shop.join(".meada/index.db")).unwrap();
+    let listed = "SELECT count(*) FROM documents WHERE path = 'spec/contract.yaml'";
+    assert_eq!(db.query_row(listed, [], |r| r.get::<_, i64>(0)).unwrap(), 1);
+}
+
 #[test]
 fn documents_alone_make_a_serve_table_and_unlisted_ignored_ones_stay_out() {
     let case = "documents_listed_only";
