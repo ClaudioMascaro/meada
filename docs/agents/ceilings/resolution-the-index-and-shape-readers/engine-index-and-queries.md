@@ -110,12 +110,7 @@
   flight on any index of the process extends the wait, so a statement behind another process's
   lock waits until the runs of its own process end, then a whole busy timeout more before it
   fails: the time it waits behind a run of its own process does not count, so a short lock
-  another process takes as the run ends is waited for (#757). Before, past 10 s it got one try
-  more when the run ended and failed at once: with a connection taking the write lock for 0.3 s
-  at a time after a refresh that held it for 13 s, every call answered `database is locked` in
-  one run of four. A test at `wait` reproduces that path, a call's own statement whose wait
-  covered the run; the other candidate, a statement of the next run, runs on the run's thread,
-  which keeps the whole timeout, and cannot fail on a 0.3 s lock. The calls in flight
+  another process takes as the run ends is waited for (#757). The calls in flight
   are not bounded: each holds its own connections while it waits, and all of them query at once
   when the run ends, on top of what the run allocated (under a 2 GiB cap, debug build, Meada's
   own checkout: the server is killed with 100 calls in flight when nothing changed, with 16 to

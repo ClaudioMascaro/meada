@@ -345,7 +345,7 @@ thread_local! {
     static RUNNING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Where the busy timeout of this thread's wait on a lock counts from: when the wait began,
     /// or the last time it saw a refresh of another thread in flight (`wait`).
-    static WAITING: std::cell::Cell<Option<Instant>> = const { std::cell::Cell::new(None) };
+    static TIMEOUT_FROM: std::cell::Cell<Option<Instant>> = const { std::cell::Cell::new(None) };
 }
 
 /// The refreshes in flight in this process, on any index (`Run`).
@@ -365,11 +365,11 @@ static IN_FLIGHT: AtomicUsize = AtomicUsize::new(0);
 // connection; a wait on another process's lock then lasts until the runs of this process end.
 fn wait(tries: i32) -> bool {
     let in_flight = !RUNNING.get() && IN_FLIGHT.load(Ordering::Relaxed) > 0;
-    let since = match WAITING.get() {
+    let since = match TIMEOUT_FROM.get() {
         Some(since) if tries > 0 && !in_flight => since,
         _ => Instant::now(),
     };
-    WAITING.set(Some(since));
+    TIMEOUT_FROM.set(Some(since));
     if since.elapsed() >= BUSY.get() {
         return false;
     }
