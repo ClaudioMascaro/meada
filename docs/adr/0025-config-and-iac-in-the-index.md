@@ -91,6 +91,10 @@ checkout does not, and the docs point at `.meadaignore` for files that must stay
 
 IaC written in general-purpose code (CDK, Pulumi) is out.
 
+(Amended 2026-11-12; ADR 0028, proposed.) **GitHub Actions** joins these formats: a file under
+`.github/workflows/` that holds `jobs` (a pipeline) and an `action.yml` or `action.yaml` that
+holds `runs` (an action). The files of other CI systems stay config values only.
+
 ### HCL reader
 
 - HCL is read with `hcl-edit` (a span for every node) and `hcl-rs` (its expression evaluator),
@@ -456,6 +460,10 @@ Its address:
 - CloudFormation and SAM: the logical id within its template.
 - Compose: `services.<name>`.
 - Serverless: `functions.<name>`, and its resources by logical id.
+- (Amended 2026-11-12; ADR 0028, proposed.) GitHub Actions: the key path of the block,
+  `jobs.<id>` for a CI job, `jobs.<id>.steps[n]` and `runs.steps[n]` for a CI step, and `.` for
+  the pipeline or the action itself. A CI step's address is positional: its `id`, `name` and
+  `uses` are selectors, never identity.
 
 Each node records the label of the root module or overlay that roots its evaluation (ADR 0026
 labels a provisioner by it). Its identity is `<repo remote>::<file>::<address>`, the form of a
@@ -471,7 +479,9 @@ A static reference from one IaC node to another is stored like a call and walked
   namespace and evaluation unit, ConfigMap, Secret and service account references, and Ingress
   backends;
 - Compose: `depends_on`, `links` and shared networks;
-- Crossplane: claims to composite resources to composed resources.
+- Crossplane: claims to composite resources to composed resources;
+- (Amended 2026-11-12; ADR 0028, proposed.) GitHub Actions: a pipeline to its CI jobs, a CI job
+  or a composite action to its CI steps, and a CI job to the CI jobs its `needs` names.
 
 References per node are a named ceiling.
 
@@ -481,6 +491,8 @@ An evaluation unit is the set of files evaluated together: a Terraform module di
 local module instantiated once per call), a Kustomize tree per overlay, a CloudFormation or SAM
 template, a Compose project, a Serverless service file. A change to any file of a unit
 re-evaluates the whole unit. Links across repositories resolve at link time, as today.
+(Amended 2026-11-12; ADR 0028, proposed.) A pipeline file and an action's manifest are each one
+evaluation unit.
 
 ### Static evaluation
 
@@ -495,6 +507,9 @@ re-evaluates the whole unit. Links across repositories resolve at link time, as 
 - **Never resolved**: data sources, remote state, registry modules (beyond what the type table
   says of their inputs), Terraform workspaces, `-var` and `TF_VAR_`, Helm template rendering,
   composition patches and functions, and anything read from a process environment.
+- (Amended 2026-11-12; ADR 0028, proposed.) **GitHub Actions.** A `${{ }}` expression resolves
+  only where a literal `env` of the step, the job or the pipeline gives its value. Anything else
+  is an unresolved part, and `secrets.X` and `vars.X` have no value in a repository.
 - **Unresolved parts.** An unresolved part of a name becomes a wildcard, and the name becomes a
   pattern (ADR 0026 fixes how a pattern links).
 - **Level of an evaluated name.** A name written as one literal, or assembled from literals,
@@ -564,6 +579,10 @@ re-evaluates the whole unit. Links across repositories resolve at link time, as 
   keeps its answer byte for byte, and one that found nothing changes only by finding a config
   value.
 - The MCP `search` tool's kind list gains `value` and `iac`.
+- (Amended 2026-11-12; ADR 0028, proposed.) `search` gains the kind `ci` for the nodes of the
+  GitHub Actions format, matched by address, type and a CI step's `id`, `name` and `uses`. The
+  kind `iac` keeps its answers, the default search still includes no IaC node, and the MCP tool's
+  kind list gains `ci`.
 
 ## Considered options
 
