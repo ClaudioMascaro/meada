@@ -41,9 +41,9 @@
   every refresh. A read inflates a stored blob to `ENTRY_BYTES` at most, whatever the blob asks
   for, so one that would inflate past it is a miss. An entry nested past `serde_json`'s depth
   (128) does not deserialize and is parsed again on every refresh, as is anything else wrong with
-  the cache (unreadable, locked past the busy timeout, a blob that is no zlib stream, a write that
-  failed): a miss costs a parse, never a different index. An extraction that leaves more than half
-  of the file's pages free vacuums it. A changed file is parsed twice per refresh, once for its stored facts
+  the cache (unreadable, locked past the busy timeout, a blob that is not one whole zlib stream,
+  a write that failed): a miss costs a parse, never a different index. An extraction that leaves
+  more than half of the file's pages free vacuums it. A changed file is parsed twice per refresh, once for its stored facts
   and once for its values, since the first parse is under the setting `settle` may still change.
   A refresh that changes nothing or keeps every group leaves the cache as it is. A dev build that changes a kind
   without changing the version keeps the rows an older build gave the groups it does not touch.

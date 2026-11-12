@@ -139,11 +139,33 @@ impl Values {
     }
 }
 
-/// The facts of a stored entry: `None` for a blob that is no zlib stream, that inflates past
-/// `ENTRY_BYTES` (the inflation stops there, whatever the blob asks for: the cache is a file of
-/// the repository's directory, so a blob is input) or that does not deserialize.
+/// The facts of a stored entry: `None` for a blob that is not one whole zlib stream (bytes past
+/// its end included), that inflates past `ENTRY_BYTES` (the inflation stops there, whatever the
+/// blob asks for: the cache is a file of the repository's directory, so a blob is input) or that
+/// does not deserialize.
 fn facts_of(blob: &[u8]) -> Option<Facts> {
-    let json = miniz_oxide::inflate::decompress_to_vec_zlib_with_limit(blob, ENTRY_BYTES).ok()?;
+    use miniz_oxide::inflate::TINFLStatus;
+    use miniz_oxide::inflate::core::{DecompressorOxide, decompress, inflate_flags};
+    // `decompress_to_vec_zlib_with_limit`'s loop, which stops at the stream's end however much of
+    // the blob is left.
+    let flags = inflate_flags::TINFL_FLAG_PARSE_ZLIB_HEADER
+        | inflate_flags::TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF;
+    let mut state = Box::<DecompressorOxide>::default();
+    let mut json = vec![0; blob.len().saturating_mul(2).clamp(64, ENTRY_BYTES)];
+    let (mut rest, mut len) = (blob, 0);
+    loop {
+        let (status, read, wrote) = decompress(&mut state, rest, &mut json, len, flags);
+        len += wrote;
+        rest = rest.get(read..)?;
+        match status {
+            TINFLStatus::Done if rest.is_empty() => break,
+            TINFLStatus::HasMoreOutput if json.len() < ENTRY_BYTES => {
+                json.resize(json.len().saturating_mul(2).min(ENTRY_BYTES), 0);
+            }
+            _ => return None,
+        }
+    }
+    json.truncate(len);
     // ponytail: an entry nested past `serde_json`'s depth (128) does not deserialize, so its
     // file is parsed on every refresh; a deeper limit needs a deserializer without one.
     serde_json::from_slice(&json).ok()
@@ -249,8 +271,8 @@ mod tests {
     }
 
     /// A blob inflates to `ENTRY_BYTES` at most: one that would inflate past it is a miss however
-    /// small it is, and so are plain JSON (an older build's entry) and bytes that are no zlib
-    /// stream.
+    /// small it is, and so are plain JSON (an older build's entry), bytes that are no zlib stream
+    /// and a whole stream with bytes past its end.
     #[test]
     fn a_blob_that_inflates_past_its_size_limit_or_is_no_entry_is_a_miss() {
         let json = |n: usize| {
@@ -268,6 +290,13 @@ mod tests {
         assert!(serde_json::from_slice::<Facts>(&plain).is_ok());
         assert!(super::facts_of(&plain).is_none());
         assert!(super::facts_of(&noise(7, 4096)).is_none());
+        // A whole entry, then a second stream or anything else: one stream's facts are not the
+        // blob's.
+        let whole = deflate(&plain);
+        assert!(super::facts_of(&whole).is_some());
+        for tail in [&whole[..], &b"garbage"[..]] {
+            assert!(super::facts_of(&[&whole[..], tail].concat()).is_none());
+        }
     }
 
     /// One `keep` that replaces every entry by one a tenth of its size leaves the file at less

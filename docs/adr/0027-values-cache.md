@@ -96,9 +96,10 @@ the whole excess of the index directory over its size target once #817 bounded `
 - **Inflation is bounded.** A read inflates a blob to `ENTRY_BYTES` at most and stops there,
   whatever the blob asks for: the cache is a file in the repository's directory, so a blob is
   input, not something this build is known to have written. A blob that would inflate past the
-  limit is a miss, and so is one that is no zlib stream (its header or checksum fails), the plain
-  JSON of an older build included. Such an entry misses by its key first, since the build is in
-  it: there is no migration, and a new build's extraction replaces the entries.
+  limit is a miss, and so is one that is not one whole zlib stream (its header or checksum fails,
+  or bytes follow its end), the plain JSON of an older build included. Such an entry misses by
+  its key first, since the build is in it: there is no migration, and a new build's extraction
+  replaces the entries.
 - **Pages are given back.** After the transaction that writes and prunes the entries, a file
   whose free pages are more than half of its pages is vacuumed, so the pages that entries
   replaced by smaller ones, or dropped because `valued` lost files, leave the file instead of
