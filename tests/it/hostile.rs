@@ -29,7 +29,7 @@ const STACK: usize = 2 << 20;
 const BUDGET: Duration = Duration::from_secs(60);
 
 /// Nesting and chains within one file, past every depth limit (`PATH_DEPTH`, `FOLD_DEPTH`,
-/// `EVAL_DEPTH` and `PROCESS_DEPTH` are 256, the others less) by enough that a recursion with no
+/// `EVAL_DEPTH` and `WALK_DEPTH` are 256, the others less) by enough that a recursion with no
 /// limit at all needs more than `STACK`.
 const DEEP: usize = 1000;
 /// Python nesting by indentation, past `DEFINITION_DEPTH` (128): its file grows with the square
