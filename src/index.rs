@@ -750,12 +750,13 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         let mut flights = FLIGHTS.lock().unwrap_or_else(PoisonError::into_inner);
         flights.entry(PathBuf::from(path)).or_default().clone()
     };
-    let table = serve.declared.then(|| serve.documents.clone());
+    let listed = documents_by(serve).map(<[String]>::to_vec);
     let mut runs = flight.runs.lock().unwrap_or_else(PoisonError::into_inner);
     let needed = runs.started + 1;
     loop {
-        // A run that started after this call came, by the same `[serve]` table (#758).
-        if runs.finished >= needed && runs.table == table {
+        // A run that started after this call came and found documents as this call reads them
+        // (#758).
+        if runs.finished >= needed && runs.documents_by == listed {
             return runs.failed.clone().map_or(Ok(()), |e| Err(e.into()));
         }
         if !runs.running {
@@ -773,7 +774,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         flight: &flight,
         number: runs.started,
         failed: Some("the refresh in flight stopped".to_string()),
-        table,
+        documents_by: listed,
         nested: RUNNING.replace(true),
     };
     drop(runs);
@@ -792,17 +793,16 @@ struct Flight {
     done: Condvar,
 }
 
-/// How many runs started and finished, whether one runs now, and the last one's error and
-/// `[serve]` table.
+/// How many runs started and finished, whether one runs now, and the last one's error and what
+/// it found documents by.
 #[derive(Default)]
 struct Runs {
     started: u64,
     finished: u64,
     running: bool,
     failed: Option<String>,
-    /// What the last run found documents by (`documents_found`): `None` without a `[serve]`
-    /// table, else the paths its `documents` lists.
-    table: Option<Vec<String>>,
+    /// What the last run found documents by (`documents_by`).
+    documents_by: Option<Vec<String>>,
 }
 
 /// The run in flight: dropped, even by a panic, it records its outcome and wakes the waiters,
@@ -811,8 +811,8 @@ struct Run<'a> {
     flight: &'a Flight,
     number: u64,
     failed: Option<String>,
-    /// The `[serve]` table this run finds documents by (`Runs::table`).
-    table: Option<Vec<String>>,
+    /// What this run finds documents by (`documents_by`).
+    documents_by: Option<Vec<String>>,
     /// Whether this thread already ran a refresh when this one started (a rebuild's).
     nested: bool,
 }
@@ -825,7 +825,7 @@ impl Drop for Run<'_> {
         runs.running = false;
         runs.finished = self.number;
         runs.failed = self.failed.take();
-        runs.table = self.table.take();
+        runs.documents_by = self.documents_by.take();
         self.flight.done.notify_all();
     }
 }
@@ -2224,6 +2224,12 @@ pub fn forget(db: &Connection, path: &str) -> Result<()> {
     Ok(())
 }
 
+/// All of `serve` that `documents_found` reads, which a run shares with a call (`refresh`):
+/// `None` without a `[serve]` table, else the paths its `documents` lists.
+fn documents_by(serve: &Serve) -> Option<&[String]> {
+    serve.declared.then_some(serve.documents.as_slice())
+}
+
 /// The documents of a repository (path and absolute path): those `walk` found by file name,
 /// then each path `[serve] documents` lists that is a file, ignored by `.gitignore` or not. A
 /// listed path that is not a file, or that goes through a symbolic link, is no document;
@@ -2233,14 +2239,14 @@ fn documents_found(
     walked: &[(String, PathBuf)],
     serve: &Serve,
 ) -> Vec<(String, PathBuf)> {
-    if !serve.declared {
+    let Some(listed) = documents_by(serve) else {
         return Vec::new();
-    }
+    };
     let mut found: Vec<_> = (walked.iter())
         .filter(|(path, _)| document::is_document(path))
         .cloned()
         .collect();
-    for path in &serve.documents {
+    for path in listed {
         if found.iter().any(|(p, _)| p == path) {
             continue;
         }
