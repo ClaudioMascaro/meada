@@ -533,6 +533,10 @@ pub struct Use {
     pub contract: String,
     pub site: String,
     pub at: String,
+    /// `exact` for a structured identifier, `inferred` for a plain name under a key that names
+    /// the type; absent in an export an older version wrote.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<Level>,
 }
 
 /// A consumer linked to a provider through a contract. Each side is a call site, a symbol, a

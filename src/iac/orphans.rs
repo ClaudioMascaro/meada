@@ -9,7 +9,10 @@ use super::provision;
 #[derive(Default)]
 struct Group {
     provisioned: bool,
+    /// Any use, a name match included: the marks of `context` and `search` count every side.
     used: bool,
+    /// A use that is no name match: only such a use opens the orphan scope (ADR 0026).
+    certain: bool,
 }
 
 /// Groups are separate per contract kind and broker or resource kind, never per name.
@@ -32,9 +35,11 @@ impl<'e> Scope<'e> {
                     groups.entry(key).or_default().provisioned = true;
                 }
             }
-            for (_, contract) in provision::uses(export) {
+            for (_, contract, _, name_match) in provision::uses(export) {
                 if let Some(key) = group(contract) {
-                    groups.entry(key).or_default().used = true;
+                    let group = groups.entry(key).or_default();
+                    group.used = true;
+                    group.certain |= !name_match;
                 }
             }
         }
@@ -77,7 +82,7 @@ impl<'e> Scope<'e> {
         let both = |contract: &str| {
             group(contract)
                 .and_then(|key| self.groups.get(&key))
-                .is_some_and(|g| g.provisioned && g.used)
+                .is_some_and(|g| g.provisioned && g.certain)
         };
         self.exports
             .iter()
@@ -103,8 +108,9 @@ impl<'e> Scope<'e> {
                         ));
                     }
                 }
-                for (site, contract) in provision::uses(export) {
-                    if both(contract)
+                for (site, contract, level, name_match) in provision::uses(export) {
+                    if !name_match
+                        && both(contract)
                         && !links
                             .iter()
                             .any(|l| l.side == site && l.contract == contract)
@@ -115,7 +121,12 @@ impl<'e> Scope<'e> {
                             site.strip_prefix(&format!("{}::", export.repository))
                                 .unwrap_or(site)
                         };
-                        rows.insert((contract, Msg::OrphanUse { contract, place }.text()));
+                        let line = Msg::OrphanUse {
+                            contract,
+                            place,
+                            level,
+                        };
+                        rows.insert((contract, line.text()));
                     }
                 }
                 rows.into_iter().map(|(_, line)| line).collect()

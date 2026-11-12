@@ -538,6 +538,13 @@ IaC-only repository produces no such lines; `search` and `context` mark the side
 patterns and independent root modules, determine whether a counterpart exists. Existing
 warnings about declared resources without writers and readers remain separate.
 
+A use Meada only infers from a key name (a plain value under `queue`, `topic`, `bucket`, `table`
+or a typed alias, `inferred`) opens no orphan scope for its group and is never an orphan line: a
+name match proves neither a use nor its absence. It still links to the provisioner of the same
+name, which is therefore no `no use`, and `context` still shows it with `[inferred]`. A
+`no provisioner` line ends with its side's level in brackets, as `context` writes it (`[exact]`,
+`[declared]`), and the `uses` rows of `meada export` carry `level`.
+
 ### Terraform provisioners
 
 An `aws_sqs_queue` resource provisions `channel::sqs::<name>` through its `name` argument;

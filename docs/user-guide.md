@@ -539,6 +539,14 @@ código ou só de IaC não gera essas linhas; `search` e `context` marcam o pró
 inclusive padrões e módulos raiz independentes, determinam se há contraparte. Os avisos
 existentes de recursos declarados sem escritor e leitor continuam separados.
 
+Um uso que o Meada só infere pelo nome de uma chave (um valor simples sob `queue`, `topic`,
+`bucket`, `table` ou um alias tipado, `inferred`) não abre o escopo de órfãos do seu grupo e
+nunca vira linha de órfão: uma coincidência de nome não prova nem o uso nem a falta dele. Ele
+continua ligado ao provisionador do mesmo nome, que por isso não é um `no use`, e o `context`
+continua a mostrá-lo com `[inferred]`. Uma linha `no provisioner` termina com o nível do seu lado
+entre colchetes, como o `context` o escreve (`[exact]`, `[declared]`), e as linhas `uses` do
+`meada export` trazem `level`.
+
 ### Provisionadores Terraform
 
 Um `resource` `aws_sqs_queue` provisiona `channel::sqs::<nome>` pelo argumento `name`;

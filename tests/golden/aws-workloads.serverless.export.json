@@ -258,7 +258,8 @@
     {
       "contract": "channel::sqs::orders",
       "site": "example.com/acme/serverless",
-      "at": "serverless.yml#custom.queue"
+      "at": "serverless.yml#custom.queue",
+      "level": "inferred"
     }
   ],
   "links": [],

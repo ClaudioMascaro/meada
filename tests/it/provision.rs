@@ -281,8 +281,8 @@ fn status_lists_orphans_only_where_both_sides_of_the_group_exist() {
         "example.com/orphan/app (.) indexed, 1 files
   resource::s3::archive is unlinked: no writer and reader in different repositories
   resource::s3::unmanaged is unlinked: no writer and reader in different repositories
-  orphan channel::sqs::unmanaged: no provisioner; app.ts::sendUnmanaged::SendMessageCommand#0
-  orphan resource::s3::unmanaged: no provisioner; (repository-level)
+  orphan channel::sqs::unmanaged: no provisioner; app.ts::sendUnmanaged::SendMessageCommand#0 [exact]
+  orphan resource::s3::unmanaged: no provisioner; (repository-level) [declared]
 example.com/orphan/infra (../orphan-infra) indexed, 0 files
   orphan channel::sqs::unused: no use; main.tf:2 aws_sqs_queue.unused (root .)
   orphan resource::s3::unused: no use; main.tf:4 aws_s3_bucket.unused (root .)
@@ -507,5 +507,67 @@ fn search_finds_provisioner_sides_as_contracts_without_uses() {
     assert_eq!(
         engine.search("orders", Some("resource"), None).unwrap(),
         "no matches for `orders`\n"
+    );
+}
+
+/// A use side `inferred` from a key name opens no orphan scope and is never an orphan line, while
+/// one Meada is certain of is, naming its level; `context` still shows the inferred side and the
+/// export's `uses` rows carry the level (ADR 0026, "Orphan sides", #797).
+#[test]
+fn a_use_inferred_from_a_key_name_opens_no_orphan_scope() {
+    let repo = fixture_repo(
+        "orphan_level",
+        "orphan-level",
+        Some("https://example.com/acme/o2.git"),
+    );
+    let orphans = || {
+        let (_, reports) = Engine::open(&repo).unwrap().status_report().unwrap();
+        (reports.into_iter().flatten())
+            .filter(|l| l.starts_with("orphan "))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(orphans(), Vec::<String>::new());
+    let engine = Engine::open(&repo).unwrap();
+    let context = engine.context("channel::sqs::jobs", None).unwrap();
+    assert!(
+        context.contains(
+            "example.com/acme/o2 use config/labels.yaml#routing.queue (line 2) [inferred]"
+        ),
+        "{context}"
+    );
+    let export: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let levels: Vec<_> = (export["uses"].as_array().unwrap().iter())
+        .map(|u| (u["contract"].as_str(), u["level"].as_str()))
+        .collect();
+    assert_eq!(
+        levels,
+        [
+            (Some("channel::sqs::jobs"), Some("inferred")),
+            (Some("resource::dynamodb::sales.orders"), Some("inferred")),
+        ]
+    );
+    // A certain use of a queue nothing provisions opens the scope of SQS queues, and of them
+    // alone: the inferred `jobs` and the DynamoDB tables stay out.
+    fs::write(
+        repo.join("config/arn.yaml"),
+        "target: arn:aws:sqs:us-east-1:123456789012:ghost\n",
+    )
+    .unwrap();
+    assert_eq!(
+        orphans(),
+        [
+            "orphan channel::sqs::acme-jobs: no use; infra/main.tf:1 aws_sqs_queue.jobs (root infra)",
+            "orphan channel::sqs::ghost: no provisioner; config/arn.yaml#target [exact]",
+        ]
+    );
+    // A provisioned queue whose only use is an inferred one of its own name is not unused.
+    fs::write(
+        repo.join("config/labels.yaml"),
+        "routing:\n  queue: acme-jobs\n",
+    )
+    .unwrap();
+    assert_eq!(
+        orphans(),
+        ["orphan channel::sqs::ghost: no provisioner; config/arn.yaml#target [exact]"]
     );
 }

@@ -158,11 +158,14 @@ fn config_use_refresh_and_secret_boundaries_preserve_complete_sets() {
             .iter()
             .all(|l| l["at"] != "values.yaml#worker.queue")
     );
+    // A key-name use is `inferred`: no orphan line, while `context` shows the refreshed side (#797).
     let (_, reports) = engine.status_report().unwrap();
     let reports = reports.into_iter().flatten().collect::<Vec<_>>().join("\n");
+    assert!(!reports.contains("channel::sqs::absent"), "{reports}");
+    let context = engine.context("channel::sqs::absent", None).unwrap();
     assert!(
-        reports.contains("channel::sqs::absent") && reports.contains("worker.queue"),
-        "{reports}"
+        context.contains("use values.yaml#worker.queue") && context.contains("[inferred]"),
+        "{context}"
     );
     fs::write(&values, original).unwrap();
     assert_eq!(engine.export().unwrap(), text);

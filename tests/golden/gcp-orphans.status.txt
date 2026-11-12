@@ -3,6 +3,5 @@ orphan resource::gcs::assets: no use; main.tf:7 google_storage_bucket.assets (ro
 config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 13, redacted: 0
 resource::cloudsql::orders-db/orders is unlinked: no writer and reader in different repositories
 resource::cloudsql::audit-db/orders is unlinked: no writer and reader in different repositories
-orphan resource::gcs::absent: no provisioner; settings.yaml#exact.bucket
-orphan resource::gcs::absent: no provisioner; settings.yaml#typed.gcs_bucket
+orphan resource::gcs::absent: no provisioner; settings.yaml#exact.bucket [exact]
 config files: 3 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 25, redacted: 2

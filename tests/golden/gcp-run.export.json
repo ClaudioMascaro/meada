@@ -363,52 +363,62 @@
     {
       "contract": "channel::pubsub::orders",
       "site": "example.com/gcp/app",
-      "at": "settings.yaml#exact.topic"
+      "at": "settings.yaml#exact.topic",
+      "level": "exact"
     },
     {
       "contract": "channel::pubsub::orders",
       "site": "example.com/gcp/app",
-      "at": "settings.yaml#typed.pubsub_topic"
+      "at": "settings.yaml#typed.pubsub_topic",
+      "level": "inferred"
     },
     {
       "contract": "channel::pubsub::subscriptions/orders",
       "site": "example.com/gcp/app",
-      "at": "settings.yaml#exact.subscription"
+      "at": "settings.yaml#exact.subscription",
+      "level": "exact"
     },
     {
       "contract": "channel::pubsub::subscriptions/orders",
       "site": "example.com/gcp/app",
-      "at": "settings.yaml#typed.pubsub_subscription"
+      "at": "settings.yaml#typed.pubsub_subscription",
+      "level": "inferred"
     },
     {
       "contract": "resource::cloudsql::orders-db",
       "site": "example.com/gcp/app",
-      "at": "settings.yaml#typed.cloudsql_instance"
+      "at": "settings.yaml#typed.cloudsql_instance",
+      "level": "inferred"
     },
     {
       "contract": "resource::cloudsql::orders-db/orders",
       "site": "example.com/gcp/app",
-      "at": "settings.yaml#typed.cloudsql_database"
+      "at": "settings.yaml#typed.cloudsql_database",
+      "level": "inferred"
     },
     {
       "contract": "resource::gcpsecretmanager::api-key",
       "site": "example.com/gcp/app",
-      "at": "settings.yaml#exact.secret"
+      "at": "settings.yaml#exact.secret",
+      "level": "exact"
     },
     {
       "contract": "resource::gcpsecretmanager::api-key",
       "site": "example.com/gcp/app",
-      "at": "settings.yaml#typed.gcpsecretmanager_secret"
+      "at": "settings.yaml#typed.gcpsecretmanager_secret",
+      "level": "inferred"
     },
     {
       "contract": "resource::gcs::assets",
       "site": "example.com/gcp/app",
-      "at": "settings.yaml#exact.bucket"
+      "at": "settings.yaml#exact.bucket",
+      "level": "exact"
     },
     {
       "contract": "resource::gcs::assets",
       "site": "example.com/gcp/app",
-      "at": "settings.yaml#typed.gcs_bucket"
+      "at": "settings.yaml#typed.gcs_bucket",
+      "level": "inferred"
     }
   ],
   "links": [

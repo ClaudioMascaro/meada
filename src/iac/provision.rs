@@ -118,16 +118,17 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     Ok(sides)
 }
 
-/// Directed and directionless uses both reach provisioners; neither invents a direction.
-pub(crate) fn uses(export: &Export) -> impl Iterator<Item = (&str, &str)> {
+/// Directed and directionless uses both reach provisioners; neither invents a direction. Each
+/// comes with its level and whether it is only a name match, a config value's plain name under a
+/// key that names the type (`inferred`), which opens no orphan scope and is no orphan line (ADR
+/// 0026, "Orphan sides").
+pub(crate) fn uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level, bool)> {
     directed_uses(export)
-        .map(|(site, contract, _)| (site, contract))
-        .chain(
-            export
-                .config_uses
-                .iter()
-                .map(|u| (u.site.as_str(), u.contract.as_str())),
-        )
+        .map(|(site, contract, level)| (site, contract, level, false))
+        .chain(export.config_uses.iter().map(|u| {
+            let name_match = u.level == Level::Inferred;
+            (u.site.as_str(), u.contract.as_str(), u.level, name_match)
+        }))
 }
 
 fn directed_uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
@@ -372,7 +373,7 @@ impl Source<'_> {
 
     fn target_exists(self, export: &Export, contract: &str) -> bool {
         match self {
-            Self::Provisioner(_) => uses(export).any(|(_, c)| c == contract),
+            Self::Provisioner(_) => uses(export).any(|(_, c, ..)| c == contract),
             Self::Use { .. } => export.provisioners.iter().any(|p| p.contract == contract),
         }
     }
@@ -438,7 +439,8 @@ fn sources(export: &Export) -> Vec<Source<'_>> {
         .map(Source::Provisioner)
         .collect();
     let uses = uses(export)
-        .filter(|(_, c)| c.contains('*'))
+        .filter(|(_, c, ..)| c.contains('*'))
+        .map(|(site, contract, ..)| (site, contract))
         .collect::<std::collections::BTreeSet<_>>();
     sources.extend(
         uses.into_iter()
@@ -656,8 +658,8 @@ pub(crate) fn item_sites(exports: &[Export]) -> Vec<(usize, String)> {
         .enumerate()
         .flat_map(|(n, e)| {
             uses(e)
-                .filter(|(_, c)| c.contains('*'))
-                .map(move |(site, _)| (n, site.to_owned()))
+                .filter(|(_, c, ..)| c.contains('*'))
+                .map(move |(site, ..)| (n, site.to_owned()))
         })
         .collect()
 }
@@ -667,10 +669,9 @@ pub(crate) fn items(
     exports: &[Export],
 ) -> Vec<(crate::items::OpenItem, bool)> {
     use crate::items::{ItemKind, OpenItem};
-    if !exports
-        .iter()
-        .any(|e| e.provisioners.iter().any(Side::pattern) || uses(e).any(|(_, c)| c.contains('*')))
-    {
+    if !exports.iter().any(|e| {
+        e.provisioners.iter().any(Side::pattern) || uses(e).any(|(_, c, ..)| c.contains('*'))
+    }) {
         return Vec::new();
     }
     let core = raw_links(exports);

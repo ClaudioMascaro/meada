@@ -24,6 +24,7 @@ impl Side {
         side.contract = self.contract.clone();
         side.site = repository.into();
         side.at = format!("{}#{}", self.path, self.key);
+        side.level = Some(self.level);
         side
     }
 

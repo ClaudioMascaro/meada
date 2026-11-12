@@ -44,6 +44,11 @@ All notable changes to Meada are recorded here. The format follows
   table older than the one in `meada.toml`: a refresh reads the table when it starts, not when
   its call opened the index, so a call that read the file before an edit no longer writes the
   index back by the older table (#758).
+- `meada status` no longer reports orphans from a use Meada only infers from a key name (a plain
+  value under `queue`, `topic`, `bucket`, `table` or a typed alias): such a use side opens no
+  orphan scope and is never an orphan line, though it still links to a provisioner of its name
+  and `context` still shows it with `[inferred]`. A `no provisioner` line ends with its side's
+  level, and the `uses` rows of `meada export` carry `level`, an added optional field (#797).
 
 ## [1.3.0] - 2026-11-11
 
