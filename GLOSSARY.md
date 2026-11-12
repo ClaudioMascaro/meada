@@ -689,6 +689,8 @@ The contract `image::<registry>/<repository>` between the repository that builds
 workloads that run it, the name normalized (Docker Hub short names expanded, tag and digest dropped,
 lowercase). Its **builder** is the provider, the repository whose CI or build configuration
 publishes the image; its **runner** is the consumer, the workload whose image field names it.
+Its orphan scope is asked per registry and namespace, the first segment of the repository path,
+so a runner of a public image is no orphan where the workspace builds nothing in that namespace.
 _Avoid_: container, artifact; publisher and deployer (for builder and runner)
 
 **Alert contract**:
@@ -703,8 +705,16 @@ A connection Meada makes between a consumer and a provider through a contract. I
 level and a reason. A **provisioning link** is a link of its own kind, between any other side of
 a contract and a provisioner of it (ADR 0026). A config value that names a contract is a **use**
 side with no direction: it joins only provisioning links and orphans, never a consumer to a
-provider.
+provider. A use side at `inferred`, a plain name under a key that names the type, opens no orphan
+scope and is never an orphan line, though it keeps its provisioning links.
 _Avoid_: edge, bridge, connection
+
+**Grant**:
+A structured identifier in the resource list of an IAM policy statement (`Resource` or
+`NotResource` of a `Statement` entry, `resources` or `not_resources` of a `statement` block of an
+`aws_iam_policy_document`): who may touch a resource, not a use of it. It has no direction:
+`context` shows it on the resource, and it joins no provisioning link and no orphan (ADR 0026).
+_Avoid_: permission, policy use, access
 
 **Level**:
 How well a link is established: exact, declared, inferred, decided or ambiguous. It is a name,
