@@ -8,6 +8,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- `trace` stops following a branch 256 levels below its start and marks the line there
+  `(depth limit)`, as a process step is marked: a call chain of about 2,000 hops overflowed the
+  stack and aborted `meada mcp`, with every call in flight (#732).
 - A `terraform-aws-modules/s3-bucket/aws` call with `putin_khuylo = false`, or with a value
   Meada cannot resolve, provisions no bucket: upstream creates it only with
   `create_bucket && putin_khuylo`, and the Lambda module's call is read the same way (#787).

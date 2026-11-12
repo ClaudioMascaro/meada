@@ -70,12 +70,18 @@
   marker). A route handler Meada could not find (an Express handler passed as a parameter) has
   no entry point.
 
+- `trace.rs` (walks): `WALK_DEPTH` (256) caps the recursion of one branch of every `trace`,
+  down or up, from any start, and of a process: the line at the limit is written, marked
+  `(depth limit)` (a process step `depth-limit`), and nothing hangs from it, so a longer chain is
+  cut. A node cut there is not counted as followed: a shorter path that meets it later follows
+  it. Where an IaC trace continues into code (`Graph::attached_rows`), the limit counts from the
+  IaC node. Without it a debug build (`28f1a4d7`, MCP over stdio, a runtime worker's 2 MiB
+  stack) aborted on a call chain between 1,972 and 1,992 hops down and between 3,144 and 3,164
+  up (#732): the limit stays more than seven and twelve times under them.
 - `trace.rs` (process walk): an ambiguous call or link is one unexpanded step listing its
   candidates; `inferred` and `decided` links expand. A process is walked down only; `trace`
-  up from `process::...` answers with a note. `PROCESS_DEPTH` (256) caps the recursion of one
-  branch: the step at the limit is marked `depth-limit` (`(depth limit)` in `trace`) and not
-  expanded, so a longer call chain is cut. `Graph::processes_of` (the processes `context` lists)
-  walks upstream with no depth limit, so on chains deeper than `PROCESS_DEPTH` membership and
+  up from `process::...` answers with a note. `Graph::processes_of` (the processes `context` lists)
+  walks upstream with no depth limit, so on chains deeper than `WALK_DEPTH` membership and
   trees can disagree: a node past depth 256 is no step of the tree, and the limit can hide a
   node shallower than that, through `Seen`. E reaches X at depth 255, so X expands and each of
   its callees, Y among them, is a `depth-limit` step at 256 whose own callee Z is no step; a
