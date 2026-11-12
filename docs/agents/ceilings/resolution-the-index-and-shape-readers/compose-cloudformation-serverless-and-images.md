@@ -15,7 +15,13 @@
   CI job or a CI step that came by a YAML alias has no lines of its own: a step sits at its CI
   job's first line and a job at line 1, since the reader hands a location only where a mapping is
   written. A pipeline is a file directly under `.github/workflows/`, and with `action.yml` and
-  `action.yaml` in one folder the action is `action.yml`, whatever each of them holds.
+  `action.yaml` in one folder the action is `action.yml`, whatever each of them holds. The
+  extension is `.yml` or `.yaml` in lower case. The file node spans the whole file, the documents
+  after the first included. A CI job id written twice is the last block, while the config values
+  keep both. A merge key (`<<`) is not expanded: what it would bring gives no CI step. The config
+  values have their own budget for what aliases repeat: past it the file counts as unreadable
+  there and stores no value, and its nodes stay, with `values: none` (found by #823's
+  verification).
 - `iac/serverless.rs` (#654, ADR 0025): a service reuses `NODES_MAX` (functions first, in name
   order, then the resources of its `resources` section, together), `REFERENCES_MAX` (per node) and
   `ROOT_STORED_MAX` (per file, the functions' names, handlers and events counting against it before

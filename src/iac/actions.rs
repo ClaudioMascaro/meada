@@ -7,7 +7,7 @@
 //! composite action to its CI steps, a CI job to the CI jobs its `needs` names. A
 //! `strategy.matrix` multiplies nothing: a CI job is one node.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
 use rusqlite::{Connection, Transaction};
@@ -312,8 +312,11 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
             Some(Value::String(one)) => vec![one.as_str()],
             _ => Vec::new(),
         };
+        // A CI job named twice is needed once.
+        let mut seen = HashSet::new();
         for needed in needs {
-            if matches!(jobs.get(needed), Some(Value::Object(_))) && needed != id {
+            let other = matches!(jobs.get(needed), Some(Value::Object(_))) && needed != id;
+            if other && seen.insert(needed) {
                 unit.reference(&at, &address(needed), Some("needs"), &mut held);
             }
         }
@@ -382,9 +385,9 @@ pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<
 }
 
 /// Whether `text` names the node `n` of this format otherwise than by its address: the file node
-/// by its path, a CI step by a selector in place of its index (`jobs.build.steps[id=login]`,
-/// `name=` and `uses=` alike), each alone or after the repository identity, a selector also
-/// after the path.
+/// by its path, alone or after the repository identity; a CI step by a selector in place of its
+/// index (`jobs.build.steps[id=login]`, `name=` and `uses=` alike), alone, after the path or
+/// after the identity and the path, as an address is (ADR 0025).
 pub(super) fn names(identity: &str, n: &Node, text: &str) -> bool {
     if !owns(n) {
         return false;
@@ -392,11 +395,16 @@ pub(super) fn names(identity: &str, n: &Node, text: &str) -> bool {
     let after = |text: &'_ str, prefix: &str| {
         (text.strip_prefix(prefix)).and_then(|rest| rest.strip_prefix("::").map(str::len))
     };
-    let text = after(text, identity).map_or(text, |len| &text[text.len() - len..]);
+    let rest = after(text, identity);
+    let text = rest.map_or(text, |len| &text[text.len() - len..]);
     if n.address == "." {
         return text == n.path;
     }
-    let text = after(text, &n.path).map_or(text, |len| &text[text.len() - len..]);
+    let text = match (after(text, &n.path), rest) {
+        (Some(len), _) => &text[text.len() - len..],
+        (None, None) => text,
+        (None, Some(_)) => return false,
+    };
     let split = |address: &'_ str| {
         let (parent, rest) = address.strip_suffix(']')?.rsplit_once(".steps[")?;
         Some((parent.len(), rest.len()))
@@ -451,7 +459,7 @@ jobs:
           make test
 
   publish-prd:
-    needs: [build, absent]
+    needs: [build, absent, build]
     uses: acme/workflows/.github/workflows/publish.yml@v1
   test:
     needs: build
@@ -655,6 +663,8 @@ jobs:
             "jobs.build.steps[id=absent]",
             "jobs.build.steps[run=make]",
             "other.yml::jobs.build.steps[id=login]",
+            // After the repository a selector needs the path, as an address does (ADR 0025).
+            "example.com/acme/app::jobs.build.steps[id=login]",
             "jobs.build",
         ] {
             assert_eq!(named(text), [""; 0], "{text}");
