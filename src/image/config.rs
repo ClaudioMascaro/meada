@@ -38,7 +38,7 @@ pub(super) fn is_file(path: &str) -> bool {
     legacy_file(path) || crate::iac::is_source(path) || crate::iac::cloudformation::is_source(path)
 }
 
-fn legacy_file(path: &str) -> bool {
+pub(super) fn legacy_file(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
     (path.starts_with(".github/workflows/") && (path.ends_with(".yml") || path.ends_with(".yaml")))
         || crate::iac::compose::is_file(path)

@@ -3442,6 +3442,9 @@ Row { key: "[1].apiVersion", value: Some("v1"), kind: "string", line: 15, cut: f
 Row { key: "[1].kind", value: Some("Secret"), kind: "string", line: 16, cut: false }
 Row { key: "[1].stringData.password", value: None, kind: "string", line: 18, cut: false }
 
+sample.data.yaml, one value past the ceiling
+"data"
+
 sample.kustomization.yaml
 Output {
     nodes: [

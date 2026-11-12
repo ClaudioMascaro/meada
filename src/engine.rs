@@ -388,7 +388,7 @@ impl Engine {
         let repos = &self.workspace.repos;
         let entries = drift_view::entries(repos, &exports, &links);
         let drift = drift_view::counts(repos.len(), &entries);
-        let configs: Vec<Option<String>> = (self.dbs.iter())
+        let configs: Vec<Vec<String>> = (self.dbs.iter())
             .map(config_values::status)
             .collect::<Result<_>>()?;
         let kubes: Vec<Option<String>> =

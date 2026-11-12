@@ -136,6 +136,52 @@ fn status_counts_the_config_files_read_and_skipped_and_the_values_redacted() {
     assert_golden("config-values.status.txt", &engine::status(&repo).unwrap());
 }
 
+/// The issue's reproduction (#817): a JSON dump of 14,000 scalars that only the config value
+/// reader takes is data. It keeps no value, so a `value` search finds none of them, and `meada
+/// status` counts and names it apart; a small file beside it is read as before.
+#[test]
+fn a_data_file_keeps_no_value_and_status_counts_and_names_it() {
+    let repo = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join("config_values_data_file")
+        .join("repro");
+    let _ = fs::remove_dir_all(&repo);
+    fs::create_dir_all(&repo).unwrap();
+    fs::write(repo.join("a.ts"), "export function f() { return 1 }\n").unwrap();
+    let runs: Vec<String> = (0..2000)
+        .map(|i| {
+            let (model, score, topic) = (i % 7, f64::from(i) / 1000.0, i % 97);
+            let label = if i % 3 == 0 { "miss" } else { "ok" };
+            let (detail, tokens) = (i * 31 % 1009, 100 + i % 900);
+            format!(
+                "    {{\"id\": \"run-{i:05}\", \"model\": \"model-{model}\", \"score\": {score}, \
+                 \"label\": \"{label}\", \"prompt\": \"question {i} about topic {topic}\", \
+                 \"answer\": \"answer {i} with detail {detail}\", \"tokens\": {tokens}}}"
+            )
+        })
+        .collect();
+    let measure = format!("{{\"runs\": [\n{}\n]}}\n", runs.join(",\n"));
+    fs::write(repo.join("measure.json"), measure).unwrap();
+    fs::write(
+        repo.join("settings.yaml"),
+        "region: sa-east-1\nreplicas: 3\n",
+    )
+    .unwrap();
+    common::git(&repo, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    common::git(&repo, &["add", "-A"]);
+    common::git(&repo, &["commit", "-q", "-m", "repro"]);
+
+    let engine = Engine::open(&repo).unwrap();
+    let found = |query: &str| engine.search(query, Some("value"), None).unwrap();
+    assert_eq!(found("run-00042"), "no matches for `run-00042`\n");
+    assert!(found("sa-east-1").contains("settings.yaml"));
+    let status = engine::status(&repo).unwrap();
+    let counted = "config files: 1 read, 1 skipped (lockfiles: 0, unreadable: 0, data: 1); \
+                   values: 2, redacted: 0";
+    assert!(status.contains(counted), "{status}");
+    let named = "data files (more than 1000 values each, none kept): measure.json";
+    assert!(status.contains(named), "{status}");
+}
+
 /// With no kind, values answer only when no symbol and no contract matches: `health` finds the
 /// function alone though `HealthCheckFailing` is a value, and `team-b` finds the values.
 #[test]

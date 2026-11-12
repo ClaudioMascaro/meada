@@ -43,6 +43,24 @@ pub(crate) fn helm_values(path: &str) -> bool {
     name.split(['.', '-', '_']).any(|word| word == "values")
 }
 
+/// Whether a reader of a kind takes the YAML or JSON file at `path` (bytes `src`) as its own, so
+/// that it keeps every value past `VALUES_MAX` (#817): one `taken` names (an OpenAPI or AsyncAPI
+/// document, a configuration file a language pack reads or includes), a Compose file, a GitHub
+/// workflow or Skaffold file the image reader reads by name, a package manifest, a kustomization
+/// or a file the Kubernetes reader takes an object from, a CloudFormation or SAM template or
+/// Serverless service, and one the alert reader takes a rule, a route or a receiver from. Terraform's own files are
+/// read whole by `read_with`. A Helm values file is none of them: the image reader takes its
+/// images from the file's bytes, not from its config values.
+pub(crate) fn kind_file(path: &str, src: &[u8], taken: impl Fn(&str) -> bool) -> bool {
+    taken(path)
+        || crate::iac::compose::is_file(path)
+        || (crate::image::named_config(path) && !helm_values(path))
+        || crate::package::is_manifest(path)
+        || crate::kube::takes(path, src)
+        || crate::iac::template_wanted(path, src)
+        || crate::alert::takes(path, src)
+}
+
 /// The hidden entries of the repository root read although hidden (ADR 0025): the CI
 /// directories, read whole, and the CI files.
 pub(crate) const HIDDEN_CI: [&str; 6] = [
@@ -61,6 +79,17 @@ pub(crate) const VALUE_MAX: usize = 1024;
 /// The documents one file may hold; a stream of more is unreadable.
 // ponytail: a manifest bundle holds tens of documents; past a thousand it is generated output.
 pub(crate) const DOCUMENTS_MAX: usize = 1000;
+
+/// The values a YAML or JSON file that only this reader takes may give, all its documents
+/// together, redacted ones counted (#817): past it the file is data and keeps none. A Terraform
+/// or OpenTofu file, and one a reader of a kind takes as its own (`kind_file`), keeps them all.
+// ponytail: the configuration a contract or a rule reads holds tens to hundreds of values; a
+// data dump (measurements, a generated schema snapshot) holds thousands.
+pub(crate) const VALUES_MAX: usize = 1000;
+
+/// The data files `meada status` names, in path order; it counts the rest.
+// ponytail: a repository holds a handful; past ten the count says it.
+const DATA_NAMED: usize = 10;
 
 /// The bytes the rows of one file may store (key paths and values), as a factor of its size,
 /// plus `STORED_SLACK`: a file of long keys nested deep, each repeated in the key path of every
@@ -90,6 +119,9 @@ pub(crate) enum Outcome {
     /// configuration with a regular expression Go refuses (`alert::refused`), whose values it
     /// still keeps.
     Unreadable { line: usize, reason: String },
+    /// Data: a YAML or JSON file that only this reader takes, past `VALUES_MAX` values, which
+    /// keeps none (#817).
+    Data,
 }
 
 /// One config value as stored.
@@ -576,18 +608,22 @@ fn is_secret(object: &Value) -> bool {
 
 /// The values of the file at `path` and what reading it came to. Every scalar but a null is a
 /// row; a value of a Kubernetes `Secret`'s `data` or `stringData` (at the root of a document,
-/// or an item of a `List`) keeps its key path, type and line only.
+/// or an item of a `List`) keeps its key path, type and line only. A YAML or JSON file past
+/// `VALUES_MAX` values is data, Terraform's aside.
 #[cfg(test)]
 pub(crate) fn read(path: &str, src: &[u8]) -> (Outcome, Vec<Row>) {
-    read_with(path, src, &BTreeSet::new())
+    read_with(path, src, &BTreeSet::new(), || false)
 }
 
 /// `read` for the file at `path` against `sensitive`, the Terraform variables marked sensitive
-/// that a `.tfvars` file's values are redacted for (`Sensitive::of`).
+/// that a `.tfvars` file's values are redacted for (`Sensitive::of`). A YAML or JSON file past
+/// `VALUES_MAX` values keeps them when `whole` says a reader of a kind takes it (`kind_file`),
+/// asked only then.
 pub(crate) fn read_with(
     path: &str,
     src: &[u8],
     sensitive: &BTreeSet<String>,
+    whole: impl FnOnce() -> bool,
 ) -> (Outcome, Vec<Row>) {
     let unreadable = |line, reason: String| (Outcome::Unreadable { line, reason }, Vec::new());
     if lockfile(path) {
@@ -728,6 +764,9 @@ pub(crate) fn read_with(
             },
         )
         .collect();
+    if rows.len() > VALUES_MAX && !is_terraform(path) && !is_tfvars(path) && !whole() {
+        return (Outcome::Data, Vec::new());
+    }
     // An Alertmanager configuration Go's `regexp` refuses is one Alertmanager cannot load; its
     // values stay searchable.
     if let Some(reason) = crate::alert::refused(path, &documents) {
@@ -1010,14 +1049,18 @@ fn successor(prefix: &str) -> Option<String> {
     None
 }
 
-/// The `meada status` line of the config files of `db`: how many were read and skipped (as
-/// lockfiles, as unreadable) and how many values they hold and redact; `None` with no file.
-pub(crate) fn status(db: &Connection) -> Result<Option<String>> {
-    let mut statement = db.prepare("SELECT summary FROM config_files")?;
-    let summaries = statement.query_map([], |r| r.get::<_, String>(0))?;
+/// The `meada status` lines of the config files of `db`: how many were read and skipped (as
+/// lockfiles, as unreadable, as data) and how many values they hold and redact, then the data
+/// files by path, the first `DATA_NAMED` named and the rest counted; none with no file.
+pub(crate) fn status(db: &Connection) -> Result<Vec<String>> {
+    let mut statement = db.prepare("SELECT path, summary FROM config_files ORDER BY path")?;
+    let files =
+        statement.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
     let (mut read, mut lockfiles, mut unreadable, mut values, mut redacted) = (0, 0, 0, 0, 0);
-    for summary in summaries {
-        match serde_json::from_str(&summary?)? {
+    let mut data = Vec::new();
+    for file in files {
+        let (path, summary) = file?;
+        match serde_json::from_str(&summary)? {
             Outcome::Read {
                 values: v,
                 redacted: r,
@@ -1029,18 +1072,31 @@ pub(crate) fn status(db: &Connection) -> Result<Option<String>> {
             }
             Outcome::Lockfile => lockfiles += 1,
             Outcome::Unreadable { .. } => unreadable += 1,
+            Outcome::Data => data.push(path),
         }
     }
-    Ok((read + lockfiles + unreadable > 0).then(|| {
+    if read + lockfiles + unreadable + data.len() == 0 {
+        return Ok(Vec::new());
+    }
+    let mut lines = vec![
         Msg::ConfigFiles {
             read,
             lockfiles,
             unreadable,
+            data: data.len(),
             values,
             redacted,
         }
-        .text()
-    }))
+        .text(),
+    ];
+    if !data.is_empty() {
+        let more = data.len().saturating_sub(DATA_NAMED);
+        data.truncate(DATA_NAMED);
+        let paths = data.join(", ");
+        let max = VALUES_MAX;
+        lines.push(Msg::DataFiles { paths, more, max }.text());
+    }
+    Ok(lines)
 }
 
 #[cfg(test)]
@@ -1403,6 +1459,208 @@ mod tests {
         ));
     }
 
+    /// `n` scalars as one YAML document: `k0: 0`, `k1: 1`, and on.
+    fn yaml_of(n: usize) -> String {
+        (0..n).map(|i| format!("k{i}: {i}\n")).collect()
+    }
+
+    /// `n` scalars as one JSON object, a key a line.
+    fn json_of(n: usize) -> String {
+        let keys: Vec<String> = (0..n).map(|i| format!("  \"k{i}\": {i}")).collect();
+        format!("{{\n{}\n}}\n", keys.join(",\n"))
+    }
+
+    /// A YAML or JSON file of `VALUES_MAX` values is read whole; one more and it is data (#817),
+    /// which keeps no row, not even its first thousand.
+    #[test]
+    fn a_generic_file_past_the_values_ceiling_is_data_and_keeps_no_row() {
+        for (path, text) in [
+            ("measure.json", json_of as fn(usize) -> String),
+            ("measure.yaml", yaml_of),
+        ] {
+            let (outcome, rows) = read(path, text(VALUES_MAX).as_bytes());
+            let whole = Outcome::Read {
+                values: VALUES_MAX,
+                redacted: 0,
+                sensitive: vec![],
+            };
+            assert_eq!((outcome, rows.len()), (whole, VALUES_MAX), "{path}");
+            let past = text(VALUES_MAX + 1);
+            assert_eq!(
+                read(path, past.as_bytes()),
+                (Outcome::Data, vec![]),
+                "{path}"
+            );
+        }
+    }
+
+    /// The documents of a stream count together against `VALUES_MAX`, and so do the values a
+    /// format redacts.
+    #[test]
+    fn the_documents_of_a_stream_and_redacted_values_count_against_the_values_ceiling() {
+        let half = VALUES_MAX / 2;
+        let stream = |second: usize| format!("{}---\n{}", yaml_of(half), yaml_of(second));
+        let (outcome, rows) = read("stream.yaml", stream(half).as_bytes());
+        assert!(matches!(outcome, Outcome::Read { values, .. } if values == VALUES_MAX));
+        assert_eq!(rows.len(), VALUES_MAX);
+        let past = stream(half + 1);
+        assert_eq!(
+            read("stream.yaml", past.as_bytes()),
+            (Outcome::Data, vec![])
+        );
+        // Three values name the Secret; the rest of its data is redacted.
+        let secret = |n: usize| {
+            let data: String = (0..n).map(|i| format!("  k{i}: djA=\n")).collect();
+            format!("apiVersion: v1\nkind: Secret\nmetadata:\n  name: s\ndata:\n{data}")
+        };
+        let (outcome, _) = read("secret.yaml", secret(VALUES_MAX - 3).as_bytes());
+        let redacted = VALUES_MAX - 3;
+        assert!(
+            matches!(outcome, Outcome::Read { values, redacted: r, .. } if values == VALUES_MAX && r == redacted)
+        );
+        let past = secret(VALUES_MAX - 2);
+        assert_eq!(
+            read("secret.yaml", past.as_bytes()),
+            (Outcome::Data, vec![])
+        );
+    }
+
+    /// Terraform's JSON files and var files keep every value past the ceiling: a kind of its
+    /// own, whatever `whole` says (#817).
+    #[test]
+    fn terraform_json_and_its_var_files_keep_every_value_past_the_ceiling() {
+        let locals = format!("{{\"locals\": {}}}", json_of(VALUES_MAX + 1));
+        for (path, text) in [
+            ("main.tf.json", locals.as_str()),
+            ("main.tofu.json", locals.as_str()),
+            ("prod.tfvars.json", &json_of(VALUES_MAX + 1)),
+            ("terraform.tfvars.json", &json_of(VALUES_MAX + 1)),
+        ] {
+            let (outcome, rows) = read(path, text.as_bytes());
+            assert!(
+                matches!(outcome, Outcome::Read { .. }),
+                "{path}: {outcome:?}"
+            );
+            assert_eq!(rows.len(), VALUES_MAX + 1, "{path}");
+        }
+    }
+
+    /// A file past the ceiling keeps its values when `whole` says a reader of a kind takes it,
+    /// and `whole` is asked only past the ceiling.
+    #[test]
+    fn whole_is_asked_only_past_the_ceiling_and_keeps_the_values() {
+        let (outcome, rows) = read_with(
+            "big.yaml",
+            yaml_of(VALUES_MAX + 1).as_bytes(),
+            &BTreeSet::new(),
+            || true,
+        );
+        assert!(matches!(outcome, Outcome::Read { values, .. } if values == VALUES_MAX + 1));
+        assert_eq!(rows.len(), VALUES_MAX + 1);
+        let asked = std::cell::Cell::new(false);
+        read_with(
+            "small.yaml",
+            yaml_of(VALUES_MAX).as_bytes(),
+            &BTreeSet::new(),
+            || asked.replace(true),
+        );
+        assert!(!asked.get());
+    }
+
+    /// The files a reader of a kind takes as its own (#817); a Helm values file is none, and
+    /// neither is a file that only looks like one by a word in it.
+    #[test]
+    fn kind_file_names_the_files_a_reader_of_a_kind_takes() {
+        let none = |_: &str| false;
+        for (path, src) in [
+            ("docker-compose.yml", "services: {}\n"),
+            (".github/workflows/ci.yml", "on: push\n"),
+            ("skaffold.yaml", "build: {}\n"),
+            ("package.json", "{}"),
+            ("web/tsconfig.json", "{}"),
+            ("deploy/kustomization.yaml", "resources: []\n"),
+            (
+                "k8s/web.yaml",
+                "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n",
+            ),
+            (
+                "stack/template.yaml",
+                "AWSTemplateFormatVersion: '2010-09-09'\nResources: {}\n",
+            ),
+            ("serverless.yml", "service: api\nprovider:\n  name: aws\n"),
+            (
+                "rules/alerts.yaml",
+                "groups:\n- name: g\n  rules:\n  - alert: Down\n    expr: up == 0\n",
+            ),
+        ] {
+            assert!(kind_file(path, src.as_bytes(), none), "{path}");
+        }
+        assert!(kind_file("spec/api.yaml", b"a: 1\n", |p| p == "spec/api.yaml"));
+        for (path, src) in [
+            ("measure.json", "{\"runs\": []}"),
+            ("chart/values.yaml", "image: app\n"),
+            ("chart/values-prod.yaml", "image: app\n"),
+            ("docs/runs.yaml", "groups: []\n"),
+            ("conf/settings.yaml", "service: api\n"),
+            (
+                "schema/deployment.json",
+                "{\"properties\": {\"apiVersion\": {\"type\": \"string\"}}}",
+            ),
+        ] {
+            assert!(!kind_file(path, src.as_bytes(), none), "{path}");
+        }
+    }
+
+    /// `meada status` counts the data files apart and names them in path order, up to
+    /// `DATA_NAMED`, counting the rest; the value total leaves them out.
+    #[test]
+    fn status_counts_and_names_the_data_files_up_to_a_bound() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE config_files (path TEXT PRIMARY KEY, summary TEXT NOT NULL);",
+        )
+        .unwrap();
+        let read = serde_json::to_string(&Outcome::Read {
+            values: 3,
+            redacted: 1,
+            sensitive: vec![],
+        })
+        .unwrap();
+        let data = serde_json::to_string(&Outcome::Data).unwrap();
+        db.execute("INSERT INTO config_files VALUES ('app.yaml', ?1)", [&read])
+            .unwrap();
+        assert_eq!(
+            status(&db).unwrap(),
+            [
+                "config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 3, redacted: 1"
+            ]
+        );
+        for n in (0..=DATA_NAMED).rev() {
+            db.execute(
+                "INSERT INTO config_files VALUES (?1, ?2)",
+                [format!("runs/{n:02}.json"), data.clone()],
+            )
+            .unwrap();
+        }
+        let named: Vec<String> = (0..DATA_NAMED)
+            .map(|n| format!("runs/{n:02}.json"))
+            .collect();
+        assert_eq!(
+            status(&db).unwrap(),
+            [
+                format!(
+                    "config files: 1 read, {} skipped (lockfiles: 0, unreadable: 0, data: {}); values: 3, redacted: 1",
+                    DATA_NAMED + 1,
+                    DATA_NAMED + 1
+                ),
+                format!(
+                    "data files (more than {VALUES_MAX} values each, none kept): {}, and 1 more",
+                    named.join(", ")
+                ),
+            ]
+        );
+    }
+
     /// Long keys nested deep, each repeated in the key path of every scalar below them, would
     /// store many times the file: the file stops at its stored budget.
     #[test]
@@ -1446,7 +1704,9 @@ mod tests {
             team[format!("svc{n}")] = Value::String(value);
         }
         let text = serde_json::to_string(&Value::Object(teams)).unwrap();
-        let (outcome, rows) = read("big.json", text.as_bytes());
+        // Read whole, as a file a reader of a kind takes: past `VALUES_MAX` a generic one is
+        // data (#817).
+        let (outcome, rows) = read_with("big.json", text.as_bytes(), &BTreeSet::new(), || true);
         assert!(
             matches!(outcome, Outcome::Read { values: 1500, .. }),
             "{outcome:?}"

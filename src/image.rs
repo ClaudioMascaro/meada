@@ -16,6 +16,12 @@ mod patterns;
 
 pub struct Image;
 
+/// Whether the image reader takes the file at `path` by its name alone: a GitHub workflow, a
+/// Compose or Skaffold file, a Maven or Gradle build, a Helm values file.
+pub(crate) fn named_config(path: &str) -> bool {
+    config::legacy_file(path)
+}
+
 /// Effective image links for execution, without replacing the raw links used to validate
 /// decisions and list open items. Every consumer of workload scope shares this projection.
 pub(crate) fn execution_links(exports: &[Export], repositories: &[Repository]) -> Vec<Link> {

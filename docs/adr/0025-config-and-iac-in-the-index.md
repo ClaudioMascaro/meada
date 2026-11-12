@@ -27,6 +27,14 @@ model, and the same inputs give the same answers.
 - **Skipped.** Lockfiles, by a fixed list of names (`package-lock.json`,
   `npm-shrinkwrap.json`, `pnpm-lock.yaml` and `packages.lock.json`, the lockfiles a YAML or JSON
   extension reaches), and files that do not parse are skipped and counted in `meada status`.
+  A YAML or JSON file that only this reader takes is data past a named ceiling of values
+  (`VALUES_MAX`, 1,000, all its documents together, redacted values counted; #817,
+  2026-11-12): it keeps none, and `meada status` counts it apart and names it. Terraform and
+  OpenTofu files in every form, and a file a reader of a kind takes as its own (a document, a
+  config file a language pack reads, Compose, a GitHub workflow or Skaffold file, a package
+  manifest, a Kubernetes object, a CloudFormation or SAM template, a Serverless service, an
+  alert rule, route or receiver), keep every value, since the config use rule reads their rows.
+  A Helm chart's values file is a generic file here: past the ceiling it keeps none.
 - **Reader.** One event reader for YAML and JSON yields each scalar with its line and reads
   every document of a stream. Alias expansion keeps today's budget (a node built is charged to a
   budget proportional to the source). The documents per file are a named ceiling. The Spring and
