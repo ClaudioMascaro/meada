@@ -138,14 +138,22 @@ pub enum Msg<'a> {
     },
     /// The missing reads of the repository's consumers against the routes they call (spec #23).
     Drift(usize),
-    /// The config files of a repository (#639): read, skipped as lockfiles or as unreadable,
-    /// and the values they hold and redact.
+    /// The config files of a repository (#639): read, skipped as lockfiles, as unreadable or
+    /// as data (#817, named only when there is one), and the values they hold and redact.
     ConfigFiles {
         read: usize,
         lockfiles: usize,
         unreadable: usize,
+        data: usize,
         values: usize,
         redacted: usize,
+    },
+    /// The data files of a repository (#817), each past `max` config values and keeping none:
+    /// the first paths, joined, and how many more there are.
+    DataFiles {
+        paths: String,
+        more: usize,
+        max: usize,
     },
     /// The Kustomize entries of a repository that were not followed (#651): in all, and the
     /// remote ones among them.
@@ -1855,24 +1863,54 @@ impl Msg<'_> {
                 read,
                 lockfiles,
                 unreadable,
+                data,
                 values,
                 redacted,
             } => {
-                let skipped = lockfiles + unreadable;
+                let skipped = lockfiles + unreadable + data;
+                let (en, pt, es) = match data {
+                    0 => Default::default(),
+                    n => (
+                        format!(", data: {n}"),
+                        format!(", dados: {n}"),
+                        format!(", datos: {n}"),
+                    ),
+                };
                 pick(
                     format!(
                         "config files: {read} read, {skipped} skipped (lockfiles: {lockfiles}, \
-                         unreadable: {unreadable}); values: {values}, redacted: {redacted}"
+                         unreadable: {unreadable}{en}); values: {values}, redacted: {redacted}"
                     ),
                     format!(
                         "arquivos de configuração: {read} lidos, {skipped} ignorados \
-                         (lockfiles: {lockfiles}, ilegíveis: {unreadable}); valores: {values}, \
-                         ocultados: {redacted}"
+                         (lockfiles: {lockfiles}, ilegíveis: {unreadable}{pt}); valores: \
+                         {values}, ocultados: {redacted}"
                     ),
                     format!(
                         "archivos de configuración: {read} leídos, {skipped} omitidos \
-                         (lockfiles: {lockfiles}, ilegibles: {unreadable}); valores: {values}, \
-                         ocultados: {redacted}"
+                         (lockfiles: {lockfiles}, ilegibles: {unreadable}{es}); valores: \
+                         {values}, ocultados: {redacted}"
+                    ),
+                )
+            }
+            Msg::DataFiles { paths, more, max } => {
+                let (en, pt, es) = match more {
+                    0 => Default::default(),
+                    n => (
+                        format!(", and {n} more"),
+                        format!(" e mais {n}"),
+                        format!(" y {n} más"),
+                    ),
+                };
+                pick(
+                    format!("data files (more than {max} values each, none kept): {paths}{en}"),
+                    format!(
+                        "arquivos de dados (mais de {max} valores cada, nenhum guardado): \
+                         {paths}{pt}"
+                    ),
+                    format!(
+                        "archivos de datos (más de {max} valores cada uno, ninguno guardado): \
+                         {paths}{es}"
                     ),
                 )
             }

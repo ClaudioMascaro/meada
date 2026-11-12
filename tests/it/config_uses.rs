@@ -179,13 +179,19 @@ fn config_use_classification_stays_bounded_on_a_full_file() {
         time::{Duration, Instant},
     };
     let (infra, app) = workspace("config_use_hostile");
-    let mut input = String::new();
+    // A Terraform var file keeps its values past `VALUES_MAX` (#817), so the whole file is still
+    // classified; a generic YAML file of this size is data and gives no use at all.
+    let mut input = String::from("{\n");
     let mut count = 0;
     while input.len() < (1 << 20) - 2048 {
-        input += &format!("v{count}: arn:aws:sqs:eu-west-1:123456789012:orders\n");
+        if count > 0 {
+            input += ",\n";
+        }
+        input += &format!("\"v{count}\": \"arn:aws:sqs:eu-west-1:123456789012:orders\"");
         count += 1;
     }
-    fs::write(app.join("wide.yaml"), input).unwrap();
+    input += "\n}\n";
+    fs::write(app.join("wide.tfvars.json"), input).unwrap();
     let start = Instant::now();
     let text = Engine::open(&infra).unwrap().export().unwrap();
     let elapsed = start.elapsed();

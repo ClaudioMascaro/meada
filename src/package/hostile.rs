@@ -105,9 +105,12 @@ fn stream(syntax: Syntax, text: String) -> usize {
     handed + documents.map_or(0, |d| d.len())
 }
 
-/// The bytes of the key paths and values config values store for `text` at `path`.
+/// The bytes of the key paths and values config values store for `text` at `path`, read whole
+/// as a file a reader of a kind takes (`config_values::kind_file`): past `VALUES_MAX` a generic
+/// file stores none (#817).
 fn stored(path: &str, text: String) -> usize {
-    let (_, rows) = config_values::read(path, &file(text));
+    let (outcome, rows) = config_values::read_with(path, &file(text), &Default::default(), || true);
+    assert_ne!(outcome, config_values::Outcome::Data, "{path}");
     (rows.iter())
         .map(|r| r.key.len() + r.value.as_ref().map_or(0, String::len))
         .sum()

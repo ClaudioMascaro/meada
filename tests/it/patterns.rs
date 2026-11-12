@@ -810,15 +810,21 @@ fn many_config_key_sources_keep_indexed_locations_in_bounded_time() {
     let (infra, app) = workspace("pattern_config_source_growth");
     fs::write(infra.join("main.tf"), "resource \"aws_s3_bucket\" \"east\" { bucket = \"receipts-east\" }\nresource \"aws_s3_bucket\" \"west\" { bucket = \"receipts-west\" }\n").unwrap();
     fs::remove_file(app.join("app.ts")).unwrap();
-    fs::write(app.join("meada.toml"), "[[peer]]\nrepo = \"example.com/pattern/infra\"\n[[resource]]\nkind = \"s3\"\nid = \"receipts-*\"\nrole = \"read\"\nvia = [\"settings.json#entries[enabled=true].bucket\"]\n").unwrap();
-    let entries: Vec<_> = (0..10000)
+    // 10,000 sources in 20 files of 500 entries: each file holds 1,000 values, the most a
+    // generic config file keeps (#817).
+    let (files, per_file) = (20, 500);
+    let path = |f: usize| format!("settings-{f:02}.json");
+    let via: Vec<String> = (0..files)
+        .map(|f| format!("\"{}#entries[enabled=true].bucket\"", path(f)))
+        .collect();
+    fs::write(app.join("meada.toml"), format!("[[peer]]\nrepo = \"example.com/pattern/infra\"\n[[resource]]\nkind = \"s3\"\nid = \"receipts-*\"\nrole = \"read\"\nvia = [{}]\n", via.join(", "))).unwrap();
+    let entries: Vec<_> = (0..per_file)
         .map(|_| serde_json::json!({"enabled": true, "bucket": "receipts-*"}))
         .collect();
-    fs::write(
-        app.join("settings.json"),
-        serde_json::to_string(&serde_json::json!({"entries": entries})).unwrap(),
-    )
-    .unwrap();
+    let settings = serde_json::to_string(&serde_json::json!({"entries": entries})).unwrap();
+    for f in 0..files {
+        fs::write(app.join(path(f)), &settings).unwrap();
+    }
     let engine = Engine::open(&app).unwrap();
     let start = std::time::Instant::now();
     let items = engine.open_items().unwrap();
@@ -826,9 +832,10 @@ fn many_config_key_sources_keep_indexed_locations_in_bounded_time() {
     eprintln!("10000 config-key sources: {elapsed:?}");
     assert!(elapsed < std::time::Duration::from_secs(30), "{elapsed:?}");
     assert_eq!(items.len(), 10000);
-    let expected: std::collections::BTreeMap<_, _> = (0..10000)
-        .map(|n| {
-            let key = format!("settings.json#entries[{n}].bucket");
+    let expected: std::collections::BTreeMap<_, _> = (0..files)
+        .flat_map(|f| (0..per_file).map(move |n| (f, n)))
+        .map(|(f, n)| {
+            let key = format!("{}#entries[{n}].bucket", path(f));
             (
                 format!("provision-use::example.com/pattern/app::{key}::resource::s3::receipts-*"),
                 format!("resource::s3::receipts-* at {key}"),
@@ -847,7 +854,7 @@ fn many_config_key_sources_keep_indexed_locations_in_bounded_time() {
     );
     assert!(items.iter().all(|i| {
         i.repository == "example.com/pattern/app"
-            && i.path == "settings.json"
+            && i.id.contains(&format!("::{}#", i.path))
             && i.line == Some(1)
             && expected.get(&i.id) == Some(&i.expression)
     }));

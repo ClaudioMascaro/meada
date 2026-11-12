@@ -55,6 +55,14 @@ mark; one a format marks secret is stored as `redacted`. `search` finds it with 
 never enters the export.
 _Avoid_: setting, config entry, property
 
+**Data file**:
+A YAML or JSON file that only the config value reader takes and that holds more than 1,000
+config values, all its documents together (#817, ADR 0025). It keeps none: no `value` hit, no
+declared site, no config use. `meada status` counts it apart from the unreadable files and
+lockfiles and names it. A Terraform or OpenTofu file, or one a reader of a kind takes as its own
+(a template, a Kubernetes object, a document), is never one.
+_Avoid_: large config file, dump
+
 **Key path**:
 Where a config value sits in its file, jq style: keys joined by dots, list items `[n]` from 0, a
 key that is not a plain identifier written `["..."]`, and a document index first in a file of

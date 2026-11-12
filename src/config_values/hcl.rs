@@ -857,7 +857,7 @@ mod tests {
         let text = "region = \"eu-west-1\"\ndb_password = \"hunter2\"\nlimits = { max = 5 }\ntags = [\"x\"]\n";
         let sensitive: BTreeSet<String> = ["db_password", "limits"].map(String::from).into();
         for path in ["terraform.tfvars", "prod.auto.tfvars", "envs/prd.tfvars"] {
-            let (outcome, found) = read_with(path, text.as_bytes(), &sensitive);
+            let (outcome, found) = read_with(path, text.as_bytes(), &sensitive, || false);
             let hidden: Vec<_> = found
                 .iter()
                 .filter(|r| r.value.is_none())
@@ -871,7 +871,7 @@ mod tests {
             assert!(!format!("{found:?}").contains("hunter2"));
         }
         // A `.tf` file's top-level attribute of the same name is not a tfvars value.
-        let (_, found) = read_with("main.tf", b"db_password = \"x\"\n", &sensitive);
+        let (_, found) = read_with("main.tf", b"db_password = \"x\"\n", &sensitive, || false);
         assert!(found[0].value.is_some());
     }
 
@@ -889,7 +889,7 @@ mod tests {
             r#"{"variable": {"db": {"default": "hunter2"}, "region": {"default": "eu-west-1"}}}"#;
         let hidden = |path: &str, text: &str, names: &[&str]| {
             let names: BTreeSet<String> = names.iter().map(|n| n.to_string()).collect();
-            let (outcome, found) = read_with(path, text.as_bytes(), &names);
+            let (outcome, found) = read_with(path, text.as_bytes(), &names, || false);
             let Outcome::Read { sensitive, .. } = outcome else {
                 panic!("{outcome:?}");
             };
@@ -950,6 +950,7 @@ mod tests {
             "prod.tfvars.json",
             br#"{"token": "abc", "region": "eu"}"#,
             &sensitive,
+            || false,
         );
         assert_eq!(
             (found[0].key.as_str(), found[0].value.as_deref()),
@@ -957,7 +958,7 @@ mod tests {
         );
         assert_eq!(found[1].value.as_deref(), Some("eu"));
         // The same name in an ordinary JSON file is no secret.
-        let (_, found) = read_with("prod.json", br#"{"token": "abc"}"#, &sensitive);
+        let (_, found) = read_with("prod.json", br#"{"token": "abc"}"#, &sensitive, || false);
         assert_eq!(found[0].value.as_deref(), Some("abc"));
     }
 
@@ -970,7 +971,7 @@ mod tests {
  {"variable": {"name": {"default": "${x}"}, "db": {"default": "hunter2"}}},
  {"resource": {"aws_ssm_parameter": {"p": {"type": "SecureString", "value": "ssm-secret"}}}}]"#;
         let sensitive: BTreeSet<String> = ["db".to_string()].into();
-        let (_, found) = read_with("main.tf.json", text.as_bytes(), &sensitive);
+        let (_, found) = read_with("main.tf.json", text.as_bytes(), &sensitive, || false);
         let by = |key: &str| found.iter().find(|r| r.key == key).unwrap();
         assert_eq!(by("[0].variable.token.default").value, None);
         assert_eq!(by("[1].variable.db.default").value, None);
@@ -985,7 +986,7 @@ mod tests {
     #[test]
     fn a_tfvars_file_read_against_any_variable_redacts_every_value() {
         let sensitive: BTreeSet<String> = [crate::config_values::ANY_VARIABLE.to_string()].into();
-        let (outcome, found) = read_with("a.tfvars", b"a = \"x\"\nb = [1]\n", &sensitive);
+        let (outcome, found) = read_with("a.tfvars", b"a = \"x\"\nb = [1]\n", &sensitive, || false);
         assert!(found.iter().all(|r| r.value.is_none()));
         assert!(
             matches!(outcome, Outcome::Read { redacted: 2, .. }),

@@ -17,6 +17,13 @@ All notable changes to Meada are recorded here. The format follows
 - A `terraform-aws-modules/s3-bucket/aws` call with `putin_khuylo = false`, or with a value
   Meada cannot resolve, provisions no bucket: upstream creates it only with
   `create_bucket && putin_khuylo`, and the Lambda module's call is read the same way (#787).
+- A YAML or JSON file that only the config value reader takes keeps no config value once it
+  holds more than 1,000, all its documents together: it is a data file (a measurement dump, a
+  generated snapshot), `meada status` counts and names it apart, and a `value` search no longer
+  finds its values. Terraform and OpenTofu files, and a file a reader of a kind takes (a
+  template, a Kubernetes object, a document, an alert rule, a workflow, a package manifest),
+  keep every value. An existing index is rebuilt on its first open by this version, which drops
+  the values those files held (#817).
 - A call of `meada mcp` that waited longer than the busy timeout (10 s) behind another call's
   refresh no longer fails with `database is locked` when another process writes the index as
   that refresh ends: the time spent behind a refresh of the same process no longer counts toward

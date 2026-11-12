@@ -40,14 +40,22 @@ pub(super) fn is_file(path: &str) -> bool {
 
 fn legacy_file(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
+    named_file(path)
+        || (crate::config_values::helm_values(name)
+            && (name.ends_with(".yaml") || name.ends_with(".yml")))
+}
+
+/// Whether the file at `path` is, by its name alone, a GitHub workflow, a Compose or Skaffold
+/// file, or a Maven or Gradle build: the image reader reads each whole. A Helm values file it
+/// reads too (`legacy_file`), for its `image` key alone.
+pub(crate) fn named_file(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
     (path.starts_with(".github/workflows/") && (path.ends_with(".yml") || path.ends_with(".yaml")))
         || crate::iac::compose::is_file(path)
         || matches!(
             name,
             "skaffold.yaml" | "skaffold.yml" | "pom.xml" | "build.gradle" | "build.gradle.kts"
         )
-        || (crate::config_values::helm_values(name)
-            && (name.ends_with(".yaml") || name.ends_with(".yml")))
 }
 
 fn builder(out: &mut Summary, image: &str, at: &str, inferred: bool) {

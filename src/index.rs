@@ -108,14 +108,17 @@ pub(crate) fn schema_version() -> i32 {
 /// `config_files` holds each config file (#639, ADR 0025: a YAML or JSON file the walk visits,
 /// or one under the hidden CI paths) stamped like `documents`, its `summary` being
 /// `config_values::Outcome` as JSON (read, with its count of values and of those redacted; a
-/// lockfile; or unreadable, with the line and the reason); `config_values` holds each of its
-/// scalars but nulls: the `key` path, the `value` (cut at `config_values::VALUE_MAX`, `cut` 1,
+/// lockfile; unreadable, with the line and the reason; or data, past `config_values::VALUES_MAX`);
+/// `config_values` holds each of its scalars but nulls: the `key` path, the `value` (cut at `config_values::VALUE_MAX`, `cut` 1,
 /// or NULL when a format marks it secret), its `type` (`string`, `number`, `boolean`), its
 /// `line`, and the key path and value lowercased (`folded_key`, `folded_value`, each with a
 /// B-tree for exact and prefix search), rewritten with the file. `config_search` is an FTS5
 /// trigram index over both folded columns (#647, no text of its own: it reads `config_values` by
 /// `id`), which serves substring search for a query of three characters or more. None of the
-/// three reaches the export. `iac_nodes` holds each IaC node (#649, `iac::Node`: its address, the
+/// three reaches the export. `taken` lists the documents and the config files a pack reads or
+/// includes as of the last refresh: those keep every value past `config_values::VALUES_MAX`
+/// (#817), so a config file one starts or stops taking is read again.
+/// `iac_nodes` holds each IaC node (#649, `iac::Node`: its address, the
 /// label of its root module, its type, physical name as static evaluation resolves it (#650),
 /// whether that is a `pattern`, the `overridable` values it went through as JSON, file, first and
 /// last line, the key path of its block and, for a Compose service (#652), its image and build
@@ -178,6 +181,7 @@ CREATE TABLE config_files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
+CREATE TABLE taken (path TEXT PRIMARY KEY);
 CREATE TABLE contract_configs (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT ''
@@ -898,7 +902,7 @@ fn refresh_attempt(
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
                  DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities; \
-                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM contract_configs; DELETE FROM config_values; \
+                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM taken; DELETE FROM contract_configs; DELETE FROM config_values; \
                  INSERT INTO config_search (config_search) VALUES ('delete-all'); \
                  DELETE FROM iac_nodes; DELETE FROM iac_references; DELETE FROM iac_images; \
                  DELETE FROM iac_unresolved;",
@@ -916,10 +920,11 @@ fn refresh_attempt(
     let stored = stored_files(&tx)?;
 
     let all = walk(root);
+    let documents = documents_found(root, &all, &serve);
     refresh_stamped(
         &tx,
         "documents",
-        &documents_found(root, &all, &serve),
+        &documents,
         now,
         |_| Ok(false),
         |abs| read_up_to(abs, document::DOCUMENT_BYTES_MAX),
@@ -943,6 +948,26 @@ fn refresh_attempt(
     let hidden = hidden_ci(root);
     let (configs, shadowed) = configs_found(&all, &hidden);
     let sensitive = config_values::Sensitive::new(&tx, &configs, &shadowed);
+    let Packs {
+        walked,
+        packs,
+        configs: pack_files,
+        symlinks,
+        digest,
+        settings,
+    } = packs_of(root, &all);
+    // A document, and a config file a pack reads or includes, keeps every config value past the
+    // ceiling, as the other kinds' files do (#817).
+    let taken: BTreeSet<&str> = (documents.iter().map(|(path, _)| path.as_str()))
+        .chain(pack_files.values().flatten().map(|(path, _)| path.as_str()))
+        .collect();
+    let kind_file =
+        |path: &str, src: &[u8]| config_values::kind_file(path, src, |p| taken.contains(p));
+    // A config file a document listing or a pack starts or stops taking is read again: past the
+    // ceiling, being taken decides whether it keeps its values, as in a new index.
+    let before: BTreeSet<String> = (tx.prepare("SELECT path FROM taken")?)
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
     // The Terraform files and var files read again: the units holding them are evaluated again.
     let terraform = std::cell::RefCell::new(BTreeSet::new());
     // Whether a Kubernetes file changed, appeared or left: its objects are evaluated again.
@@ -952,7 +977,7 @@ fn refresh_attempt(
         "config_files",
         &configs,
         now,
-        |path| sensitive.stale(path),
+        |path| Ok(sensitive.stale(path)? || before.contains(path) != taken.contains(path)),
         |abs| read_up_to(abs, lang::MAX_BYTES),
         |path, src| {
             if iac::is_input(path) {
@@ -967,7 +992,8 @@ fn refresh_attempt(
             if iac::template_changed(&tx, path, Some(src))? {
                 iac::refresh_template(&tx, path, Some(src))?;
             }
-            let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?);
+            let whole = || kind_file(path, src);
+            let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?, whole);
             config_values::store(&tx, path, &rows)?;
             Ok(serde_json::to_string(&outcome)?)
         },
@@ -979,6 +1005,12 @@ fn refresh_attempt(
             iac::refresh_template(&tx, path, None)?;
         }
         config_values::forget(&tx, path)?;
+    }
+    if !before.iter().map(String::as_str).eq(taken.iter().copied()) {
+        tx.execute("DELETE FROM taken", [])?;
+        for path in &taken {
+            tx.execute("INSERT INTO taken VALUES (?1)", [path])?;
+        }
     }
     // A Terraform file of a directory holding an override file is read above with every default
     // redacted: now that every file is stored, one read against other sensitive variables than
@@ -992,7 +1024,8 @@ fn refresh_attempt(
         let Ok(src) = read_up_to(abs, lang::MAX_BYTES) else {
             continue;
         };
-        let (outcome, rows) = config_values::read_with(path, &src, &names);
+        let (outcome, rows) =
+            config_values::read_with(path, &src, &names, || kind_file(path, &src));
         config_values::store(&tx, path, &rows)?;
         tx.execute(
             "UPDATE config_files SET summary = ?2 WHERE path = ?1",
@@ -1089,14 +1122,6 @@ fn refresh_attempt(
     }
     // The packages decide which files keep the shapes of what they export (issue #175).
     let manifest_rows = manifest_rows(&tx)?;
-    let Packs {
-        walked,
-        packs,
-        configs,
-        symlinks,
-        digest,
-        settings,
-    } = packs_of(root, &all);
     let mut changed = Vec::new();
     for &(path, abs, pack) in &walked {
         let setting = settings[&pack](path);
@@ -1200,7 +1225,7 @@ fn refresh_attempt(
         .chain(kept.iter().map(|(p, f)| (p.clone(), f.setting.clone())))
         .collect();
     let found_configs = |pack: usize| -> Vec<(&str, &[u8])> {
-        (configs.get(&pack).into_iter().flatten())
+        (pack_files.get(&pack).into_iter().flatten())
             .map(|(n, c)| (n.as_str(), c.as_slice()))
             .collect()
     };
@@ -1360,7 +1385,7 @@ fn refresh_attempt(
     }
     // A pack's config input may be another pack's config file: each path once.
     let mut seen = HashSet::new();
-    let pack_configs: Vec<(&str, &[u8])> = (configs.values().flatten())
+    let pack_configs: Vec<(&str, &[u8])> = (pack_files.values().flatten())
         .filter(|(path, _)| seen.insert(path.as_str()))
         .map(|(path, src)| (path.as_str(), src.as_slice()))
         .collect();
@@ -4713,6 +4738,12 @@ mod tests {
         let outcome = serde_json::to_string_pretty(&outcome).unwrap();
         actual += &format!("\nsample.values.yaml\n{outcome}\n");
         actual.extend(rows.iter().map(|row| format!("{row:?}\n")));
+        // A generic file past the values ceiling is data, and stores no value (#817).
+        let (outcome, rows) =
+            config_values::read("sample.data.yaml", past_the_ceiling("").as_bytes());
+        let outcome = serde_json::to_string_pretty(&outcome).unwrap();
+        actual += &format!("\nsample.data.yaml, one value past the ceiling\n{outcome}\n");
+        actual.extend(rows.iter().map(|row| format!("{row:?}\n")));
 
         // The IaC nodes, references, images and unresolved entries of a kustomization (#651).
         let files: Vec<(String, Vec<u8>)> = [
@@ -4975,6 +5006,324 @@ mod tests {
             index_now();
             assert!(is_fresh(), "{file} {content:?} indexed");
         }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `VALUES_MAX + 1` scalars, one a line at `indent`: `p0: 0`, `p1: 1`, and on.
+    fn past_the_ceiling(indent: &str) -> String {
+        (0..=config_values::VALUES_MAX)
+            .map(|i| format!("{indent}p{i}: {i}\n"))
+            .collect()
+    }
+
+    /// The rows and the stored outcome of the config file at `path`.
+    fn config_rows(db: &Connection, path: &str) -> (i64, config_values::Outcome) {
+        let rows = "SELECT count(*) FROM config_values WHERE path = ?1";
+        let rows = db.query_row(rows, [path], |r| r.get(0)).unwrap();
+        let summary = "SELECT summary FROM config_files WHERE path = ?1";
+        let summary: String = db.query_row(summary, [path], |r| r.get(0)).unwrap();
+        (rows, serde_json::from_str(&summary).unwrap())
+    }
+
+    /// A file a reader of a kind takes keeps every config value past the ceiling, and the
+    /// reader still takes from it what it did (#817); a generic file past it keeps none.
+    #[test]
+    fn a_file_of_a_kind_keeps_its_values_past_the_ceiling_and_a_generic_one_none() {
+        let (dir, index) = index_dir("kind_files_past_the_ceiling");
+        let root = checkout(&dir);
+        let pad = past_the_ceiling("  ");
+        let json_pad: Vec<String> = (0..=config_values::VALUES_MAX)
+            .map(|i| format!("\"p{i}\": {i}"))
+            .collect();
+        let json_pad = json_pad.join(", ");
+        let files = [
+            (
+                "infra/main.tf.json",
+                format!(
+                    "{{\"resource\": {{\"aws_s3_bucket\": {{\"b\": {{\"bucket\": \"acme\"}}}}}}, \
+                     \"locals\": {{{json_pad}}}}}"
+                ),
+            ),
+            ("infra/prod.tfvars.json", format!("{{{json_pad}}}")),
+            (
+                "docker-compose.yml",
+                format!("services:\n  web:\n    image: acme/web:1\nx-pad:\n{pad}"),
+            ),
+            (
+                "stack/template.yaml",
+                format!(
+                    "AWSTemplateFormatVersion: '2010-09-09'\nResources:\n  Queue:\n    \
+                     Type: AWS::SQS::Queue\nMetadata:\n{pad}"
+                ),
+            ),
+            (
+                "serverless.yml",
+                format!(
+                    "service: api\nprovider:\n  name: aws\nfunctions:\n  hello:\n    \
+                     handler: handler.hello\ncustom:\n{pad}"
+                ),
+            ),
+            (
+                "k8s/web.yaml",
+                format!(
+                    "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  \
+                     annotations:\n{}spec:\n  template:\n    spec:\n      containers:\n      \
+                     - name: web\n        image: acme/web:1\n",
+                    past_the_ceiling("    ")
+                ),
+            ),
+            (
+                "rules/alerts.yaml",
+                format!(
+                    "groups:\n- name: g\n  rules:\n  - alert: Down\n    expr: up == 0\nx-pad:\n{pad}"
+                ),
+            ),
+            (
+                ".github/workflows/ci.yml",
+                format!(
+                    "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n    \
+                     - uses: docker/build-push-action@v6\n      with:\n        tags: \
+                     acme/api:1\nenv:\n{pad}"
+                ),
+            ),
+            (
+                "skaffold.yaml",
+                format!(
+                    "apiVersion: skaffold/v4beta6\nkind: Config\nbuild:\n  artifacts:\n  - \
+                     image: acme/web\nx-pad:\n{pad}"
+                ),
+            ),
+            (
+                "openapi.yaml",
+                format!(
+                    "openapi: 3.0.0\ninfo:\n  title: api\n  version: '1'\npaths:\n  /orders:\n    \
+                     get:\n      responses:\n        '200':\n          description: ok\nx-pad:\n{pad}"
+                ),
+            ),
+            (
+                "package.json",
+                format!("{{\"name\": \"web\", \"version\": \"1.0.0\", \"x-pad\": {{{json_pad}}}}}"),
+            ),
+            (
+                "tsconfig.json",
+                format!("{{\"compilerOptions\": {{\"strict\": true}}, \"x-pad\": {{{json_pad}}}}}"),
+            ),
+            (
+                "app-config.yaml",
+                format!("app:\n  title: web\nx-pad:\n{pad}"),
+            ),
+            (
+                "asyncapi.yaml",
+                format!(
+                    "asyncapi: 2.6.0\ninfo:\n  title: events\n  version: '1'\nchannels:\n  \
+                     orders: {{}}\nx-pad:\n{pad}"
+                ),
+            ),
+            (
+                "alertmanager.yml",
+                format!("route:\n  receiver: team\nreceivers:\n- name: team\nx-pad:\n{pad}"),
+            ),
+            (
+                "k8s/prod/kustomization.yaml",
+                format!("resources:\n- ../web.yaml\nnamePrefix: prod-\nx-pad:\n{pad}"),
+            ),
+            (
+                "src/main/resources/application.yml",
+                format!("stock:\n  url: https://web.example.com\nx-pad:\n{pad}"),
+            ),
+            (
+                "appsettings.json",
+                format!(
+                    "{{\"Api\": {{\"Url\": \"https://config.example.com/v2\"}}, \
+                     \"x-pad\": {{{json_pad}}}}}"
+                ),
+            ),
+            ("data/measure.json", format!("{{{json_pad}}}")),
+            (
+                "chart/values.yaml",
+                format!("image: acme/web:1\nx-pad:\n{pad}"),
+            ),
+        ];
+        // The code that reads the Spring and .NET configuration files.
+        let code = [
+            (
+                "src/main/java/com/example/api/StockClient.java",
+                "package com.example.api;\nimport org.springframework.beans.factory.annotation.Value;\n\
+                 import org.springframework.web.reactive.function.client.WebClient;\n\
+                 public class StockClient {\n    private final WebClient web;\n    \
+                 public StockClient(@Value(\"${stock.url}\") String base) {\n        \
+                 this.web = WebClient.create(base);\n    }\n    \
+                 public void level() {\n        web.get().uri(\"/api/stock\").retrieve();\n    }\n}\n",
+            ),
+            (
+                "A/IApi.cs",
+                "using Refit;\nusing System.Threading.Tasks;\nnamespace A;\n\
+                 public interface IApi {\n[Get(\"/items/{id}\")] Task<string> Item(int id);\n}\n",
+            ),
+            (
+                "A/Make.cs",
+                "using Refit;\nusing Microsoft.Extensions.Configuration;\nnamespace A;\n\
+                 public class Make {\n\
+                 public IApi Api(IConfiguration config) => RestService.For<IApi>(config[\"Api:Url\"]);\n}\n",
+            ),
+        ];
+        let written = (files.iter()).map(|(path, text)| (*path, text.as_str()));
+        for (path, text) in written.chain(code) {
+            let path = root.join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        }
+        let serve = Serve {
+            declared: true,
+            ..Serve::default()
+        };
+        let db = open(&index, &root, REPO, &serve).unwrap();
+
+        let values = config_values::VALUES_MAX as i64 + 1;
+        for (path, _) in &files[..files.len() - 2] {
+            let (rows, outcome) = config_rows(&db, path);
+            assert!(rows >= values, "{path}: {rows} rows, {outcome:?}");
+            assert!(
+                matches!(outcome, config_values::Outcome::Read { values: v, .. } if v as i64 == rows),
+                "{path}: {outcome:?}"
+            );
+        }
+        for path in ["data/measure.json", "chart/values.yaml"] {
+            assert_eq!(
+                config_rows(&db, path),
+                (0, config_values::Outcome::Data),
+                "{path}"
+            );
+        }
+        // What each reader takes from its file.
+        let count =
+            |sql: &str, path: &str| -> i64 { db.query_row(sql, [path], |r| r.get(0)).unwrap() };
+        let nodes = "SELECT count(*) FROM iac_nodes WHERE path = ?1";
+        for path in [
+            "infra/main.tf.json",
+            "docker-compose.yml",
+            "stack/template.yaml",
+            "serverless.yml",
+            "k8s/web.yaml",
+        ] {
+            assert!(count(nodes, path) > 0, "{path}: no IaC node");
+        }
+        for path in ["openapi.yaml", "asyncapi.yaml"] {
+            assert_eq!(
+                count("SELECT count(*) FROM documents WHERE path = ?1", path),
+                1,
+                "{path}"
+            );
+        }
+        // The overlay's objects, renamed by its prefix.
+        let overlay = "SELECT count(*) FROM iac_nodes WHERE address LIKE ?1";
+        assert!(count(overlay, "%prod-web%") > 0, "no object of the overlay");
+        // The Spring and .NET clients take their bases from their configuration files.
+        let client = "SELECT count(*) FROM contracts WHERE contract = ?1 AND via LIKE ?2";
+        let clients = |contract: &str, via: &str| -> i64 {
+            db.query_row(client, [contract, via], |r| r.get(0)).unwrap()
+        };
+        assert_eq!(clients("http::GET::/api/stock", "host:web.example.com"), 1);
+        assert!(clients("http::GET::/v2/items/{}", "%host:config.example.com%") > 0);
+        for path in ["package.json", "tsconfig.json"] {
+            assert_eq!(
+                count("SELECT count(*) FROM manifests WHERE path = ?1", path),
+                1,
+                "{path}"
+            );
+        }
+        let summary = |path: &str| -> String {
+            let sql = "SELECT summary FROM contract_configs WHERE path = ?1";
+            db.query_row(sql, [path], |r| r.get(0)).unwrap()
+        };
+        assert!(summary("rules/alerts.yaml").contains("Down"));
+        assert!(summary("alertmanager.yml").contains("team"));
+        assert!(summary(".github/workflows/ci.yml").contains("acme/api"));
+        assert!(summary("skaffold.yaml").contains("acme/web"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A data file that a `[serve]` table lists later is read again and keeps its values, and
+    /// keeps none again once the listing goes (#817): what makes a file a document lies outside
+    /// its bytes, and a refreshed index answers as a new one.
+    #[test]
+    fn a_data_file_keeps_its_values_while_a_serve_table_lists_it() {
+        let (dir, index) = index_dir("data_file_listed_later");
+        let root = checkout(&dir);
+        let spec = format!("openapi: 3.0.0\nx-pad:\n{}", past_the_ceiling("  "));
+        fs::write(root.join("spec.yaml"), spec).unwrap();
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        assert_eq!(
+            config_rows(&db, "spec.yaml"),
+            (0, config_values::Outcome::Data)
+        );
+        let listed = Serve {
+            declared: true,
+            documents: vec!["spec.yaml".into()],
+            ..Serve::default()
+        };
+        super::refresh(&db, &root, REPO, &|| Ok(listed.clone())).unwrap();
+        let (rows, outcome) = config_rows(&db, "spec.yaml");
+        assert_eq!(rows, config_values::VALUES_MAX as i64 + 2, "{outcome:?}");
+        super::refresh(&db, &root, REPO, &|| Ok(Serve::default())).unwrap();
+        assert_eq!(
+            config_rows(&db, "spec.yaml"),
+            (0, config_values::Outcome::Data)
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// An index another build wrote, holding the rows of a file now past the ceiling, keeps none
+    /// of them once this build opens it (#817): a change of the stored format, as `Outcome`'s
+    /// new case is, changes the schema version (`schema_version`), and another version is rebuilt.
+    #[test]
+    fn an_index_of_another_version_drops_the_rows_of_a_data_file() {
+        let (dir, index) = index_dir("data_rows_of_another_version");
+        let root = checkout(&dir);
+        fs::write(root.join("measure.yaml"), past_the_ceiling("")).unwrap();
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        assert_eq!(
+            config_rows(&db, "measure.yaml"),
+            (0, config_values::Outcome::Data)
+        );
+        // As an older build stored it: every value, and another schema version.
+        let rows: Vec<config_values::Row> = (0..=config_values::VALUES_MAX)
+            .map(|i| config_values::Row {
+                key: format!("p{i}"),
+                value: Some(i.to_string()),
+                kind: "number",
+                line: i + 1,
+                cut: false,
+            })
+            .collect();
+        let tx = rusqlite::Transaction::new_unchecked(&db, rusqlite::TransactionBehavior::Deferred)
+            .unwrap();
+        config_values::store(&tx, "measure.yaml", &rows).unwrap();
+        let read = config_values::Outcome::Read {
+            values: rows.len(),
+            redacted: 0,
+            sensitive: vec![],
+        };
+        let read = serde_json::to_string(&read).unwrap();
+        tx.execute(
+            "UPDATE config_files SET summary = ?1 WHERE path = 'measure.yaml'",
+            [read],
+        )
+        .unwrap();
+        tx.commit().unwrap();
+        db.pragma_update(
+            None,
+            "user_version",
+            super::schema_version().wrapping_add(1),
+        )
+        .unwrap();
+        drop(db);
+
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        assert_eq!(
+            config_rows(&db, "measure.yaml"),
+            (0, config_values::Outcome::Data)
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 }
