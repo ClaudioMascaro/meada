@@ -23,7 +23,7 @@ report.
 | `refs` | a provider and a consumer pinned to the provider's commit, to another 40-digit id, to a 64-digit id and to an abbreviated id |
 | `orphan` | a reusable pipeline nobody calls beside one that is called |
 | `orphan-control` | a reusable pipeline nobody calls in a scope without consumers |
-| `solo` | a repository without `origin` that calls its own pipeline and a peer's |
+| `solo` | a repository without `origin` that calls its own pipeline and a peer's, whose pipeline nobody links to |
 
 A case is one row of `CASES` and one node of a generated file, marked there by `# case: <id>` and,
 on the next line, `# control: <id>`. The control is another case whose expected answer differs, so
@@ -39,16 +39,30 @@ with #820's table of the four consumers of `publish.yml`.
 | CI nodes and references | new | #820, and `nodes()`: this driver's reading of the generated YAML | `search` kind `ci` by id, step `id`, `uses` and type; `context` on a pipeline, a CI job (`needs` both ways), a CI step, a selector and a composite action |
 | Consumers of a provider | new | #820's table (`PUBLISH_CONSUMERS`) and `CASES` | the whole sets of `ci::` providers, consumers and links of each workspace; each link's reason (`@<ref> (indexed <commit>)`); the `ref`, `with` and `secrets` fields; `context` on `publish.yml` |
 | `trace` through `wrapper` | new | #820 | up from the contract, the file path and a CI node; down from `app-c`; a control from `on-string.yml` |
-| External files | new | #820 | no row of any export, no line of any `meada status`, no answer of `search` kinds `ambiguous` and `unresolved` names one; a control reads their `uses` lines as config values |
-| Orphan, absent file, `ref mismatch` | new | #820, each with its control | `orphan ci::` lines; `absent at the indexed commit` in `context` on the consumer; the end of the reason |
+| External files | new | #820 | no contract of any export section, no line of any `meada status`, no answer of `search` kinds `ambiguous` and `unresolved` from any repository names one; controls: their `uses` lines are config values, and the hub sees a peer's open item |
+| Orphan, absent file, `ref mismatch` | new | #820, each with its control | `orphan ci::` lines; `absent at the indexed commit` in `context` on the consumer; the end of the reason in the export and in `context` |
 | The files the CI reader owns | existing | the base binary; allowed: the typed-key uses removed, the site of an `exact` use | `uses` rows of `forms` on both binaries |
 | `uses` lines as config values, `[[resource]] via`, `search` kind `iac`, the default search | existing | the base binary | byte-equal answers from the hub |
-| Every other row of every export | existing | the base binary | `parity`: all sections but `ci::` rows, rows on a CI node and uses read from a CI file |
-| MCP over HTTP | copies stdio | the same binary's stdio answers | the hub's answers, byte for byte |
+| Every other row of every export | existing | the base binary | `parity`: all sections but `ci::` rows, CI nodes, unresolved consumers on a CI node and uses read from a CI file. Another kind's side or link sited on a pipeline file (an image builder) is the base's |
+| MCP over HTTP | copies stdio | the same binary's stdio answers | every answer asked in the `calls` workspace, again at the same repository, byte for byte |
 | The pinned corpus | existing, plus five links read here from the source | the base binary; the source at the pin | `--corpus` |
 
-The names of the consumer row's optional fields (`ref`, `with`, `secrets`) are the driver's
-`REF`, `WITH` and `SECRETS`: #824 names them in the export and changes them here if it differs.
+Both binaries are required: half of these keys are the base.
+
+## What #820 does not state
+
+The driver had to choose where the spec is silent. Each choice is a guess until the ticket that
+builds it lands, and that ticket changes the driver, never the reverse:
+
+- The export's field names (`REF`, `WITH`, `SECRETS`, #824), an unresolved consumer as a
+  `consumers` row with `contract: null`, the `orphan ci::` status line and the words of the
+  absent mark (`ABSENT`, #827).
+- The shape of an answer: one consumer per line in `context`, one hop per line in `trace`, the
+  name `<file>::<address>` for a CI node, a type word (`job`, `step`) as a `search` query.
+- Three cases. `job_not_reusable` carries the absent mark (#827 settles it). `step_docker_only`
+  is a consumer with no link and no mark. `solo_remote` holds no side at all, and its peer's
+  pipeline is an orphan in the scope seen from `solo`.
+- `REASON` matches the whole reason: F3's `permissions mismatch` extends it (#830).
 
 ## The pinned corpus
 
@@ -82,6 +96,12 @@ checker reads `input/`, #820 and the captures and writes the verdict.
   unexpected consumer, not as one wrong row.
 - The identity of a repository without `origin` is read from its own export: the driver cannot
   know it, so `solo_local` proves the link, not the identity.
+- Three pairs (`a_publish`, `c_release`, `w_release`) are link against link at `@main`: they
+  fail on a wrong provider only. The `refs` workspace and `b_publish_prd` catch one ref for all.
+- `trace` through `wrapper` is presence on a line, not order, and `trace` down has no negative
+  control.
+- `--selftest` checks the cases and the reading, never a check of `drive()`: a check that passes
+  on an empty answer shows only when a fresh checker reads the capture.
 
 ## Not covered
 
@@ -89,5 +109,10 @@ checker reads `input/`, #820 and the captures and writes the verdict.
   host.
 - The console graph and query page: they copy the CLI and MCP through the shared rows, and the
   console drivers of the Scope table run on the paths that reach them.
-- Hostile pipeline files and freshness after an edit: `tests/it` holds them (#823, #824).
+- Hostile pipeline files, freshness after an edit, a second YAML document, a matrix, a file
+  without `jobs` or `runs`, a pipeline in a subfolder and a local `uses` that leaves the
+  repository: `tests/it` and the reader's unit tests hold them (#823, #824).
+- An orphan action, a folder with neither an action file nor a `Dockerfile` beside one that
+  exists, typed keys other than `bucket`, a use sited on a CI job or in an action file.
+- Time, memory and index size (#835 measures them), and the count of CI nodes in `meada status`.
 - Declared permissions and the `run` script: F3 and F2 (#830).

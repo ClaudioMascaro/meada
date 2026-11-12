@@ -72,7 +72,8 @@ BUILD = pipeline('ref-provider', 'build.yml')
 HEAD_REF, OTHER_40, OTHER_64, SHORT = 'PROVIDER_HEAD_SHA', '0123456789abcdef' * 2 + '01234567', '0123456789abcdef' * 4, '0123456'
 
 # id: (workspace, repository, file, job or `runs` or None, step id or None, expected answer).
-# The first five are #820's table under "Further Notes"; the rest are one row per form of `uses`
+# The first four are #820's table under "Further Notes" and the fifth its `trace` sentence; the rest
+# are one row per form of `uses`
 # and per "certain or absent" probe of its "Testing Decisions".
 CASES = {
     'a_publish': ('calls', 'app-a', W + 'ci.yml', 'publish', None, link(PUBLISH, 'main')),
@@ -126,6 +127,8 @@ CASES = {
     'solo_local': ('solo', 'solo', W + 'ci.yml', 'solo_local', None,
                    ('link', f'ci::{SOLO}/{W}build.yml', f'{SOLO}::{W}build.yml::.', None)),
     'solo_remote': ('solo', 'solo', W + 'ci.yml', 'solo_remote', None, NONE),
+    # Nobody links to the peer's pipeline, and the scope seen from `solo` holds a provider and a consumer.
+    'solo_peer_unused': ('solo', 'solo-peer', W + 'build.yml', None, None, ('orphan', pipeline('solo-peer', 'build.yml')[0])),
 }
 
 REUSABLE = '''name: NAME
@@ -213,7 +216,10 @@ jobs:
       # case: a_image
       # control: step_remote_folder
       - id: a_image
+        name: Build neutral image
         uses: docker/build-push-action@v6
+        env:
+          CHANNEL_ENV: neutral-env
         with:
           context: .
           build-args: CHANNEL=neutral-zz
@@ -512,11 +518,11 @@ jobs:
   solo_local:
     uses: ./.github/workflows/build.yml
   # case: solo_remote
-  # control: orphan_used
+  # control: solo_local
   solo_remote:
     uses: acme/solo-peer/.github/workflows/build.yml@main
 '''},
-        'solo-peer': {W + 'build.yml': reusable('build')},
+        'solo-peer': {W + 'build.yml': '# case: solo_peer_unused\n# control: orphan_no_scope\n' + reusable('build')},
     },
 }
 NO_ORIGIN = {'solo'}
@@ -732,7 +738,7 @@ def selftest():
 
 class Run:
     def __init__(self, folder, head, base):
-        self.folder, self.bins, self.checks = folder, {'head': head, **({'base': base} if base else {})}, []
+        self.folder, self.bins, self.checks, self.asked = folder, {'head': head, 'base': base}, [], []
 
     def check(self, name, ok, evidence):
         self.checks.append({'name': name, 'passed': bool(ok), 'evidence': evidence})
@@ -753,6 +759,7 @@ class Run:
         _, answers, _ = mcp_answers(self.bins[side], cwd, [{'tool': tool, 'arguments': arguments} for tool, arguments in queries], log)
         dump(log.with_suffix('.answers.json'), [{'tool': tool, 'arguments': arguments, 'answer': text}
                                                 for (tool, arguments), text in zip(queries, answers)])
+        self.asked.append((side, Path(cwd), queries, answers))
         return answers
 
 
@@ -763,9 +770,12 @@ def file_of(site):
 
 
 def owned(section, row, own_files):
-    """A row the spec lets differ from the base: a `ci::` row, a row on a CI node, a use read from a CI file."""
-    return ((row.get('contract') or '').startswith('ci::') or section == 'uses' and row.get('at', '').split('#')[0] in own_files
-            or any(file_of(row.get(key)) in own_files for key in ('site', 'identity', 'consumer')))
+    """A row the spec lets differ from the base: a `ci::` row, a CI node, an unresolved consumer on a CI
+    node, a use read from a CI file. Any other side or link sited on a pipeline file is the base's."""
+    contract = row.get('contract')
+    return ((contract or '').startswith('ci::') or section == 'uses' and row.get('at', '').split('#')[0] in own_files
+            or section == 'iac_nodes' and file_of(row.get('identity')) in own_files
+            or section == 'consumers' and contract is None and file_of(row.get('site')) in own_files)
 
 
 def parity(run, name, base, head, own_files):
@@ -794,14 +804,17 @@ def drive(run, http):
                 cwd = run.folder / side / 'work' / workspace / repo
                 exports[side, workspace, repo] = json.loads(run.command(side, cwd, f'{workspace}-{repo}-export', 'export'))
                 statuses[side, workspace, repo] = run.command(side, cwd, f'{workspace}-{repo}-status', 'status')
-    solo = exports['head', 'solo', 'solo']['repository']
+    solo = exports['head', 'solo', 'solo'].get('repository')
+    run.check('solo: the export names its repository', isinstance(solo, str) and solo, solo)
+    solo = solo if isinstance(solo, str) and solo else SOLO
 
     def real(value):
         return json.loads(json.dumps(value).replace(SOLO, solo).replace(HEAD_REF, heads['ref-provider']))
 
     for workspace, repos in WORKSPACES.items():
         own_files = {file for _, file in ci_files(workspace)}
-        rows = lambda section: [row for repo in repos for row in exports['head', workspace, repo][section]]
+        rows = lambda section: list({json.dumps(row, sort_keys=True): row for repo in repos
+                                     for row in exports['head', workspace, repo].get(section, [])}.values())
         cases = {case: (real(located(case)[0]), located(case)[1], real(row[5])) for case, row in CASES.items() if row[0] == workspace}
         want_consumers, want_links = set(), set()
         for case, (site, body, expected) in cases.items():
@@ -835,9 +848,14 @@ def drive(run, http):
                     shape = REASON.fullmatch(reasons[0]) if len(reasons) == 1 else None
                     ok = bool(shape) and shape[1] == expected[3] and indexed.startswith(shape[2]) and bool(shape[3]) == (expected[0] == 'mismatch')
                 run.check(f'{case}: the reason of its link', ok, reasons)
+            if expected[0] in ('link', 'mismatch', 'absent', 'unlinked'):
                 row = [row for row in rows('consumers') if row['site'] == site and row['contract'] == expected[1]]
                 got = {key: row[0].get(key) for key in (REF, WITH, SECRETS) if row and row[0].get(key) is not None}
                 run.check(f'{case}: the Git ref and the keys it wrote', got == real(fields(body)), got)
+            if workspace == 'refs':
+                reply = run.ask('head', cwd, f'{case}-context', [('context', {'symbol': site.split('::', 1)[1], 'budget': 200000})])[0]
+                run.check(f'{case}: `context` on the consumer {"says" if expected[0] == "mismatch" else "does not say"} `ref mismatch`',
+                          ('ref mismatch' in reply) == (expected[0] == 'mismatch') and f'@{expected[3]}' in reply, reply)
             if expected[0] in ('absent', 'unlinked', 'unresolved'):
                 reply = run.ask('head', cwd, f'{case}-context', [('context', {'symbol': site.split('::', 1)[1], 'budget': 200000})])[0]
                 run.check(f'{case}: {"marked" if expected[0] == "absent" else "not marked"} absent', (ABSENT in reply) == (expected[0] == 'absent'), reply)
@@ -847,25 +865,31 @@ def drive(run, http):
         orphans = {match[1] for repo in [*repos, 'hub'] for line in statuses['head', workspace, repo].splitlines() if (match := ORPHAN.match(line))}
         want = {row[5][1] for row in CASES.values() if row[0] == workspace and row[5][0] == 'orphan'}
         run.check(f'{workspace}: the orphan lines of the CI kind', orphans == want, sorted(orphans))
-        if 'base' in run.bins:
-            for repo in [*repos, 'hub']:
-                parity(run, f'{workspace}/{repo}', exports['base', workspace, repo], exports['head', workspace, repo], own_files)
-                write(run.folder / 'status' / f'{workspace}-{repo}.diff', '\n'.join(
-                    [f'- {line}' for line in statuses['base', workspace, repo].splitlines() if line not in statuses['head', workspace, repo].splitlines()]
-                    + [f'+ {line}' for line in statuses['head', workspace, repo].splitlines() if line not in statuses['base', workspace, repo].splitlines()]) + '\n')
+        for repo in [*repos, 'hub']:
+            parity(run, f'{workspace}/{repo}', exports['base', workspace, repo], exports['head', workspace, repo], own_files)
+            write(run.folder / 'status' / f'{workspace}-{repo}.diff', '\n'.join(
+                [f'- {line}' for line in statuses['base', workspace, repo].splitlines() if line not in statuses['head', workspace, repo].splitlines()]
+                + [f'+ {line}' for line in statuses['head', workspace, repo].splitlines() if line not in statuses['base', workspace, repo].splitlines()]) + '\n')
 
     calls = lambda side, repo: run.folder / side / 'work' / 'calls' / repo
     big = {'budget': 200000}
     # External files, over the whole output: no side, no orphan line, no open item.
-    named = [f'{repo}:{section}' for repo in WORKSPACES['calls'] for section in ('providers', 'consumers', 'links', 'uses', 'provisions')
-             for row in exports['head', 'calls', repo][section] if any(name in json.dumps(row) for name in EXTERNAL)]
-    run.check('external files hold no side in any export', not named, named)
+    everywhere = [*WORKSPACES['calls'], 'hub']
+    named = [f'{repo}:{section}' for repo in everywhere for section, found in exports['head', 'calls', repo].items() if isinstance(found, list)
+             for row in found if isinstance(row, dict) and any(name in str(row.get('contract')) for name in EXTERNAL)]
+    run.check('external files name no contract in any export', not named, named)
     named = [repo for repo in [*WORKSPACES['calls'], 'hub'] if any(name in statuses['head', 'calls', repo] for name in EXTERNAL)]
     run.check('external files are in no line of `meada status`', not named, named)
-    open_items = [('search', {'query': query, 'kind': kind, **big}) for query in ('checkout', 'build-push-action', 'setup-node', 'other-org', 'upload')
+    # A legitimate open item (a `./<folder>` step with no checkout) may say `checkout` in its cause: a line
+    # counts only when it names the external file's own `uses`.
+    open_items = [('search', {'query': query, 'kind': kind, **big}) for query in ('actions/checkout', 'build-push-action', 'setup-node', 'other-org', 'upload')
                   for kind in ('ambiguous', 'unresolved')]
-    replies = run.ask('head', calls('head', 'hub'), 'external-open-items', open_items)
-    run.check('external files are no open item of `search`', not any(name in reply for reply in replies for name in EXTERNAL), replies)
+    external_uses = ('actions/checkout@', 'actions/setup-node@', 'docker/build-push-action@', 'other-org/')
+    for repo in everywhere:
+        replies = run.ask('head', calls('head', repo), f'external-open-items-{repo}', open_items)
+        run.check(f'{repo}: external files are no open item of `search`', not any(name in reply for reply in replies for name in external_uses), replies)
+    reply = run.ask('head', calls('head', 'hub'), 'open-items-control', [('search', {'query': 'local-action', 'kind': 'unresolved', **big})])[0]
+    run.check('control: `search` kind `unresolved` from the hub shows the open items of a peer', 'step_local_no_checkout' in reply or 'steps_no_checkout' in reply, reply)
     reply = run.ask('head', calls('head', 'hub'), 'external-control', [('search', {'query': 'actions/checkout', 'kind': 'value', **big})])[0]
     run.check('control: the `uses` lines of the external actions are read as config values', 'actions/checkout@v4' in reply, reply)
 
@@ -891,6 +915,7 @@ def drive(run, http):
               f'{HOST}/wrapper' in down and 'release.yml' in down and f'{HOST}/workflows' in down and 'publish.yml' in down, down)
 
     # CI nodes and references, in `app-a` and `actions`.
+    step_site = lambda case: located(case)[0]
     node_queries = [('search', {'query': 'publish', 'kind': 'ci'}), ('search', {'query': 'a_image', 'kind': 'ci'}),
                     ('search', {'query': 'docker/build-push-action', 'kind': 'ci'}), ('context', {'symbol': W + 'ci.yml', **big}),
                     ('context', {'symbol': W + 'ci.yml::jobs.publish', **big}), ('context', {'symbol': W + 'ci.yml::jobs.build', **big}),
@@ -903,30 +928,43 @@ def drive(run, http):
     by_type = run.ask('head', calls('head', 'hub'), 'nodes-by-type', [('search', {'query': kind, 'kind': 'ci', **big}) for kind in ('job', 'step')])
     for kind, reply in zip(('job', 'step'), by_type):
         want = [site for site in sorted(nodes('calls')) if ('.steps[' in site) == (kind == 'step') and not site.endswith('::.')]
-        missing = [site for site in want if not any(all(part in line for part in site.split('::')) for line in reply.splitlines())]
+        whole = lambda site, line: site.split('::')[1] in line and re.search(re.escape(site.split('::')[2]) + r'(?![\w.\[])', line)
+        missing = [site for site in want if not any(whole(site, line) for line in reply.splitlines())]
         run.check(f'`search` kind `ci` for the type `{kind}` finds every CI {kind} this driver reads ({len(want)})', not missing, missing or reply)
     reply = run.ask('head', calls('head', 'actions'), 'composite', [('context', {'symbol': 'action.yml', **big})])[0]
     run.check('`context` on a composite action shows its own CI steps', 'runs.steps[0]' in reply, reply)
+    named, callers = run.ask('head', calls('head', 'app-a'), 'step-name', [('search', {'query': 'Build neutral image', 'kind': 'ci'}),
+                                                                           ('context', {'symbol': W + 'ci.yml::jobs.build.steps[1]', **big})])
+    run.check('`search` kind `ci` finds a CI step by its `name`', 'jobs.build.steps[1]' in named, named)
+    run.check('`context` on a CI step shows the values of its `env`', 'neutral-env' in callers, callers)
+    setup = step_site('step_remote_folder').split('::')
+    reply = run.ask('head', calls('head', 'actions'), 'action-callers', [('context', {'symbol': 'setup/action.yml', **big})])[0]
+    run.check('`context` on an action lists the CI step that calls it', any(setup[0] in line and setup[2] in line for line in reply.splitlines()), reply)
+    reply = run.ask('head', calls('head', 'forms'), 'trace-composite', [('trace', {'from': 'local-action/nested/action.yml', 'direction': 'up', **big})])[0]
+    run.check('`trace` up from a nested action reaches the pipeline through the composite action that calls it',
+              'runs.steps[1]' in reply and step_site('step_local_own').split('::')[2] in reply, reply)
 
     # The files the CI reader owns (#828): only the typed-key use goes, and an `exact` use gains its CI step.
-    step_site = lambda case: located(case)[0]
-    at = lambda side, suffix: [row for row in exports[side, 'calls', 'forms']['uses'] if row['at'].endswith(suffix)]
+    at = lambda side, suffix: [row for row in exports[side, 'calls', 'forms'].get('uses', []) if row['at'].endswith(suffix)]
     run.check('use_typed_key: no use from a plain name under a typed key', not at('head', '.with.bucket'), at('head', '.with.bucket'))
     run.check('use_role_arn: no use from a role ARN in `with`', not at('head', 'role-to-assume"]'), at('head', 'role-to-assume"]'))
-    run.check('use_structured: an `exact` use on its CI step', [row['site'] for row in at('head', '.with.target')] == [step_site('use_structured')], at('head', '.with.target'))
+    run.check('use_structured: the use is on its CI step', [row['site'] for row in at('head', '.with.target')] == [step_site('use_structured')], at('head', '.with.target'))
     run.check('use_other_file: another file of `.github/` keeps its use', len(at('head', 'storage.bucket')) == 1, at('head', 'storage.bucket'))
 
-    if 'base' in run.bins:
-        run.check('control: the base gives the typed key a use', len(at('base', '.with.bucket')) == 1, at('base', '.with.bucket'))
-        run.check('control: the base has the structured use on the repository', [row['site'] for row in at('base', '.with.target')] == [f'{HOST}/forms'], at('base', '.with.target'))
-        run.check('use_other_file: equal to the base', at('head', 'storage.bucket') == at('base', 'storage.bucket'), at('base', 'storage.bucket'))
-        # Existing answers: the `uses` lines as config values, the hand declaration, kind `iac` and the default search.
-        same = [('search', {'query': 'publish.yml', 'kind': 'value', **big}), ('search', {'query': 'publish', 'kind': 'iac'}), ('search', {'query': 'publish'}),
-                ('context', {'symbol': 'resource::gha-workflow::acme/workflows/.github/workflows/publish.yml', **big})]
-        before, after = (run.ask(side, calls(side, 'hub'), 'existing', same) for side in ('base', 'head'))
-        for query, left, right in zip(same, before, after):
-            run.check(f'existing answer equal to the base: {json.dumps(query)}', left == right, [left, right])
-        run.check('control: the base finds the four `uses` lines of `publish.yml` as config values', before[0].count('publish.yml@') >= 4, before[0])
+    run.check('control: the base gives the typed key a use', len(at('base', '.with.bucket')) == 1, at('base', '.with.bucket'))
+    run.check('control: the base gives the role ARN a use', len(at('base', 'role-to-assume"]')) == 1, at('base', 'role-to-assume"]'))
+    structured = [{key: value for key, value in row.items() if key != 'site'} for side in ('base', 'head') for row in at(side, '.with.target')]
+    run.check('control: the base has the structured use on the repository, the same row but for its site',
+              [row['site'] for row in at('base', '.with.target')] == [f'{HOST}/forms'] and structured[:1] == structured[1:], at('base', '.with.target'))
+    run.check('use_other_file: equal to the base', at('head', 'storage.bucket') == at('base', 'storage.bucket'), at('base', 'storage.bucket'))
+    # Existing answers: the `uses` lines as config values, the hand declaration, kind `iac` and the default search.
+    same = [('search', {'query': 'publish.yml', 'kind': 'value', **big}), ('search', {'query': 'publish', 'kind': 'iac'}), ('search', {'query': 'publish'}),
+            ('context', {'symbol': 'resource::gha-workflow::acme/workflows/.github/workflows/publish.yml', **big})]
+    before, after = (run.ask(side, calls(side, 'hub'), 'existing', same) for side in ('base', 'head'))
+    for query, left, right in zip(same, before, after):
+        run.check(f'existing answer equal to the base: {json.dumps(query)}', left == right, [left, right])
+    run.check('control: the base finds the four `uses` lines of `publish.yml` as config values', before[0].count('publish.yml@') >= 4, before[0])
+    run.check('control: the base answers the hand declaration of #816 with its declared consumer', f'{HOST}/app-a' in before[3], before[3])
 
     if http:
         folder = run.folder / 'http'
@@ -948,10 +986,18 @@ def drive(run, http):
                         break
                     except OSError:
                         time.sleep(.1)
-                client = Http(f'http://127.0.0.1:{port}/{HOST}/hub')
-                replies = [answer(client.call('tools/call', {'name': tool, 'arguments': arguments})) for tool, arguments in hub_queries + open_items]
+                differing, replies = [], []
+                for side, cwd, queries, answers in run.asked:
+                    if side != 'head' or cwd.parent != calls('head', 'hub').parent:
+                        continue
+                    client = Http(f'http://127.0.0.1:{port}/{HOST}/{cwd.name}')
+                    for (tool, arguments), stdio in zip(queries, answers):
+                        reply = answer(client.call('tools/call', {'name': tool, 'arguments': arguments}))
+                        replies.append({'repository': cwd.name, 'tool': tool, 'arguments': arguments, 'answer': reply})
+                        if reply != stdio:
+                            differing.append(replies[-1])
                 dump(folder / 'answers.json', replies)
-                run.check('MCP over HTTP: every hub answer byte-equal to stdio', replies == hub + run.ask('head', calls('head', 'hub'), 'http-twin', open_items), len(replies))
+                run.check(f'MCP over HTTP: each of the {len(replies)} answers of the `calls` workspace byte-equal to stdio', replies and not differing, differing)
             finally:
                 server.terminate()
                 server.wait(timeout=20)
@@ -975,10 +1021,11 @@ def corpus(run):
     for name, repository in CORPUS.items():
         tracked = git('ls-files', '-z', '--', W, '*action.yml', '*action.yaml', cwd=roots['head', name]).split('\0')
         files = set(owned_files({file: (roots['head', name] / file).read_text(errors='replace') for file in tracked if file}))
-        if 'base' in run.bins:
-            parity(run, f'corpus {name}', exports['base', name], exports['head', name], files)
-        local = [row for row in exports['head', name]['links'] if row['contract'].startswith('ci::')]
-        run.check(f'corpus {name}: alone, every CI link stays inside the repository', all(row['provider'].startswith(repository + '::') for row in local), len(local))
+        parity(run, f'corpus {name}', exports['base', name], exports['head', name], files)
+        local = [row for row in exports['head', name].get('links', []) if row['contract'].startswith('ci::')]
+        # `ci-slsa` calls its own pipelines by local path: alone, it holds links.
+        run.check(f'corpus {name}: alone, every CI link stays inside the repository',
+                  all(row['provider'].startswith(repository + '::') for row in local) and (local or name != 'ci-slsa'), len(local))
     folder = run.folder / 'workspace'
     write(folder / 'workspace.toml', 'index_dir = "indexes"\n' + ''.join(
         f'\n[[repository]]\nrepo = "{repository}"\npath = {json.dumps(str(roots["head", name]))}\n' for name, repository in CORPUS.items()))
@@ -986,7 +1033,7 @@ def corpus(run):
     links = []
     for name, repository in CORPUS.items():
         export = json.loads(run.command('head', folder, f'workspace-{name}-export', 'export', '--workspace', 'workspace.toml', '--repo', repository))
-        links += [row for row in export['links'] if row['contract'].startswith('ci::') and row not in links]
+        links += [row for row in export.get('links', []) if row['contract'].startswith('ci::') and row not in links]
     # Every link goes to the fresh checker of #835, who reads each against the source; these four are read here.
     dump(folder / 'ci-links.json', {'levels': {level: sum(row['level'] == level for row in links) for level in sorted({row['level'] for row in links})}, 'links': links})
     slsa, scanner, osv = CORPUS.values()
@@ -1018,11 +1065,11 @@ def main():
     if args.selftest:
         selftest()
         return 0
-    if not args.head_bin or not args.run:
-        parser.error('--head-bin and --run are required')
+    if not args.head_bin or not args.base_bin or not args.run:
+        parser.error('--head-bin, --base-bin and --run are required: half of the answer keys are the base binary')
     folder = Path(args.run).resolve()
     folder.mkdir(parents=True, exist_ok=False)
-    run = Run(folder, str(Path(args.head_bin).resolve()), args.base_bin and str(Path(args.base_bin).resolve()))
+    run = Run(folder, str(Path(args.head_bin).resolve()), str(Path(args.base_bin).resolve()))
     corpus(run) if args.corpus else drive(run, args.http)
     failed = [row['name'] for row in run.checks if not row['passed']]
     write(folder / 'receipt.md', '# CI in the graph, slice F1 (#820)\n\nAnswer key: #820 and the generated files, in `input/`.\n\n'
