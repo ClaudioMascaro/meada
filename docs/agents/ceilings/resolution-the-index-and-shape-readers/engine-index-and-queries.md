@@ -84,14 +84,14 @@
   cut (`Chain::answer` keeps the lines that fit), so its work follows the reachable graph, not the
   lines it returns. `render::Files` counts the newlines of each file it reads once per answer,
   per `LINE_BLOCK` (1 KiB), so placing a line on its file's line reads one block, not the file
-  before it. A line still costs its depth, read in the code and not measured: its indent (two
-  spaces a level) and the cycle check, which scans the branch's ancestors, each at most
-  `WALK_DEPTH`. Reading the reachable graph (`trace::read`) also grows faster than it: the index is
-  asked once per frontier and `Partial` sorts every row it holds at each merge, so the merges
-  cost the frontiers times the rows. On the issue's generated Python graph in one file (each
-  function calling 3 of the next 20; debug build, `7518ebe7`, MCP over stdio) the merges took
-  6, 14, 25 and 79 ms at 1,200, 2,000, 3,000 and 6,000 functions (75 to 357 frontiers), of a read
-  of 51 to 342 ms.
+  before it. A line still costs its depth: its indent (two spaces a level) and the cycle check,
+  which scans the branch's ancestors, each at most `WALK_DEPTH`. Reading the reachable graph
+  (`trace::read`) also grows faster than it: the index is asked once per frontier and `Partial`
+  sorts every row it holds at each merge, so the merges cost the frontiers times the rows. On the
+  issue's generated Python graph in one file (each function calling 3 of the next 20; debug
+  build, `7518ebe7`, MCP over stdio) the merges took 6, 14, 25 and 79 ms at 1,200, 2,000, 3,000
+  and 6,000 functions (75 to 357 frontiers), of a read of 51 to 342 ms; at 6,000 the walk
+  without the line lookups took 35 ms for its 3,904 lines, down to depth 256.
 - `trace.rs` (process walk): an ambiguous call or link is one unexpanded step listing its
   candidates; `inferred` and `decided` links expand. A process is walked down only; `trace`
   up from `process::...` answers with a note. `Graph::processes_of` (the processes `context` lists)

@@ -1780,7 +1780,7 @@ mod tests {
 
     /// A trace places each line it writes at a cost that does not grow with the file holding it
     /// (#745): every function of a tree of `n` sits in one file and is reached, so the work of
-    /// `n` and of `4n` functions keeps the ratio of the lines written. Placing a line by counting
+    /// `n` and of `8n` functions keeps the ratio of the lines written. Placing a line by counting
     /// the file's newlines from its start makes it the square.
     #[test]
     fn a_trace_of_many_functions_in_one_file_grows_with_the_functions_reached() {
@@ -1812,7 +1812,7 @@ mod tests {
             }
             (workspace, [export])
         };
-        let (small, large) = (tree(500), tree(2000));
+        let (small, large) = (tree(500), tree(4000));
         let [small, large] = [&small, &large].map(|(w, e)| Graph::new(w, e, &[]));
         let run = |graph: &Graph| {
             let started = std::time::Instant::now();
@@ -1829,8 +1829,8 @@ mod tests {
         }
         let _ = std::fs::remove_dir_all(&dir);
         assert!(
-            at_large < at_small * 8,
-            "{at_small:?} for 500 functions, {at_large:?} for 2,000"
+            at_large < at_small * 24,
+            "{at_small:?} for 500 functions, {at_large:?} for 4,000"
         );
     }
 }
