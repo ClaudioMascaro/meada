@@ -522,7 +522,7 @@ carries its level with no reason.
 | `<step-level>` | ` [<level>]` | The level of a call that is not exact. |
 | `<repeat>` | ` (cycle)` | The node is one of its own ancestors. |
 | `<repeat>` | ` (see above)` | The node is shown above, with what follows it. |
-| `<repeat>` | ` (depth limit)` | A line or a process step at the walk's depth limit, 256 levels below its start (below the IaC node, for the code an IaC trace goes on into): what follows it is not shown. |
+| `<repeat>` | ` (depth limit)` | A node, or a process step, the walk reached at its depth limit, 256 levels below its start (below the IaC node, for the code an IaC trace goes on into): what follows it is not shown. A note at that depth (no provider, an overload set) carries no mark: nothing follows it. |
 | `<drift>` | ` drift: missing <paths>` | The link's consumer reads fields its provider lacks. |
 | `<verb>` | `produces` | Produces to the channel. |
 | `<verb>` | `consumes` | Consumes the channel. |

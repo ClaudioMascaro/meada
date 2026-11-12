@@ -75,9 +75,11 @@
   `(depth limit)` (a process step `depth-limit`), and nothing hangs from it, so a longer chain is
   cut. A node cut there is not counted as followed: a shorter path that meets it later follows
   it. Where an IaC trace continues into code (`Graph::attached_rows`), the limit counts from the
-  IaC node. Without it a debug build (`28f1a4d7`, MCP over stdio, a runtime worker's 2 MiB
-  stack) aborted on a call chain between 1,972 and 1,992 hops down and between 3,144 and 3,164
-  up (#732): the limit stays more than seven and twelve times under them.
+  IaC node, so code behind a nested IaC node is cut deeper than 256 (the IaC walk keeps its own
+  stack). Without it a debug build (`28f1a4d7`, MCP over stdio, a runtime worker's 2 MiB stack)
+  aborted on a call chain between 1,972 and 1,992 hops down and between 3,144 and 3,164 up, and
+  on a chain of HTTP links between 900 and 1,200 hops down (#732): the limit stays more than
+  seven, twelve and three times under them.
 - `trace.rs` (process walk): an ambiguous call or link is one unexpanded step listing its
   candidates; `inferred` and `decided` links expand. A process is walked down only; `trace`
   up from `process::...` answers with a note. `Graph::processes_of` (the processes `context` lists)
