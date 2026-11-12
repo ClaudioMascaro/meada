@@ -123,9 +123,12 @@
   checkout, up to about 90 MB after a refresh that added 100,000 functions): four of the
   largest stay near 360 MB. Before the bound, under a 2 GiB cap, debug build, Meada's
   own checkout, the server was killed with 100 calls in flight when nothing changed (2,040 MB
-  resident after 20 replies), with 16 to 21 during an edit every 2 s at one call a second (86
-  at four), and with 11 behind a run that adds 100,000 functions to one file, which alone peaks
-  at about 940 MB; with it the 100 calls all answer, in 36 to 38 s, at 249 to 274 MB.
+  resident after 20 replies; one run of four survived, at a 2,044 MB peak), with 16 to 21
+  during an edit every 2 s at one call a second (86 at four), and with 11 behind a run that adds
+  100,000 functions to one file, which alone peaks at about 940 MB; with it the 100 calls all
+  answer, in 36 to 38 s, at 249 to 274 MB. The bound costs time where answers are heavy: 30
+  calls after an edit of that checkout took 18.6 s with it and 12.5 s without, at a 485 MB peak
+  against 1,199 MB.
   Across processes (two servers, a CLI command beside a server) the wait is SQLite's: a refresh
   with nothing to write takes no write lock, and one with something to write waits up to the
   busy timeout (10 s) for another process's writer to commit, then walks again; after
