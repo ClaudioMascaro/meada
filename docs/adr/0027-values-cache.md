@@ -104,3 +104,8 @@ the whole excess of the index directory over its size target once #817 bounded `
   whose free pages are more than half of its pages is vacuumed, so the pages that entries
   replaced by smaller ones, or dropped because `valued` lost files, leave the file instead of
   staying in it. A failed vacuum is dropped, as a failed write is.
+- **Size.** On this repository at `c1a8730c`, indexed cold in a scratch clone by debug builds of
+  `main` and of this change: `values.db` is 4.1 MB instead of 30.2 MB (13.5%), beside an
+  `index.db` of about 112.7 MB, so the index directory goes from about 142.9 MB to 116.7 MB. A
+  cold index takes 44.7 s instead of 44.0 s, and a refresh after a one-line edit of a Rust file
+  4.9 s instead of 4.7 s (medians of three; debug builds, slower than a release build).

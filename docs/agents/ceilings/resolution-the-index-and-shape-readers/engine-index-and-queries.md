@@ -33,7 +33,8 @@
 
 - `index/values.rs`: the values cache holds one entry per file of `valued` (pruned on every
   extraction), each the file's parse as JSON, values included, deflated (#839): on this
-  repository, as plain JSON, 18.7 MB beside a 60.8 MB index, 616 entries, the largest 1.6 MB. An entry is keyed by the file's bytes, setting
+  repository at `c1a8730c`, 4.1 MB where its JSON took 30.2 MB, beside a 112.7 MB index (at #611,
+  616 entries, the largest 1.6 MB of JSON). An entry is keyed by the file's bytes, setting
   and pack and by Meada's build (version, stored format, the executable's path, size and mtime),
   so a rebuilt or moved binary misses every entry once. An entry is at most `ENTRY_BYTES`
   (8 MiB) of JSON before it is deflated, so the cache is at most that per `valued` file: a file
