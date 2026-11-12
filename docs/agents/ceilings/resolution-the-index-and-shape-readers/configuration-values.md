@@ -18,9 +18,9 @@
   Compose file, a GitHub workflow or Skaffold file, a package manifest, a kustomization or a
   file the Kubernetes reader takes an object from, a CloudFormation or SAM template or
   Serverless service, a file the alert reader takes a rule, a route or a receiver from), keep
-  every value. The kinds are asked only past the ceiling. A data file that a `[serve]` listing
-  or a language pack takes later is read again; a file that stops being taken keeps its values
-  until it changes. What is given up: a large generic values file, such as a Helm chart's
+  every value. The kinds are asked only past the ceiling. A file that a `[serve]` listing or a
+  language pack starts or stops taking is read again (the index keeps the files they took,
+  `taken`), so a refreshed index holds what a new one would. What is given up: a large generic values file, such as a Helm chart's
   `values.yaml` past 1,000 values, keeps none, so it gives no `value` hit, no declared site and
   no config use, and `.meadaignore` cannot bring it back (the image reader still takes its
   images from the file's bytes). Search kind `value` finds exact and prefix

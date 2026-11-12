@@ -53,8 +53,7 @@ pub(crate) fn helm_values(path: &str) -> bool {
 /// images from the file's bytes, not from its config values.
 pub(crate) fn kind_file(path: &str, src: &[u8], taken: impl Fn(&str) -> bool) -> bool {
     taken(path)
-        || crate::iac::compose::is_file(path)
-        || (crate::image::named_config(path) && !helm_values(path))
+        || crate::image::named_file(path)
         || crate::package::is_manifest(path)
         || crate::kube::takes(path, src)
         || crate::iac::template_wanted(path, src)
@@ -1575,6 +1574,8 @@ mod tests {
         for (path, src) in [
             ("docker-compose.yml", "services: {}\n"),
             (".github/workflows/ci.yml", "on: push\n"),
+            // A workflow whose name holds the word of a Helm values file is still a workflow.
+            (".github/workflows/release-values.yml", "on: push\n"),
             ("skaffold.yaml", "build: {}\n"),
             ("package.json", "{}"),
             ("web/tsconfig.json", "{}"),
