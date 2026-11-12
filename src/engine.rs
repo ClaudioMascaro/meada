@@ -181,9 +181,9 @@ impl Engine {
     /// no watcher: only files whose mtime or size changed are hashed. Each repository is
     /// refreshed on its own, through its own connection; links are derived from the stored
     /// contracts at query time, so links that touch a changed file follow it. Does nothing on
-    /// an engine opened from a manifest: there the operator's `meada index` refreshes. A run
-    /// reads each repository's `[serve]` table from its `meada.toml` when it starts (#758), not
-    /// the one this engine read when it opened.
+    /// an engine opened from a manifest: there the operator's `meada index` refreshes. A refresh
+    /// reads each repository's `[serve]` table from its `meada.toml` (#758), not the one this
+    /// engine read when it opened.
     pub fn refresh(&self) -> Result<()> {
         if self.read_only {
             return Ok(());
@@ -251,9 +251,12 @@ impl Engine {
     /// and the index is fresh, as `meada index --workspace` decides before recording.
     fn checkout_commit(&self, before: Option<String>) -> Option<(String, bool)> {
         let before = before?;
-        let serve = &self.workspace.repos[0].config.serve;
+        // By the `[serve]` table the refresh read (#758), not the one read at the open.
+        let serve = config::load(&self.root).map(|config| config.serve);
         // A freshness check that fails leaves the commit unknown rather than failing the export.
-        let fresh = index::fresh(&self.dbs[0], &self.root, &self.identity, serve).unwrap_or(false);
+        let fresh = serve
+            .and_then(|serve| index::fresh(&self.dbs[0], &self.root, &self.identity, &serve))
+            .unwrap_or(false);
         if !fresh || repo::head(&self.root).ok().as_ref() != Some(&before) {
             return None;
         }

@@ -730,15 +730,16 @@ pub struct Indexed<'a> {
 /// only its extraction gives) makes the refresh start over without keeping any group.
 ///
 /// Documents (spec #21) are refreshed first, the same way, when the `[serve]` table that
-/// `serve` reads is declared; without one the repository has none. They hold no code, so an
+/// `read_serve` reads is declared; without one the repository has none. They hold no code, so an
 /// edited document changes no code row: `Http::declare` reads them at query time.
 ///
 /// Refreshes of one index share it (#704). In one process (MCP calls in flight together) one
 /// runs at a time: a call that comes while another runs waits for it, with no timer, then for
 /// the next run, which starts after it came and so sees the tree as the call found it; the
 /// calls that came meanwhile share that run's outcome. A run reads the `[serve]` table it finds
-/// documents by through `serve` when it starts (#758), whichever call started it: every run that
-/// starts after an edit of the table finds them by the edited one. A statement that meets the
+/// documents by through `read_serve` as each of its attempts starts (#758), whichever call
+/// started it: a run that starts after an edit of the table, or starts over after one, finds
+/// them by the edited one. A statement that meets the
 /// run's lock outside a refresh (an open, a query) waits for the run too (`wait`). Across
 /// processes, one that finds nothing to write takes no write lock, and one whose first write
 /// meets another process's writer waits up to the busy timeout for that commit, then starts
@@ -747,10 +748,10 @@ pub fn refresh(
     db: &Connection,
     root: &Path,
     identity: &str,
-    serve: &dyn Fn() -> Result<Serve>,
+    read_serve: &dyn Fn() -> Result<Serve>,
 ) -> Result<()> {
     let Some(path) = db.path().filter(|p| !p.is_empty()) else {
-        return refresh_keeping(db, root, identity, &serve()?, true);
+        return refresh_keeping(db, root, identity, read_serve, true);
     };
     let flight = {
         let mut flights = FLIGHTS.lock().unwrap_or_else(PoisonError::into_inner);
@@ -777,7 +778,7 @@ pub fn refresh(
         nested: RUNNING.replace(true),
     };
     drop(runs);
-    let outcome = serve().and_then(|serve| refresh_keeping(db, root, identity, &serve, true));
+    let outcome = refresh_keeping(db, root, identity, read_serve, true);
     run.failed = outcome.as_ref().err().map(|e| e.to_string());
     outcome
 }
@@ -835,11 +836,11 @@ fn refresh_keeping(
     db: &Connection,
     root: &Path,
     identity: &str,
-    serve: &Serve,
+    read_serve: &dyn Fn() -> Result<Serve>,
     keep: bool,
 ) -> Result<()> {
     attempts(db, |behavior| {
-        refresh_attempt(db, root, identity, serve, keep, behavior)
+        refresh_attempt(db, root, identity, read_serve, keep, behavior)
     })
 }
 
@@ -877,7 +878,7 @@ fn refresh_attempt(
     db: &Connection,
     root: &Path,
     identity: &str,
-    serve: &Serve,
+    read_serve: &dyn Fn() -> Result<Serve>,
     keep: bool,
     behavior: TransactionBehavior,
 ) -> Result<()> {
@@ -906,6 +907,7 @@ fn refresh_attempt(
         }
     };
     let mappings = crate::config::load(root)?.iac;
+    let serve = read_serve()?;
     let mapping_stamp = mappings.stamp()?;
     let mappings_changed = known_configs
         .as_deref()
@@ -917,7 +919,7 @@ fn refresh_attempt(
     refresh_stamped(
         &tx,
         "documents",
-        &documents_found(root, &all, serve),
+        &documents_found(root, &all, &serve),
         now,
         |_| Ok(false),
         |abs| read_up_to(abs, document::DOCUMENT_BYTES_MAX),
@@ -1180,7 +1182,7 @@ fn refresh_attempt(
         drop(tx);
         db.execute("DELETE FROM meta", [])?;
         // Not `refresh`: this call is the run in flight for this index, which it would wait on.
-        return refresh_keeping(db, root, identity, serve, true);
+        return refresh_keeping(db, root, identity, read_serve, true);
     };
     settle(
         &tx,
@@ -1693,7 +1695,7 @@ fn refresh_attempt(
         // An entry point asked the name of an inline definition of a kept file: only its
         // group's extraction knows it, so start over without keeping any group.
         drop(tx);
-        return refresh_keeping(db, root, identity, serve, false);
+        return refresh_keeping(db, root, identity, read_serve, false);
     }
     tx.execute("DELETE FROM entry_points", [])?;
     for e in doors {
