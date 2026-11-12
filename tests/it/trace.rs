@@ -265,7 +265,8 @@ fn a_trace_over_budget_says_where_it_stopped_and_keeps_the_footer() {
     assert!(tokens <= 120, "{tokens} tokens");
 }
 
-/// How deep a trace follows one branch below where it starts (`WALK_DEPTH`).
+/// How deep a trace follows one branch below where it starts: `WALK_DEPTH` of `src/trace.rs`,
+/// which this crate cannot see.
 const WALK_DEPTH: usize = 256;
 
 /// `trace` on a thread with the stack of a runtime worker (tokio's 2 MiB), where the MCP server
