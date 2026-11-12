@@ -8,6 +8,9 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- `meada mcp` over stdio answers at most four calls at once, and the others wait their turn: each
+  call held an engine and its answer in memory together with every other call in flight, so a
+  batch of pipelined calls could exhaust memory (#756).
 - A `terraform-aws-modules/s3-bucket/aws` call with `putin_khuylo = false`, or with a value
   Meada cannot resolve, provisions no bucket: upstream creates it only with
   `create_bucket && putin_khuylo`, and the Lambda module's call is read the same way (#787).

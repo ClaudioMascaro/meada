@@ -165,6 +165,57 @@ async fn pipelined_calls_all_get_a_result() {
     client.cancel().await.unwrap();
 }
 
+/// Three times as many calls as one stdio server answers at once (`CALLS_IN_FLIGHT`, 4, #756),
+/// sent together: the ones past the bound wait their turn, and each gets the reply it gets alone.
+#[tokio::test]
+async fn calls_past_the_bound_in_flight_each_get_their_own_reply() {
+    let repo = fixture_repo(
+        "mcp_calls_in_flight",
+        "ts-basic",
+        Some("https://example.com/acme/web.git"),
+    );
+    let (transport, _stderr) = server_in(&repo);
+    let client = ().serve(transport).await.unwrap();
+    let calls = [
+        ("search", serde_json::json!({"query": "sum"})),
+        ("search", serde_json::json!({"query": "add"})),
+        ("context", serde_json::json!({"symbol": "sum"})),
+        ("trace", serde_json::json!({"from": "sum"})),
+        (
+            "trace",
+            serde_json::json!({"from": "add", "direction": "up"}),
+        ),
+    ];
+    let params = |n: usize| {
+        let (tool, arguments) = &calls[n % calls.len()];
+        CallToolRequestParams::new(*tool).with_arguments(arguments.as_object().unwrap().clone())
+    };
+    let mut alone = Vec::new();
+    for n in 0..calls.len() {
+        let answer = client.call_tool(params(n)).await.unwrap();
+        alone.push(text_of(&answer).to_string());
+    }
+
+    let mut in_flight = tokio::task::JoinSet::new();
+    for n in 0..12 {
+        let (peer, params) = (client.peer().clone(), params(n));
+        in_flight.spawn(async move { (n, peer.call_tool(params).await) });
+    }
+    let replies = tokio::time::timeout(Duration::from_secs(120), in_flight.join_all())
+        .await
+        .expect("every call is answered");
+
+    assert_eq!(replies.len(), 12);
+    for (n, answer) in replies {
+        assert_eq!(
+            text_of(&answer.unwrap()),
+            alone[n % calls.len()],
+            "call {n}"
+        );
+    }
+    client.cancel().await.unwrap();
+}
+
 /// The client's first `file://` root wins over the server's cwd (#192): a client that answers
 /// `roots/list` with another repository, under a directory with a space in its name, gets
 /// answers about that repository.
