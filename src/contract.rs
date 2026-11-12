@@ -627,6 +627,12 @@ pub trait ContractKind {
         provider.site == link.provider && serves(provider, &link.contract)
     }
 
+    /// The consumers with no contract that are the kind's own, by site, each with why it is
+    /// unresolved. Such a consumer holds no candidate, and its open item says the cause.
+    fn unresolved_causes(&self, _exports: &[Export]) -> HashMap<String, &'static str> {
+        HashMap::new()
+    }
+
     /// Whether `provider` is a candidate for `consumer`, which has no contract.
     fn candidate(&self, _consumer: &Consumer, _provider: &Provider) -> bool {
         false

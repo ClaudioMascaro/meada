@@ -19,7 +19,7 @@ const SIDE_WORDS: [&str; 4] = ["provides ", "consumes ", "  consumer: ", "  prov
 
 /// The reproduction of #816 as siblings in one case directory: the reusable pipelines
 /// (`acme/workflows`), an intermediate reusable pipeline (`acme/wrapper`) and three callers.
-fn reproduction(case: &str) -> [PathBuf; 5] {
+pub(crate) fn reproduction(case: &str) -> [PathBuf; 5] {
     ["workflows", "wrapper", "app-a", "app-b", "app-c"].map(|name| {
         let origin = format!("https://github.com/acme/{name}.git");
         fixture_repo(case, &format!("ci-{name}"), Some(&origin))
@@ -27,12 +27,12 @@ fn reproduction(case: &str) -> [PathBuf; 5] {
 }
 
 /// The indexed commit of the checkout at `root`, as a link's reason shows it.
-fn indexed(root: &Path) -> String {
+pub(crate) fn indexed(root: &Path) -> String {
     git(root, &["rev-parse", "HEAD"])[..7].to_string()
 }
 
 /// The export of the repository where `engine` runs, as JSON.
-fn exported(engine: &Engine) -> Value {
+pub(crate) fn exported(engine: &Engine) -> Value {
     serde_json::from_str(&engine.export().unwrap()).unwrap()
 }
 
@@ -43,13 +43,20 @@ fn column<'a>(export: &'a Value, section: &str, key: &str) -> Vec<&'a str> {
         .collect()
 }
 
+/// The contracts among `contracts` that name a pipeline file: the calls of CI jobs, without
+/// those of the CI steps of `forms.yml` (#826, `ci_uses`).
+fn pipelines(contracts: Vec<&str>) -> Vec<&str> {
+    let pipeline = |contract: &&str| contract.contains("/.github/workflows/");
+    contracts.into_iter().filter(pipeline).collect()
+}
+
 /// Whether `answer` holds a line of a CI side.
 fn sided(answer: &str) -> bool {
     (answer.lines()).any(|line| SIDE_WORDS.iter().any(|word| line.starts_with(word)))
 }
 
 /// The lines of `answer` that start with `prefix`, without it.
-fn listed<'a>(answer: &'a str, prefix: &str) -> Vec<&'a str> {
+pub(crate) fn listed<'a>(answer: &'a str, prefix: &str) -> Vec<&'a str> {
     (answer.lines())
         .filter_map(|line| line.strip_prefix(prefix))
         .collect()
@@ -104,8 +111,13 @@ fn a_pipeline_provides_only_with_workflow_call_and_its_identifier_is_lower_cased
     let export = exported(&engine);
     let file = |name: &str| format!("ci::github.com/acme/workflows/.github/workflows/{name}");
     assert_eq!(
-        column(&export, "providers", "contract"),
-        [file("lint.yml"), file("publish.yml"), file("scan.yml")]
+        pipelines(column(&export, "providers", "contract")),
+        [
+            file("forms.yml"),
+            file("lint.yml"),
+            file("publish.yml"),
+            file("scan.yml")
+        ]
     );
     let internal = engine
         .context(".github/workflows/internal.yml", None)
@@ -117,9 +129,12 @@ fn a_pipeline_provides_only_with_workflow_call_and_its_identifier_is_lower_cased
     assert_eq!(listed(&scan, "provides "), [file("scan.yml")], "{scan}");
     assert_eq!(
         listed(&scan, "  consumer: "),
-        [format!(
-            "github.com/acme/app-a {CI}:24 jobs.scan [exact: @v2 (indexed {at})]"
-        )],
+        [
+            format!("github.com/acme/app-a {CI}:24 jobs.scan [exact: @v2 (indexed {at})]"),
+            // The `$/` call of `forms.yml` (#826), inside the repository: no ref.
+            "github.com/acme/workflows .github/workflows/forms.yml:8 jobs.rooted [exact: own repository]"
+                .to_string(),
+        ],
         "{scan}"
     );
     let publish = engine.context(PUBLISH, None).unwrap();
@@ -139,10 +154,11 @@ fn a_pipeline_provides_only_with_workflow_call_and_its_identifier_is_lower_cased
     }
     let links = exported(&Engine::open(&app_a).unwrap());
     assert_eq!(
-        column(&links, "links", "contract"),
+        pipelines(column(&links, "links", "contract")),
         [file("lint.yml"), file("publish.yml"), file("scan.yml")]
     );
-    assert_eq!(column(&links, "links", "level"), ["exact"; 3]);
+    let levels = column(&links, "links", "level");
+    assert!(levels.iter().all(|level| *level == "exact"), "{levels:?}");
 }
 
 /// A `uses` writes no host: it is the one of the consumer's repository identity.
@@ -183,7 +199,7 @@ fn the_host_of_a_call_is_the_consumers_own() {
     );
     let [same, other, none] = callers.map(|repo| exported(&Engine::open(&repo).unwrap()));
     assert_eq!(
-        column(&same, "links", "contract"),
+        pipelines(column(&same, "links", "contract")),
         ["lint.yml", "publish.yml", "scan.yml"]
             .map(|name| format!("ci::git.example.com/acme/workflows/.github/workflows/{name}"))
     );
@@ -257,9 +273,12 @@ fn a_uses_outside_the_workspace_holds_no_side_on_any_surface() {
         let answer = engine.context(&format!("{CI}::{address}"), None).unwrap();
         assert!(!sided(&answer), "{answer}");
     }
-    for kind in ["ambiguous", "unresolved"] {
-        let answer = engine.search("", Some(kind), None).unwrap();
-        assert_eq!(answer, "no matches for ``\n", "{kind}");
+    let ambiguous = engine.search("", Some("ambiguous"), None).unwrap();
+    assert_eq!(ambiguous, "no matches for ``\n");
+    // The open items are the CI steps whose `./<folder>` is unresolved (#826), none of these.
+    let unresolved = engine.search("", Some("unresolved"), None).unwrap();
+    for line in unresolved.lines() {
+        assert!(line.contains("(unresolved) candidates: 0; "), "{line}");
     }
     let export = engine.export().unwrap();
     let (status, _, ok) = meada(&app_a, &["status"], "", |_| {});
@@ -444,12 +463,12 @@ fn an_edited_call_or_provider_answers_as_a_cold_index_does() {
     assert_eq!(answers(&Engine::open(workflows).unwrap()), warm);
 }
 
-fn traced(engine: &Engine, from: &str, direction: Direction) -> String {
+pub(crate) fn traced(engine: &Engine, from: &str, direction: Direction) -> String {
     engine.trace(Start::From(from), direction, None).unwrap()
 }
 
 /// The lines of the chain in `answer`, without its footer.
-fn chain(answer: &str) -> Vec<&str> {
+pub(crate) fn chain(answer: &str) -> Vec<&str> {
     let lines: Vec<&str> = answer.lines().collect();
     lines[..lines.len() - 1].to_vec()
 }

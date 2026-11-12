@@ -125,6 +125,7 @@ example.com/acme/app action.yml:6 runs.steps[0].id = "prepare"
 example.com/acme/app action.yml:7 runs.steps[0].run = "echo prepare"
 example.com/acme/app action.yml:8 runs.steps[0].shell = "bash"
 example.com/acme/app action.yml:9 runs.steps[1].uses = "./tools/setup"
+provides ci::example.com/acme/app
 
 example.com/acme/app tools/setup/action.yml:1-6 .
 type: action
@@ -139,6 +140,7 @@ example.com/acme/app tools/setup/action.yml:1 name = "Setup"
 example.com/acme/app tools/setup/action.yml:3 runs.using = "composite"
 example.com/acme/app tools/setup/action.yml:5 runs.steps[0].run = "echo setup"
 example.com/acme/app tools/setup/action.yml:6 runs.steps[0].shell = "bash"
+provides ci::example.com/acme/app/tools/setup
 
 example.com/acme/app tools/only/action.yaml:1-4 .
 type: action
@@ -151,6 +153,7 @@ values:
 example.com/acme/app tools/only/action.yaml:1 name = "Only yaml"
 example.com/acme/app tools/only/action.yaml:3 runs.using = "node20"
 example.com/acme/app tools/only/action.yaml:4 runs.main = "index.js"
+provides ci::example.com/acme/app/tools/only
 
 `runs.steps[0]` fits 2 IaC nodes; pass one of:
 example.com/acme/app action.yml:6 runs.steps[0] (root action.yml)

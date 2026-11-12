@@ -49,6 +49,25 @@
   `iac/actions.rs`) has no file node above it: `trace` up ends at that CI job, and down from
   the pipeline never reaches what it calls. A contract identifier is matched as written: one
   with the owner in another case, or a trailing `/`, starts nothing.
+- `ci.rs` (#826, ADR 0028): a CI step's `./<folder>` is read in the CI runner's workspace, which
+  Meada knows to be the file's repository in one position only: a pipeline that is not
+  reusable, after an `actions/checkout` step of the same CI job, with no `actions/checkout`
+  before the CI step that names `repository` or `path` in `with`. It is unresolved in a reusable
+  pipeline (whatever other triggers it has), where a checkout is of the caller's repository, and
+  in a composite action, which runs in its caller's workspace; with no checkout before it; and
+  after a checkout that names one of the two keys, also when the key names the own repository (`${{ github.repository }}`) or a
+  path the folder is not under. Only `actions/checkout` at any ref counts, owner and name in
+  any case: a fork of it, a wrapper action or a `git clone` in a `run` is no checkout, and a
+  step that removes the files afterwards is not seen. A checkout's `ref` is not read: the link
+  is to the own repository at its indexed commit. An unresolved CI step holds no candidate,
+  `meada decide` offers nothing for it, and a decision written by hand for it was not probed.
+  `$/<path>` reads on every host, though GitHub Enterprise Server does not have it. A path is
+  normalised by the path rule of `iac::joined` in every form (`.`, `..`, empty segments), which
+  GitHub may refuse in a call by owner and name; one that leaves the root holds no side. A
+  CI step that names a pipeline file, a CI job that names anything else, and a `./` call with a
+  ref hold no side. An action in a folder named as a pipeline file
+  (`.github/workflows/x.yml/action.yml`) provides nothing. A folder with only a `Dockerfile` is
+  no provider (ADR 0028), and until #827 a call to a folder with no action carries no mark.
 - `iac/serverless.rs` (#654, ADR 0025): a service reuses `NODES_MAX` (functions first, in name
   order, then the resources of its `resources` section, together), `REFERENCES_MAX` (per node) and
   `ROOT_STORED_MAX` (per file, the functions' names, handlers and events counting against it before

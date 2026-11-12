@@ -7,7 +7,7 @@ consumer only when the repository it names is one of the workspace, which the in
 repository cannot know. The provider sits on the file node `.` whose `iac::actions::Facts` says
 `reusable` (`on` holds `workflow_call` as a string, a list item or a map key). The consumer sits
 on the `job` node whose `uses` reads `<owner>/<repo>/.github/workflows/<file>@<ref>`
-(`Call::read`). A `uses` writes no host, so the host is the one of the consumer's identity, with
+(`Uses::read`, `consumed`). A `uses` writes no host, so the host is the one of the consumer's identity, with
 owner and repository lower-cased as an identity is and the path as written; a repository
 without `origin` (`local/...`) names no peer. A call whose repository is not in the workspace
 holds no side at all: nothing lists it as an orphan or an open item. One whose repository is
@@ -41,3 +41,15 @@ walk's cycle and repeat marks key a node by repository, root and address. A CI c
 identifier starts at the node that provides it (`trace::provider_node`, read in
 `Engine::trace` before the start is looked up), so it answers as the pipeline's name does; the
 walk adds no cap for GitHub's ten levels of nesting.
+
+The other forms of `uses` (#826) go through the same reader: `Uses` is `Peer` (owner, name,
+path, Git ref), `Rooted` (`$/<path>`) or `Local` (`./<path>`), and `consumed` gives the contract
+of a call for a CI job (a pipeline file) or a CI step (the folder of an action, nothing for the
+root), with the path normalised by `iac::joined`. An action's file node provides
+`ci::<identity>[/<folder>]`. A call inside its repository links with the reason `own
+repository` and no ref. A CI step's `./<folder>` is unresolved wherever `workspace_causes` names
+a cause (a composite action, a reusable pipeline, no `actions/checkout` before it in its CI
+job, one that names `repository` or `path`): its consumer then has no contract. The kind hook
+`unresolved_causes` hands those sites to `items::list` (no candidate, `OpenItem::cause`) and to
+`Engine::search` (no line in the default search or under the kind `contract`); `search` with
+the kind `unresolved`, `context` on the CI step and `meada decide --list` show the cause.

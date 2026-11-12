@@ -477,6 +477,11 @@
   export, context, search and status goldens. `trace` over CI calls (#825): up from the
   reusable pipeline through the intermediate one, down from a caller, the three starts, a cycle,
   a caller outside the workspace and the `ci-calls.trace.txt` golden.
+- `ci_uses.rs` (#826): the other forms of `uses` on the same fixtures (`forms.yml` of
+  `ci-app-a` and of `ci-workflows`, the actions under `ci-workflows`): a CI step's action by
+  owner and name, a local call, `$/`, the five positions of a CI step's `./<folder>`, the open
+  items with no candidate beside an HTTP route, a repository without `origin`, `trace` through
+  composite actions and the `ci-uses.*` goldens.
 
 - `patterns.rs` (#674): sibling `pattern-infra`/`pattern-app` fixtures cover channel and
   resource anchors, ambiguous literal names, short/interior and pattern-to-pattern negatives,

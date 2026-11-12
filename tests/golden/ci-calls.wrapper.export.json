@@ -57,7 +57,7 @@
       "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
       "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
       "level": "exact",
-      "reason": "@main (indexed fde768c)"
+      "reason": "@main (indexed 2344e45)"
     }
   ]
 }

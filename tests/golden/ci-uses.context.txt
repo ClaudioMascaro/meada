@@ -1,0 +1,60 @@
+github.com/acme/workflows tools/setup/action.yml:1-10 .
+type: action
+name: "Setup"
+root: tools/setup/action.yml
+overridable: none
+references:
+github.com/acme/workflows tools/setup/action.yml:6 runs.steps[0]
+github.com/acme/workflows tools/setup/action.yml:9 runs.steps[1]
+referenced by: none
+values:
+github.com/acme/workflows tools/setup/action.yml:1 name = "Setup"
+github.com/acme/workflows tools/setup/action.yml:2 description = "A composite action in a folder, which calls another action."
+github.com/acme/workflows tools/setup/action.yml:4 runs.using = "composite"
+github.com/acme/workflows tools/setup/action.yml:6 runs.steps[0].uses = "acme/workflows/tools/login@v1"
+github.com/acme/workflows tools/setup/action.yml:8 runs.steps[0].with.registry = "internal"
+github.com/acme/workflows tools/setup/action.yml:9 runs.steps[1].run = "echo setup"
+github.com/acme/workflows tools/setup/action.yml:10 runs.steps[1].shell = "bash"
+provides ci::github.com/acme/workflows/tools/setup
+  consumer: github.com/acme/app-a .github/workflows/forms.yml:9 jobs.actions.steps[2] [exact: @v2 (indexed 2344e45)] with: version
+  consumer: github.com/acme/workflows .github/workflows/forms.yml:15 jobs.steps.steps[2] [exact: own repository]
+  consumer: github.com/acme/workflows action.yml:6 runs.steps[0] [exact: own repository]
+
+github.com/acme/app-a .github/workflows/forms.yml:12-14 jobs.actions.steps[3]
+type: step
+name: none
+root: .github/workflows/forms.yml
+overridable: none
+references: none
+referenced by:
+github.com/acme/app-a .github/workflows/forms.yml:4 jobs.actions
+values:
+github.com/acme/app-a .github/workflows/forms.yml:12 jobs.actions.steps[3].uses = "./tools/local"
+github.com/acme/app-a .github/workflows/forms.yml:14 jobs.actions.steps[3].with.mode = "fast"
+consumes ci::github.com/acme/app-a/tools/local with: mode
+  provider: github.com/acme/app-a tools/local/action.yml:1 . [exact: own repository]
+
+github.com/acme/app-a .github/workflows/forms.yml:22-22 jobs["no-checkout"].steps[0]
+type: step
+name: none
+root: .github/workflows/forms.yml
+overridable: none
+references: none
+referenced by:
+github.com/acme/app-a .github/workflows/forms.yml:19 jobs["no-checkout"]
+values:
+github.com/acme/app-a .github/workflows/forms.yml:22 jobs["no-checkout"].steps[0].uses = "./tools/local"
+consumes (unresolved) ./tools/local: no checkout before the CI step
+
+github.com/acme/workflows .github/workflows/forms.yml:6-7 jobs.local
+type: job
+name: none
+root: .github/workflows/forms.yml
+overridable: none
+references: none
+referenced by:
+github.com/acme/workflows .github/workflows/forms.yml:1 .
+values:
+github.com/acme/workflows .github/workflows/forms.yml:7 jobs.local.uses = "./.github/workflows/lint.yml"
+consumes ci::github.com/acme/workflows/.github/workflows/lint.yml
+  provider: github.com/acme/workflows .github/workflows/lint.yml:1 . [exact: own repository]

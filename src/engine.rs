@@ -7,7 +7,7 @@ use rusqlite::Connection;
 
 use crate::contract::{self, ContractKind, Hit, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
-use crate::index::{CallSite, Dropped, Export, State, Symbol};
+use crate::index::{CallSite, Consumer, Dropped, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::{Fix, Msg};
 use crate::partial::{self, Partial};
@@ -652,8 +652,8 @@ impl Engine {
     /// when no symbol and no contract does; `iac` lists the IaC nodes whose address, type or
     /// physical name matches (`iac::hits`), never part of the answer with no `kind`; `ambiguous`
     /// and `unresolved` list the open items whose enclosing symbol or call expression matches,
-    /// each with the `meada decide` command that resolves it. The answer is cut at `budget`
-    /// tokens.
+    /// each with the `meada decide` command that resolves it, or with its cause when its kind
+    /// leaves it no candidate. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
         if let Some(item_kind) = kind.and_then(ItemKind::parse) {
             return self.search_items(query, item_kind, budget);
@@ -716,6 +716,10 @@ impl Engine {
         // (rank, identity to break ties, line)
         let mut hits: Vec<Hit> = Vec::new();
         let orphans = iac::orphans::Scope::new(&exports);
+        // An unresolved consumer a kind owns is an open item, and no contract to list.
+        let owned: HashSet<String> = (KINDS.iter())
+            .flat_map(|kind| kind.unresolved_causes(&exports).into_keys())
+            .collect();
         for ((export, repo), db) in exports.iter().zip(&self.workspace.repos).zip(&self.dbs) {
             let mut files = Files::new(&repo.root);
             if symbols {
@@ -742,7 +746,8 @@ impl Engine {
                 .iter()
                 .map(|p| (p.contract.clone(), &p.site, Some(Role::Provider)));
             // An unresolved consumer has no contract: it shows as `(unresolved) <callee>`.
-            let consumed = export.consumers.iter().map(|c| {
+            let listed = |c: &&Consumer| c.contract.is_some() || !owned.contains(&c.site);
+            let consumed = export.consumers.iter().filter(listed).map(|c| {
                 let contract = c.contract.clone();
                 (
                     contract.unwrap_or_else(|| unresolved(&c.site)),
@@ -1037,13 +1042,17 @@ impl Engine {
             .min() else {
                 continue;
             };
+            // An item no decision closes says why, where another names the command.
+            let close = match item.cause {
+                Some(cause) => format!("{cause} (`{}`)", item.id),
+                None => format!("run `meada decide --item {}`", item.id),
+            };
             let line = format!(
-                "{} {} ({}) candidates: {}; run `meada decide --item {}`",
+                "{} {} ({}) candidates: {}; {close}",
                 item.repository,
                 item.location(),
                 kind.name(),
                 item.candidates.len(),
-                item.id
             );
             hits.push((r, item.id, line));
         }

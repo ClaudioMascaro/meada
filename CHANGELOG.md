@@ -34,6 +34,15 @@ All notable changes to Meada are recorded here. The format follows
   CI job it reaches the pipeline it calls, with its CI jobs and CI steps. The CI contract
   identifier, the pipeline's file node and the file's path start the same chain. Every other
   `trace` answer is unchanged. Release level: minor, meada (#825).
+- Every form of `uses` reads as GitHub resolves it. A CI step that calls an action of the
+  workspace (`<owner>/<repo>[/<folder>]@<ref>`) consumes `ci::<repository identity>[/<folder>]`,
+  which the action's file provides. A CI job's `./.github/workflows/<file>` and a `$/<path>`
+  link inside their repository, with the reason `own repository` and no ref. A CI step's
+  `./<folder>` links only in a pipeline that is not reusable, after a default
+  `actions/checkout` in its CI job; elsewhere it is unresolved: an open item with no candidate
+  and its cause, in `search` kind `unresolved`, `context` and `meada decide --list`.
+  `docker://` holds no CI contract. `trace` crosses composite actions as it crosses reusable
+  pipelines. Release level: minor, meada (#826).
 
 ### Fixed
 

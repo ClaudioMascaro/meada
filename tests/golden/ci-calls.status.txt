@@ -1,7 +1,7 @@
 github.com/acme/app-a (.) indexed, 0 files
-  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 18, redacted: 0
+  config files: 3 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 48, redacted: 0
 github.com/acme/workflows (../ci-workflows) indexed, 0 files
-  config files: 4 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 22, redacted: 0
+  config files: 9 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 49, redacted: 0
 github.com/acme/app-b (../ci-app-b) indexed, 0 files
   config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 15, redacted: 0
 github.com/acme/wrapper (../ci-wrapper) indexed, 0 files

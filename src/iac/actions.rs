@@ -30,9 +30,9 @@ const WORKFLOWS: &str = ".github/workflows/";
 
 /// The node types of this format. Prose says pipeline, action, CI job and CI step (ADR 0028).
 const WORKFLOW: &str = "workflow";
-const ACTION: &str = "action";
+pub(crate) const ACTION: &str = "action";
 const JOB: &str = "job";
-const STEP: &str = "step";
+pub(crate) const STEP: &str = "step";
 
 /// The condition that a row of `iac_nodes` is a node of this format: its unit is its file, which
 /// no Terraform root or Kubernetes unit is, and its type is one of the four.
@@ -92,7 +92,7 @@ pub(crate) fn is_workflow(path: &str) -> bool {
 }
 
 /// The folder (with its `/`, empty for the root) of an `action.yml` or `action.yaml`.
-fn action_folder(path: &str) -> Option<&str> {
+pub(crate) fn action_folder(path: &str) -> Option<&str> {
     let folder = (path.strip_suffix("action.yml")).or_else(|| path.strip_suffix("action.yaml"))?;
     (folder.is_empty() || folder.ends_with('/')).then_some(folder)
 }

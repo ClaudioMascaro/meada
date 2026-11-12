@@ -1,10 +1,12 @@
-//! The CI contract kind (ADR 0028, spec #820): `ci::<repository identity>/<path>` links a
-//! reusable pipeline to every CI job of the workspace that calls it. Both sides sit on the IaC
-//! nodes the GitHub Actions reader stores (`iac::actions`): the provider on the file node of a
-//! pipeline with `on.workflow_call`, the consumer on the CI job whose `uses` names it. A `uses`
-//! writes no host, so the host is the consumer's own, and one whose repository is not in the
-//! workspace holds no side at all. The Git ref is an attribute of the consumer, never part of
-//! the identifier: it is shown as written and never resolved.
+//! The CI contract kind (ADR 0028, spec #820): `ci::<repository identity>[/<path>]` links a
+//! reusable pipeline or an action to every CI job or CI step of the workspace that calls it.
+//! Both sides sit on the IaC nodes the GitHub Actions reader stores (`iac::actions`): the
+//! provider on the file node of a pipeline with `on.workflow_call` or of an action, the consumer
+//! on the CI job or CI step whose `uses` names it. A `uses` writes no host, so the host is the
+//! consumer's own, and one whose repository is not in the workspace holds no side at all. The
+//! Git ref is an attribute of the consumer, never part of the identifier: it is shown as written
+//! and never resolved. A CI step's `./<folder>` is read in the CI runner's workspace, so it is
+//! unresolved wherever that is not known to be the file's repository (`workspace_causes`).
 
 use std::collections::{HashMap, HashSet};
 
@@ -20,32 +22,152 @@ pub struct Ci;
 
 const PREFIX: &str = "ci::";
 
-/// A call to a reusable pipeline of another repository, as a CI job's `uses` writes it:
-/// `<owner>/<repo>/.github/workflows/<file>@<ref>`. It holds no expression, so it is literal.
-struct Call<'a> {
-    owner: &'a str,
-    repo: &'a str,
-    path: &'a str,
-    git_ref: &'a str,
+/// What a `uses` names, in the forms GitHub reads (ADR 0028). It holds no expression, so it is
+/// literal. `docker://<image>` names an image, no file of a repository: it reads as none.
+enum Uses<'a> {
+    /// `<owner>/<repo>[/<path>]@<ref>`: a file or a folder of a repository, at a Git ref.
+    Peer {
+        owner: &'a str,
+        repo: &'a str,
+        path: &'a str,
+        git_ref: &'a str,
+    },
+    /// `$/<path>`: of the repository of the file that writes it.
+    Rooted(&'a str),
+    /// `./<path>`: of the own repository under a CI job, of the CI runner's workspace under a
+    /// CI step.
+    Local(&'a str),
 }
 
-impl<'a> Call<'a> {
+impl<'a> Uses<'a> {
     fn read(uses: &'a str) -> Option<Self> {
         // No name GitHub takes holds a control character, and one would break an answer's line.
-        if uses.contains(char::is_control) {
+        if uses.contains(char::is_control) || uses.starts_with("docker://") {
             return None;
+        }
+        if let Some(path) = uses.strip_prefix("$/") {
+            return Some(Self::Rooted(path));
+        }
+        if let Some(path) = uses.strip_prefix("./") {
+            return Some(Self::Local(path));
         }
         let (target, git_ref) = uses.split_once('@')?;
         let mut parts = target.splitn(3, '/');
-        let (owner, repo, path) = (parts.next()?, parts.next()?, parts.next()?);
+        let (owner, repo) = (parts.next()?, parts.next()?);
         let named = ![owner, repo, git_ref].iter().any(|part| part.is_empty());
-        (named && owner != "." && actions::is_workflow(path)).then_some(Self {
+        named.then_some(Self::Peer {
             owner,
             repo,
-            path,
+            path: parts.next().unwrap_or_default(),
             git_ref,
         })
     }
+
+    /// The Git ref the call names its provider at: none for a call inside its repository.
+    fn git_ref(&self) -> Option<&'a str> {
+        match self {
+            Self::Peer { git_ref, .. } => Some(git_ref),
+            Self::Rooted(_) | Self::Local(_) => None,
+        }
+    }
+}
+
+/// The identifier of what sits at `path` of `repository`: a pipeline file, the folder of an
+/// action, or nothing for an action at the root.
+fn contract(repository: &str, path: &str) -> String {
+    match path {
+        "" => format!("{PREFIX}{repository}"),
+        path => format!("{PREFIX}{repository}/{path}"),
+    }
+}
+
+/// The contract the call `uses` consumes, written in the repository `own` by a CI step or by a
+/// CI job. None for a repository outside the workspace (`known`), for a path that leaves the
+/// root, and where GitHub runs nothing: a pipeline file under a CI step, anything else under a
+/// CI job.
+fn consumed(uses: &str, step: bool, own: &str, known: &HashSet<&str>) -> Option<String> {
+    let (repository, path) = match Uses::read(uses)? {
+        Uses::Peer {
+            owner, repo, path, ..
+        } => {
+            let (owner, repo) = (owner.to_lowercase(), repo.to_lowercase());
+            let repository = format!("{}/{owner}/{repo}", host(own)?);
+            (
+                known.contains(repository.as_str()).then_some(repository)?,
+                path,
+            )
+        }
+        Uses::Rooted(path) | Uses::Local(path) => (own.to_string(), path),
+    };
+    let path = crate::iac::joined("", path)?;
+    (actions::is_workflow(&path) != step).then(|| contract(&repository, &path))
+}
+
+const COMPOSITE: &str = "a composite action runs in the workspace of its caller";
+const REUSABLE: &str = "a checkout in a reusable pipeline is of its caller's repository";
+const NO_CHECKOUT: &str = "no checkout before the CI step";
+const ELSEWHERE: &str = "a checkout before the CI step names `repository` or `path`";
+
+/// Why a CI step's `./<folder>` is unresolved, for each such CI step of `nodes` by its site.
+/// The CI runner reads the folder in its workspace, which is known to be the repository of the
+/// file only in a pipeline that is not reusable, once its CI job checked that repository out
+/// at the default path: an `actions/checkout` before the CI step, and none before it that
+/// names `repository` or `path`.
+fn workspace_causes(own: &str, nodes: &[Node]) -> HashMap<String, &'static str> {
+    // Where a CI step sits: the address of what holds it, and its index there.
+    let place = |n: &'_ Node| {
+        let (parent, index) = n.address.strip_suffix(']')?.rsplit_once(".steps[")?;
+        (n.ty == actions::STEP).then_some((parent.len(), index.parse::<usize>().ok()?))
+    };
+    let checkout = |uses: &str| {
+        let target = uses.split_once('@').map(|(target, _)| target);
+        target.is_some_and(|target| target.eq_ignore_ascii_case("actions/checkout"))
+    };
+    // A file whose CI steps run in the workspace of another: its cause holds for each.
+    let mut callers: HashMap<&str, &'static str> = HashMap::new();
+    // By file and CI job: the first checkout at the default path, and the first elsewhere.
+    let mut checkouts: HashMap<(&str, &str), [Option<usize>; 2]> = HashMap::new();
+    let mut local = Vec::new();
+    for n in nodes.iter().filter(|n| actions::owns(n)) {
+        let facts = n.actions.as_ref();
+        if n.address == "." {
+            match (n.ty.as_str(), facts.is_some_and(|f| f.reusable)) {
+                (actions::ACTION, _) => _ = callers.insert(&n.path, COMPOSITE),
+                (_, true) => _ = callers.insert(&n.path, REUSABLE),
+                _ => {}
+            }
+            continue;
+        }
+        let (Some((parent, index)), Some(facts)) = (place(n), facts) else {
+            continue;
+        };
+        let Some(uses) = facts.uses.as_deref() else {
+            continue;
+        };
+        let job = &n.address[..parent];
+        if uses.starts_with("./") {
+            local.push((n, job, index));
+        } else if checkout(uses) {
+            let elsewhere = (facts.with.iter()).any(|key| key == "repository" || key == "path");
+            let first = &mut checkouts.entry((&n.path, job)).or_default()[usize::from(elsewhere)];
+            *first = Some(first.map_or(index, |at| at.min(index)));
+        }
+    }
+    let mut causes = HashMap::new();
+    for (n, job, index) in local {
+        let before = |first: Option<usize>| first.is_some_and(|at| at < index);
+        let [own_first, elsewhere] = (checkouts.get(&(n.path.as_str(), job)))
+            .copied()
+            .unwrap_or_default();
+        let cause = match callers.get(n.path.as_str()) {
+            Some(cause) => cause,
+            None if before(elsewhere) => ELSEWHERE,
+            None if before(own_first) => continue,
+            None => NO_CHECKOUT,
+        };
+        causes.insert(n.identity(own), cause);
+    }
+    causes
 }
 
 /// The host of a repository identity, which a `uses` leaves out: none for a repository without
@@ -57,7 +179,11 @@ fn host(identity: &str) -> Option<&str> {
 
 /// A link's reason: the Git ref as written and the provider's indexed commit, with `ref
 /// mismatch` only when the ref is a full commit id (40 or 64 hexadecimal digits) other than it.
-fn reason(git_ref: &str, indexed: Option<&str>) -> String {
+/// A call inside its repository writes no ref, and its reason holds none.
+fn reason(git_ref: Option<&str>, indexed: Option<&str>) -> String {
+    let Some(git_ref) = git_ref else {
+        return "own repository".into();
+    };
     let Some(commit) = indexed else {
         return format!("@{git_ref} (indexed commit unknown)");
     };
@@ -148,32 +274,39 @@ impl ContractKind for Ci {
         let known: HashSet<&str> = repositories.iter().map(|r| r.identity.as_str()).collect();
         for export in exports.iter_mut() {
             let own = export.repository.as_str();
+            let causes = workspace_causes(own, &export.iac);
             for node in export.iac.iter().filter(|n| actions::owns(n)) {
-                let Some(facts) = &node.actions else {
-                    continue;
-                };
-                if node.address == "." && facts.reusable {
-                    export.providers.push(Provider {
-                        contract: format!("{PREFIX}{own}/{}", node.path),
-                        site: node.identity(own),
-                        ..Provider::default()
-                    });
-                }
-                let called = (facts.uses.as_deref())
-                    .filter(|_| node.ty == "job")
-                    .and_then(Call::read);
-                let (Some(call), Some(host)) = (called, host(own)) else {
-                    continue;
-                };
-                let (owner, repo) = (call.owner.to_lowercase(), call.repo.to_lowercase());
-                let repository = format!("{host}/{owner}/{repo}");
-                if !known.contains(repository.as_str()) {
+                let facts = node.actions.as_ref();
+                if node.address == "." {
+                    // A folder named as a pipeline file would share that file's identifier.
+                    let path = match node.ty.as_str() {
+                        actions::ACTION => actions::action_folder(&node.path)
+                            .map(|folder| folder.trim_end_matches('/'))
+                            .filter(|folder| !actions::is_workflow(folder)),
+                        _ => (facts.is_some_and(|f| f.reusable)).then_some(node.path.as_str()),
+                    };
+                    if let Some(path) = path {
+                        export.providers.push(Provider {
+                            contract: contract(own, path),
+                            site: node.identity(own),
+                            ..Provider::default()
+                        });
+                    }
                     continue;
                 }
+                let step = node.ty == actions::STEP;
+                let Some(uses) = facts.and_then(|f| f.uses.as_deref()) else {
+                    continue;
+                };
+                let Some(contract) = consumed(uses, step, own, &known) else {
+                    continue;
+                };
+                let site = node.identity(own);
                 export.consumers.push(Consumer {
-                    contract: Some(format!("{PREFIX}{repository}/{}", call.path)),
-                    site: node.identity(own),
-                    via: facts.uses.clone(),
+                    // Unresolved: no contract, as a call whose URL could not be read.
+                    contract: (!causes.contains_key(&site)).then_some(contract),
+                    site,
+                    via: Some(uses.to_string()),
                     shape: None,
                     method: None,
                     identity: None,
@@ -186,6 +319,15 @@ impl ContractKind for Ci {
             crate::index::sort_consumers(&mut export.consumers);
         }
     }
+    fn unresolved_causes(&self, exports: &[Export]) -> HashMap<String, &'static str> {
+        let mut causes = HashMap::new();
+        for export in exports {
+            let found = workspace_causes(&export.repository, &export.iac);
+            let open = export.consumers.iter().filter(|c| c.contract.is_none());
+            causes.extend(open.filter_map(|c| Some((c.site.clone(), *found.get(&c.site)?))));
+        }
+        causes
+    }
     fn link(
         &self,
         consumer: &Consumer,
@@ -193,9 +335,9 @@ impl ContractKind for Ci {
         providers: &[(&Repository, &Provider)],
         exports: &[Export],
     ) -> Vec<Link> {
-        let (Some(contract), Some(call)) = (
+        let (Some(contract), Some(uses)) = (
             consumer.contract.as_deref(),
-            consumer.via.as_deref().and_then(Call::read),
+            consumer.via.as_deref().and_then(Uses::read),
         ) else {
             return Vec::new();
         };
@@ -210,7 +352,7 @@ impl ContractKind for Ci {
                     provider.site.clone(),
                     contract.into(),
                     Level::Exact,
-                    reason(call.git_ref, indexed),
+                    reason(uses.git_ref(), indexed),
                     None,
                     None,
                     None,
@@ -252,11 +394,19 @@ impl ContractKind for Ci {
                 lines.extend(calling.filter_map(|l| side("consumer", &l.consumer, l)));
             }
             for consumer in export.consumers.iter().filter(|c| c.site == site) {
-                let Some(contract) = consumer.contract.as_deref().filter(|c| ours(c)) else {
+                let uses = consumer.via.as_deref();
+                let Some(contract) = consumer.contract.as_deref() else {
+                    let causes = workspace_causes(&export.repository, &export.iac);
+                    if let (Some(cause), Some(uses)) = (causes.get(site), uses) {
+                        lines.push(format!("consumes (unresolved) {uses}: {cause}"));
+                    }
                     continue;
                 };
-                let call = consumer.via.as_deref().and_then(Call::read);
-                let git_ref = call.map_or(String::new(), |c| format!(" @{}", c.git_ref));
+                if !ours(contract) {
+                    continue;
+                }
+                let git_ref = uses.and_then(Uses::read).and_then(|u| u.git_ref());
+                let git_ref = git_ref.map_or(String::new(), |r| format!(" @{r}"));
                 let keys = node_at(exports, site).map_or(String::new(), |(_, n)| passed(n));
                 lines.push(format!("consumes {contract}{git_ref}{keys}"));
                 let called =
@@ -280,8 +430,8 @@ impl ContractKind for Ci {
             {
                 continue;
             }
-            let call = consumer.via.as_deref().and_then(Call::read);
-            consumer.git_ref = call.map(|c| c.git_ref.to_string());
+            let uses = consumer.via.as_deref().and_then(Uses::read);
+            consumer.git_ref = uses.and_then(|u| u.git_ref()).map(str::to_string);
             if let Some(facts) = calling.get(&consumer.site).and_then(|n| n.actions.as_ref()) {
                 consumer.with = facts.with.clone();
                 consumer.secrets = facts.secrets.clone();
@@ -294,34 +444,96 @@ impl ContractKind for Ci {
 mod tests {
     use super::*;
 
+    /// The contract of `uses` in `github.com/acme/app`, beside `github.com/acme/workflows`.
+    fn consumed_by(uses: &str, step: bool) -> Option<String> {
+        let known = HashSet::from(["github.com/acme/app", "github.com/acme/workflows"]);
+        consumed(uses, step, "github.com/acme/app", &known)
+    }
+
     #[test]
-    fn a_call_names_owner_repository_pipeline_file_and_ref() {
-        let call = Call::read("Acme/Workflows/.github/workflows/publish.yml@release/v1").unwrap();
-        assert_eq!(
-            (call.owner, call.repo, call.path, call.git_ref),
+    fn a_ci_job_consumes_a_pipeline_file_and_nothing_else() {
+        let publish = "ci::github.com/acme/workflows/.github/workflows/publish.yml";
+        for (uses, expected) in [
+            // Owner and repository are lower-cased as the identity is; the path keeps its case.
             (
-                "Acme",
-                "Workflows",
-                ".github/workflows/publish.yml",
-                "release/v1"
-            )
-        );
-        for other in [
-            // The forms of later tickets (a local call, an action) and what names nothing.
-            "./.github/workflows/publish.yml",
-            "acme/workflows/.github/workflows/publish.yml",
-            "acme/workflows/.github/workflows/sub/publish.yml@main",
-            "acme/workflows/publish.yml@main",
-            "acme/workflows@main",
-            "actions/checkout@v4",
-            "docker://alpine:3",
-            "acme/workflows/.github/workflows/publish.yml@",
+                "Acme/Workflows/.github/workflows/publish.yml@release/v1",
+                Some(publish),
+            ),
+            (
+                "./.github/workflows/ci.yml",
+                Some("ci::github.com/acme/app/.github/workflows/ci.yml"),
+            ),
+            (
+                "$/.github/workflows/ci.yml",
+                Some("ci::github.com/acme/app/.github/workflows/ci.yml"),
+            ),
+            // What names no pipeline file: a folder, a file below the folder, no ref, an action.
+            ("acme/workflows/.github/workflows/publish.yml", None),
+            (
+                "acme/workflows/.github/workflows/sub/publish.yml@main",
+                None,
+            ),
+            ("acme/workflows/publish.yml@main", None),
+            ("acme/workflows@main", None),
+            ("acme/workflows/.github/workflows/publish.yml@", None),
+            ("./tools/setup", None),
+            ("$/tools/setup", None),
+            ("./.github/workflows/ci.yml@main", None),
+            ("docker://alpine:3", None),
+            // A repository outside the workspace.
+            ("other/pipelines/.github/workflows/deploy.yml@v3", None),
             // A control character is in no name GitHub takes, and would break a line.
-            "acme/workflows/.github/workflows/publish.yml@main\n  consumer: forged",
-            "acme/workflows/.github/workflows/pub\tlish.yml@main",
+            (
+                "acme/workflows/.github/workflows/publish.yml@main\n  consumer: forged",
+                None,
+            ),
+            ("acme/workflows/.github/workflows/pub\tlish.yml@main", None),
         ] {
-            assert!(Call::read(other).is_none(), "{other}");
+            assert_eq!(consumed_by(uses, false).as_deref(), expected, "{uses}");
         }
+    }
+
+    #[test]
+    fn a_ci_step_consumes_the_folder_of_an_action_and_nothing_else() {
+        let setup = Some("ci::github.com/acme/workflows/tools/setup");
+        let own = Some("ci::github.com/acme/app/tools/local");
+        for (uses, expected) in [
+            ("acme/workflows@v1", Some("ci::github.com/acme/workflows")),
+            ("Acme/Workflows/tools/setup@v1", setup),
+            ("acme/workflows/tools/./setup/@v1", setup),
+            ("./tools/local", own),
+            ("$/tools/local", own),
+            ("./tools/../tools/local/", own),
+            // The root of the repository holds an action too.
+            ("./", Some("ci::github.com/acme/app")),
+            ("$/", Some("ci::github.com/acme/app")),
+            // A path that leaves the root, by the rule of `iac::joined`.
+            ("./../outside", None),
+            ("$/tools/../../outside", None),
+            ("acme/workflows/../other@v1", None),
+            // An image, a pipeline file, a repository outside the workspace, no ref.
+            ("docker://alpine:3", None),
+            ("docker://ghcr.io/acme/workflows@sha256:0123", None),
+            ("acme/workflows/.github/workflows/publish.yml@main", None),
+            ("./.github/workflows/ci.yml", None),
+            ("actions/checkout@v4", None),
+            ("acme/workflows", None),
+            ("acme/workflows/tools/setup@", None),
+            ("acme/workflows@v1\n  consumer: forged", None),
+        ] {
+            assert_eq!(consumed_by(uses, true).as_deref(), expected, "{uses}");
+        }
+    }
+
+    #[test]
+    fn a_call_by_owner_and_name_needs_the_host_of_its_own_repository() {
+        let known = HashSet::from(["local/app", "github.com/acme/workflows"]);
+        let read = |uses: &str| consumed(uses, true, "local/app", &known);
+        assert_eq!(read("acme/workflows/tools/setup@v1"), None);
+        assert_eq!(
+            read("./tools/local").as_deref(),
+            Some("ci::local/app/tools/local")
+        );
     }
 
     #[test]
@@ -339,14 +551,16 @@ mod tests {
             ("0123456", "@0123456 (indexed 0123456)"),
             ("fffffff", "@fffffff (indexed 0123456)"),
         ] {
-            assert_eq!(reason(git_ref, Some(indexed)), expected);
+            assert_eq!(reason(Some(git_ref), Some(indexed)), expected);
         }
         let long = "a".repeat(64);
         assert_eq!(
-            reason(&long, Some(indexed)),
+            reason(Some(&long), Some(indexed)),
             format!("@{long} (indexed 0123456), ref mismatch")
         );
-        assert_eq!(reason("main", None), "@main (indexed commit unknown)");
+        assert_eq!(reason(Some("main"), None), "@main (indexed commit unknown)");
+        // A call inside its repository: no ref to show, whatever the commit.
+        assert_eq!(reason(None, Some(indexed)), "own repository");
     }
 
     #[test]

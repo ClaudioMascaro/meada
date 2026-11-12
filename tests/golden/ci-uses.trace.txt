@@ -1,0 +1,36 @@
+github.com/acme/workflows tools/login/action.yml:1 .
+  →[exact: @v1 (indexed 2344e45)] github.com/acme/workflows tools/setup/action.yml:6 runs.steps[0]
+    github.com/acme/workflows tools/setup/action.yml:1 .
+      →[exact: @v2 (indexed 2344e45)] github.com/acme/app-a .github/workflows/forms.yml:9 jobs.actions.steps[2]
+        github.com/acme/app-a .github/workflows/forms.yml:4 jobs.actions
+          github.com/acme/app-a .github/workflows/forms.yml:1 .
+      →[exact: own repository] github.com/acme/workflows .github/workflows/forms.yml:15 jobs.steps.steps[2]
+        github.com/acme/workflows .github/workflows/forms.yml:10 jobs.steps
+          github.com/acme/workflows .github/workflows/forms.yml:1 .
+      →[exact: own repository] github.com/acme/workflows action.yml:6 runs.steps[0]
+        github.com/acme/workflows action.yml:1 .
+          →[exact: @v1 (indexed 2344e45)] github.com/acme/app-a .github/workflows/forms.yml:8 jobs.actions.steps[1]
+            github.com/acme/app-a .github/workflows/forms.yml:4 jobs.actions (see above)
+chain: exact · 5 hops · 2 repos · 277 tokens
+
+github.com/acme/app-a .github/workflows/forms.yml:4 jobs.actions
+  github.com/acme/app-a .github/workflows/forms.yml:7 jobs.actions.steps[0]
+  github.com/acme/app-a .github/workflows/forms.yml:8 jobs.actions.steps[1]
+    →[exact: @v1 (indexed 2344e45)] github.com/acme/workflows action.yml:1 .
+      github.com/acme/workflows action.yml:6 runs.steps[0]
+        →[exact: own repository] github.com/acme/workflows tools/setup/action.yml:1 .
+          github.com/acme/workflows tools/setup/action.yml:6 runs.steps[0]
+            →[exact: @v1 (indexed 2344e45)] github.com/acme/workflows tools/login/action.yml:1 .
+          github.com/acme/workflows tools/setup/action.yml:9 runs.steps[1]
+      github.com/acme/workflows action.yml:7 runs.steps[1]
+  github.com/acme/app-a .github/workflows/forms.yml:9 jobs.actions.steps[2]
+    →[exact: @v2 (indexed 2344e45)] github.com/acme/workflows tools/setup/action.yml:1 . (see above)
+  github.com/acme/app-a .github/workflows/forms.yml:12 jobs.actions.steps[3]
+    →[exact: own repository] github.com/acme/app-a tools/local/action.yml:1 .
+      github.com/acme/app-a tools/local/action.yml:6 runs.steps[0]
+  github.com/acme/app-a .github/workflows/forms.yml:15 jobs.actions.steps[4]
+    →[exact: own repository] github.com/acme/app-a tools/local/action.yml:1 . (see above)
+  github.com/acme/app-a .github/workflows/forms.yml:16 jobs.actions.steps[5]
+  github.com/acme/app-a .github/workflows/forms.yml:17 jobs.actions.steps[6]
+  github.com/acme/app-a .github/workflows/forms.yml:18 jobs.actions.steps[7]
+chain: exact · 6 hops · 2 repos · 401 tokens

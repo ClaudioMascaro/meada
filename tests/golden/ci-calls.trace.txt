@@ -1,11 +1,11 @@
 github.com/acme/workflows .github/workflows/publish.yml:1 .
-  →[exact: @main (indexed fde768c)] github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish
+  →[exact: @main (indexed 2344e45)] github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish
     github.com/acme/app-a .github/workflows/ci.yml:1 .
-  →[exact: @v1 (indexed fde768c)] github.com/acme/app-b .github/workflows/ci.yml:11 jobs["publish-prd"]
+  →[exact: @v1 (indexed 2344e45)] github.com/acme/app-b .github/workflows/ci.yml:11 jobs["publish-prd"]
     github.com/acme/app-b .github/workflows/ci.yml:1 .
-  →[exact: @main (indexed fde768c)] github.com/acme/app-b .github/workflows/ci.yml:18 jobs["publish-stg"]
+  →[exact: @main (indexed 2344e45)] github.com/acme/app-b .github/workflows/ci.yml:18 jobs["publish-stg"]
     github.com/acme/app-b .github/workflows/ci.yml:1 . (see above)
-  →[exact: @main (indexed fde768c)] github.com/acme/wrapper .github/workflows/release.yml:5 jobs.release
+  →[exact: @main (indexed 2344e45)] github.com/acme/wrapper .github/workflows/release.yml:5 jobs.release
     github.com/acme/wrapper .github/workflows/release.yml:1 .
       →[exact: @main (indexed 1d7b325)] github.com/acme/app-c .github/workflows/release.yml:6 jobs.release
         github.com/acme/app-c .github/workflows/release.yml:1 .
@@ -14,7 +14,7 @@ chain: exact · 5 hops · 5 repos · 236 tokens
 github.com/acme/app-c .github/workflows/release.yml:6 jobs.release
   →[exact: @main (indexed 1d7b325)] github.com/acme/wrapper .github/workflows/release.yml:1 .
     github.com/acme/wrapper .github/workflows/release.yml:5 jobs.release
-      →[exact: @main (indexed fde768c)] github.com/acme/workflows .github/workflows/publish.yml:1 .
+      →[exact: @main (indexed 2344e45)] github.com/acme/workflows .github/workflows/publish.yml:1 .
         github.com/acme/workflows .github/workflows/publish.yml:15 jobs.publish
           github.com/acme/workflows .github/workflows/publish.yml:18 jobs.publish.steps[0]
           github.com/acme/workflows .github/workflows/publish.yml:19 jobs.publish.steps[1]

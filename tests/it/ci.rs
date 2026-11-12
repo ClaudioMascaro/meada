@@ -185,7 +185,8 @@ fn pipelines_actions_jobs_and_steps_are_nodes_found_by_the_kind_ci() {
 }
 
 /// The kind `iac`, the default search and the kind `value` answer as before, and the export
-/// holds no CI node: none holds a side yet.
+/// holds only the CI nodes that hold a side (#826): the three actions, and the CI step of a
+/// composite action whose `./tools/setup` is unresolved.
 #[test]
 fn ci_nodes_stay_out_of_the_kind_iac_the_default_search_and_the_export() {
     let repo = fixture_repo("ci_nodes_others", "ci-nodes", ORIGIN);
@@ -216,8 +217,18 @@ fn ci_nodes_stay_out_of_the_kind_iac_the_default_search_and_the_export() {
     ];
     assert_golden("ci-nodes.other-kinds.txt", &others.join("\n"));
     let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
-    // A section with no row is left out of the export.
-    assert!(export["iac_nodes"].is_null(), "{export:#}");
+    let nodes = export["iac_nodes"].as_array().unwrap().iter();
+    let nodes: Vec<&str> = nodes.map(|n| n["identity"].as_str().unwrap()).collect();
+    assert_eq!(
+        nodes,
+        [
+            "action.yml::.",
+            "action.yml::runs.steps[1]",
+            "tools/only/action.yaml::.",
+            "tools/setup/action.yml::."
+        ]
+        .map(|node| format!("{REPO}::{node}"))
+    );
     assert!(export["files"].is_array(), "{export:#}");
 }
 

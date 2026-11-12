@@ -42,11 +42,14 @@ pub(crate) fn items(engine: &Engine, only: Option<&str>) -> Result<Vec<OpenItem>
     }
 }
 
-/// The item as `--list` and the prompt show it: id, location and call, then every candidate
-/// numbered from 1.
+/// The item as `--list` and the prompt show it: id, location and call, the cause of one that
+/// takes no candidate, then every candidate numbered from 1.
 fn show(item: &OpenItem, out: &mut impl Write) -> Result<()> {
     writeln!(out, "{}", item.id)?;
     writeln!(out, "{}  {}", item.location(), item.expression)?;
+    if let Some(cause) = item.cause {
+        writeln!(out, "  {cause}")?;
+    }
     for (n, c) in item.candidates.iter().enumerate() {
         writeln!(out, "  {}) {}", n + 1, c.describe())?;
     }

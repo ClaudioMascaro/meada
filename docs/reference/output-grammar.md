@@ -123,7 +123,8 @@ an import hop. A link to a provider that serves every method ends with `; any me
 of a CI contract reads `@<ref> (indexed <short commit>)`: the Git ref the call wrote and the
 commit the provider's index was read at, followed by `, ref mismatch` when the ref is a full
 commit id (40 or 64 hexadecimal digits) other than that commit, or `@<ref> (indexed commit
-unknown)` when the provider's repository records none.
+unknown)` when the provider's repository records none. A call inside its repository (a local
+call, `$/`, a CI step's `./<folder>`) writes no ref and reads `own repository`.
 
 The reason of a call's mark is how many definitions have its name: `one method named render`,
 `2 functions or classes named render`, `one of several methods named run` (a match narrowed to
@@ -201,6 +202,7 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | ci node | `<repository> <place> <address> (<ci-type><ci-id?><ci-name?><ci-uses?>)` | A pipeline, an action, a CI job or a CI step, at its block's first line, with its type and what else names it. |
 | copies | `<n> copies` | A group of duplicates; one symbol line per copy follows. |
 | open item | `` <repository> <place> (<item-kind>) candidates: <n>; run `meada decide --item <call-site>` `` | An open item and the command that closes it. |
+| open item cause | `` <repository> <place> (<item-kind>) candidates: 0; <reason> (`<identity>`) `` | An open item its kind leaves no candidate for: why the consumer is unresolved, then its identity, which `context` takes. A CI step whose `./<folder>` is read in a workspace Meada does not know is one. |
 | no matches | `` no matches for `<query?>` `` | Nothing matched. |
 
 | Field | Form | Meaning |
@@ -247,6 +249,7 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | `<ci-name>` | `, name <text>` | The node's `name`, quoted as JSON. |
 | `<ci-uses>` | `, uses <text>` | What a CI job or a CI step calls, as written, quoted as JSON. |
 | `<git-ref>` | `<word>` | The Git ref of a call, as written after `@`: a branch, a tag or a commit id. Meada never resolves it. |
+| `<ci-ref>` | ` @<git-ref>` | The Git ref the call wrote. A call inside its repository writes none. |
 | `<ci-passed>` | ` with: <ci-keys>` | The keys of the call's `with`, never their values. |
 | `<ci-passed>` | ` secrets: <ci-keys>` | The keys of the call's `secrets`, or the word `inherit`. |
 | `<ci-passed>` | ` with: <ci-keys>; secrets: <ci-keys>` | Both. |
@@ -346,13 +349,14 @@ words:
 | no symbol | `` no symbol matches `<query>` `` | No symbol has the name. |
 | config use | `<repository> use <config-place> [<level>] <contract><orphan-note?>` | A directionless config use named by its key locator. |
 | config key | `<repository> <config-place>` | A declared resource key's canonical location. |
-| located provides | `provides <contract>` | The selected key or IaC node writes the declared resource, or the selected pipeline is the provider of the CI contract. |
+| located provides | `provides <contract>` | The selected key or IaC node writes the declared resource, or the selected pipeline or action is the provider of the CI contract. |
 | located consumes | `consumes <contract>` | The selected key or IaC node reads the declared resource. |
 | linked reader | `  reader: <identity><mark>` | A reader linked to the selected resource writer. |
 | linked writer | `  writer: <identity><mark>` | A writer linked to the selected resource reader. |
-| ci consumer | `  consumer: <repository> <place> <address> [<level>: <reason>]<ci-passed?>` | Under a pipeline's `provides`: a CI job that calls it, with the link's level and reason and the keys the call passes. |
-| ci consumes | `consumes <contract> @<git-ref><ci-passed?>` | The selected CI job calls the reusable pipeline of the contract, at the Git ref and with the keys it wrote. |
-| ci provider | `  provider: <repository> <place> <address> [<level>: <reason>]` | Under a CI job's `consumes`: the pipeline that provides the contract, with the link's level and reason. |
+| ci consumer | `  consumer: <repository> <place> <address> [<level>: <reason>]<ci-passed?>` | Under a pipeline's or an action's `provides`: a CI job or a CI step that calls it, with the link's level and reason and the keys the call passes. |
+| ci consumes | `consumes <contract><ci-ref?><ci-passed?>` | The selected CI job calls the reusable pipeline of the contract, or the selected CI step its action, at the Git ref and with the keys it wrote. |
+| ci unresolved | `consumes (unresolved) <text>: <reason>` | The selected CI step names `./<folder>`, read in a workspace Meada does not know: its `uses` as written, then why. It is an open item with no candidate. |
+| ci provider | `  provider: <repository> <place> <address> [<level>: <reason>]` | Under a CI job's or a CI step's `consumes`: the pipeline or the action that provides the contract, with the link's level and reason. |
 | contract head | `<shown-contract>` | The contract the sides below belong to. |
 | side | `  <repository> <role> <side><mark?><orphan-note?>` | A side of the contract; a side linked through another name carries its mark. |
 | drift | `    drift: missing <missing>` | Under a consumer: the field paths it reads that the provider lacks, each with its level. |

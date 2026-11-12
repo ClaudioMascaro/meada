@@ -92,6 +92,9 @@ pub struct OpenItem {
     pub enclosing: Option<Enclosing>,
     /// Sorted by repository identity, then label (method and path of a route), then site.
     pub candidates: Vec<Candidate>,
+    /// Why no provider can be a candidate, for an unresolved consumer whose kind says so
+    /// (`ContractKind::unresolved_causes`): `meada decide` has nothing to offer for it.
+    pub cause: Option<&'static str>,
 }
 
 impl OpenItem {
@@ -141,6 +144,9 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
     fn candidate<'a>(&(repository, p): &(&'a str, &'a Provider)) -> (&'a str, &'a str, &'a str) {
         (repository, p.contract.as_str(), p.site.as_str())
     }
+    let causes: HashMap<String, &'static str> = (contract::KINDS.iter())
+        .flat_map(|kind| kind.unresolved_causes(exports))
+        .collect();
     let mut items = Vec::new();
     for (export, repo) in exports.iter().zip(repos) {
         let calls: HashMap<&str, _> = export.calls.iter().map(|c| (c.id.as_str(), c)).collect();
@@ -154,8 +160,9 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                 ambiguous.get(consumer.item_site().as_ref()),
             ) {
                 (None, _) => {
+                    let open = !causes.contains_key(consumer.site.as_str());
                     let fitting = providers.iter().filter(|(_, p)| {
-                        kind_of(&p.contract).is_some_and(|k| k.candidate(consumer, p))
+                        open && kind_of(&p.contract).is_some_and(|k| k.candidate(consumer, p))
                     });
                     (
                         ItemKind::Unresolved,
@@ -233,6 +240,9 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                     span: range(s.span.start, s.span.end),
                 }),
                 candidates,
+                cause: (consumer.contract.is_none())
+                    .then(|| causes.get(consumer.site.as_str()).copied())
+                    .flatten(),
             });
         }
     }

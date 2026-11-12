@@ -1,12 +1,17 @@
 {
   "format": 1,
   "repository": "github.com/acme/app-a",
-  "commit": "a3bc53e7f107433cf92659252425c08602e76bd6",
+  "commit": "c9d54060a6d7018c7a4820cb86723ea92d722a28",
   "dirty": false,
   "files": [],
   "symbols": [],
   "calls": [],
-  "providers": [],
+  "providers": [
+    {
+      "contract": "ci::github.com/acme/app-a/tools/local",
+      "site": "github.com/acme/app-a::tools/local/action.yml::."
+    }
+  ],
   "consumers": [
     {
       "contract": "ci::github.com/acme/workflows/.github/workflows/internal.yml",
@@ -36,6 +41,49 @@
       "site": "github.com/acme/app-a::.github/workflows/ci.yml::jobs.scan",
       "via": "Acme/Workflows/.github/workflows/scan.yml@v2",
       "ref": "v2"
+    },
+    {
+      "contract": "ci::github.com/acme/workflows",
+      "site": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[1]",
+      "via": "acme/workflows@v1",
+      "ref": "v1"
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/tools/setup",
+      "site": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[2]",
+      "via": "Acme/Workflows/tools/setup@v2",
+      "ref": "v2",
+      "with": [
+        "version"
+      ]
+    },
+    {
+      "contract": "ci::github.com/acme/app-a/tools/local",
+      "site": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[3]",
+      "via": "./tools/local",
+      "with": [
+        "mode"
+      ]
+    },
+    {
+      "contract": "ci::github.com/acme/app-a/tools/local",
+      "site": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[4]",
+      "via": "$/tools/local"
+    },
+    {
+      "contract": null,
+      "site": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.elsewhere.steps[1]",
+      "via": "./tools/local"
+    },
+    {
+      "contract": null,
+      "site": "github.com/acme/app-a::.github/workflows/forms.yml::jobs[\"at-a-path\"].steps[2]",
+      "via": "./tools/local"
+    },
+    {
+      "contract": null,
+      "site": "github.com/acme/app-a::.github/workflows/forms.yml::jobs[\"no-checkout\"].steps[0]",
+      "via": "./tools/local"
     }
   ],
   "iac_nodes": [
@@ -74,6 +122,78 @@
       "path": ".github/workflows/ci.yml",
       "line": 24,
       "end_line": 25
+    },
+    {
+      "identity": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[1]",
+      "address": "jobs.actions.steps[1]",
+      "type": "step",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 8,
+      "end_line": 8
+    },
+    {
+      "identity": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[2]",
+      "address": "jobs.actions.steps[2]",
+      "type": "step",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 9,
+      "end_line": 11
+    },
+    {
+      "identity": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[3]",
+      "address": "jobs.actions.steps[3]",
+      "type": "step",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 12,
+      "end_line": 14
+    },
+    {
+      "identity": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[4]",
+      "address": "jobs.actions.steps[4]",
+      "type": "step",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 15,
+      "end_line": 15
+    },
+    {
+      "identity": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.elsewhere.steps[1]",
+      "address": "jobs.elsewhere.steps[1]",
+      "type": "step",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 30,
+      "end_line": 30
+    },
+    {
+      "identity": "github.com/acme/app-a::.github/workflows/forms.yml::jobs[\"at-a-path\"].steps[2]",
+      "address": "jobs[\"at-a-path\"].steps[2]",
+      "type": "step",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 38,
+      "end_line": 38
+    },
+    {
+      "identity": "github.com/acme/app-a::.github/workflows/forms.yml::jobs[\"no-checkout\"].steps[0]",
+      "address": "jobs[\"no-checkout\"].steps[0]",
+      "type": "step",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 22,
+      "end_line": 22
+    },
+    {
+      "identity": "github.com/acme/app-a::tools/local/action.yml::.",
+      "address": ".",
+      "type": "action",
+      "root": "tools/local/action.yml",
+      "path": "tools/local/action.yml",
+      "line": 1,
+      "end_line": 7
     }
   ],
   "links": [
@@ -82,21 +202,49 @@
       "provider": "github.com/acme/workflows::.github/workflows/lint.yml::.",
       "contract": "ci::github.com/acme/workflows/.github/workflows/lint.yml",
       "level": "exact",
-      "reason": "@main (indexed fde768c)"
+      "reason": "@main (indexed 2344e45)"
     },
     {
       "consumer": "github.com/acme/app-a::.github/workflows/ci.yml::jobs.publish",
       "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
       "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
       "level": "exact",
-      "reason": "@main (indexed fde768c)"
+      "reason": "@main (indexed 2344e45)"
     },
     {
       "consumer": "github.com/acme/app-a::.github/workflows/ci.yml::jobs.scan",
       "provider": "github.com/acme/workflows::.github/workflows/scan.yml::.",
       "contract": "ci::github.com/acme/workflows/.github/workflows/scan.yml",
       "level": "exact",
-      "reason": "@v2 (indexed fde768c)"
+      "reason": "@v2 (indexed 2344e45)"
+    },
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[1]",
+      "provider": "github.com/acme/workflows::action.yml::.",
+      "contract": "ci::github.com/acme/workflows",
+      "level": "exact",
+      "reason": "@v1 (indexed 2344e45)"
+    },
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[2]",
+      "provider": "github.com/acme/workflows::tools/setup/action.yml::.",
+      "contract": "ci::github.com/acme/workflows/tools/setup",
+      "level": "exact",
+      "reason": "@v2 (indexed 2344e45)"
+    },
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[3]",
+      "provider": "github.com/acme/app-a::tools/local/action.yml::.",
+      "contract": "ci::github.com/acme/app-a/tools/local",
+      "level": "exact",
+      "reason": "own repository"
+    },
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[4]",
+      "provider": "github.com/acme/app-a::tools/local/action.yml::.",
+      "contract": "ci::github.com/acme/app-a/tools/local",
+      "level": "exact",
+      "reason": "own repository"
     }
   ]
 }
