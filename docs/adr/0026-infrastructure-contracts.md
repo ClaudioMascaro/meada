@@ -90,12 +90,15 @@ amends these tables.
   so it takes part only in provisioning links (to each provisioner of its contract) and in
   orphans, never in a producer to consumer link. Its site is the repository, located by
   `<file>#<key path>`.
-- (Amended 2026-11-12; ADR 0028, proposed.) **Pipelines and actions.** In a file that is a
+- (Amended 2026-11-12; ADR 0028.) **Pipelines and actions.** In a file that is a
   pipeline or an action node the CI reader owns the uses. A structured identifier stays an
   `exact` use, and its site is the CI step or CI job that holds the key instead of the
   repository. A plain name under a typed key gives no use there: a key of `with` belongs to the
   vocabulary of the action or the reusable pipeline, not to the cloud's. A role ARN in `with` is
-  a grant, never a use. The other files of `.github/**` keep the rule above.
+  a grant, never a use. The other files of `.github/**` keep the rule above. This is the rule
+  #796 decides for a file a reader owns, and the GitHub Actions format is the exception to
+  #796's statement that IaC files keep the key-name rule, because its reader gives a meaning to
+  the keys of `with`.
 - **Subscriptions.** SNS to SQS subscriptions, EventBridge rules and their targets, Pub/Sub
   subscriptions and Service Bus subscriptions are read from IaC and followed like a RabbitMQ
   binding: a consumer of the target links to the producers of the source, `exact` for an
@@ -162,7 +165,7 @@ execution, context, trace, orphan and export seams and the shared 1.3.0 minor re
   publishes the image: docker/build-push-action `tags`, docker/metadata-action `images`, Compose
   `build` with `image`, Skaffold artifacts, ko and Jib. Its site is the repository, located by
   `<file>#<key path>`.
-- (Amended 2026-11-12; ADR 0028, proposed.) In a pipeline or an action the builder forms keep
+- (Amended 2026-11-12; ADR 0028.) In a pipeline or an action the builder forms keep
   their rule and their site becomes the CI step that holds the form. `docker push` and
   `docker buildx build --push` in a `run` script join them, read through the command table. A CI
   job is no workload yet, and `container` and `services` give no runner side yet.
@@ -234,7 +237,7 @@ execution, context, trace, orphan and export seams and the shared 1.3.0 minor re
 - **`via`.** Besides a symbol, a `[[resource]]` `via` may name an IaC address or
   `<file>#<key path>`, with `[key=value]` selectors in list steps. A `via` that finds no node or
   key is reported stale with today's status lines.
-- (Amended 2026-11-12; ADR 0028, proposed.) `context` on a reusable pipeline or an action lists
+- (Amended 2026-11-12; ADR 0028.) `context` on a reusable pipeline or an action lists
   its consumers with their Git ref and keys. `trace` walks the links of the `ci` kind together
   with references, across repositories: up from a provider to its consumers, and from a consumer
   to the pipeline or action of its file, which may be a provider in turn.
@@ -249,7 +252,7 @@ execution, context, trace, orphan and export seams and the shared 1.3.0 minor re
   with no status line.
 - `meada status` also counts the config and IaC files read and skipped, the values redacted
   (ADR 0025) and the IaC nodes.
-- (Amended 2026-11-12; ADR 0028, proposed.) The `ci` kind follows the scope rule: a reusable
+- (Amended 2026-11-12; ADR 0028.) The `ci` kind follows the scope rule: a reusable
   pipeline or an action with no consumer is listed only when the scope holds at least one
   provider and one consumer of the kind. A `uses` that names a repository outside the workspace
   holds no side, so it is never an orphan. A consumer whose repository is in the workspace and
@@ -273,7 +276,7 @@ These enter `meada export`, each as an optional field that is left out when empt
   of IaC-declared routes, go into `providers`, `consumers` and `links` as every kind does. A side
   read from a config file (a builder) has the repository as its site, the repository-level form,
   and an optional `at` field with its `<file>#<key path>`.
-- (Amended 2026-11-12; ADR 0028, proposed.) The `ci` kind's sides and links enter `providers`,
+- (Amended 2026-11-12; ADR 0028.) The `ci` kind's sides and links enter `providers`,
   `consumers` and `links`, a CI node that holds a side enters `iac_nodes`, and a consumer's Git
   ref, keys and declared permissions are optional fields. A builder or a use read from a pipeline
   or an action has the CI node as its site, in the IaC node form. The format stays 1.

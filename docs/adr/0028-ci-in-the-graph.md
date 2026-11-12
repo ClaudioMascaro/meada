@@ -1,6 +1,6 @@
 # 28. CI in the graph
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-12
 
 ## Context
@@ -36,9 +36,13 @@ host, and a provider is a file in the local checkout of a peer.
 - A file under `.github/workflows/` that holds `jobs` is a pipeline, of type `workflow`. A file
   named `action.yml` or `action.yaml` that holds `runs` is an action, of type `action`. When both
   names exist in one folder the action is `action.yml`, the one the runner loads.
-- An address is the key path of the block, as for Compose and Serverless nodes: `jobs.<id>` (type
-  `job`), `jobs.<id>.steps[n]` and `runs.steps[n]` (type `step`). The file node's address is `.`,
-  the root key path, and a query names it by its file path.
+- The format's reader sits in the IaC module, on the bounded event reader of ADR 0025. Only the
+  first YAML document of a pipeline or an action file is read.
+- An address is the key path of the block in the grammar of ADR 0025 ("Key path"), as for Compose
+  and Serverless nodes. A CI job (type `job`) is `jobs.build`, and `jobs["publish-prd"]` when its
+  id is not a plain identifier, quoted as in every key path. A CI step (type `step`) is
+  `jobs.build.steps[2]` or `runs.steps[0]`. The file node's address is `.`, the root key path, and
+  a query names it by its file path.
 - The identity is `<repository identity>::<file>::<address>`, as for any IaC node.
 - Each pipeline file and each action manifest is one evaluation unit. References stay inside it:
   a pipeline to its CI jobs, a CI job or a composite action to its CI steps, a CI job to the CI
@@ -46,7 +50,9 @@ host, and a provider is a file in the local checkout of a peer.
 - A CI step's `id`, `name` and `uses` are searchable and are selectors (`steps[id=login]`), never
   identity.
 - `strategy.matrix` does not multiply nodes: a CI job with a matrix is one node and one consumer.
-- `search` finds CI nodes with the kind `ci`. The kind `iac` keeps its answers.
+- `search` finds CI nodes with the kind `ci`, and the MCP tool's kind list gains the value. The
+  kind `iac` keeps its answers and the default search includes no CI node.
+- `meada status` counts CI nodes among the IaC nodes it already counts.
 
 ### The CI contract
 
@@ -58,10 +64,15 @@ host, and a provider is a file in the local checkout of a peer.
   build its identifier alone at index time.
 - A `uses` never writes a host. The host is the one of the consumer's repository identity. A
   consumer in a repository without `origin` links only its local calls.
-- The provider is the file node of a reusable pipeline (`on.workflow_call`) or of an action.
+- The provider is the file node of a reusable pipeline or of an action. A pipeline is reusable
+  when its `on` holds `workflow_call`, in any of the three shapes `on` takes: a string, a list, a
+  map. A pipeline without it holds no provider side.
 - The consumer is the CI job whose `uses` names a reusable pipeline, or the CI step whose `uses`
   names an action. `uses` holds no expression, in a job or in a step, so a call is always literal.
-- A consumer records its node, the Git ref and the keys of `with` and `secrets`.
+- A consumer records its node, the Git ref and the keys of `with` and `secrets` as written
+  (`secrets: inherit` as that word).
+- The kind implements the contract kind interface that exists and links at link time, by
+  identifier, across the repositories of the workspace.
 
 | Form of `uses` | Where | Reading |
 | --- | --- | --- |
@@ -75,7 +86,11 @@ host, and a provider is a file in the local checkout of a peer.
 A step's `./<folder>` resolves against what the CI runner checked out, not against the repository
 of the file. It links `exact` to the own repository only in a pipeline that is not reusable and
 whose job checks out its own repository at the default path. In a reusable pipeline, in a composite
-action, and in a job whose checkout names `repository` or `path`, it is unresolved.
+action, and in a job with no checkout or whose checkout names `repository` or `path`, it is
+unresolved.
+
+An unresolved consumer holds no candidate. It is an open item as any kind's unresolved consumer
+is, with the cause in its reason.
 
 ### Git ref
 
@@ -83,7 +98,8 @@ action, and in a job whose checkout names `repository` or `path`, it is unresolv
   provider file, whatever refs its consumers name.
 - The reason of a link reads `@<ref> (indexed <short commit>)`. When the ref is a full commit id
   (40 or 64 hexadecimal digits) that differs from the provider's indexed commit, the reason ends
-  with `, ref mismatch`. A branch or a tag is shown as written, with no flag.
+  with `, ref mismatch`. A branch or a tag is shown as written, with no flag. A local call and a
+  `$/` call write no ref and carry no such text.
 - The level of a link does not depend on the ref. Every comparison with the provider's file reads
   the indexed commit.
 - Meada never resolves a ref with the local git of the peer: the answer would depend on what the
@@ -96,8 +112,10 @@ action, and in a job whose checkout names `repository` or `path`, it is unresolv
 - A reusable pipeline or an action with no consumer is an orphan under the scope rule of ADR 0026:
   only when the scope holds at least one provider and one consumer of the kind.
 - A consumer whose repository is in the workspace and whose path names no provider there is marked
-  absent at the indexed commit, never broken: the file may exist at the ref. A folder that holds
-  only a `Dockerfile`, a valid action for GitHub, is no provider in v1 and raises no such mark.
+  absent at the indexed commit, on the side, never broken: the file may exist at the ref. A folder
+  that holds only a `Dockerfile`, a valid action for GitHub, is no provider in v1 and raises no
+  such mark: the mark needs the folder to be missing, or to hold no action file and no
+  `Dockerfile`.
 
 ### Queries
 
@@ -110,18 +128,23 @@ action, and in a job whose checkout names `repository` or `path`, it is unresolv
 - This needs one walk that follows links and references together across repositories. Today the
   shared walk follows upward only a consumer that is a call or a declarative client, and
   references are walked inside one repository.
+- GitHub caps a chain of reusable pipelines at ten levels. The walk keeps its own cycle detection
+  and token budget and adds no cap.
 
 ### Declared permissions
 
 - Each side is indexed in its own repository. For a consumer: the block that governs the CI job,
   its own, else the pipeline's, else `not declared`. A block is closed: a permission it does not
-  name is `none`, so a job's block does not add to the pipeline's. For a provider: what each of
-  its CI jobs declares.
-- The comparison happens at the link. When a provider's job declares more than the consumer's
-  block grants, the reason ends with `permissions mismatch` and names the permission and both
-  levels.
-- A consumer with `not declared` is shown so and is not compared: the default lives in settings
+  name is `none`, so a job's block does not add to the pipeline's. For a provider: the block that
+  governs each of its CI jobs, by the same rule.
+- `read-all`, `write-all` and `{}` are read as the blocks they stand for. The levels order as
+  `none`, `read`, `write`.
+- The comparison happens at the link. When a CI job of the provider declares a permission above
+  what the consumer's block holds, the reason ends with `permissions mismatch` and names the
+  permission and both levels.
+- A side that is `not declared` is shown so and is not compared: the default lives in settings
   outside the repository.
+- Only a link whose consumer is a CI job compares permissions: an action declares none.
 - Meada never says a permission is granted. The repository default, a pull request from a fork and
   the consumers further up can only reduce, so no mismatch proves nothing and a mismatch is enough.
 - The flag states the fact, not its consequence, and it is about the provider's indexed commit.
@@ -140,6 +163,10 @@ The `run` script of a CI step is read through the command table, under one gate:
   `$(...)` and backticks. In part of a name they make a pattern; as the whole name they make an
   unresolved side that names the variable. In an option's value they change nothing.
 
+A script the reader cannot hold whole (past the value length ceiling) is not read. The command
+table evaluates no shell: an assignment, `cd`, a function and a called script are not followed. A
+command outside the table gives no side.
+
 The rows of v1:
 
 | Command | Side |
@@ -151,7 +178,8 @@ The rows of v1:
 
 ### Programs of the workspace
 
-- A package manifest keeps the name of each console script, beside its module and function.
+- A package manifest keeps the name of each console script, beside its module and function. The
+  stored summary changes, so the schema version rises and indexes rebuild (ADR 0004).
 - A CI step whose command is that name links to the program entry point the script names, through
   the package contract: no new kind. The arguments are recorded as text.
 - `trace` upward from the program reaches the CI step, its job, its pipeline and that pipeline's
@@ -173,7 +201,8 @@ workspace is `exact`, whatever index serves it.
 A `${{ }}` expression is evaluated statically where a literal gives its value (an `env` of the
 step, the job or the pipeline), and is otherwise a pattern or unresolved, as a Terraform expression
 is under ADR 0025. `secrets.X` and `vars.X` have no value in the repository (ADR 0005): they stay
-unresolved and name the variable, unless a provisioner declares them.
+unresolved and name the variable, and are never matched by name across repositories. v1 reads no
+provisioner for them.
 
 ### The CI reader owns its files
 
@@ -191,8 +220,19 @@ In a file that became a pipeline or an action node:
 - Every scalar stays a config value, `[[resource]] via` on a key stays valid, and the other files
   of `.github/**` and of other CI systems stay under the generic rule.
 
-This removes `inferred` uses and orphan lines that came from pipelines. The stability document
-does not freeze which links Meada finds.
+This removes `inferred` uses and orphan lines that came from pipelines. These are the only
+existing answers that change, and the stability document does not freeze which links Meada finds.
+
+The rule on a file a reader owns is the one #796 decides for ADR 0026 (its cause 4): a document
+that the reader of a contract kind recognizes is not read by the key-name rule, and a structured
+identifier in it is still an `exact` use. #796 also says that IaC files keep the key-name rule,
+because an IaC reader takes nodes out of them and gives no meaning to their other values. The
+GitHub Actions format is the exception to that statement: its reader gives a meaning to the keys
+of `with`, the inputs of the action or the reusable pipeline the node calls. #796's own amendment
+was not on main when this ADR was accepted, so this ADR carries the sentence alone until that
+amendment repeats it. #796's level rule (#797) already keeps an `inferred` use out of orphan
+lines; this section also removes the use itself. Its role `grant` (#798) is for IAM policy
+statements: a role ARN in `with` gives no side here, whatever that role becomes.
 
 ### Other CI systems
 
@@ -210,19 +250,35 @@ Pipelines' templates:
 
 - The sides and links enter `providers`, `consumers` and `links` as every kind's do, and a CI node
   that holds a side enters `iac_nodes`. Git ref, keys and declared permissions are optional
-  fields. The export format stays 1 under ADR 0004's rule.
-- The new rows follow the existing grants, generations and partial export.
-- The shipped skill and the documentation in the three languages change in the PR of each slice.
+  fields, each left out when empty. The export format stays 1 under ADR 0004's rule.
+- The console graph and query page show the kind through the shared rows, with the same answers
+  as the CLI and MCP.
+- In server mode and named workspaces the new rows follow the existing grants, generations and
+  partial export.
+- The shipped skill and the documentation in the three languages (the capabilities page, the user
+  guide, the changelog) change in the PR of each slice. The user guide keeps the hand declaration
+  (`[[resource]]` with `via` on the calling key) for the CI systems Meada does not read, and a
+  workspace that declares its pipelines that way keeps those sides and links at `declared`,
+  beside the CI contract.
+
+### Limits and safety
+
+- The reader adds its row to the hostile probes of ADR 0025: a pipeline at the per-file size
+  ceiling with deep nesting, thousands of steps and one huge `run` script is read in bounded time
+  and size.
+- Nodes per evaluation unit and references per node are the named ceilings that exist.
+- A path read from a pipeline (a local `uses`) stays inside the repository root, by the path rule
+  that exists.
 
 ### Slices
 
 | Slice | Holds | Accepted by |
 | --- | --- | --- |
-| F1 | nodes and references; the CI contract with Git ref and keys; `trace` through an intermediate pipeline; external files; orphans and absent files; export, console, server mode, skill | the reproduction of the feedback's item 7 |
-| F2 | the command table's gate; `pip install` as a package consumer; programs of the workspace; `docker push` | a chain of three contracts: an HTTP route, the package whose program calls it, the reusable pipeline that runs the program, and the CI jobs that call the pipeline |
+| F1 | nodes and references; `search` kind `ci`; the CI contract with Git ref and keys; `trace` through an intermediate pipeline; external files; orphans and absent files; the CI reader owning its files; export, console, server mode, skill, docs | the reproduction of the feedback's item 7 (#816) |
+| F2 | the command table's gate; `pip install` as a package consumer; programs of the workspace; `docker push`; builder sites on CI steps | a chain of three contracts: an HTTP route, the package whose program calls it, the reusable pipeline that runs the program, and the CI jobs that call the pipeline |
 | F3 | declared permissions and `permissions mismatch` | a consumer without the permission its provider declares; a consumer with `not declared` |
 
-F1 and F2 ship in the same minor release. Each slice is additive.
+F1 and F2 ship in the same minor release, F3 in that one or the next. Each slice is additive.
 
 Afterwards, by value over noise and reordered by the measured precision:
 
@@ -237,13 +293,16 @@ Afterwards, by value over noise and reordered by the measured precision:
 5. The command table's other rows (`aws s3`, `aws sqs`, `curl`), a client wrapper across
    repositories and `changes: uncommitted`.
 
-Out, with no slice: a publisher role for packages, alerts, provider documents, a trigger of `on`
-as an entry point, duplicates, effective permissions and other CI systems.
+Out, with no slice: a publisher role for packages (`npm publish`, `twine`), alerts, provider
+documents, a trigger of `on` as an entry point, duplicates of CI jobs, effective permissions,
+console scripts of ecosystems other than PyPI, a link across hosts (GitHub Connect),
+`Dockerfile`-only actions as providers, and other CI systems (GitLab, Azure Pipelines).
 
 ### Ceilings
 
 Each enters `docs/agents/ceilings` with its slice:
 
+- Only the first YAML document of a pipeline or an action file is read.
 - A CI step's identity is positional: a step inserted above renames the ones below.
 - A CI job with a matrix is one consumer.
 - Only a ref of 40 or 64 hexadecimal digits is a commit id; a branch of that shape reads as one.
@@ -262,8 +321,7 @@ Each enters `docs/agents/ceilings` with its slice:
 
 ### Amendments to ADRs 0005, 0025 and 0026
 
-This ADR amends three ADRs, each carrying its dated amendments (2026-11-12), marked proposed
-until this one is accepted:
+This ADR amends three ADRs, each carrying its dated amendments (2026-11-12):
 
 - ADR 0005: its contract kinds gain `ci`, and `secrets.X` and `vars.X` fall under its rule on
   environment variables.

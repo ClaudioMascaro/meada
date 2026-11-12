@@ -42,7 +42,7 @@ value an environment entry sets in a repository, and a value a format marks secr
 overridable value, a workload's environment, a Service, a pattern). ADR 0026 records the
 details.
 
-(Amended 2026-11-12; ADR 0028, proposed.) CI joins these kinds: a new kind, `ci`
+(Amended 2026-11-12; ADR 0028.) CI joins these kinds: a new kind, `ci`
 (`ci::<repository identity>/<path>`), links a reusable pipeline or an action, its provider, to
 the CI jobs and CI steps that call it, the Git ref a consumer writes being its attribute and
 never part of the identifier; and a CI step is a site of sides of the kinds above (a package it
