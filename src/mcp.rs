@@ -38,6 +38,7 @@ use rmcp::{
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
+use tokio::sync::Semaphore;
 
 use crate::engine::{self, Direction, Engine, Start};
 use crate::msg::Msg;
@@ -168,6 +169,14 @@ pub(crate) fn served_call(tool: &str, arguments: serde_json::Value) -> Result<As
 /// below the point where a client gives up on the call itself (#282).
 const ROOTS_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// The calls one stdio server answers at once (#756); the others wait their turn. Each call
+/// holds an engine of its own (connections to every index of the workspace) and builds its
+/// answer in memory, so the bound caps what a batch holds, and the readers a refresh's commit
+/// waits for.
+// ponytail: a fixed count, chosen by the memory one answer holds (up to about 90 MB on the
+// largest repositories measured); sharing one engine among the calls of a batch would lift it.
+const CALLS_IN_FLIGHT: usize = 4;
+
 #[derive(Clone)]
 struct Meada {
     tool_router: ToolRouter<Self>,
@@ -178,9 +187,11 @@ struct Meada {
 #[derive(Clone)]
 enum Source {
     /// The client's first root, else the current directory (stdio). `last_root` is the last
-    /// root this connection's client sent; clones share it.
+    /// root this connection's client sent, and `turns` the turns its calls take
+    /// (`CALLS_IN_FLIGHT`); clones share both.
     Roots {
         last_root: Arc<Mutex<Option<PathBuf>>>,
+        turns: Arc<Semaphore>,
     },
     /// The workspace of the manifest at `manifest`, as `listed` read it at start, `identity`
     /// first (server mode): read-only, one engine per call, and no request to the client. A
@@ -212,7 +223,9 @@ impl Meada {
     /// whose answer fails gets its last root, or a tool error when it sent none. In server mode
     /// the workspace holds what the request's `Pass` may read, and a call without one (never
     /// routed) is a tool error. The engine blocks (SQLite, and a read that meets a commit waits
-    /// up to the busy timeout), so it runs where the runtime expects blocking work.
+    /// up to the busy timeout), so it runs where the runtime expects blocking work. Over stdio
+    /// the engine and the answer wait for a turn (`CALLS_IN_FLIGHT`), taken once the root is
+    /// known: the round trip that asks for it holds no engine.
     async fn answer(
         &self,
         ctx: RequestContext<RoleServer>,
@@ -221,12 +234,20 @@ impl Meada {
     ) -> CallToolResponse {
         let pass = (ctx.extensions.get::<hyper::http::request::Parts>())
             .and_then(|parts| parts.extensions.get::<Pass>());
+        let mut turn = None;
         let open = match (&self.source, pass) {
-            (Source::Roots { last_root }, _) => match root_dir(&ctx, input.0, last_root).await {
-                Ok(Root::Dir(dir)) => tokio::task::block_in_place(|| Engine::open(&dir)),
-                Ok(Root::Ask(ask)) => return ask.into(),
-                Err(why) => return self.result(Err(why)).into(),
-            },
+            (Source::Roots { last_root, turns }, _) => {
+                match root_dir(&ctx, input.0, last_root).await {
+                    Ok(Root::Dir(dir)) => {
+                        // Fair: waiting calls take their turns in the order they asked.
+                        // The semaphore is never closed, so the turn always comes.
+                        turn = turns.acquire().await.ok();
+                        tokio::task::block_in_place(|| Engine::open(&dir))
+                    }
+                    Ok(Root::Ask(ask)) => return ask.into(),
+                    Err(why) => return self.result(Err(why)).into(),
+                }
+            }
             (_, None) => return self.result(Err(Msg::NotAdmitted.text())).into(),
             (
                 Source::Served {
@@ -255,6 +276,7 @@ impl Meada {
             }),
         };
         let answer = tokio::task::block_in_place(|| open.and_then(|engine| ask(&engine)));
+        drop(turn);
         self.result(answer.map_err(|e| e.to_string())).into()
     }
 
@@ -471,6 +493,7 @@ pub fn serve() -> crate::Result<()> {
     tokio::runtime::Runtime::new()?.block_on(async {
         Meada::new(Source::Roots {
             last_root: Arc::default(),
+            turns: Arc::new(Semaphore::new(CALLS_IN_FLIGHT)),
         })
         .serve(rmcp::transport::stdio())
         .await?
