@@ -223,9 +223,7 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                 id: consumer.item_site().into_owned(),
                 kind,
                 repository: export.repository.clone(),
-                line: files
-                    .get(&span.path)
-                    .map(|src| crate::render::line_of(src, span.start)),
+                line: files.line(&span.path, span.start),
                 path: span.path.clone(),
                 expression,
                 enclosing: caller.map(|s| Enclosing {

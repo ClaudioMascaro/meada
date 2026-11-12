@@ -11,6 +11,10 @@ All notable changes to Meada are recorded here. The format follows
 - `trace` stops following a branch 256 levels below its start and marks the line there
   `(depth limit)`, as a process step is marked: a call chain of about 2,000 hops overflowed the
   stack and aborted `meada mcp`, with every call in flight (#732).
+- A `trace` that reaches thousands of functions of one file takes time in proportion to them,
+  not to their square: each line it writes was placed by counting the newlines of its file from
+  the start, and now reads one block of it. `context` and the open items place their lines the
+  same way (#745).
 - `meada mcp` over stdio answers at most four calls at once, and the others wait their turn: each
   call held an engine and its answer in memory together with every other call in flight, so a
   batch of pipelined calls could exhaust memory (#756).
