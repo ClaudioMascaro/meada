@@ -58,13 +58,14 @@ pub(crate) struct Facts {
     pub secrets: Option<Secrets>,
 }
 
-/// The keys of the mapping `value`, each short enough to be kept.
+/// The keys of the mapping `value`, each short enough to be kept and free of control
+/// characters, which no input or secret name holds and which would break an answer's line.
 fn keys(value: Option<&Value>) -> Vec<String> {
     let Some(Value::Object(map)) = value else {
         return Vec::new();
     };
-    let short = map.keys().filter(|key| key.len() <= VALUE_MAX);
-    short.cloned().collect()
+    let kept = |key: &&String| key.len() <= VALUE_MAX && !key.contains(char::is_control);
+    map.keys().filter(kept).cloned().collect()
 }
 
 /// Whether `on` holds `workflow_call`, in the three shapes it takes: a string, a list, a map.

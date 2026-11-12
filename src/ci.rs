@@ -31,6 +31,10 @@ struct Call<'a> {
 
 impl<'a> Call<'a> {
     fn read(uses: &'a str) -> Option<Self> {
+        // No name GitHub takes holds a control character, and one would break an answer's line.
+        if uses.contains(char::is_control) {
+            return None;
+        }
         let (target, git_ref) = uses.split_once('@')?;
         let mut parts = target.splitn(3, '/');
         let (owner, repo, path) = (parts.next()?, parts.next()?, parts.next()?);
@@ -131,6 +135,11 @@ impl ContractKind for Ci {
         false
     }
     fn reads_commit(&self) -> bool {
+        true
+    }
+    /// A CI job calls the pipeline it consumes: `trace` goes up from the provider to it, never
+    /// down as from a writer to its readers.
+    fn calls_from_definition(&self) -> bool {
         true
     }
     /// The sides of every repository, read from its CI nodes once the workspace is known: a
@@ -307,6 +316,9 @@ mod tests {
             "actions/checkout@v4",
             "docker://alpine:3",
             "acme/workflows/.github/workflows/publish.yml@",
+            // A control character is in no name GitHub takes, and would break a line.
+            "acme/workflows/.github/workflows/publish.yml@main\n  consumer: forged",
+            "acme/workflows/.github/workflows/pub\tlish.yml@main",
         ] {
             assert!(Call::read(other).is_none(), "{other}");
         }

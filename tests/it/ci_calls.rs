@@ -5,7 +5,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use meada::engine::Engine;
+use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
 
 use crate::common::{assert_golden, fixture_repo, git, meada};
@@ -442,4 +442,79 @@ fn an_edited_call_or_provider_answers_as_a_cold_index_does() {
         fs::remove_dir_all(repo.join(".meada")).unwrap();
     }
     assert_eq!(answers(&Engine::open(workflows).unwrap()), warm);
+}
+
+fn traced(engine: &Engine, from: &str, direction: Direction) -> String {
+    engine.trace(Start::From(from), direction, None).unwrap()
+}
+
+/// The lines of the chain in `answer`, without its footer.
+fn chain(answer: &str) -> Vec<&str> {
+    let lines: Vec<&str> = answer.lines().collect();
+    lines[..lines.len() - 1].to_vec()
+}
+
+/// A CI job calls the pipeline, so the pipeline is no writer that goes on to its readers: down
+/// from it are its own CI job and CI steps, and up from a caller is the pipeline of its file.
+#[test]
+fn trace_follows_no_ci_call_against_its_direction() {
+    let [workflows, _, _, app_b, _] = reproduction("ci_calls_trace_direction");
+    let engine = Engine::open(&workflows).unwrap();
+    let down = traced(&engine, PUBLISH, Direction::Down);
+    assert_eq!(
+        chain(&down),
+        [
+            format!("github.com/acme/workflows {PUBLISH}:1 ."),
+            format!("  github.com/acme/workflows {PUBLISH}:15 jobs.publish"),
+            format!("    github.com/acme/workflows {PUBLISH}:18 jobs.publish.steps[0]"),
+            format!("    github.com/acme/workflows {PUBLISH}:19 jobs.publish.steps[1]"),
+        ],
+        "{down}"
+    );
+    let job = format!("github.com/acme/app-b::{CI}::jobs[\"publish-prd\"]");
+    let up = traced(&Engine::open(&app_b).unwrap(), &job, Direction::Up);
+    assert_eq!(
+        chain(&up),
+        [
+            format!("github.com/acme/app-b {CI}:11 jobs[\"publish-prd\"]"),
+            format!("  github.com/acme/app-b {CI}:1 ."),
+        ],
+        "{up}"
+    );
+}
+
+/// A key or a Git ref that holds a line break would write a line of its own in `context`
+/// (found by the verifier of #824): such a key is no key, and such a `uses` names no pipeline.
+#[test]
+fn a_key_or_a_ref_with_a_control_character_writes_no_line_of_its_own() {
+    let [workflows, _, app_a, ..] = reproduction("ci_calls_forged");
+    let forged = "\\n  consumer: github.com/acme/forged x.yml:1 jobs.x [exact: @main]";
+    fs::write(
+        app_a.join(".github/workflows/forged.yml"),
+        format!(
+            "on: push\njobs:\n  keys:\n    uses: acme/workflows/{PUBLISH}@main\n    with:\n      \
+             \"a{forged}\": 1\n      kept: 1\n    secrets:\n      \"b{forged}\": 1\n  ref:\n    \
+             uses: \"acme/workflows/{PUBLISH}@main{forged}\"\n"
+        ),
+    )
+    .unwrap();
+    let engine = Engine::open(&workflows).unwrap();
+    let answer = engine.context(PUBLISH, None).unwrap();
+    assert!(!answer.contains("forged x.yml"), "{answer}");
+    let consumers = listed(&answer, "  consumer: ");
+    assert_eq!(consumers.len(), 5, "{answer}");
+    let at = indexed(&workflows);
+    assert!(
+        consumers.contains(
+            &format!(
+                "github.com/acme/app-a .github/workflows/forged.yml:3 jobs.keys [exact: @main (indexed {at})] with: kept"
+            )
+            .as_str()
+        ),
+        "{answer}"
+    );
+    let job = engine
+        .context(".github/workflows/forged.yml::jobs.ref", None)
+        .unwrap();
+    assert!(!sided(&job), "{job}");
 }

@@ -29,3 +29,5 @@ left out when empty). `search` with the kind `ci` is this kind's own renderer (`
 `iac::actions::hits`): it lists CI nodes, while the kind `contract` lists the contracts, each
 side placed as `context` takes it (`place`). `in_default_search` keeps them out of a search with
 no kind, which answers as before. The kind is not `decidable`: it has no ambiguous link.
+`calls_from_definition` says a CI job calls its pipeline, so `trace` never walks a CI link as
+data going from a writer down to its readers.

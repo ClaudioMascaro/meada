@@ -35,7 +35,13 @@
   one `git` call per repository that holds a reusable pipeline on each query; a provider whose
   repository records no commit (none made yet, a server-mode index without its recorded commit)
   reads `@<ref> (indexed commit unknown)`, with no flag. Until #827 a call to a file that
-  provides nothing (absent, or no `on.workflow_call`) carries no mark.
+  provides nothing (absent, or no `on.workflow_call`) carries no mark. A `uses` that holds a
+  control character names no pipeline, and a key of `with` or `secrets` that holds one is left
+  out: GitHub takes neither, and each would break a line of `context`. On that line a key named
+  `inherit` reads like the word, and a key that holds `, ` or `; ` like several; `meada export`
+  tells them apart. The side lines close `context` on a pipeline, after its values, so a
+  pipeline of many CI steps shows them only under a larger `budget`. A `uses` with two `@` has
+  the ref after the first.
 - `iac/serverless.rs` (#654, ADR 0025): a service reuses `NODES_MAX` (functions first, in name
   order, then the resources of its `resources` section, together), `REFERENCES_MAX` (per node) and
   `ROOT_STORED_MAX` (per file, the functions' names, handlers and events counting against it before
