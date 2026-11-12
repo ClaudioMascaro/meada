@@ -276,10 +276,11 @@ These enter `meada export`, each as an optional field that is left out when empt
   of IaC-declared routes, go into `providers`, `consumers` and `links` as every kind does. A side
   read from a config file (a builder) has the repository as its site, the repository-level form,
   and an optional `at` field with its `<file>#<key path>`.
-- (Amended 2026-11-12; ADR 0028.) The `ci` kind's sides and links enter `providers`,
-  `consumers` and `links`, a CI node that holds a side enters `iac_nodes`, and a consumer's Git
-  ref, keys and declared permissions are optional fields. A builder or a use read from a pipeline
-  or an action has the CI node as its site, in the IaC node form. The format stays 1.
+- (Amended 2026-11-12; ADR 0028.) The `ci` kind's sides and links enter `providers`, `consumers` and
+  `links`, a CI node that holds a side enters `iac_nodes`, and a consumer's Git ref, keys of `with`,
+  keys of `secrets` and declared permissions are four optional fields. A builder or a use read
+  from a pipeline or an action has the CI node as its site, in the IaC node form. The format stays
+  1.
 
 **The export format stays 1.** Under its rule (ADR 0004, amended 2026-10-30) the integer rises
 only when a reader of the previous shape would misread the new one. Nothing here renames or

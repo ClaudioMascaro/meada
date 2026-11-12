@@ -509,7 +509,7 @@ evaluation unit.
   says of their inputs), Terraform workspaces, `-var` and `TF_VAR_`, Helm template rendering,
   composition patches and functions, and anything read from a process environment.
 - (Amended 2026-11-12; ADR 0028.) **GitHub Actions.** A `${{ }}` expression resolves
-  only where a literal `env` of the step, the job or the pipeline gives its value. Anything else
+  only where a literal `env` of the CI step, the CI job or the pipeline gives its value. Anything else
   is an unresolved part, and `secrets.X` and `vars.X` have no value in a repository.
 - **Unresolved parts.** An unresolved part of a name becomes a wildcard, and the name becomes a
   pattern (ADR 0026 fixes how a pattern links).

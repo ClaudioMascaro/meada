@@ -5,14 +5,15 @@
 
 ## Context
 
-The 1.3.0 feedback (item 7) showed that a reusable GitHub Actions workflow called from many
-repositories is invisible as a contract. Its `uses:` lines are config values only, a hand-declared
-`[[resource]]` gives one repository-level edge per repository, and `trace` cannot start from it.
+The 1.3.0 feedback (item 7) showed that a reusable pipeline (a GitHub Actions workflow that other
+pipelines call) used from many repositories is invisible as a contract. Its `uses:` lines are
+config values only, a hand-declared `[[resource]]` gives one repository-level edge per repository,
+and `trace` cannot start from it.
 
 Today Meada reads `.github/**` as config values (ADR 0025), derives directionless uses from them
 (#661, ADR 0026), reads three image builder forms (`docker/build-push-action`,
 `docker/metadata-action`, `ko`) and accepts `[[resource]] via` on their keys (#641). It reads no
-call, no job, no step and no `permissions`.
+call, no CI job, no CI step and no `permissions`.
 
 This ADR records how CI configuration enters the graph: its nodes, the contract that carries a
 call between files and repositories, and what CI gives to the kinds and mechanisms that exist. v1
@@ -30,6 +31,8 @@ host, and a provider is a file in the local checkout of a peer.
   repositories or inside one. Its sides sit on IaC nodes, as the alert kind's do.
 - Every other contract CI takes part in belongs to the kind that exists (package, image, resource,
   channel, HTTP), with the CI node as the site of its side.
+- `workflow`, `action`, `job` and `step` are node types of the GitHub Actions format only. Prose
+  and messages use the glossary terms: pipeline, action, CI job, CI step.
 
 ### Nodes
 
@@ -68,7 +71,8 @@ host, and a provider is a file in the local checkout of a peer.
   when its `on` holds `workflow_call`, in any of the three shapes `on` takes: a string, a list, a
   map. A pipeline without it holds no provider side.
 - The consumer is the CI job whose `uses` names a reusable pipeline, or the CI step whose `uses`
-  names an action. `uses` holds no expression, in a job or in a step, so a call is always literal.
+  names an action. `uses` holds no expression, in a CI job or in a CI step, so a call is always
+  literal.
 - A consumer records its node, the Git ref and the keys of `with` and `secrets` as written
   (`secrets: inherit` as that word).
 - The kind implements the contract kind interface that exists and links at link time, by
@@ -76,18 +80,18 @@ host, and a provider is a file in the local checkout of a peer.
 
 | Form of `uses` | Where | Reading |
 | --- | --- | --- |
-| `<owner>/<repo>/.github/workflows/<file>@<ref>` | job | the peer `<host>/<owner>/<repo>`, `exact` |
-| `<owner>/<repo>[/<folder>]@<ref>` | step | the peer `<host>/<owner>/<repo>`, `exact` |
-| `./.github/workflows/<file>` | job | the own repository at the same commit, `exact` |
-| `$/<path>` | job, step | the repository of the file, also inside a reusable pipeline or a composite action, `exact` |
-| `./<folder>` | step | the workspace of the CI runner: see below |
-| `docker://<image>` | step | no CI contract |
+| `<owner>/<repo>/.github/workflows/<file>@<ref>` | CI job | the peer `<host>/<owner>/<repo>`, `exact` |
+| `<owner>/<repo>[/<folder>]@<ref>` | CI step | the peer `<host>/<owner>/<repo>`, `exact` |
+| `./.github/workflows/<file>` | CI job | the own repository at the same commit, `exact` |
+| `$/<path>` | CI job, CI step | the repository of the file, also inside a reusable pipeline or a composite action, `exact` |
+| `./<folder>` | CI step | the workspace of the CI runner: see below |
+| `docker://<image>` | CI step | no CI contract |
 
-A step's `./<folder>` resolves against what the CI runner checked out, not against the repository
+A CI step's `./<folder>` resolves against what the CI runner checked out, not against the repository
 of the file. It links `exact` to the own repository only in a pipeline that is not reusable and
-whose job checks out its own repository at the default path. In a reusable pipeline, in a composite
-action, and in a job with no checkout or whose checkout names `repository` or `path`, it is
-unresolved.
+whose CI job checks out its own repository at the default path. In a reusable pipeline, in a
+composite action, and in a CI job with no checkout or whose checkout names `repository` or `path`,
+it is unresolved.
 
 An unresolved consumer holds no candidate. It is an open item as any kind's unresolved consumer
 is, with the cause in its reason.
@@ -135,7 +139,7 @@ is, with the cause in its reason.
 
 - Each side is indexed in its own repository. For a consumer: the block that governs the CI job,
   its own, else the pipeline's, else `not declared`. A block is closed: a permission it does not
-  name is `none`, so a job's block does not add to the pipeline's. For a provider: the block that
+  name is `none`, so a CI job's block does not add to the pipeline's. For a provider: the block that
   governs each of its CI jobs, by the same rule.
 - `read-all`, `write-all` and `{}` are read as the blocks they stand for. The levels order as
   `none`, `read`, `write`.
@@ -157,7 +161,7 @@ The `run` script of a CI step is read through the command table, under one gate:
 - **Unit.** Each line of the script, a trailing `\` joined. A script that holds a heredoc is not
   read.
 - **Command.** The first word of a line, or the one after `&&` or `;`. Text inside `echo`, a string
-  or a comment never gives a side. A command inside `if` or a loop counts: the step may run it.
+  or a comment never gives a side. A command inside `if` or a loop counts: the CI step may run it.
 - **Word.** A literal, a quoted literal, or an expression that static evaluation resolves.
 - **Unresolved.** `secrets.X`, `vars.X`, `github.*`, `matrix.*`, a `$VAR` no literal `env` gives,
   `$(...)` and backticks. In part of a name they make a pattern; as the whole name they make an
@@ -198,11 +202,11 @@ workspace is `exact`, whatever index serves it.
 
 ### Expressions
 
-A `${{ }}` expression is evaluated statically where a literal gives its value (an `env` of the
-step, the job or the pipeline), and is otherwise a pattern or unresolved, as a Terraform expression
-is under ADR 0025. `secrets.X` and `vars.X` have no value in the repository (ADR 0005): they stay
-unresolved and name the variable, and are never matched by name across repositories. v1 reads no
-provisioner for them.
+A `${{ }}` expression is evaluated statically where a literal gives its value (an `env` of the CI
+step, the CI job or the pipeline), and is otherwise a pattern or unresolved, as a Terraform
+expression is under ADR 0025. `secrets.X` and `vars.X` have no value in the repository (ADR 0005):
+they stay unresolved and name the variable, and are never matched by name across repositories. v1
+reads no provisioner for them.
 
 ### The CI reader owns its files
 
@@ -239,9 +243,11 @@ statements: a role ARN in `with` gives no side here, whatever that role becomes.
 v1 reads GitHub Actions. Four points keep the model fit for GitLab's `include` and Azure
 Pipelines' templates:
 
-- A consumer is the node where the reference is written, at any level: a step, a job or the file.
+- A consumer is the node where the reference is written, at any level: a CI step, a CI job or the
+  file.
 - A reference has optional parts: a host (the consumer's when absent), a repository, a path or a
-  name, a Git ref (absent means the provider's default) and the keys it passes.
+  name, a Git ref (absent in a call to another repository, it means that repository's default; a
+  local call has none) and the keys it passes.
 - A link finds its provider by repository and path in the peer's index. A mark in the provider's
   file is a GitHub Actions fact, not a rule of the kind.
 - Glossary terms carry no vendor name; node types follow each format.
@@ -249,8 +255,9 @@ Pipelines' templates:
 ### Export, server mode, console and skill
 
 - The sides and links enter `providers`, `consumers` and `links` as every kind's do, and a CI node
-  that holds a side enters `iac_nodes`. Git ref, keys and declared permissions are optional
-  fields, each left out when empty. The export format stays 1 under ADR 0004's rule.
+  that holds a side enters `iac_nodes`. The consumer row gains optional fields for the Git ref,
+  the keys of `with`, the keys of `secrets` and the declared permissions, each left out when
+  empty. The export format stays 1 under ADR 0004's rule.
 - The console graph and query page show the kind through the shared rows, with the same answers
   as the CLI and MCP.
 - In server mode and named workspaces the new rows follow the existing grants, generations and
@@ -264,7 +271,7 @@ Pipelines' templates:
 ### Limits and safety
 
 - The reader adds its row to the hostile probes of ADR 0025: a pipeline at the per-file size
-  ceiling with deep nesting, thousands of steps and one huge `run` script is read in bounded time
+  ceiling with deep nesting, thousands of CI steps and one huge `run` script is read in bounded time
   and size.
 - Nodes per evaluation unit and references per node are the named ceilings that exist.
 - A path read from a pipeline (a local `uses`) stays inside the repository root, by the path rule
