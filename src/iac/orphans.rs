@@ -11,8 +11,8 @@ struct Group {
     provisioned: bool,
     /// Any use, a name match included: the marks of `context` and `search` count every side.
     used: bool,
-    /// A use that is no name match: only such a use opens the orphan scope (ADR 0026).
-    certain: bool,
+    /// One of `provision::orphan_uses`, the only uses that open the orphan scope (ADR 0026).
+    opens_scope: bool,
 }
 
 /// Groups are separate per contract kind and broker or resource kind, never per name.
@@ -35,11 +35,14 @@ impl<'e> Scope<'e> {
                     groups.entry(key).or_default().provisioned = true;
                 }
             }
-            for (_, contract, _, name_match) in provision::uses(export) {
+            for (_, contract) in provision::uses(export) {
                 if let Some(key) = group(contract) {
-                    let group = groups.entry(key).or_default();
-                    group.used = true;
-                    group.certain |= !name_match;
+                    groups.entry(key).or_default().used = true;
+                }
+            }
+            for (_, contract, _) in provision::orphan_uses(export) {
+                if let Some(key) = group(contract) {
+                    groups.entry(key).or_default().opens_scope = true;
                 }
             }
         }
@@ -82,7 +85,7 @@ impl<'e> Scope<'e> {
         let both = |contract: &str| {
             group(contract)
                 .and_then(|key| self.groups.get(&key))
-                .is_some_and(|g| g.provisioned && g.certain)
+                .is_some_and(|g| g.provisioned && g.opens_scope)
         };
         self.exports
             .iter()
@@ -108,9 +111,8 @@ impl<'e> Scope<'e> {
                         ));
                     }
                 }
-                for (site, contract, level, name_match) in provision::uses(export) {
-                    if !name_match
-                        && both(contract)
+                for (site, contract, level) in provision::orphan_uses(export) {
+                    if both(contract)
                         && !links
                             .iter()
                             .any(|l| l.side == site && l.contract == contract)

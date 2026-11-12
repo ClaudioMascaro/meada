@@ -285,7 +285,7 @@ impl<'a> Graph<'a> {
                 .exports
                 .iter()
                 .flat_map(crate::iac::provision::uses)
-                .map(|(site, ..)| site)
+                .map(|(site, _)| site)
                 .find(|s| *s == id)
             else {
                 continue;
