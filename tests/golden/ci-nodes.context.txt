@@ -1,4 +1,3 @@
-# .github/workflows/ci.yml
 example.com/acme/app .github/workflows/ci.yml:1-37 .
 type: workflow
 name: "CI"
@@ -33,7 +32,6 @@ example.com/acme/app .github/workflows/ci.yml:34 jobs["publish-prd"].needs[1] = 
 example.com/acme/app .github/workflows/ci.yml:35 jobs["publish-prd"].uses = "acme/workflows/.github/workflows/publish.yml@v1"
 example.com/acme/app .github/workflows/ci.yml:37 jobs["publish-prd"].with.package = "app"
 
-# jobs.build
 example.com/acme/app .github/workflows/ci.yml:7-26 jobs.build
 type: job
 name: "Build"
@@ -62,7 +60,6 @@ example.com/acme/app .github/workflows/ci.yml:22 jobs.build.steps[1].env.MODE = 
 example.com/acme/app .github/workflows/ci.yml:23 jobs.build.steps[2].name = "Compile"
 example.com/acme/app .github/workflows/ci.yml:25 jobs.build.steps[2].run = "make build\nmake check\n"
 
-# jobs.test
 example.com/acme/app .github/workflows/ci.yml:28-32 jobs.test
 type: job
 name: none
@@ -79,7 +76,6 @@ example.com/acme/app .github/workflows/ci.yml:29 jobs.test.needs = "build"
 example.com/acme/app .github/workflows/ci.yml:30 jobs.test["runs-on"] = "ubuntu-latest"
 example.com/acme/app .github/workflows/ci.yml:32 jobs.test.steps[0].run = "make test"
 
-# jobs["publish-prd"]
 example.com/acme/app .github/workflows/ci.yml:33-37 jobs["publish-prd"]
 type: job
 name: none
@@ -96,7 +92,6 @@ example.com/acme/app .github/workflows/ci.yml:34 jobs["publish-prd"].needs[1] = 
 example.com/acme/app .github/workflows/ci.yml:35 jobs["publish-prd"].uses = "acme/workflows/.github/workflows/publish.yml@v1"
 example.com/acme/app .github/workflows/ci.yml:37 jobs["publish-prd"].with.package = "app"
 
-# jobs.build.steps[id=login]
 example.com/acme/app .github/workflows/ci.yml:15-22 jobs.build.steps[1]
 type: step
 name: "Log in"
@@ -113,7 +108,6 @@ example.com/acme/app .github/workflows/ci.yml:19 jobs.build.steps[1].with.regist
 example.com/acme/app .github/workflows/ci.yml:20 jobs.build.steps[1].with.username = "acme"
 example.com/acme/app .github/workflows/ci.yml:22 jobs.build.steps[1].env.MODE = "release"
 
-# action.yml
 example.com/acme/app action.yml:1-9 .
 type: action
 name: "Root action"
@@ -132,7 +126,6 @@ example.com/acme/app action.yml:7 runs.steps[0].run = "echo prepare"
 example.com/acme/app action.yml:8 runs.steps[0].shell = "bash"
 example.com/acme/app action.yml:9 runs.steps[1].uses = "./tools/setup"
 
-# tools/setup/action.yml
 example.com/acme/app tools/setup/action.yml:1-6 .
 type: action
 name: "Setup"
@@ -147,7 +140,6 @@ example.com/acme/app tools/setup/action.yml:3 runs.using = "composite"
 example.com/acme/app tools/setup/action.yml:5 runs.steps[0].run = "echo setup"
 example.com/acme/app tools/setup/action.yml:6 runs.steps[0].shell = "bash"
 
-# tools/only/action.yaml
 example.com/acme/app tools/only/action.yaml:1-4 .
 type: action
 name: "Only yaml"
@@ -160,7 +152,6 @@ example.com/acme/app tools/only/action.yaml:1 name = "Only yaml"
 example.com/acme/app tools/only/action.yaml:3 runs.using = "node20"
 example.com/acme/app tools/only/action.yaml:4 runs.main = "index.js"
 
-# runs.steps[0]
 `runs.steps[0]` fits 2 IaC nodes; pass one of:
 example.com/acme/app action.yml:6 runs.steps[0] (root action.yml)
 example.com/acme/app tools/setup/action.yml:5 runs.steps[0] (root tools/setup/action.yml)

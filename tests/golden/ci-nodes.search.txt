@@ -1,15 +1,12 @@
-# workflow
 example.com/acme/app .github/workflows/ci.yml:1 . (workflow, name "CI")
 example.com/acme/app .github/workflows/ci.yml:33 jobs["publish-prd"] (job, id "publish-prd", uses "acme/workflows/.github/workflows/publish.yml@v1")
 
-# action
 example.com/acme/app action.yml:1 . (action, name "Root action")
 example.com/acme/app tools/only/action.yaml:1 . (action, name "Only yaml")
 example.com/acme/app tools/setup/action.yml:1 . (action, name "Setup")
 example.com/acme/app .github/workflows/ci.yml:14 jobs.build.steps[0] (step, uses "actions/checkout@v4")
 example.com/acme/app .github/workflows/ci.yml:15 jobs.build.steps[1] (step, id "login", name "Log in", uses "docker/login-action@v3")
 
-# job
 example.com/acme/app .github/workflows/ci.yml:7 jobs.build (job, id "build", name "Build")
 example.com/acme/app .github/workflows/ci.yml:28 jobs.test (job, id "test")
 example.com/acme/app .github/workflows/ci.yml:33 jobs["publish-prd"] (job, id "publish-prd", uses "acme/workflows/.github/workflows/publish.yml@v1")
@@ -18,7 +15,6 @@ example.com/acme/app .github/workflows/ci.yml:15 jobs.build.steps[1] (step, id "
 example.com/acme/app .github/workflows/ci.yml:23 jobs.build.steps[2] (step, name "Compile")
 example.com/acme/app .github/workflows/ci.yml:32 jobs.test.steps[0] (step)
 
-# step
 example.com/acme/app .github/workflows/ci.yml:14 jobs.build.steps[0] (step, uses "actions/checkout@v4")
 example.com/acme/app .github/workflows/ci.yml:15 jobs.build.steps[1] (step, id "login", name "Log in", uses "docker/login-action@v3")
 example.com/acme/app .github/workflows/ci.yml:23 jobs.build.steps[2] (step, name "Compile")
@@ -27,14 +23,11 @@ example.com/acme/app action.yml:6 runs.steps[0] (step, id "prepare")
 example.com/acme/app action.yml:9 runs.steps[1] (step, uses "./tools/setup")
 example.com/acme/app tools/setup/action.yml:5 runs.steps[0] (step)
 
-# build
 example.com/acme/app .github/workflows/ci.yml:7 jobs.build (job, id "build", name "Build")
 example.com/acme/app .github/workflows/ci.yml:14 jobs.build.steps[0] (step, uses "actions/checkout@v4")
 example.com/acme/app .github/workflows/ci.yml:15 jobs.build.steps[1] (step, id "login", name "Log in", uses "docker/login-action@v3")
 example.com/acme/app .github/workflows/ci.yml:23 jobs.build.steps[2] (step, name "Compile")
 
-# Log in
 example.com/acme/app .github/workflows/ci.yml:15 jobs.build.steps[1] (step, id "login", name "Log in", uses "docker/login-action@v3")
 
-# nothing-here
 no matches for `nothing-here`

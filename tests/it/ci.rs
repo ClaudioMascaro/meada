@@ -11,11 +11,11 @@ const ORIGIN: Option<&str> = Some("https://example.com/acme/app.git");
 const REPO: &str = "example.com/acme/app";
 const CI: &str = ".github/workflows/ci.yml";
 
+/// The answers to `questions`, a blank line between two, as the output grammar's check reads a
+/// golden of several answers.
 fn answers(questions: &[&str], ask: impl Fn(&str) -> String) -> String {
-    (questions.iter())
-        .map(|q| format!("# {q}\n{}", ask(q)))
-        .collect::<Vec<_>>()
-        .join("\n")
+    let answers: Vec<_> = questions.iter().map(|q| ask(q)).collect();
+    answers.join("\n")
 }
 
 /// The lines of `answer` that are hits of the kind `ci`: every line, each of the shape

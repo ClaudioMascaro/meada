@@ -174,6 +174,7 @@ substrings), and an optional `kind`:
 | `duplicate` | Groups of symbols with the same span text, by name or path. |
 | `value` | Config values of YAML, JSON and Terraform files, by value or key path. |
 | `iac` | IaC nodes (Terraform resources, data blocks and module calls, Kubernetes objects), by address, type or physical name. |
+| `ci` | Pipelines, actions, CI jobs and CI steps of GitHub Actions, by address, type, id, `name` or `uses`. |
 | `ambiguous` | Open items: calls with several candidate providers. |
 | `unresolved` | Open items: calls whose target Meada cannot read. |
 
@@ -192,6 +193,7 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | process | `<repository> <label> process::<entry-identity> (<entry-kind>)` | A process: `process::<entry-identity>` is what `trace` starts from. |
 | value | `<repository> <place> <key-path> = <shown-value>` | A config value, at its file and line. |
 | iac node | `<repository> <place> <address> (<iac-type><iac-name?>, root <iac-root>)<orphan-note?>` | An IaC node, at its block's first line, with its type, its physical name and its root module. |
+| ci node | `<repository> <place> <address> (<ci-type><ci-id?><ci-name?><ci-uses?>)` | A pipeline, an action, a CI job or a CI step, at its block's first line, with its type and what else names it. |
 | copies | `<n> copies` | A group of duplicates; one symbol line per copy follows. |
 | open item | `` <repository> <place> (<item-kind>) candidates: <n>; run `meada decide --item <call-site>` `` | An open item and the command that closes it. |
 | no matches | `` no matches for `<query?>` `` | Nothing matched. |
@@ -227,11 +229,18 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | `<item-kind>` | `unresolved` | An unresolved consumer, such as a dynamic URL. |
 | `<key-path>` | `<text>` | Where the value sits in its file, jq style: `spec.containers[0].image`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` in a file of several documents. |
 | `<shown-value>` | `<text> (cut)` | A string past 1 KiB, quoted as JSON and cut. |
-| `<address>` | `<word>` | An IaC node's address: `aws_sqs_queue.orders`, `data.aws_iam_policy_document.p`, `module.orders.aws_sqs_queue.this`, `aws_sqs_queue.dlq[0]`, and for a Kubernetes object `<Kind>[.<group>]/<namespace>/<name>`: `Deployment.apps/shop/api`, `Service/shop/api`, `ClusterRole.rbac.authorization.k8s.io/reader`. |
+| `<address>` | `<word>` | An IaC node's address: `aws_sqs_queue.orders`, `data.aws_iam_policy_document.p`, `module.orders.aws_sqs_queue.this`, `aws_sqs_queue.dlq[0]`, and for a Kubernetes object `<Kind>[.<group>]/<namespace>/<name>`: `Deployment.apps/shop/api`, `Service/shop/api`, `ClusterRole.rbac.authorization.k8s.io/reader`. In a pipeline or an action the address is the key path of the block: `.` for the file, `jobs.build`, `jobs["publish-prd"]`, `jobs.build.steps[2]`, `runs.steps[0]`. |
 | `<iac-type>` | `<word>` | The resource or data type of an IaC node, `module` for a module call, or the kind of a Kubernetes object. |
 | `<iac-name>` | `, name <text>` | The node's physical name, its `name` argument as static evaluation resolves it or a Kubernetes object's `metadata.name` once its overlay's prefix and suffix are applied, quoted as JSON. |
 | `<iac-name>` | `, pattern <text>` | The node's physical name when a part of it is unresolved (a data source, `terraform.workspace`, a resource's attribute), each such part a `*`, quoted as JSON. |
 | `<iac-root>` | `<word>` | The root module or overlay its evaluation starts from: its directory, `.` for the repository's root. |
+| `<ci-type>` | `workflow` | A pipeline: its address is `.`. |
+| `<ci-type>` | `action` | An action: its address is `.`. |
+| `<ci-type>` | `job` | A CI job, at `jobs.<id>`. |
+| `<ci-type>` | `step` | A CI step, at `<parent>.steps[<n>]`. |
+| `<ci-id>` | `, id <text>` | A CI job's id or a CI step's `id`, quoted as JSON. |
+| `<ci-name>` | `, name <text>` | The node's `name`, quoted as JSON. |
+| `<ci-uses>` | `, uses <text>` | What a CI job or a CI step calls, as written, quoted as JSON. |
 | `<shown-value>` | `<text>` | A string quoted as JSON (`"team-b"`), a number or a boolean as written, an HCL `expression` or `template` as written, a line break as `\n` (`var.env`, `"${var.env}-orders"`), or `redacted` for a value a format marks secret. |
 
 ## `context`
@@ -338,8 +347,8 @@ words:
 | no contract | `` no <contract-kind> matches `<query>` `` | No side of the contract is in the workspace. |
 | provisioner | `<repository> <place> <address> (root <iac-root>)<mark?>` | A provisioner with its level and reason. |
 | iac type | `type: <iac-type>` | The IaC node's type. |
-| iac name | `name: <physical-name>` | The IaC node's physical name. |
-| iac root | `root: <iac-root>` | The IaC node's root module. |
+| iac name | `name: <physical-name>` | The IaC node's physical name; for a pipeline, an action, a CI job or a CI step, its `name`. |
+| iac root | `root: <iac-root>` | The IaC node's root module; for a pipeline or an action and the nodes under it, the file's path. |
 | iac role | `role: <text>` | What a Kubernetes object is to Crossplane: `crossplane composite resource definition`, `crossplane composition`, `crossplane claim`, `crossplane composite resource`, `crossplane managed resource` or `crossplane composed resource`. |
 | iac image | `image: <text><iac-mark?>` | A Compose service's image quoted as JSON, or a workload's image contract with its optional missing-builder note. |
 | image builder | `  builder: <repository> [<level>: <reason>]` | A workload's image builder, with its evaluated evidence. |
