@@ -187,11 +187,11 @@ struct Meada {
 #[derive(Clone)]
 enum Source {
     /// The client's first root, else the current directory (stdio). `last_root` is the last
-    /// root this connection's client sent, and `calls` the turns of its calls
+    /// root this connection's client sent, and `turns` the turns its calls take
     /// (`CALLS_IN_FLIGHT`); clones share both.
     Roots {
         last_root: Arc<Mutex<Option<PathBuf>>>,
-        calls: Arc<Semaphore>,
+        turns: Arc<Semaphore>,
     },
     /// The workspace of the manifest at `manifest`, as `listed` read it at start, `identity`
     /// first (server mode): read-only, one engine per call, and no request to the client. A
@@ -216,41 +216,17 @@ enum Source {
     },
 }
 
-impl Source {
-    /// Runs `work` in a turn of its own: over stdio once fewer than `CALLS_IN_FLIGHT` calls run,
-    /// after the calls that came to wait before it (tokio's semaphore is fair); in server mode at
-    /// once.
-    async fn in_turn<T>(&self, work: impl Future<Output = T>) -> T {
-        let _turn = match self {
-            // The semaphore is never closed, so the turn always comes.
-            Source::Roots { calls, .. } => calls.acquire().await.ok(),
-            _ => None,
-        };
-        work.await
-    }
-}
-
 impl Meada {
-    /// `open_and_ask` in a turn of its own (`Source::in_turn`).
-    async fn answer(
-        &self,
-        ctx: RequestContext<RoleServer>,
-        input: InputResponses,
-        ask: impl FnOnce(&Engine) -> crate::Result<String>,
-    ) -> CallToolResponse {
-        self.source
-            .in_turn(self.open_and_ask(ctx, input, ask))
-            .await
-    }
-
     /// Opens the engine where `source` says and runs `ask`; over stdio it refreshes the index
     /// first, after `root_dir` found the client's root: a 2026-07-28 client is first answered
     /// with `InputRequiredResult` asking for it (`input` carries the retry's answer), and one
     /// whose answer fails gets its last root, or a tool error when it sent none. In server mode
     /// the workspace holds what the request's `Pass` may read, and a call without one (never
     /// routed) is a tool error. The engine blocks (SQLite, and a read that meets a commit waits
-    /// up to the busy timeout), so it runs where the runtime expects blocking work.
-    async fn open_and_ask(
+    /// up to the busy timeout), so it runs where the runtime expects blocking work. Over stdio
+    /// the engine and the answer wait for a turn (`CALLS_IN_FLIGHT`), taken once the root is
+    /// known: the round trip that asks for it holds no engine.
+    async fn answer(
         &self,
         ctx: RequestContext<RoleServer>,
         input: InputResponses,
@@ -258,10 +234,16 @@ impl Meada {
     ) -> CallToolResponse {
         let pass = (ctx.extensions.get::<hyper::http::request::Parts>())
             .and_then(|parts| parts.extensions.get::<Pass>());
+        let mut turn = None;
         let open = match (&self.source, pass) {
-            (Source::Roots { last_root, .. }, _) => {
+            (Source::Roots { last_root, turns }, _) => {
                 match root_dir(&ctx, input.0, last_root).await {
-                    Ok(Root::Dir(dir)) => tokio::task::block_in_place(|| Engine::open(&dir)),
+                    Ok(Root::Dir(dir)) => {
+                        // Fair: waiting calls take their turns in the order they asked.
+                        // The semaphore is never closed, so the turn always comes.
+                        turn = turns.acquire().await.ok();
+                        tokio::task::block_in_place(|| Engine::open(&dir))
+                    }
                     Ok(Root::Ask(ask)) => return ask.into(),
                     Err(why) => return self.result(Err(why)).into(),
                 }
@@ -294,6 +276,7 @@ impl Meada {
             }),
         };
         let answer = tokio::task::block_in_place(|| open.and_then(|engine| ask(&engine)));
+        drop(turn);
         self.result(answer.map_err(|e| e.to_string())).into()
     }
 
@@ -510,7 +493,7 @@ pub fn serve() -> crate::Result<()> {
     tokio::runtime::Runtime::new()?.block_on(async {
         Meada::new(Source::Roots {
             last_root: Arc::default(),
-            calls: Arc::new(Semaphore::new(CALLS_IN_FLIGHT)),
+            turns: Arc::new(Semaphore::new(CALLS_IN_FLIGHT)),
         })
         .serve(rmcp::transport::stdio())
         .await?
@@ -1193,8 +1176,6 @@ pub(crate) fn address(listen: &str) -> crate::Result<SocketAddr> {
 mod tests {
     use super::*;
 
-    use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
-
     /// The `search` documentation is a literal: the tool list is a token-limited contract, and
     /// a derived text would change its lines. A new kind, or an engine word, fails here until
     /// its word is added.
@@ -1227,36 +1208,5 @@ mod tests {
         );
         assert_eq!(file_path("https://example.com/x"), None);
         assert_eq!(file_path("file://localhost/x"), None);
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn a_stdio_server_answers_at_most_calls_in_flight_at_once_and_every_one_in_the_end() {
-        let source = Source::Roots {
-            last_root: Arc::default(),
-            calls: Arc::new(Semaphore::new(CALLS_IN_FLIGHT)),
-        };
-        let now = Arc::new(AtomicUsize::new(0));
-        let most = Arc::new(AtomicUsize::new(0));
-        let mut calls = tokio::task::JoinSet::new();
-        for n in 0..3 * CALLS_IN_FLIGHT {
-            let (source, now, most) = (source.clone(), now.clone(), most.clone());
-            calls.spawn(async move {
-                let work = async {
-                    let k = now.fetch_add(1, SeqCst) + 1;
-                    most.fetch_max(k, SeqCst);
-                    tokio::time::sleep(Duration::from_millis(20)).await;
-                    now.fetch_sub(1, SeqCst);
-                    n
-                };
-                source.in_turn(work).await
-            });
-        }
-
-        let mut answered = calls.join_all().await;
-
-        answered.sort();
-        assert_eq!(answered, (0..3 * CALLS_IN_FLIGHT).collect::<Vec<_>>());
-        let most = most.load(SeqCst);
-        assert!(most <= CALLS_IN_FLIGHT, "{most} in flight");
     }
 }

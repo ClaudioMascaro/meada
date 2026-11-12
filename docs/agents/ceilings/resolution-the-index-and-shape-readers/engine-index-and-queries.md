@@ -114,13 +114,14 @@
   Measured once, cause not isolated: with a connection taking the write lock for 0.3 s at a
   time after a refresh that held it for 13 s, every call answered `database is locked` in one
   run of four, and which statement failed was not observed (#757). One stdio server answers
-  `CALLS_IN_FLIGHT` (4) calls at once (#756), the others waiting their turn at a fair semaphore
-  in the order they reach it (rmcp starts a task per request, so two that arrive together may
-  swap): a batch holds at most four engines and four answers on top of what the run allocated,
-  and a run's commit waits for the reads of three other calls of its process at most. Four, by the memory one
-  answer holds (about 26 MB waiting on Meada's own checkout, up to about 90 MB after a refresh
-  that added 100,000 functions): four of the largest stay near 360 MB, and more turns would not
-  answer a batch faster on a few cores. Before the bound, under a 2 GiB cap, debug build, Meada's
+  `CALLS_IN_FLIGHT` (4) calls at once (#756): with its root known (the `roots/list` round trip
+  holds no turn), a call waits for a turn at a fair semaphore, in the order the calls ask for
+  one (rmcp starts a task per request, so two that arrive together may swap), and keeps it
+  through its engine and its answer. A batch holds at most four engines and four answers on top
+  of what the run allocated, and a run's commit waits for the reads of three other calls of its
+  process at most. Four, by the memory one answer holds (about 26 MB waiting on Meada's own
+  checkout, up to about 90 MB after a refresh that added 100,000 functions): four of the
+  largest stay near 360 MB. Before the bound, under a 2 GiB cap, debug build, Meada's
   own checkout, the server was killed with 100 calls in flight when nothing changed (2,040 MB
   resident after 20 replies), with 16 to 21 during an edit every 2 s at one call a second (86
   at four), and with 11 behind a run that adds 100,000 functions to one file, which alone peaks

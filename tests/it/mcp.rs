@@ -165,10 +165,12 @@ async fn pipelined_calls_all_get_a_result() {
     client.cancel().await.unwrap();
 }
 
-/// Three times as many calls as one stdio server answers at once (`CALLS_IN_FLIGHT`, 4, #756),
-/// sent together: the ones past the bound wait their turn, and each gets the reply it gets alone.
+/// One stdio server answers at most four calls at once (`CALLS_IN_FLIGHT`, #756), and the others
+/// wait their turn. Twelve calls sent together while another process holds the index under a
+/// commit in progress: the four in flight wait out the busy timeout (10 s) and fail, then the
+/// eight that waited for a turn meet the index free and each answers what it answers alone.
 #[tokio::test]
-async fn calls_past_the_bound_in_flight_each_get_their_own_reply() {
+async fn calls_past_the_bound_wait_their_turn_and_each_gets_its_own_reply() {
     let repo = fixture_repo(
         "mcp_calls_in_flight",
         "ts-basic",
@@ -195,23 +197,36 @@ async fn calls_past_the_bound_in_flight_each_get_their_own_reply() {
         let answer = client.call_tool(params(n)).await.unwrap();
         alone.push(text_of(&answer).to_string());
     }
+    let held = rusqlite::Connection::open(repo.join(".meada/index.db")).unwrap();
+    held.execute_batch("BEGIN EXCLUSIVE").unwrap();
+    let release = tokio::spawn(async move {
+        // Past the busy timeout of the first four, well within that of the next ones.
+        tokio::time::sleep(Duration::from_secs(12)).await;
+        held.execute_batch("ROLLBACK").unwrap();
+    });
 
     let mut in_flight = tokio::task::JoinSet::new();
     for n in 0..12 {
         let (peer, params) = (client.peer().clone(), params(n));
-        in_flight.spawn(async move { (n, peer.call_tool(params).await) });
+        in_flight.spawn(async move { (n, peer.call_tool(params).await.unwrap()) });
     }
     let replies = tokio::time::timeout(Duration::from_secs(120), in_flight.join_all())
         .await
         .expect("every call is answered");
+    release.await.unwrap();
 
-    assert_eq!(replies.len(), 12);
-    for (n, answer) in replies {
-        assert_eq!(
-            text_of(&answer.unwrap()),
-            alone[n % calls.len()],
-            "call {n}"
+    let (locked, answered): (Vec<_>, Vec<_>) =
+        (replies.into_iter()).partition(|(_, answer)| answer.is_error == Some(true));
+    assert_eq!(locked.len(), 4, "{locked:?}");
+    for (n, answer) in &locked {
+        assert!(
+            text_of(answer).contains("locked"),
+            "call {n}: {}",
+            text_of(answer)
         );
+    }
+    for (n, answer) in &answered {
+        assert_eq!(text_of(answer), alone[n % calls.len()], "call {n}");
     }
     client.cancel().await.unwrap();
 }
