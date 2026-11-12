@@ -343,10 +343,9 @@ thread_local! {
     static BUSY: std::cell::Cell<Duration> = const { std::cell::Cell::new(BUSY_TIMEOUT) };
     /// Whether this thread runs a refresh now (`Run`).
     static RUNNING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    /// When this thread's wait on a lock began, and whether a refresh of another thread was in
-    /// flight when it last looked (`wait`).
-    static WAITING: std::cell::Cell<(Option<Instant>, bool)> =
-        const { std::cell::Cell::new((None, false)) };
+    /// Where the busy timeout of this thread's wait on a lock counts from: when the wait began,
+    /// or the last time it saw a refresh of another thread in flight (`wait`).
+    static TIMEOUT_FROM: std::cell::Cell<Option<Instant>> = const { std::cell::Cell::new(None) };
 }
 
 /// The refreshes in flight in this process, on any index (`Run`).
@@ -354,23 +353,25 @@ static IN_FLIGHT: AtomicUsize = AtomicUsize::new(0);
 
 /// The busy handler of a connection opened to write (`current`, `writable`), called with the
 /// `tries` it already made for the statement: a statement that meets a lock waits for it up to
-/// this thread's busy timeout, and past it for as long as a refresh of another thread of this
-/// process is in flight (#704). That run is what holds the lock: once it spills or commits a
-/// large change its exclusive lock outlasts the timeout, and a call must not fail on a timer
-/// while a refresh of its own process makes progress. A run that just ended left the lock
-/// free, so the statement gets one more try. The thread that runs the refresh keeps the timeout
-/// alone: what it waits on is another process, or a reader that may be waiting on it.
+/// this thread's busy timeout, and for as long as a refresh of another thread of this process
+/// is in flight (#704). That run is what holds the lock: once it spills or commits a large
+/// change its exclusive lock outlasts the timeout, and a call must not fail on a timer while a
+/// refresh of its own process makes progress. The time spent behind such a run does not count
+/// (#757): the timeout counts from the last time the wait saw one in flight, so after the run
+/// the statement can still wait a whole timeout for another process's lock. The thread that
+/// runs the refresh keeps the timeout alone: what it waits on is another process, or a reader
+/// that may be waiting on it.
 // ponytail: a run in flight on any index extends the wait, since a plain function knows no
 // connection; a wait on another process's lock then lasts until the runs of this process end.
 fn wait(tries: i32) -> bool {
-    let (since, was) = match WAITING.get() {
-        (Some(since), was) if tries > 0 => (since, was),
-        _ => (Instant::now(), false),
-    };
     let in_flight = !RUNNING.get() && IN_FLIGHT.load(Ordering::Relaxed) > 0;
-    WAITING.set((Some(since), in_flight));
-    if since.elapsed() >= BUSY.get() && !in_flight {
-        return was;
+    let since = match TIMEOUT_FROM.get() {
+        Some(since) if tries > 0 && !in_flight => since,
+        _ => Instant::now(),
+    };
+    TIMEOUT_FROM.set(Some(since));
+    if since.elapsed() >= BUSY.get() {
+        return false;
     }
     // Steps that grow to 50 ms, as SQLite's own handler's grow to 100.
     std::thread::sleep(Duration::from_millis(
@@ -604,7 +605,7 @@ fn rebuild(index: &Path, root: &Path, identity: &str, serve: &Serve) -> Result<C
         let db = writable(&new)?;
         db.execute_batch(SCHEMA)?;
         db.pragma_update(None, "user_version", schema_version())?;
-        refresh(&db, root, identity, serve)
+        refresh(&db, root, identity, &|| Ok(serve.clone()))
     })();
     // Where a reader holding the old file forbids the rename (Windows), it stays as it was.
     let replaced = built.and_then(|()| {
@@ -728,21 +729,29 @@ pub struct Indexed<'a> {
 /// its own; an entry point that asks the name of an inline definition of a kept group (which
 /// only its extraction gives) makes the refresh start over without keeping any group.
 ///
-/// Documents (spec #21) are refreshed first, the same way, when `serve` is declared; without
-/// a `[serve]` table the repository has none. They hold no code, so an edited document changes
-/// no code row: `Http::declare` reads them at query time.
+/// Documents (spec #21) are refreshed first, the same way, when the `[serve]` table that
+/// `read_serve` reads is declared; without one the repository has none. They hold no code, so an
+/// edited document changes no code row: `Http::declare` reads them at query time.
 ///
 /// Refreshes of one index share it (#704). In one process (MCP calls in flight together) one
 /// runs at a time: a call that comes while another runs waits for it, with no timer, then for
 /// the next run, which starts after it came and so sees the tree as the call found it; the
-/// calls that came meanwhile share that run's outcome. A statement that meets the run's lock
-/// outside a refresh (an open, a query) waits for the run too (`wait`). Across processes, one
-/// that finds nothing to write takes no write lock, and one whose first write meets another
-/// process's writer waits up to the busy timeout for that commit, then starts over
-/// (`attempts`).
-pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
+/// calls that came meanwhile share that run's outcome. A run reads the `[serve]` table it finds
+/// documents by through `read_serve` as each of its attempts starts (#758), whichever call
+/// started it: a run that starts after an edit of the table, or starts over after one, finds
+/// them by the edited one. A statement that meets the
+/// run's lock outside a refresh (an open, a query) waits for the run too (`wait`). Across
+/// processes, one that finds nothing to write takes no write lock, and one whose first write
+/// meets another process's writer waits up to the busy timeout for that commit, then starts
+/// over (`attempts`).
+pub fn refresh(
+    db: &Connection,
+    root: &Path,
+    identity: &str,
+    read_serve: &dyn Fn() -> Result<Serve>,
+) -> Result<()> {
     let Some(path) = db.path().filter(|p| !p.is_empty()) else {
-        return refresh_keeping(db, root, identity, serve, true);
+        return refresh_keeping(db, root, identity, read_serve, true);
     };
     let flight = {
         let mut flights = FLIGHTS.lock().unwrap_or_else(PoisonError::into_inner);
@@ -769,7 +778,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         nested: RUNNING.replace(true),
     };
     drop(runs);
-    let outcome = refresh_keeping(db, root, identity, serve, true);
+    let outcome = refresh_keeping(db, root, identity, read_serve, true);
     run.failed = outcome.as_ref().err().map(|e| e.to_string());
     outcome
 }
@@ -827,11 +836,11 @@ fn refresh_keeping(
     db: &Connection,
     root: &Path,
     identity: &str,
-    serve: &Serve,
+    read_serve: &dyn Fn() -> Result<Serve>,
     keep: bool,
 ) -> Result<()> {
     attempts(db, |behavior| {
-        refresh_attempt(db, root, identity, serve, keep, behavior)
+        refresh_attempt(db, root, identity, read_serve, keep, behavior)
     })
 }
 
@@ -869,7 +878,7 @@ fn refresh_attempt(
     db: &Connection,
     root: &Path,
     identity: &str,
-    serve: &Serve,
+    read_serve: &dyn Fn() -> Result<Serve>,
     keep: bool,
     behavior: TransactionBehavior,
 ) -> Result<()> {
@@ -898,6 +907,7 @@ fn refresh_attempt(
         }
     };
     let mappings = crate::config::load(root)?.iac;
+    let serve = read_serve()?;
     let mapping_stamp = mappings.stamp()?;
     let mappings_changed = known_configs
         .as_deref()
@@ -909,7 +919,7 @@ fn refresh_attempt(
     refresh_stamped(
         &tx,
         "documents",
-        &documents_found(root, &all, serve),
+        &documents_found(root, &all, &serve),
         now,
         |_| Ok(false),
         |abs| read_up_to(abs, document::DOCUMENT_BYTES_MAX),
@@ -1172,7 +1182,7 @@ fn refresh_attempt(
         drop(tx);
         db.execute("DELETE FROM meta", [])?;
         // Not `refresh`: this call is the run in flight for this index, which it would wait on.
-        return refresh_keeping(db, root, identity, serve, true);
+        return refresh_keeping(db, root, identity, read_serve, true);
     };
     settle(
         &tx,
@@ -1685,7 +1695,7 @@ fn refresh_attempt(
         // An entry point asked the name of an inline definition of a kept file: only its
         // group's extraction knows it, so start over without keeping any group.
         drop(tx);
-        return refresh_keeping(db, root, identity, serve, false);
+        return refresh_keeping(db, root, identity, read_serve, false);
     }
     tx.execute("DELETE FROM entry_points", [])?;
     for e in doors {
@@ -3888,7 +3898,7 @@ mod tests {
         writer.execute_batch("BEGIN IMMEDIATE").unwrap();
 
         let refreshed = with_busy_timeout(Duration::from_millis(50), || {
-            refresh(&db, &root, REPO, &Serve::default())
+            refresh(&db, &root, REPO, &|| Ok(Serve::default()))
         });
         assert!(refreshed.is_ok(), "{refreshed:?}");
         assert_eq!(named(&db, "a"), 1);
@@ -3912,7 +3922,7 @@ mod tests {
         });
 
         let refreshed = with_busy_timeout(Duration::from_secs(10), || {
-            refresh(&db, &root, REPO, &Serve::default())
+            refresh(&db, &root, REPO, &|| Ok(Serve::default()))
         });
         ends.join().unwrap();
         assert!(refreshed.is_ok(), "{refreshed:?}");
@@ -3939,7 +3949,8 @@ mod tests {
         std::thread::spawn(move || {
             with_busy_timeout(busy, || {
                 (0..times).try_for_each(|_| {
-                    (super::refresh(&db, &root, REPO, &Serve::default())).map_err(|e| e.to_string())
+                    (super::refresh(&db, &root, REPO, &|| Ok(Serve::default())))
+                        .map_err(|e| e.to_string())
                 })
             })
         })
@@ -4053,6 +4064,47 @@ mod tests {
         drop(blocker);
     }
 
+    /// A statement whose wait covered a refresh of its own process keeps a whole busy timeout
+    /// after that refresh ends (#757): a short write lock another process takes right then is
+    /// waited for, not a `database is locked` at once. The statement is a call's query on a
+    /// connection opened before the run, as the first read of an open is.
+    #[test]
+    fn a_wait_that_covered_a_run_of_its_process_keeps_a_whole_timeout_after_it() {
+        let (dir, index) = index_dir("wait_after_run");
+        let root = checkout(&dir);
+        let mut dbs = connections(&index, &root, 2);
+        add(&root, "b");
+        let blocker = reader(&index);
+        let run = refreshing(dbs.remove(0), &root, Duration::from_secs(10), 1);
+        committing(&index);
+        // Another process's writer, waiting for the run's commit with a handler that never
+        // sleeps, so it takes the lock as the run ends, and holds it for 100 ms.
+        let other = std::thread::spawn({
+            let index = index.clone();
+            move || {
+                let writer = Connection::open(&index).unwrap();
+                writer.busy_handler(Some(|_| true)).unwrap();
+                writer.execute_batch("BEGIN EXCLUSIVE").unwrap();
+                std::thread::sleep(Duration::from_millis(100));
+                writer.execute_batch("ROLLBACK").unwrap();
+            }
+        });
+        let call = dbs.remove(0);
+        let statement = std::thread::spawn(move || {
+            with_busy_timeout(Duration::from_millis(300), || {
+                let count = "SELECT count(*) FROM symbols WHERE id LIKE '%::b'";
+                (call.query_row(count, [], |r| r.get::<_, i64>(0))).map_err(|e| e.to_string())
+            })
+        });
+        // The statement waits for the run's commit past its own busy timeout.
+        std::thread::sleep(Duration::from_millis(600));
+        drop(blocker);
+
+        assert_eq!(run.join().unwrap(), Ok(()));
+        other.join().unwrap();
+        assert_eq!(statement.join().unwrap(), Ok(1));
+    }
+
     /// A wait that ended takes nothing from the next one (#704): a call whose open waited for
     /// a lock, and whose first query meets another one a whole busy timeout later, waits for
     /// it rather than failing at once on the first wait's clock.
@@ -4113,6 +4165,50 @@ mod tests {
         let db = open(&index, &root, REPO, &Serve::default()).unwrap();
         // Read without a refresh of its own: what the second call's run left.
         assert_eq!((named(&db, "b"), named(&db, "c")), (1, 1));
+    }
+
+    /// A run reads its `[serve]` table when it starts (#758), not when its call came: a call that
+    /// came during another run, before an edit of `meada.toml` that lists a document, starts the
+    /// next run after the edit, and that run finds the document. A call that came after the edit
+    /// would share that run, and answer by the edited table.
+    #[test]
+    fn a_run_reads_the_serve_table_when_it_starts_not_when_its_call_came() {
+        let (dir, index) = index_dir("serve_at_run_start");
+        let root = checkout(&dir);
+        fs::create_dir_all(root.join("docs")).unwrap();
+        let spec = "openapi: 3.0.0\ninfo:\n  title: api\npaths: {}\n";
+        fs::write(root.join("docs").join("api.yaml"), spec).unwrap();
+        fs::write(root.join("meada.toml"), "[serve]\n").unwrap();
+        let mut dbs = connections(&index, &root, 2);
+        add(&root, "b");
+        let blocker = reader(&index);
+        let first = refreshing(dbs.remove(0), &root, Duration::from_secs(10), 1);
+        committing(&index);
+
+        let second = std::thread::spawn({
+            let (db, root) = (dbs.remove(0), root.clone());
+            move || {
+                // As the engine reads it: `meada.toml` on disk.
+                let serve = || -> crate::Result<Serve> { Ok(crate::config::load(&root)?.serve) };
+                with_busy_timeout(Duration::from_secs(10), || {
+                    super::refresh(&db, &root, REPO, &serve)
+                })
+                .map_err(|e| e.to_string())
+            }
+        });
+        // Time for the second call to find the first run in flight; then the edit.
+        std::thread::sleep(Duration::from_millis(200));
+        let edited = "[serve]\ndocuments = [\"docs/api.yaml\"]\n";
+        fs::write(root.join("meada.toml"), edited).unwrap();
+        drop(blocker);
+
+        assert_eq!(
+            (first.join().unwrap(), second.join().unwrap()),
+            (Ok(()), Ok(()))
+        );
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        let listed = "SELECT count(*) FROM documents WHERE path = 'docs/api.yaml'";
+        assert_eq!(db.query_row(listed, [], |r| r.get::<_, i64>(0)).unwrap(), 1);
     }
 
     /// A refresh refused `DEFERRED_ATTEMPTS` times in a row (#704), as under a stream of other
@@ -4763,7 +4859,7 @@ mod tests {
         let serve = Serve::default();
         let index_now = || {
             let db = open(&index, &root, REPO, &serve).unwrap();
-            refresh(&db, &root, REPO, &serve).unwrap();
+            refresh(&db, &root, REPO, &|| Ok(serve.clone())).unwrap();
         };
         let is_fresh = |identity: &str| {
             let db = read(&index).unwrap();
@@ -4859,7 +4955,7 @@ mod tests {
         };
         let index_now = || {
             let db = open(&index, &root, REPO, &serve).unwrap();
-            refresh(&db, &root, REPO, &serve).unwrap();
+            refresh(&db, &root, REPO, &|| Ok(serve.clone())).unwrap();
         };
         let is_fresh = || fresh(&read(&index).unwrap(), &root, REPO, &serve).unwrap();
         index_now();
