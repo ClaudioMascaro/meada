@@ -90,8 +90,8 @@ amends these tables.
   so it takes part only in provisioning links (to each provisioner of its contract) and in
   orphans, never in a producer to consumer link. Its site is the repository, located by
   `<file>#<key path>`. Which of these sides open an orphan scope or name an orphan line, and the
-  resource list of an IAM policy statement, a grant rather than a use side, are settled in
-  "Orphan sides".
+  resource list of an IAM policy statement, a policy grant rather than a use side, are settled
+  in "Orphan sides".
 - **Subscriptions.** SNS to SQS subscriptions, EventBridge rules and their targets, Pub/Sub
   subscriptions and Service Bus subscriptions are read from IaC and followed like a RabbitMQ
   binding: a consumer of the target links to the producers of the source, `exact` for an
@@ -251,7 +251,7 @@ These enter `meada export`, each as an optional field that is left out when empt
 - `provisioners`: the provisioner sides, each a contract and the node that provisions it.
 - `uses`: the use sides read from config values, each a contract, the repository as its site
   and `at`, the `<file>#<key path>` it was read from. The config values themselves stay out. Its
-  `level` and the array `grants` are added in "Orphan sides".
+  `level` and the array `policy_grants` are added in "Orphan sides".
 - `provisions`: the provisioning links, each the other side, the provisioner, the contract, the
   level and the reason.
 - `subscriptions`: the subscriptions read from IaC, each a source and a target contract and the
@@ -645,19 +645,22 @@ writes over real mixed repositories, since an ADR cannot be its own answer key.
    orphan line says that something is missing, and said of a name match it is a guess about a
    guess.
 2. **Role.** A structured identifier in the resource list of an IAM policy statement is a
-   **grant**, not a use side: `Resource` and `NotResource` of an entry of `Statement`, wherever
-   the config reader gives that key path (a policy file, a policy document inside a template),
-   and `resources` and `not_resources` of a `statement` block of an `aws_iam_policy_document`. A
-   grant has no direction. `context` on the resource lists it under its own role, with its place;
-   it takes part in no provisioning link, opens no orphan scope and is no orphan line. The export
-   lists grants in an added optional array of their own (`grants`: `contract`, `site`, `at`), so
-   that `uses` keeps its meaning. In a JSON Schema document, one whose root holds a `$schema` key,
-   a value under `examples`, `default`, `enum` or `const` yields no side: it documents a shape and
-   stays a config value that `search` finds. A structured identifier anywhere else is a use side
-   at `exact`, as before. Access policies of other clouds hold no grant until a case shows one.
+   **policy grant**, not a use side: `Resource` and `NotResource` of an entry of `Statement`,
+   wherever the config reader gives that key path (a policy file, a policy document inside a
+   template), and `resources` and `not_resources` of a `statement` block of an
+   `aws_iam_policy_document`. A policy grant has no direction. `context` on the resource lists
+   it under its own role, with its place; it takes part in no provisioning link, opens no orphan
+   scope and is no orphan line. The export lists policy grants in an added optional array of
+   their own (`policy_grants`: `contract`, `site`, `at`), so that `uses` keeps its meaning. The
+   name is qualified because a grant alone is what the console lets a subject read (ADR 0024).
+   In a JSON Schema document, one whose root holds a `$schema` key, a value under `examples`,
+   `default`, `enum` or `const` yields no side: it documents a shape and stays a config value
+   that `search` finds. A structured identifier anywhere else is a use side at `exact`, as
+   before. Access policies of other clouds hold no policy grant until a case shows one.
    Not taken: no side at all for a policy statement, since who may touch a resource is worth
-   showing on it, and today a grant's provisioning link also hides a real `no use` orphan; and a
-   grant for a schema example, since an example names nothing anyone may touch.
+   showing on it, and today a policy grant's provisioning link also hides a real `no use`
+   orphan; and a policy grant for a schema example, since an example names nothing anyone may
+   touch.
 3. **External image.** The orphan scope of the image kind is asked per registry and namespace,
    not once for the kind. The namespace is the first segment of the repository path of the
    normalized name: `ghcr.io/acme/shop` and `ghcr.io/acme/tools/lint` are in `ghcr.io/acme`, and
@@ -678,10 +681,11 @@ writes over real mixed repositories, since an ADR cannot be its own answer key.
    still a use side at `exact`, and its values stay config values that `search` finds. The unit
    is the document, one of a YAML stream. The readers that recognize a whole document as one of
    their kind, as the code has them on 2026-11-12 (`fdb8b5a1`):
-   - the alert reader: a document it takes a rule, a route or a receiver from, by its content: a
-     Prometheus or Loki rule file (`groups` holding `rules`), a Grafana alert rule file, an
-     Alertmanager configuration, and a `PrometheusRule` or `AlertmanagerConfig` object, which is
-     one document of a Kubernetes stream;
+   - the alert reader: a YAML or JSON document that is no IaC file and that it takes a rule, a
+     route or a receiver from, by its content: a Prometheus or Loki rule file (`groups` holding
+     `rules`), a Grafana alert rule file, an Alertmanager configuration, and a `PrometheusRule` or
+     `AlertmanagerConfig` object, which is one document of a Kubernetes stream (the rules it reads
+     from Terraform, `grafana_rule_group` in a `.tf`, `.tofu` or `.tf.json` file, are IaC's);
    - the provider document reader: a provider document, an OpenAPI or AsyncAPI file of a
      repository with a `[serve]` table, found by its name or listed in `[serve] documents`, which
      the HTTP and channel kinds read whole.
