@@ -66,7 +66,7 @@ CREATE TABLE iac_nodes (
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
     subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
-    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT, selectors TEXT
+    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT, actions TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3471,7 +3471,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "Deployment.apps/shop/dev-web",
@@ -3522,7 +3522,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "Service/shop/dev-web",
@@ -3550,7 +3550,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "ServiceAccount/shop/dev-runner",
@@ -3578,7 +3578,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
     ],
     references: [
@@ -3672,7 +3672,7 @@ Output {
                 },
             ),
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
@@ -3702,7 +3702,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws",
@@ -3732,7 +3732,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "Queue.acme.io/shop/orders",
@@ -3762,7 +3762,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/queue",
@@ -3806,7 +3806,7 @@ Output {
                 },
             ),
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/topic",
@@ -3852,7 +3852,7 @@ Output {
                 },
             ),
             ingress: [],
-            selectors: None,
+            actions: None,
         },
     ],
     references: [
@@ -3929,7 +3929,7 @@ sample.cloudformation.yaml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "Worker",
@@ -3973,7 +3973,7 @@ sample.cloudformation.yaml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
     ],
     [
@@ -4099,7 +4099,7 @@ sample.serverless.yml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "Queue",
@@ -4134,7 +4134,7 @@ sample.serverless.yml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
     ],
     [
@@ -4178,7 +4178,7 @@ sample.provision.tf
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "aws_sqs_queue.orders",
@@ -4206,7 +4206,7 @@ sample.provision.tf
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
     ],
     [],
@@ -4250,7 +4250,7 @@ sample.compose.yaml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "services.inline",
@@ -4287,7 +4287,7 @@ sample.compose.yaml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
     ],
     [
@@ -4353,7 +4353,7 @@ sample.workflow.yml
             overridable: [],
             path: ".github/workflows/sample.yml",
             line: 1,
-            end_line: 23,
+            end_line: 30,
             block: "",
             image: None,
             build: None,
@@ -4368,7 +4368,15 @@ sample.workflow.yml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: Some(
+                Facts {
+                    id: None,
+                    uses: None,
+                    reusable: true,
+                    with: [],
+                    secrets: None,
+                },
+            ),
         },
         Node {
             address: "jobs.build",
@@ -4396,12 +4404,15 @@ sample.workflow.yml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: Some(
-                Selectors {
+            actions: Some(
+                Facts {
                     id: Some(
                         "build",
                     ),
                     uses: None,
+                    reusable: false,
+                    with: [],
+                    secrets: None,
                 },
             ),
         },
@@ -4429,12 +4440,15 @@ sample.workflow.yml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: Some(
-                Selectors {
+            actions: Some(
+                Facts {
                     id: None,
                     uses: Some(
                         "actions/checkout@v4",
                     ),
+                    reusable: false,
+                    with: [],
+                    secrets: None,
                 },
             ),
         },
@@ -4464,14 +4478,19 @@ sample.workflow.yml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: Some(
-                Selectors {
+            actions: Some(
+                Facts {
                     id: Some(
                         "login",
                     ),
                     uses: Some(
                         "docker/login-action@v3",
                     ),
+                    reusable: false,
+                    with: [
+                        "registry",
+                    ],
+                    secrets: None,
                 },
             ),
         },
@@ -4499,7 +4518,7 @@ sample.workflow.yml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "jobs[\"publish-prd\"]",
@@ -4510,7 +4529,7 @@ sample.workflow.yml
             overridable: [],
             path: ".github/workflows/sample.yml",
             line: 21,
-            end_line: 23,
+            end_line: 27,
             block: "jobs[\"publish-prd\"]",
             image: None,
             build: None,
@@ -4525,13 +4544,66 @@ sample.workflow.yml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: Some(
-                Selectors {
+            actions: Some(
+                Facts {
                     id: Some(
                         "publish-prd",
                     ),
                     uses: Some(
                         "acme/workflows/.github/workflows/publish.yml@v1",
+                    ),
+                    reusable: false,
+                    with: [
+                        "package",
+                    ],
+                    secrets: Some(
+                        Keys(
+                            [
+                                "token",
+                            ],
+                        ),
+                    ),
+                },
+            ),
+        },
+        Node {
+            address: "jobs[\"publish-stg\"]",
+            root: ".github/workflows/sample.yml",
+            ty: "job",
+            name: None,
+            pattern: false,
+            overridable: [],
+            path: ".github/workflows/sample.yml",
+            line: 28,
+            end_line: 30,
+            block: "jobs[\"publish-stg\"]",
+            image: None,
+            build: None,
+            build_image: false,
+            dockerfile: None,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+            actions: Some(
+                Facts {
+                    id: Some(
+                        "publish-stg",
+                    ),
+                    uses: Some(
+                        "acme/workflows/.github/workflows/publish.yml@main",
+                    ),
+                    reusable: false,
+                    with: [],
+                    secrets: Some(
+                        Inherit(
+                            Inherit,
+                        ),
                     ),
                 },
             ),
@@ -4576,6 +4648,12 @@ sample.workflow.yml
                 "needs",
             ),
         },
+        Reference {
+            root: ".github/workflows/sample.yml",
+            source: ".",
+            target: "jobs[\"publish-stg\"]",
+            via: None,
+        },
     ],
 )
 
@@ -4608,7 +4686,7 @@ sample.action.yml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: None,
+            actions: None,
         },
         Node {
             address: "runs.steps[0]",
@@ -4634,12 +4712,15 @@ sample.action.yml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: Some(
-                Selectors {
+            actions: Some(
+                Facts {
                     id: Some(
                         "prepare",
                     ),
                     uses: None,
+                    reusable: false,
+                    with: [],
+                    secrets: None,
                 },
             ),
         },
@@ -4667,12 +4748,15 @@ sample.action.yml
             images: [],
             provisioned: None,
             ingress: [],
-            selectors: Some(
-                Selectors {
+            actions: Some(
+                Facts {
                     id: None,
                     uses: Some(
                         "./nested",
                     ),
+                    reusable: false,
+                    with: [],
+                    secrets: None,
                 },
             ),
         },

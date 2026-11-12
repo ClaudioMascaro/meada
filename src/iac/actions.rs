@@ -10,7 +10,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
-use rusqlite::{Connection, Transaction};
+use meada_core::export::{Inherit, Secrets};
+use rusqlite::Transaction;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -37,14 +38,44 @@ const STEP: &str = "step";
 /// no Terraform root or Kubernetes unit is, and its type is one of the four.
 pub(super) const ROWS: &str = "(root = path AND type IN ('workflow', 'action', 'job', 'step'))";
 
-/// What a query names a CI job or a CI step by besides its address (ADR 0028): selectors, never
-/// identity. A CI step's name is the node's own.
+/// What the reader keeps of a node besides its address and its name (ADR 0028). `id` and `uses`
+/// are what a query names a CI job or a CI step by: selectors, never identity. The rest is what
+/// the CI contract (`crate::ci`) reads of a provider and of a call.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub(crate) struct Selectors {
+pub(crate) struct Facts {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uses: Option<String>,
+    /// A pipeline that `on.workflow_call` lets a CI job call.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reusable: bool,
+    /// The keys of `with` beside a `uses`, as written, sorted.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub with: Vec<String>,
+    /// The keys of `secrets` beside a `uses`, as written, sorted, or the word `inherit`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secrets: Option<Secrets>,
+}
+
+/// The keys of the mapping `value`, each short enough to be kept.
+fn keys(value: Option<&Value>) -> Vec<String> {
+    let Some(Value::Object(map)) = value else {
+        return Vec::new();
+    };
+    let short = map.keys().filter(|key| key.len() <= VALUE_MAX);
+    short.cloned().collect()
+}
+
+/// Whether `on` holds `workflow_call`, in the three shapes it takes: a string, a list, a map.
+fn reusable(on: Option<&Value>) -> bool {
+    const CALL: &str = "workflow_call";
+    match on {
+        Some(Value::String(one)) => one == CALL,
+        Some(Value::Array(several)) => several.iter().any(|event| event.as_str() == Some(CALL)),
+        Some(Value::Object(events)) => events.contains_key(CALL),
+        _ => false,
+    }
 }
 
 /// Whether the file at `path` may be a pipeline or an action, by its place and name alone.
@@ -52,7 +83,8 @@ pub(crate) fn is_file(path: &str) -> bool {
     is_workflow(path) || action_folder(path).is_some()
 }
 
-fn is_workflow(path: &str) -> bool {
+/// Whether `path` is where GitHub reads a pipeline from.
+pub(crate) fn is_workflow(path: &str) -> bool {
     path.strip_prefix(WORKFLOWS).is_some_and(|name| {
         !name.contains('/') && (name.ends_with(".yml") || name.ends_with(".yaml"))
     })
@@ -155,13 +187,31 @@ impl Unit<'_> {
     /// and the reader's end mark), unless a ceiling is reached.
     fn node(&mut self, address: &str, ty: &str, body: &Map<String, Value>, lines: Lines) -> bool {
         let name = text(body.get("name"));
-        let selectors = Selectors {
+        let mut facts = Facts {
             id: text(body.get("id")),
             uses: text(body.get("uses")),
+            ..Facts::default()
         };
-        let size = [&name, &selectors.id, &selectors.uses]
+        // What a call passes: the keys only, the values stay config values.
+        if facts.uses.is_some() {
+            facts.with = keys(body.get("with"));
+            facts.secrets = match body.get("secrets") {
+                Some(Value::String(word)) if word == "inherit" => {
+                    Some(Secrets::Inherit(Inherit::Inherit))
+                }
+                secrets => Some(keys(secrets))
+                    .filter(|keys| !keys.is_empty())
+                    .map(Secrets::Keys),
+            };
+        }
+        let passed = match &facts.secrets {
+            Some(Secrets::Keys(keys)) => keys.iter().chain(&facts.with),
+            _ => [].iter().chain(&facts.with),
+        };
+        let size = [&name, &facts.id, &facts.uses]
             .iter()
             .map(|s| s.as_ref().map_or(0, String::len))
+            .chain(passed.map(String::len))
             .sum::<usize>();
         if !self.take(address.len() + size) {
             return false;
@@ -183,7 +233,7 @@ impl Unit<'_> {
             // the last line above it indented deeper than the key is the block's own.
             end_line: self.ends.end_of(line, mark),
             block,
-            selectors: (selectors != Selectors::default()).then_some(selectors),
+            actions: (facts != Facts::default()).then_some(facts),
             ..Node::default()
         });
         true
@@ -280,6 +330,12 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     }
     // The file node ends at the last line, whatever its indent.
     unit.nodes[0].end_line = whole.1;
+    if ty == WORKFLOW && reusable(doc.get("on")) {
+        unit.nodes[0].actions = Some(Facts {
+            reusable: true,
+            ..Facts::default()
+        });
+    }
     let mut held = 0;
     if ty == ACTION {
         if let Some(Value::Object(runs)) = doc.get("runs") {
@@ -344,23 +400,14 @@ pub(crate) fn refresh(
     super::insert(tx, &nodes, &references)
 }
 
-/// The nodes of this format in `db` (repository `identity`) that `needle`, lowercased, matches
-/// by address, type, name, `id` or `uses`, as `search` hits: `<identity> <path>:<line> <address>
-/// (<type>[, id "<id>"][, name "<name>"][, uses "<uses>"])`, ordered as the IaC hits are.
-pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<Hit>> {
-    // ponytail: scans every node of this format; an indexed lookup waits for a workspace that
-    // makes it slow.
-    let sql = format!("SELECT {} FROM iac_nodes WHERE {ROWS}", super::COLUMNS);
-    let mut statement = db.prepare(&sql)?;
+/// The nodes of this format among `nodes` (repository `identity`) that `needle`, lowercased,
+/// matches by address, type, name, `id` or `uses`, as `search` hits: `<identity> <path>:<line>
+/// <address> (<type>[, id "<id>"][, name "<name>"][, uses "<uses>"])`, ordered as the IaC hits are.
+pub(crate) fn hits(identity: &str, nodes: &[Node], needle: &str) -> Vec<Hit> {
     let mut hits = Vec::new();
-    for n in statement.query_map([], super::row)? {
-        let n = n?;
-        let selectors = n.selectors.clone().unwrap_or_default();
-        let shown = [
-            ("id", &selectors.id),
-            ("name", &n.name),
-            ("uses", &selectors.uses),
-        ];
+    for n in nodes.iter().filter(|n| owns(n)) {
+        let facts = n.actions.clone().unwrap_or_default();
+        let shown = [("id", &facts.id), ("name", &n.name), ("uses", &facts.uses)];
         let fields = [Some(&n.address), Some(&n.ty)]
             .into_iter()
             .chain(shown.iter().map(|(_, value)| value.as_ref()));
@@ -370,7 +417,7 @@ pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<
         else {
             continue;
         };
-        let mut text = format!("{} ({}", super::at(identity, &n), n.ty);
+        let mut text = format!("{} ({}", super::at(identity, n), n.ty);
         for (word, value) in shown {
             if let Some(value) = value {
                 let value = serde_json::to_string(value).unwrap_or_default();
@@ -381,7 +428,7 @@ pub(crate) fn hits(identity: &str, db: &Connection, needle: &str) -> Result<Vec<
         let key = format!("{identity} {} {:010} {}", n.path, n.line, n.address);
         hits.push((r, key, text));
     }
-    Ok(hits)
+    hits
 }
 
 /// Whether `text` names the node `n` of this format otherwise than by its address: the file node
@@ -422,7 +469,7 @@ pub(super) fn names(identity: &str, n: &Node, text: &str) -> bool {
         .as_deref()
         .filter(|_| value.starts_with('"'))
         .unwrap_or(value);
-    let selectors = n.selectors.as_ref();
+    let selectors = n.actions.as_ref();
     text[..parent] == n.address[..own]
         && match key {
             "id" => selectors.and_then(|s| s.id.as_deref()) == Some(value),
@@ -522,11 +569,11 @@ jobs:
         assert_eq!(nodes[3].block, "jobs.build.steps[1]");
         assert_eq!(nodes[0].name.as_deref(), Some("CI"));
         assert_eq!(nodes[1].name.as_deref(), Some("Build"));
-        let login = nodes[3].selectors.as_ref().unwrap();
+        let login = nodes[3].actions.as_ref().unwrap();
         assert_eq!(login.id.as_deref(), Some("login"));
         assert_eq!(login.uses.as_deref(), Some("docker/login-action@v3"));
         assert_eq!(nodes[3].name.as_deref(), Some("Log in"));
-        let publish = nodes[5].selectors.as_ref().unwrap();
+        let publish = nodes[5].actions.as_ref().unwrap();
         assert_eq!(publish.id.as_deref(), Some("publish-prd"));
         assert!(publish.uses.as_deref().unwrap().ends_with("publish.yml@v1"));
     }

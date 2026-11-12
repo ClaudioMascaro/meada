@@ -200,7 +200,7 @@ CREATE TABLE iac_nodes (
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
     subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
-    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT, selectors TEXT
+    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT, actions TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -2781,6 +2781,9 @@ pub(crate) struct Export {
     pub(crate) repository: String,
     /// Where the repository stands in the workspace; set by the engine, never stored or shown.
     pub(crate) root: PathBuf,
+    /// The indexed commit, when a kind reads it (`ContractKind::reads_commit`) and it is known;
+    /// set by the engine, never stored.
+    pub(crate) commit: Option<String>,
     /// Query-time decisions, supplied by the workspace, never stored in the index.
     pub(crate) decisions: crate::decisions::Decisions,
     pub(crate) name_candidates: std::collections::BTreeMap<String, crate::items::NameCandidates>,
@@ -3000,6 +3003,9 @@ impl Export {
         out.subscriptions.dedup();
         out.processes = self.processes;
         out.stale_decisions = self.stale_decisions;
+        for kind in crate::contract::KINDS {
+            kind.written(&self.iac, &mut out);
+        }
         out
     }
 
@@ -3379,6 +3385,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
     Ok(Export {
         repository: identity.to_string(),
         root: PathBuf::new(),
+        commit: None,
         files,
         dropped,
         symbols: Vec::new(),
@@ -4709,7 +4716,7 @@ mod tests {
         actual += "\n";
 
         // The CI nodes and references of a pipeline and of a composite action (#823), with the
-        // selectors a CI job and a CI step store.
+        // facts a pipeline, a CI job and a CI step store.
         for (name, path) in [
             ("sample.workflow.yml", ".github/workflows/sample.yml"),
             ("sample.action.yml", "tools/setup/action.yml"),

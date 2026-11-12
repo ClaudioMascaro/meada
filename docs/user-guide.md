@@ -1103,7 +1103,7 @@ As listas vazias são omitidas, menos `files`, `symbols`, `calls`, `providers`, 
 | `symbols` | Os símbolos: `id`, `span` (`path`, `start`, `end`, deslocamentos em bytes) e `hash` (BLAKE3 em hexadecimal dos bytes do span) |
 | `calls` | Os pontos de chamada: `id`, `caller`, `target` e `level` (vazios enquanto não resolve), `candidates` (se ambígua), `span`, `narrowed` e `decorates` |
 | `providers` | O lado provedor de cada contrato: `contract`, `site`, e se houver `gateway` e `shape` |
-| `consumers` | O lado consumidor: `contract` (nulo se a URL não foi avaliada), `site`, `via` (como nomeia o repositório do provedor, como `host:api.example.com` ou `env:API_URL`) e `shape` |
+| `consumers` | O lado consumidor: `contract` (nulo se a URL não foi avaliada), `site`, `via` (como nomeia o repositório do provedor, como `host:api.example.com` ou `env:API_URL`) e `shape`. No consumidor de um contrato de CI, `via` é o `uses` como escrito, e entram os campos opcionais `ref` (o ref Git depois do `@`), `with` (as chaves passadas, ordenadas) e `secrets` (as chaves, ou a palavra `inherit`) |
 | `links` | As ligações: `consumer`, `provider`, `contract`, `level`, `reason`, e se houver `by`, `p` e `drift` |
 | `bindings`, `publishes` | Os bindings (`contract`, `exchange`, `pattern`, `site`) e as publicações (`exchange`, `key`, `site`) do RabbitMQ que o repositório declara |
 | `documents` | Os documentos OpenAPI e AsyncAPI lidos: `path`, `format`, `version` e `contracts` |

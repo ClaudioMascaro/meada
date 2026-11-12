@@ -1065,7 +1065,7 @@ impl<'m> Eval<'m> {
                         service: service.into(),
                     })
                     .collect(),
-                selectors: None,
+                actions: None,
             });
         }
         let (objs, addresses, roles) = (&objs[..kept], &addresses[..kept], &roles[..kept]);
@@ -1146,7 +1146,7 @@ impl<'m> Eval<'m> {
                     images: Vec::new(),
                     provisioned: projection,
                     ingress: Vec::new(),
-                    selectors: None,
+                    actions: None,
                 });
                 held.entry(i).or_default().push(composed.len());
                 composed.push((i, address, b));

@@ -119,7 +119,11 @@ repository serving it is <repository>`, `2 providers fit; host unresolved; serve
 resource, a channel), `<channel> wildcard <pattern>`, `<queue> binding <exchange> <pattern>`,
 and for a package `<contract> <range> (local <version>)`, followed by `, range unchecked` or
 `, range mismatch` when the range does not plainly accept the version, and `; import <how>` for
-an import hop. A link to a provider that serves every method ends with `; any method`.
+an import hop. A link to a provider that serves every method ends with `; any method`. A link
+of a CI contract reads `@<ref> (indexed <short commit>)`: the Git ref the call wrote and the
+commit the provider's index was read at, followed by `, ref mismatch` when the ref is a full
+commit id (40 or 64 hexadecimal digits) other than that commit, or `@<ref> (indexed commit
+unknown)` when the provider's repository records none.
 
 The reason of a call's mark is how many definitions have its name: `one method named render`,
 `2 functions or classes named render`, `one of several methods named run` (a match narrowed to
@@ -137,6 +141,7 @@ A contract identifier starts with its contract kind and `::`:
 | `<contract>` | `package::<ecosystem>::<package>` | A package: `package::npm::@example/kit`. |
 | `<contract>` | `image::<word>` | A normalized image name or an unresolved image pattern. |
 | `<contract>` | `alert::<text>::<text>` | A label key and value (or matcher pattern) on an alert rule or Alertmanager route. |
+| `<contract>` | `ci::<repository>/<path>` | A reusable pipeline of GitHub Actions, by its repository and its file: `ci::github.com/acme/workflows/.github/workflows/publish.yml`. The Git ref a call names is no part of it. |
 | `<contract>` | `resource::<resource-kind>::<resource-id>` | A resource declared in `meada.toml` or used through an SDK: `resource::postgres::orders`, `resource::s3::orders-bucket`. |
 | `<method>` | `<word>` | An HTTP method in upper case, such as `GET` or `POST`. |
 | `<route>` | `<word>` | A route path; each parameter is `{}`. |
@@ -168,13 +173,13 @@ substrings), and an optional `kind`:
 | `alert` | Alert rule emitters and Alertmanager route matchers of `alert::` contracts. |
 | `document` | OpenAPI and AsyncAPI documents, by path or title. |
 | `package` | Packages, by name. |
+| `ci` | Pipelines, actions, CI jobs and CI steps of GitHub Actions, by address, type, id, `name` or `uses`. |
 | `drift` | Fields a consumer reads that its provider lacks, by route or field path. |
 | `community` | Communities, by name. |
 | `process` | Processes, by their entry point's label. |
 | `duplicate` | Groups of symbols with the same span text, by name or path. |
 | `value` | Config values of YAML, JSON and Terraform files, by value or key path. |
 | `iac` | IaC nodes (Terraform resources, data blocks and module calls, Kubernetes objects), by address, type or physical name. |
-| `ci` | Pipelines, actions, CI jobs and CI steps of GitHub Actions, by address, type, id, `name` or `uses`. |
 | `ambiguous` | Open items: calls with several candidate providers. |
 | `unresolved` | Open items: calls whose target Meada cannot read. |
 
@@ -241,6 +246,11 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | `<ci-id>` | `, id <text>` | A CI job's id or a CI step's `id`, quoted as JSON. |
 | `<ci-name>` | `, name <text>` | The node's `name`, quoted as JSON. |
 | `<ci-uses>` | `, uses <text>` | What a CI job or a CI step calls, as written, quoted as JSON. |
+| `<git-ref>` | `<word>` | The Git ref of a call, as written after `@`: a branch, a tag or a commit id. Meada never resolves it. |
+| `<ci-passed>` | ` with: <ci-keys>` | The keys of the call's `with`, never their values. |
+| `<ci-passed>` | ` secrets: <ci-keys>` | The keys of the call's `secrets`, or the word `inherit`. |
+| `<ci-passed>` | ` with: <ci-keys>; secrets: <ci-keys>` | Both. |
+| `<ci-keys>` | `<text>` | Keys as written, sorted, joined by `, `. |
 | `<shown-value>` | `<text>` | A string quoted as JSON (`"team-b"`), a number or a boolean as written, an HCL `expression` or `template` as written, a line break as `\n` (`var.env`, `"${var.env}-orders"`), or `redacted` for a value a format marks secret. |
 
 ## `context`
@@ -336,10 +346,13 @@ words:
 | no symbol | `` no symbol matches `<query>` `` | No symbol has the name. |
 | config use | `<repository> use <config-place> [<level>] <contract><orphan-note?>` | A directionless config use named by its key locator. |
 | config key | `<repository> <config-place>` | A declared resource key's canonical location. |
-| located provides | `provides <contract>` | The selected key or IaC node writes the declared resource. |
+| located provides | `provides <contract>` | The selected key or IaC node writes the declared resource, or the selected pipeline is the provider of the CI contract. |
 | located consumes | `consumes <contract>` | The selected key or IaC node reads the declared resource. |
 | linked reader | `  reader: <identity><mark>` | A reader linked to the selected resource writer. |
 | linked writer | `  writer: <identity><mark>` | A writer linked to the selected resource reader. |
+| ci consumer | `  consumer: <repository> <place> <address> [<level>: <reason>]<ci-passed?>` | Under a pipeline's `provides`: a CI job that calls it, with the link's level and reason and the keys the call passes. |
+| ci consumes | `consumes <contract> @<git-ref><ci-passed?>` | The selected CI job calls the reusable pipeline of the contract, at the Git ref and with the keys it wrote. |
+| ci provider | `  provider: <repository> <place> <address> [<level>: <reason>]` | Under a CI job's `consumes`: the pipeline that provides the contract, with the link's level and reason. |
 | contract head | `<shown-contract>` | The contract the sides below belong to. |
 | side | `  <repository> <role> <side><mark?><orphan-note?>` | A side of the contract; a side linked through another name carries its mark. |
 | drift | `    drift: missing <missing>` | Under a consumer: the field paths it reads that the provider lacks, each with its level. |

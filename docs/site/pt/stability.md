@@ -126,7 +126,7 @@ O export de um repositório é JSON indentado e terminado por uma quebra de linh
 | `symbols` | `id`, `span` (`path`, `start`, `end`), `hash`. |
 | `calls` | `id`, `caller`, `target`, `level`, `candidates`, `span`, `narrowed`, `decorates`. |
 | `providers` | `contract`, `site`, `gateway`, `shape`. |
-| `consumers` | `contract`, `site`, `via`, `shape`. |
+| `consumers` | `contract`, `site`, `via`, `shape`; no consumidor de um contrato de CI, também `ref`, `with` e `secrets`, cada um omitido quando vazio. |
 | `bindings` | `contract`, `exchange`, `pattern`, `site`. |
 | `documents` | `path`, `format` (`openapi` ou `asyncapi`), `version`, `contracts`. |
 | `publishes` | `exchange`, `key`, `site`. |

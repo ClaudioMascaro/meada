@@ -186,16 +186,21 @@ fn cloudformation_long(name: &str, reference: &str, between: &str) -> usize {
     ))
 }
 
-/// The bytes of the addresses, names, selectors and references the CI nodes of `text`, a lone
-/// pipeline (#823), store.
+/// The bytes of the addresses, names, selectors, passed keys and references the CI nodes of
+/// `text`, a lone pipeline (#823), store.
 fn pipeline(text: String) -> usize {
     let (nodes, references) =
         crate::iac::actions::evaluate(".github/workflows/ci.yml", &file(text));
     let nodes = nodes.iter().map(|n| {
-        let selectors = n.selectors.as_ref().map_or(0, |s| {
-            s.id.as_ref().map_or(0, String::len) + s.uses.as_ref().map_or(0, String::len)
+        let facts = n.actions.as_ref().map_or(0, |f| {
+            let secrets = match &f.secrets {
+                Some(meada_core::export::Secrets::Keys(keys)) => keys.as_slice(),
+                _ => &[],
+            };
+            let keys = f.with.iter().chain(secrets).map(String::len).sum::<usize>();
+            f.id.as_ref().map_or(0, String::len) + f.uses.as_ref().map_or(0, String::len) + keys
         });
-        n.address.len() + n.name.as_ref().map_or(0, String::len) + selectors
+        n.address.len() + n.name.as_ref().map_or(0, String::len) + facts
     });
     let references = (references.iter())
         .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
@@ -1796,6 +1801,18 @@ resource "aws_apigatewayv2_route" "wide" {{
             pipeline(format!(
                 "jobs:\n  build:\n    steps:\n      - run: |\n{script}{nested}"
             ))
+        }),
+        ("pipeline: calls that pass long keys", || {
+            // #824: a call keeps the keys of `with` and of `secrets`, never their values.
+            let keys = |section: &str| {
+                let keys = (0..20).map(|i| format!("      key-{i:060}: v\n"));
+                format!("    {section}:\n{}", keys.collect::<String>())
+            };
+            let jobs = fill(1, |i| {
+                let (with, secrets) = (keys("with"), keys("secrets"));
+                format!("  j{i}:\n    uses: a/b/.github/workflows/c.yml@v1\n{with}{secrets}")
+            });
+            pipeline(format!("jobs:\n{jobs}"))
         }),
         ("pipeline: every job needs every other", || {
             let needs = (0..300)

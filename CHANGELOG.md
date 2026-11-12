@@ -18,6 +18,16 @@ All notable changes to Meada are recorded here. The format follows
   (`jobs.build.steps[id=login]`). The kind `iac`, the default search and `meada export` answer as
   before. The index schema changes, so existing indexes are rebuilt once on first use. Release
   level: minor, meada (#823).
+- A CI job that calls a reusable pipeline of another repository of the workspace links to it by
+  the new CI contract `ci::<repository identity>/<path>` (ADR 0028): the provider is a pipeline
+  whose `on` holds `workflow_call`, the consumer the CI job whose `uses` names it, with the host
+  of its own repository. The link is `exact`; its reason shows the Git ref as written and the
+  provider's indexed commit (`@main (indexed 1a2b3c4)`), with `, ref mismatch` only for a full
+  commit id other than it, and Meada resolves no ref. `context` on a pipeline lists every CI job
+  that calls it with the keys of `with` and `secrets` it passes, and `meada export` gains the
+  optional consumer fields `ref`, `with` and `secrets`. A `uses` whose repository is not in the
+  workspace holds no side, so it is never an orphan or an open item. Existing indexes are rebuilt
+  once on first use. Release level: minor, meada and meada-core (#824).
 
 ### Fixed
 

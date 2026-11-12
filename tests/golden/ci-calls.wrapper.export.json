@@ -1,0 +1,63 @@
+{
+  "format": 1,
+  "repository": "github.com/acme/wrapper",
+  "commit": "1d7b325eb5e1a6dad91d6897fb6880735ec4b9f9",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "ci::github.com/acme/wrapper/.github/workflows/release.yml",
+      "site": "github.com/acme/wrapper::.github/workflows/release.yml::."
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "site": "github.com/acme/wrapper::.github/workflows/release.yml::jobs.release",
+      "via": "acme/workflows/.github/workflows/publish.yml@main",
+      "ref": "main",
+      "with": [
+        "package"
+      ],
+      "secrets": "inherit"
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "github.com/acme/wrapper::.github/workflows/release.yml::.",
+      "address": ".",
+      "type": "workflow",
+      "root": ".github/workflows/release.yml",
+      "path": ".github/workflows/release.yml",
+      "line": 1,
+      "end_line": 12
+    },
+    {
+      "identity": "github.com/acme/wrapper::.github/workflows/release.yml::jobs.release",
+      "address": "jobs.release",
+      "type": "job",
+      "root": ".github/workflows/release.yml",
+      "path": ".github/workflows/release.yml",
+      "line": 5,
+      "end_line": 12
+    }
+  ],
+  "links": [
+    {
+      "consumer": "github.com/acme/app-c::.github/workflows/release.yml::jobs.release",
+      "provider": "github.com/acme/wrapper::.github/workflows/release.yml::.",
+      "contract": "ci::github.com/acme/wrapper/.github/workflows/release.yml",
+      "level": "exact",
+      "reason": "@main (indexed 1d7b325)"
+    },
+    {
+      "consumer": "github.com/acme/wrapper::.github/workflows/release.yml::jobs.release",
+      "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "level": "exact",
+      "reason": "@main (indexed fde768c)"
+    }
+  ]
+}

@@ -1101,7 +1101,7 @@ which always appear (like `repository`, which is text).
 | `symbols` | The symbols: `id`, `span` (`path`, `start`, `end`, byte offsets) and `hash` (hexadecimal BLAKE3 of the span's bytes) |
 | `calls` | The call sites: `id`, `caller`, `target` and `level` (empty until resolved), `candidates` (if ambiguous), `span`, `narrowed` and `decorates` |
 | `providers` | The provider side of each contract: `contract`, `site`, and if present `gateway` and `shape` |
-| `consumers` | The consumer side: `contract` (null if the URL was not evaluated), `site`, `via` (how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`) and `shape` |
+| `consumers` | The consumer side: `contract` (null if the URL was not evaluated), `site`, `via` (how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`) and `shape`. On a consumer of a CI contract, `via` is the `uses` as written, with the optional fields `ref` (the Git ref after the `@`), `with` (the keys passed, sorted) and `secrets` (the keys, or the word `inherit`) |
 | `links` | The links: `consumer`, `provider`, `contract`, `level`, `reason`, and if present `by`, `p` and `drift` |
 | `bindings`, `publishes` | The bindings (`contract`, `exchange`, `pattern`, `site`) and the publications (`exchange`, `key`, `site`) of RabbitMQ that the repository declares |
 | `documents` | The OpenAPI and AsyncAPI documents read: `path`, `format`, `version` and `contracts` |

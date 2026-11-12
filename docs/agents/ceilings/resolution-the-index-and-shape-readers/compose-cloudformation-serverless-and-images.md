@@ -22,6 +22,20 @@
   values have their own budget for what aliases repeat: past it the file counts as unreadable
   there and stores no value, and its nodes stay, with `values: none` (found by #823's
   verification).
+- `ci.rs` (#824, ADR 0028): a CI contract links what is written, and Meada resolves no Git ref.
+  Only a ref of 40 or 64 hexadecimal digits is a commit id: an abbreviated one reads as a name
+  and never gets `ref mismatch`, and a branch or a tag of that shape reads as a commit id and
+  gets it. A CI job with a `strategy.matrix` is one consumer. A `uses` writes no host, so a call
+  from one host to another (GitHub Connect) has no link, and a repository without `origin` names
+  no peer. Owner and repository are lower-cased; the path is compared as written, so a call that
+  differs from the file's name by case is a consumer with no link. The keys of `with` and
+  `secrets` are kept sorted, not in file order, each up to `config_values::VALUE_MAX` and within
+  the file's `ROOT_STORED_MAX`; a `secrets` that is neither a mapping nor the word `inherit` gives
+  none. The indexed commit is the checkout's `HEAD` even when the checkout is dirty, read with
+  one `git` call per repository that holds a reusable pipeline on each query; a provider whose
+  repository records no commit (none made yet, a server-mode index without its recorded commit)
+  reads `@<ref> (indexed commit unknown)`, with no flag. Until #827 a call to a file that
+  provides nothing (absent, or no `on.workflow_call`) carries no mark.
 - `iac/serverless.rs` (#654, ADR 0025): a service reuses `NODES_MAX` (functions first, in name
   order, then the resources of its `resources` section, together), `REFERENCES_MAX` (per node) and
   `ROOT_STORED_MAX` (per file, the functions' names, handlers and events counting against it before

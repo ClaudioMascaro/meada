@@ -687,7 +687,7 @@ pub(super) fn evaluate(
                 images: Vec::new(),
                 provisioned: None,
                 ingress: Vec::new(),
-                selectors: None,
+                actions: None,
             });
             let mut targets: BTreeSet<(String, String)> = BTreeSet::new();
             for (list, via) in [(&s.depends_on, "depends_on"), (&s.links, "links")] {

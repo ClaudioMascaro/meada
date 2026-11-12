@@ -45,9 +45,10 @@ enum CommitSource {
     Checkout,
     /// Server mode: the commit `meada index --workspace` recorded beside the index.
     Recorded,
-    /// At a generation: the `head` its document records for the repository.
+    /// At a generation: the `head` its document records for each repository, in workspace
+    /// order.
     #[cfg(feature = "snapshot")]
-    Generation(Option<String>),
+    Generation(Vec<Option<String>>),
 }
 
 impl Engine {
@@ -129,7 +130,8 @@ impl Engine {
     /// The engine with its indexed commit the one the generation `held` records.
     #[cfg(feature = "snapshot")]
     fn at_generation(mut self, held: &crate::snapshot::serve::Held) -> Self {
-        self.commit_source = CommitSource::Generation(held.head(&self.identity));
+        let heads = self.workspace.repos.iter().map(|r| held.head(&r.identity));
+        self.commit_source = CommitSource::Generation(heads.collect());
         self
     }
 
@@ -210,7 +212,9 @@ impl Engine {
                     .map(|commit| (commit, false))
             }
             #[cfg(feature = "snapshot")]
-            CommitSource::Generation(head) => head.clone().map(|commit| (commit, false)),
+            CommitSource::Generation(heads) => {
+                (heads.first().cloned().flatten()).map(|commit| (commit, false))
+            }
         };
         let mut exports = self.exports()?;
         let here = format!("{}::", self.identity);
@@ -273,6 +277,7 @@ impl Engine {
             .collect::<Result<Vec<_>>>()?;
         // Each kind's step over the whole workspace, once every repository has declared.
         contract::workspace_steps(&mut exports, &self.workspace.repos);
+        self.commits(&mut exports);
         Ok(exports)
     }
 
@@ -302,7 +307,32 @@ impl Engine {
             }
         }
         contract::workspace_steps(&mut partial.exports, &self.workspace.repos);
+        self.commits(&mut partial.exports);
         Ok(partial)
+    }
+
+    /// Sets the indexed commit of each repository that holds a provider of a kind that reads
+    /// it (`ContractKind::reads_commit`), from where this engine learns commits: the checkout,
+    /// the commit recorded beside the index, or the generation's document.
+    fn commits(&self, exports: &mut [Export]) {
+        let read: Vec<_> = (KINDS.iter().filter(|k| k.reads_commit()))
+            .map(|k| format!("{}::", k.prefix()))
+            .collect();
+        for (n, export) in exports.iter_mut().enumerate() {
+            let providers = &export.providers;
+            if !(providers.iter()).any(|p| read.iter().any(|r| p.contract.starts_with(r))) {
+                continue;
+            }
+            let repo = &self.workspace.repos[n];
+            export.commit = match &self.commit_source {
+                // ponytail: one `git` call per such repository on each query; keep the head by
+                // the mtime of `.git/HEAD` and its ref when a workspace makes it slow.
+                CommitSource::Checkout => repo::head(&repo.root).ok(),
+                CommitSource::Recorded => index::indexed_commit(&self.dbs[n], &repo.index),
+                #[cfg(feature = "snapshot")]
+                CommitSource::Generation(heads) => heads.get(n).cloned().flatten(),
+            };
+        }
     }
 
     /// Every link of the workspace, sorted.
@@ -660,14 +690,6 @@ impl Engine {
             }
             return Ok(search::answer(query, hits, budget));
         }
-        if kind == Some("ci") {
-            self.refresh()?;
-            let mut hits = Vec::new();
-            for (identity, db) in self.indexes() {
-                hits.extend(iac::actions::hits(identity, db, &query.to_lowercase())?);
-            }
-            return Ok(search::answer(query, hits, budget));
-        }
         // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match (kind, selected) {
             (None, _) => (true, Some(String::new())),
@@ -728,6 +750,11 @@ impl Engine {
                 .map(|u| (u.contract.clone(), &u.site, None));
             for (contract, site, role) in provided.chain(consumed).chain(configured) {
                 if !contract.starts_with(prefix) {
+                    continue;
+                }
+                if kind.is_none()
+                    && contract::kind_of(&contract).is_some_and(|k| !k.in_default_search())
+                {
                     continue;
                 }
                 let Some(r) = contract_rank(&contract, &needle) else {
@@ -2028,14 +2055,13 @@ fn status_lines(
 /// The `kind` words of `search` the engine answers itself: the first two come before the kinds'
 /// filter words, the rest after the kinds' own renderers (`document` sits between the two).
 const WORDS_BEFORE: [&str; 2] = ["symbol", "contract"];
-const WORDS_AFTER: [&str; 9] = [
+const WORDS_AFTER: [&str; 8] = [
     "drift",
     "community",
     "process",
     "duplicate",
     "value",
     "iac",
-    "ci",
     "ambiguous",
     "unresolved",
 ];

@@ -28,7 +28,7 @@ from prove import Http, answer, fetch, free_port, git, mcp_answers
 
 HOST = 'github.com/acme'
 W = '.github/workflows/'
-# The optional fields of a consumer row in `meada export` (#824 names them: change them there).
+# The optional fields of a consumer row in `meada export`, as #824 named them.
 REF, WITH, SECRETS = 'ref', 'with', 'secrets'
 ABSENT = 'absent at the indexed commit'  # #820's words for the mark
 REASON = re.compile(r'@(\S+) \(indexed ([0-9a-f]{7,64})\)(, ref mismatch)?')  # #820, "Git ref"
@@ -603,15 +603,15 @@ def located(case):
 
 
 def fields(body):
-    """The Git ref and the keys a consumer wrote, as #820 says the export carries them."""
+    """The Git ref and the keys a consumer wrote, as the export carries them (#824: keys sorted)."""
     uses = str(body.get('uses', ''))
     row = {}
     if '@' in uses and not uses.startswith(('./', '$/', 'docker://')):
         row[REF] = uses.rsplit('@', 1)[1]
     if body.get('with'):
-        row[WITH] = list(body['with'])
+        row[WITH] = sorted(body['with'])
     if body.get('secrets'):
-        row[SECRETS] = body['secrets'] if body['secrets'] == 'inherit' else list(body['secrets'])
+        row[SECRETS] = body['secrets'] if body['secrets'] == 'inherit' else sorted(body['secrets'])
     return row
 
 

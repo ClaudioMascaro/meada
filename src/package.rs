@@ -2856,6 +2856,7 @@ mod tests {
             shape
         };
         Export {
+            commit: None,
             configurations: Vec::new(),
             decisions: crate::decisions::Decisions::default(),
             name_candidates: std::collections::BTreeMap::new(),

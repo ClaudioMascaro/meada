@@ -466,6 +466,16 @@
   `alert-app` fixtures, equality and regex levels, conjunctions, receiver context, bidirectional
   traces, Helm negatives and scope-aware orphan refresh, with complete export goldens.
 
+- `ci.rs` (#823): the `ci-nodes` fixture covers pipelines, actions, CI jobs and CI steps as IaC
+  nodes: `search` kind `ci`, `context` by address, path and selector, the kind `iac` and the
+  default search unchanged, and refresh equal to a cold index.
+
+- `ci_calls.rs` (#824): the reproduction of #816 as sibling `ci-workflows`, `ci-wrapper` and
+  `ci-app-{a,b,c}` fixtures covers the CI contract: the consumers of a reusable pipeline, the
+  shapes of `on`, the identifier's case and host, Git ref reasons, external `uses`, a caller
+  alone and with its peer, a hand declaration beside it, refresh equal to a cold index, and
+  export, context, search and status goldens.
+
 - `patterns.rs` (#674): sibling `pattern-infra`/`pattern-app` fixtures cover channel and
   resource anchors, ambiguous literal names, short/interior and pattern-to-pattern negatives,
   export/context/trace goldens, both provisioning orientations, real human CLI decisions,

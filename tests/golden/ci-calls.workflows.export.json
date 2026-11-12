@@ -1,0 +1,97 @@
+{
+  "format": 1,
+  "repository": "github.com/acme/workflows",
+  "commit": "fde768c9e5aa231b3e0a0b51526bdfb0d309fb85",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "ci::github.com/acme/workflows/.github/workflows/lint.yml",
+      "site": "github.com/acme/workflows::.github/workflows/lint.yml::."
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "site": "github.com/acme/workflows::.github/workflows/publish.yml::."
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/.github/workflows/scan.yml",
+      "site": "github.com/acme/workflows::.github/workflows/scan.yml::."
+    }
+  ],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/lint.yml::.",
+      "address": ".",
+      "type": "workflow",
+      "root": ".github/workflows/lint.yml",
+      "path": ".github/workflows/lint.yml",
+      "line": 1,
+      "end_line": 7
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "address": ".",
+      "type": "workflow",
+      "root": ".github/workflows/publish.yml",
+      "path": ".github/workflows/publish.yml",
+      "line": 1,
+      "end_line": 19
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/scan.yml::.",
+      "address": ".",
+      "type": "workflow",
+      "root": ".github/workflows/scan.yml",
+      "path": ".github/workflows/scan.yml",
+      "line": 1,
+      "end_line": 7
+    }
+  ],
+  "links": [
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/ci.yml::jobs.lint",
+      "provider": "github.com/acme/workflows::.github/workflows/lint.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/lint.yml",
+      "level": "exact",
+      "reason": "@main (indexed fde768c)"
+    },
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/ci.yml::jobs.publish",
+      "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "level": "exact",
+      "reason": "@main (indexed fde768c)"
+    },
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/ci.yml::jobs.scan",
+      "provider": "github.com/acme/workflows::.github/workflows/scan.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/scan.yml",
+      "level": "exact",
+      "reason": "@v2 (indexed fde768c)"
+    },
+    {
+      "consumer": "github.com/acme/app-b::.github/workflows/ci.yml::jobs[\"publish-prd\"]",
+      "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "level": "exact",
+      "reason": "@v1 (indexed fde768c)"
+    },
+    {
+      "consumer": "github.com/acme/app-b::.github/workflows/ci.yml::jobs[\"publish-stg\"]",
+      "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "level": "exact",
+      "reason": "@main (indexed fde768c)"
+    },
+    {
+      "consumer": "github.com/acme/wrapper::.github/workflows/release.yml::jobs.release",
+      "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "level": "exact",
+      "reason": "@main (indexed fde768c)"
+    }
+  ]
+}

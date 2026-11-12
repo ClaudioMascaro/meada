@@ -325,8 +325,9 @@ pub(crate) struct Node {
     pub images: Vec<WorkloadImage>,
     pub provisioned: Option<Projection>,
     pub ingress: Vec<Ingress>,
-    /// What a query names a CI job or a CI step by besides its address (#823).
-    pub selectors: Option<actions::Selectors>,
+    /// What the GitHub Actions reader keeps of a pipeline, a CI job or a CI step: its selectors
+    /// (#823) and what the CI contract reads of it (#824).
+    pub actions: Option<actions::Facts>,
 }
 
 impl Node {
@@ -2233,7 +2234,7 @@ impl<'m> Eval<'m> {
                     images: Vec::new(),
                     provisioned: None,
                     ingress: Vec::new(),
-                    selectors: None,
+                    actions: None,
                 });
                 let local = (block.source.as_deref())
                     .and_then(|s| local_source(dir, s))
@@ -3141,10 +3142,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
                 .as_ref()
                 .map(serde_json::to_string)
                 .transpose()?,
-            n.selectors
-                .as_ref()
-                .map(serde_json::to_string)
-                .transpose()?,
+            n.actions.as_ref().map(serde_json::to_string).transpose()?,
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -3157,7 +3155,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
                        block, image, image_overridable, build, build_overridable, role, \
-                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes, dockerfile, selectors";
+                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes, dockerfile, actions";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -3201,7 +3199,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         subscription: r
             .get::<_, Option<String>>(19)?
             .and_then(|s| serde_json::from_str(&s).ok()),
-        selectors: r
+        actions: r
             .get::<_, Option<String>>(26)?
             .and_then(|s| serde_json::from_str(&s).ok()),
     })
@@ -3225,7 +3223,7 @@ pub(crate) fn all_references(db: &Connection) -> Result<Vec<Reference>> {
 }
 
 /// `<identity> <path>:<line> <address>`.
-fn at(identity: &str, n: &Node) -> String {
+pub(crate) fn at(identity: &str, n: &Node) -> String {
     format!("{identity} {}:{} {}", n.path, n.line, n.address)
 }
 

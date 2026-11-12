@@ -251,6 +251,32 @@ pub struct Consumer {
     /// The evaluation root of a workload side. Earlier kinds have no root.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root: Option<String>,
+    /// The Git ref a CI call names its provider at, as written after the `@`: a branch, a tag
+    /// or a commit id (ADR 0028). Never resolved, and no part of the contract.
+    #[serde(rename = "ref", default, skip_serializing_if = "Option::is_none")]
+    pub git_ref: Option<String>,
+    /// The keys of `with` a CI call passes, as written, sorted.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub with: Vec<String>,
+    /// The secrets a CI call passes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secrets: Option<Secrets>,
+}
+
+/// The secrets a CI job passes to the reusable pipeline it calls (ADR 0028): the word `inherit`
+/// (`"secrets": "inherit"`), or the keys it names, as written, sorted (`"secrets": ["token"]`).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum Secrets {
+    Inherit(Inherit),
+    Keys(Vec<String>),
+}
+
+/// The word of `secrets: inherit`.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Inherit {
+    Inherit,
 }
 
 /// A queue bound to an exchange by a pattern: the call `site` (a call site) that binds the

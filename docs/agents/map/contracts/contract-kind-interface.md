@@ -32,6 +32,12 @@ evidence for presentation.
   consumer a `Site::Def` or `Site::Inline`). A `Site::Def` name is folded through `Names::scope`
   in the index: unnamed inline segments drop, and an empty result is the file's top level.
 
+Three default hooks serve a kind whose sides sit on IaC nodes (#824, the CI kind):
+`in_default_search` (true) lets it keep its contracts out of a `search` with no `kind`;
+`reads_commit` (false) asks the engine for the indexed commit of each repository that holds one
+of its providers (`Export::commit`); `written` (empty) adds optional fields to the rows of
+`meada export` from the repository's IaC nodes.
+
 `environment_identity` (#670) optionally resolves a private `ReceiverIdentity` from certain
 stored `EnvironmentValue` entries. Scope includes workload, IaC root and selected container;
 only the kind interprets subtype and companion components. A claimed empty result prevents

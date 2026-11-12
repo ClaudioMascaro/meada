@@ -299,13 +299,15 @@ this file, and a change to these modules updates it.
   file node `.` (type `workflow` with `jobs`, `action` with `runs`), a node `jobs.<id>` of type
   `job` and a node `<parent>.steps[<n>]` of type `step`, with the references pipeline to CI job,
   CI job or composite action to CI step, and CI job to the CI jobs of its `needs`. A CI job's id
-  and a CI job's or CI step's `uses` are `iac::Node::selectors` (`Selectors`), a `name` the node's
-  own. The index calls `refresh(tx, path, src, shadowed)` from the closure that reads a config
+  and a CI job's or CI step's `uses` are `iac::Node::actions` (`Facts`), a `name` the node's
+  own; `Facts` also holds what the CI kind (`ci.rs`, #824) reads: `reusable` on the file node of
+  a pipeline whose `on` holds `workflow_call`, and the keys of `with` and `secrets` beside a
+  `uses`. The index calls `refresh(tx, path, src, shadowed)` from the closure that reads a config
   file and when one leaves; with both action file names in a folder the one that changed has its
   twin (`twin`) read again, and `shadowed` keeps an `action.yaml` beside an `action.yml` from
   being the action. `iac::Owner::Actions` (`ROWS`: root equal to path and one of the four types)
   keeps the Terraform and Kubernetes refreshes off these rows. `hits` renders `search` kind `ci`
-  (address, type, name, `id`, `uses`), `iac::hits` leaves these rows out of kind `iac`, and
+  (address, type, name, `id`, `uses`) over the nodes of an export, for `ci.rs`, `iac::hits` leaves these rows out of kind `iac`, and
   `names` lets `iac::named` take a file path for a file node and a selector
   (`jobs.build.steps[id=login]`) for a CI step.
 - `iac/serverless.rs` (#654, ADR 0025): Serverless Framework services as IaC nodes, one unit per

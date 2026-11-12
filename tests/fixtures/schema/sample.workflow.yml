@@ -21,3 +21,10 @@ jobs:
   publish-prd:
     needs: build
     uses: acme/workflows/.github/workflows/publish.yml@v1
+    with:
+      package: sample
+    secrets:
+      token: ${{ secrets.TOKEN }}
+  publish-stg:
+    uses: acme/workflows/.github/workflows/publish.yml@main
+    secrets: inherit
