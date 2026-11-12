@@ -11,6 +11,10 @@ All notable changes to Meada are recorded here. The format follows
 - A `terraform-aws-modules/s3-bucket/aws` call with `putin_khuylo = false`, or with a value
   Meada cannot resolve, provisions no bucket: upstream creates it only with
   `create_bucket && putin_khuylo`, and the Lambda module's call is read the same way (#787).
+- A call of `meada mcp` that waited longer than the busy timeout (10 s) behind another call's
+  refresh no longer fails with `database is locked` when another process writes the index as
+  that refresh ends: the time spent behind a refresh of the same process no longer counts toward
+  the timeout (#757).
 
 ## [1.3.0] - 2026-11-11
 

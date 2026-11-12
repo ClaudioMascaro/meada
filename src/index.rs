@@ -343,10 +343,9 @@ thread_local! {
     static BUSY: std::cell::Cell<Duration> = const { std::cell::Cell::new(BUSY_TIMEOUT) };
     /// Whether this thread runs a refresh now (`Run`).
     static RUNNING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    /// When this thread's wait on a lock began, and whether a refresh of another thread was in
-    /// flight when it last looked (`wait`).
-    static WAITING: std::cell::Cell<(Option<Instant>, bool)> =
-        const { std::cell::Cell::new((None, false)) };
+    /// Where the busy timeout of this thread's wait on a lock counts from: when the wait began,
+    /// or the last time it saw a refresh of another thread in flight (`wait`).
+    static WAITING: std::cell::Cell<Option<Instant>> = const { std::cell::Cell::new(None) };
 }
 
 /// The refreshes in flight in this process, on any index (`Run`).
@@ -354,23 +353,25 @@ static IN_FLIGHT: AtomicUsize = AtomicUsize::new(0);
 
 /// The busy handler of a connection opened to write (`current`, `writable`), called with the
 /// `tries` it already made for the statement: a statement that meets a lock waits for it up to
-/// this thread's busy timeout, and past it for as long as a refresh of another thread of this
-/// process is in flight (#704). That run is what holds the lock: once it spills or commits a
-/// large change its exclusive lock outlasts the timeout, and a call must not fail on a timer
-/// while a refresh of its own process makes progress. A run that just ended left the lock
-/// free, so the statement gets one more try. The thread that runs the refresh keeps the timeout
-/// alone: what it waits on is another process, or a reader that may be waiting on it.
+/// this thread's busy timeout, and for as long as a refresh of another thread of this process
+/// is in flight (#704). That run is what holds the lock: once it spills or commits a large
+/// change its exclusive lock outlasts the timeout, and a call must not fail on a timer while a
+/// refresh of its own process makes progress. The time spent behind such a run does not count
+/// (#757): the timeout counts from the last time the wait saw one in flight, so after the run
+/// the statement can still wait a whole timeout for another process's lock. The thread that
+/// runs the refresh keeps the timeout alone: what it waits on is another process, or a reader
+/// that may be waiting on it.
 // ponytail: a run in flight on any index extends the wait, since a plain function knows no
 // connection; a wait on another process's lock then lasts until the runs of this process end.
 fn wait(tries: i32) -> bool {
-    let (since, was) = match WAITING.get() {
-        (Some(since), was) if tries > 0 => (since, was),
-        _ => (Instant::now(), false),
-    };
     let in_flight = !RUNNING.get() && IN_FLIGHT.load(Ordering::Relaxed) > 0;
-    WAITING.set((Some(since), in_flight));
-    if since.elapsed() >= BUSY.get() && !in_flight {
-        return was;
+    let since = match WAITING.get() {
+        Some(since) if tries > 0 && !in_flight => since,
+        _ => Instant::now(),
+    };
+    WAITING.set(Some(since));
+    if since.elapsed() >= BUSY.get() {
+        return false;
     }
     // Steps that grow to 50 ms, as SQLite's own handler's grow to 100.
     std::thread::sleep(Duration::from_millis(
@@ -4051,6 +4052,47 @@ mod tests {
         assert!(waited >= Duration::from_millis(300), "{waited:?}");
         assert!(run.join().unwrap().is_err());
         drop(blocker);
+    }
+
+    /// A statement whose wait covered a refresh of its own process keeps a whole busy timeout
+    /// after that refresh ends (#757): a short write lock another process takes right then is
+    /// waited for, not a `database is locked` at once. The statement is a call's query on a
+    /// connection opened before the run, as the first read of an open is.
+    #[test]
+    fn a_wait_that_covered_a_run_of_its_process_keeps_a_whole_timeout_after_it() {
+        let (dir, index) = index_dir("wait_after_run");
+        let root = checkout(&dir);
+        let mut dbs = connections(&index, &root, 2);
+        add(&root, "b");
+        let blocker = reader(&index);
+        let run = refreshing(dbs.remove(0), &root, Duration::from_secs(10), 1);
+        committing(&index);
+        // Another process's writer, waiting for the run's commit with a handler that never
+        // sleeps, so it takes the lock as the run ends, and holds it for 100 ms.
+        let other = std::thread::spawn({
+            let index = index.clone();
+            move || {
+                let writer = Connection::open(&index).unwrap();
+                writer.busy_handler(Some(|_| true)).unwrap();
+                writer.execute_batch("BEGIN EXCLUSIVE").unwrap();
+                std::thread::sleep(Duration::from_millis(100));
+                writer.execute_batch("ROLLBACK").unwrap();
+            }
+        });
+        let call = dbs.remove(0);
+        let statement = std::thread::spawn(move || {
+            with_busy_timeout(Duration::from_millis(300), || {
+                let count = "SELECT count(*) FROM symbols WHERE id LIKE '%::b'";
+                (call.query_row(count, [], |r| r.get::<_, i64>(0))).map_err(|e| e.to_string())
+            })
+        });
+        // The statement waits for the run's commit past its own busy timeout.
+        std::thread::sleep(Duration::from_millis(600));
+        drop(blocker);
+
+        assert_eq!(run.join().unwrap(), Ok(()));
+        other.join().unwrap();
+        assert_eq!(statement.join().unwrap(), Ok(1));
     }
 
     /// A wait that ended takes nothing from the next one (#704): a call whose open waited for
