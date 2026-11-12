@@ -100,11 +100,11 @@
   comes meanwhile waits for it with no timer, then shares the next run: a batch after a change
   costs about one refresh more than an unchanged one, whatever its size (debug build, 4 cores:
   Meada's own checkout, 50 calls 21 s against 15 s, 200 calls 70 s against 64 s; 5,000 files,
-  500 calls 11.0 s against 9.2 to 10.9 s). A call shares only a run that found documents by the
-  `[serve]` table it read: across an edit of that table, a call that read the other one runs one
-  refresh more after it (#758). A statement of another call that meets the run's
-  lock (the first read of an open, a query, `forget`'s write) waits for the run, past the busy
-  timeout (`wait` in `index.rs`): no call fails on a timer while a refresh of its process is in
+  500 calls 11.0 s against 9.2 to 10.9 s). A run reads the `[serve]` table it finds documents by
+  when it starts, whichever call started it (#758): the engine reads `meada.toml` again, so a file
+  that no longer parses then fails the run and the calls that share it. A statement of another
+  call that meets the run's lock (the first read of an open, a query, `forget`'s write) waits for
+  the run, past the busy timeout (`wait` in `index.rs`): no call fails on a timer while a refresh of its process is in
   flight, however long it takes, nor while the tree keeps changing. Two things stay on the 10 s
   timer in one process. The run's own commit waits that long for the reads the other calls have
   in flight: one statement that reads for longer fails the run, and the calls that share it,

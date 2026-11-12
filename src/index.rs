@@ -605,7 +605,7 @@ fn rebuild(index: &Path, root: &Path, identity: &str, serve: &Serve) -> Result<C
         let db = writable(&new)?;
         db.execute_batch(SCHEMA)?;
         db.pragma_update(None, "user_version", schema_version())?;
-        refresh(&db, root, identity, serve)
+        refresh(&db, root, identity, &|| Ok(serve.clone()))
     })();
     // Where a reader holding the old file forbids the rename (Windows), it stays as it was.
     let replaced = built.and_then(|()| {
@@ -729,43 +729,43 @@ pub struct Indexed<'a> {
 /// its own; an entry point that asks the name of an inline definition of a kept group (which
 /// only its extraction gives) makes the refresh start over without keeping any group.
 ///
-/// Documents (spec #21) are refreshed first, the same way, when `serve` is declared; without
-/// a `[serve]` table the repository has none. They hold no code, so an edited document changes
-/// no code row: `Http::declare` reads them at query time.
+/// Documents (spec #21) are refreshed first, the same way, when the `[serve]` table that
+/// `serve` reads is declared; without one the repository has none. They hold no code, so an
+/// edited document changes no code row: `Http::declare` reads them at query time.
 ///
 /// Refreshes of one index share it (#704). In one process (MCP calls in flight together) one
 /// runs at a time: a call that comes while another runs waits for it, with no timer, then for
 /// the next run, which starts after it came and so sees the tree as the call found it; the
-/// calls that came meanwhile share that run's outcome when it found documents by the `[serve]`
-/// table they read, and a call that read another (an edit between two calls) runs its own after
-/// it (#758). A statement that meets the run's lock outside a refresh (an open, a query) waits
-/// for the run too (`wait`). Across processes, one that finds nothing to write takes no write
-/// lock, and one whose first write meets another process's writer waits up to the busy timeout
-/// for that commit, then starts over (`attempts`).
-pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
+/// calls that came meanwhile share that run's outcome. A run reads the `[serve]` table it finds
+/// documents by through `serve` when it starts (#758), whichever call started it: every run that
+/// starts after an edit of the table finds them by the edited one. A statement that meets the
+/// run's lock outside a refresh (an open, a query) waits for the run too (`wait`). Across
+/// processes, one that finds nothing to write takes no write lock, and one whose first write
+/// meets another process's writer waits up to the busy timeout for that commit, then starts
+/// over (`attempts`).
+pub fn refresh(
+    db: &Connection,
+    root: &Path,
+    identity: &str,
+    serve: &dyn Fn() -> Result<Serve>,
+) -> Result<()> {
     let Some(path) = db.path().filter(|p| !p.is_empty()) else {
-        return refresh_keeping(db, root, identity, serve, true);
+        return refresh_keeping(db, root, identity, &serve()?, true);
     };
     let flight = {
         let mut flights = FLIGHTS.lock().unwrap_or_else(PoisonError::into_inner);
         flights.entry(PathBuf::from(path)).or_default().clone()
     };
-    let listed = documents_by(serve).map(<[String]>::to_vec);
     let mut runs = flight.runs.lock().unwrap_or_else(PoisonError::into_inner);
     let needed = runs.started + 1;
-    loop {
-        // A run that started after this call came and found documents as this call reads them
-        // (#758).
-        if runs.finished >= needed && runs.documents_by == listed {
-            return runs.failed.clone().map_or(Ok(()), |e| Err(e.into()));
-        }
-        if !runs.running {
-            break;
-        }
+    while runs.running && runs.finished < needed {
         runs = flight
             .done
             .wait(runs)
             .unwrap_or_else(PoisonError::into_inner);
+    }
+    if runs.finished >= needed {
+        return runs.failed.clone().map_or(Ok(()), |e| Err(e.into()));
     }
     runs.running = true;
     runs.started += 1;
@@ -774,11 +774,10 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         flight: &flight,
         number: runs.started,
         failed: Some("the refresh in flight stopped".to_string()),
-        documents_by: listed,
         nested: RUNNING.replace(true),
     };
     drop(runs);
-    let outcome = refresh_keeping(db, root, identity, serve, true);
+    let outcome = serve().and_then(|serve| refresh_keeping(db, root, identity, &serve, true));
     run.failed = outcome.as_ref().err().map(|e| e.to_string());
     outcome
 }
@@ -793,16 +792,13 @@ struct Flight {
     done: Condvar,
 }
 
-/// How many runs started and finished, whether one runs now, and the last one's error and what
-/// it found documents by.
+/// How many runs started and finished, whether one runs now, and the last one's error.
 #[derive(Default)]
 struct Runs {
     started: u64,
     finished: u64,
     running: bool,
     failed: Option<String>,
-    /// What the last run found documents by (`documents_by`).
-    documents_by: Option<Vec<String>>,
 }
 
 /// The run in flight: dropped, even by a panic, it records its outcome and wakes the waiters,
@@ -811,8 +807,6 @@ struct Run<'a> {
     flight: &'a Flight,
     number: u64,
     failed: Option<String>,
-    /// What this run finds documents by (`documents_by`).
-    documents_by: Option<Vec<String>>,
     /// Whether this thread already ran a refresh when this one started (a rebuild's).
     nested: bool,
 }
@@ -825,7 +819,6 @@ impl Drop for Run<'_> {
         runs.running = false;
         runs.finished = self.number;
         runs.failed = self.failed.take();
-        runs.documents_by = self.documents_by.take();
         self.flight.done.notify_all();
     }
 }
@@ -2224,12 +2217,6 @@ pub fn forget(db: &Connection, path: &str) -> Result<()> {
     Ok(())
 }
 
-/// All of `serve` that `documents_found` reads, which a run shares with a call (`refresh`):
-/// `None` without a `[serve]` table, else the paths its `documents` lists.
-fn documents_by(serve: &Serve) -> Option<&[String]> {
-    serve.declared.then_some(serve.documents.as_slice())
-}
-
 /// The documents of a repository (path and absolute path): those `walk` found by file name,
 /// then each path `[serve] documents` lists that is a file, ignored by `.gitignore` or not. A
 /// listed path that is not a file, or that goes through a symbolic link, is no document;
@@ -2239,14 +2226,14 @@ fn documents_found(
     walked: &[(String, PathBuf)],
     serve: &Serve,
 ) -> Vec<(String, PathBuf)> {
-    let Some(listed) = documents_by(serve) else {
+    if !serve.declared {
         return Vec::new();
-    };
+    }
     let mut found: Vec<_> = (walked.iter())
         .filter(|(path, _)| document::is_document(path))
         .cloned()
         .collect();
-    for path in listed {
+    for path in &serve.documents {
         if found.iter().any(|(p, _)| p == path) {
             continue;
         }
@@ -3909,7 +3896,7 @@ mod tests {
         writer.execute_batch("BEGIN IMMEDIATE").unwrap();
 
         let refreshed = with_busy_timeout(Duration::from_millis(50), || {
-            refresh(&db, &root, REPO, &Serve::default())
+            refresh(&db, &root, REPO, &|| Ok(Serve::default()))
         });
         assert!(refreshed.is_ok(), "{refreshed:?}");
         assert_eq!(named(&db, "a"), 1);
@@ -3933,7 +3920,7 @@ mod tests {
         });
 
         let refreshed = with_busy_timeout(Duration::from_secs(10), || {
-            refresh(&db, &root, REPO, &Serve::default())
+            refresh(&db, &root, REPO, &|| Ok(Serve::default()))
         });
         ends.join().unwrap();
         assert!(refreshed.is_ok(), "{refreshed:?}");
@@ -3960,7 +3947,8 @@ mod tests {
         std::thread::spawn(move || {
             with_busy_timeout(busy, || {
                 (0..times).try_for_each(|_| {
-                    (super::refresh(&db, &root, REPO, &Serve::default())).map_err(|e| e.to_string())
+                    (super::refresh(&db, &root, REPO, &|| Ok(Serve::default())))
+                        .map_err(|e| e.to_string())
                 })
             })
         })
@@ -4177,67 +4165,48 @@ mod tests {
         assert_eq!((named(&db, "b"), named(&db, "c")), (1, 1));
     }
 
-    /// A call answers by the `[serve]` table it read (#758), even when the run after the one in
-    /// flight as it came is started by a call that read the table before an edit. In each round
-    /// the older call's second refresh starts that run as its first one ends, on a thread already
-    /// running, while the newer call still waits to wake: it wins that race nearly always, and
-    /// three rounds make the case all but certain.
+    /// A run reads its `[serve]` table when it starts (#758), not when its call came: a call that
+    /// came during another run, before an edit of `meada.toml` that lists a document, starts the
+    /// next run after the edit, and that run finds the document. A call that came after the edit
+    /// would share that run, and answer by the edited table.
     #[test]
-    fn a_call_answers_by_its_own_serve_table_from_a_run_an_older_call_started() {
-        for round in 0..3 {
-            let answers = across_a_serve_edit(&format!("shared_run_serve_{round}"));
-            assert_eq!(answers, (Ok(()), Ok(1)), "round {round}");
-        }
-    }
-
-    /// Two calls in flight together across an edit of `[serve]` that lists `docs/api.yaml`: the
-    /// older one refreshes twice back to back by the table before the edit, and the newer one,
-    /// which comes during the older one's first run, refreshes by the table after it, then counts
-    /// the rows of that document. What each answered.
-    fn across_a_serve_edit(case: &str) -> (Result<(), String>, Result<i64, String>) {
-        let (dir, index) = index_dir(case);
+    fn a_run_reads_the_serve_table_when_it_starts_not_when_its_call_came() {
+        let (dir, index) = index_dir("serve_at_run_start");
         let root = checkout(&dir);
         fs::create_dir_all(root.join("docs")).unwrap();
         let spec = "openapi: 3.0.0\ninfo:\n  title: api\npaths: {}\n";
         fs::write(root.join("docs").join("api.yaml"), spec).unwrap();
-        // The table each call read: before the edit it lists no document, after it one.
-        let older = Serve {
-            declared: true,
-            ..Serve::default()
-        };
-        let newer = Serve {
-            documents: vec!["docs/api.yaml".into()],
-            ..older.clone()
-        };
+        fs::write(root.join("meada.toml"), "[serve]\n").unwrap();
         let mut dbs = connections(&index, &root, 2);
         add(&root, "b");
         let blocker = reader(&index);
-        let first = std::thread::spawn({
-            let (db, root) = (dbs.remove(0), root.clone());
-            move || {
-                with_busy_timeout(Duration::from_secs(10), || {
-                    (0..2).try_for_each(|_| super::refresh(&db, &root, REPO, &older))
-                })
-                .map_err(|e| e.to_string())
-            }
-        });
+        let first = refreshing(dbs.remove(0), &root, Duration::from_secs(10), 1);
         committing(&index);
 
         let second = std::thread::spawn({
             let (db, root) = (dbs.remove(0), root.clone());
             move || {
-                with_busy_timeout(Duration::from_secs(10), || -> crate::Result<i64> {
-                    super::refresh(&db, &root, REPO, &newer)?;
-                    let listed = "SELECT count(*) FROM documents WHERE path = 'docs/api.yaml'";
-                    Ok(db.query_row(listed, [], |r| r.get(0))?)
+                // As the engine reads it: `meada.toml` on disk.
+                let serve = || -> crate::Result<Serve> { Ok(crate::config::load(&root)?.serve) };
+                with_busy_timeout(Duration::from_secs(10), || {
+                    super::refresh(&db, &root, REPO, &serve)
                 })
                 .map_err(|e| e.to_string())
             }
         });
-        // Time for the newer call to find the first run in flight.
+        // Time for the second call to find the first run in flight; then the edit.
         std::thread::sleep(Duration::from_millis(200));
+        let edited = "[serve]\ndocuments = [\"docs/api.yaml\"]\n";
+        fs::write(root.join("meada.toml"), edited).unwrap();
         drop(blocker);
-        (first.join().unwrap(), second.join().unwrap())
+
+        assert_eq!(
+            (first.join().unwrap(), second.join().unwrap()),
+            (Ok(()), Ok(()))
+        );
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        let listed = "SELECT count(*) FROM documents WHERE path = 'docs/api.yaml'";
+        assert_eq!(db.query_row(listed, [], |r| r.get::<_, i64>(0)).unwrap(), 1);
     }
 
     /// A refresh refused `DEFERRED_ATTEMPTS` times in a row (#704), as under a stream of other
@@ -4888,7 +4857,7 @@ mod tests {
         let serve = Serve::default();
         let index_now = || {
             let db = open(&index, &root, REPO, &serve).unwrap();
-            refresh(&db, &root, REPO, &serve).unwrap();
+            refresh(&db, &root, REPO, &|| Ok(serve.clone())).unwrap();
         };
         let is_fresh = |identity: &str| {
             let db = read(&index).unwrap();
@@ -4984,7 +4953,7 @@ mod tests {
         };
         let index_now = || {
             let db = open(&index, &root, REPO, &serve).unwrap();
-            refresh(&db, &root, REPO, &serve).unwrap();
+            refresh(&db, &root, REPO, &|| Ok(serve.clone())).unwrap();
         };
         let is_fresh = || fresh(&read(&index).unwrap(), &root, REPO, &serve).unwrap();
         index_now();

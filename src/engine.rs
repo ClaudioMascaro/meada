@@ -17,8 +17,8 @@ use crate::render::{
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Manifest, Missing, Repository, Workspace};
 use crate::{
-    Result, config_values, decisions, document, drift_view, iac, index, items, kube, render, repo,
-    trace,
+    Result, config, config_values, decisions, document, drift_view, iac, index, items, kube,
+    render, repo, trace,
 };
 use meada_core::context::{self, shape_lines};
 use meada_core::search;
@@ -181,18 +181,22 @@ impl Engine {
     /// no watcher: only files whose mtime or size changed are hashed. Each repository is
     /// refreshed on its own, through its own connection; links are derived from the stored
     /// contracts at query time, so links that touch a changed file follow it. Does nothing on
-    /// an engine opened from a manifest: there the operator's `meada index` refreshes.
+    /// an engine opened from a manifest: there the operator's `meada index` refreshes. A run
+    /// reads each repository's `[serve]` table from its `meada.toml` when it starts (#758), not
+    /// the one this engine read when it opened.
     pub fn refresh(&self) -> Result<()> {
         if self.read_only {
             return Ok(());
         }
+        let serve = |root: &Path| -> Result<_> { Ok(config::load(root)?.serve) };
         // The peers' connections stay open for the session (#443): `exports` reads the same
         // handles, so a peer is never refreshed in one file and read from another.
         for (peer, db) in self.workspace.repos[1..].iter().zip(&self.dbs[1..]) {
-            index::refresh(db, &peer.root, &peer.identity, &peer.config.serve)?;
+            index::refresh(db, &peer.root, &peer.identity, &|| serve(&peer.root))?;
         }
-        let here = &self.workspace.repos[0];
-        index::refresh(&self.dbs[0], &self.root, &self.identity, &here.config.serve)
+        index::refresh(&self.dbs[0], &self.root, &self.identity, &|| {
+            serve(&self.root)
+        })
     }
 
     /// The canonical export of the repository where Meada runs: its whole index, plus the
@@ -1802,7 +1806,7 @@ pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
     let refresh = |r: &Repository| {
         let db = index::open(&r.index, &r.root, &r.identity, &r.config.serve)?;
         let before = repo::head(&r.root).ok();
-        index::refresh(&db, &r.root, &r.identity, &r.config.serve)?;
+        index::refresh(&db, &r.root, &r.identity, &|| Ok(r.config.serve.clone()))?;
         // Keep provenance on the same read snapshot while another indexing pass may write.
         db.execute_batch("BEGIN")?;
         let fresh = index::fresh(&db, &r.root, &r.identity, &r.config.serve)?;
