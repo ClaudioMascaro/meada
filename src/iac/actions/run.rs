@@ -84,7 +84,9 @@ pub(crate) fn rebound(script: &str) -> HashSet<&str> {
 }
 
 /// The offset past the bracket that closes the one at `at`, over quotes and nested ones of its
-/// kind. `None` when it is left open or holds a heredoc.
+/// kind. Between parentheses the shell reads words, so a comment runs to the end of its line
+/// and a `${...}` is passed whole, whatever they hold. `None` when it is left open or holds a
+/// heredoc.
 fn closed(bytes: &[u8], at: usize) -> Option<usize> {
     let (opens, closes) = match bytes[at] {
         b'(' => (b'(', b')'),
@@ -101,6 +103,12 @@ fn closed(bytes: &[u8], at: usize) -> Option<usize> {
                 while *bytes.get(i)? != quote {
                     i += 1 + usize::from(quote == b'"' && bytes[i] == b'\\');
                 }
+            }
+            b'#' if opens == b'(' && b" \t\n".contains(&bytes[i - 1]) => {
+                i += bytes[i..].iter().position(|&b| b == b'\n')?;
+            }
+            b'$' if opens == b'(' && bytes.get(i + 1) == Some(&b'{') => {
+                i = closed(bytes, i + 1)? - 1;
             }
             b'<' if bytes[i..].starts_with(b"<<<") => i += 2,
             b'<' if bytes[i..].starts_with(b"<<") => return None,
@@ -562,6 +570,43 @@ mod tests {
             ("arithmetic left open", "(( pip install a", None),
             ("subshell left open", "( pip install a", None),
             ("array left open", "CMD=(\npip install a", None),
+            // Between parentheses a comment runs to the end of its line, whatever it holds.
+            (
+                "quote in a comment of an array",
+                "ARGS=(\n  --pre   # don't pin\n)\npip install a",
+                Some(&["ARGS=", "pip install a"]),
+            ),
+            (
+                "parenthesis in a comment of an array",
+                "CMD=(\n  x   # 1) first\n  pip install a\n)\npip install b",
+                Some(&["CMD=", "pip install b"]),
+            ),
+            (
+                "heredoc mark in a comment of an array",
+                "CMD=( # a << b\n  x )\npip install a",
+                Some(&["CMD=", "pip install a"]),
+            ),
+            (
+                "comment in a command substitution",
+                "X=$(\n  echo a  # don't (\n)\npip install a",
+                Some(&["X=<$(\n  echo a  # don't (\n)>", "pip install a"]),
+            ),
+            (
+                "hash inside a word of an array",
+                "CMD=(a#b 'c # d')\npip install a",
+                Some(&["CMD=", "pip install a"]),
+            ),
+            (
+                "parenthesis in an expansion of an array",
+                "CMD=( ${x%)} pip install a )\npip install b",
+                Some(&["CMD=", "pip install b"]),
+            ),
+            // The comment holds the parenthesis that would close the array.
+            (
+                "array closed in a comment",
+                "CMD=( # x )\npip install a",
+                None,
+            ),
             // Word: a literal, a quoted literal.
             (
                 "quoted",

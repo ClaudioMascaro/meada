@@ -158,13 +158,20 @@ fn installed(word: &[Part]) -> Option<Install> {
             }
         }
     }
+    // Where an open part right after the extras starts the range, whatever it stands for.
+    let mut tail = None;
     for part in parts {
+        if matches!(part, Part::Open(_)) && rest.ends_with(']') {
+            tail.get_or_insert(rest.len());
+        }
         let (Part::Text(text) | Part::Open(text)) = part;
         rest += text;
     }
     let name = folded(&name).replace("**", "*");
     // The rest, after a name that stands for this one: extras, then the range.
+    let (rest, tail) = rest.split_at(tail.unwrap_or(rest.len()));
     let (_, range) = requirement(&format!("x{rest}"))?;
+    let range = range.or((!tail.is_empty()).then(|| tail.to_string()));
     if name.bytes().all(|b| b == b'*') {
         // No name at all (a path under `~`, a lone range) installs nothing by name.
         return (!name.is_empty()).then_some(Install::Open(open));

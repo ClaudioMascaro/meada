@@ -267,6 +267,16 @@ fn the_gate_decides_which_lines_of_a_script_are_commands() {
 - uses: actions/setup-python@v5
   with:
     run: pip install shared-lib
+- run: |
+    ARGS=(
+      --pre   # don't pin
+    )
+    pip install shared-lib
+- run: |
+    CMD=(
+      x   # 1) first
+      pip install shared-tools
+    )
 ";
     write(&web, FILE, &pipeline("", steps));
     let rows: Vec<_> = sides(&exported(&web))
@@ -281,6 +291,8 @@ fn the_gate_decides_which_lines_of_a_script_are_commands() {
             at(2, TOOLS_PACKAGE),
             at(4, SHARED),
             at(4, TOOLS_PACKAGE),
+            // A comment inside an array hides its quote, and its `)` closes nothing.
+            at(7, SHARED),
         ]
     );
 }
@@ -511,6 +523,8 @@ fn a_literal_name_is_the_package_whatever_its_range_or_extra_holds() {
         "pip install \"shared-lib>=$MIN\" shared-tools[${{ matrix.extra }}]",
         // No name at all: a path under the home directory, a lone extra or range.
         "pip install ~/wheels/$WHEEL ~/$PKG \"[dev]$X\" ==$V =$X !$X",
+        // An open part right after the extras is the range.
+        "pip install shared-lib[fast]$X \"shared-tools[${{ matrix.extra }}]${{ matrix.spec }}\"",
     ];
     let (export, rows) = named("ci_run_ranges", head, &steps);
     assert_eq!(
@@ -521,6 +535,8 @@ fn a_literal_name_is_the_package_whatever_its_range_or_extra_holds() {
             at(1, SHARED),
             at(2, SHARED),
             at(2, TOOLS_PACKAGE),
+            at(4, SHARED),
+            at(4, TOOLS_PACKAGE),
         ]
     );
     // No pattern and no unresolved consumer among them.
@@ -552,6 +568,19 @@ fn a_literal_name_is_the_package_whatever_its_range_or_extra_holds() {
             (
                 "exact",
                 "package::pypi::shared-tools none (local 0.3.0), range unchecked"
+            ),
+        ]
+    );
+    assert_eq!(
+        of(4),
+        [
+            (
+                "exact",
+                "package::pypi::shared-lib $X (local 1.2.0), range unchecked"
+            ),
+            (
+                "exact",
+                "package::pypi::shared-tools ${{ matrix.spec }} (local 0.3.0), range unchecked"
             ),
         ]
     );

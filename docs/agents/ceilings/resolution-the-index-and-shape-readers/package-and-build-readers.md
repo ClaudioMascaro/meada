@@ -29,9 +29,10 @@
   package of the same name: one provider in another repository is `exact`, whatever index
   serves the install, and one in the CI step's own repository is `inferred`, as for a manifest
   entry with no source. A name with an open part is a pattern within `iac/pattern.rs`'s limits
-  (`inferred` to the one package it fits, `ambiguous` to several, no side when it fits none); a
-  literal name with an open range or extra is the package, its range as written and
-  `range unchecked`; a
+  (`inferred` to the one package it fits, `ambiguous` to several, no side when it fits none: an
+  open part glued to a word, `shared-lib$X`, replaces no whole segment and fits nothing); a
+  literal name with an open range or extra, or an open part right after the extras
+  (`shared-lib[fast]$X`), is the package, its range as written and `range unchecked`; a
   name left open whole is one unresolved consumer per CI step, with what is written as its
   `via`, a cause and no candidate, and only in a workspace that provides a PyPI package (no
   side elsewhere). The first install of a name by a CI step gives its range, and a range pip
@@ -49,7 +50,8 @@
   `python -m <module>`, `uv run`, `poetry run`, a prefix (`sudo`, `VAR=x`, `time`) and a name
   with an open part match nothing. `uvx <package>` and `pipx run <package>` are read only with
   the package as the next word: `--from`, `--spec`, another option first, `<package>@<version>`
-  and `uv tool run` give no side. A script whose function is no program entry point of its
+  and `uv tool run` give no side, and a range after the package (`uvx 'core-sdk>=1'`) gives
+  the package and no program. A script whose function is no program entry point of its
   repository (a module outside the declared roots, a class, generated code) gives no side.
   The evidence for `exact` is an install by a literal name in an earlier command of the same CI
   job, in file order of its CI steps: an install in a later CI step, in another CI job, in a
