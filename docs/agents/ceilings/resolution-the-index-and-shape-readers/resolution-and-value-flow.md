@@ -101,12 +101,14 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   requests), one held in a parameter, a field or a package variable, the first name the path meets
   when any file of the repository assigns the field read through it (`q.TableName = ..` on any
   variable of any type, in any package or class; a write of another field does not count), and a C#
-  request filled by property assignments have no table; nor have Go locals declared together (`p, q
+  request filled by property assignments have no table or bus; nor have Go locals declared together (`p, q
   := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.
   In Java the rule covers a list or an array: one mentioned a third time or held in a field has no
-  table (a `List.of` list cannot change and keeps its tables), and neither has a `new T[]{..}` array
+  table or bus (a `List.of` list cannot change and keeps them), and neither has a `new T[]{..}` array
   or a `new ArrayList<>(..)` copy mentioned twice. A method's name is no mention in Java: a list
-  `entries` passed to `.entries(entries)` is mentioned once there (#773). A Java list, array or
+  `entries` passed to `.entries(entries)`, a list `transactItems` passed to
+  `.transactItems(transactItems)` and a builder `put` in `.put(put.build())` are each mentioned once
+  there (#773). A Java list, array or
   single entry that is the one argument of the step that sets the list (`transactItems(..)`,
   `entries(..)`) and comes in a parameter has no mentions to count and no table, one a wrapper only
   passes on included (`write(List.of(..))`, #772); two entries passed as two arguments, and a table

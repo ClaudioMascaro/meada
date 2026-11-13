@@ -545,7 +545,7 @@ pub(super) fn changed<'a>(
         path,
         scope,
         setter: &setter,
-        lists: super::entries(selector).then_some(&list),
+        lists: super::reads_entries(selector).then_some(&list),
         uses: builders.uses(code, path),
         seen: std::collections::HashSet::new(),
         depth: 0,

@@ -218,7 +218,7 @@ pub(crate) fn extract<'a>(
                         &written,
                         &builders,
                     ) || (language != Language::Java
-                        && entries(operation.field)
+                        && reads_entries(operation.field)
                         && held_changed(code, path, index, operation.field, language, {
                             counts.get_or_init(|| {
                                 (code.mentioned(path).iter())
@@ -325,7 +325,7 @@ fn transaction(selector: &str) -> bool {
 /// Whether the path reads a list of entries (`Entries[].EventBusName`, a transaction's
 /// `TransactItems[]`): a request, a list, an item or an entry held in a name on it is followed by
 /// the mentions of that name (#719, #773). The other paths keep the rule they had.
-fn entries(selector: &str) -> bool {
+fn reads_entries(selector: &str) -> bool {
     selector.contains("[].")
 }
 
@@ -410,9 +410,10 @@ fn changed_request<'a>(
     false
 }
 
-/// Whether a name on a path of entries (`entries`) may hold a value that changed (Go and C#). A request, a list, an item and an entry change in place through any name that holds
-/// them: a write past the first member, an element replaced, `append`, `Add`, a helper. So a
-/// name is followed only when the function that declares it writes it twice, where it is declared
+/// Whether a name on a path of entries (`reads_entries`) may hold a value that changed (Go and
+/// C#). A request, a list, an item and an entry change in place through any name that holds them:
+/// a write past the first member, an element replaced, `append`, `Add`, a helper. So a name is
+/// followed only when the function that declares it writes it twice, where it is declared
 /// and where the path reads it (`Facts::mentioned`). Any other mention is a change this reader
 /// does not follow, and a name that is no local of a function of the file (a parameter, a field,
 /// a package variable) can change anywhere.
