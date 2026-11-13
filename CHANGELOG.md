@@ -44,17 +44,44 @@ All notable changes to Meada are recorded here. The format follows
   `docker://` holds no CI contract. `trace` crosses composite actions as it crosses reusable
   pipelines. Release level: minor, meada (#826).
 
+### Changed
+
+- The values cache (`values.db`, ADR 0027) stores each entry deflated, and gives back the pages
+  that replaced or dropped entries free once they are most of the file: on Meada's own repository
+  it holds 4.1 MB instead of 30.2 MB. An existing cache shrinks on the first refresh, which
+  replaces its entries. A stored entry that would inflate past 8 MiB,
+  or that is not deflated, reads as a miss and costs a parse (#839).
+
 ### Fixed
 
 - `trace` stops following a branch 256 levels below its start and marks the line there
   `(depth limit)`, as a process step is marked: a call chain of about 2,000 hops overflowed the
   stack and aborted `meada mcp`, with every call in flight (#732).
+- A `trace` that reaches thousands of functions of one file takes time in proportion to them,
+  not to their square: each line it writes was placed by counting the newlines of its file from
+  the start, and now reads one block of it. `context` and the open items place their lines the
+  same way (#745).
 - `meada mcp` over stdio answers at most four calls at once, and the others wait their turn: each
   call held an engine and its answer in memory together with every other call in flight, so a
   batch of pipelined calls could exhaust memory (#756).
 - A `terraform-aws-modules/s3-bucket/aws` call with `putin_khuylo = false`, or with a value
   Meada cannot resolve, provisions no bucket: upstream creates it only with
   `create_bucket && putin_khuylo`, and the Lambda module's call is read the same way (#787).
+- A YAML or JSON file that only the config value reader takes keeps no config value once it
+  holds more than 1,000, all its documents together: it is a data file (a measurement dump, a
+  generated snapshot), `meada status` counts and names it apart, and a `value` search no longer
+  finds its values. Terraform and OpenTofu files, and a file a reader of a kind takes (a
+  template, a Kubernetes object, a document, an alert rule, a workflow, a package manifest),
+  keep every value. An existing index is rebuilt on its first open by this version, which drops
+  the values those files held (#817).
+- A call of `meada mcp` that waited longer than the busy timeout (10 s) behind another call's
+  refresh no longer fails with `database is locked` when another process writes the index as
+  that refresh ends: the time spent behind a refresh of the same process no longer counts toward
+  the timeout (#757).
+- A call of `meada mcp` no longer answers from a refresh that found documents by a `[serve]`
+  table older than the one in `meada.toml`: a refresh reads the table when it starts, not when
+  its call opened the index, so a call that read the file before an edit no longer writes the
+  index back by the older table (#758).
 
 ## [1.3.0] - 2026-11-11
 

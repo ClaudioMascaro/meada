@@ -14,6 +14,8 @@ pub(crate) mod environment;
 mod jib;
 mod patterns;
 
+pub(crate) use config::named_file;
+
 pub struct Image;
 
 /// Effective image links for execution, without replacing the raw links used to validate

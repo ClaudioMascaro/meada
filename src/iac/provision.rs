@@ -425,9 +425,8 @@ impl Source<'_> {
                 Self::Provisioner(p) => p.node.address.clone(),
             });
         let line = files
-            .get(&span.path)
-            .filter(|_| span.end > span.start)
-            .map(|s| crate::render::line_of(s, span.start));
+            .line(&span.path, span.start)
+            .filter(|_| span.end > span.start);
         (span.path, line, expression)
     }
 }

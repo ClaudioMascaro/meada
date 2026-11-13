@@ -44,6 +44,7 @@ CREATE TABLE config_files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
+CREATE TABLE taken (path TEXT PRIMARY KEY);
 CREATE TABLE contract_configs (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT ''
@@ -3441,6 +3442,9 @@ Row { key: "[0].data.hosts[1]", value: Some("b.example.com"), kind: "string", li
 Row { key: "[1].apiVersion", value: Some("v1"), kind: "string", line: 15, cut: false }
 Row { key: "[1].kind", value: Some("Secret"), kind: "string", line: 16, cut: false }
 Row { key: "[1].stringData.password", value: None, kind: "string", line: 18, cut: false }
+
+sample.data.yaml, one value past the ceiling
+"data"
 
 sample.kustomization.yaml
 Output {

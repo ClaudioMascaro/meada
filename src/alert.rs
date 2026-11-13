@@ -25,6 +25,13 @@ pub(crate) fn refused(path: &str, documents: &[Value]) -> Option<String> {
         .flatten()
 }
 
+/// Whether the alert reader takes a rule, a route or a receiver from the configuration file at
+/// `path` with bytes `src`: then the file keeps every config value (`config_values::kind_file`).
+pub(crate) fn takes(path: &str, src: &[u8]) -> bool {
+    let summary = config::read(path, src);
+    !(summary.rules.is_empty() && summary.routes.is_empty() && summary.forwardings.is_empty())
+}
+
 // ponytail: regex source length bounds compilation input; `ALERT_SCAN_MAX` bounds matching.
 const ALERT_REGEX_MAX: usize = 4096;
 /// The bytes the automata and search caches of one routing scope may take, shared equally by

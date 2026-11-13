@@ -80,3 +80,32 @@ time without its index, over the cache the first run left, to the same export.
   values); the second parse could come from the first, which only the changed files pay.
 - #610 resumes on top: what remains of a refresh is the extraction and resolution of the
   changed group.
+
+## Amendment (2026-11-12): deflated entries
+
+On the R1 acceptance repository (ADR 0003) the cache was 5.6 MB of plain JSON beside the index:
+the whole excess of the index directory over its size target once #817 bounded `index.db`
+(#839). Field names are half of that JSON, and they are what deflate removes.
+
+- **What an entry is.** The JSON above, deflated in the zlib format at level 6, zlib's default:
+  on the R1 root it keeps 11.7% of the JSON where level 1 keeps 15.7%, and either costs a small
+  part of the parses an entry saves. The crate is `miniz_oxide` (pure Rust; its one dependency,
+  `adler2`, is the zlib format's checksum). `ENTRY_BYTES` still bounds the JSON while it is
+  written. Deflate is lossless: the unit test that round-trips every fixture file of every pack
+  goes through the stored form.
+- **Inflation is bounded.** A read inflates a blob to `ENTRY_BYTES` at most and stops there,
+  whatever the blob asks for: the cache is a file in the repository's directory, so a blob is
+  input, not something this build is known to have written. A blob that would inflate past the
+  limit is a miss, and so is one that is not one whole zlib stream (its header or checksum fails,
+  or bytes follow its end), the plain JSON of an older build included. Such an entry misses by
+  its key first, since the build is in it: there is no migration, and a new build's extraction
+  replaces the entries.
+- **Pages are given back.** After the transaction that writes and prunes the entries, a file
+  whose free pages are more than half of its pages is vacuumed, so the pages that entries
+  replaced by smaller ones, or dropped because `valued` lost files, leave the file instead of
+  staying in it. A failed vacuum is dropped, as a failed write is.
+- **Size.** On this repository at `c1a8730c`, indexed cold in a scratch clone by debug builds of
+  `main` and of this change: `values.db` is 4.1 MB instead of 30.2 MB (13.5%), beside an
+  `index.db` of about 112.7 MB, so the index directory goes from about 142.9 MB to 116.7 MB. A
+  cold index takes 44.7 s instead of 44.0 s, and a refresh after a one-line edit of a Rust file
+  4.9 s instead of 4.7 s (medians of three; debug builds, slower than a release build).

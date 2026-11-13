@@ -108,14 +108,17 @@ pub(crate) fn schema_version() -> i32 {
 /// `config_files` holds each config file (#639, ADR 0025: a YAML or JSON file the walk visits,
 /// or one under the hidden CI paths) stamped like `documents`, its `summary` being
 /// `config_values::Outcome` as JSON (read, with its count of values and of those redacted; a
-/// lockfile; or unreadable, with the line and the reason); `config_values` holds each of its
-/// scalars but nulls: the `key` path, the `value` (cut at `config_values::VALUE_MAX`, `cut` 1,
+/// lockfile; unreadable, with the line and the reason; or data, past `config_values::VALUES_MAX`);
+/// `config_values` holds each of its scalars but nulls: the `key` path, the `value` (cut at `config_values::VALUE_MAX`, `cut` 1,
 /// or NULL when a format marks it secret), its `type` (`string`, `number`, `boolean`), its
 /// `line`, and the key path and value lowercased (`folded_key`, `folded_value`, each with a
 /// B-tree for exact and prefix search), rewritten with the file. `config_search` is an FTS5
 /// trigram index over both folded columns (#647, no text of its own: it reads `config_values` by
 /// `id`), which serves substring search for a query of three characters or more. None of the
-/// three reaches the export. `iac_nodes` holds each IaC node (#649, `iac::Node`: its address, the
+/// three reaches the export. `taken` lists the documents and the config files a pack reads or
+/// includes as of the last refresh: those keep every value past `config_values::VALUES_MAX`
+/// (#817), so a config file one starts or stops taking is read again.
+/// `iac_nodes` holds each IaC node (#649, `iac::Node`: its address, the
 /// label of its root module, its type, physical name as static evaluation resolves it (#650),
 /// whether that is a `pattern`, the `overridable` values it went through as JSON, file, first and
 /// last line, the key path of its block and, for a Compose service (#652), its image and build
@@ -178,6 +181,7 @@ CREATE TABLE config_files (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
+CREATE TABLE taken (path TEXT PRIMARY KEY);
 CREATE TABLE contract_configs (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT ''
@@ -343,10 +347,9 @@ thread_local! {
     static BUSY: std::cell::Cell<Duration> = const { std::cell::Cell::new(BUSY_TIMEOUT) };
     /// Whether this thread runs a refresh now (`Run`).
     static RUNNING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    /// When this thread's wait on a lock began, and whether a refresh of another thread was in
-    /// flight when it last looked (`wait`).
-    static WAITING: std::cell::Cell<(Option<Instant>, bool)> =
-        const { std::cell::Cell::new((None, false)) };
+    /// Where the busy timeout of this thread's wait on a lock counts from: when the wait began,
+    /// or the last time it saw a refresh of another thread in flight (`wait`).
+    static TIMEOUT_FROM: std::cell::Cell<Option<Instant>> = const { std::cell::Cell::new(None) };
 }
 
 /// The refreshes in flight in this process, on any index (`Run`).
@@ -354,23 +357,25 @@ static IN_FLIGHT: AtomicUsize = AtomicUsize::new(0);
 
 /// The busy handler of a connection opened to write (`current`, `writable`), called with the
 /// `tries` it already made for the statement: a statement that meets a lock waits for it up to
-/// this thread's busy timeout, and past it for as long as a refresh of another thread of this
-/// process is in flight (#704). That run is what holds the lock: once it spills or commits a
-/// large change its exclusive lock outlasts the timeout, and a call must not fail on a timer
-/// while a refresh of its own process makes progress. A run that just ended left the lock
-/// free, so the statement gets one more try. The thread that runs the refresh keeps the timeout
-/// alone: what it waits on is another process, or a reader that may be waiting on it.
+/// this thread's busy timeout, and for as long as a refresh of another thread of this process
+/// is in flight (#704). That run is what holds the lock: once it spills or commits a large
+/// change its exclusive lock outlasts the timeout, and a call must not fail on a timer while a
+/// refresh of its own process makes progress. The time spent behind such a run does not count
+/// (#757): the timeout counts from the last time the wait saw one in flight, so after the run
+/// the statement can still wait a whole timeout for another process's lock. The thread that
+/// runs the refresh keeps the timeout alone: what it waits on is another process, or a reader
+/// that may be waiting on it.
 // ponytail: a run in flight on any index extends the wait, since a plain function knows no
 // connection; a wait on another process's lock then lasts until the runs of this process end.
 fn wait(tries: i32) -> bool {
-    let (since, was) = match WAITING.get() {
-        (Some(since), was) if tries > 0 => (since, was),
-        _ => (Instant::now(), false),
-    };
     let in_flight = !RUNNING.get() && IN_FLIGHT.load(Ordering::Relaxed) > 0;
-    WAITING.set((Some(since), in_flight));
-    if since.elapsed() >= BUSY.get() && !in_flight {
-        return was;
+    let since = match TIMEOUT_FROM.get() {
+        Some(since) if tries > 0 && !in_flight => since,
+        _ => Instant::now(),
+    };
+    TIMEOUT_FROM.set(Some(since));
+    if since.elapsed() >= BUSY.get() {
+        return false;
     }
     // Steps that grow to 50 ms, as SQLite's own handler's grow to 100.
     std::thread::sleep(Duration::from_millis(
@@ -604,7 +609,7 @@ fn rebuild(index: &Path, root: &Path, identity: &str, serve: &Serve) -> Result<C
         let db = writable(&new)?;
         db.execute_batch(SCHEMA)?;
         db.pragma_update(None, "user_version", schema_version())?;
-        refresh(&db, root, identity, serve)
+        refresh(&db, root, identity, &|| Ok(serve.clone()))
     })();
     // Where a reader holding the old file forbids the rename (Windows), it stays as it was.
     let replaced = built.and_then(|()| {
@@ -728,21 +733,29 @@ pub struct Indexed<'a> {
 /// its own; an entry point that asks the name of an inline definition of a kept group (which
 /// only its extraction gives) makes the refresh start over without keeping any group.
 ///
-/// Documents (spec #21) are refreshed first, the same way, when `serve` is declared; without
-/// a `[serve]` table the repository has none. They hold no code, so an edited document changes
-/// no code row: `Http::declare` reads them at query time.
+/// Documents (spec #21) are refreshed first, the same way, when the `[serve]` table that
+/// `read_serve` reads is declared; without one the repository has none. They hold no code, so an
+/// edited document changes no code row: `Http::declare` reads them at query time.
 ///
 /// Refreshes of one index share it (#704). In one process (MCP calls in flight together) one
 /// runs at a time: a call that comes while another runs waits for it, with no timer, then for
 /// the next run, which starts after it came and so sees the tree as the call found it; the
-/// calls that came meanwhile share that run's outcome. A statement that meets the run's lock
-/// outside a refresh (an open, a query) waits for the run too (`wait`). Across processes, one
-/// that finds nothing to write takes no write lock, and one whose first write meets another
-/// process's writer waits up to the busy timeout for that commit, then starts over
-/// (`attempts`).
-pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Result<()> {
+/// calls that came meanwhile share that run's outcome. A run reads the `[serve]` table it finds
+/// documents by through `read_serve` as each of its attempts starts (#758), whichever call
+/// started it: a run that starts after an edit of the table, or starts over after one, finds
+/// them by the edited one. A statement that meets the
+/// run's lock outside a refresh (an open, a query) waits for the run too (`wait`). Across
+/// processes, one that finds nothing to write takes no write lock, and one whose first write
+/// meets another process's writer waits up to the busy timeout for that commit, then starts
+/// over (`attempts`).
+pub fn refresh(
+    db: &Connection,
+    root: &Path,
+    identity: &str,
+    read_serve: &dyn Fn() -> Result<Serve>,
+) -> Result<()> {
     let Some(path) = db.path().filter(|p| !p.is_empty()) else {
-        return refresh_keeping(db, root, identity, serve, true);
+        return refresh_keeping(db, root, identity, read_serve, true);
     };
     let flight = {
         let mut flights = FLIGHTS.lock().unwrap_or_else(PoisonError::into_inner);
@@ -769,7 +782,7 @@ pub fn refresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> R
         nested: RUNNING.replace(true),
     };
     drop(runs);
-    let outcome = refresh_keeping(db, root, identity, serve, true);
+    let outcome = refresh_keeping(db, root, identity, read_serve, true);
     run.failed = outcome.as_ref().err().map(|e| e.to_string());
     outcome
 }
@@ -827,11 +840,11 @@ fn refresh_keeping(
     db: &Connection,
     root: &Path,
     identity: &str,
-    serve: &Serve,
+    read_serve: &dyn Fn() -> Result<Serve>,
     keep: bool,
 ) -> Result<()> {
     attempts(db, |behavior| {
-        refresh_attempt(db, root, identity, serve, keep, behavior)
+        refresh_attempt(db, root, identity, read_serve, keep, behavior)
     })
 }
 
@@ -869,7 +882,7 @@ fn refresh_attempt(
     db: &Connection,
     root: &Path,
     identity: &str,
-    serve: &Serve,
+    read_serve: &dyn Fn() -> Result<Serve>,
     keep: bool,
     behavior: TransactionBehavior,
 ) -> Result<()> {
@@ -889,7 +902,7 @@ fn refresh_attempt(
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
                  DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities; \
-                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM contract_configs; DELETE FROM config_values; \
+                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM taken; DELETE FROM contract_configs; DELETE FROM config_values; \
                  INSERT INTO config_search (config_search) VALUES ('delete-all'); \
                  DELETE FROM iac_nodes; DELETE FROM iac_references; DELETE FROM iac_images; \
                  DELETE FROM iac_unresolved;",
@@ -898,6 +911,7 @@ fn refresh_attempt(
         }
     };
     let mappings = crate::config::load(root)?.iac;
+    let serve = read_serve()?;
     let mapping_stamp = mappings.stamp()?;
     let mappings_changed = known_configs
         .as_deref()
@@ -906,10 +920,11 @@ fn refresh_attempt(
     let stored = stored_files(&tx)?;
 
     let all = walk(root);
+    let documents = documents_found(root, &all, &serve);
     refresh_stamped(
         &tx,
         "documents",
-        &documents_found(root, &all, serve),
+        &documents,
         now,
         |_| Ok(false),
         |abs| read_up_to(abs, document::DOCUMENT_BYTES_MAX),
@@ -933,6 +948,26 @@ fn refresh_attempt(
     let hidden = hidden_ci(root);
     let (configs, shadowed) = configs_found(&all, &hidden);
     let sensitive = config_values::Sensitive::new(&tx, &configs, &shadowed);
+    let Packs {
+        walked,
+        packs,
+        configs: pack_files,
+        symlinks,
+        digest,
+        settings,
+    } = packs_of(root, &all);
+    // A document, and a config file a pack reads or includes, keeps every config value past the
+    // ceiling, as the other kinds' files do (#817).
+    let taken: BTreeSet<&str> = (documents.iter().map(|(path, _)| path.as_str()))
+        .chain(pack_files.values().flatten().map(|(path, _)| path.as_str()))
+        .collect();
+    let kind_file =
+        |path: &str, src: &[u8]| config_values::kind_file(path, src, |p| taken.contains(p));
+    // A config file a document listing or a pack starts or stops taking is read again: past the
+    // ceiling, being taken decides whether it keeps its values, as in a new index.
+    let before: BTreeSet<String> = (tx.prepare("SELECT path FROM taken")?)
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
     // The Terraform files and var files read again: the units holding them are evaluated again.
     let terraform = std::cell::RefCell::new(BTreeSet::new());
     // Whether a Kubernetes file changed, appeared or left: its objects are evaluated again.
@@ -959,7 +994,7 @@ fn refresh_attempt(
         "config_files",
         &configs,
         now,
-        |path| sensitive.stale(path),
+        |path| Ok(sensitive.stale(path)? || before.contains(path) != taken.contains(path)),
         |abs| read_up_to(abs, lang::MAX_BYTES),
         |path, src| {
             if iac::is_input(path) {
@@ -975,7 +1010,8 @@ fn refresh_attempt(
                 iac::refresh_template(&tx, path, Some(src))?;
             }
             actions(path, Some(src))?;
-            let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?);
+            let whole = || kind_file(path, src);
+            let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?, whole);
             config_values::store(&tx, path, &rows)?;
             Ok(serde_json::to_string(&outcome)?)
         },
@@ -989,6 +1025,12 @@ fn refresh_attempt(
         actions(path, None)?;
         config_values::forget(&tx, path)?;
     }
+    if !before.iter().map(String::as_str).eq(taken.iter().copied()) {
+        tx.execute("DELETE FROM taken", [])?;
+        for path in &taken {
+            tx.execute("INSERT INTO taken VALUES (?1)", [path])?;
+        }
+    }
     // A Terraform file of a directory holding an override file is read above with every default
     // redacted: now that every file is stored, one read against other sensitive variables than
     // the other files of its directory declare is read again (`Sensitive`), and its directory is
@@ -1001,7 +1043,8 @@ fn refresh_attempt(
         let Ok(src) = read_up_to(abs, lang::MAX_BYTES) else {
             continue;
         };
-        let (outcome, rows) = config_values::read_with(path, &src, &names);
+        let (outcome, rows) =
+            config_values::read_with(path, &src, &names, || kind_file(path, &src));
         config_values::store(&tx, path, &rows)?;
         tx.execute(
             "UPDATE config_files SET summary = ?2 WHERE path = ?1",
@@ -1098,14 +1141,6 @@ fn refresh_attempt(
     }
     // The packages decide which files keep the shapes of what they export (issue #175).
     let manifest_rows = manifest_rows(&tx)?;
-    let Packs {
-        walked,
-        packs,
-        configs,
-        symlinks,
-        digest,
-        settings,
-    } = packs_of(root, &all);
     let mut changed = Vec::new();
     for &(path, abs, pack) in &walked {
         let setting = settings[&pack](path);
@@ -1191,7 +1226,7 @@ fn refresh_attempt(
         drop(tx);
         db.execute("DELETE FROM meta", [])?;
         // Not `refresh`: this call is the run in flight for this index, which it would wait on.
-        return refresh_keeping(db, root, identity, serve, true);
+        return refresh_keeping(db, root, identity, read_serve, true);
     };
     settle(
         &tx,
@@ -1209,7 +1244,7 @@ fn refresh_attempt(
         .chain(kept.iter().map(|(p, f)| (p.clone(), f.setting.clone())))
         .collect();
     let found_configs = |pack: usize| -> Vec<(&str, &[u8])> {
-        (configs.get(&pack).into_iter().flatten())
+        (pack_files.get(&pack).into_iter().flatten())
             .map(|(n, c)| (n.as_str(), c.as_slice()))
             .collect()
     };
@@ -1369,7 +1404,7 @@ fn refresh_attempt(
     }
     // A pack's config input may be another pack's config file: each path once.
     let mut seen = HashSet::new();
-    let pack_configs: Vec<(&str, &[u8])> = (configs.values().flatten())
+    let pack_configs: Vec<(&str, &[u8])> = (pack_files.values().flatten())
         .filter(|(path, _)| seen.insert(path.as_str()))
         .map(|(path, src)| (path.as_str(), src.as_slice()))
         .collect();
@@ -1704,7 +1739,7 @@ fn refresh_attempt(
         // An entry point asked the name of an inline definition of a kept file: only its
         // group's extraction knows it, so start over without keeping any group.
         drop(tx);
-        return refresh_keeping(db, root, identity, serve, false);
+        return refresh_keeping(db, root, identity, read_serve, false);
     }
     tx.execute("DELETE FROM entry_points", [])?;
     for e in doors {
@@ -3914,7 +3949,7 @@ mod tests {
         writer.execute_batch("BEGIN IMMEDIATE").unwrap();
 
         let refreshed = with_busy_timeout(Duration::from_millis(50), || {
-            refresh(&db, &root, REPO, &Serve::default())
+            refresh(&db, &root, REPO, &|| Ok(Serve::default()))
         });
         assert!(refreshed.is_ok(), "{refreshed:?}");
         assert_eq!(named(&db, "a"), 1);
@@ -3938,7 +3973,7 @@ mod tests {
         });
 
         let refreshed = with_busy_timeout(Duration::from_secs(10), || {
-            refresh(&db, &root, REPO, &Serve::default())
+            refresh(&db, &root, REPO, &|| Ok(Serve::default()))
         });
         ends.join().unwrap();
         assert!(refreshed.is_ok(), "{refreshed:?}");
@@ -3965,7 +4000,8 @@ mod tests {
         std::thread::spawn(move || {
             with_busy_timeout(busy, || {
                 (0..times).try_for_each(|_| {
-                    (super::refresh(&db, &root, REPO, &Serve::default())).map_err(|e| e.to_string())
+                    (super::refresh(&db, &root, REPO, &|| Ok(Serve::default())))
+                        .map_err(|e| e.to_string())
                 })
             })
         })
@@ -4079,6 +4115,47 @@ mod tests {
         drop(blocker);
     }
 
+    /// A statement whose wait covered a refresh of its own process keeps a whole busy timeout
+    /// after that refresh ends (#757): a short write lock another process takes right then is
+    /// waited for, not a `database is locked` at once. The statement is a call's query on a
+    /// connection opened before the run, as the first read of an open is.
+    #[test]
+    fn a_wait_that_covered_a_run_of_its_process_keeps_a_whole_timeout_after_it() {
+        let (dir, index) = index_dir("wait_after_run");
+        let root = checkout(&dir);
+        let mut dbs = connections(&index, &root, 2);
+        add(&root, "b");
+        let blocker = reader(&index);
+        let run = refreshing(dbs.remove(0), &root, Duration::from_secs(10), 1);
+        committing(&index);
+        // Another process's writer, waiting for the run's commit with a handler that never
+        // sleeps, so it takes the lock as the run ends, and holds it for 100 ms.
+        let other = std::thread::spawn({
+            let index = index.clone();
+            move || {
+                let writer = Connection::open(&index).unwrap();
+                writer.busy_handler(Some(|_| true)).unwrap();
+                writer.execute_batch("BEGIN EXCLUSIVE").unwrap();
+                std::thread::sleep(Duration::from_millis(100));
+                writer.execute_batch("ROLLBACK").unwrap();
+            }
+        });
+        let call = dbs.remove(0);
+        let statement = std::thread::spawn(move || {
+            with_busy_timeout(Duration::from_millis(300), || {
+                let count = "SELECT count(*) FROM symbols WHERE id LIKE '%::b'";
+                (call.query_row(count, [], |r| r.get::<_, i64>(0))).map_err(|e| e.to_string())
+            })
+        });
+        // The statement waits for the run's commit past its own busy timeout.
+        std::thread::sleep(Duration::from_millis(600));
+        drop(blocker);
+
+        assert_eq!(run.join().unwrap(), Ok(()));
+        other.join().unwrap();
+        assert_eq!(statement.join().unwrap(), Ok(1));
+    }
+
     /// A wait that ended takes nothing from the next one (#704): a call whose open waited for
     /// a lock, and whose first query meets another one a whole busy timeout later, waits for
     /// it rather than failing at once on the first wait's clock.
@@ -4139,6 +4216,50 @@ mod tests {
         let db = open(&index, &root, REPO, &Serve::default()).unwrap();
         // Read without a refresh of its own: what the second call's run left.
         assert_eq!((named(&db, "b"), named(&db, "c")), (1, 1));
+    }
+
+    /// A run reads its `[serve]` table when it starts (#758), not when its call came: a call that
+    /// came during another run, before an edit of `meada.toml` that lists a document, starts the
+    /// next run after the edit, and that run finds the document. A call that came after the edit
+    /// would share that run, and answer by the edited table.
+    #[test]
+    fn a_run_reads_the_serve_table_when_it_starts_not_when_its_call_came() {
+        let (dir, index) = index_dir("serve_at_run_start");
+        let root = checkout(&dir);
+        fs::create_dir_all(root.join("docs")).unwrap();
+        let spec = "openapi: 3.0.0\ninfo:\n  title: api\npaths: {}\n";
+        fs::write(root.join("docs").join("api.yaml"), spec).unwrap();
+        fs::write(root.join("meada.toml"), "[serve]\n").unwrap();
+        let mut dbs = connections(&index, &root, 2);
+        add(&root, "b");
+        let blocker = reader(&index);
+        let first = refreshing(dbs.remove(0), &root, Duration::from_secs(10), 1);
+        committing(&index);
+
+        let second = std::thread::spawn({
+            let (db, root) = (dbs.remove(0), root.clone());
+            move || {
+                // As the engine reads it: `meada.toml` on disk.
+                let serve = || -> crate::Result<Serve> { Ok(crate::config::load(&root)?.serve) };
+                with_busy_timeout(Duration::from_secs(10), || {
+                    super::refresh(&db, &root, REPO, &serve)
+                })
+                .map_err(|e| e.to_string())
+            }
+        });
+        // Time for the second call to find the first run in flight; then the edit.
+        std::thread::sleep(Duration::from_millis(200));
+        let edited = "[serve]\ndocuments = [\"docs/api.yaml\"]\n";
+        fs::write(root.join("meada.toml"), edited).unwrap();
+        drop(blocker);
+
+        assert_eq!(
+            (first.join().unwrap(), second.join().unwrap()),
+            (Ok(()), Ok(()))
+        );
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        let listed = "SELECT count(*) FROM documents WHERE path = 'docs/api.yaml'";
+        assert_eq!(db.query_row(listed, [], |r| r.get::<_, i64>(0)).unwrap(), 1);
     }
 
     /// A refresh refused `DEFERRED_ATTEMPTS` times in a row (#704), as under a stream of other
@@ -4643,6 +4764,12 @@ mod tests {
         let outcome = serde_json::to_string_pretty(&outcome).unwrap();
         actual += &format!("\nsample.values.yaml\n{outcome}\n");
         actual.extend(rows.iter().map(|row| format!("{row:?}\n")));
+        // A generic file past the values ceiling is data, and stores no value (#817).
+        let (outcome, rows) =
+            config_values::read("sample.data.yaml", past_the_ceiling("").as_bytes());
+        let outcome = serde_json::to_string_pretty(&outcome).unwrap();
+        actual += &format!("\nsample.data.yaml, one value past the ceiling\n{outcome}\n");
+        actual.extend(rows.iter().map(|row| format!("{row:?}\n")));
 
         // The IaC nodes, references, images and unresolved entries of a kustomization (#651).
         let files: Vec<(String, Vec<u8>)> = [
@@ -4800,7 +4927,7 @@ mod tests {
         let serve = Serve::default();
         let index_now = || {
             let db = open(&index, &root, REPO, &serve).unwrap();
-            refresh(&db, &root, REPO, &serve).unwrap();
+            refresh(&db, &root, REPO, &|| Ok(serve.clone())).unwrap();
         };
         let is_fresh = |identity: &str| {
             let db = read(&index).unwrap();
@@ -4896,7 +5023,7 @@ mod tests {
         };
         let index_now = || {
             let db = open(&index, &root, REPO, &serve).unwrap();
-            refresh(&db, &root, REPO, &serve).unwrap();
+            refresh(&db, &root, REPO, &|| Ok(serve.clone())).unwrap();
         };
         let is_fresh = || fresh(&read(&index).unwrap(), &root, REPO, &serve).unwrap();
         index_now();
@@ -4916,6 +5043,324 @@ mod tests {
             index_now();
             assert!(is_fresh(), "{file} {content:?} indexed");
         }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// `VALUES_MAX + 1` scalars, one a line at `indent`: `p0: 0`, `p1: 1`, and on.
+    fn past_the_ceiling(indent: &str) -> String {
+        (0..=config_values::VALUES_MAX)
+            .map(|i| format!("{indent}p{i}: {i}\n"))
+            .collect()
+    }
+
+    /// The rows and the stored outcome of the config file at `path`.
+    fn config_rows(db: &Connection, path: &str) -> (i64, config_values::Outcome) {
+        let rows = "SELECT count(*) FROM config_values WHERE path = ?1";
+        let rows = db.query_row(rows, [path], |r| r.get(0)).unwrap();
+        let summary = "SELECT summary FROM config_files WHERE path = ?1";
+        let summary: String = db.query_row(summary, [path], |r| r.get(0)).unwrap();
+        (rows, serde_json::from_str(&summary).unwrap())
+    }
+
+    /// A file a reader of a kind takes keeps every config value past the ceiling, and the
+    /// reader still takes from it what it did (#817); a generic file past it keeps none.
+    #[test]
+    fn a_file_of_a_kind_keeps_its_values_past_the_ceiling_and_a_generic_one_none() {
+        let (dir, index) = index_dir("kind_files_past_the_ceiling");
+        let root = checkout(&dir);
+        let pad = past_the_ceiling("  ");
+        let json_pad: Vec<String> = (0..=config_values::VALUES_MAX)
+            .map(|i| format!("\"p{i}\": {i}"))
+            .collect();
+        let json_pad = json_pad.join(", ");
+        let files = [
+            (
+                "infra/main.tf.json",
+                format!(
+                    "{{\"resource\": {{\"aws_s3_bucket\": {{\"b\": {{\"bucket\": \"acme\"}}}}}}, \
+                     \"locals\": {{{json_pad}}}}}"
+                ),
+            ),
+            ("infra/prod.tfvars.json", format!("{{{json_pad}}}")),
+            (
+                "docker-compose.yml",
+                format!("services:\n  web:\n    image: acme/web:1\nx-pad:\n{pad}"),
+            ),
+            (
+                "stack/template.yaml",
+                format!(
+                    "AWSTemplateFormatVersion: '2010-09-09'\nResources:\n  Queue:\n    \
+                     Type: AWS::SQS::Queue\nMetadata:\n{pad}"
+                ),
+            ),
+            (
+                "serverless.yml",
+                format!(
+                    "service: api\nprovider:\n  name: aws\nfunctions:\n  hello:\n    \
+                     handler: handler.hello\ncustom:\n{pad}"
+                ),
+            ),
+            (
+                "k8s/web.yaml",
+                format!(
+                    "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  \
+                     annotations:\n{}spec:\n  template:\n    spec:\n      containers:\n      \
+                     - name: web\n        image: acme/web:1\n",
+                    past_the_ceiling("    ")
+                ),
+            ),
+            (
+                "rules/alerts.yaml",
+                format!(
+                    "groups:\n- name: g\n  rules:\n  - alert: Down\n    expr: up == 0\nx-pad:\n{pad}"
+                ),
+            ),
+            (
+                ".github/workflows/ci.yml",
+                format!(
+                    "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n    \
+                     - uses: docker/build-push-action@v6\n      with:\n        tags: \
+                     acme/api:1\nenv:\n{pad}"
+                ),
+            ),
+            (
+                "skaffold.yaml",
+                format!(
+                    "apiVersion: skaffold/v4beta6\nkind: Config\nbuild:\n  artifacts:\n  - \
+                     image: acme/web\nx-pad:\n{pad}"
+                ),
+            ),
+            (
+                "openapi.yaml",
+                format!(
+                    "openapi: 3.0.0\ninfo:\n  title: api\n  version: '1'\npaths:\n  /orders:\n    \
+                     get:\n      responses:\n        '200':\n          description: ok\nx-pad:\n{pad}"
+                ),
+            ),
+            (
+                "package.json",
+                format!("{{\"name\": \"web\", \"version\": \"1.0.0\", \"x-pad\": {{{json_pad}}}}}"),
+            ),
+            (
+                "tsconfig.json",
+                format!("{{\"compilerOptions\": {{\"strict\": true}}, \"x-pad\": {{{json_pad}}}}}"),
+            ),
+            (
+                "app-config.yaml",
+                format!("app:\n  title: web\nx-pad:\n{pad}"),
+            ),
+            (
+                "asyncapi.yaml",
+                format!(
+                    "asyncapi: 2.6.0\ninfo:\n  title: events\n  version: '1'\nchannels:\n  \
+                     orders: {{}}\nx-pad:\n{pad}"
+                ),
+            ),
+            (
+                "alertmanager.yml",
+                format!("route:\n  receiver: team\nreceivers:\n- name: team\nx-pad:\n{pad}"),
+            ),
+            (
+                "k8s/prod/kustomization.yaml",
+                format!("resources:\n- ../web.yaml\nnamePrefix: prod-\nx-pad:\n{pad}"),
+            ),
+            (
+                "src/main/resources/application.yml",
+                format!("stock:\n  url: https://web.example.com\nx-pad:\n{pad}"),
+            ),
+            (
+                "appsettings.json",
+                format!(
+                    "{{\"Api\": {{\"Url\": \"https://config.example.com/v2\"}}, \
+                     \"x-pad\": {{{json_pad}}}}}"
+                ),
+            ),
+            ("data/measure.json", format!("{{{json_pad}}}")),
+            (
+                "chart/values.yaml",
+                format!("image: acme/web:1\nx-pad:\n{pad}"),
+            ),
+        ];
+        // The code that reads the Spring and .NET configuration files.
+        let code = [
+            (
+                "src/main/java/com/example/api/StockClient.java",
+                "package com.example.api;\nimport org.springframework.beans.factory.annotation.Value;\n\
+                 import org.springframework.web.reactive.function.client.WebClient;\n\
+                 public class StockClient {\n    private final WebClient web;\n    \
+                 public StockClient(@Value(\"${stock.url}\") String base) {\n        \
+                 this.web = WebClient.create(base);\n    }\n    \
+                 public void level() {\n        web.get().uri(\"/api/stock\").retrieve();\n    }\n}\n",
+            ),
+            (
+                "A/IApi.cs",
+                "using Refit;\nusing System.Threading.Tasks;\nnamespace A;\n\
+                 public interface IApi {\n[Get(\"/items/{id}\")] Task<string> Item(int id);\n}\n",
+            ),
+            (
+                "A/Make.cs",
+                "using Refit;\nusing Microsoft.Extensions.Configuration;\nnamespace A;\n\
+                 public class Make {\n\
+                 public IApi Api(IConfiguration config) => RestService.For<IApi>(config[\"Api:Url\"]);\n}\n",
+            ),
+        ];
+        let written = (files.iter()).map(|(path, text)| (*path, text.as_str()));
+        for (path, text) in written.chain(code) {
+            let path = root.join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        }
+        let serve = Serve {
+            declared: true,
+            ..Serve::default()
+        };
+        let db = open(&index, &root, REPO, &serve).unwrap();
+
+        let values = config_values::VALUES_MAX as i64 + 1;
+        for (path, _) in &files[..files.len() - 2] {
+            let (rows, outcome) = config_rows(&db, path);
+            assert!(rows >= values, "{path}: {rows} rows, {outcome:?}");
+            assert!(
+                matches!(outcome, config_values::Outcome::Read { values: v, .. } if v as i64 == rows),
+                "{path}: {outcome:?}"
+            );
+        }
+        for path in ["data/measure.json", "chart/values.yaml"] {
+            assert_eq!(
+                config_rows(&db, path),
+                (0, config_values::Outcome::Data),
+                "{path}"
+            );
+        }
+        // What each reader takes from its file.
+        let count =
+            |sql: &str, path: &str| -> i64 { db.query_row(sql, [path], |r| r.get(0)).unwrap() };
+        let nodes = "SELECT count(*) FROM iac_nodes WHERE path = ?1";
+        for path in [
+            "infra/main.tf.json",
+            "docker-compose.yml",
+            "stack/template.yaml",
+            "serverless.yml",
+            "k8s/web.yaml",
+        ] {
+            assert!(count(nodes, path) > 0, "{path}: no IaC node");
+        }
+        for path in ["openapi.yaml", "asyncapi.yaml"] {
+            assert_eq!(
+                count("SELECT count(*) FROM documents WHERE path = ?1", path),
+                1,
+                "{path}"
+            );
+        }
+        // The overlay's objects, renamed by its prefix.
+        let overlay = "SELECT count(*) FROM iac_nodes WHERE address LIKE ?1";
+        assert!(count(overlay, "%prod-web%") > 0, "no object of the overlay");
+        // The Spring and .NET clients take their bases from their configuration files.
+        let client = "SELECT count(*) FROM contracts WHERE contract = ?1 AND via LIKE ?2";
+        let clients = |contract: &str, via: &str| -> i64 {
+            db.query_row(client, [contract, via], |r| r.get(0)).unwrap()
+        };
+        assert_eq!(clients("http::GET::/api/stock", "host:web.example.com"), 1);
+        assert!(clients("http::GET::/v2/items/{}", "%host:config.example.com%") > 0);
+        for path in ["package.json", "tsconfig.json"] {
+            assert_eq!(
+                count("SELECT count(*) FROM manifests WHERE path = ?1", path),
+                1,
+                "{path}"
+            );
+        }
+        let summary = |path: &str| -> String {
+            let sql = "SELECT summary FROM contract_configs WHERE path = ?1";
+            db.query_row(sql, [path], |r| r.get(0)).unwrap()
+        };
+        assert!(summary("rules/alerts.yaml").contains("Down"));
+        assert!(summary("alertmanager.yml").contains("team"));
+        assert!(summary(".github/workflows/ci.yml").contains("acme/api"));
+        assert!(summary("skaffold.yaml").contains("acme/web"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A data file that a `[serve]` table lists later is read again and keeps its values, and
+    /// keeps none again once the listing goes (#817): what makes a file a document lies outside
+    /// its bytes, and a refreshed index answers as a new one.
+    #[test]
+    fn a_data_file_keeps_its_values_while_a_serve_table_lists_it() {
+        let (dir, index) = index_dir("data_file_listed_later");
+        let root = checkout(&dir);
+        let spec = format!("openapi: 3.0.0\nx-pad:\n{}", past_the_ceiling("  "));
+        fs::write(root.join("spec.yaml"), spec).unwrap();
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        assert_eq!(
+            config_rows(&db, "spec.yaml"),
+            (0, config_values::Outcome::Data)
+        );
+        let listed = Serve {
+            declared: true,
+            documents: vec!["spec.yaml".into()],
+            ..Serve::default()
+        };
+        super::refresh(&db, &root, REPO, &|| Ok(listed.clone())).unwrap();
+        let (rows, outcome) = config_rows(&db, "spec.yaml");
+        assert_eq!(rows, config_values::VALUES_MAX as i64 + 2, "{outcome:?}");
+        super::refresh(&db, &root, REPO, &|| Ok(Serve::default())).unwrap();
+        assert_eq!(
+            config_rows(&db, "spec.yaml"),
+            (0, config_values::Outcome::Data)
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// An index another build wrote, holding the rows of a file now past the ceiling, keeps none
+    /// of them once this build opens it (#817): a change of the stored format, as `Outcome`'s
+    /// new case is, changes the schema version (`schema_version`), and another version is rebuilt.
+    #[test]
+    fn an_index_of_another_version_drops_the_rows_of_a_data_file() {
+        let (dir, index) = index_dir("data_rows_of_another_version");
+        let root = checkout(&dir);
+        fs::write(root.join("measure.yaml"), past_the_ceiling("")).unwrap();
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        assert_eq!(
+            config_rows(&db, "measure.yaml"),
+            (0, config_values::Outcome::Data)
+        );
+        // As an older build stored it: every value, and another schema version.
+        let rows: Vec<config_values::Row> = (0..=config_values::VALUES_MAX)
+            .map(|i| config_values::Row {
+                key: format!("p{i}"),
+                value: Some(i.to_string()),
+                kind: "number",
+                line: i + 1,
+                cut: false,
+            })
+            .collect();
+        let tx = rusqlite::Transaction::new_unchecked(&db, rusqlite::TransactionBehavior::Deferred)
+            .unwrap();
+        config_values::store(&tx, "measure.yaml", &rows).unwrap();
+        let read = config_values::Outcome::Read {
+            values: rows.len(),
+            redacted: 0,
+            sensitive: vec![],
+        };
+        let read = serde_json::to_string(&read).unwrap();
+        tx.execute(
+            "UPDATE config_files SET summary = ?1 WHERE path = 'measure.yaml'",
+            [read],
+        )
+        .unwrap();
+        tx.commit().unwrap();
+        db.pragma_update(
+            None,
+            "user_version",
+            super::schema_version().wrapping_add(1),
+        )
+        .unwrap();
+        drop(db);
+
+        let db = open(&index, &root, REPO, &Serve::default()).unwrap();
+        assert_eq!(
+            config_rows(&db, "measure.yaml"),
+            (0, config_values::Outcome::Data)
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 }

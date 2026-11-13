@@ -3055,7 +3055,7 @@ pub(crate) fn forget(tx: &Transaction, root: Option<&str>, owner: Owner) -> Resu
 
 /// Whether the file `path` with bytes `src` holds a template unit: a CloudFormation or SAM
 /// template, or a Serverless service (#654), whose `resources` section is one.
-fn template_wanted(path: &str, src: &[u8]) -> bool {
+pub(crate) fn template_wanted(path: &str, src: &[u8]) -> bool {
     cloudformation::wanted(path, src) || serverless::wanted(path, src)
 }
 

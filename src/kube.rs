@@ -157,6 +157,14 @@ pub(crate) fn wanted(path: &str, src: &[u8]) -> bool {
     is_source(path) && (is_kustomization(path) || src.windows(10).any(|w| w == b"apiVersion"))
 }
 
+/// Whether the file `path` with bytes `src` is a kustomization or holds an object: then it keeps
+/// every config value (`config_values::kind_file`). A file that only says `apiVersion`, such as
+/// a schema snapshot, holds none.
+pub(crate) fn takes(path: &str, src: &[u8]) -> bool {
+    let mappings = crate::iac::mapping::Config::default();
+    wanted(path, src) && (is_kustomization(path) || !read(path, src, &mappings).objects.is_empty())
+}
+
 /// What a pod template owner offers the references: its pod labels, and what its pod spec names.
 #[derive(Debug, Clone, Default, PartialEq)]
 struct Facts {

@@ -32,15 +32,19 @@
   definitions) that no read set per file captures (#391, #610).
 
 - `index/values.rs`: the values cache holds one entry per file of `valued` (pruned on every
-  extraction), each the file's parse as JSON, values included: on this repository 18.7 MB beside a
-  60.8 MB index, 616 entries, the largest 1.6 MB. An entry is keyed by the file's bytes, setting
+  extraction), each the file's parse as JSON, values included, deflated (#839): on this
+  repository at `c1a8730c`, 4.1 MB where its JSON took 30.2 MB, beside a 112.7 MB index (at #611,
+  616 entries, the largest 1.6 MB of JSON). An entry is keyed by the file's bytes, setting
   and pack and by Meada's build (version, stored format, the executable's path, size and mtime),
   so a rebuilt or moved binary misses every entry once. An entry is at most `ENTRY_BYTES`
-  (8 MiB) of JSON, so the cache is at most that per `valued` file: a file whose parse serializes
-  past it (a C# read's shared scope is written once per read) is parsed on every refresh. An entry nested past `serde_json`'s depth
+  (8 MiB) of JSON before it is deflated, so the cache is at most that per `valued` file: a file
+  whose parse serializes past it (a C# read's shared scope is written once per read) is parsed on
+  every refresh. A read inflates a stored blob to `ENTRY_BYTES` at most, whatever the blob asks
+  for, so one that would inflate past it is a miss. An entry nested past `serde_json`'s depth
   (128) does not deserialize and is parsed again on every refresh, as is anything else wrong with
-  the cache (unreadable, locked past the busy timeout, a write that failed): a miss costs a parse,
-  never a different index. A changed file is parsed twice per refresh, once for its stored facts
+  the cache (unreadable, locked past the busy timeout, a blob that is not one whole zlib stream,
+  a write that failed): a miss costs a parse, never a different index. An extraction that leaves
+  more than half of the file's pages free vacuums it. A changed file is parsed twice per refresh, once for its stored facts
   and once for its values, since the first parse is under the setting `settle` may still change.
   A refresh that changes nothing or keeps every group leaves the cache as it is. A dev build that changes a kind
   without changing the version keeps the rows an older build gave the groups it does not touch.
@@ -80,6 +84,18 @@
   aborted on a call chain between 1,972 and 1,992 hops down and between 3,144 and 3,164 up, and
   on a chain of HTTP links between 900 and 1,200 hops down (#732): the limit stays more than
   seven, twelve and three times under them.
+- `trace.rs` (cost, #745): a `trace` writes every line of the tree it reaches before the budget
+  cut (`Chain::answer` keeps the lines that fit), so its work follows the reachable graph, not the
+  lines it returns. `render::Files` counts the newlines of each file it reads once per answer,
+  per `LINE_BLOCK` (1 KiB), so placing a line on its file's line reads one block, not the file
+  before it. A line still costs its depth: its indent (two spaces a level) and the cycle check,
+  which scans the branch's ancestors, each at most `WALK_DEPTH`. Reading the reachable graph
+  (`trace::read`) also grows faster than it: the index is asked once per frontier and `Partial`
+  sorts every row it holds at each merge, so the merges cost the frontiers times the rows. On the
+  issue's generated Python graph in one file (each function calling 3 of the next 20; debug
+  build, `7518ebe7`, MCP over stdio) the merges took 6, 14, 25 and 79 ms at 1,200, 2,000, 3,000
+  and 6,000 functions (75 to 357 frontiers), of a read of 51 to 342 ms; at 6,000 the walk
+  without the line lookups took 35 ms for its 3,904 lines, down to depth 256.
 - `trace.rs` (process walk): an ambiguous call or link is one unexpanded step listing its
   candidates; `inferred` and `decided` links expand. A process is walked down only; `trace`
   up from `process::...` answers with a note. `Graph::processes_of` (the processes `context` lists)
@@ -108,20 +124,19 @@
   comes meanwhile waits for it with no timer, then shares the next run: a batch after a change
   costs about one refresh more than an unchanged one, whatever its size (debug build, 4 cores:
   Meada's own checkout, 50 calls 21 s against 15 s, 200 calls 70 s against 64 s; 5,000 files,
-  500 calls 11.0 s against 9.2 to 10.9 s). A statement of another call that meets the run's
-  lock (the first read of an open, a query, `forget`'s write) waits for the run, past the busy
-  timeout (`wait` in `index.rs`): no call fails on a timer while a refresh of its process is in
-  flight, however long it takes, nor while the tree keeps changing. Two things stay on the 10 s
-  timer in one process. The run's own commit waits that long for the reads the other calls have
+  500 calls 11.0 s against 9.2 to 10.9 s). A run reads the `[serve]` table it finds documents by
+  as each of its attempts starts, whichever call started it (#758). A statement of another call
+  that meets the run's lock (the first read of an open, a query, `forget`'s write) waits for the
+  run, past the busy timeout (`wait` in `index.rs`): no call fails on a timer while a refresh of
+  its process is in flight, however long it takes, nor while the tree keeps changing. Two things
+  stay on the 10 s timer in one process. The run's own commit waits that long for the reads the
+  other calls have
   in flight: one statement that reads for longer fails the run, and the calls that share it,
   with `database is locked`. And `wait` is a plain function that knows no connection: a run in
   flight on any index of the process extends the wait, so a statement behind another process's
-  lock waits until the runs of its own process end, then fails as before (its timer runs while
-  it waits for a run of its own process too: past 10 s it gets one try more when the run ends,
-  so a lock another process takes right then fails it at once, however short).
-  Measured once, cause not isolated: with a connection taking the write lock for 0.3 s at a
-  time after a refresh that held it for 13 s, every call answered `database is locked` in one
-  run of four, and which statement failed was not observed (#757). One stdio server answers
+  lock waits until the runs of its own process end, then a whole busy timeout more before it
+  fails: the time it waits behind a run of its own process does not count, so a short lock
+  another process takes as the run ends is waited for (#757). One stdio server answers
   `CALLS_IN_FLIGHT` (4) calls at once (#756): with its root known (the `roots/list` round trip
   holds no turn), a call waits for a turn at a fair semaphore, in the order the calls ask for
   one (rmcp starts a task per request, so two that arrive together may swap), and keeps it

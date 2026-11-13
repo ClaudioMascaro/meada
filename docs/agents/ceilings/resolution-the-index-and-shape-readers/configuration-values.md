@@ -8,7 +8,22 @@
   probes' bound:
   an indented file stores about twice its size, but a minified file of tiny scalars, such as a
   long array of numbers, and long keys nested deep are unreadable). An unreadable file and a
-  lockfile are counted in `meada status`, not named. Search kind `value` finds exact and prefix
+  lockfile are counted in `meada status`, not named. `VALUES_MAX` (#817: 1,000 config values
+  per YAML or JSON file that only this reader takes, all its documents together, redacted ones
+  counted, since configuration a contract or a rule reads holds tens to hundreds of values and a
+  data dump thousands): past it the file is data and keeps none, and `meada status` counts it
+  apart and names the first `DATA_NAMED` (10) data files in path order, the rest as a count.
+  Terraform and OpenTofu files in every form, and a file a reader of a kind takes as its own
+  (`config_values::kind_file`: a document, a config file a language pack reads or includes, a
+  Compose file, a GitHub workflow or Skaffold file, a package manifest, a kustomization or a
+  file the Kubernetes reader takes an object from, a CloudFormation or SAM template or
+  Serverless service, a file the alert reader takes a rule, a route or a receiver from), keep
+  every value. The kinds are asked only past the ceiling. A file that a `[serve]` listing or a
+  language pack starts or stops taking is read again (the index keeps the files they took,
+  `taken`), so a refreshed index holds what a new one would. What is given up: a large generic values file, such as a Helm chart's
+  `values.yaml` past 1,000 values, keeps none, so it gives no `value` hit, no declared site and
+  no config use, and `.meadaignore` cannot bring it back (the image reader still takes its
+  images from the file's bytes). Search kind `value` finds exact and prefix
   matches through the B-trees on the lowercased key path and value, and substrings through the
   FTS5 trigram table `config_search` (#647); a query of under three characters (or holding a NUL)
   scans every row of every repository, and the trigram table stores about four times the text of

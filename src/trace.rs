@@ -8,9 +8,7 @@ use crate::contract::{self, Level, Link};
 use crate::entry::EntryPoint;
 use crate::index::{CallSite, Consumer, Export, Symbol};
 use crate::render;
-use crate::render::{
-    DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, line_of, mark, unresolved,
-};
+use crate::render::{DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, unresolved};
 use meada_core::export::{Mark, Process, Step as ProcessStep, Via as StepVia};
 use meada_core::trace::{Chain, Row, arrow, level_mark};
 
@@ -482,11 +480,13 @@ impl<'a> Graph<'a> {
             };
             let hit = match change {
                 Change::Untracked => true,
-                Change::Lines(ranges) => files.get(&s.span.path).is_some_and(|src| {
-                    let first = line_of(src, s.span.start);
-                    let last = line_of(src, (s.span.end - 1).max(s.span.start));
-                    ranges.iter().any(|&(a, b)| a <= last && first <= b)
-                }),
+                Change::Lines(ranges) => {
+                    let first = files.line(&s.span.path, s.span.start);
+                    let last = files.line(&s.span.path, (s.span.end - 1).max(s.span.start));
+                    (first.zip(last)).is_some_and(|(first, last)| {
+                        ranges.iter().any(|&(a, b)| a <= last && first <= b)
+                    })
+                }
             };
             if hit {
                 hits.push((&s.span.path, s.span.start, &s.id));
@@ -1820,5 +1820,61 @@ mod tests {
         let limit = format!("{}r a.ts x (depth limit)\n", "  ".repeat(WALK_DEPTH));
         let tail = format!("{limit}  r a.ts x\n    r a.ts y\nchain: ");
         assert!(answer.contains(&tail), "{answer}");
+    }
+
+    /// A trace places each line it writes at a cost that does not grow with the file holding it
+    /// (#745): every function of a tree of `n` sits in one file and is reached, so the work of
+    /// `n` and of `8n` functions keeps the ratio of the lines written. Placing a line by counting
+    /// the file's newlines from its start makes it the square.
+    #[test]
+    fn a_trace_of_many_functions_in_one_file_grows_with_the_functions_reached() {
+        // Each function on a line of its own, its call sites on that line.
+        const WIDTH: usize = 80;
+        let dir = std::env::temp_dir().join(format!("meada-trace-745-{}", std::process::id()));
+        let tree = |n: usize| {
+            let f = |i: usize| format!("f{i}");
+            let names: Vec<String> = (0..n).map(f).collect();
+            let edges: Vec<(usize, usize)> = (0..n)
+                .flat_map(|i| (3 * i + 1..=3 * i + 3).map(move |j| (i, j)))
+                .filter(|&(_, j)| j < n)
+                .collect();
+            let calls: Vec<_> = edges.iter().map(|&(i, j)| (f(i), f(j))).collect();
+            let (mut workspace, [mut export]) = repository(&names, &calls);
+            let root = dir.join(n.to_string());
+            std::fs::create_dir_all(&root).unwrap();
+            let source: String = (0..n)
+                .map(|i| format!("{:<1$}\n", format!("function f{i}() {{}}"), WIDTH - 1))
+                .collect();
+            std::fs::write(root.join("a.ts"), source).unwrap();
+            workspace.repos[0].root = root;
+            let line = |i: usize| ((i * WIDTH) as i64, (i * WIDTH + WIDTH - 2) as i64);
+            for (i, symbol) in export.symbols.iter_mut().enumerate() {
+                (symbol.span.start, symbol.span.end) = line(i);
+            }
+            for (call, &(i, _)) in export.calls.iter_mut().zip(&edges) {
+                (call.span.start, call.span.end) = line(i);
+            }
+            (workspace, [export])
+        };
+        let (small, large) = (tree(500), tree(4000));
+        let [small, large] = [&small, &large].map(|(w, e)| Graph::new(w, e, &[]));
+        let run = |graph: &Graph| {
+            let started = std::time::Instant::now();
+            let answer = graph.answer(Start::From("f0"), None, Direction::Down, None);
+            // The lines are placed: the walk read the file.
+            assert!(answer.contains("a.ts:"), "{answer}");
+            started.elapsed()
+        };
+        // The least of interleaved runs keeps the machine's speed and load out of the ratio.
+        let (mut at_small, mut at_large) = (std::time::Duration::MAX, std::time::Duration::MAX);
+        for _ in 0..5 {
+            at_small = at_small.min(run(&small));
+            at_large = at_large.min(run(&large));
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(
+            at_large < at_small * 24,
+            "{at_small:?} for 500 functions, {at_large:?} for 4,000"
+        );
     }
 }
