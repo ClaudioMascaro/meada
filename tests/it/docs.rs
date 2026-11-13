@@ -317,7 +317,7 @@ fn over_budget(sizes: &[(String, u64)]) -> Vec<String> {
         .map(|(path, size, budget)| {
             format!(
                 "{path} is {size} bytes, over its budget of {budget} bytes: split it by area with \
-                 `cargo run --example split_agents -- {path}` in this change (a part still over \
+                 `scripts/split-agents {path}` in this change (a part still over \
                  its budget needs `## ` headings of its own first), never trim it by dropping entries"
             )
         })
@@ -363,7 +363,7 @@ fn a_file_past_its_budget_fails_with_the_path_the_size_the_budget_and_the_splitt
     assert!(over[0].contains("docs/agents/architecture.md is 8193 bytes"));
     assert!(over[0].contains("budget of 8192 bytes"));
     assert!(over[1].contains("docs/agents/map/tests.md is 65543 bytes"));
-    assert!(over[1].contains("cargo run --example split_agents -- docs/agents/map/tests.md"));
+    assert!(over[1].contains("scripts/split-agents docs/agents/map/tests.md"));
 }
 
 #[test]

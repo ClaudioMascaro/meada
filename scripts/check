@@ -54,7 +54,7 @@ def light(path):
     return (path.startswith(("docs/", "scripts/docs/", ".github/", ".claude/hooks/"))
             or (len(p.parts) == 1 and (p.suffix == ".md" or p.name.startswith("LICENSE")))
             or path in {".agents/skills-lock.json", ".claude/settings.json", ".mcp.json",
-                        "scripts/check", "scripts/prove-ci"}
+                        "scripts/check", "scripts/prove-ci", "scripts/split-agents"}
             or (path.startswith((".agents/skills/", ".claude/skills/"))
                 and p.suffix in {".md", ".json", ".yaml", ".yml", ".toml"})
             or path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/",
@@ -370,6 +370,7 @@ def product_gate(paths):
 def selftest():
     cases = [
         (["README.md", "docs/agents/architecture.md", ".claude/settings.json", ".github/workflows/ci.yml"], False, False, False),
+        (["scripts/split-agents"], False, False, False),
         (["src/lang/rust.rs"], True, True, True),
         (["README.md", "src/main.rs"], True, True, True),
         (["new-unknown-config"], True, True, True),

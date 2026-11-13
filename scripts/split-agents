@@ -1,0 +1,16 @@
+#!/bin/sh
+# Splits a docs/agents Markdown file that is over its size budget (examples/split_agents.rs).
+# The example uses only the standard library, so rustc builds it alone in seconds, without the
+# crate `cargo run --example` would build first.
+# Usage: scripts/split-agents docs/agents/<file>.md
+set -eu
+
+if [ $# -ne 1 ]; then
+  echo "usage: scripts/split-agents docs/agents/<file>.md" >&2
+  exit 2
+fi
+root="$(CDPATH= cd "$(dirname "$0")/.." && pwd)"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+rustc --edition=2024 "$root/examples/split_agents.rs" -o "$tmp/split_agents"
+"$tmp/split_agents" "$1"

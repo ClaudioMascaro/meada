@@ -148,6 +148,13 @@ indexing carries on.
   results.
 - Expansion (aliases, `$ref`s, variable substitution) is charged to a budget per file, and
   substitution runs once over the original text.
+- An estimate that gates evaluation (`iac::cost`) is an upper bound of what evaluating makes.
+  Each charge says in a comment why it covers the real output. A change to one is reviewed by
+  hunting the cheapest input it would let past its ceiling: an expanded argument (`f(x...)`), a
+  value shown longer than its counted bytes (a number), an element that costs nothing (a
+  template of no text), a literal costed once. A unit test feeds such an input and expects the
+  refusal, and a change that tightens a charge also tests that an input the old charge accepted,
+  and Meada evaluated right, is still accepted (#716, #764).
 - A path read from a file or a config stays inside the repository root: relative, without `..`,
   and through no symlink.
 - Each limit is a named constant with a `ponytail:` marker, listed in

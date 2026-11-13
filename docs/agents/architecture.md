@@ -86,7 +86,7 @@ seams](map/seams.md). Read the relevant extension before changing it.
 ## Split area files
 
 [Navigation and byte budgets](map/overview/split-area-files.md). Prepare meaningful `## `
-boundaries and use `cargo run --example split_agents -- <file>`; retain every entry.
+boundaries and use `scripts/split-agents <file>`; retain every entry.
 
 ## Known ceilings
 
