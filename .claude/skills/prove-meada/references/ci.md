@@ -1,21 +1,28 @@
-# A9: CI in the graph, slice F1 (spec #820)
+# A9: CI in the graph (spec #820)
 
-The F1 flows of #820's "End-to-end seams": CI nodes, the CI contract with its Git ref and keys,
-`trace` through an intermediate pipeline, external files, orphans, absent files, `ref mismatch`
-and the files the CI reader owns. `ci.py` drives them; F2 and F3 add theirs here (#830).
+The flows of #820's "End-to-end seams", one slice per run of `ci.py`:
+
+- **F1** (the default): CI nodes, the CI contract with its Git ref and keys, `trace` through an
+  intermediate pipeline, external files, orphans, absent files, `ref mismatch` and the files the
+  CI reader owns.
+- **F2**: the gate and the command table of a `run` script, the unresolved parts, programs of the
+  workspace with their level, the builder sites and the chain of three contracts.
+- **F3**: declared permissions and `permissions mismatch`.
 
 ```bash
 python3 $S/ci.py --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/ci" --http
+python3 $S/ci.py --slice f2 --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/ci-run" --http
+python3 $S/ci.py --slice f3 --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/ci-permissions" --http
 python3 $S/ci.py --corpus --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/ci-corpus"
 python3 $S/ci.py --selftest   # no Meada: the cases, their controls and this driver's reading
 ```
 
 ## Inputs
 
-`ci.py` writes five workspaces of sibling repositories under `github.com/acme`, each with a `hub`
-that lists the others as peers, and copies them once per binary (`input/`, `head/work/`,
-`base/work/`). Nothing comes from a feature test, a golden or the private workspace of #816's
-report.
+`ci.py` writes the workspaces of its slice (`SLICES`) as sibling repositories under
+`github.com/acme`, each with a `hub` that lists the others as peers, and copies them once per
+binary (`input/`, `head/work/`, `base/work/`). Nothing comes from a feature test, a golden or the
+private workspace of #816's report.
 
 | Workspace | Holds |
 |---|---|
@@ -24,6 +31,10 @@ report.
 | `orphan` | a reusable pipeline nobody calls beside one that is called |
 | `orphan-control` | a reusable pipeline nobody calls in a scope without consumers |
 | `solo` | a repository without `origin` that calls its own pipeline and a peer's, whose pipeline nobody links to |
+| `run` (F2) | `libs`, seven Python packages in folders (`PACKAGES`: two plain, one whose only console script has another name, two with a script each, two that declare the same script) and `steps`, four generated pipelines of one CI job per case (`PROBES`): `run.yml` (each row of the command table, each rule of the gate, the arguments that are no name, the shells), `defaults.yml` (a pipeline-level `defaults.run.shell`), `levels.yml` (each row of the level table) and `forms.yml` (each unresolved form as part of a name, as the whole name and in an option's value) |
+| `chain` (F2) | the callers of `calls` (`wrapper`, `app-a`, `app-b`, `app-c`, unmarked), `workflows` whose `publish.yml` installs `core-sdk` and runs its console script, `core-sdk` (the package; its program posts to a base URL read from `CORE_API_URL`, a `base_url_env` of its peer) and `core-api` (the route it posts to, beside a route no CI step reaches) |
+| `permissions` (F3) | `perm-provider` (reusable pipelines with a pipeline block, a job block, both, none, and two CI jobs with a block each; an action) and `perm-consumer` (one calling CI job per case of `CALLERS`, in a pipeline with a block and in one without) |
+| `calls` again (F3) | its five callers of #816 declare no block: the `not declared` rows |
 
 A case is one row of `CASES` and one node of a generated file, marked there by `# case: <id>` and,
 on the next line, `# control: <id>`. The control is another case whose expected answer differs, so
@@ -44,8 +55,13 @@ with #820's table of the four consumers of `publish.yml`.
 | The files the CI reader owns | existing | the base binary; allowed: the typed-key uses removed, the site of an `exact` use and the side of its provisioning link; a role ARN is no use on either binary | `uses` rows of `forms` on both binaries |
 | `uses` lines as config values, `[[resource]] via`, `search` kind `iac`, the default search | existing | the base binary | byte-equal answers from the hub |
 | Every other row of every export | existing | the base binary | `parity`: all sections but `ci::` rows, CI nodes, unresolved consumers on a CI node and uses read from a CI file. Another kind's side or link sited on a pipeline file (an image builder) is the base's |
-| MCP over HTTP | copies stdio | the same binary's stdio answers | every answer asked in the `calls` workspace, again at the same repository, byte for byte |
+| MCP over HTTP | copies stdio | the same binary's stdio answers | every answer asked in the `calls` workspace, again at the same repository, byte for byte. The server indexes the seeded `input/` copy: server mode records a commit only for a clean checkout, and a reason names the indexed commit |
 | The pinned corpus | existing, plus five links read here from the source | the base binary; the source at the pin | `--corpus` |
+| F2: the sides of a CI step | new | #820's command table, gate and level table, as `PROBES` writes them beside each script; `wanted()` turns a case into the contracts its step must hold, may hold, builds and starts | per case, the whole set of consumer rows, image provider rows and links sited on its CI step (`fits`); the range as written; `search` kind `unresolved` by variable name; `context` on a package lists the installing steps and no silent one; no other CI node of `run` holds a side |
+| F2: the builder forms of today | existing | the base binary; allowed: the site, which becomes the CI step | the head's provider row equals the base's but for `site`; controls: the base reads each form at the repository, and reads no builder from `docker push` or `docker buildx build --push` |
+| F2: the chain | new, over an existing link | #820's acceptance of F2; the base binary for the HTTP link | the HTTP links of the workspace equal the base's (control: the base links the program to the route); `trace` up from the route reaches the program, the CI step that runs it and the five calling CI jobs; `trace` down from `app-c` reaches both pipelines, the program and the route; control: `trace` up from the other route reaches no pipeline |
+| F3: declared permissions | new | #820's rules and `declared()`: this driver's reading of the blocks it generated (`governing`, `held`, `short`), which `--selftest` holds equal to the `DECLARED` table | per case, the link's reason (`permissions mismatch` or its absence, the permission and both levels named, no other permission named), the consumer row's block, and the consumer's line in `context` on the provider (`not declared`, each declared name and level, the flag); a call to an action carries none; no answer says "granted" |
+| MCP over HTTP, F2 and F3 | copies stdio | the same binary's stdio answers | every answer asked in each workspace of the slice, again at the same repository of one server per workspace (`http/<workspace>/answers.json`) |
 
 Both binaries are required: half of these keys are the base.
 
@@ -62,7 +78,23 @@ builds it lands, and that ticket changes the driver, never the reverse:
 - Three cases. `job_not_reusable` carries the absent mark and `step_docker_only` holds no side
   at all (#827 settled both). `solo_remote` holds no side at all, and its peer's pipeline is an
   orphan in the scope seen from `solo`.
-- `REASON` matches the whole reason: F3's `permissions mismatch` extends it (#830).
+- F3 (#834 confirms or corrects each): the consumer row's field is `PERMISSIONS`, and any shape
+  that holds each declared name and level passes; `flagged()` takes the flags in either order
+  and fixes no wording beyond #820's (`permissions mismatch`, the permission, both levels as
+  whole words); how `context` shows a provider that declares nothing is not keyed.
+- F2 (#831 to #833): where the range, the unresolved variable and a program's arguments are
+  recorded (the range is searched in every row that names the CI step, the variable through
+  `search` kind `unresolved`, the arguments not at all); the provider of an install link (any
+  site, level `exact`); whether a CI step that starts a program is also a consumer of its
+  package (allowed, not required); the variable an unresolved `github.*`, `matrix.*`, `$(...)`
+  or backtick form names (none keyed); what `packages` exports for a console script (the base
+  parity shows it as a difference to judge); the paths of the modules that build F2
+  (`CI_RUN` in `scripts/prove-ci` guesses `src/iac/actions/`, `src/package*` and `src/image*`).
+- Four readings settled in the tickets: a call to a pipeline file without `on.workflow_call`
+  carries the absent mark (#827); a step's shell is its own, else `defaults.run.shell` of the
+  CI job, else of the pipeline, and a `pip install` argument that is no name (`-r`, `-e`, a
+  path, a URL) gives no side (#831); `uvx <package>` and `pipx run <package>` start the console
+  script named like the package, and with no such script the CI step is only a consumer (#832).
 
 ## The pinned corpus
 
@@ -100,8 +132,18 @@ checker reads `input/`, #820 and the captures and writes the verdict.
   fail on a wrong provider only. The `refs` workspace and `b_publish_prd` catch one ref for all.
 - `trace` through `wrapper` is presence on a line, not order, and `trace` down has no negative
   control.
-- `--selftest` checks the cases and the reading, never a check of `drive()`: a check that passes
-  on an empty answer shows only when a fresh checker reads the capture.
+- `--selftest` checks the cases and the reading, and runs each slice over an export with no rows
+  to see it fail there. It never runs a check against an answer that should pass: a check that
+  is wrong about the product's shape shows only in the first CI capture.
+- F2 silence is a pair: a case that expects no side passes on any product that reads nothing, so
+  it proves something only beside its control and the two whole-workspace checks.
+- F2 takes any link of a CI step to a site that is no entry point as its install link, at
+  `exact`. Each package of the cases has one provider: an install link to the wrong package
+  fails on the contract, one to the wrong site of the right package passes.
+- F3 looks for names and levels as words in a line or a field, never for a structure: `read`
+  inside another word passes. The cases use three permission names so a line that lists every
+  permission fails the "no other permission named" half.
+- The chain's `trace` checks are presence on a line of the repository, as F1's.
 
 ## Not covered
 
@@ -115,4 +157,10 @@ checker reads `input/`, #820 and the captures and writes the verdict.
 - An orphan action, a folder with neither an action file nor a `Dockerfile` beside one that
   exists, typed keys other than `bucket`, a use sited on a CI job or in an action file.
 - Time, memory and index size (#835 measures them), and the count of CI nodes in `meada status`.
-- Declared permissions and the `run` script: F3 and F2 (#830).
+- F2: `pwsh` as the default on Windows runners, a script past the value length ceiling, a
+  function, a called script, a subcommand's handler, an install outside the CI job, a workspace
+  name that shadows a public package, console scripts outside PyPI manifests: ceilings of ADR
+  0028, held by `tests/it` where they are built (#831 to #833).
+- F3: effective permissions (the token's defaults, an organisation's policy), `read-all`,
+  `write-all` and `{}` on the provider's side, a permission above the consumer's inside an
+  intermediate pipeline of a chain.

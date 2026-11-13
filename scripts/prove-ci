@@ -30,6 +30,8 @@ IMAGES = r'src/(image\.rs|image/|iac/types|index\.rs|engine\.rs|trace\.rs|items\
 PATTERNS = r'src/(iac/(pattern|provision)\.rs|image/patterns\.rs|decisions\.rs)'
 INCIDENTS = r'src/(alert/(incident|forwarding|pcl)\.rs|alert\.rs|config\.rs)'
 CI = r'src/(iac/actions\.rs|ci(\.rs|/)|trace\.rs|engine\.rs|index\.rs|iac\.rs|iac/config_uses\.rs)'
+# F2 of #820: a `run` script gives sides of the package and image kinds, so their modules select it too.
+CI_RUN = f'{CI}|' + r'src/(iac/actions/|package(\.rs|/)|image(\.rs|/))'
 A8 = r'src/(lang/(ts|go|mod)|http\.rs|http/(ts|go|join)|resolve\.rs|index\.rs)'
 SOURCE_KEY = '{scripts}/a7-source-keys/native-hcl-values/'
 # The Scope table's shared core: every answer goes through it, the A7/A8 flows' too.
@@ -73,6 +75,8 @@ FLOWS = (
     ('azure', r'src/(contract/azure\.rs|iac/azure\.rs|iac/types\.toml)', 'azure.py --head-bin {head} --http'),
     ('ci', CI, 'ci.py --head-bin {head} --base-bin {base} --http'),
     ('ci-corpus', CI, 'ci.py --corpus --head-bin {head} --base-bin {base}'),
+    ('ci-run', CI_RUN, 'ci.py --slice f2 --head-bin {head} --base-bin {base} --http'),
+    ('ci-permissions', CI, 'ci.py --slice f3 --head-bin {head} --base-bin {base} --http'),
     ('a8-peers', A8, 'a8-peers.sh check {base} {head} {out}'),
     ('a8-mcp', A8, 'a8-mcp.py --head-bin {head} --base-bin {base}'),
     ('console-graph', None, 'console-graph.py --head-bin {ui} --ui-dir ui/dist'),
