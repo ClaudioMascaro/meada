@@ -1093,22 +1093,26 @@
     {
       "contract": "channel::pubsub::orders-path",
       "site": "local/gcp-sdk-env",
-      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[2].value"
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[2].value",
+      "level": "exact"
     },
     {
       "contract": "channel::pubsub::subscriptions/orders-path",
       "site": "local/gcp-sdk-env",
-      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[3].value"
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[3].value",
+      "level": "exact"
     },
     {
       "contract": "resource::gcpsecretmanager::token-env",
       "site": "local/gcp-sdk-env",
-      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[7].value"
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[7].value",
+      "level": "exact"
     },
     {
       "contract": "resource::gcs::uploads-env",
       "site": "local/gcp-sdk-env",
-      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[6].value"
+      "at": "main.tf#resource.google_cloud_run_v2_service.worker.template.containers.env[6].value",
+      "level": "exact"
     }
   ],
   "links": [

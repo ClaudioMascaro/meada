@@ -204,6 +204,7 @@ pub(super) fn items(exports: &[Export]) -> Vec<(OpenItem, bool)> {
                     enclosing: None,
                     candidates: builder.candidates().to_vec(),
                     cause: None,
+                    limit: None,
                 },
                 selected,
             ));

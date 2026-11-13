@@ -1,0 +1,1 @@
+{ "collections": { "order_rows": [ { "id": "o-1", "table": "sales.orders" } ] } }

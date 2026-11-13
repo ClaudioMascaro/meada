@@ -62,7 +62,9 @@ pub(crate) fn schema_version() -> i32 {
 /// `inferred` call reaches; an `ambiguous` call has no target and lists every definition that
 /// fits in `candidates`. An unresolved consumer's `contracts` row keeps the `method` it calls
 /// with, when readable, and the literal `fragments` of its URL path as a JSON array (NULL when
-/// none); they let `Engine::open_items` list the routes it may reach. `contracts.shape` is the
+/// none); they let `Engine::open_items` list the routes it may reach. One whose URL starts with
+/// a part Meada could not read keeps in `contracts.lead` why, and the known part after it
+/// (`contract::Lead` as JSON, #801; NULL otherwise). `contracts.shape` is the
 /// shape the code gives a side (`shape::Shape` as JSON: its source and field paths, spec #23),
 /// such as the fields an HTTP consumer reads from the parsed response; NULL when none. A RabbitMQ `binding` row
 /// keeps the queue's channel in `contract`, the exchange in `via` and the pattern in `method`;
@@ -161,7 +163,7 @@ CREATE INDEX candidates_call ON candidates (call);
 CREATE INDEX candidates_target ON candidates (target);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
-    method TEXT, fragments TEXT, shape TEXT, identity TEXT
+    method TEXT, fragments TEXT, shape TEXT, identity TEXT, lead TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (
@@ -1694,6 +1696,7 @@ fn refresh_attempt(
         }
         let fragments = (!f.fragments.is_empty()).then(|| serde_json::to_string(&f.fragments));
         let identity = f.identity.as_ref().map(serde_json::to_string).transpose()?;
+        let lead = f.lead.as_ref().map(serde_json::to_string).transpose()?;
         let key = (
             role,
             site,
@@ -1703,6 +1706,7 @@ fn refresh_attempt(
             &f.method,
             fragments.transpose()?,
             identity,
+            lead,
         );
         let shape = rows.entry(key).or_default();
         match (shape.as_mut(), &f.shape) {
@@ -1711,12 +1715,12 @@ fn refresh_attempt(
             (_, None) => {}
         }
     }
-    for ((role, site, contract, via, path, method, fragments, identity), shape) in rows {
+    for ((role, site, contract, via, path, method, fragments, identity, lead), shape) in rows {
         let shape = shape.as_ref().map(serde_json::to_string).transpose()?;
         tx.execute(
-            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
-                role, contract, site, via, path, method, fragments, shape, identity
+                role, contract, site, via, path, method, fragments, shape, identity, lead
             ],
         )?;
     }
@@ -2910,6 +2914,9 @@ pub(crate) struct Export {
     /// The `run` scripts of the CI steps, as the gate of the command table reads them (ADR
     /// 0028), by CI step. Not exported: the kinds read their sides from the commands.
     pub(crate) scripts: Vec<iac::actions::run::Script>,
+    /// Policy grants (ADR 0026, "Orphan sides"): config sides that name a resource without
+    /// using it, apart from `config_uses`.
+    pub(crate) policy_grants: Vec<iac::config_uses::Side>,
     /// Declared key locations read at query time, without the config values themselves.
     pub(crate) config_sites: Vec<config_values::sites::Site>,
     pub(crate) configurations: Vec<(String, serde_json::Value)>,
@@ -3064,6 +3071,11 @@ impl Export {
             .iter()
             .map(|u| u.written(&out.repository))
             .collect();
+        out.policy_grants = self
+            .policy_grants
+            .iter()
+            .map(|g| g.granted(&out.repository))
+            .collect();
         out.executions = self.executions;
         out.subscriptions = self
             .subscriptions
@@ -3166,6 +3178,9 @@ pub(crate) struct Consumer {
     pub(crate) method: Option<String>,
     pub(crate) identity: Option<crate::contract::ReceiverIdentity>,
     pub(crate) fragments: Vec<String>,
+    /// For an unresolved consumer whose URL starts with a part Meada could not read, why, and
+    /// the known part after it (`contracts.lead`, #801).
+    pub(crate) lead: Option<crate::contract::Lead>,
     /// For a call through a package import, where it resolves in each provider of the package
     /// (`package::import`); `Packages::link` turns them into links.
     pub(crate) hops: Vec<Hop>,
@@ -3273,7 +3288,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         .collect::<rusqlite::Result<_>>()?;
     let consumers = db
         .prepare(
-            "SELECT contract, site, via, method, fragments, shape, identity FROM contracts \
+            "SELECT contract, site, via, method, fragments, shape, identity, lead FROM contracts \
              WHERE role = 'consumer' ORDER BY site, contract, via",
         )?
         .query_map([], |r| {
@@ -3291,6 +3306,9 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                     .unwrap_or_default(),
                 hops: Vec::new(),
                 root: None,
+                lead: r
+                    .get::<_, Option<String>>(7)?
+                    .and_then(|l| serde_json::from_str(&l).ok()),
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -3460,7 +3478,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
             })
         })
         .collect();
-    let (config_uses, scripts) = iac::config_uses::read(db, identity)?;
+    let (config_uses, policy_grants, scripts) = iac::config_uses::read(db, identity)?;
     Ok(Export {
         repository: identity.to_string(),
         root: PathBuf::new(),
@@ -3489,6 +3507,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         provisioners: iac::provision::read(db, identity)?,
         config_uses,
         scripts,
+        policy_grants,
         config_sites: Vec::new(),
         configurations: db
             .prepare("SELECT path, summary FROM contract_configs ORDER BY path")?
@@ -4738,10 +4757,11 @@ mod tests {
         assert_eq!(small.as_deref(), Some(&b"{}"[..]));
     }
 
-    /// What an index stores: `SCHEMA`, then the facts each pack stores for its sample in
-    /// `tests/fixtures/schema/`, then the summary of each provider document and manifest sample,
-    /// then the outcome and rows of the config values sample, then the IaC nodes of the
-    /// kustomization sample.
+    /// What an index stores: `SCHEMA`, then the JSON forms of a receiver identity and of an
+    /// unresolved consumer's lead (`contracts.identity`, `contracts.lead`), then the facts each
+    /// pack stores for its sample in `tests/fixtures/schema/`, then the summary of each provider
+    /// document and manifest sample, then the outcome and rows of the config values sample, then
+    /// the IaC nodes of the kustomization sample.
     /// Its golden is the schema version's source (`schema_version`), so a change fails until
     /// `MEADA_BLESS=1` rewrites the golden, which changes the version.
     #[test]
@@ -4764,6 +4784,20 @@ mod tests {
         actual += &format!(
             "\nreceiver_identity\n{}\n",
             serde_json::to_string_pretty(&identity).unwrap()
+        );
+        let lead = |limit: lang::Limit, path: &str| crate::contract::Lead {
+            limit,
+            path: path.into(),
+        };
+        let leads = [
+            lead(lang::Limit::Returned("c.baseV2".into()), "/orders"),
+            lead(lang::Limit::Parameter("base".into()), "/items/{}"),
+            lead(lang::Limit::ClientBase, "/orders"),
+            lead(lang::Limit::Other, "/"),
+        ];
+        actual += &format!(
+            "\nlead\n{}\n",
+            serde_json::to_string_pretty(&leads).unwrap()
         );
         for pack in lang::packs() {
             let name = format!("sample.{}", pack.extensions()[0]);

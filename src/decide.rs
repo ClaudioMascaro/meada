@@ -50,6 +50,9 @@ fn show(item: &OpenItem, out: &mut impl Write) -> Result<()> {
     if let Some(cause) = item.cause {
         writeln!(out, "  {cause}")?;
     }
+    if let Some(limit) = &item.limit {
+        writeln!(out, "  {}", Msg::ItemLimit(limit).text())?;
+    }
     for (n, c) in item.candidates.iter().enumerate() {
         writeln!(out, "  {}) {}", n + 1, c.describe())?;
     }

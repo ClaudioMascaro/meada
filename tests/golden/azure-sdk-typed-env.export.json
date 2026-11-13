@@ -320,7 +320,8 @@
     {
       "contract": "channel::eventhubs::orders",
       "site": "local/azure-sdk-typed-env",
-      "at": "main.tf#resource.azurerm_linux_function_app.worker.app_settings.WRONG"
+      "at": "main.tf#resource.azurerm_linux_function_app.worker.app_settings.WRONG",
+      "level": "exact"
     }
   ],
   "links": [

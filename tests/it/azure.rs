@@ -520,11 +520,18 @@ fn composed_subscription_targets_preserve_physical_names_overrides_and_unknown_r
     let changed = engine.export().unwrap();
     let changed: Value = serde_json::from_str(&changed).unwrap();
     assert!(changed.get("provisions").is_none(), "{changed}");
+    // A typed key's plain value is `inferred`: no orphan line, and `context` shows it unlinked
+    // (#797).
     let (_, reports) = engine.status_report().unwrap();
     let report = reports.into_iter().flatten().collect::<Vec<_>>().join("\n");
+    assert!(!report.contains("subscription:orders/audit"), "{report}");
+    let context = engine
+        .context("channel::servicebus::subscription:orders/audit", None)
+        .unwrap();
     assert!(
-        report.contains("subscription:orders/audit") && report.contains("no provisioner"),
-        "{report}"
+        context.contains("use settings.yaml#servicebus_subscription (line 1) [inferred]")
+            && !context.contains(" provisioner "),
+        "{context}"
     );
 }
 

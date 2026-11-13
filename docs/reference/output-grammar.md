@@ -80,8 +80,8 @@ file whose path holds a space reads as more fields than it has.
 | `<query>` | `<text>` | What the call was given, echoed. |
 | `<orphan-note>` | ` (no provisioner in the workspace)` | The visible scope has uses but no provisioner of this contract kind and broker or resource kind. |
 | `<orphan-note>` | ` (no use in the workspace)` | The visible scope has provisioners but no use of this group. |
-| `<orphan-note>` | ` (no builder in the workspace)` | The visible image scope has runners but no builder. |
-| `<orphan-note>` | ` (no runner in the workspace)` | The visible image scope has builders but no runner. |
+| `<orphan-note>` | ` (no builder in the workspace)` | The visible scope has no builder of an image in this registry and namespace. |
+| `<orphan-note>` | ` (no runner in the workspace)` | The visible scope has no runner of an image in this registry and namespace. |
 | `<orphan-note>` | ` (no matcher in the workspace)` | The visible alert scope has emitters but no matcher. |
 | `<orphan-note>` | ` (no emitter in the workspace)` | The visible alert scope has matchers but no emitter. |
 | `<orphan-note>` | ` (absent at the indexed commit)` | No repository of the workspace provides the CI contract this consumer names: at the indexed commit of the repository its path holds no reusable pipeline and no action. The file may exist at the Git ref, so the mark never says broken. |
@@ -203,7 +203,7 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | iac node | `<repository> <place> <address> (<iac-type><iac-name?>, root <iac-root>)<orphan-note?>` | An IaC node, at its block's first line, with its type, its physical name and its root module. |
 | ci node | `<repository> <place> <address> (<ci-type><ci-id?><ci-name?><ci-uses?>)` | A pipeline, an action, a CI job or a CI step, at its block's first line, with its type and what else names it. |
 | copies | `<n> copies` | A group of duplicates; one symbol line per copy follows. |
-| open item | `` <repository> <place> (<item-kind>) candidates: <n>; run `meada decide --item <call-site>` `` | An open item and the command that closes it. |
+| open item | `` <repository> <place> (<item-kind>) candidates: <n>;<item-limit?> run `meada decide --item <call-site>` `` | An open item and the command that closes it. |
 | open item cause | `` <repository> <place> (<item-kind>) candidates: 0; <reason> (`<identity>`) `` | An open item its kind leaves no candidate for: why the consumer is unresolved, then its identity, which `context` takes. A CI step whose `./<folder>` is read in a workspace Meada does not know is one. |
 | no matches | `` no matches for `<query?>` `` | Nothing matched. |
 
@@ -215,6 +215,7 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | `<site>` | `<path> (documented only)` | A side only a provider document lists. |
 | `<site>` | `<path> <manifest-field>` | A dependency entry of a manifest, such as `package.json dependencies`. |
 | `<site>` | `use <config-place> [<level>]` | A directionless config use, with its key locator and evidence level. |
+| `<site>` | `policy grant <config-place>` | A policy grant: the resource named in the resource list of an IAM policy statement, with no direction and no link; its line carries no orphan note. |
 | `<site>` | `<config-place>` | A declared resource side at an indexed config key. |
 | `<config-place>` | `<path>#<key-path> (line <line>)` | A config key's repository-relative locator and 1-based line. |
 | `<manifest-field>` | `<word>` | The manifest's field holding the entry. |
@@ -236,6 +237,7 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | `<entry-kind>` | `program` | A program start a language pack declares or a manifest names. |
 | `<item-kind>` | `ambiguous` | An ambiguous link: several providers fit. |
 | `<item-kind>` | `unresolved` | An unresolved consumer, such as a dynamic URL. |
+| `<item-limit>` | ` limit: <text>;` | Why Meada could not read the start of a dynamic URL, whose path it appends to an unknown base: `base from the return value of <callee>`, `base from the parameter <name>`, `base of a client Meada did not read` or `base Meada could not read` (#801). |
 | `<key-path>` | `<text>` | Where the value sits in its file, jq style: `spec.containers[0].image`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` in a file of several documents. |
 | `<shown-value>` | `<text> (cut)` | A string past 1 KiB, quoted as JSON and cut. |
 | `<address>` | `<word>` | An IaC node's address: `aws_sqs_queue.orders`, `data.aws_iam_policy_document.p`, `module.orders.aws_sqs_queue.this`, `aws_sqs_queue.dlq[0]`, and for a Kubernetes object `<Kind>[.<group>]/<namespace>/<name>`: `Deployment.apps/shop/api`, `Service/shop/api`, `ClusterRole.rbac.authorization.k8s.io/reader`. In a pipeline or an action the address is the key path of the block: `.` for the file, `jobs.build`, `jobs["publish-prd"]`, `jobs.build.steps[2]`, `runs.steps[0]`. |
@@ -350,6 +352,7 @@ words:
 | fits | ``` `<query>` fits <n> symbols; pass one of: ``` | The name fits several symbols, listed after it. |
 | no symbol | `` no symbol matches `<query>` `` | No symbol has the name. |
 | config use | `<repository> use <config-place> [<level>] <contract><orphan-note?>` | A directionless config use named by its key locator. |
+| config policy grant | `<repository> policy grant <config-place> <contract>` | A policy grant named by its key locator. |
 | config key | `<repository> <config-place>` | A declared resource key's canonical location. |
 | located provides | `provides <contract>` | The selected key or IaC node writes the declared resource, or the selected pipeline or action is the provider of the CI contract. |
 | located consumes | `consumes <contract>` | The selected key or IaC node reads the declared resource. |
@@ -441,6 +444,7 @@ words:
 | `<exchange>` | `<word>` | An exchange. |
 | `<key>` | `<word>` | A routing key. |
 | `<role>` | `use` | Names the resource in config, with no direction; links only to provisioners. |
+| `<role>` | `policy grant` | Names the resource in the resource list of an IAM policy statement, with no direction; links to nothing, is no orphan and carries no orphan note. |
 | `<role>` | `builder` | The repository whose configuration publishes an image. |
 | `<role>` | `runner` | A workload that runs an image. |
 | `<role>` | `emitter` | An alert rule that attaches a known label. |

@@ -761,7 +761,7 @@ impl Engine {
             let provided = export
                 .providers
                 .iter()
-                .map(|p| (p.contract.clone(), &p.site, Some(Role::Provider)));
+                .map(|p| (p.contract.clone(), &p.site, Some(Role::Provider), false));
             // An unresolved consumer has no contract: it shows as `(unresolved) <callee>`.
             let listed = |c: &&Consumer| c.contract.is_some() || !owned.contains(&c.site);
             let consumed = export.consumers.iter().filter(listed).map(|c| {
@@ -770,14 +770,14 @@ impl Engine {
                     contract.unwrap_or_else(|| unresolved(&c.site)),
                     &c.site,
                     Some(Role::Consumer),
+                    false,
                 )
             });
             let mut ranked = Vec::new();
-            let configured = export
-                .config_uses
-                .iter()
-                .map(|u| (u.contract.clone(), &u.site, None));
-            for (contract, site, role) in provided.chain(consumed).chain(configured) {
+            let configured = (export.config_uses.iter().map(|u| (u, false)))
+                .chain(export.policy_grants.iter().map(|g| (g, true)))
+                .map(|(u, grant)| (u.contract.clone(), &u.site, None, grant));
+            for (contract, site, role, grant) in provided.chain(consumed).chain(configured) {
                 if !contract.starts_with(prefix) {
                     continue;
                 }
@@ -789,11 +789,11 @@ impl Engine {
                 let Some(r) = contract_rank(&contract, &needle) else {
                     continue;
                 };
-                ranked.push((r, contract, site, role));
+                ranked.push((r, contract, site, role, grant));
             }
-            let sites: Vec<&str> = ranked.iter().map(|(_, _, s, _)| s.as_str()).collect();
+            let sites: Vec<&str> = ranked.iter().map(|(_, _, s, ..)| s.as_str()).collect();
             let spans = partial::spans(db, &sites)?;
-            for (r, contract, site, role) in ranked {
+            for (r, contract, site, role, grant) in ranked {
                 let location = match spans.get(site.as_str()) {
                     Some(span) => files.at(&span.path, span.start),
                     None if export.config_sites.iter().any(|s| &s.id == site) => export
@@ -805,6 +805,14 @@ impl Engine {
                     None if export.config_uses.iter().any(|u| &u.site == site) => {
                         let u = export.config_uses.iter().find(|u| &u.site == site).unwrap();
                         format!("use {} [{}]", u.place(), u.level.name())
+                    }
+                    None if export.policy_grants.iter().any(|g| &g.site == site) => {
+                        let g = export
+                            .policy_grants
+                            .iter()
+                            .find(|g| &g.site == site)
+                            .unwrap();
+                        format!("policy grant {}", g.place())
                     }
                     None if *site == repo.identity => REPOSITORY_LEVEL.into(),
                     None => match export.document_of(site) {
@@ -820,13 +828,17 @@ impl Engine {
                         }
                     },
                 };
+                // A policy grant is no orphan (ADR 0026): it carries no orphan note.
+                let note = match grant {
+                    true => "",
+                    false => orphans.use_note(&contract),
+                };
                 let line = format!(
                     "{} {location} {}{}",
                     repo.identity,
                     contract::shown(&contract),
                     format_args!(
-                        "{}{}",
-                        orphans.use_note(&contract),
+                        "{note}{}",
                         role.zip(contract::kind_of(&contract))
                             .map_or("", |(role, kind)| kind.side_note(&exports, &contract, role))
                     )
@@ -1064,8 +1076,10 @@ impl Engine {
                 Some(cause) => format!("{cause} (`{}`)", item.id),
                 None => format!("run `meada decide --item {}`", item.id),
             };
+            let limit = (item.limit.as_ref())
+                .map_or(String::new(), |l| format!(" limit: {};", l.describe()));
             let line = format!(
-                "{} {} ({}) candidates: {}; {close}",
+                "{} {} ({}) candidates: {};{limit} {close}",
                 item.repository,
                 item.location(),
                 kind.name(),
@@ -1181,6 +1195,12 @@ impl Engine {
                     ));
                 }
             }
+            for g in &export.policy_grants {
+                if g.contract == contract {
+                    let line = format!("{} policy grant {}", export.repository, g.place());
+                    sides.push((2, line, Vec::new()));
+                }
+            }
             for p in &export.provisioners {
                 if p.contract == contract || p.matches(contract) {
                     sides.push((
@@ -1269,8 +1289,9 @@ impl Engine {
             return Ok(render::budgeted(&lines, budget));
         }
         let located = config_values::sites::found(&partial.exports, symbol);
-        let configured = iac::config_uses::found(&partial.exports, symbol);
-        if !located.is_empty() || !configured.is_empty() {
+        let configured = iac::config_uses::found(&partial.exports, symbol, |e| &e.config_uses);
+        let granted = iac::config_uses::found(&partial.exports, symbol, |e| &e.policy_grants);
+        if !located.is_empty() || !configured.is_empty() || !granted.is_empty() {
             let links = self.links(&partial.exports);
             let scope = iac::orphans::Scope::new(&partial.exports);
             let ids: HashSet<_> = located.iter().map(|(_, s)| s.id.as_str()).collect();
@@ -1309,6 +1330,14 @@ impl Engine {
                     scope.use_note(&u.contract)
                 ));
                 lines.extend(iac::provision::context(&partial.exports, &u.site));
+            }
+            for (n, g) in granted {
+                lines.push(format!(
+                    "{} policy grant {} {}",
+                    repos[n].identity,
+                    g.place(),
+                    g.contract
+                ));
             }
             return Ok(render::budgeted(&lines, budget));
         }

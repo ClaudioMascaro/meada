@@ -112,6 +112,9 @@ pub struct Export {
     /// Directionless config uses (#661), by contract and key site. No config value text.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub uses: Vec<Use>,
+    /// Policy grants (ADR 0026, "Orphan sides"), by contract and key site, apart from `uses`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub policy_grants: Vec<PolicyGrant>,
     pub links: Vec<Link>,
     /// The provisioning links that touch the repository (ADR 0026, #656): from every other
     /// side of a contract to each of its provisioners, by side, provisioner, root, contract.
@@ -152,6 +155,7 @@ impl Default for Export {
             executions: Vec::new(),
             provisioners: Vec::new(),
             uses: Vec::new(),
+            policy_grants: Vec::new(),
             links: Vec::new(),
             provisions: Vec::new(),
             subscriptions: Vec::new(),
@@ -623,6 +627,21 @@ impl Provision {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
 #[non_exhaustive]
 pub struct Use {
+    pub contract: String,
+    pub site: String,
+    pub at: String,
+    /// `exact` for a structured identifier, `inferred` for a plain name under a key that names
+    /// the type; absent in an export an older version wrote.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<Level>,
+}
+
+/// A structured identifier in the resource list of an IAM policy statement: who may touch the
+/// resource, with no direction and no link (ADR 0026, "Orphan sides"). Its repository-level site
+/// is located by `at`, as a use's is.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[non_exhaustive]
+pub struct PolicyGrant {
     pub contract: String,
     pub site: String,
     pub at: String,

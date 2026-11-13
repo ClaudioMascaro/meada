@@ -49,7 +49,9 @@
   set and one over a variable, a local module's input and output, `terraform.workspace`, a data
   source and a registry module, and a root `envs/stage` calling the same module: `search` and
   `context` against `terraform-names.{search,context}.txt`, and a changed var file evaluating
-  its root again while a row rewritten by hand in the other root survives), `crossplane` (#655,
+  its root again while a row rewritten by hand in the other root survives; #783's
+  `terraform-set-retype` fixture, one root per row of #740's table, its exact names against
+  Terraform's), `crossplane` (#655,
   the `crossplane-nodes` fixture: two XRDs, a composition of four resources, a pipeline
   composition, a claim beside them and one away from them, a composite resource and a managed
   resource beside its CRD: `search` kind `iac`, `context` and `trace` against

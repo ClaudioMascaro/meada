@@ -13226,7 +13226,7 @@
       "via": "host:local.example.com"
     },
     {
-      "contract": "http::GET::/var-base",
+      "contract": null,
       "site": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()::(call_expression).get#0",
       "via": null
     },
@@ -13326,7 +13326,7 @@
       "via": "host:journal.example.com"
     },
     {
-      "contract": "http::PUT::/notes",
+      "contract": null,
       "site": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()",
       "via": null
     },
@@ -13376,12 +13376,12 @@
       "via": null
     },
     {
-      "contract": "http::GET::/a",
+      "contract": null,
       "site": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()",
       "via": null
     },
     {
-      "contract": "http::GET::/d",
+      "contract": null,
       "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Assigned.kt::example.jvm.Assigned.send()::rest.getForObject#0",
       "via": null
     },
@@ -13546,7 +13546,7 @@
       "via": "host:star.example.com"
     },
     {
-      "contract": "http::GET::/persons/typed",
+      "contract": null,
       "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::(call_expression).uri#0",
       "via": null
     }
@@ -17292,8 +17292,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()::(call_expression).get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/var-base"
+          "mark": "unresolved"
         }
       ]
     },
@@ -17997,8 +17996,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()",
-          "mark": "no-provider",
-          "contract": "http::PUT::/notes"
+          "mark": "unresolved"
         }
       ]
     },
@@ -18050,8 +18048,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()",
-          "mark": "no-provider",
-          "contract": "http::GET::/a"
+          "mark": "unresolved"
         }
       ]
     },
@@ -18349,8 +18346,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Assigned.kt::example.jvm.Assigned.send()::rest.getForObject#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/d"
+          "mark": "unresolved"
         }
       ]
     },
@@ -19527,8 +19523,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::(call_expression).uri#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/persons/typed"
+          "mark": "unresolved"
         }
       ]
     },

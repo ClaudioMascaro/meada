@@ -7,6 +7,7 @@ use std::ops::Range;
 
 use crate::contract::{self, Link, kind_of};
 use crate::index::{Consumer, Export, Provider};
+use crate::lang::Limit;
 use crate::render::{Files, callee};
 use crate::workspace::Repository;
 
@@ -95,6 +96,8 @@ pub struct OpenItem {
     /// Why no provider can be a candidate, for an unresolved consumer whose kind says so
     /// (`ContractKind::unresolved_causes`): `meada decide` has nothing to offer for it.
     pub cause: Option<&'static str>,
+    /// For a consumer whose URL starts with a part Meada could not read, why (#801).
+    pub limit: Option<Limit>,
 }
 
 impl OpenItem {
@@ -243,6 +246,9 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                 candidates,
                 cause: (consumer.contract.is_none())
                     .then(|| causes.get(consumer.site.as_str()).copied())
+                    .flatten(),
+                limit: (consumer.contract.is_none())
+                    .then(|| consumer.lead.as_ref().map(|l| l.limit.clone()))
                     .flatten(),
             });
         }

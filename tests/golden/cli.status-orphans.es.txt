@@ -1,8 +1,8 @@
 example.com/orphan/app (.) indexado, 1 archivos
   resource::s3::archive sin vínculo: ningún escritor y lector en repositorios diferentes
   resource::s3::unmanaged sin vínculo: ningún escritor y lector en repositorios diferentes
-  huérfano channel::sqs::unmanaged: ningún provisionador; app.ts::sendUnmanaged::SendMessageCommand#0
-  huérfano resource::s3::unmanaged: ningún provisionador; (repository-level)
+  huérfano channel::sqs::unmanaged: ningún provisionador; app.ts::sendUnmanaged::SendMessageCommand#0 [exact]
+  huérfano resource::s3::unmanaged: ningún provisionador; (repository-level) [declared]
 example.com/orphan/infra (../orphan-infra) indexado, 0 archivos
   huérfano channel::sqs::unused: ningún uso; main.tf:2 aws_sqs_queue.unused (root .)
   huérfano resource::s3::unused: ningún uso; main.tf:4 aws_s3_bucket.unused (root .)

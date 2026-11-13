@@ -481,10 +481,16 @@ a symbolic link, a source with a variable, a form it does not parse) leaves the 
 `inferred`, and the reason says it was not read. `.dockerignore` is not read. Paths never cross
 symbolic links.
 
-`meada status` lists image orphans only when the scope contains both builder and runner. With
-one role, `search` and `context` show `no builder in the workspace` or `no runner in the workspace`.
-Export keeps `format: 1`, retains builder locations and workload roots, and includes `executions`
-for direct paths; the console graph shows the image contracts and workload code.
+`meada status` asks for image orphans per registry and namespace (the first segment of the
+repository path of the normalized name): `ghcr.io/acme/shop` and `ghcr.io/acme/tools/lint` are in
+`ghcr.io/acme`, `docker.io/library/postgres` is in `docker.io/library`, and an image whose path has
+one segment is grouped by its registry alone. A name read as a pattern
+(`ghcr.io/${{ github.repository }}` reads `ghcr.io/*`) is in every group its text before the `*` can
+start. It lists image orphans only for a group that contains both builder and runner; in a group
+with one role, `search` and `context` show `no builder in the workspace` or
+`no runner in the workspace`. Export keeps `format: 1`, retains builder locations and workload
+roots, and includes `executions` for direct paths; the console graph shows the image contracts and
+workload code.
 
 ### CloudFormation and SAM
 
@@ -539,6 +545,34 @@ IaC-only repository produces no such lines; `search` and `context` mark the side
 `no provisioner in the workspace` or `no use in the workspace`. Provisioning links, including
 patterns and independent root modules, determine whether a counterpart exists. Existing
 warnings about declared resources without writers and readers remain separate.
+
+A use Meada only infers from a key name (a plain value under `queue`, `topic`, `bucket`, `table`
+or a typed alias, `inferred`) opens no orphan scope for its group and is never an orphan line: a
+name match proves neither a use nor its absence. It still links to the provisioner of the same
+name, which is therefore no `no use`, and `context` still shows it with `[inferred]`. A
+`no provisioner` line ends with its side's level in brackets, as `context` writes it (`[exact]`,
+`[declared]`), and the `uses` rows of `meada export` carry `level`.
+
+A structured identifier in the resource list of an IAM policy statement (`Resource` or
+`NotResource` of an entry of `Statement`, in a policy file or in a policy document inside a
+template, and `resources` or `not_resources` of a `statement` block of an
+`aws_iam_policy_document`) is a **policy grant**, not a use: it says who may touch the resource,
+with no direction. `context` on the resource lists it with the role `policy grant` and its place,
+with no orphan note (`context` on that place shows it too); it links to no provisioner, opens no
+orphan scope and is never an orphan line, and `meada export` lists it in the `policy_grants`
+array, apart from `uses`. In a JSON Schema document (one with `$schema` at its root), a value
+under `examples`, `default`, `enum` or `const` documents a shape and is no side at all: it stays a
+config value that `search` finds.
+
+In a document that the reader of a contract kind recognizes as its own, Meada infers no use from a
+key name: a Prometheus or Loki rule file (`groups` holding `rules`), a Grafana alert rule file, an
+Alertmanager configuration, a `PrometheusRule` or `AlertmanagerConfig` object (that document of the
+stream only) and a provider document (an OpenAPI or AsyncAPI document that Meada reads, in a
+repository with `[serve]`). There, a rule's `queue: jobs` label is an alert label, not the use of a
+queue; a structured identifier (an ARN) is still an `exact` use, and the values stay config values
+that `search` finds. IaC files (Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose and
+the other documents of a Kubernetes stream) still give such uses, and the same label in a file no
+reader recognizes is still an `inferred` use.
 
 ### Terraform provisioners
 
@@ -849,6 +883,18 @@ example.com/acme/web::src/status.ts::health::fetch#0
 src/status.ts:3  fetch("/api/health")
   1) example.com/acme/api GET /api/health
   2) example.com/acme/worker GET /api/health
+```
+
+An item whose URL starts with a base Meada could not read names that limit on a line of its own
+(section 8.1):
+
+```text
+example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0
+client.go:16  http.Get(c.baseV2() + "/orders")
+  limit: base from the return value of c.baseV2
+  1) example.com/acme/api GET /api/orders
+  2) example.com/acme/api GET /orders
+  3) example.com/acme/api GET /v2/orders
 ```
 
 ### The `meada.decisions.toml` file
@@ -1211,8 +1257,12 @@ How the link is chosen, depending on what the URL shows:
    `[serve] hosts`. The link is `exact`. If no repository serves that host, there is no link.
 2. **Environment variable.** The URL starts with an environment read (`API_URL`) that a peer
    declares in `base_url_env`. The link is `inferred`; the process environment value is never read.
-3. **Unknown host.** The URL does not say which host it targets (a relative path, for example)
-   and only one repository in the workspace serves that method and that path. The link is
+3. **Unknown host.** The URL does not say which host it targets, but its path is certain: it is
+   written with no base (`fetch('/orders')`), or the library joins it to the base so that a path
+   from the root replaces the base's path (`new URL('/orders', base)` in TypeScript, a request URI
+   from the root on a C# `HttpClient`, a Retrofit route from the root, a request from the root on a
+   Ktor client with `defaultRequest` or on an aiohttp session, `URL(string:relativeTo:)` in Swift).
+   When only one repository in the workspace serves that method and that path, the link is
    `inferred`, with the reason `the only repository serving it is`.
 4. **Several providers.** The link is `ambiguous`, and Meada lists all the candidates, one link per
    candidate. It is an open item that `meada decide` resolves.
@@ -1223,6 +1273,18 @@ compute, even after folding constants and the arguments of functions that wrap t
 **unresolved consumer**: it appears in `search`, in `context` and in the export, never links, and
 is an open item. A function that builds the URL from its parameters becomes a consumer at each
 call of it, with the arguments substituted, at any depth.
+
+A URL whose base Meada could not read, with the path appended to it, is also an unresolved
+consumer: `` fetch(`${base}/orders`) `` with `base` a parameter no call binds,
+`http.Get(c.base() + "/orders")`, a request on a client whose base URL Meada did not read. That
+base may hold a path of its own, so only the end of the path is known. The open item offers as
+candidates the routes of the call's method whose path ends with the known part at a `/` (`/items`
+takes `GET /items` and `GET /api/orders/items`, not `GET /api/lineitems`), and it names the limit
+that stopped Meada: the return value of a call (with the callee), a parameter (with its name), the
+base of a client Meada did not read, or another part it could not read. `meada decide --list`
+prints the limit on a `limit:` line, and `search` with `kind: unresolved` on the item's line. A
+base that is an environment read written in place (`os.Getenv("API_URL") + "/orders"`) still links
+by its variable, whether or not a peer declares it.
 
 Why a link may be missing:
 

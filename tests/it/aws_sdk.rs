@@ -578,6 +578,111 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
     }
 }
 
+/// A list of EventBridge entries held in a name and changed in place before the call (an
+/// element replaced, the list cleared and filled again, a helper that replaces an element, in Go,
+/// C# and Java; an element replaced through the request, in Go and C#) names no bus: the call
+/// sends to the later entries, and each call keeps an unresolved side (#773). A list made and
+/// passed straight to the request keeps its buses. A method's name is no mention in Java, so a
+/// local named as the setter it is passed to (`.entries(entries)`, `.transactItems(..)`, a
+/// builder `put` in `.put(put.build())`) keeps its bus or table.
+#[test]
+fn sdk_entry_lists_changed_in_place_name_no_bus() {
+    let repo = fixture_repo(
+        "aws_sdk_entry_lists",
+        "aws-sdk",
+        Some("https://example.com/aws/app.git"),
+    );
+    std::fs::write(
+        repo.join("go.mod"),
+        "module example.com/lists\n\ngo 1.22\n\nrequire github.com/aws/aws-sdk-go-v2 v1.30.0\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("lists.go"),
+        "package main\n\nimport (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/aws\"\n\t\"github.com/aws/aws-sdk-go-v2/config\"\n\t\"github.com/aws/aws-sdk-go-v2/service/eventbridge\"\n\t\"github.com/aws/aws-sdk-go-v2/service/eventbridge/types\"\n)\n\n\
+         func replaced(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tentries := []types.PutEventsRequestEntry{{EventBusName: aws.String(\"old-list-go\")}}\n\tentries[0] = types.PutEventsRequestEntry{EventBusName: aws.String(\"new-list-go\")}\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: entries})\n}\n\n\
+         func swap(entries []types.PutEventsRequestEntry) {\n\tentries[0] = types.PutEventsRequestEntry{EventBusName: aws.String(\"new-helper-go\")}\n}\n\n\
+         func helped(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tentries := []types.PutEventsRequestEntry{{EventBusName: aws.String(\"old-helper-go\")}}\n\tswap(entries)\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: entries})\n}\n\n\
+         func cleared(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tentries := []types.PutEventsRequestEntry{{EventBusName: aws.String(\"old-cleared-go\")}}\n\tentries = append(entries[:0], types.PutEventsRequestEntry{EventBusName: aws.String(\"new-cleared-go\")})\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: entries})\n}\n\n\
+         func through(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tin := &eventbridge.PutEventsInput{Entries: []types.PutEventsRequestEntry{{EventBusName: aws.String(\"old-request-go\")}}}\n\tin.Entries[0] = types.PutEventsRequestEntry{EventBusName: aws.String(\"new-request-go\")}\n\tclient.PutEvents(ctx, in)\n}\n\n\
+         func kept(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tentries := []types.PutEventsRequestEntry{{EventBusName: aws.String(\"kept-list-go\")}}\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: entries})\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("Lists.cs"),
+        "using System.Collections.Generic;\nusing Amazon.EventBridge;\nusing Amazon.EventBridge.Model;\n\
+         class Lists {\n\
+         async System.Threading.Tasks.Task Cleared() { var events = new AmazonEventBridgeClient(); var entries = new List<PutEventsRequestEntry> { new PutEventsRequestEntry { EventBusName = \"old-list-cs\" } }; entries.Clear(); entries.Add(new PutEventsRequestEntry { EventBusName = \"new-list-cs\" }); await events.PutEventsAsync(new PutEventsRequest { Entries = entries }); }\n\
+         async System.Threading.Tasks.Task Replaced() { var events = new AmazonEventBridgeClient(); var entries = new List<PutEventsRequestEntry> { new PutEventsRequestEntry { EventBusName = \"old-list-cs-replaced\" } }; entries[0] = new PutEventsRequestEntry { EventBusName = \"new-list-cs-replaced\" }; await events.PutEventsAsync(new PutEventsRequest { Entries = entries }); }\n\
+         static void Swap(List<PutEventsRequestEntry> entries) { entries[0] = new PutEventsRequestEntry { EventBusName = \"new-helper-cs\" }; }\n\
+         async System.Threading.Tasks.Task Helped() { var events = new AmazonEventBridgeClient(); var entries = new List<PutEventsRequestEntry> { new PutEventsRequestEntry { EventBusName = \"old-helper-cs\" } }; Swap(entries); await events.PutEventsAsync(new PutEventsRequest { Entries = entries }); }\n\
+         async System.Threading.Tasks.Task Through() { var events = new AmazonEventBridgeClient(); var request = new PutEventsRequest { Entries = new List<PutEventsRequestEntry> { new PutEventsRequestEntry { EventBusName = \"old-request-cs\" } } }; request.Entries[0] = new PutEventsRequestEntry { EventBusName = \"new-request-cs\" }; await events.PutEventsAsync(request); }\n\
+         async System.Threading.Tasks.Task Kept() { var events = new AmazonEventBridgeClient(); var entries = new List<PutEventsRequestEntry> { new PutEventsRequestEntry { EventBusName = \"kept-list-cs\" } }; await events.PutEventsAsync(new PutEventsRequest { Entries = entries }); }\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("Lists.java"),
+        "import java.util.ArrayList;\nimport java.util.Arrays;\nimport java.util.List;\n\
+         import software.amazon.awssdk.services.dynamodb.DynamoDbClient;\n\
+         import software.amazon.awssdk.services.dynamodb.model.Put;\n\
+         import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;\n\
+         import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;\n\
+         import software.amazon.awssdk.services.eventbridge.EventBridgeClient;\n\
+         import software.amazon.awssdk.services.eventbridge.model.PutEventsRequest;\n\
+         import software.amazon.awssdk.services.eventbridge.model.PutEventsRequestEntry;\n\
+         class Lists {\n\
+         void replaced() { var events = EventBridgeClient.create(); List<PutEventsRequestEntry> entries = Arrays.asList(PutEventsRequestEntry.builder().eventBusName(\"old-list-java\").build()); entries.set(0, PutEventsRequestEntry.builder().eventBusName(\"new-list-java\").build()); events.putEvents(PutEventsRequest.builder().entries(entries).build()); }\n\
+         void cleared() { var events = EventBridgeClient.create(); List<PutEventsRequestEntry> entries = new ArrayList<>(); entries.add(PutEventsRequestEntry.builder().eventBusName(\"old-cleared-java\").build()); entries.clear(); entries.add(PutEventsRequestEntry.builder().eventBusName(\"new-cleared-java\").build()); events.putEvents(PutEventsRequest.builder().entries(entries).build()); }\n\
+         static void swap(List<PutEventsRequestEntry> entries) { entries.set(0, PutEventsRequestEntry.builder().eventBusName(\"new-helper-java\").build()); }\n\
+         void helped() { var events = EventBridgeClient.create(); List<PutEventsRequestEntry> entries = Arrays.asList(PutEventsRequestEntry.builder().eventBusName(\"old-helper-java\").build()); swap(entries); events.putEvents(PutEventsRequest.builder().entries(entries).build()); }\n\
+         void items() { var dynamo = DynamoDbClient.create(); List<TransactWriteItem> transactItems = Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName(\"kept-items-java\").build()).build()); dynamo.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(transactItems).build()); }\n\
+         void built() { var dynamo = DynamoDbClient.create(); var put = Put.builder().tableName(\"kept-put-java\"); dynamo.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(put.build()).build()).build()); }\n\
+         void kept() { var events = EventBridgeClient.create(); List<PutEventsRequestEntry> entries = Arrays.asList(PutEventsRequestEntry.builder().eventBusName(\"kept-list-java\").build()); events.putEvents(PutEventsRequest.builder().entries(entries).build()); }\n\
+         void listed() { var events = EventBridgeClient.create(); List<PutEventsRequestEntry> list = List.of(PutEventsRequestEntry.builder().eventBusName(\"kept-of-java\").build()); events.putEvents(PutEventsRequest.builder().entries(list).build()); }\n}\n",
+    )
+    .unwrap();
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut sides: Vec<String> = ["providers", "consumers"]
+        .iter()
+        .flat_map(|side| export[side].as_array().unwrap())
+        .filter_map(|s| {
+            let mut parts = s["site"].as_str().unwrap().split("::").skip(1);
+            let file = parts.next()?;
+            let method = parts.next()?.split('(').next()?.rsplit('.').next()?;
+            (file == "lists.go" || file.starts_with("Lists.")).then_some(())?;
+            Some(format!(
+                "{file} {method} {}",
+                s["contract"].as_str().unwrap()
+            ))
+        })
+        .collect();
+    sides.sort();
+    assert_eq!(
+        sides,
+        [
+            "Lists.cs Cleared channel::eventbridge",
+            "Lists.cs Helped channel::eventbridge",
+            "Lists.cs Kept channel::eventbridge::kept-list-cs",
+            "Lists.cs Replaced channel::eventbridge",
+            "Lists.cs Through channel::eventbridge",
+            "Lists.java built resource::dynamodb::kept-put-java",
+            "Lists.java cleared channel::eventbridge",
+            "Lists.java helped channel::eventbridge",
+            "Lists.java items resource::dynamodb::kept-items-java",
+            "Lists.java kept channel::eventbridge::kept-list-java",
+            "Lists.java listed channel::eventbridge::kept-of-java",
+            "Lists.java replaced channel::eventbridge",
+            "lists.go cleared channel::eventbridge",
+            "lists.go helped channel::eventbridge",
+            "lists.go kept channel::eventbridge::kept-list-go",
+            "lists.go replaced channel::eventbridge",
+            "lists.go through channel::eventbridge",
+        ],
+        "{export}"
+    );
+}
+
 /// ADR 0026: an EventBridge entry without `EventBusName` sends to `default`, and an SNS phone
 /// publish names no topic, in Java, Go and C# as in TypeScript and Python. A request whose
 /// fields Meada cannot all see (a `toBuilder()`, a helper's result, a factory of the
@@ -1251,7 +1356,7 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
             "lambdaStored writer resource::dynamodb",
             "listAlias writer resource::dynamodb",
             "listImmutable writer resource::dynamodb::list-of",
-            "listOther writer channel::eventbridge::list-other",
+            "listOther writer channel::eventbridge",
             "listPlain writer resource::dynamodb::list-plain",
             "listSet writer resource::dynamodb",
             "localClass writer resource::dynamodb",
@@ -1658,17 +1763,26 @@ fn aws_origin_chains_and_inline_factories_stay_bounded_at_the_file_size_ceiling(
 }
 
 /// The transaction calls of a file fold on a budget of their own: however many they are, the
-/// other calls of the file keep the sides they have without them, of every kind (#719).
+/// other calls of the file keep the sides they have without them, of every kind (#719). The calls
+/// before the one where that budget ends keep their names, and that call has a writer, named or
+/// unresolved, and no reader for write entries; a reader for a `ConditionCheck` entry, unless the
+/// budget ends inside its writer row (#784).
 #[test]
 fn transaction_calls_leave_the_other_sides_of_their_file_named() {
-    let repeated = |template: &str, count: usize| -> String {
+    // `$CHECK` declares a second entry (a `ConditionCheck` of table `c$K`, or a `Put` of table
+    // `u$K`), `$ITEM` adds it to the call.
+    let repeated = |template: &str, count: usize, check: Option<(&str, &str)>| -> String {
+        let (declared, item) = check.unwrap_or_default();
+        let template = template.replace("$CHECK", declared).replace("$ITEM", item);
         (0..count)
             .map(|k| template.replace("$K", &k.to_string()))
             .collect()
     };
-    let java = format!(
-        r#"import software.amazon.awssdk.core.sync.RequestBody;
+    let sources = |entries: &str| {
+        let java = format!(
+            r#"import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
@@ -1695,16 +1809,27 @@ class Budget {{
     }}
 }}
 "#,
-        repeated(
-            r#"        var p$K = Put.builder().tableName("t$K");
+            repeated(
+                r#"        var p$K = Put.builder().tableName("t$K");
         var e$K = p$K.build();
-        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(e$K).build()).build());
+$CHECK        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(e$K).build()$ITEM).build());
 "#,
-            2000
-        )
-    );
-    let go = format!(
-        r#"package app
+                2000,
+                match entries {
+                    "check" => Some((
+                        "        var c$K = ConditionCheck.builder().tableName(\"c$K\").build();\n",
+                        ", TransactWriteItem.builder().conditionCheck(c$K).build()",
+                    )),
+                    "pair" => Some((
+                        "        var q$K = Put.builder().tableName(\"u$K\");\n        var f$K = q$K.build();\n",
+                        ", TransactWriteItem.builder().put(f$K).build()",
+                    )),
+                    _ => None,
+                },
+            )
+        );
+        let go = format!(
+            r#"package app
 
 import (
     "context"
@@ -1729,20 +1854,31 @@ func last(ctx context.Context) {{
     topics.Publish(ctx, &sns.PublishInput{{TopicArn: aws.String("topic")}})
 }}
 "#,
-        repeated(
-            r#"
+            repeated(
+                r#"
 func f$K(ctx context.Context) {
     p := &types.Put{TableName: aws.String("t$K")}
-    items := []types.TransactWriteItem{{Put: p}}
+$CHECK    items := []types.TransactWriteItem{{Put: p}$ITEM}
     in := &dynamodb.TransactWriteItemsInput{TransactItems: items}
     client.TransactWriteItems(ctx, in)
 }
 "#,
-            2500
-        )
-    );
-    let csharp = format!(
-        r#"using System.Collections.Generic;
+                2500,
+                match entries {
+                    "check" => Some((
+                        "    c := &types.ConditionCheck{TableName: aws.String(\"c$K\")}\n",
+                        ", {ConditionCheck: c}",
+                    )),
+                    "pair" => Some((
+                        "    u := &types.Put{TableName: aws.String(\"u$K\")}\n",
+                        ", {Put: u}",
+                    )),
+                    _ => None,
+                },
+            )
+        );
+        let csharp = format!(
+            r#"using System.Collections.Generic;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
@@ -1764,40 +1900,113 @@ class Budget {{
     }}
 }}
 "#,
-        repeated(
-            r#"    async Task F$K() {
+            repeated(
+                r#"    async Task F$K() {
         var p = new Put { TableName = "t$K" };
-        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = p } };
+$CHECK        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = p }$ITEM };
         var request = new TransactWriteItemsRequest { TransactItems = items };
         await db.TransactWriteItemsAsync(request);
     }
 "#,
-            2500
-        )
-    );
-    for (language, file, source) in [
-        ("java", "Budget.java", java),
-        ("go", "budget.go", go),
-        ("csharp", "Budget.cs", csharp),
-    ] {
-        let repo = fixture_repo(
-            &format!("aws_sdk_transaction_budget_{language}"),
-            "aws-sdk-controls",
-            None,
+                2500,
+                match entries {
+                    "check" => Some((
+                        "        var c = new ConditionCheck { TableName = \"c$K\" };\n",
+                        ", new TransactWriteItem { ConditionCheck = c }",
+                    )),
+                    "pair" => Some((
+                        "        var u = new Put { TableName = \"u$K\" };\n",
+                        ", new TransactWriteItem { Put = u }",
+                    )),
+                    _ => None,
+                },
+            )
         );
-        std::fs::write(repo.join(file), source).unwrap();
-        let text = Engine::open(&repo).unwrap().export().unwrap();
-        let export: Value = serde_json::from_str(&text).unwrap();
-        for (sides, contract) in [
-            ("providers", "resource::dynamodb::t0"),
-            ("providers", "resource::dynamodb::last"),
-            ("consumers", "resource::dynamodb::get"),
-            ("providers", "resource::s3::bucket"),
-            ("providers", "channel::sns::topic"),
-        ] {
-            let named =
-                (export[sides].as_array().unwrap().iter()).any(|s| s["contract"] == contract);
-            assert!(named, "{language}: no {contract} in {sides}");
+        [
+            ("java", "Budget.java", java, 2000),
+            ("go", "budget.go", go, 2500),
+            ("csharp", "Budget.cs", csharp, 2500),
+        ]
+    };
+    // Measured with each value held in a name (the ceilings topic): the calls named in each
+    // language before the budget ends, `Put` entries only.
+    let measured = [("java", 1725), ("go", 1928), ("csharp", 2185)];
+    for entries in ["put", "check", "pair"] {
+        for (language, file, source, calls) in sources(entries) {
+            let repo = fixture_repo(
+                &format!("aws_sdk_transaction_budget_{language}_{entries}"),
+                "aws-sdk-controls",
+                None,
+            );
+            std::fs::write(repo.join(file), source).unwrap();
+            let text = Engine::open(&repo).unwrap().export().unwrap();
+            let export: Value = serde_json::from_str(&text).unwrap();
+            for (sides, contract) in [
+                ("providers", "resource::dynamodb::t0"),
+                ("providers", "resource::dynamodb::last"),
+                ("consumers", "resource::dynamodb::get"),
+                ("providers", "resource::s3::bucket"),
+                ("providers", "channel::sns::topic"),
+            ] {
+                let named =
+                    (export[sides].as_array().unwrap().iter()).any(|s| s["contract"] == contract);
+                assert!(named, "{language}: no {contract} in {sides}");
+            }
+            // The tables named on one side, by number, and its unresolved sides.
+            let listed = |kind: &str, table: &str| -> (Vec<usize>, usize) {
+                let contracts = (export[kind].as_array().unwrap().iter())
+                    .map(|s| s["contract"].as_str().unwrap());
+                let mut named: Vec<usize> = (contracts.clone())
+                    .filter_map(|c| c.strip_prefix(table)?.parse().ok())
+                    .collect();
+                named.sort_unstable();
+                let unnamed = contracts.filter(|&c| c == "resource::dynamodb").count();
+                (named, unnamed)
+            };
+            let case = format!("{language}, entries {entries}");
+            let (writers, unnamed_writers) = listed("providers", "resource::dynamodb::t");
+            let (readers, unnamed_readers) = listed("consumers", "resource::dynamodb::c");
+            // The calls before the one where the budget ends keep their names.
+            assert!(
+                writers.iter().copied().eq(0..writers.len()),
+                "{case}: {writers:?}"
+            );
+            assert!(
+                readers.iter().copied().eq(0..readers.len()),
+                "{case}: {readers:?}"
+            );
+            assert!(writers.len() < calls, "{case}: the budget did not end");
+            let sides = (
+                writers.len(),
+                unnamed_writers,
+                readers.len(),
+                unnamed_readers,
+            );
+            if entries == "check" {
+                // A call whose rows the budget read whole has its reader named; the one where it
+                // ends inside the writer row has a writer, named or unresolved, and no reader.
+                let read = readers.len() + 1 >= writers.len() && readers.len() <= writers.len();
+                assert!(
+                    read && unnamed_writers <= 1 && unnamed_readers == 0,
+                    "{case}: {sides:?}"
+                );
+            } else if entries == "pair" {
+                // Write entries only: a writer per entry, named or unresolved, and no reader.
+                let (seconds, _) = listed("providers", "resource::dynamodb::u");
+                assert!(
+                    seconds.iter().copied().eq(0..seconds.len()),
+                    "{case}: {seconds:?}"
+                );
+                assert_eq!(
+                    (readers.len(), unnamed_readers),
+                    (0, 0),
+                    "{case}: {sides:?}"
+                );
+                assert!(unnamed_writers <= 2, "{case}: {sides:?}");
+            } else {
+                let (_, measured) = measured.iter().find(|(l, _)| *l == language).unwrap();
+                assert_eq!(sides, (*measured, 0, 0, 0), "{case}");
+            }
         }
     }
 }

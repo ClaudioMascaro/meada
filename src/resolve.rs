@@ -5204,6 +5204,20 @@ impl<'a> Code<'a> {
         done
     }
 
+    /// What the work `Code::apart` runs has spent of `file`'s budget.
+    pub(crate) fn spent_apart(&self, file: &'a str) -> usize {
+        self.folded_apart
+            .borrow()
+            .get(file)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// Sets what the work `Code::apart` runs has spent of `file`'s budget.
+    pub(crate) fn set_spent_apart(&self, file: &'a str, spent: usize) {
+        self.folded_apart.borrow_mut().insert(file, spent);
+    }
+
     /// The language pack whose files these are.
     pub fn pack(&self) -> &'static dyn LanguagePack {
         self.pack
@@ -7218,7 +7232,7 @@ impl<'a> Code<'a> {
                     false => out.push(Part::Hole),
                 },
                 Value::Ref(name) => out.push(Part::Ref(name)),
-                _ => out.push(Part::Hole),
+                other => out.push(Part::unread(&other)),
             }
         }
         Value::Str(out)
@@ -7667,7 +7681,8 @@ fn unbind(value: Value, chain: bool) -> Value {
             parts
                 .into_iter()
                 .map(|p| match p {
-                    Part::Ref(_) => Part::Hole,
+                    // What remains a name is a parameter no call site binds (#801).
+                    Part::Ref(name) => Part::Limit(crate::lang::Limit::Parameter(name)),
                     p => p,
                 })
                 .collect(),

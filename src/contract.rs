@@ -55,6 +55,18 @@ pub struct Found {
     pub shape: Option<Shape>,
     /// Kind-owned name evidence, stored internally for scoped workload resolution.
     pub identity: Option<ReceiverIdentity>,
+    /// For an unresolved consumer whose URL starts with a part Meada could not read, why, and
+    /// the known part after it (#801).
+    pub lead: Option<Lead>,
+}
+
+/// What an unresolved consumer's URL starts with that Meada could not read, and the known part
+/// appended to it (#801): its candidates are the routes whose path ends with that part.
+#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Lead {
+    pub limit: crate::lang::Limit,
+    /// The known part, a path as a route's is written (`normalize_path`).
+    pub path: String,
 }
 
 /// Which side of a contract a site holds.
@@ -1277,6 +1289,7 @@ mod tests {
             method: None,
             fragments: Vec::new(),
             shape: None,
+            lead: None,
         };
         let names = super::Names::new(&[inline("a.ts")]).without(["b.ts".to_string()].into());
         assert_eq!(names.scope("a.ts", "app.@40").as_str(), "app.GET /a");

@@ -190,6 +190,7 @@ pub(crate) fn extract<'a>(
         };
         for (index, stored) in facts.calls.iter().enumerate() {
             let method = crate::resolve::method(&stored.callee);
+            let (budget_start, mut cut) = (code.spent_apart(path), false);
             // A method can have several rows: a transaction's entries differ in direction.
             let operations = services.iter().flat_map(|service| {
                 (service.operations.iter())
@@ -218,7 +219,7 @@ pub(crate) fn extract<'a>(
                         &written,
                         &builders,
                     ) || (language != Language::Java
-                        && transaction
+                        && reads_entries(operation.field)
                         && held_changed(code, path, index, operation.field, language, {
                             counts.get_or_init(|| {
                                 (code.mentioned(path).iter())
@@ -286,15 +287,29 @@ pub(crate) fn extract<'a>(
                                 method: Some(operation.method.into()),
                                 fragments: Vec::new(),
                                 shape: None,
+                                lead: None,
                             });
                         }
                     }
                 };
-                if transaction {
-                    code.apart(row);
-                } else {
+                if !transaction {
                     row();
+                    continue;
                 }
+                // Each row of a call reads the request on the budget the call started with, and
+                // the call spends what its rows spend together: what the writer row spent does
+                // not cut the reader row short (a call of `Put` entries only got a reader, #784).
+                // Once a row runs out of it, the call's later rows are not read, as the calls
+                // after it are not: they would read part of the request.
+                if cut {
+                    continue;
+                }
+                let spent = code.spent_apart(path);
+                code.set_spent_apart(path, budget_start);
+                code.apart(row);
+                let end = code.spent_apart(path);
+                cut = end > crate::resolve::EVAL_BUDGET;
+                code.set_spent_apart(path, spent.saturating_add(end - budget_start));
             }
         }
     }
@@ -315,11 +330,17 @@ fn setter(selector: &str) -> impl Fn(&str) -> bool + '_ {
     }
 }
 
-/// Whether the path is a transaction's: three members. Its sides are new with the rule that
-/// follows a request, a list, an item or an entry held in a name by the mentions of that name
-/// (#719); the shorter paths keep the rule they had.
+/// Whether the path is a transaction's: three members. Its rows fold on a budget of their own
+/// (`Code::apart`).
 fn transaction(selector: &str) -> bool {
     selector.matches('.').count() == 2
+}
+
+/// Whether the path reads a list of entries (`Entries[].EventBusName`, a transaction's
+/// `TransactItems[]`): a request, a list, an item or an entry held in a name on it is followed by
+/// the mentions of that name (#719, #773). The other paths keep the rule they had.
+fn reads_entries(selector: &str) -> bool {
+    selector.contains("[].")
 }
 
 /// Whether a wrapper's caller passes the request on as a value that changed (Java): the request
@@ -403,10 +424,10 @@ fn changed_request<'a>(
     false
 }
 
-/// Whether a name on the path to a transaction entry's table may hold a value that changed (Go
-/// and C#). A request, a list, an item and an entry change in place through any name that holds
-/// them: a write past the first member, an element replaced, `append`, `Add`, a helper. So a
-/// name is followed only when the function that declares it writes it twice, where it is declared
+/// Whether a name on a path of entries (`reads_entries`) may hold a value that changed (Go and
+/// C#). A request, a list, an item and an entry change in place through any name that holds them:
+/// a write past the first member, an element replaced, `append`, `Add`, a helper. So a name is
+/// followed only when the function that declares it writes it twice, where it is declared
 /// and where the path reads it (`Facts::mentioned`). Any other mention is a change this reader
 /// does not follow, and a name that is no local of a function of the file (a parameter, a field,
 /// a package variable) can change anywhere.

@@ -458,6 +458,7 @@ impl ContractKind for Ci {
                     fragments: Vec::new(),
                     hops: Vec::new(),
                     root: None,
+                    lead: None,
                 });
             }
             crate::index::sort_consumers(&mut export.consumers);

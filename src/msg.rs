@@ -135,6 +135,7 @@ pub enum Msg<'a> {
     OrphanUse {
         contract: &'a str,
         place: &'a str,
+        level: meada_core::export::Level,
     },
     /// A reusable pipeline or an action nothing in the scope calls (#827).
     OrphanCi {
@@ -1354,6 +1355,8 @@ pub enum Msg<'a> {
     DecideNoItems,
     DecideUnknownItem(&'a str),
     DecideNoCandidates,
+    /// The line of an open item's block that names why value flow stopped at its URL (#801).
+    ItemLimit(&'a crate::lang::Limit),
     DecidePrompt(usize),
     DecideRetry(usize),
     DecideNothing,
@@ -1831,11 +1834,14 @@ impl Msg<'_> {
                 format!("órfão {contract}: nenhum uso; {place}"),
                 format!("huérfano {contract}: ningún uso; {place}"),
             ),
-            Msg::OrphanUse { contract, place } => pick(
-                format!("orphan {contract}: no provisioner; {place}"),
-                format!("órfão {contract}: nenhum provisionador; {place}"),
-                format!("huérfano {contract}: ningún provisionador; {place}"),
-            ),
+            Msg::OrphanUse { contract, place, level } => {
+                let level = level.name();
+                pick(
+                    format!("orphan {contract}: no provisioner; {place} [{level}]"),
+                    format!("órfão {contract}: nenhum provisionador; {place} [{level}]"),
+                    format!("huérfano {contract}: ningún provisionador; {place} [{level}]"),
+                )
+            }
             Msg::OrphanCi { contract, place } => pick(
                 format!("orphan {contract}: no consumer; {place}"),
                 format!("órfão {contract}: nenhum consumidor; {place}"),
@@ -5155,6 +5161,32 @@ impl Msg<'_> {
                 "nenhum candidato serve; pulado".into(),
                 "ningún candidato sirve; omitido".into(),
             ),
+            Msg::ItemLimit(limit) => {
+                use crate::lang::Limit;
+                let (pt, es) = match limit {
+                    Limit::Returned(callee) => (
+                        format!("base vinda do retorno de {callee}"),
+                        format!("base del valor de retorno de {callee}"),
+                    ),
+                    Limit::Parameter(name) => (
+                        format!("base vinda do parâmetro {name}"),
+                        format!("base del parámetro {name}"),
+                    ),
+                    Limit::ClientBase => (
+                        "base de um cliente que o Meada não leu".into(),
+                        "base de un cliente que Meada no leyó".into(),
+                    ),
+                    Limit::Other => (
+                        "base que o Meada não conseguiu ler".into(),
+                        "base que Meada no pudo leer".into(),
+                    ),
+                };
+                pick(
+                    format!("limit: {}", limit.describe()),
+                    format!("limite: {pt}"),
+                    format!("límite: {es}"),
+                )
+            }
             Msg::DecidePrompt(n) => pick(
                 format!("pick 1-{n}, or s to skip:"),
                 format!("escolha 1-{n}, ou s para pular:"),

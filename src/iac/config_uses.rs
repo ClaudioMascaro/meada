@@ -1,15 +1,20 @@
 //! Directionless config uses (ADR 0026, #661), derived from non-secret, uncut stored strings.
-//! Only a structured cloud identifier or a final typed key gives evidence of a contract.
+//! Only a structured cloud identifier or a final typed key gives evidence of a contract, and a
+//! final typed key gives none in a document the reader of a contract kind recognizes as its own.
+//! An identifier in the resource list of an IAM policy statement is a policy grant instead, and a
+//! value under a keyword of a JSON Schema document gives no side (ADR 0026, "Orphan sides").
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Bound;
 
-use meada_core::export::{Level, Use};
+use meada_core::export::{Level, PolicyGrant, Use};
 use rusqlite::Connection;
 
 use super::actions::run::{self, Script};
 use super::types;
 use crate::Result;
+use crate::config_values::sites::parts_without_selectors;
+use crate::document::events::{Step, Syntax};
 
 /// Internal key identity and evidence; the public use keeps a repository-level site.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -31,7 +36,16 @@ impl Side {
         side.contract = self.contract.clone();
         side.site = (self.holder.clone()).unwrap_or_else(|| repository.into());
         side.at = format!("{}#{}", self.path, self.key);
+        side.level = Some(self.level);
         side
+    }
+
+    pub(crate) fn granted(&self, repository: &str) -> PolicyGrant {
+        let mut grant = PolicyGrant::default();
+        grant.contract = self.contract.clone();
+        grant.site = repository.into();
+        grant.at = format!("{}#{}", self.path, self.key);
+        grant
     }
 
     pub(crate) fn place(&self) -> String {
@@ -59,10 +73,169 @@ fn evaluated<'v>(value: &str, env: impl Fn(&str) -> Option<&'v str>) -> String {
     out + rest
 }
 
-/// The config uses of the repository, and the `run` scripts of its CI steps as the gate of the
-/// command table reads them (ADR 0028): both come from the stored strings, so a script past
-/// the value length ceiling is not read.
-pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<Script>)> {
+/// The resource list of an IAM policy statement: `Resource` or `NotResource` of an entry of
+/// `Statement`, wherever the key path is, and `resources` or `not_resources` of a `statement`
+/// block of an `aws_iam_policy_document`.
+fn policy_resource(steps: &[Step]) -> bool {
+    let keys: Vec<&str> = (steps.iter())
+        .filter_map(|step| match step {
+            Step::Key(key) => Some(key.as_str()),
+            Step::Index(_) => None,
+        })
+        .collect();
+    matches!(
+        keys.as_slice(),
+        [.., "Statement", "Resource" | "NotResource"]
+            | [
+                "data",
+                "aws_iam_policy_document",
+                _,
+                "statement",
+                "resources" | "not_resources"
+            ]
+    )
+}
+
+/// Under a JSON Schema keyword whose value documents a shape, read from the document's root:
+/// the key after `properties` or its kin names a property, whatever its name.
+fn schema_keyword(steps: &[Step]) -> bool {
+    let mut name = false;
+    for step in steps {
+        let Step::Key(key) = step else { continue };
+        if std::mem::take(&mut name) {
+            continue;
+        }
+        match key.as_str() {
+            "examples" | "default" | "enum" | "const" => return true,
+            "properties" | "patternProperties" | "$defs" | "definitions" | "dependentSchemas"
+            | "dependencies" => name = true,
+            _ => {}
+        }
+    }
+    false
+}
+
+/// The JSON Schema documents, by file: those whose root holds `$schema`, as a document index
+/// (`None` for a file of one document). A JSON file is one document, so a leading index there is
+/// an item of its root array; in YAML it is a document of a stream, or an item of a root sequence,
+/// which writes its keys the same way (ADR 0025).
+fn schemas(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
+    let mut query =
+        db.prepare("SELECT path, key FROM config_values WHERE key LIKE '%[\"$schema\"]'")?;
+    let rows = query.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    let mut schemas = HashMap::<_, Vec<_>>::new();
+    for row in rows {
+        let (path, key) = row?;
+        let document = match parts_without_selectors(&key).as_deref() {
+            Some([Step::Key(key)]) if key == "$schema" => None,
+            Some([Step::Index(n), Step::Key(key)])
+                if key == "$schema" && Syntax::of(&path) == Syntax::Yaml =>
+            {
+                Some(*n)
+            }
+            _ => continue,
+        };
+        schemas.entry(path).or_default().push(document);
+    }
+    Ok(schemas)
+}
+
+/// The documents the reader of a contract kind recognizes as its own, by file, which the key-name
+/// rule does not read: the first document of a file the document reader read (its summary names a
+/// format; it reads no later document of a stream, and a file it ignored is none of its own), and
+/// each document of a configuration file that is no IaC source and that the alert reader takes a
+/// rule, a route or a receiver from (`alert::documents`).
+fn owned(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
+    let mut owned = HashMap::<_, Vec<_>>::new();
+    let mut query = db.prepare("SELECT path, summary FROM documents")?;
+    let rows = query.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    for row in rows {
+        let (path, summary) = row?;
+        let summary: crate::document::Summary = serde_json::from_str(&summary)?;
+        if summary.format.is_some() {
+            owned.entry(path).or_default().push(Some(0));
+        }
+    }
+    let mut query = db.prepare("SELECT path, summary FROM contract_configs")?;
+    let rows = query.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    for row in rows {
+        let (path, summary) = row?;
+        if super::is_source(&path) {
+            continue;
+        }
+        let documents = crate::alert::documents(&serde_json::from_str(&summary)?);
+        if !documents.is_empty() {
+            owned.entry(path).or_default().extend(documents);
+        }
+    }
+    Ok(owned)
+}
+
+/// The key-name rule (#661): a value under a final typed key names a contract at `inferred`,
+/// through an Azure or Google Cloud alias, or as a plain name under `queue`, `topic`, `bucket` or
+/// `table`.
+fn key_name(key: &str, value: &str) -> Option<(String, Level)> {
+    // Whether the key path ends with the step `name`: alone, after a `.`, or quoted.
+    let last = |name: &str| {
+        key == name || key.ends_with(&format!(".{name}")) || key.ends_with(&format!("[\"{name}\"]"))
+    };
+    crate::contract::azure::ALIASES
+        .iter()
+        .find_map(|alias| {
+            last(alias)
+                .then(|| crate::contract::azure::typed(alias, value))
+                .flatten()
+        })
+        .map(|contract| (contract, Level::Inferred))
+        .or_else(|| {
+            let alias = [
+                "pubsub_topic",
+                "pubsub_subscription",
+                "gcs_bucket",
+                "cloudsql_instance",
+                "cloudsql_database",
+                "gcpsecretmanager_secret",
+            ]
+            .into_iter()
+            .find(|alias| last(alias));
+            if let Some(contract) =
+                alias.and_then(|alias| crate::contract::gcp::typed(alias, value))
+            {
+                return Some((contract, Level::Inferred));
+            }
+            if value.is_empty()
+                || !value
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
+            {
+                return None;
+            }
+            let kind = [
+                ("queue", "channel::sqs"),
+                ("topic", "channel::sns"),
+                ("bucket", "resource::s3"),
+                ("table", "resource::dynamodb"),
+            ]
+            .into_iter()
+            .find(|(step, _)| last(step))?
+            .1;
+            Some((format!("{kind}::{value}"), Level::Inferred))
+        })
+}
+
+/// The config use sides of a repository, its policy grants, then the `run` scripts of its CI
+/// steps as the gate of the command table reads them (ADR 0028): all come from the stored
+/// strings, so a script past the value length ceiling is not read.
+pub(crate) fn read(
+    db: &Connection,
+    repository: &str,
+) -> Result<(Vec<Side>, Vec<Side>, Vec<Script>)> {
     // A creation's defining name is its provisioner, not a second side using itself.
     // Other config attributes in the same IaC file can still name resources they use.
     let mut definitions = std::collections::HashSet::new();
@@ -70,7 +243,7 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
     // key-name rule reads none of them. Here, the pipelines and actions of the CI reader
     // (ADR 0028), each with the addresses of its CI jobs and CI steps and whether it is a
     // pipeline.
-    let mut owned = HashMap::<String, (Vec<String>, bool)>::new();
+    let mut ci_files = HashMap::<String, (Vec<String>, bool)>::new();
     // The `env` keys of a CI job or a CI step that hold no config value and define their name.
     let mut others = Vec::new();
     for node in super::nodes(db)? {
@@ -78,7 +251,7 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
             let hollow = node.actions.iter().flat_map(|facts| &facts.hollow);
             let keys = hollow.map(|name| format!("{}.env.{name}", node.address));
             others.extend(keys.map(|key| (node.path.clone(), key)));
-            let (nodes, pipeline) = owned.entry(node.path).or_default();
+            let (nodes, pipeline) = ci_files.entry(node.path).or_default();
             if node.address == "." {
                 *pipeline = node.ty != super::actions::ACTION;
             } else {
@@ -110,7 +283,7 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
     let rows = rows.collect::<rusqlite::Result<Vec<_>>>()?;
     // What a `${{ env.X }}` of an owned file reads: each key of that file, with its value when
     // it is a literal string. A key that holds anything else still defines its name.
-    if !owned.is_empty() {
+    if !ci_files.is_empty() {
         let mut query = db.prepare(
             "SELECT path, key FROM config_values \
              WHERE type != 'string' OR value IS NULL OR cut != 0",
@@ -119,17 +292,17 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
         others.extend(keys.collect::<rusqlite::Result<Vec<(String, String)>>>()?);
     }
     let mut entries = HashMap::<&str, BTreeMap<&str, Option<&str>>>::new();
-    for (path, key, value, _) in rows.iter().filter(|row| owned.contains_key(&row.0)) {
+    for (path, key, value, _) in rows.iter().filter(|row| ci_files.contains_key(&row.0)) {
         entries.entry(path).or_default().insert(key, Some(value));
     }
-    for (path, key) in others.iter().filter(|row| owned.contains_key(&row.0)) {
+    for (path, key) in others.iter().filter(|row| ci_files.contains_key(&row.0)) {
         entries.entry(path).or_default().insert(key, None);
     }
     // The names the `run` scripts of each owned file may write to the environment file
     // (`GITHUB_ENV`, `github.env`): one of them reaches the CI steps after it, so no literal
     // `env` gives it.
     let mut written = HashMap::<&str, HashSet<&str>>::new();
-    for (path, key, value, _) in rows.iter().filter(|row| owned.contains_key(&row.0)) {
+    for (path, key, value, _) in rows.iter().filter(|row| ci_files.contains_key(&row.0)) {
         let lower = value.to_ascii_lowercase();
         let writes = || {
             ["github_env", "github.env", "github["]
@@ -140,14 +313,23 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
             written.entry(path).or_default().extend(run::rebound(value));
         }
     }
+    let schemas = schemas(db)?;
+    let recognized = owned(db)?;
     let mut uses = Vec::new();
+    let mut grants = Vec::new();
     let mut scripts = Vec::new();
     for (path, key, value, line) in &rows {
         if definitions.contains(&(path.clone(), key.clone())) {
             continue;
         }
+        // Whether `documents` (by index in a stream, `None` for a whole file) hold this row; a key
+        // with no leading index is in the only document of its file, the first.
+        let document = crate::config_values::leading_index(key).unwrap_or(0);
+        let holds = |documents: &Vec<Option<usize>>| {
+            documents.contains(&None) || documents.contains(&Some(document))
+        };
         // The CI nodes that hold the key, the nearest first: a CI step, then its CI job.
-        let holders = owned.get(path).map(|(nodes, _)| {
+        let holders = ci_files.get(path).map(|(nodes, _)| {
             let holds = |node: &&String| {
                 (key.strip_prefix(node.as_str())).is_some_and(|rest| rest.starts_with(['.', '[']))
             };
@@ -158,7 +340,7 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
         // The `env` of the CI step, of its CI job, then of the pipeline (an action's file holds
         // none at its root).
         let scopes = |holders: &[&str], key: &str| -> Vec<String> {
-            let pipeline = owned[path].1.then(|| key.to_string());
+            let pipeline = ci_files[path].1.then(|| key.to_string());
             let scopes = holders.iter().map(|node| format!("{node}.{key}"));
             scopes.chain(pipeline).collect()
         };
@@ -219,29 +401,44 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
                 })
             })
             .map(|c| (c, Level::Exact))
-            // A key of `with` belongs to the action's vocabulary, not to the cloud's.
-            .or_else(|| holders.is_none().then(|| typed(key, value)).flatten());
-        if let Some((contract, level)) = named {
-            let holder = holders.map(|holders| {
-                let address = holders.first().copied().unwrap_or(".");
-                format!("{repository}::{path}::{address}")
+            // A key of `with` belongs to the action's vocabulary, not to the cloud's, and a
+            // document the reader of a contract kind recognizes means what that reader says.
+            .or_else(|| {
+                let owned = holders.is_some() || recognized.get(path).is_some_and(holds);
+                (!owned).then(|| key_name(key, value)).flatten()
             });
-            let side = Side {
-                contract,
-                site: format!("{repository}::{path}#{key}"),
-                path: path.clone(),
-                key: key.clone(),
-                line: *line,
-                level,
-                holder,
-            };
+        let Some((contract, level)) = named else {
+            continue;
+        };
+        let steps = parts_without_selectors(key).unwrap_or_default();
+        if schemas.get(path).is_some_and(holds) && schema_keyword(&steps) {
+            continue;
+        }
+        let holder = holders.map(|holders| {
+            let address = holders.first().copied().unwrap_or(".");
+            format!("{repository}::{path}::{address}")
+        });
+        let side = Side {
+            contract,
+            site: format!("{repository}::{path}#{key}"),
+            path: path.clone(),
+            key: key.clone(),
+            line: *line,
+            level,
+            holder,
+        };
+        if level == Level::Exact && policy_resource(&steps) {
+            grants.push(side);
+        } else {
             uses.push(side);
         }
     }
-    uses.sort();
-    uses.dedup();
+    for sides in [&mut uses, &mut grants] {
+        sides.sort();
+        sides.dedup();
+    }
     scripts.sort_by(|a, b| a.site.cmp(&b.site));
-    Ok((uses, scripts))
+    Ok((uses, grants, scripts))
 }
 
 /// What the `env` map at `scope` (a key path that ends in `.`) gives `name` among the keys of
@@ -270,55 +467,18 @@ fn given<'v>(
     (under('.') || under('[')).then_some(None)
 }
 
-/// The key-name rule (ADR 0026): a plain name under a typed final key is an `inferred` use.
-fn typed(key: &str, value: &str) -> Option<(String, Level)> {
-    let last = |step: &str| {
-        key == step || key.ends_with(&format!(".{step}")) || key.ends_with(&format!("[\"{step}\"]"))
-    };
-    let azure = (crate::contract::azure::ALIASES.iter())
-        .find_map(|alias| last(alias).then(|| crate::contract::azure::typed(alias, value))?);
-    if let Some(contract) = azure {
-        return Some((contract, Level::Inferred));
-    }
-    let alias = [
-        "pubsub_topic",
-        "pubsub_subscription",
-        "gcs_bucket",
-        "cloudsql_instance",
-        "cloudsql_database",
-        "gcpsecretmanager_secret",
-    ]
-    .into_iter()
-    .find(|alias| last(alias));
-    if let Some(contract) = alias.and_then(|alias| crate::contract::gcp::typed(alias, value)) {
-        return Some((contract, Level::Inferred));
-    }
-    if value.is_empty()
-        || !value
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
-    {
-        return None;
-    }
-    let kind = [
-        ("queue", "channel::sqs"),
-        ("topic", "channel::sns"),
-        ("bucket", "resource::s3"),
-        ("table", "resource::dynamodb"),
-    ]
-    .into_iter()
-    .find(|(step, _)| last(step))?
-    .1;
-    Some((format!("{kind}::{value}"), Level::Inferred))
-}
-
-/// Key-specific starts accept the full identity or its repository-relative locator.
-pub(crate) fn found<'e>(exports: &'e [crate::index::Export], name: &str) -> Vec<(usize, &'e Side)> {
+/// The sides `of` each export holds (its uses, or its policy grants) at a key: its full
+/// identity or its repository-relative locator.
+pub(crate) fn found<'e>(
+    exports: &'e [crate::index::Export],
+    name: &str,
+    of: impl Fn(&'e crate::index::Export) -> &'e [Side],
+) -> Vec<(usize, &'e Side)> {
     exports
         .iter()
         .enumerate()
         .flat_map(|(n, e)| {
-            e.config_uses.iter().filter_map(move |u| {
+            of(e).iter().filter_map(move |u| {
                 (u.site == name
                     || u.site.strip_prefix(&format!("{}::", e.repository)) == Some(name))
                 .then_some((n, u))

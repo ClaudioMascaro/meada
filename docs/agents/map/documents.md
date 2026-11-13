@@ -173,6 +173,13 @@ this file, and a change to these modules updates it.
   array keeps the repository-level site and its `at` locator; no scalar text is exported.
   `provision::uses` shares
   these sides with provisioning and orphan scope; directed kind matching never sees them.
+  `read` returns the policy grants apart (#798): an `exact` identifier in the resource list of an
+  IAM policy statement (`policy_resource`), which only `context`, `search` and the
+  `policy_grants` export array show; a value under a keyword of a JSON Schema document
+  (`schemas`, `schema_keyword`) gives no side.
+  A document the reader of a contract kind recognizes as its own (`owned`: the first document of
+  a file the document reader read, each document `alert::documents` names) gives no key-name use
+  (`key_name`, #800).
   In a file a kind's reader recognizes whole (#828, the shape #800 asks for), here the
   pipelines and actions of `iac/actions.rs` (`owned`, by their CI nodes), `typed` is not read:
   only a structured identifier is a use, after `evaluated` gave each `${{ env.X }}` its
@@ -232,14 +239,19 @@ this file, and a change to these modules updates it.
   parts and puts `*` for the rest.
   A name's value crosses boundaries that change it in Terraform: a variable's declared `type`
   converts what it receives where every source passes (`Eval::var`, `converted_through`: a
-  `set(T)` converts its elements to `T`, sorts and deduplicates them; `any` keeps the value), a module argument is evaluated
+  `set(T)` converts its elements to `T`, sorts and deduplicates them; a `list(T)` of a primitive `T`
+  converts them in their order; `any` keeps the value), a module argument is evaluated
   in the caller, an override file's `type` and `default` replace the declared ones (`Module::declare`: Terraform
   converts the default to the declaring block's type and again to the override's, which Meada
-  follows; OpenTofu 1.13+ converts once, a ceiling; a variable with a block in a `.tofu` or `.tofu.json` file is unresolved where they differ: `declared_default`), a var file's value replaces the default. Check each against Terraform's rule when a change decides on a
-  value's kind (`Eval::holds_set`); `tests/terraform-oracle/modules/` holds cases for the first three.
+  follows; OpenTofu 1.13+ converts once, a ceiling; a variable with a block in a `.tofu` or `.tofu.json` file is unresolved where they differ: `declared_default`; declared in a file Terraform reads, it keeps Terraform's reading apart, `Variable::terraform`, and `Eval::var` compares the two, #767; declared in a file of each kind, it is the `.tf` block's, `Variable::terraform_only`, #768), a var file's value replaces the default, and a default the final type refuses leaves any value
+  unresolved (`Eval::received`). Check each against Terraform's rule when a change decides on a
+  value's kind (`Eval::holds_set`, and `Eval::is_tuple` for a `for_each` both tools refuse);
+  `tests/terraform-oracle/modules/` holds cases for the first three.
   `Eval::keys` evaluates `count` and `for_each` while instances are made (no module output read
-  yet), and `Eval::root` evaluates the names once every instance exists. `Repository::read` reads
-  the files, `Repository::units` gives each root with the directories of its unit, and `refresh`
+  yet), and `Eval::root` evaluates the names once every instance exists; it starts each root with
+  none of the root before's memos, which key an instance by its place in its root (#783).
+  `Repository::read` reads the files, `Repository::units` gives each root with the directories of
+  its unit, and `refresh`
   (called by `index::refresh_keeping` with the directories a Terraform file or var file changed in)
   evaluates again the roots whose unit holds one, and the roots not stored yet.
 - `kube.rs` (#651, ADR 0025): Kubernetes objects and Kustomize trees, into the same nodes

@@ -120,6 +120,8 @@ Meada connects consumers and providers across languages, including behind gatewa
 | C# | `HttpClient`, typed clients, Refit | ASP.NET Core (controllers, minimal APIs) |
 | Swift | `URLSession`, Alamofire, AsyncHTTPClient | Vapor, Hummingbird |
 
+A URL whose base Meada could not read, with a path appended to it, is an unresolved consumer: an open item that names the limit (the return value of a call, with its callee; a parameter no call binds, with its name; the base of a client Meada did not read, such as the unknown bases of this section; or another part it did not read). That base may hold a path of its own, so the candidates are the routes of the call's method whose path ends with the known part at a `/`. The path stays certain, and the link `inferred` with the reason `host unresolved`, when the URL has no base or when the library's join replaces the base's path with a path from the root: `new URL('/x', base)` in TypeScript, a request URI from the root on a C# `HttpClient`, a Retrofit route from the root, a request from the root on a Ktor client with `defaultRequest` or on an aiohttp session, and `URL(string:relativeTo:)` in Swift. An environment read written in place still links by its variable.
+
 In TypeScript and JavaScript, a `fetch` whose URL is built by a function of the repository is a consumer when the function only returns a string: an arrow function with an expression body, or a body of one lone `return`. The call (`fetch(url("api/vets"))`), or a constant holding it (`const u = url("api/owners"); fetch(u)`), folds to the string with the function's parameters replaced by the call's arguments, also when the function comes from another module. Only a call that resolves exactly folds. A function of more than one statement, an `async` one, one that returns anything but a string, and a string with a part that does not fold (a base read from `process.env`, a conditional over a build-time global) leave the consumer unresolved.
 
 In TypeScript and JavaScript, `new URL(x)` with one argument reads as `x`, as the WHATWG URL Standard has it, only for the unassigned global `URL` or the named `URL` export of `url` or `node:url` through an import or unshadowed `require`. A constructor from an unknown package, repository alias or another export stays opaque. `u.toString()`, `u.href` and `String(u)` pass the URL through, and so does `${u}` in a template string, whether the URL is in a constant or built in place (`fetch(new URL(BASE + "/api/vets").toString())`), and a client wrapper called with one folds at its call sites. A base read from the environment shows its `via`. Changes through `u.searchParams`, `u.search` and `u.hash` keep the path; a write to any other member of a constant built by `new URL` (`u.pathname = ..`, `u.host += ..`), anywhere in the file, leaves the consumer unresolved, and so does a mutation inside a function the URL is passed to, which Meada does not see. `new URL(ref, base)` with two arguments is the join of both, as the WHATWG URL Standard has it (RFC 3986 section 5.2 for these references): an absolute `ref` is itself, `//host/x` takes its host from `ref`, `/orders` replaces the base's path, and `orders` joins the base's directory (`https://h/api/` gives `/api/orders`, `https://h/api` gives `/orders`). Over a base read from the environment or a hole, `/orders` keeps the base as its lead (`http::GET::/orders`, with `via env:API_URL` for `process.env.API_URL`); a relative `ref`, one that starts with a read, and a query or a fragment alone leave the consumer unresolved, and a parameter on either side is resolved at the call sites, as in a client wrapper. `.href`, `toString()` and `String(u)` on a two-argument `new URL` are not read.
@@ -326,6 +328,33 @@ IaC-only repository produces no such lines; `search` and `context` mark the side
 `no provisioner in the workspace` or `no use in the workspace`. Provisioning links, including
 patterns and independent root modules, determine whether a counterpart exists. Existing
 warnings about declared resources without writers and readers remain separate.
+
+A use Meada only infers from a key name (a plain value under `queue`, `topic`, `bucket`, `table`
+or a typed alias, `inferred`) opens no orphan scope for its group and is never an orphan line: a
+name match proves neither a use nor its absence. It still links to the provisioner of the same
+name, which is therefore no `no use`, and `context` still shows it with `[inferred]`. A
+`no provisioner` line ends with its side's level in brackets, as `context` writes it (`[exact]`,
+`[declared]`), and the `uses` rows of `meada export` carry `level`.
+
+A structured identifier in the resource list of an IAM policy statement (`Resource` or
+`NotResource` of an entry of `Statement`, in a policy file or in a policy document inside a
+template, and `resources` or `not_resources` of a `statement` block of an
+`aws_iam_policy_document`) is a **policy grant**, not a use: it says who may touch the resource,
+with no direction. `context` on the resource lists it with the role `policy grant` and its place;
+it links to no provisioner, opens no orphan scope and is never an orphan line, and `meada export`
+lists it in the `policy_grants` array, apart from `uses`. In a JSON Schema document (one with
+`$schema` at its root), a value under `examples`, `default`, `enum` or `const` documents a shape and
+is no side at all: it stays a config value that `search` finds.
+
+In a document that the reader of a contract kind recognizes as its own, Meada infers no use from a
+key name: a Prometheus or Loki rule file (`groups` holding `rules`), a Grafana alert rule file, an
+Alertmanager configuration, a `PrometheusRule` or `AlertmanagerConfig` object (that document of the
+stream only) and a provider document (an OpenAPI or AsyncAPI document that Meada reads, in a
+repository with `[serve]`). There, a rule's `queue: jobs` label is an alert label, not the use of a
+queue; a structured identifier (an ARN) is still an `exact` use, and the values stay config values
+that `search` finds. IaC files (Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose and
+the other documents of a Kubernetes stream) still give such uses, and the same label in a file no
+reader recognizes is still an `inferred` use.
 
 ### Terraform provisioners
 
@@ -608,13 +637,13 @@ and through no symbolic link, or at `inferred` when the context or the Dockerfil
 an overridable value. A Dockerfile that cannot be read leaves the whole context at `inferred`, and
 the reason says so. `.dockerignore` is not read.
 
-Literals link at `exact`; Compose defaults and Helm values at `inferred`, with their source in
-the reason. Unresolved parts remain patterns and match only literal names at segment
-boundaries; several candidates remain `ambiguous` and can receive a decision. `status` lists
-image orphans only when the visible scope contains builders and runners. Otherwise `search`
-and `context` mark the side with no counterpart. Export stays at format 1, adding builder `at`
-locations and direct-path `executions`; the console graph shows image contracts, their links
-and workload code.
+Literals link at `exact`; Compose defaults and Helm values at `inferred`, with their source in the
+reason. Unresolved parts remain patterns and match only literal names at segment boundaries; several
+candidates remain `ambiguous` and can receive a decision. `status` lists image orphans only for a
+registry and namespace (`ghcr.io/acme`) that holds builders and runners in the visible scope.
+Otherwise `search` and `context` mark the side with no counterpart. Export stays at format 1, adding
+builder `at` locations and direct-path `executions`; the console graph shows image contracts, their
+links and workload code.
 
 ### Partially resolved names
 

@@ -359,6 +359,7 @@ impl ContractKind for Channel {
                     method,
                     fragments: Vec::new(),
                     shape: None,
+                    lead: None,
                 }
             })
             .chain(ts::aws(code))
@@ -415,6 +416,7 @@ impl ContractKind for Channel {
                         fragments: Vec::new(),
                         hops: Vec::new(),
                         root: None,
+                        lead: None,
                     }),
                 }
             }
@@ -717,6 +719,7 @@ mod tests {
             fragments: Vec::new(),
             hops: Vec::new(),
             root: None,
+            lead: None,
         }
     }
 
