@@ -42,7 +42,9 @@ enum Uses<'a> {
 impl<'a> Uses<'a> {
     fn read(uses: &'a str) -> Option<Self> {
         // No name GitHub takes holds a control character, and one would break an answer's line.
-        if uses.contains(char::is_control) || uses.starts_with("docker://") {
+        // It evaluates no expression here either: a `uses` that holds one names nothing.
+        let named = !uses.contains(char::is_control) && !uses.contains("${{");
+        if !named || uses.starts_with("docker://") {
             return None;
         }
         if let Some(path) = uses.strip_prefix("$/") {
@@ -148,7 +150,10 @@ fn workspace_causes(own: &str, nodes: &[Node]) -> HashMap<String, &'static str> 
         if uses.starts_with("./") {
             local.push((n, job, index));
         } else if checkout(uses) {
-            let elsewhere = (facts.with.iter()).any(|key| key == "repository" || key == "path");
+            // GitHub reads an input's key in any case (`INPUT_REPOSITORY`).
+            let names = |key: &String, input| key.eq_ignore_ascii_case(input);
+            let elsewhere =
+                (facts.with.iter()).any(|key| names(key, "repository") || names(key, "path"));
             let first = &mut checkouts.entry((&n.path, job)).or_default()[usize::from(elsewhere)];
             *first = Some(first.map_or(index, |at| at.min(index)));
         }
@@ -520,6 +525,9 @@ mod tests {
             ("acme/workflows", None),
             ("acme/workflows/tools/setup@", None),
             ("acme/workflows@v1\n  consumer: forged", None),
+            // An expression, which GitHub refuses in a `uses`.
+            ("./tools/${{ matrix.dir }}", None),
+            ("acme/workflows/tools/setup@${{ inputs.ref }}", None),
         ] {
             assert_eq!(consumed_by(uses, true).as_deref(), expected, "{uses}");
         }

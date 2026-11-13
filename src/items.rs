@@ -154,6 +154,8 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
             .map(|s| (s.id.as_str(), s))
             .collect();
         let mut files = Files::new(&repo.root);
+        // The IaC nodes by identity, written out only for an export with an item on one.
+        let mut nodes: Option<HashMap<String, &crate::iac::Node>> = None;
         for consumer in &export.consumers {
             let (kind, candidates) = match (
                 &consumer.contract,
@@ -190,11 +192,12 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                 None => match symbols.get(consumer.site.as_str()) {
                     Some(def) => (&def.span, Some(def)),
                     None => {
-                        let Some(node) = export
-                            .iac
-                            .iter()
-                            .find(|n| n.identity(&export.repository) == consumer.site)
-                        else {
+                        // The first node of an identity, as a scan of them finds it.
+                        let nodes = nodes.get_or_insert_with(|| {
+                            let nodes = export.iac.iter().rev();
+                            nodes.map(|n| (n.identity(&export.repository), n)).collect()
+                        });
+                        let Some(node) = nodes.get(&consumer.site) else {
                             continue;
                         };
                         infrastructure = node.span(files.get(&node.path));

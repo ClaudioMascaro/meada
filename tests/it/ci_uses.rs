@@ -332,6 +332,29 @@ fn a_steps_local_folder_is_an_open_item_where_the_workspace_is_not_known() {
     let _ = workflows;
 }
 
+/// GitHub reads an input's key in any case (`INPUT_REPOSITORY`): a checkout that writes
+/// `REPOSITORY` or `Path` names what one in lower case does.
+#[test]
+fn a_checkout_names_its_inputs_in_any_case() {
+    let [_, _, app_a, ..] = reproduction("ci_uses_key_case");
+    for key in ["REPOSITORY: acme/workflows", "Path: sub"] {
+        let pipeline = format!(
+            "on: push\njobs:\n  cased:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          {key}\n      - uses: ./tools/local\n"
+        );
+        fs::write(app_a.join(".github/workflows/cased.yml"), pipeline).unwrap();
+        let engine = Engine::open(&app_a).unwrap();
+        let step = ".github/workflows/cased.yml::jobs.cased.steps[1]";
+        let answer = engine.context(step, None).unwrap();
+        assert_eq!(
+            listed(&answer, "consumes "),
+            [
+                "(unresolved) ./tools/local: a checkout before the CI step names `repository` or `path`"
+            ],
+            "{key}: {answer}"
+        );
+    }
+}
+
 /// A repository without `origin` names no host: its local calls link, its calls by owner and
 /// name hold no side.
 #[test]

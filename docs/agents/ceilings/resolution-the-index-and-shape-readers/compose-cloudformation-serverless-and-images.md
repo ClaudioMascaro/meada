@@ -52,20 +52,31 @@
 - `ci.rs` (#826, ADR 0028): a CI step's `./<folder>` is read in the CI runner's workspace, which
   Meada knows to be the file's repository in one position only: a pipeline that is not
   reusable, after an `actions/checkout` step of the same CI job, with no `actions/checkout`
-  before the CI step that names `repository` or `path` in `with`. It is unresolved in a reusable
+  before the CI step that names `repository` or `path` in `with` (the key in any case, as
+  GitHub reads an input). It is unresolved in a reusable
   pipeline (whatever other triggers it has), where a checkout is of the caller's repository, and
   in a composite action, which runs in its caller's workspace; with no checkout before it; and
   after a checkout that names one of the two keys, also when the key names the own repository (`${{ github.repository }}`) or a
   path the folder is not under. Only `actions/checkout` at any ref counts, owner and name in
-  any case: a fork of it, a wrapper action or a `git clone` in a `run` is no checkout, and a
+  any case: a fork of it, a wrapper action or a `git clone` in a `run` is no checkout, a
+  checkout under an `if` counts whatever its condition, and a
   step that removes the files afterwards is not seen. A checkout's `ref` is not read: the link
-  is to the own repository at its indexed commit. An unresolved CI step holds no candidate,
-  `meada decide` offers nothing for it, and a decision written by hand for it was not probed.
+  is to the own repository at its indexed commit. An unresolved CI step holds no candidate and
+  `meada decide` offers nothing for it. A decision written by hand for it (`kind =
+  "dynamic-url"`, its `target` a CI provider) is accepted for any CI provider of the workspace,
+  an action or a reusable pipeline alike: it adds a `decided` link that `trace` and the
+  provider's `context` follow and closes the item, while `context` on the CI step still says
+  `consumes (unresolved)`.
   `$/<path>` reads on every host, though GitHub Enterprise Server does not have it. A path is
-  normalised by the path rule of `iac::joined` in every form (`.`, `..`, empty segments), which
-  GitHub may refuse in a call by owner and name; one that leaves the root holds no side. A
-  CI step that names a pipeline file, a CI job that names anything else, and a `./` call with a
-  ref hold no side. An action in a folder named as a pipeline file
+  normalised by the path rule of `iac::joined` in every form (`.`, `..`, inner and trailing
+  empty segments), which GitHub may refuse in a call by owner and name; one that leaves the
+  root, or starts with an empty segment (`.//x`), holds no side. A
+  CI step that names a pipeline file and a CI job that names anything else hold no side, so a
+  CI job's `./<file>@<ref>` holds none; a CI step's `./<folder>@<ref>` or `$/<folder>@<ref>`,
+  which GitHub calls invalid, reads as a folder whose name holds the `@`. A `uses` that holds
+  `${{` names nothing: GitHub evaluates no expression there. A call by owner and name is cut
+  at its first `@` (`<folder>@v1@v2` reads the ref `v1@v2`), and a CI job's ref written
+  `refs/heads/<branch>`, which GitHub does not allow, links as any other. An action in a folder named as a pipeline file
   (`.github/workflows/x.yml/action.yml`) provides nothing. A folder with only a `Dockerfile` is
   no provider (ADR 0028), and until #827 a call to a folder with no action carries no mark.
 - `iac/serverless.rs` (#654, ADR 0025): a service reuses `NODES_MAX` (functions first, in name
