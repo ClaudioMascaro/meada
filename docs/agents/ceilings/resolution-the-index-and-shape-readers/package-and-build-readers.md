@@ -30,8 +30,15 @@
   serves the install, and one in the CI step's own repository is `inferred`, as for a manifest
   entry with no source. A name with an open part is a pattern within `iac/pattern.rs`'s limits
   (`inferred` to the one package it fits, `ambiguous` to several, no side when it fits none); a
+  literal name with an open range or extra is the package, its range as written and
+  `range unchecked`; a
   name left open whole is one unresolved consumer per CI step, with what is written as its
-  `via`, a cause and no candidate. The first install of a name by a CI step gives its range.
+  `via`, a cause and no candidate, and only in a workspace that provides a PyPI package (no
+  side elsewhere). The first install of a name by a CI step gives its range, and a range pip
+  would refuse (`shared-lib==`) links as written. `context` on a package lists the dependents
+  that name it: a pattern that fits it is counted by `search` and shown by `context` on its
+  own CI step only. `trace` walks no package link from a CI step: a manifest is no node of
+  it.
 - `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_NAME`
   (214 bytes; a longer name is no package) and `MAX_BYTES` (under `lang/mod.rs`). A range is
   stored as written, with no length limit beyond `MAX_BYTES`; npm's `flag` (`package/npm.rs`) checks only one of at most

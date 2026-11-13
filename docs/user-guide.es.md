@@ -1524,9 +1524,11 @@ el rango como está escrito: `context` en el paquete lista el paso de CI, y el e
 de la sección 8.5 (`exact` para un único proveedor en otro repositorio). Una ruta, una URL, `-e`, el
 archivo de `-r` y el valor de una opción no dan lado. Un nombre con una parte que ningún `env`
 literal da (`shared-${{ vars.X }}`) es un patrón, enlazado como `inferred` al único paquete que
-encaja; un nombre entero así (`pip install $PKG`) es un consumidor no resuelto, un ítem abierto que
-dice su causa y no tiene candidato. Meada no sigue una variable que el script asigna, `cd`, una
-función ni un script llamado.
+encaja; un nombre entero así (`pip install $PKG`) es, donde el workspace provee un paquete PyPI, un
+consumidor no resuelto, un ítem abierto que dice su causa y no tiene candidato. Un nombre literal
+con una parte así en el rango (`shared-lib==${{ matrix.v }}`) es el propio paquete, con el rango
+como está escrito. Meada no sigue una variable que el script asigna, `cd`, una función ni un script
+llamado.
 
 **Otros sistemas de CI.** Meada lee GitHub Actions. Para un sistema que no lee (GitLab CI,
 Jenkins, Azure Pipelines), declare el vínculo a mano con `[[resource]]` y `via` en la clave que

@@ -1810,14 +1810,16 @@ resource "aws_apigatewayv2_route" "wide" {{
             "pipeline: run scripts of a variable a long literal gives",
             || {
                 // #831: the gate of the command table reads each stored script, a value within
-                // `VALUE_MAX`, and the literals it reads add at most the script's own length.
+                // `VALUE_MAX`, and the literals it reads add at most the script's own length and
+                // one value's.
                 use crate::iac::actions::run::{Part, commands};
                 let script = "pip install $A$A ".repeat(crate::config_values::VALUE_MAX / 17);
                 let literal = "a".repeat(100);
                 let read = commands(&script, |_| Some(&literal)).unwrap();
                 let parts = read.iter().flatten().flatten();
                 let bytes: usize = parts.map(|(Part::Text(t) | Part::Open(t))| t.len()).sum();
-                assert!(bytes <= 2 * script.len(), "{bytes}");
+                let most = 2 * script.len() + crate::config_values::VALUE_MAX;
+                assert!(bytes <= most, "{bytes}");
                 // As many such CI steps as one file holds.
                 bytes * (MAX_BYTES / script.len())
             },

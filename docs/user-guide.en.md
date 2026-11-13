@@ -1494,8 +1494,10 @@ the range as written: `context` on the package lists the CI step, and the link f
 section 8.5 (`exact` for a single provider in another repository). A path, a URL, `-e`, the file of
 `-r` and the value of an option give no side. A name with a part no literal `env` gives (`shared-${{
 vars.X }}`) is a pattern, linked `inferred` to the one package it fits; a whole name like that (`pip
-install $PKG`) is an unresolved consumer, an open item that says its cause and has no candidate.
-Meada follows no variable the script assigns, no `cd`, no function and no called script.
+install $PKG`) is an unresolved consumer where the workspace provides a PyPI package, an open item
+that says its cause and has no candidate. A literal name with such a part in its range
+(`shared-lib==${{ matrix.v }}`) is the package itself, the range as written. Meada follows no
+variable the script assigns, no `cd`, no function and no called script.
 
 **Other CI systems.** Meada reads GitHub Actions. For a system it does not read (GitLab CI,
 Jenkins, Azure Pipelines), declare the link by hand with `[[resource]]` and `via` on the key

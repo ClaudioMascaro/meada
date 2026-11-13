@@ -1,7 +1,7 @@
 //! Directionless config uses (ADR 0026, #661), derived from non-secret, uncut stored strings.
 //! Only a structured cloud identifier or a final typed key gives evidence of a contract.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Bound;
 
 use meada_core::export::{Level, Use};
@@ -125,12 +125,19 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
     for (path, key) in others.iter().filter(|row| owned.contains_key(&row.0)) {
         entries.entry(path).or_default().insert(key, None);
     }
-    // The `run` scripts of each owned file that write to `GITHUB_ENV`: a name one of them
-    // rebinds reaches the CI steps after it, so no literal `env` gives it.
-    let mut written = HashMap::<&str, Vec<&str>>::new();
+    // The names the `run` scripts of each owned file may write to the environment file
+    // (`GITHUB_ENV`, `github.env`): one of them reaches the CI steps after it, so no literal
+    // `env` gives it.
+    let mut written = HashMap::<&str, HashSet<&str>>::new();
     for (path, key, value, _) in rows.iter().filter(|row| owned.contains_key(&row.0)) {
-        if key.ends_with(".run") && value.contains("GITHUB_ENV") {
-            written.entry(path).or_default().push(value);
+        let lower = value.to_ascii_lowercase();
+        let writes = || {
+            ["github_env", "github.env", "github["]
+                .iter()
+                .any(|w| lower.contains(w))
+        };
+        if key.ends_with(".run") && writes() {
+            written.entry(path).or_default().extend(run::rebound(value));
         }
     }
     let mut uses = Vec::new();
@@ -169,8 +176,8 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
             let envs = scopes(holders, "env.");
             let env = |name: &str| {
                 let mut found = envs.iter().filter_map(|scope| given(file, scope, name));
-                let mut scripts = written.get(path.as_str()).into_iter().flatten();
-                (found.next().flatten()).filter(|_| !scripts.any(|s| run::rebinds(s, name)))
+                let written = written.get(path.as_str());
+                (found.next().flatten()).filter(|_| written.is_none_or(|w| !w.contains(name)))
             };
             let commands = (shell.is_none_or(|shell| matches!(shell, Some("bash" | "sh"))))
                 .then(|| run::commands(value, env))

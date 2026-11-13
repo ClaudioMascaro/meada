@@ -80,7 +80,7 @@ const INSTALLS: [&[&str]; 6] = [
 
 /// The options of those commands that take no value. The word after any other option is its
 /// value, never a name: a flag missing here costs the name after it, and gives no wrong one.
-const FLAGS: [&str; 22] = [
+const FLAGS: [&str; 35] = [
     "-U",
     "--upgrade",
     "-q",
@@ -103,14 +103,27 @@ const FLAGS: [&str; 22] = [
     "--system",
     "--force",
     "--include-deps",
+    "--no-index",
+    "--dry-run",
+    "--require-hashes",
+    "--no-compile",
+    "--reinstall",
+    "--offline",
+    "-qq",
+    "-vv",
+    "--isolated",
+    "--ignore-requires-python",
+    "--no-warn-script-location",
+    "--no-warn-conflicts",
+    "--no-color",
 ];
 
 /// How a consumer says its name is a pattern (`Consumer::via`).
 const PATTERN: &str = "pattern";
 
 /// What the argument `word` of an install names: a requirement by name with its range as
-/// written, a pattern of the name when a part of it is open, or the name left open whole.
-/// `None` for anything else: a path, a URL, a direct reference.
+/// written (open parts included), a pattern of the name when a part of it is open, or the name
+/// left open whole. `None` for anything else: a path, a URL, a direct reference, no name.
 fn installed(word: &[Part]) -> Option<Install> {
     let entry = |name, range, via: Option<&str>| {
         let via = via.map(str::to_string);
@@ -153,10 +166,13 @@ fn installed(word: &[Part]) -> Option<Install> {
     // The rest, after a name that stands for this one: extras, then the range.
     let (_, range) = requirement(&format!("x{rest}"))?;
     if name.bytes().all(|b| b == b'*') {
-        return Some(Install::Open(open));
+        // No name at all (a path under `~`, a lone range) installs nothing by name.
+        return (!name.is_empty()).then_some(Install::Open(open));
     }
     normalize(&name.replace('*', "x"))?;
-    Some(entry(name, range, Some(PATTERN)))
+    // A literal name whose extras or range hold the open part is the package itself.
+    let pattern = name.contains('*').then_some(PATTERN);
+    Some(entry(name, range, pattern))
 }
 
 /// The module name a distribution's import is spelled with when it follows the convention:

@@ -25,22 +25,26 @@
 - `iac/actions/run.rs` (#831, ADR 0028): the command table evaluates no shell. A variable the
   script assigns, `cd`, a function call and a called script (`./deploy.sh`, `make`, `npm run`)
   are not followed; the lines of a function's body are read as lines of the script. A command
-  is the first word of a line or the one after `&&` or `;`, also after `if`, `then`, `else`,
-  `elif`, `do`, `while`, `until`, `!` and `{`; a prefix (`sudo`, `env`, `time`, an assignment)
-  makes it another command, and what follows `||`, a pipe, `&`, a redirection or a parenthesis
-  is not read up to the next line, `&&` or `;`. A heredoc (`<<`, also the left shift of an
-  arithmetic expansion) leaves the whole script unread, and so does a quote, an expansion or an
-  expression left open: no side and no open item. The script is the stored config value, so one
-  past `config_values::VALUE_MAX` (1024 bytes) is not read. The shell is the CI step's `shell`,
-  else `defaults.run.shell` of its CI job, then of the pipeline: only `bash`, `sh` or none
-  declared is read, never a template (`bash -e {0}`) or an expression. A CI runner on Windows
-  defaults to `pwsh`: `runs-on` is not read, and the script is read as `bash`. `${{ env.X }}`,
-  `$X` and `${X}` take the literal of the nearest `env` (CI step, CI job, pipeline) that
-  defines the name, when it holds only letters, digits, `.`, `_`, `=` and `-`, and when
-  neither the script nor another script of the file that names `GITHUB_ENV` mentions the name
-  other than by reading it. A write to `GITHUB_ENV` by an action, a called script or a script
-  past the length ceiling is not seen. The literals read add at most the script's own length;
-  past it a variable stays open.
+  is the first word of a line or the one after `&&` or `;`, also after a bare `if`, `then`,
+  `else`, `elif`, `do`, `while`, `until`, `!` and `{` (quoted, escaped or given by a variable,
+  such a word is the command); a prefix (`sudo`, `env`, `time`, an assignment) makes it another
+  command, and what follows `||`, a pipe, `&`, a redirection or a parenthesis is not read up
+  to the next line, `&&` or `;`. A parenthesis that opens a command is a subshell, `((` an
+  arithmetic command with no command inside, and any other one (an array, a function's `()`)
+  is passed over to the one that closes it. A heredoc (`<<`, also the left shift of an
+  arithmetic expansion or command) leaves the whole script unread, and so does a quote, a
+  parenthesis, an expansion or an expression left open: no side and no open item. The script is
+  the stored config value, so one past `config_values::VALUE_MAX` (1024 bytes) is not read. The
+  shell is the CI step's `shell`, else `defaults.run.shell` of its CI job, then of the
+  pipeline: only `bash`, `sh` or none declared is read, never a template (`bash -e {0}`) or an
+  expression. A CI runner on Windows defaults to `pwsh`: `runs-on` is not read, and the script
+  is read as `bash`. `${{ env.X }}`, `$X` and `${X}` take the literal string of the nearest
+  `env` (CI step, CI job, pipeline) that defines the name (a number or a boolean stays open),
+  when it holds only letters, digits, `.`, `_`, `=` and `-`, and when neither the script nor
+  another script of the file that names the environment file (`GITHUB_ENV`, `github.env`,
+  `github[`) mentions the name other than by reading it. A write to it by an action, a called
+  script or a script past the length ceiling is not seen. The literals read add at most the
+  script's own length and `VALUE_MAX`; past it a variable stays open.
 - `ci.rs` (#824, ADR 0028): a CI contract links what is written, and Meada resolves no Git ref.
   Only a ref of 40 or 64 hexadecimal digits is a commit id: an abbreviated one reads as a name
   and never gets `ref mismatch`, and a branch or a tag of that shape reads as a commit id and

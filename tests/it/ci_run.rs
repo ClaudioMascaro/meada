@@ -5,7 +5,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use meada::engine::Engine;
+use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
 
 use crate::common::fixture_repo;
@@ -485,6 +485,95 @@ fn a_name_a_script_of_the_file_rebinds_keeps_no_literal() {
 }
 
 #[test]
+fn the_environment_file_named_by_an_expression_rebinds_a_name_too() {
+    let (_, web) = pair("ci_run_github_env");
+    let head = "env:\n  PKG: shared-lib\n  TOOL: shared-tools\n";
+    let steps = "\
+- run: echo \"PKG=shared-tools\" >> ${{ github.env }}
+- run: echo \"TOOL=shared-lib\" >> \"${{ GitHub['env'] }}\"
+- run: pip install $PKG ${{ env.TOOL }}
+";
+    write(&web, FILE, &pipeline(head, steps));
+    let open = Some("$PKG, ${{ env.TOOL }}".to_string());
+    assert_eq!(
+        sides(&exported(&web)),
+        [("jobs.build.steps[2]".to_string(), None, open)]
+    );
+}
+
+#[test]
+fn a_literal_name_is_the_package_whatever_its_range_or_extra_holds() {
+    let head = "env:\n  A: shared-lib\n  B: shared-tools\n";
+    let steps = [
+        // Two short variables: the literals are longer than the script.
+        "pip install $A $B",
+        "pip install shared-lib==${{ matrix.v }}",
+        "pip install \"shared-lib>=$MIN\" shared-tools[${{ matrix.extra }}]",
+        // No name at all: a path under the home directory, a lone extra or range.
+        "pip install ~/wheels/$WHEEL ~/$PKG \"[dev]$X\" ==$V =$X !$X",
+    ];
+    let (export, rows) = named("ci_run_ranges", head, &steps);
+    assert_eq!(
+        rows,
+        [
+            at(0, SHARED),
+            at(0, TOOLS_PACKAGE),
+            at(1, SHARED),
+            at(2, SHARED),
+            at(2, TOOLS_PACKAGE),
+        ]
+    );
+    // No pattern and no unresolved consumer among them.
+    let rows = sides(&export);
+    assert!(
+        rows.iter().all(|r| r.1.is_some() && r.2.is_none()),
+        "{rows:#?}"
+    );
+    let found = links(&export);
+    let of = |n: usize| -> Vec<(&str, &str)> {
+        let own = format!("jobs.build.steps[{n}]");
+        let rows = found.iter().filter(|l| l.0 == own);
+        rows.map(|l| (l.2.as_str(), l.3.as_str())).collect()
+    };
+    assert_eq!(
+        of(1),
+        [(
+            "exact",
+            "package::pypi::shared-lib ==${{ matrix.v }} (local 1.2.0), range unchecked"
+        )]
+    );
+    assert_eq!(
+        of(2),
+        [
+            (
+                "exact",
+                "package::pypi::shared-lib >=$MIN (local 1.2.0), range unchecked"
+            ),
+            (
+                "exact",
+                "package::pypi::shared-tools none (local 0.3.0), range unchecked"
+            ),
+        ]
+    );
+}
+
+#[test]
+fn a_name_left_open_is_no_open_item_where_the_workspace_provides_no_package() {
+    let origin = "https://example.com/ci/nodes.git";
+    let root = fixture_repo("ci_run_no_provider", "ci-nodes", Some(origin));
+    let steps = "- run: pip install $PKG ${{ vars.PACKAGE }}\n- run: pip install shared-lib\n";
+    write(&root, ".github/workflows/install.yml", &pipeline("", steps));
+    let export = exported(&root);
+    let rows = export["consumers"].as_array().unwrap();
+    let installs = |row: &&Value| row["site"].as_str().unwrap().contains("install.yml");
+    let found: Vec<&Value> = rows.iter().filter(installs).collect();
+    assert!(found.is_empty(), "{found:#?}");
+    let engine = Engine::open(&root).unwrap();
+    let answer = engine.search("PKG", Some("unresolved"), None).unwrap();
+    assert!(!answer.contains("install.yml"), "{answer}");
+}
+
+#[test]
 fn a_script_past_the_value_length_ceiling_is_not_read() {
     let (_, web) = pair("ci_run_long");
     let script = |lines: usize| {
@@ -546,8 +635,12 @@ fn the_answers_show_a_ci_step_that_installs_a_package() {
         ],
         "{own}"
     );
+    // A dependent calls on its package: nothing is upstream of the CI step through the link.
+    let up = engine.trace(Start::From(&self::step(0)), Direction::Up, None);
+    let up = up.unwrap();
+    assert!(!up.contains("pyproject.toml"), "{up}");
     // A name left open is an open item no decision closes: it says why.
-    let cause = "the package name is not a literal, and no literal `env` gives it";
+    let cause = "the package name is not a literal, and static evaluation does not give it";
     let open = engine.context(&self::step(1), None).unwrap();
     assert_eq!(
         listed(&open, "consumes "),

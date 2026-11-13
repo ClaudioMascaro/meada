@@ -1553,6 +1553,7 @@ fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
 /// `dependencies` row. An entry whose package is outside the workspace, or a `workspace:` one
 /// whose package is outside its own repository, adds nothing.
 fn consume(exports: &mut [Export], providers: &Providers) {
+    let ecosystems = provided(exports);
     let found: Vec<_> = (exports.iter().enumerate())
         .map(|(n, export)| {
             let mut consumers = Vec::new();
@@ -1583,6 +1584,9 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                 let (mut named, mut open) = (HashSet::new(), Vec::new());
                 for (ecosystem, install) in installs(script) {
                     match install {
+                        // No noise: a name left open is an open item only where it may name
+                        // a package of the workspace.
+                        Install::Open(_) if !ecosystems.contains(ecosystem.name()) => {}
                         Install::Open(written) => open.push(written),
                         // The first install of a package by the CI step gives its range.
                         Install::Named(e) => {
@@ -1671,8 +1675,15 @@ fn installs(script: &Script) -> Vec<(&'static dyn Ecosystem, Install)> {
     found
 }
 
+/// The ecosystems the workspace provides a package of, by name.
+fn provided(exports: &[Export]) -> HashSet<&'static str> {
+    let named = (exports.iter().flat_map(|e| &e.manifests)).filter(|m| m.summary.name.is_some());
+    named.filter_map(|m| Some(of(&m.path)?.name())).collect()
+}
+
 /// Why a CI step's install of a name left open has no candidate.
-const OPEN_INSTALL: &str = "the package name is not a literal, and no literal `env` gives it";
+const OPEN_INSTALL: &str =
+    "the package name is not a literal, and static evaluation does not give it";
 
 /// What checking a dependency range against the provider's version found, when it is not a
 /// plain accept.
@@ -1784,6 +1795,12 @@ impl ContractKind for Packages {
 
     fn sides(&self) -> Option<(&'static str, &'static str)> {
         Some(("package", "dependent"))
+    }
+
+    /// A dependent calls on the package it names: `trace` never reads a package as a writer
+    /// that goes on to its dependents.
+    fn calls_from_definition(&self) -> bool {
+        true
     }
 
     /// A manifest provider (`<repository>::<path>`) sits at `<path>`, a dependency entry's
@@ -1946,9 +1963,16 @@ impl ContractKind for Packages {
         into(links, symbol).map(|l| l.consumer.clone()).collect()
     }
 
-    /// A name a CI step installs and leaves open whole (`Install::Open`) fits no provider.
+    /// A name a CI step installs and leaves open whole (`Install::Open`) fits no provider. It
+    /// is an open item only when the workspace provides a package of its ecosystem.
     fn unresolved_causes(&self, exports: &[Export]) -> HashMap<String, &'static str> {
-        let open = |s: &&Script| (installs(s).iter()).any(|(_, i)| matches!(i, Install::Open(_)));
+        let ecosystems = provided(exports);
+        let open = |s: &&Script| {
+            let open = |(e, i): &(&dyn Ecosystem, Install)| {
+                matches!(i, Install::Open(_)) && ecosystems.contains(e.name())
+            };
+            installs(s).iter().any(open)
+        };
         let scripts = exports.iter().flat_map(|e| &e.scripts).filter(open);
         scripts.map(|s| (s.site.clone(), OPEN_INSTALL)).collect()
     }

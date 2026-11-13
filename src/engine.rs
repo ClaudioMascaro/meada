@@ -1108,6 +1108,16 @@ impl Engine {
         for (n, (export, repo)) in exports.iter().zip(&self.workspace.repos).enumerate() {
             let mut files = Files::new(&repo.root);
             let related = prepared.as_mut().map(|rows| std::mem::take(&mut rows[n]));
+            // The IaC nodes by identity, the first of an identity kept: written out for an
+            // export with a side on one.
+            let nodes = std::cell::OnceCell::new();
+            let nodes = || {
+                nodes.get_or_init(|| {
+                    let nodes = export.iac.iter().rev();
+                    let nodes = nodes.map(|n| (n.identity(&repo.identity), n));
+                    nodes.collect::<HashMap<_, _>>()
+                })
+            };
             for (site, order, role, tag, shape) in
                 sides_of(exports, export, contract, view, kind, related)
             {
@@ -1120,11 +1130,7 @@ impl Engine {
                     format!("{at} {}", name.map_or("(top level)", |s| label(&s.id)))
                 } else if let Some(s) = export.config_sites.iter().find(|s| s.id == site) {
                     s.place()
-                } else if let Some(node) = export
-                    .iac
-                    .iter()
-                    .find(|n| n.identity(&repo.identity) == site)
-                {
+                } else if let Some(node) = nodes().get(site) {
                     format!("{}:{} {}", node.path, node.line, node.address)
                 } else if site == repo.identity {
                     REPOSITORY_LEVEL.into()
