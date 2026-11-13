@@ -15,7 +15,9 @@
   apart and names the first `DATA_NAMED` (10) data files in path order, the rest as a count.
   Terraform and OpenTofu files in every form, and a file a reader of a kind takes as its own
   (`config_values::kind_file`: a document, a config file a language pack reads or includes, a
-  Compose file, a GitHub workflow or Skaffold file, a package manifest, a kustomization or a
+  Compose file, a GitHub workflow or Skaffold file, a pipeline or an action by its place and
+  name (`iac::actions::is_file`: also an `action.yml` that holds no `runs`), a package
+  manifest, a kustomization or a
   file the Kubernetes reader takes an object from, a CloudFormation or SAM template or
   Serverless service, a file the alert reader takes a rule, a route or a receiver from), keep
   every value. The kinds are asked only past the ceiling. A file that a `[serve]` listing or a
