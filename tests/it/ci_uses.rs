@@ -16,7 +16,7 @@ const WORKFLOWS: &str = "github.com/acme/workflows";
 const APP_A: &str = "github.com/acme/app-a";
 
 /// The consumers of `export` in the file `path`: address and contract, `None` for unresolved.
-fn consumers(export: &Value, path: &str) -> Vec<(String, Option<String>)> {
+pub(crate) fn consumers(export: &Value, path: &str) -> Vec<(String, Option<String>)> {
     let repository = export["repository"].as_str().unwrap();
     let prefix = format!("{repository}::{path}::");
     let rows = export["consumers"].as_array().unwrap().iter();
@@ -46,7 +46,7 @@ fn links(export: &Value, path: &str) -> Vec<(String, String, String, String)> {
     .collect()
 }
 
-fn pair(address: &str, contract: Option<&str>) -> (String, Option<String>) {
+pub(crate) fn pair(address: &str, contract: Option<&str>) -> (String, Option<String>) {
     (address.to_string(), contract.map(str::to_string))
 }
 

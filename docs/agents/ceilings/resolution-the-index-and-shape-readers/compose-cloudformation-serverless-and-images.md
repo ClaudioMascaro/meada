@@ -34,8 +34,7 @@
   none. The indexed commit is the checkout's `HEAD` even when the checkout is dirty, read with
   one `git` call per repository that holds a reusable pipeline on each query; a provider whose
   repository records no commit (none made yet, a server-mode index without its recorded commit)
-  reads `@<ref> (indexed commit unknown)`, with no flag. Until #827 a call to a file that
-  provides nothing (absent, or no `on.workflow_call`) carries no mark. A `uses` that holds a
+  reads `@<ref> (indexed commit unknown)`, with no flag. A `uses` that holds a
   control character names no pipeline, and a key of `with` or `secrets` that holds one is left
   out: GitHub takes neither, and each would break a line of `context`. On that line a key named
   `inherit` reads like the word, and a key that holds `, ` or `; ` like several; `meada export`
@@ -77,8 +76,25 @@
   `${{` names nothing: GitHub evaluates no expression there. A call by owner and name is cut
   at its first `@` (`<folder>@v1@v2` reads the ref `v1@v2`), and a CI job's ref written
   `refs/heads/<branch>`, which GitHub does not allow, links as any other. An action in a folder named as a pipeline file
-  (`.github/workflows/x.yml/action.yml`) provides nothing. A folder with only a `Dockerfile` is
-  no provider (ADR 0028), and until #827 a call to a folder with no action carries no mark.
+  (`.github/workflows/x.yml/action.yml`) provides nothing.
+- `ci.rs` (#827, ADR 0028): the absent mark says what the index of the provider's repository
+  holds at its indexed commit, never what the Git ref of the call holds: Meada resolves no ref,
+  so a file that exists only at the ref is marked, and one removed there is not. A file Meada
+  could not read (past `lang::MAX_BYTES`, not UTF-8, refused by the event reader) gives no node
+  and reads as absent, and so does a path that differs from the file's by case. The second
+  reason (`the file is no reusable pipeline there`) needs the pipeline's file node: a file under
+  `.github/workflows/` with no `jobs` is no pipeline and gets the plain mark. A folder that
+  holds a file named exactly `Dockerfile` and no action file is no provider, and a call to it
+  holds no side at all, by owner and name, `$/` or `./` alike: no mark, no orphan line, no open
+  item (`dockerfile`, `Dockerfile.dev` and a `Dockerfile` the walk skips do not count, and the
+  call is then marked absent). The set of those folders is stored per repository (table
+  `dockerfiles`), every folder of the walk, with no ceiling of its own. The mark and the orphan
+  rule scan every CI side of the workspace once per answer. An orphan line needs a consumer
+  with a contract in the scope: a marked consumer opens it, an external `uses` and an
+  unresolved CI step do not, and a provider consumed only by a call to itself is no orphan.
+  `meada status` reports and does not index: a repository never indexed prints `not indexed`
+  and no orphan line. The `absent` field of `meada export` follows the links of that same
+  export: a consumer row of the kind with no link.
 - `iac/serverless.rs` (#654, ADR 0025): a service reuses `NODES_MAX` (functions first, in name
   order, then the resources of its `resources` section, together), `REFERENCES_MAX` (per node) and
   `ROOT_STORED_MAX` (per file, the functions' names, handlers and events counting against it before

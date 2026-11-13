@@ -482,6 +482,11 @@
   owner and name, a local call, `$/`, the five positions of a CI step's `./<folder>`, the open
   items with no candidate beside an HTTP route, a repository without `origin`, `trace` through
   composite actions and the `ci-uses.*` goldens.
+- `ci_orphans.rs` (#827): orphan providers and the absent mark on the reproduction of #816 plus
+  an action nothing calls, a `Dockerfile`-only folder and calls to paths that provide nothing:
+  the orphan lines of `meada status` and the scope rule on `ci-nodes` alone, the mark in
+  `context`, `search` and `meada export`, refresh equal to a cold index and the `ci-orphans.*`
+  goldens.
 
 - `patterns.rs` (#674): sibling `pattern-infra`/`pattern-app` fixtures cover channel and
   resource anchors, ambiguous literal names, short/interior and pattern-to-pattern negatives,

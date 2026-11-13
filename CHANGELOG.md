@@ -43,6 +43,15 @@ All notable changes to Meada are recorded here. The format follows
   and its cause, in `search` kind `unresolved`, `context` and `meada decide --list`.
   `docker://` holds no CI contract. `trace` crosses composite actions as it crosses reusable
   pipelines. Release level: minor, meada (#826).
+- `meada status` lists a reusable pipeline or an action that nothing calls as an orphan of the
+  CI contract, only when the visible scope holds a provider and a consumer of it: a repository
+  of actions indexed alone prints none. A call whose repository is in the workspace and whose
+  path names no provider there is marked ` (absent at the indexed commit)` on the consumer's
+  side, in `context` and `search`, and `"absent": true` on its row of `meada export`: the file
+  may exist at the Git ref, so it is no orphan and no open item. A pipeline file with no
+  `on.workflow_call` gets the mark with that reason. A call to a folder that holds a
+  `Dockerfile` and no action file now holds no side. Existing indexes are rebuilt once on first
+  use. Release level: minor, meada and meada-core (#827).
 
 ### Changed
 

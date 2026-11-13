@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 
 use meada_core::export as written;
 
-use crate::contract::{ContractKind, Found, Hit, Level, Link, Search};
+use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search};
 use crate::iac::{Node, actions};
 use crate::index::{Consumer, Export, Indexed, Provider};
 use crate::resolve::Code;
@@ -175,6 +175,27 @@ fn workspace_causes(own: &str, nodes: &[Node]) -> HashMap<String, &'static str> 
     causes
 }
 
+const ABSENT: &str = " (absent at the indexed commit)";
+const NOT_REUSABLE: &str =
+    " (absent at the indexed commit: the file is no reusable pipeline there)";
+
+/// The mark of a consumer of `contract` when no repository of the workspace provides it: its
+/// path names no provider at the indexed commit, and may name one at the Git ref, so the mark
+/// never says broken. A pipeline file that is there with no `on.workflow_call` says so.
+fn absent(exports: &[Export], contract: &str) -> Option<&'static str> {
+    let provided = |e: &Export| e.providers.iter().any(|p| p.contract == contract);
+    if !contract.starts_with(PREFIX) || exports.iter().any(provided) {
+        return None;
+    }
+    let plain = exports.iter().any(|e| {
+        let path = (contract[PREFIX.len()..].strip_prefix(e.repository.as_str()))
+            .and_then(|rest| rest.strip_prefix('/'));
+        let file = |n: &Node| actions::owns(n) && n.address == "." && Some(&*n.path) == path;
+        e.iac.iter().any(file)
+    });
+    Some(if plain { NOT_REUSABLE } else { ABSENT })
+}
+
 /// The host of a repository identity, which a `uses` leaves out: none for a repository without
 /// `origin`, which names no peer.
 fn host(identity: &str) -> Option<&str> {
@@ -279,33 +300,50 @@ impl ContractKind for Ci {
         let known: HashSet<&str> = repositories.iter().map(|r| r.identity.as_str()).collect();
         for export in exports.iter_mut() {
             let own = export.repository.as_str();
-            let causes = workspace_causes(own, &export.iac);
-            for node in export.iac.iter().filter(|n| actions::owns(n)) {
-                let facts = node.actions.as_ref();
-                if node.address == "." {
-                    // A folder named as a pipeline file would share that file's identifier.
-                    let path = match node.ty.as_str() {
-                        actions::ACTION => actions::action_folder(&node.path)
-                            .map(|folder| folder.trim_end_matches('/'))
-                            .filter(|folder| !actions::is_workflow(folder)),
-                        _ => (facts.is_some_and(|f| f.reusable)).then_some(node.path.as_str()),
-                    };
-                    if let Some(path) = path {
-                        export.providers.push(Provider {
-                            contract: contract(own, path),
-                            site: node.identity(own),
-                            ..Provider::default()
-                        });
-                    }
-                    continue;
+            for node in (export.iac.iter()).filter(|n| actions::owns(n) && n.address == ".") {
+                // A folder named as a pipeline file would share that file's identifier.
+                let path = match node.ty.as_str() {
+                    actions::ACTION => actions::action_folder(&node.path)
+                        .map(|folder| folder.trim_end_matches('/'))
+                        .filter(|folder| !actions::is_workflow(folder)),
+                    _ => (node.actions.as_ref().is_some_and(|f| f.reusable))
+                        .then_some(node.path.as_str()),
+                };
+                if let Some(path) = path {
+                    export.providers.push(Provider {
+                        contract: contract(own, path),
+                        site: node.identity(own),
+                        ..Provider::default()
+                    });
                 }
+            }
+            crate::index::sort_providers(&mut export.providers);
+        }
+        // A folder with a `Dockerfile` and no action is a container action GitHub builds, which
+        // no reader takes: a call to it holds no side, as one to a file outside the workspace.
+        let provided: HashSet<&str> = (exports.iter().flat_map(|e| &e.providers))
+            .map(|p| p.contract.as_str())
+            .collect();
+        let mut unread = HashSet::new();
+        for export in exports.iter() {
+            let folders = export.dockerfiles.iter();
+            let contracts = folders.map(|folder| contract(&export.repository, folder));
+            unread.extend(contracts.filter(|contract| !provided.contains(contract.as_str())));
+        }
+        for export in exports.iter_mut() {
+            let own = export.repository.as_str();
+            let causes = workspace_causes(own, &export.iac);
+            for node in (export.iac.iter()).filter(|n| actions::owns(n) && n.address != ".") {
                 let step = node.ty == actions::STEP;
-                let Some(uses) = facts.and_then(|f| f.uses.as_deref()) else {
+                let Some(uses) = node.actions.as_ref().and_then(|f| f.uses.as_deref()) else {
                     continue;
                 };
                 let Some(contract) = consumed(uses, step, own, &known) else {
                     continue;
                 };
+                if unread.contains(&contract) {
+                    continue;
+                }
                 let site = node.identity(own);
                 export.consumers.push(Consumer {
                     // Unresolved: no contract, as a call whose URL could not be read.
@@ -320,9 +358,45 @@ impl ContractKind for Ci {
                     root: None,
                 });
             }
-            crate::index::sort_providers(&mut export.providers);
             crate::index::sort_consumers(&mut export.consumers);
         }
+    }
+    /// The mark of a consumer no provider answers (`absent`). A provider nothing calls carries
+    /// none: `meada status` lists it, under the scope rule.
+    fn side_note(&self, exports: &[Export], contract: &str, role: Role) -> &'static str {
+        match role {
+            Role::Consumer => absent(exports, contract).unwrap_or_default(),
+            _ => "",
+        }
+    }
+    /// The providers of `export` that nothing calls, only when the scope holds a provider and
+    /// a consumer of the kind (ADR 0026, "Orphans"). An unresolved consumer holds no contract
+    /// and a call outside the workspace no side: neither opens the scope.
+    fn scope_status(
+        &self,
+        _: &Repository,
+        export: &Export,
+        exports: &[Export],
+        _: &[Link],
+    ) -> Vec<String> {
+        let consumed: HashSet<&str> = (exports.iter().flat_map(|e| &e.consumers))
+            .filter_map(|c| c.contract.as_deref())
+            .filter(|contract| contract.starts_with(PREFIX))
+            .collect();
+        if consumed.is_empty() {
+            return Vec::new();
+        }
+        let ours = export
+            .providers
+            .iter()
+            .filter(|p| p.contract.starts_with(PREFIX));
+        ours.filter(|p| !consumed.contains(p.contract.as_str()))
+            .map(|p| {
+                let place = self.place(&export.repository, &p.site).unwrap_or_default();
+                let (contract, place) = (p.contract.as_str(), place.as_str());
+                crate::msg::Msg::OrphanCi { contract, place }.text()
+            })
+            .collect()
     }
     fn unresolved_causes(&self, exports: &[Export]) -> HashMap<String, &'static str> {
         let mut causes = HashMap::new();
@@ -413,7 +487,8 @@ impl ContractKind for Ci {
                 let git_ref = uses.and_then(Uses::read).and_then(|u| u.git_ref());
                 let git_ref = git_ref.map_or(String::new(), |r| format!(" @{r}"));
                 let keys = node_at(exports, site).map_or(String::new(), |(_, n)| passed(n));
-                lines.push(format!("consumes {contract}{git_ref}{keys}"));
+                let mark = absent(exports, contract).unwrap_or_default();
+                lines.push(format!("consumes {contract}{git_ref}{keys}{mark}"));
                 let called =
                     (links.iter()).filter(|l| l.consumer == site && l.contract == contract);
                 lines.extend(called.filter_map(|l| side("provider", &l.provider, l)));
@@ -421,8 +496,13 @@ impl ContractKind for Ci {
         }
         lines
     }
-    /// A call's Git ref and the keys it passes, on its consumer row.
+    /// A call's Git ref and the keys it passes, on its consumer row, and the absent mark where
+    /// the rows of `out` hold no link for it: a link is written for every provider of its
+    /// contract, so none means the workspace holds none.
     fn written(&self, nodes: &[Node], out: &mut written::Export) {
+        let linked: HashSet<(&str, &str)> = (out.links.iter())
+            .map(|l| (l.consumer.as_str(), l.contract.as_str()))
+            .collect();
         let calling: HashMap<String, &Node> = (nodes.iter())
             .filter(|n| actions::owns(n) && n.actions.as_ref().is_some_and(|f| f.uses.is_some()))
             .map(|n| (n.identity(&out.repository), n))
@@ -437,6 +517,8 @@ impl ContractKind for Ci {
             }
             let uses = consumer.via.as_deref().and_then(Uses::read);
             consumer.git_ref = uses.and_then(|u| u.git_ref()).map(str::to_string);
+            let contract = consumer.contract.as_deref().unwrap_or_default();
+            consumer.absent = !linked.contains(&(consumer.site.as_str(), contract));
             if let Some(facts) = calling.get(&consumer.site).and_then(|n| n.actions.as_ref()) {
                 consumer.with = facts.with.clone();
                 consumer.secrets = facts.secrets.clone();

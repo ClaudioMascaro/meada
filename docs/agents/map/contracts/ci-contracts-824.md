@@ -11,7 +11,7 @@ on the `job` node whose `uses` reads `<owner>/<repo>/.github/workflows/<file>@<r
 owner and repository lower-cased as an identity is and the path as written; a repository
 without `origin` (`local/...`) names no peer. A call whose repository is not in the workspace
 holds no side at all: nothing lists it as an orphan or an open item. One whose repository is
-there and whose path names no provider is a consumer with no link.
+there and whose path names no provider is a consumer with no link, marked absent (#827, below).
 
 `link` joins by identifier at `exact` (`uses` takes no expression), with the reason `@<ref>
 (indexed <short commit>)` and `, ref mismatch` only for a ref of 40 or 64 hexadecimal digits
@@ -53,3 +53,14 @@ job, one that names `repository` or `path`): its consumer then has no contract. 
 `unresolved_causes` hands those sites to `items::list` (no candidate, `OpenItem::cause`) and to
 `Engine::search` (no line in the default search or under the kind `contract`); `search` with
 the kind `unresolved`, `context` on the CI step and `meada decide --list` show the cause.
+
+Orphans and the absent mark (#827): `scope_status` gives `meada status` one `Msg::OrphanCi` line
+per provider of the repository that no consumer of the visible exports consumes, and nothing
+while those exports hold no CI consumer with a contract (the scope rule of ADR 0026). `absent`
+names the mark of a consumer whose contract no export provides, with its second reason when the
+path is a pipeline's file node that is not reusable. `side_note` hands it to the engine for
+`search` kind `contract` and `context` on a contract identifier, `context_at` appends it to the
+`consumes` line, and `written` sets `absent` on the consumer rows of `meada export` that hold no
+link. `index::Export::dockerfiles` (table `dockerfiles`, rewritten when the walk's set of
+folders with a file named `Dockerfile` differs) lets `workspace_step` drop the consumer of a
+call to such a folder with no action file: GitHub builds that action and Meada reads none.

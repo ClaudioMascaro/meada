@@ -45,6 +45,7 @@ CREATE TABLE config_files (
     summary TEXT NOT NULL
 );
 CREATE TABLE taken (path TEXT PRIMARY KEY);
+CREATE TABLE dockerfiles (folder TEXT PRIMARY KEY);
 CREATE TABLE contract_configs (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT ''

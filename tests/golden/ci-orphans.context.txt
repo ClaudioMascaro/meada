@@ -1,0 +1,50 @@
+github.com/acme/app-a .github/workflows/absent.yml:3-4 jobs.missing
+type: job
+name: none
+root: .github/workflows/absent.yml
+overridable: none
+references: none
+referenced by:
+github.com/acme/app-a .github/workflows/absent.yml:1 .
+values:
+github.com/acme/app-a .github/workflows/absent.yml:4 jobs.missing.uses = "acme/workflows/.github/workflows/missing.yml@main"
+consumes ci::github.com/acme/workflows/.github/workflows/missing.yml @main (absent at the indexed commit)
+
+github.com/acme/app-a .github/workflows/absent.yml:5-6 jobs.plain
+type: job
+name: none
+root: .github/workflows/absent.yml
+overridable: none
+references: none
+referenced by:
+github.com/acme/app-a .github/workflows/absent.yml:1 .
+values:
+github.com/acme/app-a .github/workflows/absent.yml:6 jobs.plain.uses = "acme/workflows/.github/workflows/internal.yml@main"
+consumes ci::github.com/acme/workflows/.github/workflows/internal.yml @main (absent at the indexed commit: the file is no reusable pipeline there)
+
+github.com/acme/app-a .github/workflows/absent.yml:10-12 jobs.steps.steps[0]
+type: step
+name: none
+root: .github/workflows/absent.yml
+overridable: none
+references: none
+referenced by:
+github.com/acme/app-a .github/workflows/absent.yml:7 jobs.steps
+values:
+github.com/acme/app-a .github/workflows/absent.yml:10 jobs.steps.steps[0].uses = "acme/workflows/tools/nowhere@v1"
+github.com/acme/app-a .github/workflows/absent.yml:12 jobs.steps.steps[0].with.mode = "fast"
+consumes ci::github.com/acme/workflows/tools/nowhere @v1 with: mode (absent at the indexed commit)
+
+github.com/acme/app-a .github/workflows/absent.yml:13-13 jobs.steps.steps[1]
+type: step
+name: none
+root: .github/workflows/absent.yml
+overridable: none
+references: none
+referenced by:
+github.com/acme/app-a .github/workflows/absent.yml:7 jobs.steps
+values:
+github.com/acme/app-a .github/workflows/absent.yml:13 jobs.steps.steps[1].uses = "acme/workflows/tools/container@v1"
+
+ci::github.com/acme/workflows/tools/nowhere
+  github.com/acme/app-a consumer .github/workflows/absent.yml:10 jobs.steps.steps[0] (absent at the indexed commit)

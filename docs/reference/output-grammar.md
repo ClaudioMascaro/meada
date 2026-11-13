@@ -84,6 +84,8 @@ file whose path holds a space reads as more fields than it has.
 | `<orphan-note>` | ` (no runner in the workspace)` | The visible image scope has builders but no runner. |
 | `<orphan-note>` | ` (no matcher in the workspace)` | The visible alert scope has emitters but no matcher. |
 | `<orphan-note>` | ` (no emitter in the workspace)` | The visible alert scope has matchers but no emitter. |
+| `<orphan-note>` | ` (absent at the indexed commit)` | No repository of the workspace provides the CI contract this consumer names: at the indexed commit of the repository its path holds no reusable pipeline and no action. The file may exist at the Git ref, so the mark never says broken. |
+| `<orphan-note>` | ` (absent at the indexed commit: the file is no reusable pipeline there)` | The same, where the pipeline file is there and holds no `on.workflow_call`. |
 
 ## Levels
 
@@ -354,7 +356,7 @@ words:
 | linked reader | `  reader: <identity><mark>` | A reader linked to the selected resource writer. |
 | linked writer | `  writer: <identity><mark>` | A writer linked to the selected resource reader. |
 | ci consumer | `  consumer: <repository> <place> <address> [<level>: <reason>]<ci-passed?>` | Under a pipeline's or an action's `provides`: a CI job or a CI step that calls it, with the link's level and reason and the keys the call passes. |
-| ci consumes | `consumes <contract><ci-ref?><ci-passed?>` | The selected CI job calls the reusable pipeline of the contract, or the selected CI step its action, at the Git ref and with the keys it wrote. |
+| ci consumes | `consumes <contract><ci-ref?><ci-passed?><orphan-note?>` | The selected CI job calls the reusable pipeline of the contract, or the selected CI step its action, at the Git ref and with the keys it wrote. With the absent mark no `ci provider` line follows: no repository of the workspace provides the contract. |
 | ci unresolved | `consumes (unresolved) <text>: <reason>` | The selected CI step names `./<folder>`, read in a workspace Meada does not know: its `uses` as written, then why. It is an open item with no candidate. |
 | ci provider | `  provider: <repository> <place> <address> [<level>: <reason>]` | Under a CI job's or a CI step's `consumes`: the pipeline or the action that provides the contract, with the link's level and reason. |
 | contract head | `<shown-contract>` | The contract the sides below belong to. |

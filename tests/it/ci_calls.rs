@@ -139,15 +139,24 @@ fn a_pipeline_provides_only_with_workflow_call_and_its_identifier_is_lower_cased
     );
     let publish = engine.context(PUBLISH, None).unwrap();
     assert_eq!(listed(&publish, "  consumer: ").len(), 4, "{publish}");
-    // A call to a file that provides nothing is a consumer no provider answers.
-    for (job, name) in [
-        (".github/workflows/case.yml::jobs.cased", "Publish.yml"),
-        (".github/workflows/ci.yml::jobs.internal", "internal.yml"),
+    // A call to a file that provides nothing is a consumer no provider answers, marked absent
+    // (#827): no file of that name, and a file that is there and is not reusable.
+    for (job, name, mark) in [
+        (
+            ".github/workflows/case.yml::jobs.cased",
+            "Publish.yml",
+            "(absent at the indexed commit)",
+        ),
+        (
+            ".github/workflows/ci.yml::jobs.internal",
+            "internal.yml",
+            "(absent at the indexed commit: the file is no reusable pipeline there)",
+        ),
     ] {
         let answer = engine.context(job, None).unwrap();
         assert_eq!(
             listed(&answer, "consumes "),
-            [format!("{} @main", file(name))],
+            [format!("{} @main {mark}", file(name))],
             "{answer}"
         );
         assert!(listed(&answer, "  provider: ").is_empty(), "{answer}");
@@ -291,7 +300,8 @@ fn a_uses_outside_the_workspace_holds_no_side_on_any_surface() {
         assert!(!export.contains(name), "{export}");
         assert!(!status.contains(name), "{status}");
     }
-    // The whole status: each repository and its config files, no line of a side or an orphan.
+    // The whole status: each repository and its config files, no line of a side, and one
+    // orphan, the reusable pipeline `forms.yml` nothing calls (#827).
     assert_golden("ci-calls.status.txt", &status);
 }
 

@@ -61,10 +61,6 @@ def absent(target):
     return ('absent', target[0])
 
 
-def unlinked(target):
-    return ('unlinked', target[0])
-
-
 UNRESOLVED, NONE = ('unresolved',), ('none',)
 PUBLISH, RELEASE = pipeline('workflows', 'publish.yml'), pipeline('wrapper', 'release.yml')
 LOCAL, LOCAL_ACTION = pipeline('forms', 'local.yml'), action('forms', 'local-action')
@@ -98,7 +94,7 @@ CASES = {
     'step_remote_folder': ('calls', 'forms', W + 'forms.yml', 'steps_own_checkout', 'step_remote_folder', link(action('actions', 'setup'), 'v1')),
     'step_only_yaml': ('calls', 'forms', W + 'forms.yml', 'steps_own_checkout', 'step_only_yaml',
                        link(action('actions', 'only-yaml', 'action.yaml'), 'v1')),
-    'step_docker_only': ('calls', 'forms', W + 'forms.yml', 'steps_own_checkout', 'step_docker_only', unlinked(action('actions', 'docker-only'))),
+    'step_docker_only': ('calls', 'forms', W + 'forms.yml', 'steps_own_checkout', 'step_docker_only', NONE),
     'step_missing_folder': ('calls', 'forms', W + 'forms.yml', 'steps_own_checkout', 'step_missing_folder', absent(action('actions', 'nowhere'))),
     'step_docker_ref': ('calls', 'forms', W + 'forms.yml', 'steps_own_checkout', 'step_docker_ref', NONE),
     'step_external': ('calls', 'forms', W + 'forms.yml', 'steps_own_checkout', 'step_external', NONE),
@@ -818,7 +814,7 @@ def drive(run, http):
         cases = {case: (real(located(case)[0]), located(case)[1], real(row[5])) for case, row in CASES.items() if row[0] == workspace}
         want_consumers, want_links = set(), set()
         for case, (site, body, expected) in cases.items():
-            if expected[0] in ('link', 'mismatch', 'absent', 'unlinked'):
+            if expected[0] in ('link', 'mismatch', 'absent'):
                 want_consumers.add((expected[1], site))
             if expected[0] == 'unresolved':
                 want_consumers.add((None, site))
@@ -848,15 +844,17 @@ def drive(run, http):
                     shape = REASON.fullmatch(reasons[0]) if len(reasons) == 1 else None
                     ok = bool(shape) and shape[1] == expected[3] and indexed.startswith(shape[2]) and bool(shape[3]) == (expected[0] == 'mismatch')
                 run.check(f'{case}: the reason of its link', ok, reasons)
-            if expected[0] in ('link', 'mismatch', 'absent', 'unlinked'):
+            if expected[0] in ('link', 'mismatch', 'absent'):
                 row = [row for row in rows('consumers') if row['site'] == site and row['contract'] == expected[1]]
                 got = {key: row[0].get(key) for key in (REF, WITH, SECRETS) if row and row[0].get(key) is not None}
                 run.check(f'{case}: the Git ref and the keys it wrote', got == real(fields(body)), got)
+                run.check(f'{case}: its consumer row {"is" if expected[0] == "absent" else "is not"} marked absent',
+                          bool(row) and bool(row[0].get('absent')) == (expected[0] == 'absent'), row)
             if workspace == 'refs':
                 reply = run.ask('head', cwd, f'{case}-context', [('context', {'symbol': site.split('::', 1)[1], 'budget': 200000})])[0]
                 run.check(f'{case}: `context` on the consumer {"says" if expected[0] == "mismatch" else "does not say"} `ref mismatch`',
                           ('ref mismatch' in reply) == (expected[0] == 'mismatch') and f'@{expected[3]}' in reply, reply)
-            if expected[0] in ('absent', 'unlinked', 'unresolved'):
+            if expected[0] in ('absent', 'unresolved') or case == 'step_docker_only':
                 reply = run.ask('head', cwd, f'{case}-context', [('context', {'symbol': site.split('::', 1)[1], 'budget': 200000})])[0]
                 run.check(f'{case}: {"marked" if expected[0] == "absent" else "not marked"} absent', (ABSENT in reply) == (expected[0] == 'absent'), reply)
             if expected[0] == 'unresolved':

@@ -117,7 +117,10 @@ pub(crate) fn schema_version() -> i32 {
 /// `id`), which serves substring search for a query of three characters or more. None of the
 /// three reaches the export. `taken` lists the documents and the config files a pack reads or
 /// includes as of the last refresh: those keep every value past `config_values::VALUES_MAX`
-/// (#817), so a config file one starts or stops taking is read again.
+/// (#817), so a config file one starts or stops taking is read again. `dockerfiles` lists the
+/// folders (no `/` at the end, empty for the root) that hold a file named `Dockerfile` as of the
+/// last refresh (#827): the CI kind tells by it a container action, which no reader takes, from
+/// a folder that holds no action.
 /// `iac_nodes` holds each IaC node (#649, `iac::Node`: its address, the
 /// label of its root module, its type, physical name as static evaluation resolves it (#650),
 /// whether that is a `pattern`, the `overridable` values it went through as JSON, file, first and
@@ -182,6 +185,7 @@ CREATE TABLE config_files (
     summary TEXT NOT NULL
 );
 CREATE TABLE taken (path TEXT PRIMARY KEY);
+CREATE TABLE dockerfiles (folder TEXT PRIMARY KEY);
 CREATE TABLE contract_configs (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT ''
@@ -902,7 +906,7 @@ fn refresh_attempt(
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
                  DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities; \
-                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM taken; DELETE FROM contract_configs; DELETE FROM config_values; \
+                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM taken; DELETE FROM dockerfiles; DELETE FROM contract_configs; DELETE FROM config_values; \
                  INSERT INTO config_search (config_search) VALUES ('delete-all'); \
                  DELETE FROM iac_nodes; DELETE FROM iac_references; DELETE FROM iac_images; \
                  DELETE FROM iac_unresolved;",
@@ -1029,6 +1033,23 @@ fn refresh_attempt(
         tx.execute("DELETE FROM taken", [])?;
         for path in &taken {
             tx.execute("INSERT INTO taken VALUES (?1)", [path])?;
+        }
+    }
+    // The folders with a `Dockerfile`, hidden CI ones too, for the CI kind (#827): no file of
+    // theirs is stamped, so the walk's set is compared with the stored one.
+    let dockerfiles: BTreeSet<&str> = (all.iter().chain(&hidden))
+        .filter_map(|(path, _)| match path.strip_suffix("Dockerfile")? {
+            "" => Some(""),
+            folder => folder.strip_suffix('/'),
+        })
+        .collect();
+    if stored_dockerfiles(&tx)?
+        .iter()
+        .ne(dockerfiles.iter().copied())
+    {
+        tx.execute("DELETE FROM dockerfiles", [])?;
+        for folder in &dockerfiles {
+            tx.execute("INSERT INTO dockerfiles VALUES (?1)", [folder])?;
         }
     }
     // A Terraform file of a directory holding an override file is read above with every default
@@ -2350,6 +2371,13 @@ fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
         .collect()
 }
 
+/// The folders the index holds a `Dockerfile` in (`dockerfiles`), sorted.
+fn stored_dockerfiles(db: &Connection) -> Result<Vec<String>> {
+    let mut rows = db.prepare("SELECT folder FROM dockerfiles ORDER BY folder")?;
+    let folders = rows.query_map([], |r| r.get(0))?;
+    Ok(folders.collect::<rusqlite::Result<_>>()?)
+}
+
 /// The config files of a repository (path and absolute path): the YAML and JSON files `walk`
 /// found and those under the hidden CI paths (`hidden`, from `hidden_ci`), in path order; and the
 /// Terraform files left out, as a `.tofu` one shadows them.
@@ -2879,6 +2907,9 @@ pub(crate) struct Export {
     pub(crate) configurations: Vec<(String, serde_json::Value)>,
     pub(crate) iac: Vec<iac::Node>,
     pub(crate) iac_references: Vec<iac::Reference>,
+    /// The folders that hold a `Dockerfile` (`dockerfiles`), sorted. Not exported: the CI kind
+    /// reads a call to one with no action file as a container action, which holds no side.
+    pub(crate) dockerfiles: Vec<String>,
     /// HTTP's prepared workspace routing, never stored or written to the graph export.
     pub(crate) http: Option<crate::http::Prepared>,
     pub(crate) workload_images: Vec<(String, String, String)>,
@@ -3455,6 +3486,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
             .collect::<Result<_>>()?,
         iac: iac::nodes(db)?,
         iac_references: iac::all_references(db)?,
+        dockerfiles: stored_dockerfiles(db)?,
         http: None,
         workload_images: db
             .prepare(

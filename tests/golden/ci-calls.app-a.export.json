@@ -17,7 +17,8 @@
       "contract": "ci::github.com/acme/workflows/.github/workflows/internal.yml",
       "site": "github.com/acme/app-a::.github/workflows/ci.yml::jobs.internal",
       "via": "acme/workflows/.github/workflows/internal.yml@main",
-      "ref": "main"
+      "ref": "main",
+      "absent": true
     },
     {
       "contract": "ci::github.com/acme/workflows/.github/workflows/lint.yml",

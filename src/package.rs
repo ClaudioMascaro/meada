@@ -2862,6 +2862,7 @@ mod tests {
             name_candidates: std::collections::BTreeMap::new(),
             iac: Vec::new(),
             iac_references: Vec::new(),
+            dockerfiles: Vec::new(),
             http: None,
             workload_images: Vec::new(),
             executions: Vec::new(),

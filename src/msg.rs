@@ -136,6 +136,11 @@ pub enum Msg<'a> {
         contract: &'a str,
         place: &'a str,
     },
+    /// A reusable pipeline or an action nothing in the scope calls (#827).
+    OrphanCi {
+        contract: &'a str,
+        place: &'a str,
+    },
     /// The missing reads of the repository's consumers against the routes they call (spec #23).
     Drift(usize),
     /// The config files of a repository (#639): read, skipped as lockfiles, as unreadable or
@@ -1830,6 +1835,11 @@ impl Msg<'_> {
                 format!("orphan {contract}: no provisioner; {place}"),
                 format!("órfão {contract}: nenhum provisionador; {place}"),
                 format!("huérfano {contract}: ningún provisionador; {place}"),
+            ),
+            Msg::OrphanCi { contract, place } => pick(
+                format!("orphan {contract}: no consumer; {place}"),
+                format!("órfão {contract}: nenhum consumidor; {place}"),
+                format!("huérfano {contract}: ningún consumidor; {place}"),
             ),
             Msg::OrphanAlert { contract, place, emitter } => {
                 let (en, pt, es) = if *emitter { ("emitter", "emissor", "emisor") } else { ("matcher", "matcher", "matcher") };

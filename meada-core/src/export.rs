@@ -261,6 +261,11 @@ pub struct Consumer {
     /// The secrets a CI call passes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secrets: Option<Secrets>,
+    /// Whether the path a CI call names holds no provider at the indexed commit of its
+    /// repository, so the export holds no link for it (ADR 0028). The file may exist at the Git
+    /// ref: absent is not broken.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub absent: bool,
 }
 
 /// The secrets a CI job passes to the reusable pipeline it calls (ADR 0028): the word `inherit`

@@ -55,13 +55,13 @@ The driver had to choose where the spec is silent. Each choice is a guess until 
 builds it lands, and that ticket changes the driver, never the reverse:
 
 - The export's field names (`REF`, `WITH`, `SECRETS`, #824), an unresolved consumer as a
-  `consumers` row with `contract: null`, the `orphan ci::` status line and the words of the
-  absent mark (`ABSENT`, #827).
+  `consumers` row with `contract: null`, the `orphan ci::` status line, the words of the
+  absent mark (`ABSENT`) and the `absent` field of a marked consumer row (#827).
 - The shape of an answer: one consumer per line in `context`, one hop per line in `trace`, the
   name `<file>::<address>` for a CI node, a type word (`job`, `step`) as a `search` query.
-- Three cases. `job_not_reusable` carries the absent mark (#827 settles it). `step_docker_only`
-  is a consumer with no link and no mark. `solo_remote` holds no side at all, and its peer's
-  pipeline is an orphan in the scope seen from `solo`.
+- Three cases. `job_not_reusable` carries the absent mark and `step_docker_only` holds no side
+  at all (#827 settled both). `solo_remote` holds no side at all, and its peer's pipeline is an
+  orphan in the scope seen from `solo`.
 - `REASON` matches the whole reason: F3's `permissions mismatch` extends it (#830).
 
 ## The pinned corpus
