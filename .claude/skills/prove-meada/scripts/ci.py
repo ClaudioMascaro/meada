@@ -556,7 +556,9 @@ PACKAGES = {
     'tool': ('acme-tool', '0.3.0', {}),
     'plain': ('acme-plain', '0.1.0', {'plain-cli': 'plain_main'}),  # no script named like the package
     'sync': ('acme-sync-kit', '2.0.0', {'acme-sync': 'sync_main'}),
-    'fmt': ('acme-fmt', '1.0.0', {'acme-fmt': 'fmt_main'}),
+    'fmt': ('acme-fmt', '1.0.0', {'acme-fmt-all': 'fmt_all_main', 'acme-fmt': 'fmt_main'}),  # `uvx` names the package: its own script
+    'suite': ('acme-fast-suite', '1.0.0', {}),  # the one package the pattern of the forms fits
+    'flavor': ('flavor', '0.1.0', {}),  # named like a variable of the forms: never matched by that name
     'dup-a': ('acme-dup-a', '1.0.0', {'acme-dup': 'dup_a_main'}),
     'dup-b': ('acme-dup-b', '1.0.0', {'acme-dup': 'dup_b_main'}),
 }
@@ -576,7 +578,8 @@ def manifest(name, version, scripts, more=''):
 def entry(folder):
     """The program the console script of a package of `acme/libs` names: its package and the site of its function."""
     name, _, scripts = PACKAGES[folder]
-    (function,) = scripts.values()
+    function = scripts.get(name) or next(iter(scripts.values()))
+    assert name in scripts or len(scripts) == 1, folder
     return name, f'{LIBS}::{folder}/{name.replace("-", "_")}/cli.py::{function}'
 
 
@@ -626,6 +629,7 @@ PROBES = {
     'docker_push': probe('docker_build', 'docker push ghcr.io/acme/pushed:1.0', image('ghcr.io/acme/pushed')),
     'buildx_push': probe('buildx_no_push', 'docker buildx build --push -t ghcr.io/acme/built:1.0 --tag ghcr.io/acme/built-alt:1.0 .',
                          image('ghcr.io/acme/built'), image('ghcr.io/acme/built-alt')),
+    'docker_push_sha': probe('docker_build', 'docker push ghcr.io/acme/tagged:${{ github.sha }}', image('ghcr.io/acme/tagged')),  # the tag is no part of the name
     'ko_build': probe('ko_not_bare', 'ko build --bare ./cmd/app', image('ghcr.io/acme/ko-built'), **KO('ko-built')),
     'ko_publish': probe('ko_not_bare', 'ko publish --bare ./cmd/app', image('ghcr.io/acme/ko-published'), **KO('ko-published')),
     # The builder forms of actions, read before F2: they keep their rule and take the CI step as their site.
@@ -648,18 +652,31 @@ PROBES = {
     'loop': probe('echo', 'for attempt in 1 2 3; do\n  pip install acme-tool\ndone', consumer('acme-tool')),
     'continuation': probe('comment', 'pip install \\\n  acme-lib', consumer('acme-lib')),
     'quoted': probe('string', "pip install 'acme-tool==0.3.0'", consumer('acme-tool', '==0.3.0')),
+    'then_same_line': probe('echo', 'if [ -f setup.cfg ]; then pip install acme-lib; fi', consumer('acme-lib')),
+    'do_same_line': probe('echo', 'for attempt in 1 2 3; do pip install acme-tool; done', consumer('acme-tool')),
+    # The gate names `&&` and `;` alone: after `||` or a pipe, or behind another command, a command is not read.
+    'or_list': probe('and_list', 'false || pip install acme-lib'),
+    'pipe': probe('and_list', 'yes | pip install acme-lib'),
+    'prefix': probe('pip_install', 'sudo pip install acme-lib'),
+    'two_names': probe('no_provider', 'pip install acme-lib acme-tool', consumer('acme-lib'), consumer('acme-tool')),
+    # A package no repository of the workspace provides holds no side, as a dependency entry of a manifest.
+    'no_provider': probe('pip_install', 'pip install acme-absent'),
     'conda_install': probe('pip_install', 'conda install acme-lib'),
     'pip_download': probe('pip_install', 'pip download acme-lib'),
     # No shell is evaluated: an assignment is not followed, and a literal `env` gives a value.
     'assignment': probe('env_literal', 'PKG=acme-lib\npip install $PKG', ('unresolved', 'PKG')),
     'env_literal': probe('assignment', 'pip install $PKG', consumer('acme-lib'), env={'PKG': 'acme-lib'}),
     'env_expression': probe('whole_vars', 'pip install ${{ env.TOOL }}', consumer('acme-tool'), job={'env': {'TOOL': 'acme-tool'}}),
+    # The pipeline's `env` gives `WHICH`, and a nearer `env` that defines the name decides.
+    'env_pipeline': probe('env_nearest', 'pip install $WHICH', consumer('acme-tool')),
+    'env_nearest': probe('env_pipeline', 'pip install $WHICH', consumer('acme-lib'), env={'WHICH': 'acme-lib'}),
     # An argument that is no requirement by name gives no side (#831).
     'requirements_file': probe('pip_install', 'pip install -r requirements.txt'),
     'editable': probe('pip_install', 'pip install -e .'),
     'wheel_path': probe('pip_install', 'pip install ./dist/acme_lib-1.4.0-py3-none-any.whl'),
     'archive_url': probe('pip_install', 'pip install https://files.example.com/acme-lib-1.4.0.tar.gz'),
     'option_value': probe('archive_url', 'pip install --index-url https://pypi.example.com/simple acme-tool', consumer('acme-tool')),
+    'option_names_package': probe('two_names', 'pip install --no-binary acme-lib acme-tool', consumer('acme-tool')),
     # The shell: the CI step's, else the `defaults.run.shell` of its CI job, else of its pipeline (#831).
     'shell_bash': probe('shell_pwsh', 'pip install acme-lib', consumer('acme-lib'), shell='bash'),
     'shell_sh': probe('shell_pwsh', 'pip install acme-tool', consumer('acme-tool'), shell='sh'),
@@ -679,18 +696,24 @@ PROBES = {
     'level_later_step': probe('level_earlier_step', 'acme-sync --all', program('inferred', 'sync'), after=['acme-sync-kit'], file='levels.yml'),
     'level_ambiguous': probe('level_inferred', 'acme-dup --fast', program('ambiguous', 'dup-a', 'dup-b'), file='levels.yml'),
     'level_none': probe('level_inferred', 'acme-unknown --fast', file='levels.yml'),
+    'level_later_line': probe('console_script', 'acme-sync --all\npip install acme-sync-kit', consumer('acme-sync-kit'), program('inferred', 'sync'),
+                              file='levels.yml'),
+    'level_pipx_install': probe('level_none', 'pipx install acme-fmt\nacme-fmt --check .', consumer('acme-fmt'), program('exact', 'fmt'), file='levels.yml'),
 }
+NEW_BUILDERS = ('docker_push', 'docker_push_sha', 'buildx_push')  # the forms the base does not read
 # Each unresolved form, with the variable its side names when it names one, in the three places of the gate:
-# in part of a name (a pattern no package of the workspace fits), as the whole name, inside an option's value.
-FORMS = {'secrets': ('${{ secrets.FLAVOR }}', 'FLAVOR'), 'vars': ('${{ vars.FLAVOR }}', 'FLAVOR'), 'github': ('${{ github.ref_name }}', None),
-         'matrix': ('${{ matrix.flavor }}', None), 'variable': ('$FLAVOR', 'FLAVOR'), 'substitution': ('$(cat flavor.txt)', None),
+# in part of a name (a pattern one package of the workspace fits), as the whole name, inside an option's value.
+FORMS = {'secrets': ('${{ secrets.SECRET_FLAVOR }}', 'SECRET_FLAVOR'), 'vars': ('${{ vars.FLAVOR }}', 'FLAVOR'), 'github': ('${{ github.ref_name }}', None),
+         'matrix': ('${{ matrix.flavor }}', None), 'variable': ('$SHELL_FLAVOR', 'SHELL_FLAVOR'), 'substitution': ('$(cat flavor.txt)', None),
          'backticks': ('`cat flavor.txt`', None)}
+# A pattern no package fits holds no side, as a name no repository provides.
+PROBES['part_nothing'] = probe('part_vars', 'pip install other-${{ vars.FLAVOR }}-kit', file='forms.yml')
 for form, (text, variable) in FORMS.items():
     more = {'file': 'forms.yml', **({'job': {'strategy': {'matrix': {'flavor': ['fast', 'slow']}}}} if form == 'matrix' else {})}
     PROBES[f'part_{form}'] = probe(f'whole_{form}', f'pip install acme-{text}-suite', ('pattern', package('acme-*-suite')), **more)
     PROBES[f'whole_{form}'] = probe(f'option_{form}', f'pip install {text}', ('unresolved', variable), **more)
     PROBES[f'option_{form}'] = probe(f'part_{form}', f'pip install --index-url https://{text}.example.com/simple acme-tool', consumer('acme-tool'), **more)
-PIPELINES = {'run.yml': 'name: run\non: push\njobs:\n', 'forms.yml': 'name: forms\non: push\njobs:\n', 'levels.yml': 'name: levels\non: push\njobs:\n',
+PIPELINES = {'run.yml': 'name: run\non: push\nenv:\n  WHICH: acme-tool\njobs:\n', 'forms.yml': 'name: forms\non: push\njobs:\n', 'levels.yml': 'name: levels\non: push\njobs:\n',
              'defaults.yml': 'name: defaults\non: push\ndefaults:\n  run:\n    shell: pwsh\njobs:\n'}
 
 
@@ -722,8 +745,25 @@ def unmarked(text):
     return ''.join(line + '\n' for line in text.splitlines() if not re.fullmatch(r'\s*# (case|control): \w+', line))
 
 
-WORKSPACES['run'] = {'libs': libs(), 'steps': pipelines()}
+INSTALL_ACTION = '''name: install
+runs:
+  using: composite
+  steps:
+    # case: composite_run
+    # control: composite_pwsh
+    - id: composite_run
+      run: pip install acme-lib
+      shell: bash
+    # case: composite_pwsh
+    # control: composite_run
+    - id: composite_pwsh
+      run: pip install acme-tool
+      shell: pwsh
+'''
+WORKSPACES['run'] = {'libs': libs(), 'steps': {**pipelines(), 'tools/install/action.yml': INSTALL_ACTION}}
 CASES.update({case: ('run', 'steps', W + options.get('file', 'run.yml'), case, case, ('run', *sides)) for case, (_, _, sides, options) in PROBES.items()})
+CASES['composite_run'] = ('run', 'steps', 'tools/install/action.yml', 'runs', 'composite_run', ('run', consumer('acme-lib')))
+CASES['composite_pwsh'] = ('run', 'steps', 'tools/install/action.yml', 'runs', 'composite_pwsh', ('run',))
 # The chain of F2 (#820, "Further Notes"), over the callers of `calls`: `acme/core-api` serves a route,
 # the console script of `acme/core-sdk` calls it with a base URL read from the environment (a link read
 # from the SDK's code, today), and `publish.yml` installs the package and runs the script.
@@ -797,7 +837,10 @@ CASES.update({
     'chain_run': ('chain', 'workflows', W + 'publish.yml', 'publish', 'chain_run', ('run', ('program', 'exact', (('core-sdk', PUBLISH_MAIN),)))),
 })
 # The site of every console script's function: a link from a CI step to one of them starts a program.
-ENTRIES = {entry(folder)[1] for folder, row in PACKAGES.items() if row[2]} | {PUBLISH_MAIN, f'{SDK}::core_sdk/cli.py::health_main'}
+ENTRIES = {f'{LIBS}::{folder}/{name.replace("-", "_")}/cli.py::{function}' for folder, (name, _, scripts) in PACKAGES.items()
+           for function in scripts.values()} | {PUBLISH_MAIN, f'{SDK}::core_sdk/cli.py::health_main'}
+# The provider of a package: the site of its manifest.
+MANIFESTS = {package(name): f'{LIBS}::{folder}/pyproject.toml' for folder, (name, _, _) in PACKAGES.items()} | {package('core-sdk'): f'{SDK}::pyproject.toml'}
 CHAIN_CALLERS = [('app-a', 'jobs.publish'), ('app-b', 'jobs["publish-prd"]'), ('app-b', 'jobs["publish-stg"]'), ('wrapper', 'jobs.release'),
                  ('app-c', 'jobs.release')]
 
@@ -823,6 +866,7 @@ DECLARED = {
     'perm_both_flags': ({'contents': 'read'}, (('id-token', 'write', 'none'),)),  # with `ref mismatch`
     'perm_not_declared': (NOT_DECLARED, ()),
     'perm_job_alone': (BOTH, ()),
+    'perm_two_flags': ({'packages': 'read'}, (('contents', 'read', 'none'), ('id-token', 'write', 'none'))),
 }
 PERMISSION_NAMES = {'id-token', 'contents', 'packages'}
 # case: (control, its pipeline in `acme/perm-consumer`, the CI job's own block or None, the pipeline it calls).
@@ -840,6 +884,7 @@ CALLERS = {
     'perm_both_flags': ('perm_job_enough', 'blocks.yml', None, f'token.yml@{OTHER_40}'),
     'perm_not_declared': ('perm_pipeline_block', 'bare.yml', None, 'token.yml@main'),
     'perm_job_alone': ('perm_not_declared', 'bare.yml', BOTH, 'token.yml@main'),
+    'perm_two_flags': ('perm_job_enough', 'blocks.yml', {'packages': 'read'}, 'token.yml@main'),
 }
 
 
@@ -1114,7 +1159,11 @@ def selftest():
     for site in ENTRIES:  # every entry point is a function the generated files define
         repo, file, function = site.split('::')
         assert any(f'def {function}(' in files.get(file, '') for files in (WORKSPACES['run']['libs'], WORKSPACES['chain']['core-sdk'])), site
-    assert not any(re.fullmatch('acme-.+-suite', name) for name, _, _ in PACKAGES.values()), 'the pattern of the forms fits no package'
+    assert [name for name, _, _ in PACKAGES.values() if re.fullmatch('acme-.+-suite', name)] == ['acme-fast-suite'], 'one package fits the pattern'
+    assert not any(re.fullmatch('other-.+-kit', name) for name, _, _ in PACKAGES.values()), 'no package fits the control pattern'
+    assert entry('fmt') == ('acme-fmt', f'{LIBS}::fmt/acme_fmt/cli.py::fmt_main') and f'{LIBS}::fmt/acme_fmt/cli.py::fmt_all_main' in ENTRIES
+    assert located('composite_run')[0] == f'{STEPS}::tools/install/action.yml::runs.steps[0]' and located('composite_run')[1]['shell'] == 'bash'
+    assert read(WORKSPACES['run']['steps'][W + 'run.yml'])['env'] == {'WHICH': 'acme-tool'}
     want = wanted('run')
     assert want[located('level_earlier_step')[0]][3] == {(package('acme-sync-kit'), entry('sync')[1], 'exact')}
     assert want[located('level_earlier_step')[0].replace('steps[1]', 'steps[0]')][0] == {package('acme-sync-kit')}
@@ -1124,6 +1173,15 @@ def selftest():
     assert not fits(({package('acme-lib')}, set(), {(package('acme-lib'), f'{LIBS}::lib/pyproject.toml', 'inferred')}), want[located('pip_install')[0]])
     assert not fits(({package('acme-lib')}, set(), set()), want[located('echo')[0]])
     assert not fits((set(), set(), {(package('acme-sync-kit'), entry('sync')[1], 'exact')}), want[located('level_inferred')[0]])
+    assert not fits(({package('acme-lib')}, set(), {(package('acme-lib'), f'{LIBS}::tool/pyproject.toml', 'exact')}), want[located('pip_install')[0]])
+    assert not fits(({package('acme-lib')}, set(), set()), want[located('pip_install')[0]]), 'a name the workspace provides links'
+    pattern, part = package('acme-*-suite'), want[located('part_vars')[0]]
+    assert fits(({pattern}, set(), {(pattern, f'{LIBS}::suite/pyproject.toml', 'ambiguous')}), part)
+    assert not fits(({pattern}, set(), set()), part) and not fits(({pattern}, set(), {(pattern, f'{LIBS}::suite/pyproject.toml', 'exact')}), part)
+    assert not fits(({pattern}, set(), {(pattern, f'{LIBS}::lib/pyproject.toml', 'ambiguous')}), part)
+    assert not fits(({None, package('flavor')}, set(), {(package('flavor'), f'{LIBS}::flavor/pyproject.toml', 'exact')}), want[located('whole_vars')[0]])
+    assert fits((set(), set(), {(package('acme-fmt'), entry('fmt')[1], 'exact')}), want[located('level_uvx')[0]])
+    assert not fits((set(), set(), {(package('acme-fmt'), f'{LIBS}::fmt/acme_fmt/cli.py::fmt_all_main', 'exact')}), want[located('level_uvx')[0]])
     assert located('chain_run')[0] == f'{HOST}/workflows::{W}publish.yml::jobs.publish.steps[1]'
     assert 'case:' not in WORKSPACES['chain']['app-a'][W + 'ci.yml'] and 'publish.yml@main' in WORKSPACES['chain']['app-a'][W + 'ci.yml']
     # Slice F3: the keys of #820 against this driver's own reading of the blocks it generated.
@@ -1494,12 +1552,26 @@ def sided(rows, site):
 
 
 def fits(got, want):
-    """A link to an entry point starts a program. Any other link of the CI step is the `exact` one of a
-    package it installs: each package of the cases has one provider (#820, "Programs of the workspace")."""
+    """A link to an entry point starts a program. A name the CI step installs links to the manifest of its
+    package at `exact`: each package of the cases has one provider, in another repository (#820, "Programs
+    of the workspace"). A pattern links to each package it fits, never at `exact`. The link of a package
+    the CI step only starts a program of is allowed, to that manifest."""
     (consumers, builders, links), (must, may, images, programs) = got, want
     started = {link for link in links if link[1] in ENTRIES}
-    return (must <= consumers <= may and builders == images and started == programs
-            and all(contract in must and level == 'exact' for contract, _, level in links - started))
+    names = {contract for contract in must if contract and '*' not in contract}
+    patterns = {contract for contract in must if contract and '*' in contract}
+    installs = {(contract, MANIFESTS[contract], 'exact') for contract in names}
+    fitting = lambda pattern: {site for name, site in MANIFESTS.items() if re.fullmatch(re.escape(pattern).replace(r'\*', '.+'), name)}
+
+    def other(link):
+        contract, provider, level = link
+        if contract in patterns:
+            return level != 'exact' and provider in fitting(contract)
+        return link in installs or contract in may - must and provider == MANIFESTS.get(contract)
+
+    return (must <= consumers <= may and builders == images and started == programs and installs <= links
+            and all(fitting(pattern) == {link[1] for link in links if link[0] == pattern} for pattern in patterns)
+            and all(map(other, links - started)))
 
 
 def f2(run, heads, exports, statuses):
@@ -1539,14 +1611,14 @@ def f2(run, heads, exports, statuses):
         for side in row[5][1:] if row[0] == 'run' else ():
             if side[0] == 'unresolved' and side[1]:
                 run.check(f'{case}: `search` kind `unresolved` for `{side[1]}` shows its CI step', address(case) in replies[side[1]], replies[side[1]])
-    # `context` on a package lists the CI steps that install it, and no CI step of a case that gives no side.
-    silent = [case for case, row in CASES.items() if row[0] == 'run' and len(row[5]) == 1]
+    # `context` on a package lists the CI steps that install it, and no CI step of a case that may not hold it.
     for name in ('acme-lib', 'acme-tool'):
         reply = run.ask('head', at('run', 'hub'), f'context-{name}', [('context', {'symbol': package(name), **big})])[0]
         listed = lambda case: any(STEPS in line and address(case) in line for line in reply.splitlines())
         installs = [case for case, row in CASES.items() if row[0] == 'run' and ('consumer', package(name)) in [side[:2] for side in row[5][1:]]]
-        run.check(f'`context` on `{package(name)}` lists each of the {len(installs)} CI steps that install it and none of the {len(silent)} silent ones',
-                  all(map(listed, installs)) and not any(map(listed, silent)), reply)
+        others = [case for case, row in CASES.items() if row[0] == 'run' and package(name) not in want[located(case)[0]][1]]
+        run.check(f'`context` on `{package(name)}` lists each of the {len(installs)} CI steps that install it and none of the {len(others)} others',
+                  all(map(listed, installs)) and not any(map(listed, others)), reply)
     # The image builder forms. The base reads the forms of today with the repository as their site, and
     # the only difference #820 allows is that site; `docker push` and `docker buildx build --push` are new.
     built = lambda side, contracts: sorted((row for row in exports[side, 'run', 'steps'].get('providers', []) if row['contract'] in contracts),
@@ -1556,7 +1628,7 @@ def f2(run, heads, exports, statuses):
         if not contracts:
             continue
         before, after = built('base', contracts), built('head', contracts)
-        if case in ('docker_push', 'buildx_push'):
+        if case in NEW_BUILDERS:
             run.check(f'control: the base reads no builder from {case}', not before, before)
             continue
         run.check(f'control: the base reads {case} with the repository as its site',
