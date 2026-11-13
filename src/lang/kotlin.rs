@@ -2342,7 +2342,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                         match named(part).next().map(|n| value(n, src, depth + 1)) {
                             Some(Value::Str(found)) => append(&mut parts, found),
                             Some(Value::Ref(name)) => parts.push(Part::Ref(name)),
-                            _ => parts.push(Part::Hole),
+                            other => parts.push(other.as_ref().map_or(Part::Hole, Part::unread)),
                         }
                     }
                     _ => return Value::Unknown,
@@ -2468,7 +2468,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 {
                     Some(Value::Str(found)) => append(&mut parts, found),
                     Some(Value::Ref(name)) => parts.push(Part::Ref(name)),
-                    _ => parts.push(Part::Hole),
+                    other => parts.push(other.as_ref().map_or(Part::Hole, Part::unread)),
                 }
             }
             Value::Str(parts)
@@ -2570,8 +2570,9 @@ mod tests {
         );
     }
 
-    /// The parts a string literal's value is: `$name` and `${name}` are names, any other
-    /// expression a hole, a `$` that starts no name text, and an escape leaves it unknown.
+    /// The parts a string literal's value is: `$name` and `${name}` are names, a call the return
+    /// value of its callee (#801), any other expression a hole, a `$` that starts no name text,
+    /// and an escape leaves it unknown.
     #[test]
     fn a_string_template_is_text_names_and_holes() {
         let text = |s: &str| Part::Text(s.into());
@@ -2593,7 +2594,7 @@ mod tests {
             text("/"),
             name("a.b"),
             text("/"),
-            Part::Hole,
+            Part::Limit(crate::lang::Limit::Returned("f".into())),
             text("/$5 and $"),
         ];
         assert_eq!(parts, expected);

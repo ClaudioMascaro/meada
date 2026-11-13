@@ -1002,8 +1002,10 @@ impl Engine {
             .min() else {
                 continue;
             };
+            let limit = (item.limit.as_ref())
+                .map_or(String::new(), |l| format!(" limit: {};", l.describe()));
             let line = format!(
-                "{} {} ({}) candidates: {}; run `meada decide --item {}`",
+                "{} {} ({}) candidates: {};{limit} run `meada decide --item {}`",
                 item.repository,
                 item.location(),
                 kind.name(),

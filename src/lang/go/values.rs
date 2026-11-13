@@ -552,7 +552,11 @@ pub(super) fn plain(value: &Value, scope: &str, consts: &HashMap<&str, &Value>) 
             Value::Str(parts) => parts.iter().all(|p| match p {
                 Part::Text(_) => true,
                 Part::Ref(n) => name(n),
-                Part::Env(_) | Part::EnvOr(..) | Part::Read { .. } | Part::Hole => false,
+                Part::Env(_)
+                | Part::EnvOr(..)
+                | Part::Read { .. }
+                | Part::Limit(_)
+                | Part::Hole => false,
             }),
             Value::Ref(n) => name(n),
             _ => false,
@@ -711,7 +715,7 @@ fn pieces(value: Value) -> Vec<Part> {
     match value {
         Value::Str(parts) => parts,
         Value::Ref(name) => vec![Part::Ref(name)],
-        _ => vec![Part::Hole],
+        other => vec![Part::unread(&other)],
     }
 }
 
@@ -984,7 +988,11 @@ mod tests {
                 .map(|p| match p {
                     Part::Text(t) => t.clone(),
                     Part::Ref(r) => format!("<{r}>"),
-                    Part::Env(_) | Part::EnvOr(..) | Part::Read { .. } | Part::Hole => "{}".into(),
+                    Part::Env(_)
+                    | Part::EnvOr(..)
+                    | Part::Read { .. }
+                    | Part::Limit(_)
+                    | Part::Hole => "{}".into(),
                 })
                 .collect(),
         )

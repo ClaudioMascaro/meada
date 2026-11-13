@@ -1,12 +1,12 @@
 {
   "format": 1,
   "repository": "example.com/acme/client",
-  "commit": "6180476ca1bc263b407f9d0dea58c30cc9efbb4b",
+  "commit": "9fb8fa385ccaae5b038d8ed3180ffc62cb1320c0",
   "dirty": false,
   "files": [
     {
       "path": "src/client.ts",
-      "hash": "45eba812cc02c3f5a62ef9abc1a100fa93be262330882b2d0cd826cfc686ae1b"
+      "hash": "94df4d071547b44a9d7c2a5ab84371216e7726f1a97b1982f9067eb98700f1d9"
     }
   ],
   "symbols": [
@@ -14,8 +14,8 @@
       "id": "example.com/acme/client::src/client.ts::dynamic",
       "span": {
         "path": "src/client.ts",
-        "start": 384,
-        "end": 456
+        "start": 340,
+        "end": 412
       },
       "hash": "37ee0ff9870818acce62dc5e68a4a888564c731bc8d99a9203efa5f20cec977f"
     },
@@ -23,10 +23,19 @@
       "id": "example.com/acme/client::src/client.ts::health",
       "span": {
         "path": "src/client.ts",
-        "start": 231,
-        "end": 327
+        "start": 229,
+        "end": 283
       },
-      "hash": "132c913257fefabaaa243ffe8876b4fd224527bea8f5ac6c373ff20ea938b1d7"
+      "hash": "b587b8bf787b77a5a7ec4636ed0c64f2f6f193e6268d8dacb71ebf2bdd071d50"
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::origin",
+      "span": {
+        "path": "src/client.ts",
+        "start": 568,
+        "end": 664
+      },
+      "hash": "14c08b871b6e331085a32f2f202a98ca6f4b5158edc0802aa15817650187b600"
     },
     {
       "id": "example.com/acme/client::src/client.ts::users",
@@ -46,8 +55,8 @@
       "level": null,
       "span": {
         "path": "src/client.ts",
-        "start": 433,
-        "end": 453
+        "start": 389,
+        "end": 409
       }
     },
     {
@@ -57,8 +66,19 @@
       "level": null,
       "span": {
         "path": "src/client.ts",
-        "start": 292,
-        "end": 324
+        "start": 264,
+        "end": 280
+      }
+    },
+    {
+      "id": "example.com/acme/client::src/client.ts::origin::fetch#0",
+      "caller": "example.com/acme/client::src/client.ts::origin",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/client.ts",
+        "start": 629,
+        "end": 661
       }
     },
     {
@@ -83,6 +103,11 @@
     {
       "contract": "http::GET::/health",
       "site": "example.com/acme/client::src/client.ts::health::fetch#0",
+      "via": null
+    },
+    {
+      "contract": null,
+      "site": "example.com/acme/client::src/client.ts::origin::fetch#0",
       "via": null
     },
     {

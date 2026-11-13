@@ -339,7 +339,7 @@ impl<'c, 'a> Clients<'c, 'a> {
     /// differ. `None` when there is no client.
     fn base(&self, clients: &[Client<'a>]) -> Option<Option<Vec<Part>>> {
         let set = self.bases.get_or_init(|| self.set());
-        let hole = vec![Part::Hole];
+        let hole = crate::http::client_base();
         let mut bases: Vec<Option<Vec<Part>>> = Vec::new();
         for client in clients {
             let given: Vec<&Vec<Part>> = match client {
@@ -347,14 +347,14 @@ impl<'c, 'a> Clients<'c, 'a> {
                     .filter(|s| s.made == *made && through.ends_with(&s.through))
                     .map(|s| &s.base)
                     .collect(),
-                Client::Typed => Vec::new(),
-                Client::Unknown => vec![&hole],
+                // Only its type is known: whatever base it was given, Meada did not read it.
+                Client::Typed | Client::Unknown => vec![&hole],
             };
             let base = match given[..] {
                 [] => None,
                 [one] => Some(one.clone()),
                 [first, ref rest @ ..] if rest.iter().all(|b| *b == first) => Some(first.clone()),
-                _ => Some(vec![Part::Hole]),
+                _ => Some(crate::http::client_base()),
             };
             if !bases.contains(&base) {
                 bases.push(base);
@@ -363,7 +363,7 @@ impl<'c, 'a> Clients<'c, 'a> {
         match bases.len() {
             0 => None,
             1 => bases.pop(),
-            _ => Some(Some(vec![Part::Hole])),
+            _ => Some(Some(crate::http::client_base())),
         }
     }
 
@@ -384,7 +384,7 @@ impl<'c, 'a> Clients<'c, 'a> {
                 };
                 let base = match self.code.value(path, &call.scope, url) {
                     Value::Str(parts) => parts,
-                    _ => vec![Part::Hole],
+                    _ => crate::http::client_base(),
                 };
                 for client in self.clients(path, &call.scope, receiver, 0) {
                     let Client::Made(made, through, field) = client else {
@@ -392,7 +392,7 @@ impl<'c, 'a> Clients<'c, 'a> {
                     };
                     // Set through a field: on which of the instances it holds is not known.
                     let base = match field {
-                        true => vec![Part::Hole],
+                        true => crate::http::client_base(),
                         false => base.clone(),
                     };
                     let known = set
@@ -530,22 +530,34 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>) -> Vec<Found> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lang::LanguagePack;
+    use crate::contract::Lead;
     use crate::lang::go::Go;
+    use crate::lang::{LanguagePack, Limit};
     use crate::resolve::Resolver;
     use std::collections::BTreeMap;
 
     type Request = (Option<String>, Option<String>);
 
-    /// The contract and the `via` of each consumer of the Go file `src`.
-    fn requests(src: &str) -> Vec<Request> {
+    /// The consumers of the Go file `src`.
+    fn found(src: &str) -> Vec<Found> {
         let facts = Go.parse("x.go", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("x.go", &facts)]);
         let modules = Go.modules(&[], &BTreeMap::new()).unwrap();
         let resolver = Resolver::new(&files, modules, &Go);
         let code = Code::new(&resolver, &files, &Go);
-        let found = consumers(&code).into_iter();
-        found.map(|f| (f.contract, f.via)).collect()
+        consumers(&code)
+    }
+
+    /// The contract and the `via` of each consumer of the Go file `src`.
+    fn requests(src: &str) -> Vec<Request> {
+        (found(src).into_iter())
+            .map(|f| (f.contract, f.via))
+            .collect()
+    }
+
+    /// A request on a client whose base Meada did not read: unresolved, with no `via` (#801).
+    fn unread() -> Vec<Request> {
+        vec![(None, None)]
     }
 
     const HEAD: &str = "package x\n\nimport \"github.com/go-resty/resty/v2\"\n";
@@ -602,7 +614,7 @@ mod tests {
         assert_eq!(held(3), deep);
         // `R()`, the fields, `SetBaseURL` and `New` count.
         assert_eq!(held(CLIENT_DEPTH - 4), deep);
-        assert_eq!(held(CLIENT_DEPTH - 3), sent(None));
+        assert_eq!(held(CLIENT_DEPTH - 3), unread());
     }
 
     #[test]
@@ -775,7 +787,7 @@ mod tests {
         let (found, _) = lattice(3);
         assert_eq!(found, sent(Some("env:API_URL")));
         let (found, took) = lattice(40);
-        assert_eq!(found, sent(None));
+        assert_eq!(found, unread());
         // Measured at about 0.6 s in a local debug build.
         assert!(took < std::time::Duration::from_secs(15), "{took:?}");
     }
@@ -805,6 +817,25 @@ mod tests {
             sent(Some("host:deep.example.com"))
         );
         // A request that only its type tells is a request with no known base.
-        assert_eq!(held("r"), sent(None));
+        assert_eq!(held("r"), unread());
+    }
+
+    /// resty appends a request's path to the client's base, which may hold a path of its own: on
+    /// a client whose base Meada did not read (a field nothing sets) the request is an open item
+    /// that names the client's base, its candidates the routes that end with the path (#801).
+    #[test]
+    fn a_request_on_a_client_whose_base_was_not_read_names_the_client_base() {
+        let src = format!(
+            "{HEAD}\ntype T struct {{ c *resty.Client }}\n\n\
+             func (t *T) Go() {{ t.c.R().Get(\"/orders\") }}\n"
+        );
+        let leads: Vec<_> = (found(&src).into_iter())
+            .map(|f| (f.contract, f.lead))
+            .collect();
+        let lead = Lead {
+            limit: Limit::ClientBase,
+            path: "/orders".into(),
+        };
+        assert_eq!(leads, [(None, Some(lead))]);
     }
 }

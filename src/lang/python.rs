@@ -1638,6 +1638,22 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
     parts_at(node, src, 0)
 }
 
+/// What an expression `parts` does not fold stands for in a string: the return value of the call
+/// it makes, by its callee, or a hole (#801).
+fn unread(node: Node, src: &[u8]) -> Part {
+    match node.kind() {
+        "call" => node
+            .child_by_field_name("function")
+            .map_or(Part::Hole, |f| {
+                Part::Limit(super::Limit::Returned(text(f, src).to_string()))
+            }),
+        "await" | "parenthesized_expression" => {
+            named(node).next().map_or(Part::Hole, |n| unread(n, src))
+        }
+        _ => Part::Hole,
+    }
+}
+
 /// `parts` of a node `depth` levels inside the expression it started from; past `FOLD_DEPTH`
 /// the rest is a hole.
 fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
@@ -1645,7 +1661,7 @@ fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
         return Some(vec![Part::Hole]);
     }
     let parts = |n: Node| parts_at(n, src, depth + 1);
-    let inside = |n: Node| parts(n).unwrap_or_else(|| vec![Part::Hole]);
+    let inside = |n: Node| parts(n).unwrap_or_else(|| vec![unread(n, src)]);
     match node.kind() {
         "string" => Some(
             children(node)
@@ -1653,7 +1669,7 @@ fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
                     "string_content" => Some(Part::Text(text(part, src).to_string())),
                     "interpolation" => Some(match part.child_by_field_name("expression") {
                         Some(e) => (name(e, src).or_else(|| parts(e).and_then(single_env)))
-                            .unwrap_or(Part::Hole),
+                            .unwrap_or_else(|| unread(e, src)),
                         None => Part::Hole,
                     }),
                     _ => None,
@@ -1668,13 +1684,15 @@ fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
                 return None;
             }
             // Each side once: a left-associated chain would cost twice per term otherwise.
-            let (left, right) = (parts(left), parts(right));
-            if left.is_none() && right.is_none() {
+            let (l, r) = (parts(left), parts(right));
+            if l.is_none() && r.is_none() {
                 return None;
             }
-            let hole = || vec![Part::Hole];
-            let (left, right) = (left.unwrap_or_else(hole), right.unwrap_or_else(hole));
-            Some(left.into_iter().chain(right).collect())
+            let (l, r) = (
+                l.unwrap_or_else(|| vec![unread(left, src)]),
+                r.unwrap_or_else(|| vec![unread(right, src)]),
+            );
+            Some(l.into_iter().chain(r).collect())
         }
         // A fallback keeps the environment read on its left, if it is the only one.
         "boolean_operator" => {

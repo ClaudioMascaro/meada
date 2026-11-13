@@ -202,6 +202,7 @@ pub(super) fn items(exports: &[Export]) -> Vec<(OpenItem, bool)> {
                     expression: format!("{} at {at}", builder.provider.contract),
                     enclosing: None,
                     candidates: builder.candidates().to_vec(),
+                    limit: None,
                 },
                 selected,
             ));

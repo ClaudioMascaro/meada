@@ -11634,37 +11634,37 @@
       "via": "host:ledger.example.com"
     },
     {
-      "contract": "http::GET::/sync",
+      "contract": null,
       "site": "example.com/acme/conformance::client/fields.go::Mirror.Sync::(call_expression).Get#0",
       "via": null
     },
     {
-      "contract": "http::GET::/left",
+      "contract": null,
       "site": "example.com/acme/conformance::client/fields.go::Pair.Left::(call_expression).Get#0",
       "via": null
     },
     {
-      "contract": "http::GET::/ping",
+      "contract": null,
       "site": "example.com/acme/conformance::client/fields.go::Pool.Lease::(call_expression).Get#0",
       "via": null
     },
     {
-      "contract": "http::GET::/forward",
+      "contract": null,
       "site": "example.com/acme/conformance::client/fields.go::Proxy.Forward::(call_expression).Get#0",
       "via": null
     },
     {
-      "contract": "http::POST::/push",
+      "contract": null,
       "site": "example.com/acme/conformance::client/fields.go::Queue.Push::(call_expression).Post#0",
       "via": null
     },
     {
-      "contract": "http::POST::/send",
+      "contract": null,
       "site": "example.com/acme/conformance::client/fields.go::Relay.Send::(call_expression).Post#0",
       "via": null
     },
     {
-      "contract": "http::GET::/poll",
+      "contract": null,
       "site": "example.com/acme/conformance::client/fields.go::Unset.Idle::(call_expression).Get#0",
       "via": null
     },
@@ -11829,7 +11829,7 @@
       "via": null
     },
     {
-      "contract": "http::GET::/a",
+      "contract": null,
       "site": "example.com/acme/conformance::client/net.go::Written::http.Get#0",
       "via": null
     },
@@ -11859,7 +11859,7 @@
       "via": "host:a.example.com"
     },
     {
-      "contract": "http::GET::/items",
+      "contract": null,
       "site": "example.com/acme/conformance::client/rest.go::Gateway.Items::(call_expression).Get#0",
       "via": null
     },
@@ -11869,12 +11869,12 @@
       "via": "host:api.example.com"
     },
     {
-      "contract": "http::GET::/m1",
+      "contract": null,
       "site": "example.com/acme/conformance::client/rest.go::Mixed::fetchBase#0",
       "via": null
     },
     {
-      "contract": "http::GET::/m2",
+      "contract": null,
       "site": "example.com/acme/conformance::client/rest.go::Mixed::fetchBase#1",
       "via": null
     },
@@ -11939,7 +11939,7 @@
       "via": "host:returned.example.com"
     },
     {
-      "contract": "http::GET::/reused",
+      "contract": null,
       "site": "example.com/acme/conformance::client/rest.go::Reused::(call_expression).Get#0",
       "via": null
     },
@@ -11954,12 +11954,12 @@
       "via": "host:bare.example.com"
     },
     {
-      "contract": "http::GET::/typed",
+      "contract": null,
       "site": "example.com/acme/conformance::client/rest.go::Typed::(call_expression).Get#0",
       "via": null
     },
     {
-      "contract": "http::GET::/typed-request",
+      "contract": null,
       "site": "example.com/acme/conformance::client/rest.go::Typed::r.Get#0",
       "via": null
     },
@@ -12533,20 +12533,6 @@
   ],
   "links": [
     {
-      "consumer": "example.com/acme/conformance::client/fields.go::Pool.Lease::(call_expression).Get#0",
-      "provider": "example.com/acme/conformance::web/chi.go::ChiPing",
-      "contract": "http::GET::/ping",
-      "level": "ambiguous",
-      "reason": "2 providers fit; host unresolved; the only repository serving it is example.com/acme/conformance"
-    },
-    {
-      "consumer": "example.com/acme/conformance::client/fields.go::Pool.Lease::(call_expression).Get#0",
-      "provider": "example.com/acme/conformance::web/stdlib.go::Ping",
-      "contract": "http::GET::/ping",
-      "level": "ambiguous",
-      "reason": "2 providers fit; host unresolved; the only repository serving it is example.com/acme/conformance"
-    },
-    {
       "consumer": "example.com/acme/conformance::go.mod::require::example.com/acme/billing",
       "provider": "example.com/acme/conformance::forks/billing/go.mod",
       "contract": "package::go::example.com/acme/billing",
@@ -12899,8 +12885,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/fields.go::Mirror.Sync::(call_expression).Get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/sync"
+          "mark": "unresolved"
         }
       ]
     },
@@ -13033,8 +13018,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/fields.go::Pair.Left::(call_expression).Get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/left"
+          "mark": "unresolved"
         }
       ]
     },
@@ -13066,14 +13050,10 @@
         {
           "depth": 1,
           "repository": "example.com/acme/conformance",
-          "level": "ambiguous",
+          "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/fields.go::Pool.Lease::(call_expression).Get#0",
-          "mark": "ambiguous",
-          "candidates": [
-            "example.com/acme/conformance::web/chi.go::ChiPing",
-            "example.com/acme/conformance::web/stdlib.go::Ping"
-          ]
+          "mark": "unresolved"
         }
       ]
     },
@@ -13108,8 +13088,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/fields.go::Proxy.Forward::(call_expression).Get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/forward"
+          "mark": "unresolved"
         }
       ]
     },
@@ -13131,8 +13110,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/fields.go::Queue.Push::(call_expression).Post#0",
-          "mark": "no-provider",
-          "contract": "http::POST::/push"
+          "mark": "unresolved"
         }
       ]
     },
@@ -13168,8 +13146,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/fields.go::Relay.Send::(call_expression).Post#0",
-          "mark": "no-provider",
-          "contract": "http::POST::/send"
+          "mark": "unresolved"
         }
       ]
     },
@@ -13218,8 +13195,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/fields.go::Unset.Idle::(call_expression).Get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/poll"
+          "mark": "unresolved"
         }
       ]
     },
@@ -13661,8 +13637,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/net.go::Written::http.Get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/a"
+          "mark": "unresolved"
         },
         {
           "depth": 1,
@@ -13787,8 +13762,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/rest.go::Gateway.Items::(call_expression).Get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/items"
+          "mark": "unresolved"
         },
         {
           "depth": 1,
@@ -13839,8 +13813,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/rest.go::Mixed::fetchBase#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/m1"
+          "mark": "unresolved"
         },
         {
           "depth": 1,
@@ -13848,8 +13821,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/rest.go::Mixed::fetchBase#1",
-          "mark": "no-provider",
-          "contract": "http::GET::/m2"
+          "mark": "unresolved"
         }
       ]
     },
@@ -14133,8 +14105,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/rest.go::Reused::(call_expression).Get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/reused"
+          "mark": "unresolved"
         }
       ]
     },
@@ -14227,8 +14198,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/rest.go::Typed::(call_expression).Get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/typed"
+          "mark": "unresolved"
         },
         {
           "depth": 1,
@@ -14236,8 +14206,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::client/rest.go::Typed::r.Get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/typed-request"
+          "mark": "unresolved"
         }
       ]
     },

@@ -862,6 +862,18 @@ src/status.ts:3  fetch("/api/health")
   2) example.com/acme/worker GET /api/health
 ```
 
+Un ítem cuya URL empieza por una base que Meada no pudo leer nombra ese límite en una línea propia
+(sección 8.1):
+
+```text
+example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0
+client.go:16  http.Get(c.baseV2() + "/orders")
+  límite: base del valor de retorno de c.baseV2
+  1) example.com/acme/api GET /api/orders
+  2) example.com/acme/api GET /orders
+  3) example.com/acme/api GET /v2/orders
+```
+
 ### El archivo `meada.decisions.toml`
 
 Está en la raíz, se versiona en git como un lockfile, y su diff es lo que se revisa. La
@@ -1228,9 +1240,13 @@ Cómo se elige el enlace, según lo que muestra la URL:
    enlace.
 2. **Variable de entorno.** La URL empieza por una lectura de entorno (`API_URL`) que un par
    declara en `base_url_env`. El enlace es `inferred`; nunca se lee el valor del entorno del proceso.
-3. **Host desconocido.** La URL no dice de dónde viene (una ruta relativa, por ejemplo) y solo un
-   repositorio del workspace sirve ese método y esa ruta. El enlace es `inferred`, con el motivo
-   `the only repository serving it is`.
+3. **Host desconocido.** La URL no dice de dónde viene, pero su ruta es cierta: se escribe sin base
+   (`fetch('/orders')`), o la biblioteca la une a la base de modo que una ruta desde la raíz
+   reemplaza la ruta de la base (`new URL('/orders', base)` en TypeScript, una URI de petición desde
+   la raíz en un `HttpClient` de C#, una ruta de Retrofit desde la raíz, una petición desde la raíz
+   en un cliente Ktor con `defaultRequest` o en una sesión aiohttp, `URL(string:relativeTo:)` en
+   Swift). Cuando solo un repositorio del workspace sirve ese método y esa ruta, el enlace es
+   `inferred`, con el motivo `the only repository serving it is`.
 4. **Varios proveedores.** El enlace es `ambiguous`, y Meada lista todos los candidatos, un
    enlace por candidato. Es un ítem abierto que `meada decide` resuelve.
 
@@ -1241,6 +1257,19 @@ envuelven el cliente, es un **consumidor no resuelto**: aparece en `search`, en 
 el export, nunca enlaza, y es un ítem abierto. Una función que arma la URL a partir de sus
 parámetros pasa a ser un consumidor en cada llamada a ella, con los argumentos sustituidos, a
 cualquier profundidad.
+
+Una URL cuya base Meada no pudo leer, con la ruta añadida a ella, también es un consumidor no
+resuelto: `` fetch(`${base}/orders`) `` con `base` un parámetro que ninguna llamada liga,
+`http.Get(c.base() + "/orders")`, una petición en un cliente cuya URL base Meada no leyó. Esa
+base puede tener una ruta propia, así que solo se conoce el final de la ruta. El ítem abierto
+ofrece como candidatos las rutas del método de la llamada cuya ruta termina con la parte conocida
+a partir de una `/` (`/items` acepta `GET /items` y `GET /api/orders/items`, no `GET
+/api/lineitems`), y nombra el límite que detuvo a Meada: el valor de retorno de una llamada (con
+quién es llamado), un parámetro (con su nombre), la base de un cliente que Meada no leyó, u otra
+parte que no pudo leer. `meada decide --list` muestra el límite en una línea `límite:`, y
+`search` con `kind: unresolved` en la línea del ítem. Una base que es una lectura de entorno
+escrita en el lugar (`os.Getenv("API_URL") + "/orders"`) sigue enlazando por su variable, con o
+sin un par que la declare.
 
 Por qué puede faltar un enlace:
 

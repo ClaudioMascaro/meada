@@ -881,23 +881,21 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
         let mount = format!("host unresolved (Backstage plugin {plugin} at /api/{plugin})");
         assert!(reason.starts_with(&mount), "{reason}");
     }
-    // A `getBaseUrl` of something other than the discovery service folds nothing, and a path
-    // under a mount that no route of the plugin serves names no plugin.
+    // A `getBaseUrl` of something other than the discovery service folds nothing, nor does a base
+    // another argument gives, so the path after it is an open item (#801); a path under a mount
+    // that no route of the plugin serves names no plugin.
     let consumer = |name: &str| {
         let all = json["consumers"].as_array().unwrap();
         let site = |c: &&serde_json::Value| c["site"].as_str().unwrap().contains(name);
         let c = all.iter().find(site).unwrap();
-        (c["contract"].as_str().unwrap(), c["via"].as_str())
+        (c["contract"].as_str(), c["via"].as_str())
     };
-    assert_eq!(
-        consumer("::getSetting::"),
-        ("http::GET::/requests/{}", None)
-    );
+    assert_eq!(consumer("::getSetting::"), (None, None));
     assert_eq!(
         consumer("::listOrderNotes::"),
-        ("http::GET::/api/orders/notes", None)
+        (Some("http::GET::/api/orders/notes"), None)
     );
-    assert_eq!(consumer("::withHeader::"), ("http::GET::/requests/1", None));
+    assert_eq!(consumer("::withHeader::"), (None, None));
     // `meada status` names each plugin it left at the root, and no other.
     let status = meada::engine::status(&repo).unwrap();
     let left: Vec<&str> = (status.lines())

@@ -2,7 +2,10 @@
 //! library's module (`requests.get(url)`) or a method of a client it constructs
 //! (`session.get(url)`); its HTTP method is its name or, for `request(method, url)`, its first
 //! argument. The client's `base_url=` is joined by the root's `based`, a wrapper is read at each
-//! of its call sites (`Code::expand`), and the URL and method are read by the root's `fetch`.
+//! of its call sites (`Code::expand`), and the URL and method are read by the root's `fetch`. A
+//! path joined to a `base_url` Meada did not read leaves the consumer an open item that names the
+//! client's base, unless it starts from the root on an aiohttp session, whose `URL.join` replaces
+//! the base's path with it (RFC 3986): then it is the path alone (#801).
 //! The libraries read also include reqwest and ureq (spec #30), whose rows (modules and
 //! constructors) are the Rust HTTP module's (`http/rust/frameworks.rs`), so the Rust clients are
 //! read by the same rules (the Rust pack gives the receiver's value, so a receiver that is a call
@@ -59,27 +62,33 @@ fn sends(member: &str) -> bool {
 
 /// The base URL the clients that may be the receiver with these `origins` were built
 /// with, `None` when it is not a client: `Some(None)` when it has no base URL, an unknown one
-/// when the clients differ. A client is the call of a library's constructor that the receiver
-/// traces back to, by assignment, `with`, a `self` attribute or an argument.
+/// when the clients differ. With it, whether every one of them is an aiohttp session, which
+/// joins a request path as RFC 3986 does rather than append it to the base's path as httpx does.
+/// A client is the call of a library's constructor that the receiver traces back to, by
+/// assignment, `with`, a `self` attribute or an argument.
 // ponytail: a Python receiver that is the result of a call (`Session().get(...)`,
 // `make().get(...)`) is not read, a Rust one is (the pack gives the receiver's value); a
 // parameter given a client takes the base of every caller that passes one.
-fn client_base<'a>(code: &Code<'a>, origins: Vec<Origin<'a>>) -> Option<Option<Vec<Part>>> {
+fn client_base<'a>(code: &Code<'a>, origins: Vec<Origin<'a>>) -> Option<(Option<Vec<Part>>, bool)> {
     let mut bases: Vec<Option<Vec<Part>>> = Vec::new();
+    let mut joins = true;
     for (at, i) in origins.iter().filter_map(|o| o.call) {
         let Some(ctor) = code.call(at, i) else {
             continue;
         };
         let name = code.outside(at, &ctor.scope, &ctor.callee, false);
-        if !name.is_some_and(|n| libraries().any(|l| l.clients.contains(&n.spelled.as_str()))) {
+        let Some(name) =
+            name.filter(|n| libraries().any(|l| l.clients.contains(&n.spelled.as_str())))
+        else {
             continue;
-        }
+        };
+        joins &= name.spelled == "aiohttp.ClientSession";
         let base = match ctor.keyword("base_url") {
             None => None,
             Some(url) => match code.value(at, &ctor.scope, url) {
                 Value::Undefined => None,
                 Value::Str(parts) => Some(parts),
-                _ => Some(vec![Part::Hole]),
+                _ => Some(crate::http::client_base()),
             },
         };
         if !bases.contains(&base) {
@@ -88,8 +97,8 @@ fn client_base<'a>(code: &Code<'a>, origins: Vec<Origin<'a>>) -> Option<Option<V
     }
     match bases.len() {
         0 => None,
-        1 => bases.pop(),
-        _ => Some(Some(vec![Part::Hole])),
+        1 => bases.pop().map(|base| (base, joins)),
+        _ => Some((Some(crate::http::client_base()), joins)),
     }
 }
 
@@ -108,11 +117,11 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                 .and_then(|outside| {
                     let (module, function) = outside.spelled.rsplit_once('.')?;
                     let library = libraries().any(|l| l.modules.contains(&module));
-                    (library && sends(function)).then(|| (function.to_string(), None))
+                    (library && sends(function)).then(|| (function.to_string(), None, false))
                 });
             let method =
                 (call.callee.rsplit_once('.')).filter(|(_, m)| function.is_none() && sends(m));
-            let (member, base) = match (function, method) {
+            let (member, base, joins) = match (function, method) {
                 (Some(function), _) => function,
                 (None, Some((receiver, member))) => {
                     // A pack that gives the receiver's value reads a receiver that is a call;
@@ -137,7 +146,7 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                         ),
                     };
                     match client_base(code, origins) {
-                        Some(base) => (member.to_string(), base),
+                        Some((base, joins)) => (member.to_string(), base, joins),
                         None => continue,
                     }
                 }
@@ -155,7 +164,12 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
                         arg(0, "url")?,
                     ),
                 };
-                let url = based(base.as_deref(), url);
+                let url = match base.as_deref() {
+                    Some(base) if joins && crate::http::rooted_over_unread(base, url) => {
+                        url.clone()
+                    }
+                    base => based(base, url),
+                };
                 fetch(&[url, method.unwrap_or(Value::Unknown)])
             };
             for Expanded {

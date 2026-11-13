@@ -609,6 +609,7 @@ fn runner(
         fragments: Vec::new(),
         hops: Vec::new(),
         root: Some(root.into()),
+        lead: None,
     }
 }
 

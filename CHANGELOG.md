@@ -44,6 +44,19 @@ All notable changes to Meada are recorded here. The format follows
   table older than the one in `meada.toml`: a refresh reads the table when it starts, not when
   its call opened the index, so a call that read the file before an edit no longer writes the
   index back by the older table (#758).
+- A URL whose base Meada could not read (the return value of a call, a parameter no call binds,
+  the base of a client a reader did not read) with a path appended to it is an open item that
+  names that limit, no longer a consumer of the path's known end that linked to a guessed route
+  (`http.Get(c.baseV2() + "/orders")` linked to `GET /orders` when the base held `/v2`). Its
+  candidates are the routes that end with the known part at a `/`. A URL with no base, an
+  absolute path the library resolves over an unknown base (TypeScript's `new URL`, a C# request,
+  a Retrofit route, a Ktor `defaultRequest` or aiohttp request from the root, Swift's
+  `URL(string:relativeTo:)`) and an environment read written in place link as before. An
+  existing index is rebuilt on its first open by this version (#801).
+- `meada decide --list` prints the limit of such an open item on a line of its block, and
+  `search` on the item's line (#801).
+- An `ambiguous-link` decision written for such a call goes stale; a `dynamic-url` decision that
+  names one of its candidates applies (#801).
 
 ## [1.3.0] - 2026-11-11
 
