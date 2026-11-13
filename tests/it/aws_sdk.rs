@@ -1763,7 +1763,8 @@ fn aws_origin_chains_and_inline_factories_stay_bounded_at_the_file_size_ceiling(
 }
 
 /// The transaction calls of a file fold on a budget of their own: however many they are, the
-/// other calls of the file keep the sides they have without them, of every kind (#719).
+/// other calls of the file keep the sides they have without them, of every kind (#719). The call
+/// where that budget ends has the sides its entries give: a writer, and no reader (#784).
 #[test]
 fn transaction_calls_leave_the_other_sides_of_their_file_named() {
     let repeated = |template: &str, count: usize| -> String {
@@ -1904,6 +1905,37 @@ class Budget {{
                 (export[sides].as_array().unwrap().iter()).any(|s| s["contract"] == contract);
             assert!(named, "{language}: no {contract} in {sides}");
         }
+        // The call where the budget ends has the sides its entries give, a writer and no
+        // reader, and the calls before it keep their names (#784).
+        let sides = |kind: &str| -> Vec<(String, String)> {
+            (export[kind].as_array().unwrap().iter())
+                .map(|s| (s["site"].to_string(), s["contract"].to_string()))
+                .collect()
+        };
+        let mut named: Vec<usize> = (sides("providers").iter())
+            .filter_map(|(_, c)| {
+                c.trim_matches('"')
+                    .strip_prefix("resource::dynamodb::t")?
+                    .parse()
+                    .ok()
+            })
+            .collect();
+        named.sort_unstable();
+        assert!(
+            named.iter().copied().eq(0..named.len()),
+            "{language}: a gap in {named:?}"
+        );
+        let unnamed: Vec<_> = (sides("providers").into_iter())
+            .filter(|(_, c)| c == "\"resource::dynamodb\"")
+            .collect();
+        let readers: Vec<_> = (sides("consumers").into_iter())
+            .filter(|(_, c)| c != "\"resource::dynamodb::get\"")
+            .collect();
+        assert!(
+            readers.is_empty(),
+            "{language}: {} writers named, unnamed {unnamed:?}, readers {readers:?}",
+            named.len()
+        );
     }
 }
 

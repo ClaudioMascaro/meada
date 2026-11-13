@@ -190,6 +190,7 @@ pub(crate) fn extract<'a>(
         };
         for (index, stored) in facts.calls.iter().enumerate() {
             let method = crate::resolve::method(&stored.callee);
+            let call_start = found.len();
             // A method can have several rows: a transaction's entries differ in direction.
             let operations = services.iter().flat_map(|service| {
                 (service.operations.iter())
@@ -203,6 +204,7 @@ pub(crate) fn extract<'a>(
                 } else {
                     &mut origins
                 };
+                let before = found.len();
                 let mut row = || {
                     if !origins.call(path, index, &service.client)
                         && !origins.declared(path, index, service.declared)
@@ -291,10 +293,14 @@ pub(crate) fn extract<'a>(
                         }
                     }
                 };
-                if transaction {
-                    code.apart(row);
-                } else {
+                if !transaction {
                     row();
+                } else if code.apart(row).1 && before > call_start {
+                    // A row the budget ends in cannot tell whether the call has entries of its
+                    // direction: it adds no side to a call an earlier row gave one (a call of
+                    // `Put` entries only got a reader, #784). A call with none keeps it, as a
+                    // call of one row does.
+                    found.truncate(before);
                 }
             }
         }

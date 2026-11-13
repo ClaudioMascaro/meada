@@ -89,6 +89,9 @@ All notable changes to Meada are recorded here. The format follows
   a third time (logged) has no bus either. A Java method's name is no mention of a local of the
   same name (`.entries(entries)`, `.transactItems(transactItems)`, `.put(put.build())`), so such
   a list or builder made and passed straight keeps its bus, or now its tables (#773).
+- In a file of more DynamoDB transaction calls than the evaluation budget covers, the call where
+  the budget ends no longer gets an unresolved reader beside its writer when its entries are
+  `Put` only: a row the budget cuts adds no side to a call an earlier row gave one (#784).
 
 ## [1.3.0] - 2026-11-11
 
