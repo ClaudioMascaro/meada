@@ -3186,6 +3186,7 @@ sample.pyproject.toml
   ],
   "scripts": [
     [
+      "example",
       "example.cli",
       "main"
     ]

@@ -1,0 +1,374 @@
+{
+  "format": 1,
+  "repository": "github.com/acme/workflows",
+  "commit": "4a0d4cd86d60db57420988d33efefd3cad864a4c",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "site": "github.com/acme/workflows::.github/workflows/publish.yml::."
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::pypi::core-sdk",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.by_package.steps[0]",
+      "via": "run uvx core-sdk status"
+    },
+    {
+      "contract": "package::pypi::core-sdk",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.by_package.steps[1]",
+      "via": "run pipx run core-sdk status"
+    },
+    {
+      "contract": "package::pypi::core-sdk",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.declared_twice.steps[0]",
+      "via": "run core-health"
+    },
+    {
+      "contract": "package::pypi::core-tools",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.declared_twice.steps[0]",
+      "via": "run core-health"
+    },
+    {
+      "contract": "package::pypi::core-sdk",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_line.steps[0]",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::core-sdk",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_line.steps[0]",
+      "via": "run core-health --wait 5"
+    },
+    {
+      "contract": "package::pypi::core-tools",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_step.steps[0]",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::core-tools",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_step.steps[1]",
+      "via": "run core-lint --strict"
+    },
+    {
+      "contract": "package::pypi::core-tools",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.elsewhere.steps[1]",
+      "via": "run core-lint"
+    },
+    {
+      "contract": "package::pypi::core-sdk",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.later.steps[0]",
+      "via": "run core-publish early"
+    },
+    {
+      "contract": "package::pypi::core-sdk",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.later.steps[1]",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::core-tools",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.no_install.steps[0]",
+      "via": "run core-lint"
+    },
+    {
+      "contract": "package::pypi::core-tools",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.no_script.steps[0]",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::core-tools",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.picked.steps[0]",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::core-tools",
+      "site": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.picked.steps[0]",
+      "via": "run core-health"
+    },
+    {
+      "contract": "package::pypi::core-sdk",
+      "site": "github.com/acme/workflows::.github/workflows/publish.yml::jobs.publish.steps[1]",
+      "via": null
+    },
+    {
+      "contract": "package::pypi::core-sdk",
+      "site": "github.com/acme/workflows::.github/workflows/publish.yml::jobs.publish.steps[2]",
+      "via": "run core-publish ${{ inputs.package }}"
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.by_package.steps[0]",
+      "address": "jobs.by_package.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 22,
+      "end_line": 22
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.by_package.steps[1]",
+      "address": "jobs.by_package.steps[1]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 23,
+      "end_line": 23
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.declared_twice.steps[0]",
+      "address": "jobs.declared_twice.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 38,
+      "end_line": 38
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_line.steps[0]",
+      "address": "jobs.earlier_line.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 15,
+      "end_line": 17
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_step.steps[0]",
+      "address": "jobs.earlier_step.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 9,
+      "end_line": 9
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_step.steps[1]",
+      "address": "jobs.earlier_step.steps[1]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 10,
+      "end_line": 10
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.elsewhere.steps[1]",
+      "address": "jobs.elsewhere.steps[1]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 55,
+      "end_line": 55
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.later.steps[0]",
+      "address": "jobs.later.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 48,
+      "end_line": 48
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.later.steps[1]",
+      "address": "jobs.later.steps[1]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 49,
+      "end_line": 49
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.no_install.steps[0]",
+      "address": "jobs.no_install.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 33,
+      "end_line": 33
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.no_script.steps[0]",
+      "address": "jobs.no_script.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 28,
+      "end_line": 28
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.picked.steps[0]",
+      "address": "jobs.picked.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/programs.yml",
+      "path": ".github/workflows/programs.yml",
+      "line": 43,
+      "end_line": 43
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "address": ".",
+      "type": "workflow",
+      "root": ".github/workflows/publish.yml",
+      "path": ".github/workflows/publish.yml",
+      "line": 1,
+      "end_line": 20
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/publish.yml::jobs.publish.steps[1]",
+      "address": "jobs.publish.steps[1]",
+      "type": "step",
+      "root": ".github/workflows/publish.yml",
+      "path": ".github/workflows/publish.yml",
+      "line": 19,
+      "end_line": 19
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/publish.yml::jobs.publish.steps[2]",
+      "address": "jobs.publish.steps[2]",
+      "type": "step",
+      "root": ".github/workflows/publish.yml",
+      "path": ".github/workflows/publish.yml",
+      "line": 20,
+      "end_line": 20
+    }
+  ],
+  "links": [
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/ci.yml::jobs.publish",
+      "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "level": "exact",
+      "reason": "@main (indexed 4a0d4cd)"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.by_package.steps[0]",
+      "provider": "github.com/acme/core-sdk::core_sdk/cli.py::main",
+      "contract": "package::pypi::core-sdk",
+      "level": "exact",
+      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-sdk, run by its package's name"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.by_package.steps[1]",
+      "provider": "github.com/acme/core-sdk::core_sdk/cli.py::main",
+      "contract": "package::pypi::core-sdk",
+      "level": "exact",
+      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-sdk, run by its package's name"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.declared_twice.steps[0]",
+      "provider": "github.com/acme/core-sdk::core_sdk/cli.py::health_main",
+      "contract": "package::pypi::core-sdk",
+      "level": "ambiguous",
+      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-health, 2 packages declare it"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.declared_twice.steps[0]",
+      "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::health_main",
+      "contract": "package::pypi::core-tools",
+      "level": "ambiguous",
+      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-health, 2 packages declare it"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_line.steps[0]",
+      "provider": "github.com/acme/core-sdk::core_sdk/cli.py::health_main",
+      "contract": "package::pypi::core-sdk",
+      "level": "exact",
+      "reason": "package::pypi::core-sdk >=1.0 (local 1.0.0); console script core-health, its package installed earlier in the CI job"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_line.steps[0]",
+      "provider": "github.com/acme/core-sdk::pyproject.toml",
+      "contract": "package::pypi::core-sdk",
+      "level": "exact",
+      "reason": "package::pypi::core-sdk >=1.0 (local 1.0.0)"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_step.steps[0]",
+      "provider": "github.com/acme/core-sdk::tools/pyproject.toml",
+      "contract": "package::pypi::core-tools",
+      "level": "exact",
+      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_step.steps[1]",
+      "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::lint_main",
+      "contract": "package::pypi::core-tools",
+      "level": "exact",
+      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, its package installed earlier in the CI job"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.elsewhere.steps[1]",
+      "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::lint_main",
+      "contract": "package::pypi::core-tools",
+      "level": "inferred",
+      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, no install of its package earlier in the CI job"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.later.steps[0]",
+      "provider": "github.com/acme/core-sdk::core_sdk/cli.py::publish_main",
+      "contract": "package::pypi::core-sdk",
+      "level": "inferred",
+      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, no install of its package earlier in the CI job"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.later.steps[1]",
+      "provider": "github.com/acme/core-sdk::pyproject.toml",
+      "contract": "package::pypi::core-sdk",
+      "level": "exact",
+      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.no_install.steps[0]",
+      "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::lint_main",
+      "contract": "package::pypi::core-tools",
+      "level": "inferred",
+      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, no install of its package earlier in the CI job"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.no_script.steps[0]",
+      "provider": "github.com/acme/core-sdk::tools/pyproject.toml",
+      "contract": "package::pypi::core-tools",
+      "level": "exact",
+      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.picked.steps[0]",
+      "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::health_main",
+      "contract": "package::pypi::core-tools",
+      "level": "exact",
+      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-health, its package installed earlier in the CI job"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.picked.steps[0]",
+      "provider": "github.com/acme/core-sdk::tools/pyproject.toml",
+      "contract": "package::pypi::core-tools",
+      "level": "exact",
+      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/publish.yml::jobs.publish.steps[1]",
+      "provider": "github.com/acme/core-sdk::pyproject.toml",
+      "contract": "package::pypi::core-sdk",
+      "level": "exact",
+      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/publish.yml::jobs.publish.steps[2]",
+      "provider": "github.com/acme/core-sdk::core_sdk/cli.py::publish_main",
+      "contract": "package::pypi::core-sdk",
+      "level": "exact",
+      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job"
+    },
+    {
+      "consumer": "github.com/acme/wrapper::.github/workflows/release.yml::jobs.release",
+      "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "level": "exact",
+      "reason": "@main (indexed 4a0d4cd)"
+    }
+  ]
+}

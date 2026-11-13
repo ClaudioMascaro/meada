@@ -61,6 +61,14 @@ All notable changes to Meada are recorded here. The format follows
   and the sides follow the manifest, the grant, the generation and the named workspace: one
   without the provider's repository shows no link to it and no consumer of it. The Meada skill
   and the user guide teach the kind. Release level: minor, meada (#829).
+- A CI step whose command is a console script of a PyPI package of the workspace starts that
+  program (ADR 0028): it consumes the package, with the command as written, and links to the
+  function the script names. The link is `exact` when an earlier command of the same CI job
+  installs the package or the command names it (`uvx <package>`, `pipx run <package>`),
+  `inferred` with no install and one declaring package, `ambiguous` with several, and absent
+  when none declares the name. `trace` crosses it both ways, so the CI jobs that run a program
+  show above the routes it calls. The manifest reader keeps each console script's name: the
+  schema version rises and an index rebuilds on first use. Release level: minor, meada (#832).
 
 ### Changed
 

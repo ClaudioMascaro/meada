@@ -25,7 +25,7 @@
 //! `shapes`, a workspace step after `import`, fills the parts of the shapes that import one.
 
 use std::cell::{OnceCell, RefCell};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -33,7 +33,7 @@ use serde_json::Value;
 
 use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site};
 use crate::entry;
-use crate::iac::actions::run::{Script, Word};
+use crate::iac::actions::run::{self, Script, Word};
 use crate::index::{self, CallSite, Consumer, Export, Indexed, Provider};
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::lang::{Call, MAX_BYTES};
@@ -130,6 +130,13 @@ trait Ecosystem {
     /// command table (ADR 0028). None by default.
     fn installs(&self, _command: &[Word]) -> Vec<Install> {
         Vec::new()
+    }
+
+    /// The console script a command of a CI step's `run` script starts (#832): its name as
+    /// written, and the package the command takes it from when it names one (`uvx <package>`).
+    /// Only PyPI has console scripts.
+    fn runs(&self, _command: &[Word]) -> Option<(String, Option<Entry>)> {
+        None
     }
 
     /// Why a lone provider in the consumer's own repository is not certain, if any: the entry's
@@ -262,9 +269,8 @@ trait Ecosystem {
         false
     }
 
-    /// The program entry points its manifests declare, as `(file, function)`, given the files
-    /// of the repository: none.
-    fn programs(&self, _manifests: &[Manifest], _files: &[&str]) -> Vec<(String, String)> {
+    /// The programs its manifests declare by a name, given the files of the repository: none.
+    fn programs(&self, _manifests: &[Manifest], _files: &[&str]) -> Vec<Program> {
         Vec::new()
     }
 
@@ -353,8 +359,18 @@ fn of_source(path: &str) -> Option<&'static dyn Ecosystem> {
     (ECOSYSTEMS.iter().copied()).find(|e| e.sources().contains(&extension))
 }
 
+/// A program a manifest declares by a name (a PyPI console script): the file and the function
+/// the name starts, the name as written, and the position of the manifest.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Program {
+    file: String,
+    function: String,
+    name: String,
+    manifest: usize,
+}
+
 /// The program entry points the manifests of every ecosystem declare (`Ecosystem::programs`),
-/// sorted, without repeats, for the index writer.
+/// as the file and the function, sorted, without repeats, for the index writer.
 pub fn programs(manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
     programs_of(ECOSYSTEMS, manifests, files)
 }
@@ -366,6 +382,7 @@ fn programs_of(
 ) -> Vec<(String, String)> {
     let mut found: Vec<_> = (list.iter())
         .flat_map(|e| e.programs(manifests, files))
+        .map(|p| (p.file, p.function))
         .collect();
     found.sort();
     found.dedup();
@@ -453,9 +470,10 @@ pub struct Summary {
     /// artifact's `main`, whose classes a dependent never imports.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub test_roots: Vec<String>,
-    /// The console scripts a `pyproject.toml` declares, as `(module, function)` (PyPI only).
+    /// The console scripts a `pyproject.toml` declares, as `(name, module, function)`, the name
+    /// as written (PyPI only).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub scripts: Vec<(String, String)>,
+    pub scripts: Vec<(String, String, String)>,
     /// PyPI only: the `members` and `exclude` globs of a uv workspace root's
     /// `[tool.uv.workspace]`, which the seam's `inherit` reads.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -596,15 +614,17 @@ pub struct ExportedShape {
 
 pub use meada_core::export::How;
 
-/// Where a call through a package import resolves in one provider of the package.
+/// Where a consumer of a package reaches a symbol in one provider of it: a call through a
+/// package import, or a CI step that runs a console script.
 #[derive(Clone)]
 pub struct Hop {
     /// The provider's site: its manifest.
     pub manifest: String,
     /// The symbol reached.
     pub target: String,
-    pub how: How,
-    /// The import's level.
+    /// What reached it, as the link's reason says it after the package's own.
+    pub how: String,
+    /// The level of the import, or of the evidence that the step runs this script.
     pub level: Level,
 }
 
@@ -752,6 +772,8 @@ fn sourced(
         }
         Some(("path", manifest)) => from.0 == to && provider == manifest,
         Some(("git", identity)) => to == identity,
+        // A CI step that runs a console script (`run <command>`) names no source.
+        Some(("run", _)) => true,
         _ => false,
     }
 }
@@ -1289,7 +1311,7 @@ fn import(exports: &mut [Export], providers: &Providers) {
                         hops.push(Hop {
                             manifest: site(repository, &manifest.path),
                             target,
-                            how,
+                            how: format!("import {}", how.name()),
                             level,
                         });
                     }
@@ -1554,6 +1576,8 @@ fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
 /// whose package is outside its own repository, adds nothing.
 fn consume(exports: &mut [Export], providers: &Providers) {
     let ecosystems = provided(exports);
+    // Read the first time a command may run one.
+    let scripts = OnceCell::new();
     let found: Vec<_> = (exports.iter().enumerate())
         .map(|(n, export)| {
             let mut consumers = Vec::new();
@@ -1569,8 +1593,14 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                     ecosystem.reaches(source, export.place(), (exports[m].place(), &at.path))
                 })
             };
-            for script in &export.scripts {
-                let consumer = |contract, via, range| Consumer {
+            // What each CI job has installed so far by a literal name, by the package's
+            // contract, with the range as written: the evidence that a later command of the job
+            // runs that package's console script.
+            let mut installed: HashMap<&str, HashMap<String, Option<String>>> = HashMap::new();
+            let mut steps: Vec<&Script> = export.scripts.iter().collect();
+            steps.sort_by_key(|script| step_of(&script.site));
+            for script in steps {
+                let consumer = |contract, via, range, hops| Consumer {
                     identity: None,
                     contract,
                     site: script.site.clone(),
@@ -1578,28 +1608,116 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                     shape: None,
                     method: range,
                     fragments: Vec::new(),
-                    hops: Vec::new(),
+                    hops,
                     root: None,
                 };
+                let installed = installed.entry(step_of(&script.site).0).or_default();
+                // The rows the CI step holds already: a package once, a command once.
                 let (mut named, mut open) = (HashSet::new(), Vec::new());
-                for (ecosystem, install) in installs(script) {
-                    match install {
-                        // No noise: a name left open is an open item only where it may name
-                        // a package of the workspace.
-                        Install::Open(_) if !ecosystems.contains(ecosystem.name()) => {}
-                        Install::Open(written) => open.push(written),
-                        // The first install of a package by the CI step gives its range.
-                        Install::Named(e) => {
-                            let contract = contract(ecosystem, &e.name);
-                            if provided(ecosystem, &e, None) && named.insert(contract.clone()) {
-                                consumers.push(consumer(Some(contract), e.via, e.range));
+                let commands =
+                    (script.commands.iter()).flat_map(|c| ECOSYSTEMS.iter().map(move |e| (c, *e)));
+                for (command, ecosystem) in commands {
+                    for install in ecosystem.installs(command) {
+                        match install {
+                            // No noise: a name left open is an open item only where it may
+                            // name a package of the workspace.
+                            Install::Open(_) if !ecosystems.contains(ecosystem.name()) => {}
+                            Install::Open(written) => open.push(written),
+                            Install::Named(e) => {
+                                let contract = contract(ecosystem, &e.name);
+                                if !provided(ecosystem, &e, None) {
+                                    continue;
+                                }
+                                // A pattern of a name is no evidence of which package.
+                                if e.via.is_none() {
+                                    let range = || e.range.clone();
+                                    installed.entry(contract.clone()).or_insert_with(range);
+                                }
+                                // The first install of a package by the CI step gives its range.
+                                if named.insert(contract.clone()) {
+                                    let row = consumer(Some(contract), e.via, e.range, Vec::new());
+                                    consumers.push(row);
+                                }
                             }
+                        }
+                    }
+                    let Some((name, package)) = ecosystem.runs(command) else {
+                        continue;
+                    };
+                    let declared = scripts.get_or_init(|| console_scripts(exports));
+                    let key = (ecosystem.name(), name);
+                    let declared = declared.get(&key).map_or(&[][..], Vec::as_slice);
+                    let text = format!("run {}", run::written(command));
+                    let hop = |d: &Declared, level, why: &str| Hop {
+                        manifest: d.manifest.clone(),
+                        target: d.program.clone(),
+                        how: format!("console script {}, {why}", key.1),
+                        level,
+                    };
+                    // Each package whose script the command runs: its range, and a hop per
+                    // manifest that declares the script, with the level and its evidence.
+                    let rows: Vec<(String, Option<String>, Vec<Hop>)> = if let Some(e) = package {
+                        // `uvx <package>`: the script of that name, of that package alone.
+                        if !provided(ecosystem, &e, None) {
+                            continue;
+                        }
+                        let contract = contract(ecosystem, &e.name);
+                        let hops: Vec<Hop> = (declared.iter())
+                            .filter(|d| d.contract == contract)
+                            .map(|d| hop(d, Level::Exact, BY_PACKAGE))
+                            .collect();
+                        // No script of the package's name: a consumer of the package, as an
+                        // install is, and no program.
+                        if hops.is_empty() {
+                            if named.insert(contract.clone()) {
+                                consumers.push(consumer(Some(contract), None, e.range, hops));
+                            }
+                            continue;
+                        }
+                        vec![(contract, e.range, hops)]
+                    } else {
+                        let mut packages: BTreeMap<&str, Vec<&Declared>> = BTreeMap::new();
+                        for d in declared {
+                            packages.entry(&d.contract).or_default().push(d);
+                        }
+                        if packages.len() > MAX_DECLARING {
+                            continue;
+                        }
+                        // The packages of the name the job installed are the ones it may run.
+                        let evidence = packages.keys().filter(|c| installed.contains_key(**c));
+                        let evidence = evidence.count();
+                        let (level, why) = match (evidence, packages.len()) {
+                            (1, _) => (Level::Exact, INSTALLED.to_string()),
+                            (0, 1) => (Level::Inferred, NOT_INSTALLED.to_string()),
+                            (0, n) => (Level::Ambiguous, format!("{n} packages declare it")),
+                            (n, _) => (
+                                Level::Ambiguous,
+                                format!("{n} packages installed earlier in the CI job declare it"),
+                            ),
+                        };
+                        (packages.iter())
+                            .filter(|(c, _)| evidence == 0 || installed.contains_key(**c))
+                            .map(|(c, declared)| {
+                                let range = installed.get(*c).cloned().flatten();
+                                let hops = declared.iter().map(|d| hop(d, level, &why)).collect();
+                                (c.to_string(), range, hops)
+                            })
+                            .collect()
+                    };
+                    for (contract, range, hops) in rows {
+                        if named.insert(format!("{contract} {text}")) {
+                            consumers.push(consumer(
+                                Some(contract),
+                                Some(text.clone()),
+                                range,
+                                hops,
+                            ));
                         }
                     }
                 }
                 if !open.is_empty() {
                     open.dedup();
-                    consumers.push(consumer(None, Some(open.join(", ")), None));
+                    consumers.push(consumer(None, Some(open.join(", ")), None, Vec::new()));
                 }
             }
             for (i, manifest) in export.manifests.iter().enumerate() {
@@ -1654,6 +1772,64 @@ fn consume(exports: &mut [Export], providers: &Providers) {
         export.dependencies = dependencies;
     }
 }
+
+/// The CI job a CI step is in and the step's position there, from its identity
+/// (`<job>.steps[<n>]`): the steps of a job sort into the order they run.
+fn step_of(site: &str) -> (&str, usize) {
+    let (job, step) = site.rsplit_once(".steps[").unwrap_or((site, ""));
+    (job, step.trim_end_matches(']').parse().unwrap_or(0))
+}
+
+/// A console script of the workspace that starts a program entry point: the contract of its
+/// package, the manifest that declares it (the provider's site) and the program's symbol.
+struct Declared {
+    contract: String,
+    manifest: String,
+    program: String,
+}
+
+/// The console scripts of the workspace (`Ecosystem::programs`) by ecosystem and name, as
+/// written. One whose function is no program entry point of its repository, or whose manifest
+/// names no package, is left out.
+fn console_scripts(exports: &[Export]) -> HashMap<(&'static str, String), Vec<Declared>> {
+    let mut found: HashMap<_, Vec<Declared>> = HashMap::new();
+    for export in exports {
+        let files: Vec<&str> = export.files.iter().map(|f| f.path.as_str()).collect();
+        let programs: HashSet<&str> = (export.entry_points.iter())
+            .filter(|e| e.kind == entry::EntryKind::Program)
+            .map(|e| e.identity.as_str())
+            .collect();
+        for ecosystem in ECOSYSTEMS {
+            for p in ecosystem.programs(&export.manifests, &files) {
+                let manifest = &export.manifests[p.manifest];
+                let program = format!("{}::{}::{}", export.repository, p.file, p.function);
+                let Some(name) = (manifest.summary.name.as_ref())
+                    .filter(|_| programs.contains(program.as_str()))
+                else {
+                    continue;
+                };
+                let declared = Declared {
+                    contract: contract(*ecosystem, name),
+                    manifest: site(&export.repository, &manifest.path),
+                    program,
+                };
+                let key = (ecosystem.name(), p.name);
+                found.entry(key).or_default().push(declared);
+            }
+        }
+    }
+    found
+}
+
+/// The most packages of the workspace that may declare one console script name: past it a
+/// command of that name gives no side.
+// ponytail: a name that many packages declare tells nothing, and each would cost a row per command.
+const MAX_DECLARING: usize = 8;
+
+/// The evidence a program link's reason gives after the script's name.
+const INSTALLED: &str = "its package installed earlier in the CI job";
+const NOT_INSTALLED: &str = "no install of its package earlier in the CI job";
+const BY_PACKAGE: &str = "run by its package's name";
 
 /// What a command of a CI step's `run` script installs by name (`Ecosystem::installs`).
 enum Install {
@@ -1977,9 +2153,10 @@ impl ContractKind for Packages {
         scripts.map(|s| (s.site.clone(), OPEN_INSTALL)).collect()
     }
 
-    /// On a CI step, the packages its `run` script installs: `consumes <contract>`, then a
-    /// `provider:` line per link with its level and reason; a name left open says why it has
-    /// none. Elsewhere, `context_sections`.
+    /// On a CI step, the packages its `run` script installs or runs a console script of:
+    /// `consumes <contract>` once per package, then a `provider:` line per link (the manifest,
+    /// or the program a script starts) with its level and reason; a name left open says why it
+    /// has none. Elsewhere, `context_sections`.
     fn context_at(
         &self,
         exports: &[Export],
@@ -1992,9 +2169,13 @@ impl ContractKind for Packages {
         let scripts = exports
             .iter()
             .filter(|e| e.scripts.iter().any(|s| s.site == site));
+        let mut shown = HashSet::new();
         for consumer in (scripts.flat_map(|e| &e.consumers)).filter(|c| c.site == site) {
             match (&consumer.contract, &consumer.via) {
                 (Some(contract), _) if contract.starts_with(PREFIX) => {
+                    if !shown.insert(contract) {
+                        continue;
+                    }
                     lines.push(format!("consumes {contract}"));
                     let found =
                         (links.iter()).filter(|l| l.consumer == site && l.contract == *contract);
@@ -2066,8 +2247,9 @@ impl ContractKind for Packages {
     /// (`inferred` when it shares the consumer's repository and `Ecosystem::unsourced` says no
     /// source names it), several are each `ambiguous`. A `workspace:` range keeps the providers
     /// of its own repository. The reason is `reason()`'s, flag included. A call through a package import
-    /// (`Consumer::hops`) links instead to the symbol it reaches in each provider, at the
-    /// weaker of that level and the import's, the reason followed by `; import <how>`.
+    /// and a CI step that runs a console script (`Consumer::hops`) link instead to the symbol
+    /// they reach in each provider, at the weaker of that level and the hop's, the reason
+    /// followed by `; import <how>` or `; console script <name>, <evidence>`.
     fn link(
         &self,
         consumer: &Consumer,
@@ -2147,7 +2329,7 @@ impl ContractKind for Packages {
                             h.target.clone(),
                             link.contract.clone(),
                             link.level.max(h.level),
-                            format!("{}; import {}", link.reason, h.how.name()),
+                            format!("{}; {}", link.reason, h.how),
                             None,
                             None,
                             None,
@@ -2602,9 +2784,14 @@ mod tests {
         ) -> Vec<(&'e Entry, String)> {
             Vec::new()
         }
-        fn programs(&self, _manifests: &[Manifest], _files: &[&str]) -> Vec<(String, String)> {
+        fn programs(&self, _manifests: &[Manifest], _files: &[&str]) -> Vec<Program> {
             (self.1.iter())
-                .map(|(file, def)| (file.to_string(), def.to_string()))
+                .map(|(file, def)| Program {
+                    file: file.to_string(),
+                    function: def.to_string(),
+                    name: String::new(),
+                    manifest: 0,
+                })
                 .collect()
         }
         fn inherit(&self, manifests: &mut [Manifest]) {

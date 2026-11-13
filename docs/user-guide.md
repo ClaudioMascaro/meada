@@ -1506,6 +1506,39 @@ aberto que diz a causa e não tem candidato. Um nome literal com uma parte assim
 (`shared-lib==${{ matrix.v }}`) é o próprio pacote, com a faixa como escrita. O Meada não segue uma
 variável que o script atribui, `cd`, uma função nem um script chamado.
 
+**Programas.** Um passo de CI cujo comando é um script de console de um pacote PyPI do workspace
+(um nome sob `[project.scripts]` ou `[tool.poetry.scripts]`) inicia esse programa: o passo de CI
+consome o pacote, e a ligação segue até a função que o script nomeia. O nível diz quanta certeza o
+Meada tem do pacote que roda:
+
+| Evidência | Nível |
+| --- | --- |
+| Uma linha ou um passo de CI anterior do mesmo job de CI instala o pacote | `exact` |
+| O comando nomeia o pacote: `uvx <pacote>`, `pipx run <pacote>` | `exact` |
+| Nenhuma instalação, e um só pacote do workspace declara o nome | `inferred` |
+| Vários pacotes do workspace declaram o nome | `ambiguous` |
+| Nenhum pacote do workspace declara o nome | nenhum lado |
+
+O `trace` com `direction=up` a partir de uma rota chega então a quem roda o chamador dela no CI,
+e com `direction=down` a partir de um job de CI ele entra no programa:
+
+```text
+github.com/acme/core-api app/main.py:6 register_package
+  →[inferred: base URL from CORE_API_URL, a base_url_env of peer github.com/acme/core-api] github.com/acme/core-sdk core_sdk/cli.py:10 publish_main
+    →[exact: package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
+      github.com/acme/workflows .github/workflows/publish.yml:12 jobs.publish
+        github.com/acme/workflows .github/workflows/publish.yml:1 .
+          →[exact: @main (indexed 1a2b3c4)] github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish
+```
+
+A ligação nunca é mais forte que a ligação de pacote que ela continua (seção 8.5): um pacote do
+próprio repositório do passo de CI dá `inferred`. `uvx <pacote>` e `pipx run <pacote>` rodam o
+script com o nome do pacote; quando o pacote não declara nenhum, o passo de CI só consome o
+pacote. O nome é comparado como escrito, então um caminho até o script, `python -m`, `uv run` e
+`poetry run` não são reconhecidos, e a ligação nomeia a função do script, não o handler de um
+subcomando. Uma instalação num passo de CI posterior, em outro job de CI ou num script chamado
+não é evidência.
+
 **Outros sistemas de CI.** O Meada lê o GitHub Actions. Para um sistema que ele não lê (GitLab
 CI, Jenkins, Azure Pipelines), declare o vínculo à mão com `[[resource]]` e `via` na chave que
 faz a chamada (seção 4):

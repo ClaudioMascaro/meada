@@ -42,6 +42,13 @@ identifier starts at the node that provides it (`trace::provider_node`, read in
 `Engine::trace` before the start is looked up), so it answers as the pipeline's name does; the
 walk adds no cap for GitHub's ten levels of nesting.
 
+A link from a CI step to a program's symbol (#832, a console script) joins the two walks in
+`trace::Walk::enter`: going down, an IaC node's calling links whose provider is a symbol are
+reached like any link; going up, a calling link into a symbol whose consumer is an IaC node
+continues in `Walk::holders_up`, which lists what calls that node (`Graph::node_calls`) and the
+nodes that hold it (`iac_references`), so the CI step is followed by its CI job, its pipeline
+and that pipeline's callers. `Walk::held` marks a node already listed.
+
 The other forms of `uses` (#826) go through the same reader: `Uses` is `Peer` (owner, name,
 path, Git ref), `Rooted` (`$/<path>`) or `Local` (`./<path>`), and `consumed` gives the contract
 of a call for a CI job (a pipeline file) or a CI step (the folder of an action, nothing for the

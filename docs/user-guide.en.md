@@ -1499,6 +1499,38 @@ that says its cause and has no candidate. A literal name with such a part in its
 (`shared-lib==${{ matrix.v }}`) is the package itself, the range as written. Meada follows no
 variable the script assigns, no `cd`, no function and no called script.
 
+**Programs.** A CI step whose command is a console script of a PyPI package of the workspace (a
+name under `[project.scripts]` or `[tool.poetry.scripts]`) starts that program: the CI step
+consumes the package, and its link goes on to the function the script names. The level says how
+sure Meada is of the package that runs:
+
+| Evidence | Level |
+| --- | --- |
+| An earlier line or CI step of the same CI job installs the package | `exact` |
+| The command names the package: `uvx <package>`, `pipx run <package>` | `exact` |
+| No install, and one package of the workspace declares the name | `inferred` |
+| Several packages of the workspace declare the name | `ambiguous` |
+| No package of the workspace declares the name | no side |
+
+`trace` with `direction=up` from a route then reaches whoever runs its caller in CI, and with
+`direction=down` from a CI job it enters the program:
+
+```text
+github.com/acme/core-api app/main.py:6 register_package
+  →[inferred: base URL from CORE_API_URL, a base_url_env of peer github.com/acme/core-api] github.com/acme/core-sdk core_sdk/cli.py:10 publish_main
+    →[exact: package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
+      github.com/acme/workflows .github/workflows/publish.yml:12 jobs.publish
+        github.com/acme/workflows .github/workflows/publish.yml:1 .
+          →[exact: @main (indexed 1a2b3c4)] github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish
+```
+
+The link is never stronger than the package link it continues (section 8.5): a package of the CI
+step's own repository gives `inferred`. `uvx <package>` and `pipx run <package>` run the script
+named like the package; when the package declares none, the CI step only consumes the package.
+The name is compared as written, so a path to the script, `python -m`, `uv run` and `poetry run`
+are not matched, and the link names the script's function, not the handler of a subcommand. An
+install in a later CI step, in another CI job or in a called script is no evidence.
+
 **Other CI systems.** Meada reads GitHub Actions. For a system it does not read (GitLab CI,
 Jenkins, Azure Pipelines), declare the link by hand with `[[resource]]` and `via` on the key
 that makes the call (section 4):

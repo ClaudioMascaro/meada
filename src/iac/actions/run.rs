@@ -28,6 +28,18 @@ pub(crate) struct Script {
     pub commands: Vec<Vec<Word>>,
 }
 
+/// A command as an answer shows it: its words joined by one space, a quoted word without its
+/// quotes and an open part as written.
+pub(crate) fn written(command: &[Word]) -> String {
+    let word = |word: &Word| -> String {
+        let parts = word
+            .iter()
+            .map(|(Part::Text(text) | Part::Open(text))| text.as_str());
+        parts.collect()
+    };
+    command.iter().map(word).collect::<Vec<_>>().join(" ")
+}
+
 /// The text of a word with no open part.
 pub(crate) fn literal(word: &[Part]) -> Option<&str> {
     match word {

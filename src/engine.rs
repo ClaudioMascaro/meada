@@ -1539,9 +1539,13 @@ fn sides_of<'e>(
 ) -> Vec<(&'e str, u8, String, String, Option<&'e crate::shape::Shape>)> {
     let provided = export.providers.iter().filter(|p| p.contract == contract);
     let provided = provided.map(|p| (p.site.as_str(), 0, provider.into(), p.shape.as_ref()));
-    let consumed = export.consumers.iter().filter_map(|c| {
+    // A site is listed once: a CI step that installs a package and runs its console script
+    // holds two rows of one contract.
+    let mut listed = HashSet::new();
+    let consumed = export.consumers.iter().filter_map(move |c| {
         let words = consumer.filter(|_| c.contract.as_deref() == Some(contract))?;
-        Some((c.site.as_str(), 1, words.into(), c.shape.as_ref()))
+        (c.shape.is_some() || listed.insert(c.site.as_str()))
+            .then(|| (c.site.as_str(), 1, words.into(), c.shape.as_ref()))
     });
     let own = provided
         .chain(consumed)

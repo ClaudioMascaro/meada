@@ -140,10 +140,11 @@ impl Pyproject {
     }
 
     /// The console scripts of `[project.scripts]` (else Poetry's `[tool.poetry.scripts]`) as
-    /// `(module, function)` pairs, sorted, without repeats: each `module:function` value, its
-    /// extras (`module:function [extra]`) dropped. A value that is not a dotted module, a colon
-    /// and a dotted name is left out.
-    pub fn scripts(&self) -> Vec<(String, String)> {
+    /// `(name, module, function)`, sorted by name: the key as written, which is the command
+    /// pip installs, and its `module:function` value, extras (`module:function [extra]`)
+    /// dropped. An empty name, and a value that is not a dotted module, a colon and a dotted
+    /// name, are left out.
+    pub fn scripts(&self) -> Vec<(String, String, String)> {
         let table = (self.at(&["project", "scripts"]))
             .or_else(|| self.at(&["tool", "poetry", "scripts"]))
             .and_then(|t| t.as_table());
@@ -152,16 +153,15 @@ impl Pyproject {
                 !part.is_empty() && part.chars().all(|c| c.is_alphanumeric() || c == '_')
             })
         };
-        let mut found: Vec<(String, String)> = (table.into_iter().flatten())
-            .filter_map(|(_, target)| {
+        let mut found: Vec<(String, String, String)> = (table.into_iter().flatten())
+            .filter_map(|(name, target)| {
                 let (module, function) = target.as_str()?.split_once(':')?;
                 let function = function.split(['[', ' ']).next()?;
-                (dotted(module) && dotted(function))
-                    .then(|| (module.to_string(), function.to_string()))
+                (!name.is_empty() && dotted(module) && dotted(function))
+                    .then(|| (name.clone(), module.to_string(), function.to_string()))
             })
             .collect();
         found.sort();
-        found.dedup();
         found
     }
 
@@ -351,7 +351,7 @@ exclude = ["packages/old"]
     }
 
     #[test]
-    fn scripts_are_the_module_and_function_of_each_console_script() {
+    fn scripts_are_the_name_module_and_function_of_each_console_script() {
         let p = parse(
             r#"
 [project.scripts]
@@ -359,6 +359,9 @@ serve = "app.cli:main"
 sync = "app.cli:main"
 extra = "tools:run [fast]"
 nested = "app.cli:Group.start"
+"Acme_Tool" = "app.cli:main"
+"acme.dotted" = "app.cli:main"
+"" = "app.cli:main"
 no-colon = "app.cli"
 no-module = ":main"
 bad-module = "app/../x:main"
@@ -366,13 +369,17 @@ empty-part = "app..cli:main"
 not-text = 3
 "#,
         );
-        let pair = |m: &str, f: &str| (m.to_string(), f.to_string());
+        let script = |n: &str, m: &str, f: &str| (n.to_string(), m.to_string(), f.to_string());
+        // The name is kept as written (#832): pip installs the command under it, byte for byte.
         assert_eq!(
             p.scripts(),
             [
-                pair("app.cli", "Group.start"),
-                pair("app.cli", "main"),
-                pair("tools", "run"),
+                script("Acme_Tool", "app.cli", "main"),
+                script("acme.dotted", "app.cli", "main"),
+                script("extra", "tools", "run"),
+                script("nested", "app.cli", "Group.start"),
+                script("serve", "app.cli", "main"),
+                script("sync", "app.cli", "main"),
             ]
         );
     }
@@ -380,12 +387,10 @@ not-text = 3
     #[test]
     fn poetry_scripts_count_when_there_is_no_project_table() {
         let poetry = "[tool.poetry.scripts]\nrun = \"a:b\"\n";
-        assert_eq!(
-            parse(poetry).scripts(),
-            [("a".to_string(), "b".to_string())]
-        );
+        let script = |m: &str, f: &str| [("run".to_string(), m.to_string(), f.to_string())];
+        assert_eq!(parse(poetry).scripts(), script("a", "b"));
         let both = format!("[project.scripts]\nrun = \"c:d\"\n{poetry}");
-        assert_eq!(parse(&both).scripts(), [("c".to_string(), "d".to_string())]);
+        assert_eq!(parse(&both).scripts(), script("c", "d"));
         assert!(parse("[project]\nname = \"x\"\n").scripts().is_empty());
     }
 

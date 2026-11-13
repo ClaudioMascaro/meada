@@ -39,6 +39,27 @@
   that name it: a pattern that fits it is counted by `search` and shown by `context` on its
   own CI step only. `trace` walks no package link from a CI step: a manifest is no node of
   it.
+- `package.rs`, `package/pypi.rs` (#832, ADR 0028): a CI step that runs a console script links
+  to the script's function, never to the handler of a subcommand, and only for PyPI
+  (`[project.scripts]`, else `[tool.poetry.scripts]`): an npm `bin`, a Go or a Cargo binary is
+  not read, nor `gui-scripts` or another entry point group. The command's first word is
+  compared byte for byte with the script's name as written, since pip writes the command under
+  that name unchanged (a probe with pip 26 and setuptools kept `Acme_Tool`, `acme.dotted` and
+  `acme_under`; the specification page was not reachable to cite): a path to the script,
+  `python -m <module>`, `uv run`, `poetry run`, a prefix (`sudo`, `VAR=x`, `time`) and a name
+  with an open part match nothing. `uvx <package>` and `pipx run <package>` are read only with
+  the package as the next word: `--from`, `--spec`, another option first, `<package>@<version>`
+  and `uv tool run` give no side. A script whose function is no program entry point of its
+  repository (a module outside the declared roots, a class, generated code) gives no side.
+  The evidence for `exact` is an install by a literal name in an earlier command of the same CI
+  job, in file order of its CI steps: an install in a later CI step, in another CI job, in a
+  called script or a composite action, by a pattern, by `-e .`, by `-r` or by a path is not
+  seen, and neither is an `if:` that skips the installing CI step. With no install the name
+  alone links `inferred`, so a script of the workspace wins over a shell builtin or a public
+  tool of the same name. `MAX_DECLARING` (8): a name more packages of the workspace declare
+  gives no side at all. The link is at the weaker of the evidence's level and the package
+  link's, and its range is the install's. `context` on the program's symbol lists no CI step
+  (`callers` are calls in code): `trace` up from it does.
 - `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_NAME`
   (214 bytes; a longer name is no package) and `MAX_BYTES` (under `lang/mod.rs`). A range is
   stored as written, with no length limit beyond `MAX_BYTES`; npm's `flag` (`package/npm.rs`) checks only one of at most

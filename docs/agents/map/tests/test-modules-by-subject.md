@@ -493,6 +493,15 @@
   controls that keep the key-name rule, every scalar still a config value, `vars.X` never matched
   across repositories, a pattern that fits two names as an open item, and the `env` lookup: the
   nearest that defines the name, literal or not, and none at an action's root.
+- `ci_run.rs` (#831): the command table over the PyPI pair (`pkg-pylib`, `pkg-pyweb`) with a
+  pipeline written inline: each install command, the arguments that give no side, the gate's
+  lines and shells, a name as a literal, a pattern or left open, the environment file and
+  `context` from both ends.
+- `ci_program.rs` (#832): console scripts over the chain of F2 as siblings (`ci-core-api`,
+  `ci-core-sdk`, `ci-core-workflows` with the callers of #816's reproduction): one CI job of
+  `programs.yml` per row of the level table, the command as text on the consumer row
+  (`ci-programs.workflows.export.json`), the limit of declaring packages, a program of the CI
+  step's own repository, `context` from both ends and `trace` both ways (`ci-programs.trace.txt`).
 - `ci_served.rs` (#829): the CI kind in server mode over the reproduction of #816: MCP over HTTP
   equal to stdio for every flow of the kind, and a manifest without the provider's repository
   giving no link to it and no consumer of it. Its helpers (`listed`, `about_the_call`,

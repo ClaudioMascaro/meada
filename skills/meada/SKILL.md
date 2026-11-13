@@ -74,6 +74,15 @@ it consumes it.
   a caller pinned to a full commit id other than the indexed one: read the file at that commit
   before you state what that caller runs. `(indexed commit unknown)` is server mode over a
   checkout that was not clean: no commit is known there, and no mismatch is ever flagged.
+- **Programs.** A CI step whose command is a console script of a PyPI package of the workspace
+  links to the function the script names, so `trace` with `direction: "up"` from a symbol or a
+  route reaches the CI jobs that run it, and `direction: "down"` from a CI job enters the
+  program. Read the level as evidence of which package runs: `exact` when an earlier command of
+  the same CI job installs the package or the command names it (`uvx <package>`, `pipx run
+  <package>`), `inferred` with no install seen (the script's name matched alone), `ambiguous`
+  when several packages declare the name. The link names the script's function, not a
+  subcommand's handler, and a missing CI caller is unproven: a path to the script, `python -m`,
+  `uv run` and a script another script calls are not read.
 - **`(absent at the indexed commit)`.** The call names a file or folder that is not there at
   the indexed commit, or, with `: the file is no reusable pipeline there`, a pipeline without
   `workflow_call`. The file may exist at the caller's ref: report a call to check, not a

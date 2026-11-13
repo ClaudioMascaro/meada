@@ -324,7 +324,9 @@ this file, and a change to these modules updates it.
   `defaults.run.shell` of the CI job, then of the pipeline), with the literal `env` of the CI
   step, its CI job and its pipeline (`given`), and gives `Export::scripts` (`Script`: the CI
   step's identity and its commands). Nothing is stored. The rows that give a command its side
-  live in the kinds: `package/pypi.rs` (`Ecosystem::installs`) is the first.
+  live in the kinds: `package/pypi.rs` (`Ecosystem::installs`) is the first, and
+  `Ecosystem::runs` (#832) reads the console script a command runs (`written` gives a
+  command back as text).
 - `iac/serverless.rs` (#654, ADR 0025): Serverless Framework services as IaC nodes, one unit per
   `serverless.{yml,yaml,json}` (root: its path). `wanted`, `is_file` and `is_service` decide,
   `evaluate(path, bytes)` reads it with `document::events::read_keyed`, expands the file's
