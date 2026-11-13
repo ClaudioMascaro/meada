@@ -28,7 +28,8 @@ rule is checked against both. Where they differ Meada follows Terraform (#740), 
 to "certain or absent" (the fork's reader may be right) that covers what Terraform reads: a
 variable with a block in a file only OpenTofu reads (`.tofu`, `.tofu.json`), declaring or
 overriding, has no whole Terraform answer to follow, and is unresolved where the two rules
-differ. The difference is recorded as a ceiling.
+differ; declared in a file Terraform reads, it is Terraform's reading where OpenTofu refuses the
+directory (#767). The difference is recorded as a ceiling.
 
 ## Exactly N, only X
 

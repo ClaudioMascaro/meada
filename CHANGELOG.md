@@ -44,6 +44,29 @@ All notable changes to Meada are recorded here. The format follows
   table older than the one in `meada.toml`: a refresh reads the table when it starts, not when
   its call opened the index, so a call that read the file before an edit no longer writes the
   index back by the older table (#758).
+- A value given to a variable declared `list(string)`, `list(number)` or `list(bool)` has its
+  elements converted as Terraform converts them: `["010", "1.50"]` under `list(number)` names
+  `10` and `1.5`, where Meada kept the strings and gave `010` and `1.50` at `exact`. An element
+  Meada cannot convert with certainty (`-0`, whose sign Terraform keeps) leaves the value
+  unresolved, from a default, a var file or a module argument alike (#770).
+- A variable whose default its final type refuses (a `set(string)` default an override retypes
+  as a tuple, `["x"]` under `list(number)`) names nothing exactly, whatever gives its value:
+  Terraform and OpenTofu refuse the configuration, where a var file's value or a module argument
+  still named every instance at `exact`. A `for_each` over a tuple gives no exact name either,
+  as both tools refuse it: a tuple written out, or a variable that holds one (a var file's value
+  or a default under `any` or no type, a declared tuple type, a module argument that is a tuple)
+  (#769).
+- A variable declared in a `.tf` file and overridden in a `.tofu` file has no exact name where
+  Terraform, which reads the directory without the `.tofu` file, gives it another value or type
+  than OpenTofu: `default = ["c"]` in `override.tofu` over a declared `["b", "a", "a"]` names
+  `0-c` in OpenTofu and `0-a`, `1-b` in Terraform, where Meada gave OpenTofu's `0-c` at
+  `exact`. Where both give one value of one type it stays exact, and where OpenTofu refuses the
+  directory (a string no number spells in a default a `.tofu` block retypes as numbers) Meada
+  reads it as Terraform does (#767).
+- A variable declared both in a `.tf` file and in a `.tofu` file, which OpenTofu refuses, is the
+  `.tf` block with the override files Terraform reads, in either order of the two files: `a.tf`
+  declaring `["x"]` and `b.tofu` declaring `["b", "a", "a"]` names `0-x`, where Meada gave the
+  block of the file it read last at `exact` (#768).
 - `meada status` no longer reports orphans from a use Meada only infers from a key name (a plain
   value under `queue`, `topic`, `bucket`, `table` or a typed alias): such a use side opens no
   orphan scope and is never an orphan line, though it still links to a provisioner of its name

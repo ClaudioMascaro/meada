@@ -89,7 +89,7 @@ fn text(args: FuncArgs, f: fn(&str) -> String) -> Out {
 }
 
 /// A scalar as a template shows it; `None` for a null, a list or an object.
-fn shown(v: &Value) -> Option<String> {
+pub(super) fn shown(v: &Value) -> Option<String> {
     match v {
         Value::String(s) => Some(s.clone()),
         Value::Number(n) => Some(n.to_string()),
@@ -386,6 +386,11 @@ impl Elem {
             "any" => Elem::Any,
             _ => Elem::Other,
         }
+    }
+
+    /// Whether this is a primitive type: `string`, `number` or `bool`.
+    pub(super) fn primitive(self) -> bool {
+        matches!(self, Elem::String | Elem::Number | Elem::Bool)
     }
 }
 
