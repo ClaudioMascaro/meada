@@ -538,10 +538,11 @@ impl Declared {
     /// Whether this type converts a value no set has touched: a set, or a list of a primitive
     /// type.
     fn converts(self) -> bool {
-        matches!(
-            self,
-            Declared::Set(_) | Declared::List(Elem::String | Elem::Number | Elem::Bool)
-        )
+        match self {
+            Declared::Set(_) => true,
+            Declared::List(elem) => elem.primitive(),
+            Declared::Any | Declared::Other => false,
+        }
     }
 }
 
@@ -559,7 +560,7 @@ fn converted_through(mut value: Value, steps: &[Declared]) -> Option<Value> {
             }
             // A list of a primitive type converts any value; a list of another type converts only
             // a set that came before it (an override retyping a declared set).
-            Declared::List(elem) if set || step.converts() => {
+            Declared::List(elem) if set || elem.primitive() => {
                 value = functions::to_list(&value, elem).ok()?;
                 set = false;
             }
@@ -606,41 +607,45 @@ fn converted_once(value: Value, ty: Option<Declared>) -> Option<Value> {
 /// type of its declaring block and again to each override's. A variable with a block in a file
 /// only OpenTofu reads (`.tofu`, `.tofu.json`) is one Terraform does not read whole, and OpenTofu
 /// 1.13 and later convert the default once, to the final type, where 1.12 and earlier convert it
-/// as Terraform does: the default is unresolved where the two spell other elements (`spelled`),
-/// or are another kind of collection, so that no tool's answer is taken for certain. An override
-/// in such a file is merged as OpenTofu merges it, also over a declaration Terraform reads.
+/// as Terraform does: the default is unresolved where the two hold other elements, or another
+/// kind of collection, so that no tool's answer is taken for certain, and is the value OpenTofu
+/// 1.13 gives where they agree. A set's elements are compared as they are (#754), a list's as a
+/// name spells them (`spelled`): where a list's two values differ only in an element's type
+/// (`[10, 9]` against `["10", "9"]` under an override typed `any`), OpenTofu 1.13's is the value
+/// Meada gave before lists converted (#770). An override in such a file is merged as OpenTofu
+/// merges it, also over a declaration Terraform reads.
 fn declared_default(found: Evaluated, variable: &Variable) -> Evaluated {
     // Only a set or a list of a primitive type converts a value here: a default no such type
     // touches is one value.
     let converts = (variable.through.iter()).any(|t| t.converts());
-    if let (true, true, Val::Known(v)) = (variable.opentofu, converts, &found.val) {
-        let (twice, once) = (
-            converted_through(v.clone(), &variable.through),
-            converted_once(v.clone(), variable.ty),
-        );
-        let same_kind = ends_in_set(&variable.through) == ends_in_set(variable.ty.as_slice());
-        if twice.as_ref().map(spelled) != once.as_ref().map(spelled) || !same_kind {
-            return Evaluated {
-                val: Val::Unknown,
-                through: found.through,
-            };
-        }
+    let (true, true, Val::Known(v)) = (variable.opentofu, converts, &found.val) else {
+        return declared(found, &variable.through);
+    };
+    let (twice, once) = (
+        converted_through(v.clone(), &variable.through),
+        converted_once(v.clone(), variable.ty),
+    );
+    let same_kind = ends_in_set(&variable.through) == ends_in_set(variable.ty.as_slice());
+    let agree = match (variable.through.iter()).any(|t| matches!(t, Declared::Set(_))) {
+        true => twice == once,
+        false => twice.as_ref().map(spelled) == once.as_ref().map(spelled),
+    };
+    Evaluated {
+        val: (once.filter(|_| agree && same_kind)).map_or(Val::Unknown, Val::Known),
+        through: found.through,
     }
-    declared(found, &variable.through)
 }
 
-/// `value` with each scalar as the text a template shows of it, so that two conversions whose
-/// elements a name spells alike compare equal: `[10, 9]` and `["10", "9"]` do, `["010"]` and
-/// `[10]` do not.
+/// `value` with each scalar as the text a template shows of it (`functions::shown`), so that two
+/// values whose elements a name spells alike compare equal: `[10, 9]` and `["10", "9"]` do,
+/// `["010"]` and `[10]` do not.
 fn spelled(value: &Value) -> Value {
     match value {
         Value::Array(items) => Value::Array(items.iter().map(spelled).collect()),
         Value::Object(map) => {
             Value::Object(map.iter().map(|(k, v)| (k.clone(), spelled(v))).collect())
         }
-        Value::Number(n) => Value::String(n.to_string()),
-        Value::Bool(b) => Value::String(b.to_string()),
-        _ => value.clone(),
+        scalar => functions::shown(scalar).map_or_else(|| scalar.clone(), Value::String),
     }
 }
 

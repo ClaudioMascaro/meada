@@ -243,6 +243,30 @@ fn a_value_entering_a_declared_list_is_converted_to_its_element_type() {
     assert_eq!(by(&list("number", r#"["9", "-0"]"#)), UNRESOLVED);
 }
 
+/// A ceiling: Meada converts no other declared type, so `"010"` given to a primitive, a tuple, a
+/// map, an object or a list of objects keeps its spelling, where Terraform v1.17.1 and OpenTofu
+/// v1.13.9 name `10` in each.
+#[test]
+fn a_value_entering_a_type_meada_does_not_convert_keeps_its_spelling() {
+    let kept = |ty: &str, default: &str, read: &str| {
+        let main = format!("variable \"s\" {{\n  type = {ty}\n  default = {default}\n}}\n");
+        answer(&main, &format!("{{ only = {read} }}"), &[])
+    };
+    for (ty, default, read) in [
+        ("number", r#""010""#, "var.s"),
+        ("tuple([number])", r#"["010"]"#, "var.s[0]"),
+        ("map(number)", r#"{ a = "010" }"#, r#"var.s["a"]"#),
+        ("object({ n = number })", r#"{ n = "010" }"#, "var.s.n"),
+        (
+            "list(object({ n = number }))",
+            r#"[{ n = "010" }]"#,
+            "var.s[0].n",
+        ),
+    ] {
+        assert_eq!(kept(ty, default, read), "queue-only-010", "{ty}");
+    }
+}
+
 /// The default, a var file's value and a module argument of a declared `set(string)` are one set,
 /// read by `tolist`, by `length` as a `count`, by `join` and by `for_each`.
 #[test]

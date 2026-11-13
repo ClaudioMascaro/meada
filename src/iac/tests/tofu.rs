@@ -396,7 +396,9 @@ fn a_default_no_set_type_touches_is_exact_with_a_block_only_opentofu_reads() {
 /// reads that retypes it can spell other elements once and twice converted: `["010", "9"]`
 /// declared `list(number)` and retyped `list(string)` or `any` names `f-0-10`, `f-1-9` in
 /// Terraform v1.17.1 (the override in `override.tf`) and `f-0-010`, `f-1-9` in OpenTofu v1.13.9.
-/// `["10", "9"]` names `f-0-10`, `f-1-9` in both, numbers once and strings twice converted.
+/// `["10", "9"]` retyped `any` names `f-0-10`, `f-1-9` in both, strings once and numbers twice
+/// converted, and is OpenTofu's value: a read that tells `"10"` from `10` names `f-0-ten` in
+/// OpenTofu, `f-0-other` in Terraform.
 #[test]
 fn a_list_an_opentofu_override_retypes_is_unresolved_where_the_conversions_differ() {
     let main = |default: &str| {
@@ -420,6 +422,19 @@ fn a_list_an_opentofu_override_retypes_is_unresolved_where_the_conversions_diffe
     let any = "variable \"s\" {\n  type = any\n}\n";
     let opentofu = [("main.tf", canonical.as_str()), ("override.tofu", any)];
     assert_eq!(answer(&opentofu), "f-0-10, f-1-9");
+    let typed = r#"variable "s" {
+  type = list(number)
+  default = ["10", "9"]
+}
+resource "a" "f" {
+  for_each = toset([for k, v in tolist(var.s) : "${k}-${v == "10" ? "ten" : "other"}"])
+  name = "f-${each.value}"
+}
+"#;
+    let opentofu = [("main.tf", typed), ("override.tofu", any)];
+    assert_eq!(answer(&opentofu), "f-0-ten, f-1-other");
+    let terraform = [("main.tf", typed), ("override.tf", any)];
+    assert_eq!(answer(&terraform), "f-0-other, f-1-other");
 }
 
 /// The last block that gives a default decides it: one an override file Terraform reads gives

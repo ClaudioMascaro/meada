@@ -221,13 +221,16 @@
   default as Terraform does where 1.13+ converts once, so no value is certain for it: when an
   override retypes it (in any of `override.tf`, `*_override.tf`, `override.tf.json`,
   `override.tofu`, `*_override.tofu`, `override.tofu.json`) the default is unresolved where the
-  two conversions spell other elements (compared as a name spells them, so `[10, 9]` and
-  `["10", "9"]` are the same, while `["010", "9"]` declared `list(number)` and retyped
-  `list(string)` or `any` spells `10` converted twice and `010` once) or are another kind of
-  collection, and exact where they agree (no override, an override restating the set, an
-  override with its own default of the final type, a var file's value, and a default its types
-  convert alike once and twice). An override in a file only OpenTofu reads is applied as
-  OpenTofu applies it, also over a declaration
+  two conversions hold other elements (a set's compared once converted, so `[10, 9]` and
+  `["10", "9"]` are the same under `set(string)`; a list's as a name spells them, so
+  `["010", "9"]` declared `list(number)` and retyped `list(string)` or `any`, `10` converted
+  twice and `010` once, is unresolved) or another kind of collection, and exact where they
+  agree, with OpenTofu 1.13's value (no override, an override restating the set, an override
+  with its own default of the final type, a var file's value, and a default its types convert
+  alike once and twice). `["10", "9"]` declared `list(number)` and retyped `any` holds
+  OpenTofu 1.13's strings, so a read that tells `"10"` from `10` names OpenTofu's instances,
+  not the ones Terraform names with that override in a `.tf` file. An override in a file only
+  OpenTofu reads is applied as OpenTofu applies it, also over a declaration
   Terraform reads, though Terraform ignores that file: `main.tf` with the set above and an
   `override.tofu` giving `default = ["c"]` names `0-c`, OpenTofu's instance, where Terraform
   names `0-a` and `1-b`. A module is judged by its own files,
