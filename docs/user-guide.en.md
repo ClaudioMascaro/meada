@@ -479,10 +479,14 @@ a symbolic link, a source with a variable, a form it does not parse) leaves the 
 `inferred`, and the reason says it was not read. `.dockerignore` is not read. Paths never cross
 symbolic links.
 
-`meada status` lists image orphans only when the scope contains both builder and runner. With
-one role, `search` and `context` show `no builder in the workspace` or `no runner in the workspace`.
-Export keeps `format: 1`, retains builder locations and workload roots, and includes `executions`
-for direct paths; the console graph shows the image contracts and workload code.
+`meada status` asks for image orphans per registry and namespace (the first segment of the
+repository path of the normalized name): `ghcr.io/acme/shop` and `ghcr.io/acme/tools/lint` are in
+`ghcr.io/acme`, `docker.io/library/postgres` is in `docker.io/library`, and an image whose path has
+one segment is grouped by its registry alone. It lists image orphans only for a group that contains
+both builder and runner; in a group with one role, `search` and `context` show
+`no builder in the workspace` or `no runner in the workspace`. Export keeps `format: 1`, retains
+builder locations and workload roots, and includes `executions` for direct paths; the console graph
+shows the image contracts and workload code.
 
 ### CloudFormation and SAM
 

@@ -408,8 +408,11 @@ fn ecs_encoded_containers_run_images_independently_and_scope_environment_to_each
         .flatten()
         .collect::<Vec<_>>()
         .join("\n");
+    // `ghcr.io/acme` builds `aws-worker`, so `aws-sidecar` lacks a builder there; nothing of
+    // `docker.io/library` is built, so `redis` is no orphan (ADR 0026, "Orphan sides").
     assert!(
-        status.contains("orphan image::docker.io/library/redis: no builder"),
+        status.contains("orphan image::ghcr.io/acme/aws-sidecar: no builder")
+            && !status.contains("orphan image::docker.io/"),
         "{status}"
     );
     assert_golden("aws-workloads.ecs.export.json", &exported);

@@ -595,13 +595,13 @@ incluso sin `image`, dentro de la raíz y sin atravesar enlaces simbólicos, o e
 el contexto o la ruta del Dockerfile pasó por un valor reemplazable. Un Dockerfile que no se puede
 leer deja el contexto entero en `inferred`, y el motivo lo dice. `.dockerignore` no se lee.
 
-Los literales enlazan en `exact`; los defaults Compose y valores Helm, en `inferred`, con su
-origen en el motivo. Las partes no resueltas permanecen patrones y solo corresponden a nombres
-literales en límites de segmentos; varios candidatos quedan `ambiguous` y admiten una decisión.
-`status` solo enumera imágenes huérfanas cuando el ámbito visible tiene constructores y
-ejecutores. En caso contrario, `search` y `context` marcan el lado sin contraparte. La
-exportación mantiene el formato 1, con ubicaciones `at` y `executions` para rutas directas;
-el grafo del console muestra contratos de imagen, enlaces y código de cargas de trabajo.
+Los literales enlazan en `exact`; los defaults Compose y valores Helm, en `inferred`, con su origen
+en el motivo. Las partes no resueltas permanecen patrones y solo corresponden a nombres literales en
+límites de segmentos; varios candidatos quedan `ambiguous` y admiten una decisión. `status` solo
+enumera imágenes huérfanas de un registro y namespace (`ghcr.io/acme`) que tiene constructores y
+ejecutores en el ámbito visible. En caso contrario, `search` y `context` marcan el lado sin
+contraparte. La exportación mantiene el formato 1, con ubicaciones `at` y `executions` para rutas
+directas; el grafo del console muestra contratos de imagen, enlaces y código de cargas de trabajo.
 
 ### Nombres parcialmente resueltos
 

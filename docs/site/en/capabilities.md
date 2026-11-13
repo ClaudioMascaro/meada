@@ -587,13 +587,13 @@ and through no symbolic link, or at `inferred` when the context or the Dockerfil
 an overridable value. A Dockerfile that cannot be read leaves the whole context at `inferred`, and
 the reason says so. `.dockerignore` is not read.
 
-Literals link at `exact`; Compose defaults and Helm values at `inferred`, with their source in
-the reason. Unresolved parts remain patterns and match only literal names at segment
-boundaries; several candidates remain `ambiguous` and can receive a decision. `status` lists
-image orphans only when the visible scope contains builders and runners. Otherwise `search`
-and `context` mark the side with no counterpart. Export stays at format 1, adding builder `at`
-locations and direct-path `executions`; the console graph shows image contracts, their links
-and workload code.
+Literals link at `exact`; Compose defaults and Helm values at `inferred`, with their source in the
+reason. Unresolved parts remain patterns and match only literal names at segment boundaries; several
+candidates remain `ambiguous` and can receive a decision. `status` lists image orphans only for a
+registry and namespace (`ghcr.io/acme`) that holds builders and runners in the visible scope.
+Otherwise `search` and `context` mark the side with no counterpart. Export stays at format 1, adding
+builder `at` locations and direct-path `executions`; the console graph shows image contracts, their
+links and workload code.
 
 ### Partially resolved names
 

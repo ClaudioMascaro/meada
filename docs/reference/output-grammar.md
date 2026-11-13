@@ -80,8 +80,8 @@ file whose path holds a space reads as more fields than it has.
 | `<query>` | `<text>` | What the call was given, echoed. |
 | `<orphan-note>` | ` (no provisioner in the workspace)` | The visible scope has uses but no provisioner of this contract kind and broker or resource kind. |
 | `<orphan-note>` | ` (no use in the workspace)` | The visible scope has provisioners but no use of this group. |
-| `<orphan-note>` | ` (no builder in the workspace)` | The visible image scope has runners but no builder. |
-| `<orphan-note>` | ` (no runner in the workspace)` | The visible image scope has builders but no runner. |
+| `<orphan-note>` | ` (no builder in the workspace)` | The visible scope has no builder of an image in this registry and namespace. |
+| `<orphan-note>` | ` (no runner in the workspace)` | The visible scope has no runner of an image in this registry and namespace. |
 | `<orphan-note>` | ` (no matcher in the workspace)` | The visible alert scope has emitters but no matcher. |
 | `<orphan-note>` | ` (no emitter in the workspace)` | The visible alert scope has matchers but no emitter. |
 

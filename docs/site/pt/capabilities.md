@@ -590,13 +590,13 @@ o contexto ou o caminho do Dockerfile passou por um valor sobrescrevível. Um Do
 pode ser lido deixa o contexto inteiro em `inferred`, e o motivo diz isso. O `.dockerignore` não
 é lido.
 
-Literais ligam em `exact`; defaults Compose e valores Helm em `inferred`, com sua origem no
-motivo. Trechos não resolvidos permanecem padrões e só correspondem a nomes literais nos
-limites de segmentos; vários candidatos ficam `ambiguous` e podem receber uma decisão.
-`status` só lista imagens órfãs quando o escopo visível tem construtores e executores.
-Sem um desses lados, `search` e `context` marcam o lado sem contraparte. A exportação mantém
-formato 1, com `at` nos construtores e `executions` para os caminhos diretos; o grafo do console
-mostra os contratos de imagem, as ligações e o código das cargas de trabalho.
+Literais ligam em `exact`; defaults Compose e valores Helm em `inferred`, com sua origem no motivo.
+Trechos não resolvidos permanecem padrões e só correspondem a nomes literais nos limites de
+segmentos; vários candidatos ficam `ambiguous` e podem receber uma decisão. `status` só lista
+imagens órfãs de um registro e namespace (`ghcr.io/acme`) que tem construtores e executores no
+escopo visível. Sem um desses lados no grupo, `search` e `context` marcam o lado sem contraparte. A
+exportação mantém formato 1, com `at` nos construtores e `executions` para os caminhos diretos; o
+grafo do console mostra os contratos de imagem, as ligações e o código das cargas de trabalho.
 
 ### Nomes parcialmente resolvidos
 

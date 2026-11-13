@@ -150,7 +150,7 @@ fn image_orphans_require_both_roles_in_the_visible_scope_and_refresh() {
     assert!(!status.contains("orphan image::"), "{status}");
     std::fs::write(
         repo.join("compose.yaml"),
-        "services:\n  cache:\n    image: redis:7\n",
+        "services:\n  cache:\n    image: redis:7\n  worker:\n    image: ghcr.io/acme/worker:1\n",
     )
     .unwrap();
     let status = engine
@@ -161,19 +161,24 @@ fn image_orphans_require_both_roles_in_the_visible_scope_and_refresh() {
         .flatten()
         .collect::<Vec<_>>()
         .join("\n");
+    // Asked per registry and namespace: `ghcr.io/acme` builds and runs, `docker.io/library` runs.
     assert!(
         status.contains("orphan image::ghcr.io/acme/orders: no runner"),
         "{status}"
     );
     assert!(
-        status.contains("orphan image::docker.io/library/redis: no builder"),
+        status.contains("orphan image::ghcr.io/acme/worker: no builder"),
         "{status}"
     );
+    assert!(!status.contains("orphan image::docker.io/"), "{status}");
     std::fs::remove_file(repo.join(".github/workflows/build.yml")).unwrap();
-    let context = engine
-        .context("image::docker.io/library/redis", None)
-        .unwrap();
-    assert!(context.contains("no builder in the workspace"), "{context}");
+    for image in [
+        "image::docker.io/library/redis",
+        "image::ghcr.io/acme/worker",
+    ] {
+        let context = engine.context(image, None).unwrap();
+        assert!(context.contains("no builder in the workspace"), "{context}");
+    }
     let status = engine
         .status_report()
         .unwrap()
@@ -183,6 +188,41 @@ fn image_orphans_require_both_roles_in_the_visible_scope_and_refresh() {
         .collect::<Vec<_>>()
         .join("\n");
     assert!(!status.contains("orphan image::"), "{status}");
+}
+
+/// The orphan scope of images is asked per registry and namespace (ADR 0026, "Orphan sides"),
+/// so a public image no repository builds is no orphan because the workspace builds another.
+#[test]
+fn an_image_is_an_orphan_only_in_a_group_that_builds_and_runs() {
+    let repo = fixture_repo(
+        "images_orphan_groups",
+        "orphan-image",
+        Some("https://example.com/acme/o4.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+    let orphans = || -> Vec<String> {
+        (engine.status_report().unwrap().1.into_iter().flatten())
+            .filter(|l| l.starts_with("orphan "))
+            .collect()
+    };
+    assert_eq!(orphans(), Vec::<String>::new());
+    let postgres = engine
+        .context("image::docker.io/library/postgres", None)
+        .unwrap();
+    assert!(
+        postgres.contains("(no builder in the workspace)"),
+        "{postgres}"
+    );
+    let compose = std::fs::read_to_string(repo.join("docker-compose.yaml")).unwrap();
+    std::fs::write(
+        repo.join("docker-compose.yaml"),
+        format!("{compose}  worker:\n    image: ghcr.io/acme/worker\n"),
+    )
+    .unwrap();
+    assert_eq!(
+        orphans(),
+        ["orphan image::ghcr.io/acme/worker: no builder; docker-compose.yaml::services.worker"]
+    );
 }
 
 #[test]

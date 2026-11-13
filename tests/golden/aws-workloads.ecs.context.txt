@@ -8,7 +8,7 @@ referenced by: none
 values:
 example.com/acme/tasks main.tf:3 resource.aws_ecs_task_definition.worker.family = "worker"
 example.com/acme/tasks main.tf:4 resource.aws_ecs_task_definition.worker.container_definitions = jsonencode([\n    { name = "worker", image = "ghcr.io/acme/aws-worker:1", environment = [{ name = "QUEUE_NAME", value = "orders" }] },\n    { name = "sidecar", image = "ghcr.io/acme/aws-sidecar:1", environment = [{ name = "QUEUE_NAME", value = "sidecar" }] },\n    { name = "plain", image = "redis:7" }\n  ])
-image: image::docker.io/library/redis
+image: image::docker.io/library/redis (no builder in the workspace)
 image: image::ghcr.io/acme/aws-sidecar
 image: image::ghcr.io/acme/aws-worker
   builder: example.com/acme/app [exact: image::ghcr.io/acme/aws-worker]

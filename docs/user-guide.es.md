@@ -486,10 +486,14 @@ Meada no puede leer (ausente, tras un enlace simbólico, un origen con variable,
 analiza) deja el contexto entero en `inferred`, y el motivo dice que no se leyó. `.dockerignore` no
 se lee. Las rutas no cruzan enlaces simbólicos.
 
-`meada status` solo lista imágenes huérfanas si el ámbito contiene builder y runner. Con un solo
-papel, `search` y `context` muestran `no builder in the workspace` o `no runner in the workspace`.
-El export conserva `format: 1`, guarda ubicaciones de builders y raíces de workloads e incluye
-`executions` para rutas directas; el grafo de la consola muestra contratos y código de workloads.
+`meada status` pregunta por las imágenes huérfanas por registro y namespace (el primer segmento de
+la ruta del repositorio en el nombre normalizado): `ghcr.io/acme/shop` y `ghcr.io/acme/tools/lint`
+están en `ghcr.io/acme`, `docker.io/library/postgres` en `docker.io/library`, y una imagen cuya ruta
+tiene un solo segmento se agrupa solo por su registro. Solo lista imágenes huérfanas de un grupo que
+contiene builder y runner; en un grupo con un solo papel, `search` y `context` muestran
+`no builder in the workspace` o `no runner in the workspace`. El export conserva `format: 1`, guarda
+ubicaciones de builders y raíces de workloads e incluye `executions` para rutas directas; el grafo
+de la consola muestra contratos y código de workloads.
 
 ### CloudFormation y SAM
 

@@ -323,8 +323,8 @@ impl ContractKind for Image {
     fn link_candidate(&self, provider: &Provider, link: &Link, exports: &[Export]) -> bool {
         provider.site == link.provider && patterns::active_match(exports, provider, &link.contract)
     }
-    fn side_note(&self, exports: &[Export], _: &str, role: Role) -> &'static str {
-        let (built, run) = roles(exports);
+    fn side_note(&self, exports: &[Export], contract: &str, role: Role) -> &'static str {
+        let (built, run) = roles(exports, contract);
         match role {
             Role::Provider if !run => " (no runner in the workspace)",
             Role::Consumer if !built => " (no builder in the workspace)",
@@ -338,15 +338,14 @@ impl ContractKind for Image {
         exports: &[Export],
         _: &[Link],
     ) -> Vec<String> {
-        if roles(exports) != (true, true) {
-            return Vec::new();
-        }
+        // Asked per group: a side whose group lacks a builder or a runner is no orphan.
+        let scoped = |contract: &str| {
+            contract.starts_with("image::")
+                && !self.unresolved(contract)
+                && roles(exports, contract) == (true, true)
+        };
         let mut rows = std::collections::BTreeSet::new();
-        for p in export
-            .providers
-            .iter()
-            .filter(|p| p.contract.starts_with("image::") && !self.unresolved(&p.contract))
-        {
+        for p in export.providers.iter().filter(|p| scoped(&p.contract)) {
             if !exports.iter().flat_map(|e| &e.consumers).any(|c| {
                 c.contract
                     .as_deref()
@@ -362,11 +361,7 @@ impl ContractKind for Image {
                 );
             }
         }
-        for c in export.consumers.iter().filter(|c| {
-            c.contract
-                .as_deref()
-                .is_some_and(|c| c.starts_with("image::") && !self.unresolved(c))
-        }) {
+        for c in (export.consumers.iter()).filter(|c| c.contract.as_deref().is_some_and(scoped)) {
             let contract = c.contract.as_deref().unwrap_or_default();
             if !exports
                 .iter()
@@ -568,9 +563,12 @@ fn images(export: &Export) -> Vec<(&crate::iac::Node, &str, Option<String>)> {
     out
 }
 
-/// Whether the scope holds a builder and a runner of a resolved image name.
-fn roles(exports: &[Export]) -> (bool, bool) {
-    let side = |c: &str| c.starts_with("image::") && !crate::contract::unresolved(c);
+/// Whether the scope holds a builder and a runner of a resolved image name in the group of
+/// `contract`, the image's orphan scope (ADR 0026, "Orphan sides").
+fn roles(exports: &[Export], contract: &str) -> (bool, bool) {
+    let side = |c: &str| {
+        c.starts_with("image::") && !crate::contract::unresolved(c) && same_group(c, contract)
+    };
     (
         (exports.iter().flat_map(|e| &e.providers)).any(|p| side(&p.contract)),
         (exports.iter().flat_map(|e| &e.consumers))
@@ -659,6 +657,26 @@ fn evaluated(written: &str) -> Option<String> {
     normalize_name(&out, true)
 }
 
+/// The registry and namespace an image's orphan scope is asked in: the registry and the first
+/// segment of the repository path (`ghcr.io/acme/shop` and `ghcr.io/acme/tools/lint` are in
+/// `ghcr.io/acme`), or the registry alone for a path of one segment.
+fn group(contract: &str) -> &str {
+    let name = contract.strip_prefix("image::").unwrap_or(contract);
+    let Some((registry, path)) = name.split_once('/') else {
+        return name;
+    };
+    match path.split_once('/') {
+        Some((namespace, _)) => &name[..registry.len() + 1 + namespace.len()],
+        None => registry,
+    }
+}
+
+/// Whether two images are in one group, a pattern's group taking the groups it matches.
+fn same_group(a: &str, b: &str) -> bool {
+    let (a, b) = (group(a), group(b));
+    a == b || crate::iac::pattern::matches(a, b) || crate::iac::pattern::matches(b, a)
+}
+
 /// The registry and repository of an image, without its deployment tag or digest.
 fn normalize(written: &str) -> Option<String> {
     normalize_name(written, false)
@@ -724,7 +742,29 @@ fn normalize_name(written: &str, pattern: bool) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{evaluated, matches, normalize};
+    use super::{evaluated, group, matches, normalize, same_group};
+
+    #[test]
+    fn an_image_is_grouped_by_its_registry_and_namespace() {
+        for (contract, expected) in [
+            ("image::ghcr.io/acme/shop", "ghcr.io/acme"),
+            ("image::ghcr.io/acme/tools/lint", "ghcr.io/acme"),
+            ("image::docker.io/library/postgres", "docker.io/library"),
+            ("image::localhost:5000/orders", "localhost:5000"),
+            ("image::localhost:5000/acme/shop", "localhost:5000/acme"),
+        ] {
+            assert_eq!(group(contract), expected, "{contract}");
+        }
+        let shop = "image::ghcr.io/acme/shop";
+        let redis = "image::docker.io/library/redis";
+        assert!(same_group(shop, "image::ghcr.io/acme/tools/lint"));
+        assert!(!same_group(shop, redis));
+        assert!(!same_group(shop, "image::ghcr.io/other/shop"));
+        // A pattern's group is matched as a pattern: `ghcr.io/*` takes `ghcr.io/acme`.
+        assert!(same_group("image::ghcr.io/*/orders", shop));
+        assert!(same_group("image::ghcr.io/acme/orders-*", shop));
+        assert!(!same_group("image::ghcr.io/*/orders", redis));
+    }
 
     #[test]
     fn a_wholly_unknown_image_has_no_literal_matching_evidence() {

@@ -57,6 +57,11 @@ All notable changes to Meada are recorded here. The format follows
   place, and `meada export` lists it in `policy_grants`, an added optional array. A value under
   `examples`, `default`, `enum` or `const` of a JSON Schema document gives no side and stays a
   config value (#798).
+- `meada status` asks for image orphans per registry and namespace (`ghcr.io/acme`,
+  `docker.io/library`), so a runner of a public image is no longer a `no builder` line because
+  the workspace builds some other image. A group that lacks builders or runners prints no orphan
+  line, and its sides carry `no builder in the workspace` or `no runner in the workspace` in
+  `context` and `search` (#799).
 
 ## [1.3.0] - 2026-11-11
 
