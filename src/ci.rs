@@ -183,14 +183,21 @@ const NOT_REUSABLE: &str =
 /// path names no provider at the indexed commit, and may name one at the Git ref, so the mark
 /// never says broken. A pipeline file that is there with no `on.workflow_call` says so.
 fn absent(exports: &[Export], contract: &str) -> Option<&'static str> {
-    let provided = |e: &Export| e.providers.iter().any(|p| p.contract == contract);
-    if !contract.starts_with(PREFIX) || exports.iter().any(provided) {
+    let rest = contract.strip_prefix(PREFIX)?;
+    // A provider's identifier starts with its own repository: no other export is read.
+    let mut named = (exports.iter()).filter(|e| rest.starts_with(e.repository.as_str()));
+    if (named.clone()).any(|e| e.providers.iter().any(|p| p.contract == contract)) {
         return None;
     }
-    let plain = exports.iter().any(|e| {
-        let path = (contract[PREFIX.len()..].strip_prefix(e.repository.as_str()))
-            .and_then(|rest| rest.strip_prefix('/'));
-        let file = |n: &Node| actions::owns(n) && n.address == "." && Some(&*n.path) == path;
+    let plain = named.any(|e| {
+        let path = (rest.strip_prefix(e.repository.as_str())).and_then(|at| at.strip_prefix('/'));
+        // An action's file is no pipeline: a CI step that names it names a folder not there.
+        let file = |n: &Node| {
+            actions::owns(n)
+                && n.address == "."
+                && n.ty != actions::ACTION
+                && Some(&*n.path) == path
+        };
         e.iac.iter().any(file)
     });
     Some(if plain { NOT_REUSABLE } else { ABSENT })
@@ -341,13 +348,15 @@ impl ContractKind for Ci {
                 let Some(contract) = consumed(uses, step, own, &known) else {
                     continue;
                 };
-                if unread.contains(&contract) {
+                let site = node.identity(own);
+                // Unresolved, the folder may be another repository's: the open item stays.
+                let resolved = !causes.contains_key(&site);
+                if resolved && unread.contains(&contract) {
                     continue;
                 }
-                let site = node.identity(own);
                 export.consumers.push(Consumer {
                     // Unresolved: no contract, as a call whose URL could not be read.
-                    contract: (!causes.contains_key(&site)).then_some(contract),
+                    contract: resolved.then_some(contract),
                     site,
                     via: Some(uses.to_string()),
                     shape: None,

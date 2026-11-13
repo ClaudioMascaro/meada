@@ -118,9 +118,9 @@ pub(crate) fn schema_version() -> i32 {
 /// three reaches the export. `taken` lists the documents and the config files a pack reads or
 /// includes as of the last refresh: those keep every value past `config_values::VALUES_MAX`
 /// (#817), so a config file one starts or stops taking is read again. `dockerfiles` lists the
-/// folders (no `/` at the end, empty for the root) that hold a file named `Dockerfile` as of the
-/// last refresh (#827): the CI kind tells by it a container action, which no reader takes, from
-/// a folder that holds no action.
+/// folders (no `/` at the end, empty for the root) that hold a file named `Dockerfile` or
+/// `dockerfile`, the two the runner builds an action from, as of the last refresh (#827): the CI
+/// kind tells by it a container action, which no reader takes, from a folder that holds no action.
 /// `iac_nodes` holds each IaC node (#649, `iac::Node`: its address, the
 /// label of its root module, its type, physical name as static evaluation resolves it (#650),
 /// whether that is a `pattern`, the `overridable` values it went through as JSON, file, first and
@@ -1038,9 +1038,14 @@ fn refresh_attempt(
     // The folders with a `Dockerfile`, hidden CI ones too, for the CI kind (#827): no file of
     // theirs is stamped, so the walk's set is compared with the stored one.
     let dockerfiles: BTreeSet<&str> = (all.iter().chain(&hidden))
-        .filter_map(|(path, _)| match path.strip_suffix("Dockerfile")? {
-            "" => Some(""),
-            folder => folder.strip_suffix('/'),
+        .filter_map(|(path, _)| {
+            let folder =
+                (path.strip_suffix("Dockerfile")).or_else(|| path.strip_suffix("dockerfile"))?;
+            if folder.is_empty() {
+                Some("")
+            } else {
+                folder.strip_suffix('/')
+            }
         })
         .collect();
     if stored_dockerfiles(&tx)?

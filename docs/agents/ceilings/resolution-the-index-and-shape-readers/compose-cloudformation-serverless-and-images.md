@@ -78,20 +78,28 @@
   `refs/heads/<branch>`, which GitHub does not allow, links as any other. An action in a folder named as a pipeline file
   (`.github/workflows/x.yml/action.yml`) provides nothing.
 - `ci.rs` (#827, ADR 0028): the absent mark says what the index of the provider's repository
-  holds at its indexed commit, never what the Git ref of the call holds: Meada resolves no ref,
-  so a file that exists only at the ref is marked, and one removed there is not. A file Meada
+  holds, never what the Git ref of the call holds: Meada resolves no ref, so a file that exists
+  only at the ref is marked, and one removed there is not. The index follows the checkout, a
+  dirty one included, and the mark reads the same for a peer with no commit. A file Meada
   could not read (past `lang::MAX_BYTES`, not UTF-8, refused by the event reader) gives no node
-  and reads as absent, and so does a path that differs from the file's by case. The second
-  reason (`the file is no reusable pipeline there`) needs the pipeline's file node: a file under
-  `.github/workflows/` with no `jobs` is no pipeline and gets the plain mark. A folder that
-  holds a file named exactly `Dockerfile` and no action file is no provider, and a call to it
-  holds no side at all, by owner and name, `$/` or `./` alike: no mark, no orphan line, no open
-  item (`dockerfile`, `Dockerfile.dev` and a `Dockerfile` the walk skips do not count, and the
-  call is then marked absent). The set of those folders is stored per repository (table
-  `dockerfiles`), every folder of the walk, with no ceiling of its own. The mark and the orphan
-  rule scan every CI side of the workspace once per answer. An orphan line needs a consumer
-  with a contract in the scope: a marked consumer opens it, an external `uses` and an
-  unresolved CI step do not, and a provider consumed only by a call to itself is no orphan.
+  and reads as absent, and so do a path that differs from the file's by case and a path the
+  walk skips though the commit holds it (a hidden folder outside `.github`, `node_modules`, an
+  ignored path, a symlink). The second reason (`the file is no reusable pipeline there`) needs
+  a pipeline's file node: a file under `.github/workflows/` with no `jobs` is no pipeline and
+  gets the plain mark, and so does a CI step that names an action's file. A folder that holds
+  a file named `Dockerfile` or `dockerfile` (the two names the runner builds an action from)
+  and no action file is no provider, and a resolved call to it holds no side at all: no mark,
+  no orphan line, no open item. `Dockerfile.dev`, `DOCKERFILE` and a `Dockerfile` the walk
+  skips do not count, and the call is then marked absent. An unresolved `./<folder>` stays an
+  open item whatever the own repository holds in that folder. The set of those folders is
+  stored per repository (table `dockerfiles`), every folder of the walk, with no ceiling of its
+  own. The mark reads the providers and the IaC nodes of the repository its contract names
+  once per listed consumer, so `search` with the kind `contract` over thousands of marked
+  consumers costs seconds. An orphan line needs a consumer with a contract in the scope: a
+  marked consumer opens it, an external `uses` and an unresolved CI step do not, a provider
+  consumed only by a call to itself is no orphan, and one whose only caller is an unresolved
+  CI step is an orphan once another consumer opens the scope. A peer `meada.toml` names and
+  the disk does not hold is outside the workspace: a call to it holds no side and no mark.
   `meada status` reports and does not index: a repository never indexed prints `not indexed`
   and no orphan line. The `absent` field of `meada export` follows the links of that same
   export: a consumer row of the kind with no link.

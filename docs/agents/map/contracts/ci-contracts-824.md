@@ -62,5 +62,6 @@ path is a pipeline's file node that is not reusable. `side_note` hands it to the
 `search` kind `contract` and `context` on a contract identifier, `context_at` appends it to the
 `consumes` line, and `written` sets `absent` on the consumer rows of `meada export` that hold no
 link. `index::Export::dockerfiles` (table `dockerfiles`, rewritten when the walk's set of
-folders with a file named `Dockerfile` differs) lets `workspace_step` drop the consumer of a
-call to such a folder with no action file: GitHub builds that action and Meada reads none.
+folders with a `Dockerfile` or a `dockerfile` differs) lets `workspace_step` drop the resolved
+consumer of a call to such a folder with no action file: GitHub builds that action and Meada
+reads none.

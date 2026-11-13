@@ -279,3 +279,47 @@ fn adding_the_missing_file_removes_the_mark_as_a_cold_index_does() {
     assert!(step.contains(MARK), "{step}");
     assert_eq!(answers(&engine), cold());
 }
+
+/// What the verification of #827 found. The second reason is a pipeline's alone: a CI step
+/// that names an action's file names a folder that is not there. A `./<folder>` read in a
+/// workspace Meada does not know stays an open item, whatever the own repository holds in
+/// that folder. And the runner builds an action from `dockerfile` as from `Dockerfile`.
+#[test]
+fn the_reason_the_open_item_and_the_lower_case_name_follow_the_runner() {
+    let (workflows, app_a) = workspace("ci_orphans_verified");
+    write(&workflows, "tools/lower/dockerfile", "FROM alpine:3.20\n");
+    write(
+        &workflows,
+        "tools/wrap/action.yml",
+        "runs:\n  using: composite\n  steps:\n    - uses: ./tools/container\n",
+    );
+    write(
+        &app_a,
+        ABSENT,
+        "on: push\njobs:\n  steps:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: acme/workflows/tools/unused/action.yml@v1\n      - uses: acme/workflows/tools/lower@v1\n",
+    );
+    let engine = Engine::open(&app_a).unwrap();
+    let file = engine
+        .context(&format!("{ABSENT}::jobs.steps.steps[0]"), None)
+        .unwrap();
+    assert_eq!(
+        listed(&file, "consumes "),
+        [format!("{WORKFLOWS}/tools/unused/action.yml @v1{MARK}")],
+        "{file}"
+    );
+    let export = exported(&engine);
+    assert_eq!(
+        consumers(&export, ABSENT),
+        [pair(
+            "jobs.steps.steps[0]",
+            Some(&format!("{WORKFLOWS}/tools/unused/action.yml"))
+        )]
+    );
+    let engine = Engine::open(&workflows).unwrap();
+    assert_eq!(
+        consumers(&exported(&engine), "tools/wrap/action.yml"),
+        [pair("runs.steps[0]", None)]
+    );
+    let open = engine.search("", Some("unresolved"), None).unwrap();
+    assert!(open.contains("tools/wrap/action.yml"), "{open}");
+}
