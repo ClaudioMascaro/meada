@@ -211,15 +211,18 @@ fn a_variable_declared_twice_keeps_every_files_kind_whatever_the_order() {
 /// variable another value or another type no name is exact. Terraform v1.17.1 and OpenTofu v1.13.9
 /// name other instances on every row (the issue's three: `default = ["c"]`, `0-a` and `1-b`
 /// against `0-c`; `set(number)` over `["10", "9"]`, `0-10` and `1-9` against `0-9` and `1-10`; a
-/// list retyped a set, `0-b`, `1-a` and `2-a` against `0-a` and `1-b`) but the last, a list of
-/// strings retyped a list of numbers, where both name `0-10`, `1-9` and `2-10`.
+/// list retyped a set, `0-b`, `1-a` and `2-a` against `0-a` and `1-b`; a string retyped a number
+/// and a map of strings retyped a map of numbers, `f-010` and `f-a-010` against `f-10` and
+/// `f-a-10`) but the last, a list of strings retyped a list of numbers, where both name `0-10`,
+/// `1-9` and `2-10`.
 #[test]
 fn a_declaration_terraform_reads_is_unresolved_where_a_file_only_opentofu_reads_changes_it() {
     let main = format!("{DECLARED}{READ}");
     let read = |declaration: &str| format!("{declaration}{READ}");
     let typed = |ty: &str| format!("variable \"s\" {{\n  type = {ty}\n}}\n");
     let (set, numbers, any) = (typed("set(string)"), typed("list(number)"), typed("any"));
-    let set_number = typed("set(number)");
+    let (set_number, number) = (typed("set(number)"), typed("number"));
+    let map_number = typed("map(number)");
     let own = "variable \"s\" {\n  type = list(string)\n  default = [\"b\", \"a\", \"a\"]\n}\n";
     let c = "variable \"s\" {\n  default = [\"c\"]\n}\n";
     let ten = read("variable \"s\" {\n  type = set(string)\n  default = [\"10\", \"9\"]\n}\n");
@@ -229,6 +232,8 @@ fn a_declaration_terraform_reads_is_unresolved_where_a_file_only_opentofu_reads_
     let x = read("variable \"s\" {\n  type = set(string)\n  default = [\"x\"]\n}\n");
     let child = read(&set);
     let call = "module \"m\" {\n  source = \"./m\"\n  s = [\"b\", \"a\", \"a\"]\n}\n";
+    let scalar = "variable \"s\" {\n  type = string\n  default = \"010\"\n}\nresource \"a\" \"f\" {\n  name = \"f-${var.s}\"\n}\n";
+    let map = "variable \"s\" {\n  type = map(string)\n  default = { a = \"010\" }\n}\nresource \"a\" \"f\" {\n  for_each = var.s\n  name = \"f-${each.key}-${each.value}\"\n}\n";
     let rows: Vec<(&str, Vec<(&str, &str)>)> = vec![
         (
             "override.tofu",
@@ -336,6 +341,14 @@ fn a_declaration_terraform_reads_is_unresolved_where_a_file_only_opentofu_reads_
             ],
         ),
         (
+            "a string retyped a number",
+            vec![("main.tf", scalar), ("override.tofu", &number)],
+        ),
+        (
+            "a map of strings retyped a map of numbers",
+            vec![("main.tf", map), ("override.tofu", &map_number)],
+        ),
+        (
             "strings retyped numbers, spelled alike",
             vec![("main.tf", &strings), ("override.tofu", &numbers)],
         ),
@@ -361,6 +374,16 @@ fn a_declaration_terraform_reads_is_exact_where_both_tools_read_one_value() {
         (
             "an override.tofu restating the set",
             vec![("main.tf", &main), ("override.tofu", set)],
+        ),
+        (
+            "an override.tofu restating the set, spaced otherwise",
+            vec![
+                ("main.tf", &main),
+                (
+                    "override.tofu",
+                    "variable \"s\" {\n  type = set( string )\n}\n",
+                ),
+            ],
         ),
         (
             "an override.tofu restating the default",

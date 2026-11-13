@@ -656,6 +656,9 @@ struct Variable {
     default: Option<Expression>,
     /// What its declared `type` does to the value it receives; `None` without a `type`.
     ty: Option<Declared>,
+    /// Its final `type` as written (`None` without one), which tells two readings of one class
+    /// apart (`string` and `number`, `map(string)` and `map(number)`: `Eval::var`, #767).
+    type_text: Option<String>,
     /// The types its default is converted through, in order (`converted_through`): the type of
     /// the block that gave the default, then the final type at each override that gives a type or
     /// a default.
@@ -681,6 +684,7 @@ impl Variable {
         self.opentofu = variable.opentofu;
         // An override block's `type` replaces the declared one; without one the declared stays.
         let (own, merged) = (variable.ty, variable.ty.or(self.ty));
+        let type_text = (variable.type_text.clone()).or_else(|| self.type_text.clone());
         // An override block without a default keeps the declared one, and where it is.
         if overriding && variable.default.is_none() {
             self.sensitive = variable.sensitive;
@@ -688,12 +692,14 @@ impl Variable {
             // 1.13 and later convert once, to the final type, and name other instances: #740).
             self.through.extend(own);
             self.ty = merged;
+            self.type_text = type_text;
         } else {
             variable.through = own
                 .into_iter()
                 .chain(merged.filter(|_| overriding))
                 .collect();
             variable.ty = merged;
+            variable.type_text = type_text;
             variable.terraform = self.terraform.take();
             *self = variable;
         }
@@ -1482,6 +1488,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
                 let variable = Variable {
                     default: attr("default").cloned(),
                     ty: attr("type").map(Declared::expr),
+                    type_text: attr("type").map(|t| t.to_string()),
                     through: Vec::new(),
                     opentofu: false,
                     sensitive: crate::config_values::hcl::is_sensitive(attr("sensitive")),
@@ -2498,13 +2505,10 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// The value of `var.<n>` in the instance `at`: in a module called locally, the call's
-    /// argument evaluated in the caller (else the variable's default, which the repository
-    /// fixes); in a root, the value its var files give or else its default, either of which a
-    /// deployer can override. A sensitive or undeclared variable is unresolved.
-    /// The value of `var.<n>` in the instance `at`. A variable Terraform reads without some of its
-    /// blocks (`Variable::terraform`) is unresolved where the two readings give it another value or
-    /// another type, since either tool may run the directory (#767).
+    /// The value of `var.<n>` in the instance `at` (`reading`). A sensitive or undeclared variable
+    /// is unresolved, and so is one Terraform reads without some of its blocks
+    /// (`Variable::terraform`) where the two readings give it another value or another type, since
+    /// either tool may run the directory (#767).
     fn var(&mut self, at: usize, n: &str, depth: usize) -> Evaluated {
         let module = &self.modules[self.instances[at].dir];
         let Some(variable) = module.variables.get(n).filter(|v| !v.sensitive) else {
@@ -2514,8 +2518,10 @@ impl<'m> Eval<'m> {
         let Some(terraform) = variable.terraform.as_deref() else {
             return found;
         };
-        // No `type` is `any`: either keeps the value as it is.
-        let ty = |v: &Variable| v.ty.unwrap_or(Declared::Any);
+        // A type as written, whitespace aside; no `type` is `any`: either keeps the value as it is.
+        let ty = |v: &Variable| -> String {
+            (v.type_text.as_deref().unwrap_or("any").split_whitespace()).collect()
+        };
         let same = ty(variable) == ty(terraform)
             && ends_in_set(&variable.through) == ends_in_set(&terraform.through)
             && self.reading(at, n, terraform, depth).val == found.val;
@@ -2528,8 +2534,10 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// The value `variable`, a reading of `var.<n>`, has in the instance `at`: a module argument's,
-    /// a var file's or its default.
+    /// The value `variable`, a reading of `var.<n>`, has in the instance `at`: in a module called
+    /// locally, the call's argument evaluated in the caller (else the variable's default, which the
+    /// repository fixes); in a root, the value its var files give or else its default, either of
+    /// which a deployer can override.
     fn reading(&mut self, at: usize, n: &str, variable: &'m Variable, depth: usize) -> Evaluated {
         let module = &self.modules[self.instances[at].dir];
         if let Some((caller, block)) = self.instances[at].parent {

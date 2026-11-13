@@ -244,14 +244,14 @@
   `["10", "9", "10"]` declared `list(string)` and retyped `list(number)`: both `0-10`, `1-9`,
   `2-10`), and exact where they give one (an override restating the default or the type, a
   `.tofu` override's type and then a `.tf` one's, a var file's value or a module argument under
-  one type). Types are compared as Meada classes them (a set or a list of each element type,
-  `any`, one class for all others). Where OpenTofu refuses the directory, Terraform's reading
-  is the variable's, and Meada tells one refusal: a string no number spells in a default a
-  `.tofu` block retypes `list(number)` or `set(number)` (`["z"]` declared `list(string)` names
-  `0-z`, and Terraform's instances of a var file's value). A default Terraform refuses under a
-  type only OpenTofu reads names nothing exactly. A local overridden in a `.tofu` file keeps
-  OpenTofu's value (`"b"` in `override.tofu` over `"a"` names `f-b`, Terraform `f-a`): only
-  variables are compared. A module is judged by its own files,
+  one type). Types are compared as written, whitespace aside, and no `type` is `any` (`"010"`
+  declared `string` and retyped `number`: Terraform `f-010`, OpenTofu `f-10`). Where OpenTofu
+  refuses the directory, Terraform's reading is the variable's, and Meada tells one refusal: a
+  string no number spells in a default a `.tofu` block retypes `list(number)` or `set(number)`
+  (`["z"]` declared `list(string)` names `0-z`, and Terraform's instances of a var file's value). A
+  default Terraform refuses under a type only OpenTofu reads names nothing exactly. A local
+  overridden in a `.tofu` file keeps OpenTofu's value (`"b"` in `override.tofu` over `"a"` names
+  `f-b`, Terraform `f-a`): only variables are compared. A module is judged by its own files,
   whatever calls it: a module of `.tf` files called only from a root written in `.tofu` follows
   Terraform though Terraform cannot read that root, and OpenTofu's answer differs.
 - A variable's declared type converts what it receives (a default, a var file's value, a module
