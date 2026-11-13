@@ -144,7 +144,8 @@
   and no orphan line. The `absent` field of `meada export` follows the links of that same
   export: a consumer row of the kind with no link.
 - `ci.rs`, `iac/actions.rs` (#834, ADR 0028): permissions are the declared ones, as the files
-  hold them at the indexed commit. The default of a repository's or an organization's settings
+  of the checkout hold them (an uncommitted edit is read, beside the commit the reason shows).
+  The default of a repository's or an organization's settings
   is not read, so `not declared` is unknown, never `none`, and a side that declares nothing is
   never compared. What GitHub does when a called pipeline declares more than its caller grants
   is not confirmed: `permissions mismatch` states the fact only, and no answer says a
@@ -157,4 +158,12 @@
   highest level its CI jobs declare, each by its own block, else its pipeline's: a CI job past
   `NODES_MAX` is not read and not compared, and a CI job of the called pipeline that declares
   nothing adds nothing. A link to an action, or from a CI step, carries no permissions text.
-  A block's named keys count in the stored size of the CI job's node.
+  A block's named keys count in the stored size of the CI job's node, so a block of thousands
+  of names over many CI jobs drops the jobs past `ROOT_STORED_MAX`, and `status` says nothing.
+  A name or a `permissions` key written twice reads as the YAML reader gives it (the last
+  one), where GitHub refuses the file; `1` and `true` read as names. Each link of a CI job that
+  declares a block reads the blocks of the called pipeline once, on every query: the cost is
+  callers times the CI jobs of the pipeline (600 by 600 took 0.3 s in a debug build). A `with`
+  key is shown as written, so one may hold the text `permissions:`; the true block is the last
+  `permissions:` of the line, before the absent mark, and the export holds it apart. A `uses`
+  whose Git ref holds a space names nothing.

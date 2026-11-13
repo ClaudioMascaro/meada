@@ -352,3 +352,46 @@ fn an_edited_block_on_either_side_changes_the_flag_as_a_cold_index_gives_it() {
     assert_eq!(flagged(&warm), 0, "{warm}");
     assert_eq!(warm, cold());
 }
+
+/// The flag reads the blocks of the called pipeline in one pass per link: its cost grows with
+/// the CI jobs of that pipeline, not with their square (found by the verifier of #834).
+#[test]
+fn many_governed_ci_jobs_and_many_callers_are_flagged_in_bounded_time() {
+    let [workflows, _, _, _, app_c] = reproduction("ci_permissions_growth");
+    let jobs: String = (0..600)
+        .map(|n| {
+            format!(
+                "  j{n}:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      \
+                 id-token: write\n    steps:\n      - run: echo {n}\n"
+            )
+        })
+        .collect();
+    let called = format!("on:\n  workflow_call:\njobs:\n{jobs}");
+    fs::write(workflows.join(PUBLISH), called).unwrap();
+    for file in 0..12 {
+        let calls: String = (0..50)
+            .map(|n| {
+                format!(
+                    "  c{n}:\n    permissions:\n      contents: read\n    uses: \
+                     acme/workflows/{PUBLISH}@main\n"
+                )
+            })
+            .collect();
+        let path = format!(".github/workflows/many{file}.yml");
+        fs::write(app_c.join(path), format!("on: push\njobs:\n{calls}")).unwrap();
+    }
+    let engine = Engine::open(&app_c).unwrap();
+    exported(&engine);
+    let started = std::time::Instant::now();
+    let export = exported(&engine);
+    let elapsed = started.elapsed();
+    eprintln!("600 governed CI jobs, 600 callers: {elapsed:?}");
+    let flag = "permissions mismatch: id-token write against none";
+    let flagged = (export["links"].as_array().unwrap().iter())
+        .filter(|l| l["consumer"].as_str().unwrap().contains("/many"))
+        .filter(|l| l["reason"].as_str().unwrap().ends_with(flag))
+        .count();
+    assert_eq!(flagged, 600, "{elapsed:?}");
+    // The square took 20 s here in a debug build.
+    assert!(elapsed < std::time::Duration::from_secs(10), "{elapsed:?}");
+}

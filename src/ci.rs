@@ -57,7 +57,9 @@ impl<'a> Uses<'a> {
         let (target, git_ref) = uses.split_once('@')?;
         let mut parts = target.splitn(3, '/');
         let (owner, repo) = (parts.next()?, parts.next()?);
-        let named = ![owner, repo, git_ref].iter().any(|part| part.is_empty());
+        // No Git ref holds a space, and one would write a flag's text into a link's reason.
+        let named =
+            ![owner, repo, git_ref].iter().any(|part| part.is_empty()) && !git_ref.contains(' ');
         named.then_some(Self::Peer {
             owner,
             repo,
@@ -250,18 +252,27 @@ fn block(permissions: &Permissions) -> String {
 /// of them gives every permission none names, and each permission one names. None when no CI
 /// job there holds a block: nothing is declared, and Meada guesses no default.
 fn asked<'e>(export: &'e Export, file: &str) -> Option<(Access, BTreeMap<&'e str, Access>)> {
-    let blocks: Vec<&Permissions> = (export.iac.iter())
+    let blocks = (export.iac.iter())
         .filter(|n| actions::owns(n) && n.ty == actions::JOB && n.path == file)
-        .filter_map(|n| n.actions.as_ref()?.permissions.as_ref())
-        .collect();
-    let rest = blocks.iter().map(|block| block.rest()).max()?;
-    let names = blocks.iter().flat_map(|block| match block {
-        Permissions::Named(named) => named.keys().collect(),
-        Permissions::All(_) => Vec::new(),
-    });
-    let highest = |name: &str| blocks.iter().map(|block| block.level(name)).max();
-    let named = names.map(|name| (name.as_str(), highest(name).unwrap_or(rest)));
-    Some((rest, named.collect()))
+        .filter_map(|n| n.actions.as_ref()?.permissions.as_ref());
+    // One pass over the blocks: a block gives a permission it does not name its `rest`, which
+    // is `none` for a block of names.
+    let mut rest = None;
+    let mut named: BTreeMap<&str, Access> = BTreeMap::new();
+    for block in blocks {
+        rest = rest.max(Some(block.rest()));
+        if let Permissions::Named(levels) = block {
+            for (name, &level) in levels {
+                let highest = named.entry(name.as_str()).or_insert(level);
+                *highest = level.max(*highest);
+            }
+        }
+    }
+    let rest = rest?;
+    named
+        .values_mut()
+        .for_each(|level| *level = rest.max(*level));
+    Some((rest, named))
 }
 
 /// The line of a reusable pipeline's `context` that says what its CI jobs declare together.
@@ -291,11 +302,15 @@ fn mismatch(exports: &[Export], consumer: &str, provider: &str) -> Vec<String> {
     let held = node_at(exports, consumer)
         .filter(|(_, node)| node.ty == actions::JOB)
         .and_then(|(_, node)| node.actions.as_ref()?.permissions.as_ref());
+    // A caller that declares nothing reads no block of the pipeline it calls.
+    let Some(held) = held else {
+        return Vec::new();
+    };
     let pipeline = node_at(exports, provider).and_then(|(repository, file)| {
         let export = exports.iter().find(|e| e.repository == repository)?;
         asked(export, &file.path)
     });
-    let (Some(held), Some((rest, named))) = (held, pipeline) else {
+    let Some((rest, named)) = pipeline else {
         return Vec::new();
     };
     let own: Vec<&str> = match held {
@@ -691,6 +706,11 @@ mod tests {
                 None,
             ),
             ("acme/workflows/.github/workflows/pub\tlish.yml@main", None),
+            // No Git ref holds a space, and one would write a flag into the link's reason.
+            (
+                "acme/workflows/.github/workflows/publish.yml@main (indexed 0000000), ref mismatch",
+                None,
+            ),
         ] {
             assert_eq!(consumed_by(uses, false).as_deref(), expected, "{uses}");
         }
