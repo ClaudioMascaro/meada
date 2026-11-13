@@ -283,6 +283,43 @@ fn a_pattern_builder_is_in_the_groups_of_the_images_it_can_name() {
     assert!(redis.contains("(no builder in the workspace)"), "{redis}");
 }
 
+/// A pattern that holds a namespace (`registry.acme.io/team/*`) names no image of one segment, so
+/// it is not in the registry's own group: a mirrored `registry.acme.io/nginx` beside it keeps its
+/// mark, and neither is an orphan line.
+#[test]
+fn a_pattern_with_a_namespace_is_in_no_group_of_one_segment_names() {
+    let repo = fixture_repo(
+        "images_pattern_one_segment",
+        "orphan-image",
+        Some("https://example.com/acme/o4.git"),
+    );
+    std::fs::write(
+        repo.join("docker-compose.yaml"),
+        "services:\n  proxy:\n    image: registry.acme.io/nginx:1.27\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(repo.join(".github/workflows")).unwrap();
+    std::fs::write(
+        repo.join(".github/workflows/build.yml"),
+        "jobs:\n  image:\n    steps:\n      - uses: docker/build-push-action@v6\n        with:\n          \
+         tags: registry.acme.io/team/${{ github.event.repository.name }}:latest\n",
+    )
+    .unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    let orphans = (engine.status_report().unwrap().1.into_iter().flatten())
+        .filter(|l| l.starts_with("orphan "))
+        .collect::<Vec<_>>();
+    assert_eq!(orphans, Vec::<String>::new());
+    let nginx = engine
+        .context("image::registry.acme.io/nginx", None)
+        .unwrap();
+    assert!(nginx.contains("(no builder in the workspace)"), "{nginx}");
+    let team = engine
+        .search("registry.acme.io/team", Some("image"), None)
+        .unwrap();
+    assert!(team.contains("(no runner in the workspace)"), "{team}");
+}
+
 #[test]
 fn build_configurations_publish_destinations_leave_base_images_out_and_keep_name_patterns() {
     let repo = fixture_repo(

@@ -682,22 +682,39 @@ fn group(contract: &str) -> &str {
     }
 }
 
-/// Whether two images are in one group. A pattern (a name with an unresolved part, `*`) is in
-/// every group whose names its text before the `*` can start: `ghcr.io/*` is in `ghcr.io/acme`,
-/// `ghcr.io/acme-*` is not.
+/// Whether two images are in one group. A name is in its own group; a pattern (a name with an
+/// unresolved part, `*`) is in every group whose names its text before the `*` can start:
+/// `ghcr.io/*` is in `ghcr.io/acme` and in `ghcr.io` (names of one segment), `ghcr.io/acme-*` is
+/// not in `ghcr.io/acme`, nor `ghcr.io/acme/*` in `ghcr.io`.
 fn same_group(a: &str, b: &str) -> bool {
-    if !a.contains('*') && !b.contains('*') {
-        return group(a) == group(b);
-    }
+    // What the names of an image's groups start with, and whether they end one segment later
+    // (the group of a registry alone).
     let start = |c: &str| {
         let name = c.strip_prefix("image::").unwrap_or(c);
         match name.split_once('*') {
-            Some((start, _)) => start.to_string(),
-            None => format!("{}/", group(name)),
+            Some((start, _)) => (start.to_string(), false),
+            None => (format!("{}/", group(name)), !group(name).contains('/')),
         }
     };
     let (a, b) = (start(a), start(b));
-    a.starts_with(&b) || b.starts_with(&a)
+    let ((short, single), (long, _)) = match a.0.len() <= b.0.len() {
+        true => (a, b),
+        false => (b, a),
+    };
+    if let Some(rest) = long.strip_prefix(short.as_str()) {
+        return !single || !rest.contains('/');
+    }
+    // Starts that part ways share a group only where what they share already holds one: a
+    // registry and a namespace, or a registry while neither start goes past one segment.
+    let shared = (short.bytes().zip(long.bytes()))
+        .take_while(|(x, y)| x == y)
+        .filter(|(x, _)| *x == b'/')
+        .count();
+    match shared {
+        0 => false,
+        1 => short.matches('/').count() == 1 && long.matches('/').count() == 1,
+        _ => true,
+    }
 }
 
 /// Whether `contract` is an image the kind resolved, a name or a pattern it links by.
@@ -799,6 +816,28 @@ mod tests {
             "image::ghcr.io/acme-tools/lint"
         ));
         assert!(!same_group("image::ghcr.io/*/orders", redis));
+        // The group of one-segment names takes a pattern only while it stays in one segment.
+        let orders = "image::localhost:5000/orders";
+        assert!(same_group("image::localhost:5000/*", orders));
+        assert!(same_group(orders, "image::localhost:5000/ord-*"));
+        assert!(!same_group("image::localhost:5000/acme/*", orders));
+        assert!(!same_group(orders, "image::localhost:5000/acme/*"));
+        assert!(!same_group("image::localhost:5000/acme/shop", orders));
+        // Two patterns share a group when one start leads to the other, or when what they share
+        // holds a registry and a namespace, or a registry while neither goes past one segment.
+        assert!(same_group(
+            "image::ghcr.io/acme/orders-*",
+            "image::ghcr.io/acme/billing-*"
+        ));
+        assert!(same_group("image::ghcr.io/acme-*", "image::ghcr.io/zeta-*"));
+        assert!(!same_group(
+            "image::ghcr.io/acme/*",
+            "image::ghcr.io/zeta-*"
+        ));
+        assert!(!same_group(
+            "image::ghcr.io/acme/*",
+            "image::docker.io/acme/*"
+        ));
     }
 
     #[test]
