@@ -8,7 +8,7 @@ use tree_sitter::{Language, Node, Parser};
 
 use super::{
     Binds, Call, ConfigInput, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind,
-    LanguagePack, Modules, Param, Part, Ty, Value, children, named, text,
+    LanguagePack, Limit, Modules, Param, Part, Ty, Value, children, named, text,
 };
 use crate::{Result, package, qualify};
 
@@ -1807,8 +1807,8 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
         return Some(vec![Part::Hole]);
     }
     let parts = |n: Node| parts_at(n, src, up, depth + 1);
-    // Anything inside a string that is not itself foldable is a hole.
-    let inside = |n: Node| parts(n).unwrap_or_else(|| vec![Part::Hole]);
+    // Anything inside a string that is not itself foldable is unread.
+    let inside = |n: Node| parts(n).unwrap_or_else(|| vec![unread(n, src)]);
     match node.kind() {
         "string" => Some(vec![Part::Text(unquote(node, src))]),
         "template_string" => {
@@ -1831,13 +1831,13 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
             match text(node.child_by_field_name("operator")?, src) {
                 // At least one side must be a string for `+` to concatenate.
                 "+" => {
-                    let (left, right) = (parts(left), parts(right));
-                    if left.is_none() && right.is_none() {
+                    let (l, r) = (parts(left), parts(right));
+                    if l.is_none() && r.is_none() {
                         return None;
                     }
-                    let hole = || vec![Part::Hole];
-                    let (left, right) = (left.unwrap_or_else(hole), right.unwrap_or_else(hole));
-                    Some(left.into_iter().chain(right).collect())
+                    let l = l.unwrap_or_else(|| vec![unread(left, src)]);
+                    let r = r.unwrap_or_else(|| vec![unread(right, src)]);
+                    Some(l.into_iter().chain(r).collect())
                 }
                 // A fallback keeps the environment read on its left, if it is the only one.
                 "||" | "??" => {
@@ -1860,6 +1860,20 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
         | "satisfies_expression" => parts(named(node).next()?),
         _ => url_form(node, src, up, depth)
             .or_else(|| env_read(node, src, up, depth).map(|env| vec![env])),
+    }
+}
+
+/// What a string holds where the expression `node` is written and no part of it can be read: the
+/// return value of a call names its callee (#801), anything else is a hole.
+fn unread(node: Node, src: &[u8]) -> Part {
+    match node.kind() {
+        "call_expression" => {
+            callee_node(node).map_or(Part::Hole, |f| Part::Limit(Limit::Returned(callee(f, src))))
+        }
+        "await_expression" | "parenthesized_expression" | "non_null_expression" => {
+            named(node).next().map_or(Part::Hole, |n| unread(n, src))
+        }
+        _ => Part::Hole,
     }
 }
 

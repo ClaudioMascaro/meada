@@ -294,7 +294,9 @@ impl Reads<'_, '_> {
             };
         }
         if member(&call.callee) == "appendingPathComponent" && call.callee.contains('.') {
-            let base = text_parts(&self.url(call.receiver.as_deref()?))?;
+            // A component appended to a base Meada did not read leaves the URL an open item (#801).
+            let base = text_parts(&self.url(call.receiver.as_deref()?));
+            let base = base.unwrap_or_else(crate::http::client_base);
             return Some(append(base, text_parts(call.args.first()?)?));
         }
         None

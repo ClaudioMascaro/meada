@@ -79,7 +79,7 @@ fn client_base<'a>(code: &Code<'a>, origins: Vec<Origin<'a>>) -> Option<Option<V
             Some(url) => match code.value(at, &ctor.scope, url) {
                 Value::Undefined => None,
                 Value::Str(parts) => Some(parts),
-                _ => Some(vec![Part::Hole]),
+                _ => Some(crate::http::client_base()),
             },
         };
         if !bases.contains(&base) {
@@ -89,7 +89,7 @@ fn client_base<'a>(code: &Code<'a>, origins: Vec<Origin<'a>>) -> Option<Option<V
     match bases.len() {
         0 => None,
         1 => bases.pop(),
-        _ => Some(Some(vec![Part::Hole])),
+        _ => Some(Some(crate::http::client_base())),
     }
 }
 

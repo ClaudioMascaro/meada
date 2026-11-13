@@ -71,8 +71,9 @@ pub(in crate::http) fn consumers(
 /// `args` with a first argument `new URL(reference, base)` replaced by the join of the two (RFC
 /// 3986 section 5.2, which the WHATWG URL Standard's constructor agrees with for these
 /// references), before the `fetch` is read. Over a base that is an environment read or a hole, an
-/// absolute-path reference keeps the opaque lead; a parameter on either side waits for the call
-/// sites; anything else the join does not read leaves the URL unknown.
+/// absolute-path reference keeps the read as its origin, and any other unknown origin is dropped,
+/// the path certain (#801); a parameter on either side waits for the call sites; anything else
+/// the join does not read leaves the URL unknown.
 fn joined(args: &[Value]) -> Vec<Value> {
     let Some(Value::New(callee, urls)) = args.first() else {
         return args.to_vec();

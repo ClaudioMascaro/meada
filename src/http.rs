@@ -4,10 +4,10 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::config::gateway_path;
-use crate::contract::{ContractKind, Found, Level, Link, Role, Search, Site, View, shown};
+use crate::contract::{ContractKind, Found, Lead, Level, Link, Role, Search, Site, View, shown};
 use crate::entry::EntryKind;
 use crate::index::{self, Consumer, Export as IndexExport, Gateway, Indexed, Provider};
-use crate::lang::{Depends, Part, Value, literal, property};
+use crate::lang::{Depends, Limit, Part, Value, literal, property};
 use crate::literals::Literals;
 use crate::msg::Msg;
 use crate::resolve::Code;
@@ -52,11 +52,12 @@ struct Read {
     via: Option<String>,
     method: Option<String>,
     fragments: Vec<String>,
+    lead: Option<Lead>,
 }
 
 /// What `fetch(url, init)` reads, or `None` when the URL or the method depends on a parameter.
 fn fetch(args: &[Value]) -> Option<Read> {
-    let (contract, via) = locate(args)?;
+    let (contract, via, lead) = locate(args)?;
     let (mut method, mut texts) = (None, Vec::new());
     if contract.is_none() {
         method = self::method(args.get(1))
@@ -72,6 +73,7 @@ fn fetch(args: &[Value]) -> Option<Read> {
         via,
         method,
         fragments: texts,
+        lead,
     })
 }
 
@@ -293,16 +295,22 @@ fn drift(links: &mut [Link], exports: &[IndexExport]) {
     }
 }
 
+/// The path of the route `contract` when a call of `method` can reach it: a route of that
+/// method or of every method (`ANY`), or of any method when `method` is unknown.
+fn route_path<'a>(contract: &'a str, method: Option<&str>) -> Option<&'a str> {
+    let (route_method, path) = route(contract)?;
+    method
+        .is_none_or(|m| m == route_method || route_method == ANY)
+        .then_some(path)
+}
+
 /// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
 /// `method` when that is known (or of every method), and its path holds every literal
 /// fragment, in order.
 fn route_fits(contract: &str, method: Option<&str>, fragments: &[String]) -> bool {
-    let Some((route_method, mut path)) = route(contract) else {
+    let Some(mut path) = route_path(contract, method) else {
         return false;
     };
-    if method.is_some_and(|m| m != route_method && route_method != ANY) {
-        return false;
-    }
     for fragment in fragments {
         match path.find(fragment.as_str()) {
             Some(at) => path = &path[at + fragment.len()..],
@@ -312,19 +320,31 @@ fn route_fits(contract: &str, method: Option<&str>, fragments: &[String]) -> boo
     true
 }
 
+/// Whether the route `contract` can be what a URL reaches whose start Meada could not read and
+/// whose known rest is the path `known` (#801): it is a route of `method` when that is known,
+/// and some suffix of its path that starts at a `/` is `known`, as a whole path fits a route.
+/// A rest that is no path (`/`) may follow any base.
+fn tail_fits(contract: &str, method: Option<&str>, known: &str) -> bool {
+    let Some(path) = route_path(contract, method) else {
+        return false;
+    };
+    known == "/" || path.match_indices('/').any(|(at, _)| path[at..] == *known)
+}
+
 /// The contract and `via` of `fetch(url, init)`, or `None` when the URL or the method
-/// depends on a parameter; the contract is `None` when the URL or the method cannot be read.
-fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>)> {
+/// depends on a parameter; the contract is `None` when the URL or the method cannot be read,
+/// and when the URL starts with a part Meada could not read, which its `Lead` names (#801).
+fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead>)> {
     let method = method(args.get(1)).ok()?;
     let parts = match args.first() {
         Some(Value::Str(parts)) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => return None,
         Some(Value::Str(parts)) => parts,
         Some(Value::Ref(_)) => return None,
-        _ => return Some((None, None)),
+        _ => return Some((None, None, None)),
     };
-    let (via, path) = match parts.split_first() {
+    let (via, path, lead) = match parts.split_first() {
         Some((Part::Env(var) | Part::EnvOr(var, _), rest)) => {
-            (Some(format!("env:{var}")), Some(render(rest)))
+            (Some(format!("env:{var}")), Some(render(rest)), None)
         }
         _ => {
             let url = render(parts);
@@ -333,18 +353,27 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>)> {
                     let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
                     let host = &rest[..end];
                     if host.contains(PARAM) || host.is_empty() {
-                        (None, None)
+                        (None, None, None)
                     } else {
                         let via = format!("host:{}", host.to_lowercase());
-                        (Some(via), Some(rest[end..].to_string()))
+                        (Some(via), Some(rest[end..].to_string()), None)
                     }
                 }
+                // `/users`: no base, the host unresolved.
+                None if !matches!(parts.first(), Some(p) if unknown(p)) => (None, Some(url), None),
+                // `${base}/users`: the rest is appended to a base Meada could not read, which may
+                // hold a path of its own, so only the end of the path is known.
                 None => {
-                    // `${base}/users`: an unknown base, the host unresolved.
-                    let unknown = |p: &&Part| matches!(p, Part::Hole | Part::Read { .. });
-                    let base = parts.iter().take_while(unknown).count();
-                    let rest = render(&parts[base..]);
-                    (None, (base == 0 || rest.starts_with('/')).then_some(rest))
+                    let rest = render(&parts[parts.iter().take_while(|p| unknown(p)).count()..]);
+                    let lead = rest.is_empty() || rest.starts_with(['/', '?', '#']);
+                    let lead = lead.then(|| Lead {
+                        limit: match &parts[0] {
+                            Part::Limit(limit) => limit.clone(),
+                            _ => Limit::Other,
+                        },
+                        path: normalize_path(&rest),
+                    });
+                    (None, None, lead)
                 }
             }
         }
@@ -352,9 +381,28 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>)> {
     // A path that does not start at the root, such as `${base}${path}`, is not read.
     let path = path.filter(|p| p.is_empty() || p.starts_with(['/', '?', '#']));
     Some(match (method, path) {
-        (Some(method), Some(path)) => (Some(contract(&method, &path)), via),
-        _ => (None, via),
+        (Some(method), Some(path)) => (Some(contract(&method, &path)), via, None),
+        _ => (None, via, lead),
     })
+}
+
+/// A part of a URL Meada could not read, which a base may hold (#801).
+fn unknown(part: &Part) -> bool {
+    matches!(part, Part::Hole | Part::Read { .. } | Part::Limit(_))
+}
+
+/// The base of a client Meada did not read (#801): a path appended to it leaves the consumer an
+/// open item that names the client's base.
+pub(in crate::http) fn client_base() -> Vec<Part> {
+    vec![Part::Limit(Limit::ClientBase)]
+}
+
+/// Whether the origin of `base` is a part Meada could not read: it starts with one, and no
+/// literal `://` places a host after it. A path from the root joined to it as RFC 3986 does
+/// replaces whatever path it has, so that URL's path is certain and its host unresolved (#801).
+pub(in crate::http) fn unknown_origin(base: &[Part]) -> bool {
+    base.first().is_some_and(unknown)
+        && !(base.iter()).any(|p| matches!(p, Part::Text(t) if t.contains("://")))
 }
 
 /// The method `init` gives: `GET` when it gives none (the `fetch` default), `None` when it
@@ -433,6 +481,7 @@ fn provider(site: Site, contract: String) -> Found {
         method: None,
         fragments: Vec::new(),
         shape: None,
+        lead: None,
     }
 }
 
@@ -457,6 +506,7 @@ fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
         via: read.via,
         method: read.method,
         fragments: read.fragments,
+        lead: read.lead,
         shape,
     }
 }
@@ -467,7 +517,12 @@ fn render(parts: &[Part]) -> String {
         .iter()
         .map(|p| match p {
             Part::Text(t) => t.as_str(),
-            Part::Env(_) | Part::EnvOr(..) | Part::Read { .. } | Part::Ref(_) | Part::Hole => PARAM,
+            Part::Env(_)
+            | Part::EnvOr(..)
+            | Part::Read { .. }
+            | Part::Ref(_)
+            | Part::Limit(_)
+            | Part::Hole => PARAM,
         })
         .collect()
 }
@@ -1005,9 +1060,14 @@ impl ContractKind for Http {
         serves(provider, contract)
     }
 
-    /// A route fits a dynamic URL by its code path or by a gateway path.
+    /// A route fits a dynamic URL by its code path or by a gateway path: by the literal fragments
+    /// of the URL, or, after a base Meada could not read, by the end of the path (#801).
     fn candidate(&self, consumer: &Consumer, provider: &Provider) -> bool {
-        let fits = |c: &str| route_fits(c, consumer.method.as_deref(), &consumer.fragments);
+        let method = consumer.method.as_deref();
+        let fits = |c: &str| match &consumer.lead {
+            Some(lead) => tail_fits(c, method, &lead.path),
+            None => route_fits(c, method, &consumer.fragments),
+        };
         fits(&provider.contract) || gateway_contracts(provider).any(|(g, _)| fits(&g))
     }
 
@@ -1044,15 +1104,18 @@ impl ContractKind for Http {
 mod tests {
     use super::{
         CallAt, Http, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits,
+        tail_fits,
     };
     use crate::contract::{ContractKind, Role, Search, View};
     use crate::entry::EntryKind;
     use crate::index::{Consumer, Gateway, Provider};
-    use crate::lang::{Part, Value};
+    use crate::lang::{Limit, Part, Value};
 
-    /// A read no kind decided is an unknown base, as a hole: the host is unresolved, the path is read.
+    /// A base Meada could not read (a hole, a read no kind decided, a limit of value flow), with
+    /// a path appended, may hold a path of its own: the consumer is unresolved, and its lead
+    /// names why and the known end of the path (#801). With no base, the path is the URL's.
     #[test]
-    fn a_leading_read_nobody_decided_is_an_unknown_base() {
+    fn a_base_meada_could_not_read_leaves_the_consumer_unresolved_with_its_lead() {
         let read = Part::Read {
             scope: "".into(),
             callee: "c[]".into(),
@@ -1060,11 +1123,47 @@ mod tests {
             then: Vec::new(),
         };
         let text = |t: &str| Value::Str(vec![Part::Text(t.into())]);
-        for lead in [Part::Hole, read] {
-            let url = Value::Str(vec![lead, Part::Text("/a".into())]);
-            let found = super::fetches(&[url, text("GET")]).unwrap();
-            assert_eq!(found[0].contract.as_deref(), Some("http::GET::/a"));
+        let call = Limit::Returned("c.base".into());
+        for (lead, limit) in [
+            (Part::Hole, Limit::Other),
+            (read, Limit::Other),
+            (Part::Limit(call.clone()), call),
+            (Part::Limit(Limit::ClientBase), Limit::ClientBase),
+        ] {
+            let parts = vec![lead, Part::Text("/a/".into()), Part::Hole];
+            let found = super::fetches(&[Value::Str(parts), text("GET")]).unwrap();
+            assert_eq!(found[0].contract, None);
             assert_eq!(found[0].via, None);
+            let lead = found[0].lead.as_ref().unwrap();
+            assert_eq!((&lead.limit, lead.path.as_str()), (&limit, "/a/{}"));
+        }
+        let found = super::fetches(&[text("/a"), text("GET")]).unwrap();
+        assert_eq!(found[0].contract.as_deref(), Some("http::GET::/a"));
+        assert!(found[0].lead.is_none());
+    }
+
+    /// After a base Meada could not read, a route fits by the end of its path, at a `/`, as a
+    /// whole path fits a route (#801).
+    #[test]
+    fn a_route_fits_a_known_end_by_a_suffix_of_its_path_at_a_slash() {
+        for (contract, method, known, expected) in [
+            ("http::GET::/items", Some("GET"), "/items", true),
+            ("http::GET::/api/orders/items", Some("GET"), "/items", true),
+            ("http::GET::/api/items/export", Some("GET"), "/items", false),
+            ("http::GET::/api/lineitems", Some("GET"), "/items", false),
+            ("http::GET::/v2/orders/{}", None, "/orders/{}", true),
+            ("http::GET::/v2/orders/{}", None, "/orders", false),
+            ("http::POST::/v2/orders", Some("GET"), "/orders", false),
+            ("http::ANY::/v2/orders", Some("GET"), "/orders", true),
+            // A rest that is no path may follow any base.
+            ("http::GET::/v2/orders", None, "/", true),
+            ("channel::orders", None, "/", false),
+        ] {
+            assert_eq!(
+                tail_fits(contract, method, known),
+                expected,
+                "{contract} {method:?} {known}"
+            );
         }
     }
 
@@ -1159,6 +1258,7 @@ mod tests {
             fragments: vec!["/shop/".into()],
             hops: Vec::new(),
             root: None,
+            lead: None,
         };
         let direct = provider("http::GET::/shop/users");
         let gateway = Provider {

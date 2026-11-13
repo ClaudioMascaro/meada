@@ -7,6 +7,7 @@ use std::ops::Range;
 
 use crate::contract::{self, Link, kind_of};
 use crate::index::{Consumer, Export, Provider};
+use crate::lang::Limit;
 use crate::render::{Files, callee};
 use crate::workspace::Repository;
 
@@ -92,6 +93,8 @@ pub struct OpenItem {
     pub enclosing: Option<Enclosing>,
     /// Sorted by repository identity, then label (method and path of a route), then site.
     pub candidates: Vec<Candidate>,
+    /// For a consumer whose URL starts with a part Meada could not read, why (#801).
+    pub limit: Option<Limit>,
 }
 
 impl OpenItem {
@@ -231,6 +234,9 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                     span: range(s.span.start, s.span.end),
                 }),
                 candidates,
+                limit: (consumer.contract.is_none())
+                    .then(|| consumer.lead.as_ref().map(|l| l.limit.clone()))
+                    .flatten(),
             });
         }
     }

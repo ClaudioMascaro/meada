@@ -113,7 +113,9 @@
   query), a literal, an interpolation, a `+` or a `let` constant (`static let` too, from other files and
   imported modules); a hole the evaluation cannot fold stays a parameter marker, a reference or a
   base that is a wrapper's parameter is resolved at its call sites, and a URL left unknown is an
-  unresolved consumer. UIKit, AppKit, SwiftUI and Cocoa spell Foundation's names (they re-export it). `URLRequest(url:)` takes its method from an `httpMethod`
+  unresolved consumer. A path appended to a base Meada did not read (a `+` or an interpolation
+  after a call's return value, an `appendingPathComponent` on a URL it did not read) makes an
+  open item that names the limit (#801). UIKit, AppKit, SwiftUI and Cocoa spell Foundation's names (they re-export it). `URLRequest(url:)` takes its method from an `httpMethod`
   assignment, `HTTPClientRequest(url:)` from `method`, Alamofire from `method:`; GET when absent.
   Not read: `dataTask(with:)`, `AF.download` and `AF.upload`, a request mutated through an
   `inout` or an alias, a request with `url` assigned afterwards (unknown URL), a method that is
@@ -148,8 +150,9 @@
   RFC 3986 does (`https://c/v1` and `orders` give `/orders`, `https://c/v1/` gives
   `/v1/orders`) and one starting with `/` keeps the origin; a base with no literal scheme is
   cut at the first text after its non-literal parts. `request.Method = HttpMethod.X`, set
-  after the construction, is read the same way (a `Bound` named `<name>.Method`). A client with
-  no readable base is a path-only contract. Named clients (`CreateClient(name)`) held by a
+  after the construction, is read the same way (a `Bound` named `<name>.Method`). Over a base
+  Meada did not read, a URL from the root is its path alone and a relative one an open item that
+  names the client's base (`based_on`, #801). Named clients (`CreateClient(name)`) held by a
   local or by a field assigned from it (a `Bound` named `<field>=`, read with `Code::bounds`)
   are not consumers. `a?.M()` is a call of `M` on `a` (the grammar parses `await a?.M()` with
   the `await` around `a`; `condition` reads through it). Ceilings: a field is followed only
@@ -198,8 +201,9 @@
   extends it (#367: the interfaces `Def::bases` reach, up to `BASE_DEPTH` (32) levels, each
   once), read with
   `Expand::Call` (a wrapper's callers pass it) and the reads decided in the file of `For`; one
-  consumer per base, and an interface no `For` makes has an unknown base. The route follows the
-  base's own path (Refit appends it). `AddRefitClient` and `For` given an `HttpClient` are not
+  consumer per base, and an interface no `For` makes has a base Meada did not read. The route
+  follows the base's own path (Refit appends it), so over such a base each endpoint is an open
+  item that names the client's base (#801). `AddRefitClient` and `For` given an `HttpClient` are not
   read. A caller reaches the method through a receiver whose type is declared (a field, a
   parameter, a typed local); `var api = RestService.For<Api>(..)` types nothing, since the
   resolver reads no library's result (the kinds run after it), so its calls stay name matches.

@@ -6,8 +6,9 @@
 //!
 //! The base comes from each `RestService.For<Api>(base)` that makes the interface, read whole
 //! (`Expand::Call`, so a wrapper's callers pass it), with its environment and configuration
-//! reads decided where `For` is written; one consumer per base, and an interface no `For` names
-//! has an unknown base. Refit appends the method's path to the base's own path. A path that does
+//! reads decided where `For` is written; one consumer per base. Refit appends the method's path to
+//! the base's own path, so an interface no `For` names, whose base Meada did not read, has
+//! consumers that are open items naming the client's base (#801). A path that does
 //! not start with `/` is none Refit accepts. `AddRefitClient<Api>()` is not read.
 // ponytail: `For` given an `HttpClient` has an unknown base; read its `BaseAddress` as
 // `clients.rs` does if such clients matter.
@@ -89,16 +90,17 @@ pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
         return Vec::new();
     }
     let bases = bases(code, &files, indexed, &interfaces);
+    let unread = crate::http::client_base();
     let mut found = Vec::new();
     for (key, endpoints) in &interfaces {
-        let bases: Vec<Option<&[Part]>> = match bases.get(key).filter(|b| !b.is_empty()) {
-            Some(bases) => bases.iter().map(|b| Some(b.as_slice())).collect(),
-            None => vec![None],
+        let bases: Vec<&[Part]> = match bases.get(key).filter(|b| !b.is_empty()) {
+            Some(bases) => bases.iter().map(Vec::as_slice).collect(),
+            None => vec![&unread],
         };
         for endpoint in endpoints {
             for base in &bases {
                 let method = Value::Str(vec![Part::Text(endpoint.verb.into())]);
-                let Some(reads) = fetches(&[url(*base, &endpoint.route), method]) else {
+                let Some(reads) = fetches(&[url(base, &endpoint.route), method]) else {
                     continue;
                 };
                 for read in reads {
@@ -157,12 +159,12 @@ fn bases<'a>(
                 Some(Value::Str(p)) if p.iter().any(|p| matches!(p, Part::Ref(_))) => None,
                 Some(Value::Ref(_)) => None,
                 Some(Value::Str(p)) => Some(p.clone()),
-                _ => Some(vec![Part::Hole]),
+                _ => Some(crate::http::client_base()),
             };
             for base in code.expand(Expand::Call(path, n), &read) {
                 let parts = match reads.value(code, path, Value::Str(base.found)) {
                     Value::Str(parts) => parts,
-                    _ => vec![Part::Hole],
+                    _ => crate::http::client_base(),
                 };
                 for &key in &served {
                     let entry = out.entry(key).or_default();
@@ -209,11 +211,8 @@ fn inherited<'a>(code: &Code<'a>, path: &'a str, name: &'a str) -> Vec<(&'a str,
 }
 
 /// The URL of the path `route` (from the root) of a Refit with `base`: the base, its own path
-/// kept, then the route. `None` for a base not read.
-fn url(base: Option<&[Part]>, route: &str) -> Value {
-    let Some(base) = base else {
-        return Value::Str(vec![Part::Text(route.into())]);
-    };
+/// kept, then the route.
+fn url(base: &[Part], route: &str) -> Value {
     let trim = |parts: &mut Vec<Part>| {
         if let Some(Part::Text(t)) = parts.last_mut() {
             *t = t.trim_end_matches('/').to_string();
@@ -232,8 +231,9 @@ fn url(base: Option<&[Part]>, route: &str) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lang::LanguagePack;
+    use crate::contract::Lead;
     use crate::lang::csharp::CSharp;
+    use crate::lang::{LanguagePack, Limit};
     use crate::resolve::Resolver;
 
     /// A consumer as `(contract, via, the definition it is at)`.
@@ -251,6 +251,21 @@ mod tests {
 
     /// The consumers of the files (`(path, source)`), with `configs` beside them, sorted.
     fn sent(sources: &[(&str, &str)], configs: &[(&str, &[u8])]) -> Vec<Sent> {
+        let mut found: Vec<Sent> = (found(sources, configs).into_iter())
+            .map(|f| {
+                let at = match f.site {
+                    Site::Def { name, .. } => name,
+                    _ => String::new(),
+                };
+                (f.contract, f.via, at)
+            })
+            .collect();
+        found.sort();
+        found
+    }
+
+    /// `sent`'s consumers as they are found.
+    fn found(sources: &[(&str, &str)], configs: &[(&str, &[u8])]) -> Vec<Found> {
         let parsed: Vec<_> = (sources.iter())
             .map(|(p, s)| (*p, CSharp.parse(p, s.as_bytes()).unwrap()))
             .collect();
@@ -266,17 +281,7 @@ mod tests {
             configs,
             symlinks: &[],
         };
-        let mut found: Vec<Sent> = (consumers(&code, &indexed).into_iter())
-            .map(|f| {
-                let at = match f.site {
-                    Site::Def { name, .. } => name,
-                    _ => String::new(),
-                };
-                (f.contract, f.via, at)
-            })
-            .collect();
-        found.sort();
-        found
+        consumers(&code, &indexed)
     }
 
     fn at(contract: &str, via: Option<&str>, target: &str) -> Sent {
@@ -356,17 +361,39 @@ mod tests {
 
     #[test]
     fn an_interface_no_rest_service_makes_has_an_unknown_base() {
-        // `AddRefitClient` is not read.
+        // `AddRefitClient` is not read: the path follows a base Meada did not read (#801).
         let registered = "services.AddRefitClient<IApi>()\
                           .ConfigureHttpClient(c => c.BaseAddress = new Uri(\"https://x.example.com\"));\n\
                           return null;";
-        let unknown = [(Some("http::GET::/items/{}".into()), None)];
+        let unknown = [(None, None)];
         assert_eq!(item(made(registered)), unknown);
         // Another `For`, or one of another interface.
         assert_eq!(
             item(made("return Other.For<IApi>(\"https://x.example.com\");")),
             unknown
         );
+    }
+
+    /// Refit appends the path to the base, so over a base Meada did not read (a `For` it cannot
+    /// fold, or none) each endpoint is an open item that names the client's base (#801).
+    #[test]
+    fn an_endpoint_on_a_base_meada_did_not_read_names_the_client_base() {
+        let maker = "using Refit;\nnamespace A;\npublic static class Make {\n\
+                     public static IApi Api() { return RestService.For<IApi>(Settings.Url()); }\n}\n";
+        let lead = Some(Lead {
+            limit: Limit::ClientBase,
+            path: "/items/{}".into(),
+        });
+        for sources in [
+            vec![("A/IApi.cs", API), ("A/Make.cs", maker)],
+            vec![("A/IApi.cs", API)],
+        ] {
+            let items: Vec<_> = (found(&sources, &[]).into_iter())
+                .filter(|f| matches!(&f.site, Site::Def { name, .. } if name == "A.IApi.Item(int)"))
+                .map(|f| (f.contract, f.lead))
+                .collect();
+            assert_eq!(items, [(None, lead.clone())]);
+        }
     }
 
     #[test]
@@ -392,11 +419,7 @@ mod tests {
         // Written in full, it binds without a using.
         assert_eq!(
             sent(&[("A/IApi.cs", &api("", "Refit.Get(\"/a\")"))], &[]),
-            [(
-                Some("http::GET::/a".into()),
-                None,
-                "A.IApi.Item(int)".into()
-            )]
+            [(None, None, "A.IApi.Item(int)".into())]
         );
     }
 
@@ -481,10 +504,11 @@ mod tests {
             pings(&[("A/A.cs", &reached)]),
             [(host, format!("A.I{BASE_DEPTH}.Ping()"))]
         );
+        // Past it, the endpoint has no base Meada read: an open item.
         let past = files(&chain(BASE_DEPTH + 1), make);
         assert_eq!(
-            pings(&[("A/A.cs", &past)]),
-            [(None, format!("A.I{}.Ping()", BASE_DEPTH + 1))]
+            sent(&[("A/A.cs", &past)], &[]),
+            [(None, None, format!("A.I{}.Ping()", BASE_DEPTH + 1))]
         );
     }
 }

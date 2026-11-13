@@ -19,7 +19,11 @@ Infrastructure routing and its shared inference explanation:
   `Zod`, which `response_reads` and `provider_shape` reach through it), holding the budgets of
   each file; Express reads a handler once for every prefix it is mounted under),
   `normalize_path`, and the link rules (host,
-  `base_url_env`, unique provider). A provider that serves every method has the method `ANY`
+  `base_url_env`, unique provider). `locate` makes a URL whose leading part Meada could not read
+  (a hole, an undecided read, a `Part::Limit`) with a rest appended an unresolved consumer that
+  carries `Found::lead` (`Lead {limit, path}`, stored in `contracts.lead`), never a hostless
+  contract (#801); a reader gives a client base it did not read as `http::client_base()`, and
+  keeps a path certain over an unknown origin (`unknown_origin`) where its library's join does. A provider that serves every method has the method `ANY`
   (`http::ANY::<path>`): `http::fits(provided, wanted)` matches it to a consumer of any method
   on its path, and its link's reason ends with `; any method`; `route_fits` (HTTP's `candidate`) and a `trace` start
   (`POST /health`, HTTP's `starts`) take it the same way. `http::drift(links, exports)`, HTTP's `after_links` pass, sets `Link::drift` on every

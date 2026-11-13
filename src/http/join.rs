@@ -7,8 +7,9 @@
 //! stays unknown. A parameter on either side waits for the call sites (`depends`).
 //!
 //! `opaque_lead` is TypeScript's alone: a base that is an environment read or a hole is no URL
-//! the resolver can place, yet an absolute-path reference replaces whatever path it has and keeps
-//! its origin.
+//! the resolver can place, yet an absolute-path reference replaces whatever path it has, so the
+//! path is certain: an environment read stays its origin, any other unknown origin leaves the URL
+//! hostless (#801).
 
 use crate::lang::{Part, Value};
 
@@ -238,17 +239,20 @@ pub(super) fn merged(parts: Vec<Part>) -> Vec<Part> {
 
 /// The origin of a base that is an environment read or a hole, for a reference that is an
 /// absolute path: `/orders` replaces whatever path the base has, so `${API_URL}` + `/orders` is
-/// `${API_URL}/orders` and keeps the lead (`via env:API_URL`). `None` for anything else: a
-/// relative or network-path reference (the base's path or host would matter), a query or a
-/// fragment alone, a reference that starts with a part that is not text, and a base whose opaque
-/// part is not its whole origin (a port or a host written after it).
+/// `${API_URL}/orders` and keeps the lead (`via env:API_URL`), and a base Meada could not read
+/// (a hole, an undecided read, a limit of value flow) + `/orders` is `/orders`, a hostless path
+/// (#801). `None` for anything else: a relative or network-path reference (the base's path or
+/// host would matter), a query or a fragment alone, a reference that starts with a part that is
+/// not text, and a base whose opaque part is not its whole origin (a port or a host written
+/// after it).
 // ponytail: TypeScript's rule alone, so an `EnvOr` lead (a default `fetches` reads) is not one;
 // Swift keeps its answers. Another pack takes it by calling this after `resolve` fails.
 pub(super) fn opaque_lead(base: &[Part], reference: &[Part]) -> Option<Vec<Part>> {
-    let lead = base.first()?;
-    if !matches!(lead, Part::Env(_) | Part::Hole | Part::Read { .. }) {
-        return None;
-    }
+    let lead = match base.first()? {
+        lead @ Part::Env(_) => Some(lead.clone()),
+        Part::Hole | Part::Read { .. } | Part::Limit(_) => None,
+        _ => return None,
+    };
     match base.get(1) {
         None => {}
         Some(Part::Text(t)) if t.starts_with(['/', '?', '#']) => {}
@@ -257,7 +261,7 @@ pub(super) fn opaque_lead(base: &[Part], reference: &[Part]) -> Option<Vec<Part>
     let Some(Reference::AbsolutePath) = classify(reference) else {
         return None;
     };
-    let mut out = vec![lead.clone()];
+    let mut out: Vec<Part> = lead.into_iter().collect();
     out.extend(without_dots(reference)?);
     Some(merged(out))
 }
@@ -447,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    fn an_absolute_path_over_an_opaque_base_keeps_the_opaque_lead() {
+    fn an_absolute_path_over_an_opaque_base_keeps_an_environment_read_and_drops_the_rest() {
         let text = |t: &str| Part::Text(t.into());
         let lead = |base: Vec<Part>, reference: &str| {
             opaque_lead(&base, &[text(reference)]).map(|p| written(&p))
@@ -462,14 +466,17 @@ mod tests {
             lead(vec![env(), text("/v1/")], "/orders").as_deref(),
             Some("${API_URL}/orders")
         );
-        assert_eq!(lead(vec![Part::Hole], "/a/../b").as_deref(), Some("{}/b"));
+        // Any other unknown origin leaves the path alone: certain, and hostless (#801).
+        assert_eq!(lead(vec![Part::Hole], "/a/../b").as_deref(), Some("/b"));
         let read = Part::Read {
             scope: "s".into(),
             callee: "config.getString".into(),
             key: "a.b".into(),
             then: vec![],
         };
-        assert_eq!(lead(vec![read], "/orders").as_deref(), Some("{}/orders"));
+        assert_eq!(lead(vec![read], "/orders").as_deref(), Some("/orders"));
+        let limit = Part::Limit(crate::lang::Limit::Parameter("base".into()));
+        assert_eq!(lead(vec![limit], "/orders").as_deref(), Some("/orders"));
         // A default (`Part::EnvOr`) has a path of its own that `fetches` would append to.
         let defaulted = Part::EnvOr("API_URL".into(), vec![text("http://h/api")]);
         assert_eq!(lead(vec![defaulted], "/orders"), None);

@@ -17,7 +17,9 @@
 //! property or a `static readonly` field), or the one `BaseAddress = new Uri(base)` assignment
 //! made on the name the call is made on, in the scope that declares the name: a base not read
 //! (two assignments, one that may not run, one that sets another address than the initializer,
-//! a name that is assigned or hidden) is unknown, so the path alone is the contract. A relative URL joins the base as `Uri` does (RFC 3986).
+//! a name that is assigned or hidden) is unknown: a path from the root replaces its path, so it is
+//! the contract alone, and a relative one leaves the consumer an open item that names the client's
+//! base (#801). A relative URL joins the base as `Uri` does (RFC 3986).
 //!
 //! A typed client (#113): the `HttpClient` a dependency injection container passes to a
 //! constructor nothing calls (`Injected::Param`) has the one `BaseAddress` the constructor sets on
@@ -322,9 +324,9 @@ fn base<'a>(
     // the initializer leaves the base unknown.
     let [assigned, initial] = [assigned, initial].map(|v| v.map(|v| address(code, reads, path, v)));
     match (assigned, initial) {
-        (Some(a), Some(i)) if a != i => vec![Part::Hole],
+        (Some(a), Some(i)) if a != i => crate::http::client_base(),
         (Some(set), _) | (None, Some(set)) => set,
-        (None, None) => vec![Part::Hole],
+        (None, None) => crate::http::client_base(),
     }
 }
 
@@ -335,9 +337,9 @@ fn address<'a>(code: &Code<'a>, reads: &Reads, path: &'a str, set: &Value) -> Ve
         Value::New(_, args) if args.len() == 1 => match reads.value(code, path, args[0].clone()) {
             Value::Str(parts) => parts,
             Value::Ref(name) => vec![Part::Ref(name.clone())],
-            _ => vec![Part::Hole],
+            _ => crate::http::client_base(),
         },
-        _ => vec![Part::Hole],
+        _ => crate::http::client_base(),
     }
 }
 
@@ -381,7 +383,7 @@ fn registered<'a>(code: &Code<'a>, reads: &Reads) -> BTreeMap<&'a str, Vec<Vec<P
                     &code.value(path, &set.within, &set.value),
                 ),
                 Some(None) => continue,
-                None => vec![Part::Hole],
+                None => crate::http::client_base(),
             };
             let entry = out.entry(class.name).or_default();
             if !entry.contains(&parts) {
@@ -526,8 +528,16 @@ fn injected<'a>(
 /// `url` with `base` in front when `url` is relative to it, as `Uri` joins them (RFC 3986): a
 /// path from the root (`/orders`) replaces the base's own path, and a relative one replaces the
 /// base's last segment (`https://c/v1` and `orders` give `/orders`, `https://c/v1/` gives
-/// `/v1/orders`).
+/// `/v1/orders`). Over a base whose origin Meada could not read, a path from the root is the
+/// path alone (#801).
 fn based_on(base: Vec<Part>, url: Value) -> Value {
+    let rooted = |p: &[Part]| matches!(p.first(), Some(Part::Text(t)) if t.starts_with('/') && !t.starts_with("//"));
+    if let Value::Str(parts) = &url
+        && rooted(parts)
+        && crate::http::unknown_origin(&base)
+    {
+        return url;
+    }
     // A base read from configuration (`Part::EnvOr`) joins on the literal it defaults to.
     let base = match &base[..] {
         [Part::EnvOr(var, default)] => {
@@ -602,8 +612,9 @@ fn path_start(base: &[Part]) -> Option<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lang::LanguagePack;
+    use crate::contract::Lead;
     use crate::lang::csharp::CSharp;
+    use crate::lang::{LanguagePack, Limit};
     use crate::resolve::Resolver;
     use std::collections::BTreeMap;
 
@@ -633,6 +644,15 @@ mod tests {
 
     /// `sent_with`, with config files (`(path, bytes)`) beside the sources.
     fn sent_in(body: &str, others: &[(&str, &str)], configs: &[(&str, &[u8])]) -> Vec<Sent> {
+        let mut found: Vec<Sent> = (consumers_of(body, others, configs).into_iter())
+            .map(|f| (f.contract, f.via, f.method))
+            .collect();
+        found.sort();
+        found
+    }
+
+    /// `sent_in`'s consumers as they are found.
+    fn consumers_of(body: &str, others: &[(&str, &str)], configs: &[(&str, &[u8])]) -> Vec<Found> {
         let src = format!("{USINGS}\nnamespace A;\npublic class C {{\n{body}\n}}\n");
         let mut parsed = vec![("A/C.cs", CSharp.parse("A/C.cs", src.as_bytes()).unwrap())];
         for (path, source) in others {
@@ -650,11 +670,7 @@ mod tests {
         let layout = CSharp.layout(&[], &files).unwrap();
         let resolver = Resolver::with_shared(&files, layout.modules, layout.shared, &CSharp);
         let code = Code::new(&resolver, &files, &CSharp);
-        let mut found: Vec<Sent> = (found(&code, configs).into_iter())
-            .map(|f| (f.contract, f.via, f.method))
-            .collect();
-        found.sort();
-        found
+        found(&code, configs)
     }
 
     fn sent(body: &str) -> Vec<Sent> {
@@ -714,6 +730,34 @@ mod tests {
                 "http::POST::/j",
                 "http::PUT::/c",
                 "http::PUT::/k",
+            ]
+        );
+    }
+
+    /// A client whose base Meada did not read (#801): `Uri` resolves a path from the root over the
+    /// base, replacing its path, so that request links by its path alone; a relative one follows
+    /// the unknown path, so it is an open item that names the client's base.
+    #[test]
+    fn a_relative_request_on_a_client_whose_base_was_not_read_names_the_client_base() {
+        let body = format!(
+            "{CLIENT}async void F() {{\n\
+             await _http.GetAsync(\"/rooted\");\n\
+             await _http.GetAsync(\"orders\");\n\
+             }}"
+        );
+        let mut found: Vec<_> = (consumers_of(&body, &[], &[]).into_iter())
+            .map(|f| (f.contract, f.lead))
+            .collect();
+        found.sort_by_key(|(contract, _)| contract.is_none());
+        let lead = Lead {
+            limit: Limit::ClientBase,
+            path: "/orders".into(),
+        };
+        assert_eq!(
+            found,
+            [
+                (Some("http::GET::/rooted".into()), None),
+                (None, Some(lead))
             ]
         );
     }
@@ -1245,12 +1289,8 @@ mod tests {
         for url in not {
             let body =
                 format!("{CLIENT}async Task F(string name) {{ await _http.GetAsync({url}); }}");
-            assert_eq!(contracts(&body), ["http::GET::/a"], "{url}");
-            assert_eq!(
-                sent(&body),
-                [(Some("http::GET::/a".into()), None, None)],
-                "{url}"
-            );
+            // No read names the base: the path after it is an open item (#801).
+            assert_eq!(sent(&body), [open("GET")], "{url}");
         }
         // A type of the repository named `Environment` hides the framework's.
         let hiding = "namespace A;\npublic static class Environment { \
@@ -1260,7 +1300,7 @@ mod tests {
         );
         assert_eq!(
             sent_with(&body, &[("A/Environment.cs", hiding)]),
-            [(Some("http::GET::/a".into()), None, None)]
+            [open("GET")]
         );
     }
 
@@ -1284,7 +1324,7 @@ mod tests {
         let body = format!(
             "{CLIENT}async Task F() {{ var web = Other.Get(\"X\"); await _http.GetAsync(web + \"/a\"); }}"
         );
-        assert_eq!(sent(&body), [(Some("http::GET::/a".into()), None, None)]);
+        assert_eq!(sent(&body), [open("GET")]);
     }
 
     #[test]
@@ -1393,10 +1433,7 @@ mod tests {
         };
         assert_eq!(made("WebApplication.CreateSlimBuilder"), twin);
         assert_eq!(made("WebApplication.CreateBuilder"), twin);
-        assert_eq!(
-            made("Other.CreateBuilder"),
-            [(Some("http::GET::/x".into()), None, None)]
-        );
+        assert_eq!(made("Other.CreateBuilder"), [open("GET")]);
         // Another type, an undeclared name, a dictionary, a section and a method result.
         for (receiver, decl) in [
             ("_c", "Dictionary<string, string> _c;"),
@@ -1408,11 +1445,7 @@ mod tests {
             ("builder.Environment", "WebApplicationBuilder builder;"),
         ] {
             let found = src(receiver, decl);
-            assert_eq!(
-                found,
-                [(Some("http::GET::/x".into()), None, None)],
-                "{receiver} {decl}"
-            );
+            assert_eq!(found, [open("GET")], "{receiver} {decl}");
         }
     }
 
@@ -1428,7 +1461,7 @@ mod tests {
                 &[("A/IConfiguration.cs", own)],
                 &[("appsettings.json", SETTINGS)]
             ),
-            [(Some("http::GET::/x".into()), None, None)]
+            [open("GET")]
         );
     }
 
@@ -1450,10 +1483,7 @@ mod tests {
             ],
         );
         let mut expected = twins("http::GET::/x", "audit", "audit.example.com").to_vec();
-        expected.extend([
-            (Some("http::GET::/s".into()), None, None),
-            (Some("http::GET::/v".into()), None, None),
-        ]);
+        expected.extend([open("GET"), open("GET")]);
         expected.sort();
         assert_eq!(found, expected);
     }
@@ -1523,7 +1553,9 @@ mod tests {
         assert_eq!(sent_in(&body, &[], &[("appsettings.json", SETTINGS)]), twin);
     }
 
-    /// A typed client `C`: its constructor takes the `HttpClient`, a field holds it.
+    /// A typed client `C`: its constructor takes the `HttpClient`, a field holds it. It sends `/a`,
+    /// from the root, and `b`, relative: over a base Meada did not read, the first is its path
+    /// alone and the second an open item (#801).
     const TYPED: &str = "private readonly HttpClient _http;\n\
                          public C(HttpClient http) { _http = http; }\n\
                          public async Task F() { await _http.GetAsync(\"/a\"); await this._http.GetAsync(\"b\"); }";
@@ -1576,7 +1608,7 @@ mod tests {
             "services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://one.example.com\"));";
         let two =
             "services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://two.example.com\"));";
-        let unknown = [to("http::GET::/a"), to("http::GET::/b")];
+        let unknown = [open("GET"), to("http::GET::/a")];
         assert_eq!(typed(&format!("{one}\n{two}")), unknown);
         assert_eq!(typed(&format!("{one}\n{one}")).len(), 2);
         assert_eq!(
@@ -1639,7 +1671,7 @@ mod tests {
 
     #[test]
     fn a_base_the_constructor_may_not_set_or_that_differs_from_the_registration_is_unknown() {
-        let unknown = [to("http::GET::/a"), to("http::GET::/b")];
+        let unknown = [open("GET"), to("http::GET::/a")];
         for ctor in [
             "public C(HttpClient http) { if (http.BaseAddress == null) http.BaseAddress = new Uri(\"https://own.example.com/\"); _http = http; }",
             "public C(HttpClient http, bool f) { http.BaseAddress = f ? new Uri(\"https://own.example.com/\") : null; _http = http; }",
@@ -1689,13 +1721,13 @@ mod tests {
         );
         assert_eq!(
             typed_with("public C(HttpClient http) { _http = http; }", &made),
-            [to("http::GET::/a"), to("http::GET::/b")]
+            [open("GET"), to("http::GET::/a")]
         );
     }
 
     #[test]
     fn a_registration_meada_cannot_read_leaves_the_base_unknown() {
-        let unknown = [to("http::GET::/a"), to("http::GET::/b")];
+        let unknown = [open("GET"), to("http::GET::/a")];
         let ctor = "public C(HttpClient http) { _http = http; }";
         let other =
             "services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://two.example.com\"));";

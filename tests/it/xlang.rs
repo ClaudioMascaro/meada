@@ -1139,7 +1139,7 @@ fn context_names_the_base_url_and_selected_peer_after_a_partial_edit_and_restore
             .lines()
             .filter(|line| line.contains(" consumes "))
             .collect::<Vec<_>>(),
-        ["example.com/backstage/web src/clients.ts:25 consumes http::GET::/orders"]
+        ["example.com/backstage/web src/clients.ts:25 consumes (unresolved) fetch"]
     );
     let partial = web.join("config/partials/acme.yaml");
     let original = fs::read_to_string(&partial).unwrap();
@@ -1209,7 +1209,8 @@ fn context_names_the_base_url_and_selected_peer_after_a_partial_edit_and_restore
 }
 
 /// Ordinary inferred links keep their plain context contract (#683's existing controls): a
-/// sole provider or a gateway rewrite does not make an environment-derived base URL.
+/// sole provider or a gateway rewrite does not make an environment-derived base URL. A base a
+/// parameter holds may carry a path of its own, so that call links to nothing (#801).
 #[test]
 fn context_keeps_non_environment_inferred_consumers_plain() {
     let case = "xlang_backstage_context_controls";
@@ -1242,14 +1243,20 @@ fn context_keeps_non_environment_inferred_consumers_plain() {
     .unwrap();
     let engine = Engine::open(&web).unwrap();
     let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let tpl = "example.com/backstage/web::src/controls.ts::ordersTpl::fetch#0";
+    let links = export["links"].as_array().unwrap();
+    assert!(
+        links.iter().all(|link| link["consumer"] != tpl),
+        "{links:?}"
+    );
+    let items = engine.open_items().unwrap();
+    let item = items.iter().find(|item| item.id == tpl).unwrap();
+    assert_eq!(
+        item.limit.as_ref().map(|l| l.describe()).as_deref(),
+        Some("base from the parameter base")
+    );
     let mut consumed = Vec::new();
     for (method, path, via, reason) in [
-        (
-            "ordersTpl",
-            "/orders",
-            None,
-            "host unresolved; the only repository serving it is example.com/backstage/api",
-        ),
         (
             "ordersRelative",
             "/orders",
@@ -1308,7 +1315,6 @@ fn context_keeps_non_environment_inferred_consumers_plain() {
     assert_eq!(
         consumed,
         [
-            "example.com/backstage/web src/controls.ts:1 consumes http::GET::/orders",
             "example.com/backstage/web src/controls.ts:2 consumes http::GET::/orders",
             "example.com/backstage/web src/controls.ts:3 consumes http::GET::/gateway/orders",
         ]

@@ -1,0 +1,6 @@
+# The issue's open item (#801), decided to one of its candidates.
+[[decision]]
+kind = "dynamic-url"
+call = "example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0"
+target = "example.com/acme/api::http::GET::/v2/orders"
+by = "human"

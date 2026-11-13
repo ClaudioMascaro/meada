@@ -125,7 +125,7 @@ impl<'c, 'a> Clients<'c, 'a> {
             let base = match client {
                 Client::Made(path, index) => self.configured(path, *index),
                 Client::Typed => None,
-                Client::Unknown => Some(vec![Part::Hole]),
+                Client::Unknown => Some(crate::http::client_base()),
             };
             if !bases.contains(&base) {
                 bases.push(base);
@@ -134,7 +134,7 @@ impl<'c, 'a> Clients<'c, 'a> {
         match bases.len() {
             0 => None,
             1 => bases.pop().flatten(),
-            _ => Some(vec![Part::Hole]),
+            _ => Some(crate::http::client_base()),
         }
     }
 
@@ -162,7 +162,7 @@ impl<'c, 'a> Clients<'c, 'a> {
                 continue;
             };
             let urls = calls(lambda, "url");
-            let hole = || vec![Part::Hole];
+            let hole = crate::http::client_base;
             let base = match &urls[..] {
                 [] => continue,
                 [(_, url)] => match url.args.first() {
@@ -179,7 +179,7 @@ impl<'c, 'a> Clients<'c, 'a> {
         match &mut bases[..] {
             [] => None,
             [one] => Some(std::mem::take(one)),
-            _ => Some(vec![Part::Hole]),
+            _ => Some(crate::http::client_base()),
         }
     }
 }
@@ -278,9 +278,10 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lang::LanguagePack;
+    use crate::contract::Lead;
     use crate::lang::java::Java;
     use crate::lang::kotlin::Kotlin;
+    use crate::lang::{LanguagePack, Limit};
     use crate::resolve::{EVAL_DEPTH, Resolver};
     use std::collections::BTreeMap;
 
@@ -291,6 +292,17 @@ mod tests {
     /// The consumers of the Kotlin file `body`, after the Ktor imports, and how long reading
     /// them took at best of three.
     fn read(body: &str) -> (usize, std::time::Duration) {
+        with_code(body, |code, indexed| {
+            let runs = (0..3).map(|_| {
+                let at = std::time::Instant::now();
+                (consumers(code, indexed).len(), at.elapsed())
+            });
+            runs.min_by_key(|(_, took)| *took).unwrap()
+        })
+    }
+
+    /// `f` of the code of the Kotlin file `body`, after the Ktor imports.
+    fn with_code<R>(body: &str, f: impl Fn(&Code, &Indexed) -> R) -> R {
         let src = format!("package a\n{IMPORTS}{body}");
         let facts = Kotlin.parse(KOTLIN, src.as_bytes()).unwrap();
         let files = BTreeMap::from([(KOTLIN, &facts)]);
@@ -305,11 +317,38 @@ mod tests {
             configs: &[],
             symlinks: &[],
         };
-        let runs = (0..3).map(|_| {
-            let at = std::time::Instant::now();
-            (consumers(&code, &indexed).len(), at.elapsed())
+        f(&code, &indexed)
+    }
+
+    /// A path the reader joins after a base Meada did not read (#801): a `defaultRequest` base
+    /// that is no string leaves the consumer an open item that names the client's base, and a
+    /// template that starts with a call's return value names the callee.
+    #[test]
+    fn a_path_after_a_base_meada_did_not_read_is_an_open_item_that_names_it() {
+        let body = "import io.ktor.client.plugins.defaultRequest\n\
+            fun base(): String = System.getenv(\"API_URL\") + \"/v2\"\n\
+            val client = HttpClient(CIO) { defaultRequest { url(base()) } }\n\
+            suspend fun f() {\n    client.get(\"/orders\")\n    \
+            HttpClient(CIO).get(\"${base()}/items\")\n}\n";
+        let mut found: Vec<_> = with_code(body, |code, indexed| {
+            (consumers(code, indexed).into_iter())
+                .map(|f| (f.contract, f.lead))
+                .collect()
         });
-        runs.min_by_key(|(_, took)| *took).unwrap()
+        found.sort_by_key(|(_, lead)| lead.as_ref().map(|l| l.path.clone()));
+        let lead = |limit: Limit, path: &str| {
+            Some(Lead {
+                limit,
+                path: path.into(),
+            })
+        };
+        assert_eq!(
+            found,
+            [
+                (None, lead(Limit::Returned("base".into()), "/items")),
+                (None, lead(Limit::ClientBase, "/orders")),
+            ]
+        );
     }
 
     /// A client held through locals is followed by the value flow (`Facts::bound`), past
