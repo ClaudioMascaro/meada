@@ -234,13 +234,24 @@
   twice and `010` once, is unresolved) or another kind of collection, and exact where they
   agree, with OpenTofu 1.13's value (no override, an override restating the set, an override
   with its own default of the final type, a var file's value, and a default its types convert
-  alike once and twice). `["10", "9"]` declared `list(number)` and retyped `any` holds
-  OpenTofu 1.13's strings, so a read that tells `"10"` from `10` names OpenTofu's instances,
-  not the ones Terraform names with that override in a `.tf` file. An override in a file only
-  OpenTofu reads is applied as OpenTofu applies it, also over a declaration
-  Terraform reads, though Terraform ignores that file: `main.tf` with the set above and an
-  `override.tofu` giving `default = ["c"]` names `0-c`, OpenTofu's instance, where Terraform
-  names `0-a` and `1-b`. A module is judged by its own files,
+  alike once and twice). `["10", "9"]` declared `list(number)` in a `.tofu` file and retyped
+  `any` holds OpenTofu 1.13's strings, so a read that tells `"10"` from `10` names OpenTofu's
+  instances, not the ones Terraform names with that override in a `.tf` file. A declaration
+  Terraform reads, followed by a block in a file only OpenTofu reads, has a second reading,
+  Terraform's without that file (#767): the variable is unresolved where the two give it another
+  value or another type, even where both tools name alike (`main.tf` with the set above and an
+  `override.tofu` giving `default = ["c"]`: Terraform `0-a` and `1-b`, OpenTofu `0-c`;
+  `["10", "9", "10"]` declared `list(string)` and retyped `list(number)`: both `0-10`, `1-9`,
+  `2-10`), and exact where they give one (an override restating the default or the type, a
+  `.tofu` override's type and then a `.tf` one's, a var file's value or a module argument under
+  one type). Types are compared as Meada classes them (a set or a list of each element type,
+  `any`, one class for all others). Where OpenTofu refuses the directory, Terraform's reading
+  is the variable's, and Meada tells one refusal: a string no number spells in a default a
+  `.tofu` block retypes `list(number)` or `set(number)` (`["z"]` declared `list(string)` names
+  `0-z`, and Terraform's instances of a var file's value). A default Terraform refuses under a
+  type only OpenTofu reads names nothing exactly. A local overridden in a `.tofu` file keeps
+  OpenTofu's value (`"b"` in `override.tofu` over `"a"` names `f-b`, Terraform `f-a`): only
+  variables are compared. A module is judged by its own files,
   whatever calls it: a module of `.tf` files called only from a root written in `.tofu` follows
   Terraform though Terraform cannot read that root, and OpenTofu's answer differs.
 - A variable's declared type converts what it receives (a default, a var file's value, a module
@@ -257,6 +268,5 @@
   (#769), and so does a default Meada cannot convert with certainty, though both tools take it:
   `["-0"]` under `list(number)`, given `["1", "2"]` by a var file or a module argument, names
   nothing exactly where both name `0-1` and `1-2`. A variable with a block in a file only
-  OpenTofu reads is not checked this way (#767 decides): `["z"]` declared `list(string)` and
-  retyped `list(number)` in `override.tofu`, given `["10", "9", "10"]` by `terraform.tfvars`,
-  names Terraform's three instances, where OpenTofu refuses the default.
+  OpenTofu reads is not checked this way: declared in a file Terraform reads, it is compared
+  with Terraform's reading (#767, above).

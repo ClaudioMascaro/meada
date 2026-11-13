@@ -9,7 +9,9 @@
 //! on 2026-11-10 by the black-box verifiers of #754. A case or a resource the tool refuses is left
 //! out, also where a plan would then refuse the whole directory. Each line is a case: `files`, and
 //! per reader (a resource of `aws_sqs_queue`, or `""` for all of them) those names in `want` and a
-//! `mark`.
+//! `mark`. An OpenTofu case whose variable is declared in a `.tf` file and changed by a `.tofu`
+//! block is `~` where Terraform, reading the directory without that block, gives the variable
+//! another value or type (#767).
 
 use super::*;
 use std::path::Path;

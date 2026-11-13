@@ -118,6 +118,7 @@ impl Read<'_> {
                     sensitive: crate::config_values::is_sensitive(body.get("sensitive")),
                     path: self.path.into(),
                     line,
+                    terraform: None,
                 };
                 self.module.declare(names[0], variable, false);
             }

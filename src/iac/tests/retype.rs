@@ -487,24 +487,6 @@ fn a_default_meada_cannot_convert_to_its_types_leaves_every_source_unresolved() 
     }
 }
 
-/// A variable with a block in a file only OpenTofu reads keeps the value it receives, whatever its
-/// default (#767 decides that reading): `["z"]` declared `list(string)` and retyped `list(number)`
-/// in `override.tofu`, given `["10", "9", "10"]` by `terraform.tfvars`, names Terraform v1.17.1's
-/// three instances (it reads no `.tofu` file), where OpenTofu v1.13.9 refuses the default.
-#[test]
-fn a_variable_with_a_block_only_opentofu_reads_keeps_the_value_it_receives() {
-    let main = "variable \"s\" {\n  type = list(string)\n  default = [\"z\"]\n}\n";
-    let retype = over("  type = list(number)\n");
-    let more = [
-        ("override.tofu", retype.as_str()),
-        ("terraform.tfvars", "s = [\"10\", \"9\", \"10\"]\n"),
-    ];
-    assert_eq!(
-        answer(main, "var.s", &more),
-        "queue-0-10, queue-1-9, queue-2-10"
-    );
-}
-
 /// `for_each` over a tuple: Terraform v1.17.1 and OpenTofu v1.13.9 refuse it (it takes a map or a
 /// set of strings), so no name is exact (#769). The same elements as a set name each instance.
 #[test]

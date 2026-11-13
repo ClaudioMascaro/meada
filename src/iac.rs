@@ -613,7 +613,8 @@ fn converted_once(value: Value, ty: Option<Declared>) -> Option<Value> {
 /// name spells them (`spelled`): where a list's two values differ only in an element's type
 /// (`[10, 9]` against `["10", "9"]` under an override typed `any`), OpenTofu 1.13's is the value
 /// Meada gave before lists converted (#770). An override in such a file is merged as OpenTofu
-/// merges it, also over a declaration Terraform reads.
+/// merges it, also over a declaration Terraform reads, whose value `Eval::var` then compares with
+/// Terraform's reading (#767).
 fn declared_default(found: Evaluated, variable: &Variable) -> Evaluated {
     // Only a set or a list of a primitive type converts a value here: a default no such type
     // touches is one value.
@@ -650,6 +651,7 @@ fn spelled(value: &Value) -> Value {
 }
 
 /// A `variable` block: its default, whether it is sensitive, and where it is declared.
+#[derive(Clone)]
 struct Variable {
     default: Option<Expression>,
     /// What its declared `type` does to the value it receives; `None` without a `type`.
@@ -664,6 +666,54 @@ struct Variable {
     sensitive: bool,
     path: String,
     line: usize,
+    /// Terraform's reading of the variable where it is declared in a file Terraform reads and a
+    /// later block is in a file only OpenTofu reads: its blocks without those files' (#767).
+    terraform: Option<Box<Variable>>,
+}
+
+impl Variable {
+    /// Merges `variable`, a later block of this variable, into it. An override file's
+    /// (`overriding`) default replaces the one it holds; a declaring block replaces it whole.
+    fn merge(&mut self, mut variable: Variable, overriding: bool) {
+        variable.sensitive |= self.sensitive;
+        // Any block in a file only OpenTofu reads, whatever the order the blocks come in.
+        variable.opentofu = self.opentofu | config_values::only_opentofu(&variable.path);
+        self.opentofu = variable.opentofu;
+        // An override block's `type` replaces the declared one; without one the declared stays.
+        let (own, merged) = (variable.ty, variable.ty.or(self.ty));
+        // An override block without a default keeps the declared one, and where it is.
+        if overriding && variable.default.is_none() {
+            self.sensitive = variable.sensitive;
+            // Terraform converts the kept default again to the type the override gives (OpenTofu
+            // 1.13 and later convert once, to the final type, and name other instances: #740).
+            self.through.extend(own);
+            self.ty = merged;
+        } else {
+            variable.through = own
+                .into_iter()
+                .chain(merged.filter(|_| overriding))
+                .collect();
+            variable.ty = merged;
+            variable.terraform = self.terraform.take();
+            *self = variable;
+        }
+    }
+
+    /// Whether OpenTofu refuses the directory for this variable's default, as far as Meada can
+    /// tell: a list or set of numbers whose default holds a string no number spells (`["z"]`),
+    /// which every OpenTofu converts to a number once or through the declared types. Meada tells
+    /// no other refusal from a default it cannot convert.
+    fn opentofu_refuses(&self) -> bool {
+        let number = matches!(
+            self.ty,
+            Some(Declared::List(Elem::Number) | Declared::Set(Elem::Number))
+        );
+        let Some(Expression::Array(items)) = self.default.as_ref().filter(|_| number) else {
+            return false;
+        };
+        (items.iter())
+            .any(|item| matches!(item, Expression::String(s) if s.value().parse::<f64>().is_err()))
+    }
 }
 
 /// The value a var file gives a variable, and where: `None` when it is past the evaluation
@@ -679,7 +729,9 @@ struct Given {
 impl Module {
     /// Records the `variable` block `variable` of `name`. An override file's (`overriding`) merges
     /// into the declaration, its default replacing the declared one, or with none is left out, as
-    /// Terraform refuses it. A variable any of its blocks marks sensitive stays sensitive.
+    /// Terraform refuses it. A variable any of its blocks marks sensitive stays sensitive. Where
+    /// a block in a file only OpenTofu reads follows a declaration Terraform reads, Terraform's
+    /// reading is kept apart, made of the blocks it reads (`Variable::terraform`).
     fn declare(&mut self, name: &str, mut variable: Variable, overriding: bool) {
         let Some(declared) = self.variables.get_mut(name) else {
             if !overriding {
@@ -690,26 +742,24 @@ impl Module {
             }
             return;
         };
-        variable.sensitive |= declared.sensitive;
-        // Any block in a file only OpenTofu reads, whatever the order the blocks come in.
-        variable.opentofu = declared.opentofu | config_values::only_opentofu(&variable.path);
-        declared.opentofu = variable.opentofu;
-        // An override block's `type` replaces the declared one; without one the declared stays.
-        let (own, merged) = (variable.ty, variable.ty.or(declared.ty));
-        // An override block without a default keeps the declared one, and where it is.
-        if overriding && variable.default.is_none() {
-            declared.sensitive = variable.sensitive;
-            // Terraform converts the kept default again to the type the override gives (OpenTofu
-            // 1.13 and later convert once, to the final type, and name other instances: #740).
-            declared.through.extend(own);
-            declared.ty = merged;
-        } else {
-            variable.through = own
-                .into_iter()
-                .chain(merged.filter(|_| overriding))
-                .collect();
-            variable.ty = merged;
-            *declared = variable;
+        let tofu = config_values::only_opentofu(&variable.path);
+        if tofu && !declared.opentofu {
+            declared.terraform = Some(Box::new(declared.clone()));
+        } else if let Some(terraform) = declared.terraform.as_mut().filter(|_| !tofu) {
+            terraform.merge(variable.clone(), overriding);
+        }
+        declared.merge(variable, overriding);
+    }
+
+    /// Each variable OpenTofu refuses (`Variable::opentofu_refuses`) as Terraform reads it, the
+    /// only tool that runs its directory (#767).
+    fn settle(&mut self) {
+        for variable in self.variables.values_mut() {
+            if variable.opentofu_refuses()
+                && let Some(terraform) = variable.terraform.take()
+            {
+                *variable = *terraform;
+            }
         }
     }
 
@@ -1437,6 +1487,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
                     sensitive: crate::config_values::hcl::is_sensitive(attr("sensitive")),
                     path: path.to_string(),
                     line: line(b.span().map_or(0, |s| s.start)),
+                    terraform: None,
                 };
                 module.declare(name, variable, overriding);
                 continue;
@@ -2451,11 +2502,36 @@ impl<'m> Eval<'m> {
     /// argument evaluated in the caller (else the variable's default, which the repository
     /// fixes); in a root, the value its var files give or else its default, either of which a
     /// deployer can override. A sensitive or undeclared variable is unresolved.
+    /// The value of `var.<n>` in the instance `at`. A variable Terraform reads without some of its
+    /// blocks (`Variable::terraform`) is unresolved where the two readings give it another value or
+    /// another type, since either tool may run the directory (#767).
     fn var(&mut self, at: usize, n: &str, depth: usize) -> Evaluated {
         let module = &self.modules[self.instances[at].dir];
         let Some(variable) = module.variables.get(n).filter(|v| !v.sensitive) else {
             return Evaluated::unknown();
         };
+        let found = self.reading(at, n, variable, depth);
+        let Some(terraform) = variable.terraform.as_deref() else {
+            return found;
+        };
+        // No `type` is `any`: either keeps the value as it is.
+        let ty = |v: &Variable| v.ty.unwrap_or(Declared::Any);
+        let same = ty(variable) == ty(terraform)
+            && ends_in_set(&variable.through) == ends_in_set(&terraform.through)
+            && self.reading(at, n, terraform, depth).val == found.val;
+        match same {
+            true => found,
+            false => Evaluated {
+                val: Val::Unknown,
+                through: found.through,
+            },
+        }
+    }
+
+    /// The value `variable`, a reading of `var.<n>`, has in the instance `at`: a module argument's,
+    /// a var file's or its default.
+    fn reading(&mut self, at: usize, n: &str, variable: &'m Variable, depth: usize) -> Evaluated {
+        let module = &self.modules[self.instances[at].dir];
         if let Some((caller, block)) = self.instances[at].parent {
             let call = self.instances[at].call.clone();
             return match (block.args.get(n), &variable.default) {
@@ -2511,7 +2587,8 @@ impl<'m> Eval<'m> {
     /// `found`, the value a module argument or a var file gives `variable` in the instance `at`,
     /// converted to its final type. Unresolved where the variable's default does not convert to
     /// its types (`converted_through`): Terraform and OpenTofu refuse the configuration whatever
-    /// gives the value. A variable with a block in a file only OpenTofu reads is left to #767.
+    /// gives the value. A variable with a block in a file only OpenTofu reads is not checked: with
+    /// a declaration Terraform reads, `Eval::var` compares it with Terraform's reading (#767).
     fn received(
         &mut self,
         at: usize,
@@ -2914,6 +2991,7 @@ impl Repository {
             let dir = config_values::parent(path).to_string();
             read(path, src, modules.entry(dir).or_default());
         }
+        modules.values_mut().for_each(Module::settle);
         for path in shadowed {
             if let Some(module) = modules.get_mut(config_values::parent(path)) {
                 module.unreadable = true;

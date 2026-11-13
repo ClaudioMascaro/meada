@@ -56,6 +56,13 @@ All notable changes to Meada are recorded here. The format follows
   as both tools refuse it: a tuple written out, or a variable that holds one (a var file's value
   or a default under `any` or no type, a declared tuple type, a module argument that is a tuple)
   (#769).
+- A variable declared in a `.tf` file and overridden in a `.tofu` file has no exact name where
+  Terraform, which reads the directory without the `.tofu` file, gives it another value or type
+  than OpenTofu: `default = ["c"]` in `override.tofu` over a declared `["b", "a", "a"]` names
+  `0-c` in OpenTofu and `0-a`, `1-b` in Terraform, where Meada gave OpenTofu's `0-c` at
+  `exact`. Where both give one value of one type it stays exact, and where OpenTofu refuses the
+  directory (a string no number spells in a default a `.tofu` block retypes as numbers) Meada
+  reads it as Terraform does (#767).
 
 ## [1.3.0] - 2026-11-11
 
