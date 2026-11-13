@@ -193,7 +193,8 @@ fn a_declaration_only_opentofu_reads_is_exact_where_the_two_conversions_agree() 
 /// (#768): OpenTofu refuses the directory ("Duplicate variable declaration") and Terraform reads
 /// the `.tf` block alone, in either order of the two files, with the override files it reads and
 /// none only OpenTofu reads. Terraform v1.17.1 names `0-x` on every row; OpenTofu v1.13.9 refuses
-/// each.
+/// each. A `sensitive` the block only OpenTofu reads gives still holds, as any block's does:
+/// Terraform names `0-x` there too, and Meada names nothing exactly.
 #[test]
 fn a_variable_declared_in_a_file_of_each_tool_is_the_block_terraform_reads() {
     let tf = format!("variable \"s\" {{\n  type = set(string)\n  default = [\"x\"]\n}}\n{READ}");
@@ -205,6 +206,21 @@ fn a_variable_declared_in_a_file_of_each_tool_is_the_block_terraform_reads() {
         (
             "a.tf, b.tofu.json",
             vec![("a.tf", &tf), ("b.tofu.json", DECLARED_JSON)],
+        ),
+        (
+            "a.tf.json, b.tofu",
+            vec![
+                (
+                    "a.tf.json",
+                    r#"{"variable": {"s": {"type": "set(string)", "default": ["x"]}}}"#,
+                ),
+                ("read.tf", READ),
+                ("b.tofu", tofu),
+            ],
+        ),
+        (
+            "a.tofu.json, b.tf",
+            vec![("a.tofu.json", DECLARED_JSON), ("b.tf", &tf)],
         ),
         (
             "a.tf, b.tofu, an override.tf",
@@ -225,6 +241,14 @@ fn a_variable_declared_in_a_file_of_each_tool_is_the_block_terraform_reads() {
     ];
     for (row, files) in rows {
         assert_eq!(answer(&files), "f-0-x", "{row}");
+    }
+    let secret = "variable \"s\" {\n  sensitive = true\n}\n";
+    for files in [
+        vec![("a.tf", tf.as_str()), ("b.tofu", secret)],
+        vec![("a.tofu", secret), ("b.tf", &tf)],
+        vec![("a.tf", &tf), ("b.tofu", tofu), ("override.tofu", secret)],
+    ] {
+        assert_eq!(answer(&files), UNRESOLVED, "{files:?}");
     }
 }
 

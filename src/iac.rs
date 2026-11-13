@@ -674,7 +674,7 @@ struct Variable {
     terraform: Option<Box<Variable>>,
     /// Whether it is declared both in a file Terraform reads and in one only OpenTofu reads, which
     /// OpenTofu refuses ("Duplicate variable declaration"): it is then the block Terraform reads,
-    /// with no block of a file only OpenTofu reads (#768).
+    /// with nothing of a block in a file only OpenTofu reads but its `sensitive` (#768).
     terraform_only: bool,
 }
 
@@ -747,16 +747,21 @@ impl Module {
     fn declare(&mut self, name: &str, mut variable: Variable, overriding: bool) {
         let tofu = config_values::only_opentofu(&variable.path);
         if let Some(declared) = self.variables.get_mut(name) {
-            let twice = !overriding && tofu != config_values::only_opentofu(&declared.path);
-            match (twice, tofu) {
+            let across_tools = !overriding && tofu != config_values::only_opentofu(&declared.path);
+            match (across_tools, tofu) {
                 // A declaration Terraform reads replaces one only OpenTofu reads.
-                (true, false) => variable.terraform_only = true,
-                (true, true) => {
+                (true, false) => {
+                    variable.terraform_only = true;
+                    variable.sensitive |= declared.sensitive;
+                }
+                // Terraform does not read a block only OpenTofu reads of a variable declared for
+                // each tool; only its `sensitive` is kept, as any block's is.
+                (_, true) if across_tools || declared.terraform_only => {
                     declared.terraform_only = true;
+                    declared.sensitive |= variable.sensitive;
                     return;
                 }
-                (false, true) if declared.terraform_only => return,
-                (false, _) => {
+                _ => {
                     if tofu && !declared.opentofu {
                         declared.terraform = Some(Box::new(declared.clone()));
                     } else if let Some(terraform) = declared.terraform.as_mut().filter(|_| !tofu) {

@@ -254,9 +254,9 @@
   `f-b`, Terraform `f-a`): only variables are compared. A variable declared in a file Terraform
   reads and again in a file only OpenTofu reads, which OpenTofu refuses ("Duplicate variable
   declaration"), is the `.tf` block with the override files Terraform reads, in either order of the
-  files (#768). A module is judged by its own files, whatever calls it: a module of `.tf` files
-  called only from a root written in `.tofu` follows Terraform though Terraform cannot read that
-  root, and OpenTofu's answer differs.
+  files, though a `sensitive` the `.tofu` block gives still holds (#768). A module is judged by its
+  own files, whatever calls it: a module of `.tf` files called only from a root written in `.tofu`
+  follows Terraform though Terraform cannot read that root, and OpenTofu's answer differs.
 - A variable's declared type converts what it receives (a default, a var file's value, a module
   argument) where Meada can make the conversion with certainty: a `set(T)` converts its elements,
   sorts and deduplicates them, and a `list(T)` of `string`, `number` or `bool` converts its
