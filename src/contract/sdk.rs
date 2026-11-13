@@ -190,7 +190,7 @@ pub(crate) fn extract<'a>(
         };
         for (index, stored) in facts.calls.iter().enumerate() {
             let method = crate::resolve::method(&stored.callee);
-            let budget_start = code.spent_apart(path);
+            let (budget_start, mut cut) = (code.spent_apart(path), false);
             // A method can have several rows: a transaction's entries differ in direction.
             let operations = services.iter().flat_map(|service| {
                 (service.operations.iter())
@@ -299,11 +299,17 @@ pub(crate) fn extract<'a>(
                 // Each row of a call reads the request on the budget the call started with, and
                 // the call spends what its rows spend together: what the writer row spent does
                 // not cut the reader row short (a call of `Put` entries only got a reader, #784).
+                // Once a row runs out of it, the call's later rows are not read, as the calls
+                // after it are not: they would read part of the request.
+                if cut {
+                    continue;
+                }
                 let spent = code.spent_apart(path);
                 code.set_spent_apart(path, budget_start);
                 code.apart(row);
-                let cost = code.spent_apart(path) - budget_start;
-                code.set_spent_apart(path, spent.saturating_add(cost));
+                let end = code.spent_apart(path);
+                cut = end > crate::resolve::EVAL_BUDGET;
+                code.set_spent_apart(path, spent.saturating_add(end - budget_start));
             }
         }
     }

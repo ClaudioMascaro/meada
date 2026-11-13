@@ -1764,12 +1764,13 @@ fn aws_origin_chains_and_inline_factories_stay_bounded_at_the_file_size_ceiling(
 
 /// The transaction calls of a file fold on a budget of their own: however many they are, the
 /// other calls of the file keep the sides they have without them, of every kind (#719). The calls
-/// before the one where that budget ends keep their names, and that call has the sides its
-/// entries give: a writer and no reader for `Put` entries, a writer and a reader for `Put` and
-/// `ConditionCheck` entries (#784).
+/// before the one where that budget ends keep their names, and that call has a writer, named or
+/// unresolved, and no reader for write entries; a reader for a `ConditionCheck` entry, unless the
+/// budget ends inside its writer row (#784).
 #[test]
 fn transaction_calls_leave_the_other_sides_of_their_file_named() {
-    // `$CHECK` declares a `ConditionCheck` entry of table `c$K`, `$ITEM` adds it to the call.
+    // `$CHECK` declares a second entry (a `ConditionCheck` of table `c$K`, or a `Put` of table
+    // `u$K`), `$ITEM` adds it to the call.
     let repeated = |template: &str, count: usize, check: Option<(&str, &str)>| -> String {
         let (declared, item) = check.unwrap_or_default();
         let template = template.replace("$CHECK", declared).replace("$ITEM", item);
@@ -1777,7 +1778,7 @@ fn transaction_calls_leave_the_other_sides_of_their_file_named() {
             .map(|k| template.replace("$K", &k.to_string()))
             .collect()
     };
-    let sources = |checked: bool| {
+    let sources = |entries: &str| {
         let java = format!(
             r#"import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -1814,10 +1815,17 @@ class Budget {{
 $CHECK        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(e$K).build()$ITEM).build());
 "#,
                 2000,
-                checked.then_some((
-                    "        var c$K = ConditionCheck.builder().tableName(\"c$K\").build();\n",
-                    ", TransactWriteItem.builder().conditionCheck(c$K).build()",
-                )),
+                match entries {
+                    "check" => Some((
+                        "        var c$K = ConditionCheck.builder().tableName(\"c$K\").build();\n",
+                        ", TransactWriteItem.builder().conditionCheck(c$K).build()",
+                    )),
+                    "pair" => Some((
+                        "        var q$K = Put.builder().tableName(\"u$K\");\n        var f$K = q$K.build();\n",
+                        ", TransactWriteItem.builder().put(f$K).build()",
+                    )),
+                    _ => None,
+                },
             )
         );
         let go = format!(
@@ -1856,10 +1864,17 @@ $CHECK    items := []types.TransactWriteItem{{Put: p}$ITEM}
 }
 "#,
                 2500,
-                checked.then_some((
-                    "    c := &types.ConditionCheck{TableName: aws.String(\"c$K\")}\n",
-                    ", {ConditionCheck: c}",
-                )),
+                match entries {
+                    "check" => Some((
+                        "    c := &types.ConditionCheck{TableName: aws.String(\"c$K\")}\n",
+                        ", {ConditionCheck: c}",
+                    )),
+                    "pair" => Some((
+                        "    u := &types.Put{TableName: aws.String(\"u$K\")}\n",
+                        ", {Put: u}",
+                    )),
+                    _ => None,
+                },
             )
         );
         let csharp = format!(
@@ -1894,10 +1909,17 @@ $CHECK        var items = new List<TransactWriteItem> { new TransactWriteItem { 
     }
 "#,
                 2500,
-                checked.then_some((
-                    "        var c = new ConditionCheck { TableName = \"c$K\" };\n",
-                    ", new TransactWriteItem { ConditionCheck = c }",
-                )),
+                match entries {
+                    "check" => Some((
+                        "        var c = new ConditionCheck { TableName = \"c$K\" };\n",
+                        ", new TransactWriteItem { ConditionCheck = c }",
+                    )),
+                    "pair" => Some((
+                        "        var u = new Put { TableName = \"u$K\" };\n",
+                        ", new TransactWriteItem { Put = u }",
+                    )),
+                    _ => None,
+                },
             )
         );
         [
@@ -1909,10 +1931,10 @@ $CHECK        var items = new List<TransactWriteItem> { new TransactWriteItem { 
     // Measured with each value held in a name (the ceilings topic): the calls named in each
     // language before the budget ends, `Put` entries only.
     let measured = [("java", 1725), ("go", 1928), ("csharp", 2185)];
-    for checked in [false, true] {
-        for (language, file, source, calls) in sources(checked) {
+    for entries in ["put", "check", "pair"] {
+        for (language, file, source, calls) in sources(entries) {
             let repo = fixture_repo(
-                &format!("aws_sdk_transaction_budget_{language}_{checked}"),
+                &format!("aws_sdk_transaction_budget_{language}_{entries}"),
                 "aws-sdk-controls",
                 None,
             );
@@ -1941,7 +1963,7 @@ $CHECK        var items = new List<TransactWriteItem> { new TransactWriteItem { 
                 let unnamed = contracts.filter(|&c| c == "resource::dynamodb").count();
                 (named, unnamed)
             };
-            let case = format!("{language}, ConditionCheck entries {checked}");
+            let case = format!("{language}, entries {entries}");
             let (writers, unnamed_writers) = listed("providers", "resource::dynamodb::t");
             let (readers, unnamed_readers) = listed("consumers", "resource::dynamodb::c");
             // The calls before the one where the budget ends keep their names.
@@ -1960,16 +1982,27 @@ $CHECK        var items = new List<TransactWriteItem> { new TransactWriteItem { 
                 readers.len(),
                 unnamed_readers,
             );
-            if checked {
-                // Every call with a named writer has a reader, named or unresolved: an entry the
-                // budget leaves unread at the call where it ends gives each row one unresolved
-                // side at most.
-                let reader_sides = readers.len() + unnamed_readers;
-                assert_eq!(reader_sides, writers.len(), "{case}: {sides:?}");
+            if entries == "check" {
+                // A call whose rows the budget read whole has its reader named; the one where it
+                // ends inside the writer row has a writer, named or unresolved, and no reader.
+                let read = readers.len() + 1 >= writers.len() && readers.len() <= writers.len();
                 assert!(
-                    unnamed_writers <= 1 && unnamed_readers <= 1,
+                    read && unnamed_writers <= 1 && unnamed_readers == 0,
                     "{case}: {sides:?}"
                 );
+            } else if entries == "pair" {
+                // Write entries only: a writer per entry, named or unresolved, and no reader.
+                let (seconds, _) = listed("providers", "resource::dynamodb::u");
+                assert!(
+                    seconds.iter().copied().eq(0..seconds.len()),
+                    "{case}: {seconds:?}"
+                );
+                assert_eq!(
+                    (readers.len(), unnamed_readers),
+                    (0, 0),
+                    "{case}: {sides:?}"
+                );
+                assert!(unnamed_writers <= 2, "{case}: {sides:?}");
             } else {
                 let (_, measured) = measured.iter().find(|(l, _)| *l == language).unwrap();
                 assert_eq!(sides, (*measured, 0, 0, 0), "{case}");

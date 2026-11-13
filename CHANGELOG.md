@@ -90,9 +90,10 @@ All notable changes to Meada are recorded here. The format follows
   same name (`.entries(entries)`, `.transactItems(transactItems)`, `.put(put.build())`), so such
   a list or builder made and passed straight keeps its bus, or now its tables (#773).
 - In a file of more DynamoDB transaction calls than the evaluation budget covers, the call where
-  the budget ends has the sides its entries give: no unresolved reader beside the writer of `Put`
-  entries, and a reader for its `ConditionCheck` entries. Each row of a call reads the request on
-  the budget the call started with (#784).
+  the budget ends no longer gets an unresolved reader beside the writer of its write entries,
+  and names its `ConditionCheck` entries when its writer row was read whole. Each row of a call
+  reads the request on the budget the call started with, and the rows after one the budget cuts
+  are not read (#784).
 
 ## [1.3.0] - 2026-11-11
 

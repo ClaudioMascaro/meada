@@ -91,10 +91,10 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   in Java, 1,928 in Go, 2,185 in C#; a hundred calls of 25 inline entries each do not): the
   transaction calls after that have no side. At the one where it ends, each row of the call reads
   the request on the budget the call started with, and the call spends what its rows spend
-  together: a `Put`-only call keeps its writer and gets no reader, and a call of `Put` and
-  `ConditionCheck` entries has a writer and a reader (#784). An entry the budget leaves unread
-  there gives each row an unresolved side beside the names it read, a reader beside `Put` entries
-  included. A Java builder held in a `final` field is read in its own
+  together, so a call of write entries keeps its writer and gets no reader, and a call of `Put`
+  and `ConditionCheck` entries names both (#784). Where the budget ends inside a row, the call's
+  later rows are not read, as the calls after it are not: a call whose writer row it cuts has a
+  writer, named or unresolved, and no reader, a `ConditionCheck` included. A Java builder held in a `final` field is read in its own
   file, and a call on its name from another Java file leaves it unresolved; one handed to a call
   or aliased there, or reached by reflection from there, is not seen, and the field keeps its
   first name. A request type is the SDK's unless a type of its directory, an import or a
