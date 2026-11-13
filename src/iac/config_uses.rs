@@ -1,7 +1,8 @@
 //! Directionless config uses (ADR 0026, #661), derived from non-secret, uncut stored strings.
 //! Only a structured cloud identifier or a final typed key gives evidence of a contract.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::ops::Bound;
 
 use meada_core::export::{Level, Use};
 use rusqlite::Connection;
@@ -63,12 +64,17 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     let mut definitions = std::collections::HashSet::new();
     // The files a kind's reader recognizes whole, by their content (ADR 0026, #800): the
     // key-name rule reads none of them. Here, the pipelines and actions of the CI reader
-    // (ADR 0028), each with the addresses of its CI jobs and CI steps.
-    let mut owned = HashMap::<String, Vec<String>>::new();
+    // (ADR 0028), each with the addresses of its CI jobs and CI steps and whether it is a
+    // pipeline.
+    let mut owned = HashMap::<String, (Vec<String>, bool)>::new();
     for node in super::nodes(db)? {
         if super::actions::owns(&node) {
-            let nodes = owned.entry(node.path).or_default();
-            nodes.extend((node.address != ".").then_some(node.address));
+            let (nodes, pipeline) = owned.entry(node.path).or_default();
+            if node.address == "." {
+                *pipeline = node.ty != super::actions::ACTION;
+            } else {
+                nodes.push(node.address);
+            }
         } else if let Some(mapped) = node.provisioned.as_ref().filter(|p| !p.defining.is_empty()) {
             definitions.extend(
                 mapped
@@ -93,11 +99,23 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
         ))
     })?;
     let rows = rows.collect::<rusqlite::Result<Vec<_>>>()?;
-    // What a `${{ env.X }}` of an owned file reads: the literal strings of that file, by key.
-    let mut literals = HashMap::<&str, HashMap<&str, &str>>::new();
+    // What a `${{ env.X }}` of an owned file reads: each key of that file, with its value when
+    // it is a literal string. A key that holds anything else still defines its name.
+    let mut others = Vec::new();
+    if !owned.is_empty() {
+        let mut query = db.prepare(
+            "SELECT path, key FROM config_values \
+             WHERE type != 'string' OR value IS NULL OR cut != 0",
+        )?;
+        let keys = query.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        others = keys.collect::<rusqlite::Result<Vec<(String, String)>>>()?;
+    }
+    let mut entries = HashMap::<&str, BTreeMap<&str, Option<&str>>>::new();
     for (path, key, value, _) in rows.iter().filter(|row| owned.contains_key(&row.0)) {
-        let file = literals.entry(path).or_default();
-        file.insert(key, value);
+        entries.entry(path).or_default().insert(key, Some(value));
+    }
+    for (path, key) in others.iter().filter(|row| owned.contains_key(&row.0)) {
+        entries.entry(path).or_default().insert(key, None);
     }
     let mut uses = Vec::new();
     for (path, key, value, line) in &rows {
@@ -105,7 +123,7 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
             continue;
         }
         // The CI nodes that hold the key, the nearest first: a CI step, then its CI job.
-        let holders = owned.get(path).map(|nodes| {
+        let holders = owned.get(path).map(|(nodes, _)| {
             let holds = |node: &&String| {
                 (key.strip_prefix(node.as_str())).is_some_and(|rest| rest.starts_with(['.', '[']))
             };
@@ -116,17 +134,19 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
         let text = match &holders {
             // A written asterisk is no unresolved part: such a value is read as before.
             Some(holders) if value.contains("${{") && !value.contains('*') => {
-                // The `env` of the CI step, of its CI job, then of the pipeline; never the
-                // one the key itself is written in.
+                // The `env` of the CI step, of its CI job, then of the pipeline (an action's
+                // file holds none at its root); never the one the key itself is written in.
+                let pipeline = owned[path].1.then(|| "env.".to_string());
                 let scopes = holders.iter().map(|node| format!("{node}.env."));
-                let scopes: Vec<String> = scopes.chain(["env.".to_string()]).collect();
+                let scopes: Vec<String> = scopes.chain(pipeline).collect();
                 evaluated(value, |name| {
                     let outer = scopes
                         .iter()
                         .filter(|scope| !key.starts_with(scope.as_str()));
-                    let file = literals.get(path.as_str())?;
-                    let mut found = outer.filter_map(|scope| file.get(&*format!("{scope}{name}")));
-                    found.next().copied()
+                    let file = entries.get(path.as_str())?;
+                    // The nearest `env` that defines the name decides, literal or not.
+                    let mut found = outer.filter_map(|scope| given(file, scope, name));
+                    found.next().flatten()
                 })
             }
             _ => value.clone(),
@@ -168,6 +188,32 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     uses.sort();
     uses.dedup();
     Ok(uses)
+}
+
+/// What the `env` map at `scope` (a key path that ends in `.`) gives `name` among the keys of
+/// its file: `None` when the map does not define the name, and inside it the literal string, or
+/// `None` when the map defines the name with anything else.
+fn given<'v>(
+    file: &BTreeMap<&str, Option<&'v str>>,
+    scope: &str,
+    name: &str,
+) -> Option<Option<&'v str>> {
+    // An `env` written as one expression may define any name.
+    if file.contains_key(scope.trim_end_matches('.')) {
+        return Some(None);
+    }
+    let key = format!("{scope}{name}");
+    if let Some(value) = file.get(key.as_str()) {
+        return Some(*value);
+    }
+    // A list or a map under the name.
+    let under = |open: char| {
+        let prefix = format!("{key}{open}");
+        let from = (Bound::Included(prefix.as_str()), Bound::Unbounded);
+        let mut next = file.range::<str, _>(from);
+        next.next().is_some_and(|(k, _)| k.starts_with(&prefix))
+    };
+    (under('.') || under('[')).then_some(None)
 }
 
 /// The key-name rule (ADR 0026): a plain name under a typed final key is an `inferred` use.

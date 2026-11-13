@@ -61,7 +61,8 @@ All notable changes to Meada are recorded here. The format follows
   ARN, a queue URL, `s3://`, `gs://`) stays an `exact` use, and `meada export` writes the CI
   step or CI job that holds its key as the `site` of the use and the `side` of its provisioning
   link, in place of the repository. A `${{ env.X }}` a literal `env` gives resolves, any other
-  expression in a name makes a pattern, and `vars.X` and `secrets.X` are never matched by name.
+  expression in the name of an AWS form makes a pattern, and `vars.X` and `secrets.X` are never
+  matched by name.
   Every other file answers as before. Release level: minor, meada (#828).
 - The values cache (`values.db`, ADR 0027) stores each entry deflated, and gives back the pages
   that replaced or dropped entries free once they are most of the file: on Meada's own repository

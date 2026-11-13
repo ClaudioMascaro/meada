@@ -413,3 +413,99 @@ jobs:
         ]
     );
 }
+
+/// The nearest `env` that defines the name decides, whatever it holds. A number, a boolean, a
+/// list, a map or an `env` written as one expression gives no literal: the name is then an
+/// unresolved part, never the value of an `env` farther up.
+#[test]
+fn a_nearer_env_entry_that_is_no_literal_hides_the_ones_above() {
+    let (_, app) = workspace("ci_owned_shadowed");
+    let pipeline = "\
+on: push
+env:
+  NUMBER: v1
+  FLAG: v1
+  LIST: v1
+  LIST2: v1
+  MAP: v1
+  FAR: v1
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      NUMBER: 2
+      FLAG: true
+      LIST: [a]
+      LIST2: v2
+      MAP: {a: b}
+    steps:
+      - uses: other-org/upload@v1
+        with:
+          number: s3://cache-${{ env.NUMBER }}/x
+          flag: s3://cache-${{ env.FLAG }}/x
+          list: s3://cache-${{ env.LIST }}/x
+          map: s3://cache-${{ env.MAP }}/x
+          far: s3://cache-${{ env.FAR }}/x
+  whole:
+    runs-on: ubuntu-latest
+    env: ${{ fromJSON(vars.ENV) }}
+    steps:
+      - uses: other-org/upload@v1
+        with:
+          opaque: s3://cache-${{ env.FAR }}/x
+";
+    write(&app, DEPLOY, pipeline);
+    let step = format!("{APP}::{DEPLOY}::jobs.deploy.steps[0]");
+    let key = |name: &str| format!("jobs.deploy.steps[0].with.{name}");
+    let mut found = uses(&exported(&app), DEPLOY);
+    found.sort();
+    assert_eq!(
+        found,
+        [
+            row("resource::s3::cache-*", &step, &key("flag")),
+            row("resource::s3::cache-*", &step, &key("list")),
+            row("resource::s3::cache-*", &step, &key("map")),
+            row("resource::s3::cache-*", &step, &key("number")),
+            row(
+                "resource::s3::cache-*",
+                &format!("{APP}::{DEPLOY}::jobs.whole.steps[0]"),
+                "jobs.whole.steps[0].with.opaque"
+            ),
+            // No `env` between the key and the pipeline's defines `FAR`.
+            row("resource::s3::cache-v1", &step, &key("far")),
+        ]
+    );
+}
+
+/// An action's metadata holds no `env` of its own: a composite action reads only the `env` of
+/// its CI steps.
+#[test]
+fn an_action_reads_no_env_at_its_root() {
+    let (_, app) = workspace("ci_owned_action_env");
+    let action = "tools/deploy/action.yml";
+    write(
+        &app,
+        action,
+        "\
+env:
+  NAME: archive
+runs:
+  using: composite
+  steps:
+    - uses: other-org/upload@v1
+      env:
+        OWN: orders
+      with:
+        root: s3://${{ env.NAME }}/x
+        step: s3://${{ env.OWN }}/x
+",
+    );
+    assert_eq!(
+        uses(&exported(&app), action),
+        [row(
+            "resource::s3::orders",
+            &format!("{APP}::{action}::runs.steps[0]"),
+            "runs.steps[0].with.step"
+        )]
+    );
+}

@@ -487,6 +487,12 @@
   the orphan lines of `meada status` and the scope rule on `ci-nodes` alone, the mark in
   `context`, `search` and `meada export`, refresh equal to a cold index and the `ci-orphans.*`
   goldens.
+- `ci_owned.rs` (#828): the files the CI reader owns, over the config use fixtures plus a
+  pipeline or an action written inline: no use by key name, a structured identifier on its CI
+  step or CI job in `uses`, `provisions` and `iac_nodes` (`ci-owned.app.export.json`), the
+  controls that keep the key-name rule, every scalar still a config value, `vars.X` never matched
+  across repositories, a pattern that fits two names as an open item, and the `env` lookup: the
+  nearest that defines the name, literal or not, and none at an action's root.
 
 - `patterns.rs` (#674): sibling `pattern-infra`/`pattern-app` fixtures cover channel and
   resource anchors, ambiguous literal names, short/interior and pattern-to-pattern negatives,

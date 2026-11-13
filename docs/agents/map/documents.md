@@ -176,7 +176,8 @@ this file, and a change to these modules updates it.
   In a file a kind's reader recognizes whole (#828, the shape #800 asks for), here the
   pipelines and actions of `iac/actions.rs` (`owned`, by their CI nodes), `typed` is not read:
   only a structured identifier is a use, after `evaluated` gave each `${{ env.X }}` its
-  literal and every other expression a `*`. `Side::holder` is the CI node that holds the key,
+  literal (`given`: the nearest `env` that defines the name decides, literal or not) and every
+  other expression a `*`. `Side::holder` is the CI node that holds the key,
   which `Engine::export` writes as the `site` of the use and the `side` of its provisioning
   link.
 - `iac/provision.rs`, `iac/pattern.rs` (#656): `crate::iac::provision::read` derives provisioner

@@ -78,21 +78,35 @@
   pages until they are reused (`secure_delete` is off).
 - `iac/config_uses.rs` (#828, ADR 0028): the key-name rule skips the files the CI reader owns
   (a pipeline, an action), by the reader's own file node and never by name: a file under
-  `.github/workflows/` with no `jobs`, an `action.yml` with no `runs`, and one the reader could
-  not read keep the rule. In an owned file only a structured identifier is a use. Its holder is
-  the nearest CI node whose address starts the key path: a CI step, else its CI job, else the
-  file node. The holder is the `site` of `uses` and the `side` of `provisions` in `meada
-  export` alone: `context`, `search` and `trace` place the use by its key as before, so
-  `trace` from the key does not climb to the callers of its pipeline. A `${{ }}` expression is
-  closed at the first `}}` (one that holds `}}` in a string is cut there) and one left open
-  leaves the value as written. Only `env.<name>` alone resolves, the name of letters, digits
-  and `_` in the case written: `env['X']`, another case, a function or an operator are
-  unresolved. The literal is a string of `<node>.env.<name>` or of the pipeline's `env.<name>`,
-  the nearest above the key and never the map the key is written in; a number or a boolean, a
-  redacted or cut value and one that holds an expression or a `*` are no literal, and a
-  composite action reads only the `env` of its own CI steps. An unresolved part is `*`: in the
-  name it makes a pattern under ADR 0026's limits, as the whole name no use and no open item
-  (the config value alone names the variable), outside the name (an ARN's account, the object
-  key after a bucket) nothing. A value with a written `*` is not evaluated. A role ARN gives no
-  use because IAM is in no row of the type table, in any file: nothing reads `with` apart. The
-  image builder forms keep the repository as their site until #831.
+  `.github/workflows/` with no `jobs` and an `action.yml` with no `runs` keep the rule. In an
+  owned file only a structured identifier is a use. Its holder is the nearest CI node whose
+  address starts the key path: a CI step, else its CI job, else the file node. In a file with
+  more than one YAML document every key path starts with the document's index, so the holder
+  is the file node and no `env` resolves. The holder is the `site` of `uses` and the `side` of
+  `provisions` in `meada export` alone: `context`, `search` and `trace` place the use by its
+  key as before, so `trace` from the key does not climb to the callers of its pipeline, and
+  `context` lists a patterned use under its pattern contract at the use's own level, `exact`
+  (the level of its provisioning link is in `meada export`). A `${{ }}` expression is closed
+  at the first `}}` (one that holds `}}` in a string is cut there) and one left open leaves
+  the value as written. Only `env.<name>` alone resolves, the name of letters, digits and `_`
+  in the case written: `env['X']`, another case, a function or an operator are unresolved. The
+  value comes from the nearest `env` above the key that defines the name, never the map the
+  key is written in: the CI step's, its CI job's, then the pipeline's (an action's file holds
+  no `env` at its root, so a composite action reads only the `env` of its CI steps). That
+  `env` gives a literal only as a string with no expression and no `*`, not cut: a number, a
+  boolean, a list, a map and an `env` written as one expression define the name with no
+  literal, so the part is unresolved and never read from an `env` farther up. A null or blank
+  entry stores no config value: it is not seen, and the lookup goes on to the `env` above. An
+  unresolved part is `*`: in the name of an AWS form (an ARN, a queue URL, `s3://`) it makes a
+  pattern under ADR 0026's limits, and such a use opens the orphan scope as any use does; in a
+  `gs://` name, a Pub/Sub or Secret Manager path (its project included) and an Azure URL,
+  whose readers take whole names, it gives no use. As the whole name it gives no use and no
+  open item (the config value alone names the variable), outside the name (an ARN's account,
+  the object key after a bucket) nothing. A value with a written `*` is not evaluated. A role
+  ARN gives no use because IAM is in no row of the type table, in any file: nothing reads
+  `with` apart. A `[[resource]]` whose `via` names a typed key of an owned file keeps its
+  `declared` side, and its row of `provisions` is the one of a declared key with no use
+  (`<repository>::<file>#<key>` as `side`, no `at`). An identifier among other words of a
+  `run` script is no use, as before. On 200 pipelines of 50 CI steps with an identifier each,
+  the holders add 10,000 rows to `iac_nodes` and double the export (11 to 22 MB, 5.2 to 6.3 s).
+  The image builder forms keep the repository as their site until #831.
