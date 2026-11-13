@@ -67,6 +67,13 @@ All notable changes to Meada are recorded here. The format follows
   `.tf` block with the override files Terraform reads, in either order of the two files: `a.tf`
   declaring `["x"]` and `b.tofu` declaring `["b", "a", "a"]` names `0-x`, where Meada gave the
   block of the file it read last at `exact` (#768).
+- Each Terraform root knows which of its variables hold a set, whatever root was evaluated before
+  it in the repository: a root's answer could come from another root's variable of the same name.
+  Under `type = set(string)` with a default `["b", "a", "a"]`, a `for_each = { for k, v in var.s :
+  k => v }` whose override retypes `s` to `list(string)` names `0-a`, `1-b` as Terraform
+  does, where a root holding a set `s` before it left one pattern name, the gap 1.3.0
+  noted for #740; and a root whose `s` stays a set has no exact name, where a root holding a list
+  `s` before it named its instances by index, which Terraform does not create (#783).
 - `meada status` no longer reports orphans from a use Meada only infers from a key name (a plain
   value under `queue`, `topic`, `bucket`, `table` or a typed alias): such a use side opens no
   orphan scope and is never an orphan line, though it still links to a provisioner of its name

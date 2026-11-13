@@ -2151,6 +2151,8 @@ impl<'m> Eval<'m> {
         self.memo.clear();
         self.open.clear();
         self.values.clear();
+        // An instance's number is its place in its root: a root's sets are no other root's (#783).
+        self.sets.clear();
         self.evaluating.clear();
         self.pending.clear();
         self.subscription_inputs = subscription::Inputs::default();
