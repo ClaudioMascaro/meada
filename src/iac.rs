@@ -1804,13 +1804,15 @@ fn cost(
                 add(key, cost(v.expr(), roots, iters, overhead))
             })
             .fold(2, add),
+        // A template makes a string, its quotes counted as `size` counts them: one of no text
+        // still makes an element, so no element of a list costs nothing (#764).
         Expression::StringTemplate(t) => {
             *overhead = add(*overhead, parse_cost(t.span(), t, iters));
-            template_cost(t, roots, iters, overhead)
+            add(template_cost(t, roots, iters, overhead), 2)
         }
         Expression::HeredocTemplate(h) => {
             *overhead = add(*overhead, parse_cost(h.span(), &h.template, iters));
-            template_cost(&h.template, roots, iters, overhead)
+            add(template_cost(&h.template, roots, iters, overhead), 2)
         }
         Expression::Parenthesis(p) => cost(p.inner(), roots, iters, overhead),
         Expression::Variable(v) => match iters.iter().rev().find(|(n, _)| n == v.as_str()) {
@@ -1843,25 +1845,28 @@ fn cost(
                 .map(|e| cost(e, roots, iters, overhead))
                 .collect();
             let sum = args.iter().copied().fold(8, add);
+            // The three products below are charged their output's bound (#764), never more
+            // than the square of their arguments they were charged before.
+            let square = sum.saturating_mul(sum);
             match (f.name.name.as_str(), args.as_slice()) {
                 // An expanded last argument (`join(x...)`) may hold any of the others.
-                ("formatlist" | "join" | "replace", _) if f.args.expand_final() => {
-                    sum.saturating_mul(sum)
-                }
+                ("formatlist" | "join" | "replace", _) if f.args.expand_final() => square,
                 // At most an element per byte of the lists, each shown in up to three times
-                // its cost, and a separator after each (#764).
+                // its cost, and a separator after each.
                 ("join", [sep, lists @ ..]) => {
                     let sep = shown_len(f.args.iter().next(), *sep);
                     let lists = lists.iter().copied().fold(0, add);
-                    add(sum, lists.saturating_mul(add(sep, 3)))
+                    add(sum, lists.saturating_mul(add(sep, 3))).min(square)
                 }
-                // A literal, non-empty substring matches at most once per byte (#764).
+                // A literal, non-empty substring matches at most once per byte.
                 ("replace", [s, _, to]) => {
                     let s = shown_len(f.args.iter().next(), *s);
                     let to = shown_len(f.args.iter().nth(2), *to);
-                    add(sum, s.saturating_mul(add(to, 1)))
+                    add(sum, s.saturating_mul(add(to, 1))).min(square)
                 }
-                ("formatlist", [_, ..]) => add(sum, formatlist_cost(f, &args, roots, iters)),
+                ("formatlist", [_, ..]) => {
+                    add(sum, formatlist_cost(f, &args, roots, iters)).min(square)
+                }
                 ("format", _) => add(sum, args.len().saturating_mul(functions::WIDTH_MAX)),
                 ("jsonencode", _) => sum.saturating_mul(6),
                 ("split", _) => sum.saturating_mul(4),
@@ -5176,6 +5181,7 @@ mod tests {
         let escaped = vec![format!("\"{}\"", "\\u0001".repeat(200)); 1000].join(", ");
         let n = "${1.7976931348623157e308}";
         let (empty, many) = (vec!["\"\""; 6300].join(", "), vec!["\"\""; 975].join(", "));
+        let empty_for = vec!["\"%{for x in []}%{endfor}\""; 2000].join(", ");
         for text in [
             format!("join(\"{wide}\", [{list}])"),
             format!("formatlist(\"%s-%s\", \"{wide}\", [{list}])"),
@@ -5188,10 +5194,37 @@ mod tests {
             format!("replace(\"{}\", \"a\", \"x{n}\")", "a".repeat(95_000)),
             format!("join(\"{}\", [{empty}])", n.repeat(10)),
             format!("formatlist(\"x{}\", [{many}])", n.repeat(100)),
+            // A template of no text still makes a string: 2,000 of them joined by 100 KB.
+            format!("join(\"{}\", [{empty_for}])", "x".repeat(100_000)),
         ] {
             let expr = parser::parse_expr(&text).unwrap();
             assert!(steps(&expr, &Map::new()) > EVAL_COST_MAX, "{text}");
         }
+    }
+
+    /// What the square of their arguments named before #764 stays named: a `formatlist` over a
+    /// list of no known length and a `replace` of two variables. Each name is the one Terraform
+    /// v1.17.1's `console` gives (the #764 verifier's cases p1, p2b and p3).
+    #[test]
+    fn a_join_formatlist_or_replace_the_square_accepted_stays_named() {
+        let items = |n: usize| (0..n).map(|i| format!("\"i-{i:02}\"")).collect::<Vec<_>>();
+        let (p, q) = (items(60).join(", "), items(70).join(", "));
+        let (s, t) = ("b".repeat(398), "y".repeat(398));
+        let main = format!(
+            "variable \"p\" {{ default = [{p}] }}\n\
+             variable \"q\" {{ default = [{q}] }}\n\
+             variable \"s\" {{ default = \"{s}\" }}\n\
+             variable \"t\" {{ default = \"{t}\" }}\n\
+             resource \"a\" \"p\" {{ name = formatlist(\"q-%s\", [for x in var.p : x])[0] }}\n\
+             resource \"a\" \"e\" {{ name = element(formatlist(\"q-%s\", tolist(var.q)), 0) }}\n\
+             resource \"a\" \"t\" {{ name = replace(var.s, \"a\", var.t) }}\n"
+        );
+        let want = [
+            "a.p = \"q-i-00\" [var.p main.tf:1]".to_string(),
+            "a.e = \"q-i-00\" [var.q main.tf:2]".to_string(),
+            format!("a.t = \"{s}\" [var.s main.tf:3] [var.t main.tf:4]"),
+        ];
+        assert_eq!(names(&[("main.tf", &main)]), want);
     }
 
     /// A key bound over `toset(...)` is the element in Terraform, where Meada's set is a list

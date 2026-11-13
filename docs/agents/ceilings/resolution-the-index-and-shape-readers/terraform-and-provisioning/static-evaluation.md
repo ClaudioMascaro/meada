@@ -11,15 +11,17 @@
   `for` is not charged its parse; a `for` collection counts its own elements through any root,
   a literal list or object as many as it lists at its costliest element's cost, and its
   elements once, read or not (#716), a conditional its larger branch; `join`, `replace` and
-  `formatlist` are charged their arguments and the output they can make (#764), a string
-  argument at what it shows (a literal its length, anything else three times its cost: a
+  `formatlist` are charged their arguments and the output they can make (#764), never more
+  than the square of their arguments they were charged before, a string argument at what it
+  shows (a literal its length, anything else three times its cost: a
   number shown takes up to 24 bytes, where 8 are counted): `join` its lists times the separator
   plus three, `replace` its string times the replacement plus one, `formatlist` a row per
   element of its shortest literal or bound list (else as many rows as its costliest argument of
   no known kind), each row the format, `WIDTH_MAX` per argument and six bytes per byte of what
   it formats (`%q` escapes), a list's elements once and any other argument in each row; with an
-  expanded last argument (`f(x...)`) the three are still charged the square of their
-  arguments, and a call's charge counts again in the call around it, so by a reading of `cost`
+  expanded last argument (`f(x...)`) the three are still charged that square, a template
+  counts its two quotes as `size` counts a string's (one of no text is still an element of a
+  list), and a call's charge counts again in the call around it, so by a reading of `cost`
   eight nested one-element `join`s are refused where Terraform names `a`; past `EVAL_COST_MAX`
   `hcl-rs` does not evaluate the expression, only its
   template parts resolve; the implementer measured about 0.2 s for an expression at the ceiling
