@@ -23,7 +23,7 @@ The yardstick of the pair "HTTP links", by the defaults of ADR 0029. This ticket
 ### Mais contexto · More context · Más contexto
 
 - Related measurements of HTTP readers: #549 and #462. This yardstick does not replace them: they ask whether a reader finds calls, this one asks whether a link is right.
-- The same harness serves the public half of the release diff (#N10).
+- The same harness serves the public half of the release diff (#852).
 - The safety rule of the dogfood notes holds: third-party repositories are indexed, their code is never run.
 
 ## Agent Brief

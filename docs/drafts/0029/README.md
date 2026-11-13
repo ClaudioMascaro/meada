@@ -1,3 +1,3 @@
 - Issue drafts written from ADR 0029 (proposed in #849) on 2026-11-13, held until #795 has run once under its rules.
-- `01` is the gate list, `02` and `03` are the yardsticks of HTTP links and of package links, `06` is the A9 yardstick; a `#N…` stands for an issue number not assigned yet.
+- `01` is the gate list, `02` and `03` are the yardsticks of HTTP links and of package links, `06` is the A9 yardstick; `#N1`, `#N2`, `#N3` and `#N6` stand for the numbers these four get when they are opened.
 - `on-accept.diff` waits for ADR 0029 to be accepted: invariant 7 in ADR 0002 and the changes to `AGENTS.md` and `CONTRIBUTING`.

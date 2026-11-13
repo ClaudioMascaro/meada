@@ -27,10 +27,10 @@ F1, F2 and F3 sit on one branch. Before any slice can ship alone, the maintainer
 
 ### F2: the `run` script
 
-- Unmeasured until a corpus exercises it: the pinned corpus holds no install by name, no `uvx`, no `pipx run`, no `docker push` and no Python package. #N4 looks for one. If it finds a set, this ticket pins it and judges it as F1 is judged: each install read from a `run` script, each program link with its level, each image builder side on a CI step and the image link it gives.
-- On such a corpus the provider is the true publisher of the package, so a link by name is right by construction. What this part approves is the reading of the `run` script by the command table. Inference by name is bounded elsewhere: by the `inferred` level and the fork probe (#N5), and by the count of installs by name in the private aggregates.
+- Unmeasured until a corpus exercises it: the pinned corpus holds no install by name, no `uvx`, no `pipx run`, no `docker push` and no Python package. #854 looks for one. If it finds a set, this ticket pins it and judges it as F1 is judged: each install read from a `run` script, each program link with its level, each image builder side on a CI step and the image link it gives.
+- On such a corpus the provider is the true publisher of the package, so a link by name is right by construction. What this part approves is the reading of the `run` script by the command table. Inference by name is bounded elsewhere: by the `inferred` level and the fork probe (#850), and by the count of installs by name in the private aggregates.
 - The report counts the installs whose name equals a provider of the workspace, even when the count is zero.
-- F2 ships after #N5, so that no install by name alone is `exact`.
+- F2 ships after #850, so that no install by name alone is `exact`.
 - Cost, accepted: F2 stays longer on its branch than F1, and it carries its own schema rise with a rebuild of the indexes.
 
 ### F3: declared permissions
@@ -60,5 +60,5 @@ F1, F2 and F3 sit on one branch. Before any slice can ship alone, the maintainer
 ## Blocked by
 
 - #837, where the A9 chain ends.
-- #N4, for the F2 part only.
-- #N5, before F2 ships.
+- #854, for the F2 part only.
+- #850, before F2 ships.

@@ -66,9 +66,9 @@ Agent lane:
 1. The A9 chain goes on, on its branch, with its tickets as written (through #836).
 2. #806: a `dynamic-url` decision applied unchecked makes a wrong link.
 3. The yardsticks of HTTP and of package (#N2, #N3), once the order of origins is written above.
-4. In any gap: #N8 (an orphan line names its scope), #N11 (the glossary entry), #N10 (the release diff job), #N4 (a corpus for A9's F2), and #N9 after triage.
+4. In any gap: #855 (an orphan line names its scope), #853 (the glossary entry), #852 (the release diff job), #854 (a corpus for A9's F2), and #851 after triage.
 5. Off the critical path: #802 to #805.
-6. After #837: #N5 and #N6.
+6. After #837: #850 and #N6.
 
 Maintainer lane, in the order of what releases most:
 

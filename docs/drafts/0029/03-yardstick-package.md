@@ -7,7 +7,7 @@ Labels: enhancement, ready-for-human
 
 Nothing measures how often a package link is right. Package links are in the gate of ADR 0029 (#N1) because a usage question is answered by reading them ("which repositories consume the packages a team publishes"). The dogfooding report of 1.3.0 holds no package item, which says only that nobody looked.
 
-Meada reads no lockfile and queries no registry. A dependency links at `exact` to the one provider of that name in another repository of the workspace, on the assumption that the workspace holds the published package, whatever index serves the name. So a workspace that holds a fork or a copy of a public package under the same name links every consumer of the public package to the fork, at `exact`. Spec A9 builds on the same rule: an install by name in a CI step, and the program link that rests on it (#N5).
+Meada reads no lockfile and queries no registry. A dependency links at `exact` to the one provider of that name in another repository of the workspace, on the assumption that the workspace holds the published package, whatever index serves the name. So a workspace that holds a fork or a copy of a public package under the same name links every consumer of the public package to the fork, at `exact`. Spec A9 builds on the same rule: an install by name in a CI step, and the program link that rests on it (#850).
 
 ### Proposta · Proposal · Propuesta
 
@@ -18,7 +18,7 @@ The yardstick of the pair "package links", by the defaults of ADR 0029. This tic
 3. **Distractor, from the start.** A public repository that is a fork or a copy of a public package and kept its name, added to a workspace whose consumers install the public one. A link from such a consumer to the fork is a wrong link. At `exact` it is a bug.
 4. **Answer key.** The consumer's lockfile, read by the harness and never by indexing: it records where the installed package came from. Where a consumer has no lockfile, a model outside indexing judges, and the maintainer samples about 50 of its marks, the "correct" ones included.
 5. **Thresholds.** The defaults: no wrong `exact` link, no silent absence, no `ambiguous` link whose candidates lack the right provider, at most 1 wrong `inferred` link in 10 (valid from 30 judged). Each cause of an open miss is an entry the maintainer approves with its expected count before the run.
-6. **What it decides.** Its report approves, or not, the rule "one provider of a name in the workspace is the package a consumer installs". Until it does, an install by name alone in a CI step is `inferred` (#N5).
+6. **What it decides.** Its report approves, or not, the rule "one provider of a name in the workspace is the package a consumer installs". Until it does, an install by name alone in a CI step is `inferred` (#850).
 
 ### Mais contexto · More context · Más contexto
 
@@ -49,7 +49,7 @@ A repeatable run over a pinned corpus prints, as counts and not samples: links p
 - [ ] Each cause of an open miss has an entry the maintainer approved, with its expected count, before the run.
 - [ ] The report gives the counts above and marks unmeasured whatever is under the floor of 30.
 - [ ] A wrong `exact` link gets a failing test and a fix. Each other wrong link and each silent absence get a fix, or a ceiling the maintainer decides entry by entry.
-- [ ] The report states whether the rule of item 6 is approved, and #N5 is told.
+- [ ] The report states whether the rule of item 6 is approved, and #850 is told.
 - [ ] The maintainer closes this ticket with every count inside its threshold. That is the approval the gate list records.
 
 **Out of scope:**
