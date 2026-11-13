@@ -1843,12 +1843,24 @@ fn cost(
                 .map(|e| cost(e, roots, iters, overhead))
                 .collect();
             let sum = args.iter().copied().fold(8, add);
-            match f.name.name.as_str() {
-                "formatlist" | "join" | "replace" => sum.saturating_mul(sum),
-                "format" => add(sum, args.len().saturating_mul(functions::WIDTH_MAX)),
-                "jsonencode" => sum.saturating_mul(6),
-                "split" => sum.saturating_mul(4),
-                "upper" | "lower" | "title" => sum.saturating_mul(3),
+            match (f.name.name.as_str(), args.as_slice()) {
+                // An expanded last argument (`join(x...)`) may hold any of the others.
+                ("formatlist" | "join" | "replace", _) if f.args.expand_final() => {
+                    sum.saturating_mul(sum)
+                }
+                // An element and a separator per byte of the lists at most; a number it shows
+                // takes up to three times the 8 bytes counted for it (#764).
+                ("join", [sep, lists @ ..]) => {
+                    let lists = lists.iter().copied().fold(0, add);
+                    add(sum, lists.saturating_mul(add(*sep, 2)))
+                }
+                // A literal, non-empty substring matches at most once per byte (#764).
+                ("replace", [s, _, to]) => add(sum, s.saturating_mul(add(*to, 1))),
+                ("formatlist", [_, ..]) => add(sum, formatlist_cost(f, &args, roots, iters)),
+                ("format", _) => add(sum, args.len().saturating_mul(functions::WIDTH_MAX)),
+                ("jsonencode", _) => sum.saturating_mul(6),
+                ("split", _) => sum.saturating_mul(4),
+                ("upper" | "lower" | "title", _) => sum.saturating_mul(3),
                 _ => sum,
             }
         }
@@ -1879,6 +1891,58 @@ fn cost(
             n.saturating_mul(body)
         }
     }
+}
+
+/// The bytes `formatlist` makes from its arguments (`costs`, the format's first): a row per
+/// element of its lists, which share one length or it makes none (as many rows as its costliest
+/// argument of no known kind without one), each row the format, a width up to `WIDTH_MAX` per
+/// argument and what it formats escaped (`%q`, up to six bytes a byte): a list's elements once
+/// in all, any other argument whole in each row (#764).
+fn formatlist_cost(
+    f: &hcl_edit::expr::FuncCall,
+    costs: &[usize],
+    roots: &Roots<'_>,
+    iters: &[(String, usize)],
+) -> usize {
+    let (mut rows, mut most, mut lists, mut each) = (None, 1, 0usize, 0usize);
+    for (e, &c) in f.args.iter().zip(costs).skip(1) {
+        let value = match e {
+            Expression::Traversal(t) => unshadowed(t, roots, iters),
+            _ => None,
+        };
+        let len = match (e, value) {
+            (Expression::Array(items), _) => Some(items.len()),
+            (_, Some(Value::Array(items))) => Some(items.len()),
+            _ => None,
+        };
+        match len {
+            Some(n) => {
+                rows = Some(rows.map_or(n, |r: usize| r.min(n)));
+                lists = lists.saturating_add(c);
+            }
+            None => {
+                each = each.saturating_add(c);
+                let scalar = value.is_some()
+                    || matches!(
+                        e,
+                        Expression::String(_)
+                            | Expression::Number(_)
+                            | Expression::Bool(_)
+                            | Expression::Null(_)
+                    );
+                if !scalar {
+                    most = most.max(c);
+                }
+            }
+        }
+    }
+    let row = (costs.len() - 1).saturating_mul(functions::WIDTH_MAX);
+    let row = row
+        .saturating_add(costs[0])
+        .saturating_add(each.saturating_mul(6));
+    let rows = rows.unwrap_or(most);
+    rows.saturating_mul(row)
+        .saturating_add(lists.saturating_mul(6))
 }
 
 /// What parsing the template `t` again costs at one evaluation in a `for` (`iters`), its text
@@ -5050,6 +5114,56 @@ mod tests {
         );
         let expr = parser::parse_expr(&three).unwrap();
         assert!(steps(&expr, &Map::new()) > EVAL_COST_MAX);
+    }
+
+    /// `join`, `formatlist` and `replace` are costed by the output they can make, not by their
+    /// arguments' cost squared, which a nested call squared again past `EVAL_COST_MAX` (#764).
+    /// Each name is the one Terraform v1.17.1's `console` gives.
+    #[test]
+    fn join_formatlist_and_replace_are_costed_by_their_output() {
+        let s = "a-".repeat(1000);
+        let n = (0..400)
+            .map(|i| format!("\"item-{i:03}\""))
+            .collect::<Vec<_>>();
+        let n = n.join(", ");
+        let main = format!(
+            "variable \"l\" {{ default = [\"a\", \"b\", \"c\", \"d\"] }}\n\
+             variable \"m\" {{ default = [\"a\", \"b\", \"c\"] }}\n\
+             variable \"n\" {{ default = [{n}] }}\n\
+             variable \"s\" {{ default = \"{s}\" }}\n\
+             resource \"a\" \"j\" {{ name = join(\"-\", [join(\"-\", [join(\",\", [\"a\"])])]) }}\n\
+             resource \"a\" \"k\" {{ name = join(\"-\", [join(\",\", var.l), join(\",\", var.l)]) }}\n\
+             resource \"a\" \"f\" {{ name = \"q-${{join(\"\", [for a in var.m : join(\"\", [for b in var.m : \"${{a}}${{b}}\"])])}}\" }}\n\
+             resource \"a\" \"g\" {{ name = join(\",\", formatlist(\"q-%s\", var.n)) }}\n\
+             resource \"a\" \"r\" {{ name = replace(var.s, \"-\", \"_\") }}\n"
+        );
+        let items: Vec<String> = (0..400).map(|i| format!("q-item-{i:03}")).collect();
+        let want = [
+            "a.j = \"a\"".to_string(),
+            "a.k = \"a,b,c,d-a,b,c,d\" [var.l main.tf:1]".to_string(),
+            "a.f = \"q-aaabacbabbbccacbcc\" [var.m main.tf:2]".to_string(),
+            format!("a.g = \"{}\" [var.n main.tf:3]", items.join(",")),
+            format!("a.r = \"{}\" [var.s main.tf:4]", "a_".repeat(1000)),
+        ];
+        assert_eq!(names(&[("main.tf", &main)]), want);
+    }
+
+    /// A `join`, a `formatlist` and a `replace` whose output would pass `EVAL_COST_MAX` (two
+    /// million bytes: a separator, a scalar or a replacement of 1,000 to 2,000 bytes once per
+    /// element or match) are refused before they are evaluated (#764).
+    #[test]
+    fn a_join_formatlist_or_replace_past_the_cost_ceiling_is_refused() {
+        let (wide, a, to) = ("x".repeat(2000), "a".repeat(2000), "y".repeat(1000));
+        let list = (0..1000).map(|i| i.to_string()).collect::<Vec<_>>();
+        let list = list.join(", ");
+        for text in [
+            format!("join(\"{wide}\", [{list}])"),
+            format!("formatlist(\"%s-%s\", \"{wide}\", [{list}])"),
+            format!("replace(\"{a}\", \"a\", \"{to}\")"),
+        ] {
+            let expr = parser::parse_expr(&text).unwrap();
+            assert!(steps(&expr, &Map::new()) > EVAL_COST_MAX, "{text}");
+        }
     }
 
     /// A key bound over `toset(...)` is the element in Terraform, where Meada's set is a list

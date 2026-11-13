@@ -72,6 +72,11 @@ All notable changes to Meada are recorded here. The format follows
   stood for both and squared it: a `for_each` over forty inline objects names its forty
   instances, where it gave one pattern name. A `for` whose output would pass the estimate's
   ceiling is still refused before it is evaluated, and so is a literal holding one (#716).
+- `join`, `replace` and `formatlist` are costed by the output they can make (a separator per
+  byte of the lists joined, a replacement per byte of the string, a row per element of the
+  list formatted), where their arguments' cost was squared and squared again when nested:
+  `join("-", [join("-", [join(",", ["a"])])])` names `a`, where it gave `*`. A call whose output
+  would pass the estimate's ceiling is still refused before it is evaluated (#764).
 - `meada status` no longer reports orphans from a use Meada only infers from a key name (a plain
   value under `queue`, `topic`, `bucket`, `table` or a typed alias): such a use side opens no
   orphan scope and is never an orphan line, though it still links to a provisioner of its name
