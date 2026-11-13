@@ -215,8 +215,10 @@
   OpenTofu `0-b`, `1-a`, `2-a`), `type = any` (the set, `a-a`, `b-b`; OpenTofu index keys),
   `type = tuple([string, string])` over `["b", "a"]` (Terraform rejects it, so Meada gives no
   exact name; OpenTofu `0-b`, `1-a`), an `a_override.tf` giving the default and a
-  `b_override.tf` retyping it, and a child module called without the argument with the override
-  in its directory. The same default with no override, a restated `set(string)`, an override
+  `b_override.tf` retyping it, a child module called without the argument with the override in
+  its directory, and a `null` default retyped `tuple([string, string, string])` with a var file's
+  `["b", "a", "a"]` (Terraform rejects the default, so Meada gives no exact name; OpenTofu `0-b`,
+  `1-a`, `2-a`). The same default with no override, a restated `set(string)`, an override
   giving `type` and `default` together and a var file's value name the same in both. OpenTofu
   1.13.9 was run; that 1.12 and earlier behave as Terraform is read from the source, not run.
   The exception covers a variable all of whose blocks Terraform reads (`.tf`, `.tf.json`): it
@@ -250,4 +252,11 @@
   no other type: a primitive, a `list(any)`, a list of collections or objects, a tuple, a map
   and an object keep the value as written, and a name read from one is exact even where
   Terraform converts an element and spells it otherwise (`"010"` given to `type = number`
-  names `010`, where Terraform names `10`).
+  names `010`, where Terraform names `10`). A default its types refuse leaves the value of every
+  source unresolved, as Terraform and OpenTofu refuse the configuration whatever gives the value
+  (#769), and so does a default Meada cannot convert with certainty, though both tools take it:
+  `["-0"]` under `list(number)`, given `["1", "2"]` by a var file or a module argument, names
+  nothing exactly where both name `0-1` and `1-2`. A variable with a block in a file only
+  OpenTofu reads is not checked this way (#767 decides): `["z"]` declared `list(string)` and
+  retyped `list(number)` in `override.tofu`, given `["10", "9", "10"]` by `terraform.tfvars`,
+  names Terraform's three instances, where OpenTofu refuses the default.

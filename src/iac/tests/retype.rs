@@ -11,9 +11,9 @@ use super::*;
 /// expected answer.
 type Row<'a> = (&'a str, String, &'a str, Vec<(&'a str, &'a str)>, &'a str);
 
-/// A row of a `for_each` read: its label, the files, the address of its resource and the expected
-/// answer.
-type Reading<'a> = (&'a str, Vec<(&'a str, String)>, &'a str, &'a str);
+/// A row given as whole files: its label, the files, the address of the resource read and the
+/// expected answer.
+type FileRow<'a> = (&'a str, Vec<(&'a str, String)>, &'a str, &'a str);
 
 const UNRESOLVED: &str = "unresolved";
 
@@ -28,7 +28,7 @@ fn answer_in(file: &str, main: &str, source: &str, more: &[(&str, &str)]) -> Str
     let main = format!("{main}{}", reader(source));
     let mut list = vec![(file, main.as_str())];
     list.extend_from_slice(more);
-    exact(&list, "a.q")
+    exact_names(&list, "a.q")
 }
 
 /// The resource `a.q`: an instance per key of `source`, named `queue-<key>-<value>`.
@@ -38,9 +38,14 @@ fn reader(source: &str) -> String {
     )
 }
 
+/// The resource `a.q` with `for_each = <source>`, each instance named `fe-<key>`.
+fn for_each_over(source: &str) -> String {
+    format!("resource \"a\" \"q\" {{\n  for_each = {source}\n  name = \"fe-${{each.key}}\"\n}}\n")
+}
+
 /// The exact names of the instances of `address` in the files `list`, joined by `, `, or
 /// `unresolved` when Meada gives no exact name.
-fn exact(list: &[(&str, &str)], address: &str) -> String {
+fn exact_names(list: &[(&str, &str)], address: &str) -> String {
     let found: Vec<String> = (names(list).into_iter())
         .filter(|n| n.starts_with(address))
         .collect();
@@ -414,16 +419,26 @@ fn a_var_file_value_of_a_set_retyped_to_any_is_converted_once() {
 /// Terraform v1.17.1 and OpenTofu v1.13.9 refuse the configuration whatever gives the variable
 /// its value, so a var file's value and a module argument name nothing exactly (#769). A `null`
 /// set retyped a tuple is refused by Terraform alone (OpenTofu converts it once), and Meada
-/// follows Terraform (#740). A default the final type takes keeps the value's names.
+/// follows Terraform (#740). A ceiling: a default Meada cannot convert with certainty is treated
+/// the same, though both tools take `["-0"]` under `list(number)` and name `queue-0-1` and
+/// `queue-1-2` for `["1", "2"]`. A default the final type takes keeps the value's names.
 #[test]
-fn a_default_the_final_type_refuses_leaves_every_source_unresolved() {
+fn a_default_meada_cannot_convert_to_its_types_leaves_every_source_unresolved() {
     let tuple = over("  type = tuple([string, string, string])\n");
     let list = over("  type = list(string)\n");
     let set = declared("[\"x\"]");
     let null = declared("null");
     let numbers = "variable \"s\" {\n  type = list(number)\n  default = [\"x\"]\n}\n";
+    let negative_zero = "variable \"s\" {\n  type = list(number)\n  default = [\"-0\"]\n}\n";
     let three = "[\"b\", \"a\", \"a\"]";
     let rows = [
+        (
+            "-0 under list(number), a ceiling",
+            negative_zero,
+            None,
+            "[\"1\", \"2\"]",
+            UNRESOLVED,
+        ),
         (
             "retyped a tuple",
             set.as_str(),
@@ -465,27 +480,43 @@ fn a_default_the_final_type_refuses_leaves_every_source_unresolved() {
         let mut files = vec![("main.tf", call.as_str()), ("m/main.tf", child.as_str())];
         files.extend(retype.map(|t| ("m/override.tf", t.as_str())));
         assert_eq!(
-            exact(&files, "module.m.a.q"),
+            exact_names(&files, "module.m.a.q"),
             want,
             "{row}, module argument"
         );
     }
 }
 
+/// A variable with a block in a file only OpenTofu reads keeps the value it receives, whatever its
+/// default (#767 decides that reading): `["z"]` declared `list(string)` and retyped `list(number)`
+/// in `override.tofu`, given `["10", "9", "10"]` by `terraform.tfvars`, names Terraform v1.17.1's
+/// three instances (it reads no `.tofu` file), where OpenTofu v1.13.9 refuses the default.
+#[test]
+fn a_variable_with_a_block_only_opentofu_reads_keeps_the_value_it_receives() {
+    let main = "variable \"s\" {\n  type = list(string)\n  default = [\"z\"]\n}\n";
+    let retype = over("  type = list(number)\n");
+    let more = [
+        ("override.tofu", retype.as_str()),
+        ("terraform.tfvars", "s = [\"10\", \"9\", \"10\"]\n"),
+    ];
+    assert_eq!(
+        answer(main, "var.s", &more),
+        "queue-0-10, queue-1-9, queue-2-10"
+    );
+}
+
 /// `for_each` over a tuple: Terraform v1.17.1 and OpenTofu v1.13.9 refuse it (it takes a map or a
 /// set of strings), so no name is exact (#769). The same elements as a set name each instance.
 #[test]
 fn for_each_over_a_tuple_gives_no_exact_name() {
-    let each = "resource \"a\" \"q\" {\n  for_each = var.s\n  name = \"fe-${each.key}\"\n}\n";
+    let each = for_each_over("var.s");
     let typed = |body: &str| format!("{}{each}", over(body));
     let call = |arg: &str| format!("module \"m\" {{\n  source = \"./m\"\n  s = {arg}\n}}\n");
     let any = over("  type = any\n");
     let vars = ("terraform.tfvars", "s = [\"b\", \"a\", \"a\"]\n");
     let set_x = format!("{}{each}", declared("[\"x\"]"));
     let set_dup = format!("{}{each}", declared("[\"b\", \"a\", \"a\"]"));
-    let written =
-        "resource \"a\" \"q\" {\n  for_each = [\"b\", \"a\"]\n  name = \"fe-${each.key}\"\n}\n";
-    let rows: [Reading; 12] = [
+    let rows: [FileRow; 12] = [
         (
             "a var file's value, retyped any",
             vec![
@@ -546,7 +577,7 @@ fn for_each_over_a_tuple_gives_no_exact_name() {
         ),
         (
             "written out",
-            vec![("main.tf", written.into())],
+            vec![("main.tf", for_each_over("[\"b\", \"a\"]"))],
             "a.q",
             UNRESOLVED,
         ),
@@ -586,7 +617,7 @@ fn for_each_over_a_tuple_gives_no_exact_name() {
     ];
     for (row, files, address, want) in rows {
         let list: Vec<(&str, &str)> = files.iter().map(|(p, t)| (*p, t.as_str())).collect();
-        assert_eq!(exact(&list, address), want, "{row}");
+        assert_eq!(exact_names(&list, address), want, "{row}");
     }
 }
 
@@ -596,22 +627,20 @@ fn for_each_over_a_tuple_gives_no_exact_name() {
 /// result of `concat`, `keys` or `tolist` name `fe-a` and `fe-b`.
 #[test]
 fn a_list_meada_does_not_know_as_a_tuple_still_expands() {
-    let each = |source: &str| {
-        format!(
-            "resource \"a\" \"q\" {{\n  for_each = {source}\n  name = \"fe-${{each.key}}\"\n}}\n"
-        )
-    };
     let list = "variable \"s\" {\n  type = list(string)\n  default = [\"b\", \"a\"]\n}\n";
     let local = "locals {\n  l = [\"b\", \"a\"]\n}\n";
     for (row, main) in [
-        ("a declared list", format!("{list}{}", each("var.s"))),
-        ("a local", format!("{local}{}", each("local.l"))),
-        ("concat", each("concat([\"b\"], [\"a\"])")),
-        ("keys", each("keys({ b = 1, a = 2 })")),
-        ("tolist", each("tolist([\"b\", \"a\"])")),
+        (
+            "a declared list",
+            format!("{list}{}", for_each_over("var.s")),
+        ),
+        ("a local", format!("{local}{}", for_each_over("local.l"))),
+        ("concat", for_each_over("concat([\"b\"], [\"a\"])")),
+        ("keys", for_each_over("keys({ b = 1, a = 2 })")),
+        ("tolist", for_each_over("tolist([\"b\", \"a\"])")),
     ] {
         assert_eq!(
-            exact(&[("main.tf", main.as_str())], "a.q"),
+            exact_names(&[("main.tf", main.as_str())], "a.q"),
             "fe-a, fe-b",
             "{row}"
         );

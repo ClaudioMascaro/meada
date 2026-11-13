@@ -2415,7 +2415,7 @@ impl<'m> Eval<'m> {
 
     /// Whether `expr`, in the instance `at`, is known to be a tuple, which `for_each` refuses: a
     /// tuple written out (`[...]`, `[for ...]`), or a variable read whole that holds one. A tuple
-    /// that arrives any other way (a local, an output, a function's result) is a ceiling (#717).
+    /// that arrives any other way (a local, a function's result) is a ceiling (#717).
     fn is_tuple(&self, at: usize, expr: &Expression) -> bool {
         match expr {
             Expression::Array(_) => true,
