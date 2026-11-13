@@ -9,6 +9,32 @@
   (`patterns::prepare`) compare every image builder with every runner, with no index: 4,000
   patterns took 54.6 s for a `status` in a debug build.
 
+- `image.rs`, `image/config.rs` (#833, ADR 0028): the builder forms of a pipeline. Read in a
+  `run` script, through the command table's gate (`iac/actions/run.rs`): `docker push` with
+  exactly one image (its flags `-a`, `--all-tags`, `-q`, `--quiet` and
+  `--disable-content-trust`; the word after any other option is its value, so an unknown flag
+  costs the image and gives no wrong one), `docker buildx build` with a literal `--push` and
+  each `-t <image>`, `--tag <image>` and `--tag=<image>`, and `ko build` or `ko publish` with
+  one `--bare`, at most one literal package and `KO_DOCKER_REPO` in an `env` of the document
+  (read at index time, with no `env` literal in its words). Not read: `docker build` (also with
+  `--push`), `docker image push`, `--push=true`, `--output type=registry`, `-o`, `docker buildx
+  bake`, `docker compose push`, a global option before the subcommand, a prefix (`sudo`,
+  `time`), a tag glued to `-t`, a word left open whole that may hold the options (`$ARGS`),
+  Podman, Buildah, Kaniko, crane and Skopeo. A `buildx` word that reads `--push` or `-t` as
+  the value of another option is taken for the option. `docker/build-push-action`,
+  `docker/metadata-action` and `ko` are read in a pipeline file only, never in a composite
+  action, while `docker push` and `docker buildx build` are read in both. A builder's site is
+  its CI step when the CI reader gives the file that node, else the repository; the builders of
+  Compose, Skaffold and Jib stay on the repository. A CI job is no workload: `container`,
+  `services` and its `env` give no runner. A workload links to each CI step of a repository
+  that builds its image and runs the repository's code once; `trace` down from the workload
+  shows each such CI step. Of the sites of one repository that build one image, only those on
+  its best evidence link (the level first, then a literal name before one that is evidence): a
+  Compose service whose image is a default, beside a CI step that names the image, adds no
+  link, and two CI steps on the same evidence both link. An image a script pushes under two
+  tags is one side; `ko` and `docker push` of one image in one script are two rows. On a CI
+  step `context` shows `builds <image>` and each runner linked to it, a pattern included.
+
 - `PATHS_MAX`, `WORK_MAX` (`image/dockerfile.rs`) and `LIST_MAX` (`contract.rs`, #744): a Compose
   build runs the paths its Dockerfile takes from the context. A Dockerfile naming more than
   `PATHS_MAX` (256) sources, or matching more paths than that, is not read; the wildcard sources of

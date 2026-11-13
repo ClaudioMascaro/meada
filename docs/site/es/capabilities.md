@@ -586,9 +586,24 @@ destinos Jib literales de Maven/Gradle y comandos ko `build --bare` o `publish -
 `KO_DOCKER_REPO` definido en el workflow. Las imágenes base no son destinos. Otros modos de
 nombres de ko y expresiones Gradle no leídas no crean un constructor supuesto.
 
+En un pipeline, el sitio del constructor es el paso de CI que contiene la forma (#833): el
+enlace de la carga nombra ese paso de CI, `trace` desde la carga lo muestra, y `trace` con
+`direction=up` desde el paso de CI llega a las cargas que ejecutan lo que construye. Varios
+pasos de CI de un mismo repositorio que construyen la misma imagen son un solo constructor, con
+un enlace para cada uno. Un script `run` entra por la tabla de comandos: `docker push <imagen>`
+construye esa imagen, `docker buildx build` con `--push` construye cada imagen que nombran sus
+opciones `-t`, `--tag` y `--tag=`, y un comando ko se lee donde la tabla lee un comando. Una
+etiqueta o un digest sin resolver se quita con la etiqueta, una parte del nombre que ningún
+`env` literal da se vuelve patrón (`ghcr.io/${{ github.repository_owner }}/api` es
+`ghcr.io/*/api`), y un nombre entero sin resolver es un constructor no resuelto, sin enlace.
+`docker build`, `docker buildx build` sin `--push`, `docker image push`, `--output
+type=registry`, `docker buildx bake`, `docker compose push` y otras herramientas (Podman,
+Buildah, Kaniko, crane) no son constructores, y un job de CI no es una carga: su `container`,
+sus `services` y su `env` no dan ejecutor.
+
 Los ejecutores son containers e init containers de cargas Kubernetes, después de aplicar los
 overrides de imagen de Kustomize, servicios Compose e `image.repository` de valores Helm.
-No se renderizan templates Helm. `context` muestra la imagen y los repositorios constructores;
+No se renderizan templates Helm. `context` muestra la imagen y sus constructores;
 `trace` recorre la relación en ambos sentidos hasta las entradas del código. Los overlays que
 usan la misma carga e imagen conservan un ejecutor y su enlace por raíz de evaluación. Las
 evidencias repetidas de esa imagen en una carga y raíz forman un solo lado. Un build

@@ -9,15 +9,26 @@
   "providers": [
     {
       "contract": "image::ghcr.io/pattern/orders-*",
-      "site": "example.com/pattern/app",
+      "site": "example.com/pattern/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "at": ".github/workflows/build.yml#jobs.image.steps[0].with.tags"
     }
   ],
   "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/pattern/app::.github/workflows/build.yml::jobs.image.steps[0]",
+      "address": "jobs.image.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/build.yml",
+      "path": ".github/workflows/build.yml",
+      "line": 4,
+      "end_line": 6
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/pattern/infra::compose.yaml::services.west",
-      "provider": "example.com/pattern/app",
+      "provider": "example.com/pattern/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/pattern/orders-west",
       "level": "decided",
       "reason": "decided by human",

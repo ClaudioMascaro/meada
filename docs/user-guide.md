@@ -465,14 +465,15 @@ na mesma pasta é lido como um projeto, enraizado na pasta. Cada serviço é um 
 O contrato `image::<registry>/<repositório>` liga um workload ao repositório que constrói sua
 imagem. Nomes curtos do Docker Hub são expandidos, letras ficam minúsculas e tag e digest são
 removidos. O builder vem de tags do docker/build-push-action, imagens do docker/metadata-action,
-Compose com `build` e `image`, artefatos Skaffold, destinos Jib e comandos ko simples com
-`KO_DOCKER_REPO` escrito na configuração e `--bare`. Scripts ko com sintaxe de shell não lida
-não declaram builder. O comando aceita um `--bare`, no máximo um pacote literal e nenhuma outra
-opção; um shell explícito deve ser `bash` ou `sh`. Runners vêm de containers e init containers Kubernetes, serviços Compose,
+Compose com `build` e `image`, artefatos Skaffold, destinos Jib, comandos ko com
+`KO_DOCKER_REPO` escrito na configuração e `--bare`, e `docker push` e `docker buildx build
+--push` em um script `run` (a seção de CI diz como um script é lido). O comando ko aceita um
+`--bare`, no máximo um pacote literal e nenhuma outra opção. Em um pipeline, o site do builder é
+o passo de CI que contém a forma. Runners vêm de containers e init containers Kubernetes, serviços Compose,
 `image.repository` de values Helm e imagens após overrides Kustomize.
 
 `search` com `kind = "image"` encontra esses contratos. `context` no workload mostra sua imagem
-e o repositório builder; `trace` desce do workload ao código e sobe do código aos workloads.
+e seus builders (o passo de CI, em um pipeline); `trace` desce do workload ao código e sobe do código aos workloads.
 Nomes literais ligam em `exact`; padrões e valores sobrescrevíveis em `inferred`, com o motivo.
 Vários candidatos ficam `ambiguous`. Um build Compose local e seguro liga o serviço diretamente
 ao código que o seu Dockerfile copia do contexto (`COPY`, `ADD` e `RUN --mount=type=bind`, em todos
@@ -1538,6 +1539,30 @@ pacote. O nome é comparado como escrito, então um caminho até o script, `pyth
 `poetry run` não são reconhecidos, e a ligação nomeia a função do script, não o handler de um
 subcomando. Uma instalação num passo de CI posterior, em outro job de CI ou num script chamado
 não é evidência.
+
+**Imagens.** Um passo de CI que publica uma imagem é um builder dessa imagem (seção "Imagens e
+código de workloads"): `docker/build-push-action` pelas suas `tags`, `docker/metadata-action`
+pelas suas `images` e, em um script `run` que a tabela de comandos lê, `docker push <imagem>`,
+`docker buildx build` com `--push` (cada `-t`, `--tag` e `--tag=`) e `ko build --bare` ou `ko
+publish --bare` com `KO_DOCKER_REPO` em um `env`. O `context` do workload nomeia o passo de CI,
+e o `trace` atravessa a ligação nos dois sentidos:
+
+```text
+image: image::ghcr.io/acme/orders
+  builder: github.com/acme/app::.github/workflows/publish.yml::jobs.push.steps[1] [exact: image::ghcr.io/acme/orders]
+```
+
+No passo de CI, o `context` mostra `builds image::ghcr.io/acme/orders` e cada runner ligado a
+ele.
+
+Uma tag ou um digest em aberto (`$IMAGE:${{ github.sha }}`) sai junto com a tag. Uma parte do
+nome que nenhum `env` literal dá vira padrão, ligado em `inferred`; um nome inteiro assim é um
+builder não resolvido, sem ligação. Vários passos de CI de um mesmo repositório que constroem a
+mesma imagem são um só builder, com uma ligação para cada. `docker build`, um build sem
+`--push`, `docker image push`, `--output type=registry`, `docker buildx bake`, `docker compose
+push`, Podman, Buildah, Kaniko e crane não são lidos, e o valor de qualquer outra opção
+(`--build-arg`, `--label`) não dá nada. Um job de CI não é workload: seu `container`, seus
+`services` e seu `env` não dão runner.
 
 **Outros sistemas de CI.** O Meada lê o GitHub Actions. Para um sistema que ele não lê (GitLab
 CI, Jenkins, Azure Pipelines), declare o vínculo à mão com `[[resource]]` e `via` na chave que

@@ -2,6 +2,7 @@
 
 use crate::contract::Level;
 use crate::contract::{ContractKind, Found, Link, Role};
+use crate::iac::actions::run::{Part, Word, literal};
 use crate::index::{Consumer, Export, Indexed, Provider};
 use crate::resolve::Code;
 use crate::workspace::Repository;
@@ -89,7 +90,7 @@ impl ContractKind for Image {
             for side in summary.builders {
                 export.providers.push(Provider {
                     contract: format!("image::{}", side.image),
-                    site: repo.identity.clone(),
+                    site: step(export, &side.at).unwrap_or_else(|| repo.identity.clone()),
                     at: Some(side.at.clone()),
                     evidence: side.inferred.then_some(side.at),
                     ..Provider::default()
@@ -121,6 +122,27 @@ impl ContractKind for Image {
                     end_line: side.line,
                     block: "image".into(),
                     ..Default::default()
+                });
+            }
+        }
+        // The builder rows of the command table (ADR 0028): the CI step is the site.
+        for script in &export.scripts {
+            let step = script.site.strip_prefix(&repo.identity);
+            let Some((path, step)) = step.and_then(|s| s.strip_prefix("::")?.split_once("::"))
+            else {
+                continue;
+            };
+            let at = format!("{path}#{step}.run");
+            // An image the script pushes under two tags is one side.
+            let images: std::collections::BTreeSet<String> =
+                script.commands.iter().flat_map(|c| pushed(c)).collect();
+            for image in images {
+                export.providers.push(Provider {
+                    evidence: image.contains('*').then(|| at.clone()),
+                    contract: format!("image::{image}"),
+                    site: script.site.clone(),
+                    at: Some(at.clone()),
+                    ..Provider::default()
                 });
             }
         }
@@ -217,7 +239,7 @@ impl ContractKind for Image {
             return Vec::new();
         }
         let mut candidates = std::collections::BTreeMap::new();
-        for (_, p) in providers
+        for (builder, p) in providers
             .iter()
             .filter(|(_, p)| matches(&p.contract, contract))
         {
@@ -273,20 +295,44 @@ impl ContractKind for Image {
                 link.by = Some(by);
                 link.p = p;
             }
-            let key = (p.site.clone(), p.contract.clone());
-            let prior = candidates.entry(key).or_insert_with(|| link.clone());
-            if (link.level, &link.reason) < (prior.level, &prior.reason) {
-                *prior = link;
+            // A repository builds an image in each CI step that names it: one link a site.
+            let key = (
+                builder.identity.as_str(),
+                p.site.clone(),
+                p.contract.clone(),
+            );
+            // With whether the builder's own name is evidence, not a literal.
+            let found = (p.evidence.is_some(), link);
+            let prior = candidates.entry(key).or_insert_with(|| found.clone());
+            if (found.1.level, &found.1.reason) < (prior.1.level, &prior.1.reason) {
+                *prior = found;
             }
         }
         // A builder repository's literal name covers its pattern that matches the same runner.
         let literal = (candidates.keys())
-            .filter(|(_, c)| !c.contains('*'))
-            .map(|(site, _)| site.clone())
+            .filter(|(_, _, c)| !c.contains('*'))
+            .map(|&(repository, ..)| repository)
             .collect::<std::collections::BTreeSet<_>>();
-        candidates.retain(|(site, c), _| !c.contains('*') || !literal.contains(site));
-        let mut links = candidates.into_values().collect::<Vec<_>>();
-        if links.len() > 1 {
+        candidates
+            .retain(|(repository, _, c), _| !c.contains('*') || !literal.contains(repository));
+        // Of the sites of one repository that build one image, those on its best evidence
+        // link: a Compose default beside a CI step that names the image adds no link.
+        let rank = |(weak, link): &(bool, Link)| (link.level, *weak);
+        let mut best = std::collections::HashMap::new();
+        for ((repository, _, contract), found) in &candidates {
+            let held = (best.entry((*repository, contract.clone()))).or_insert(rank(found));
+            *held = rank(found).min(*held);
+        }
+        candidates.retain(|(repository, _, contract), found| {
+            best[&(*repository, contract.clone())] == rank(found)
+        });
+        // Several CI steps of a repository that build one image are one candidate.
+        let builders = (candidates.keys())
+            .map(|(repository, _, contract)| (*repository, contract.as_str()))
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
+        let mut links: Vec<Link> = candidates.into_values().map(|(_, link)| link).collect();
+        if builders > 1 {
             for l in &mut links {
                 l.level = Level::Ambiguous;
                 l.by = None;
@@ -393,6 +439,9 @@ impl ContractKind for Image {
             .iter()
             .flat_map(|e| e.executions.iter().cloned())
             .collect::<Vec<_>>();
+        // The CI steps of one repository that build an image run its code once, at the best
+        // level of their links.
+        let mut run = std::collections::HashMap::new();
         for link in links.iter().filter(|l| l.contract.starts_with("image::")) {
             for e in exports {
                 for n in &e.iac {
@@ -401,14 +450,23 @@ impl ContractKind for Image {
                         && link.root.as_deref().is_none_or(|r| r == n.root)
                         && runs(e, n, &link.contract)
                     {
-                        out.push(meada_core::export::Execution {
+                        let repository = repository(&link.provider);
+                        let key = (identity.clone(), &n.root, repository, &link.contract);
+                        let at = *run.entry(key).or_insert(out.len());
+                        let execution = meada_core::export::Execution {
                             workload: identity,
                             root: n.root.clone(),
-                            repository: link.provider.clone(),
+                            repository: repository.into(),
                             path: ".".into(),
                             level: link.level,
                             reason: link.reason.clone(),
-                        });
+                        };
+                        match out.get_mut(at) {
+                            Some(prior)
+                                if (prior.level, &prior.reason) <= (link.level, &link.reason) => {}
+                            Some(prior) => *prior = execution,
+                            None => out.push(execution),
+                        }
                     }
                 }
             }
@@ -458,6 +516,23 @@ impl ContractKind for Image {
                     ));
                 }
             }
+            // A builder at the node, a CI step: the image it builds and what runs it.
+            let built = |p: &&Provider| p.site == symbol && p.contract.starts_with("image::");
+            for p in e.providers.iter().filter(built) {
+                lines.push(format!("builds {}", p.contract));
+                for link in (links.iter())
+                    .filter(|l| l.provider == symbol && matches(&p.contract, &l.contract))
+                {
+                    let root = link.root.as_deref();
+                    let root = root.map_or(String::new(), |root| format!(" (root {root})"));
+                    lines.push(format!(
+                        "  runner: {}{root} [{}: {}]",
+                        link.consumer,
+                        link.level.name(),
+                        link.reason
+                    ));
+                }
+            }
             for n in &e.iac {
                 let identity = n.identity(&e.repository);
                 if identity == symbol && root.is_none_or(|r| r == n.root) {
@@ -493,6 +568,95 @@ impl ContractKind for Image {
         }
         lines
     }
+}
+
+/// The repository of a builder's site: the site itself, or the repository of its CI step.
+fn repository(site: &str) -> &str {
+    site.split_once("::")
+        .map_or(site, |(repository, _)| repository)
+}
+
+/// The CI step that holds the builder form at `at` (`<file>#<key path>`), when the CI reader
+/// gives the file its nodes.
+fn step(export: &Export, at: &str) -> Option<String> {
+    let (path, key) = at.split_once('#')?;
+    (export.iac.iter())
+        .filter(|n| n.ty == crate::iac::actions::STEP && n.path == path)
+        .find(|n| (key.strip_prefix(n.address.as_str())).is_some_and(|rest| rest.starts_with('.')))
+        .map(|n| n.identity(&export.repository))
+}
+
+/// The options of `docker push` that take no value. The word after any other option is its
+/// value, never an image: a flag missing here costs the image after it, and gives no wrong one.
+const PUSH_FLAGS: [&str; 5] = [
+    "-a",
+    "--all-tags",
+    "-q",
+    "--quiet",
+    "--disable-content-trust",
+];
+
+/// The images a command of a `run` script publishes (ADR 0028, the command table): the one
+/// `docker push` names, and each `-t` or `--tag` of a `docker buildx build` with `--push`.
+/// No other word of the command is read for a name.
+fn pushed(command: &[Word]) -> Vec<String> {
+    let words: Vec<Option<&str>> = command.iter().map(|w| literal(w)).collect();
+    let mut tags = Vec::new();
+    match words.as_slice() {
+        [Some("docker"), Some("push"), rest @ ..] => {
+            let mut rest = rest.iter().zip(&command[2..]);
+            while let Some((text, word)) = rest.next() {
+                match text {
+                    Some(option) if option.starts_with('-') => {
+                        if !PUSH_FLAGS.contains(option) && !option.contains('=') {
+                            rest.next();
+                        }
+                    }
+                    _ => tags.push((word, 0)),
+                }
+            }
+            tags.truncate(usize::from(tags.len() == 1));
+        }
+        [Some("docker"), Some("buildx"), Some("build"), rest @ ..] => {
+            if !rest.contains(&Some("--push")) {
+                return Vec::new();
+            }
+            let mut rest = command[3..].iter();
+            while let Some(word) = rest.next() {
+                match word.as_slice() {
+                    [Part::Text(option)] if option == "-t" || option == "--tag" => {
+                        tags.extend(rest.next().map(|tag| (tag, 0)));
+                    }
+                    [Part::Text(option), ..] if option.starts_with("--tag=") => {
+                        tags.push((word, "--tag=".len()));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        _ => {}
+    }
+    let mut images: Vec<String> = (tags.into_iter())
+        .filter_map(|(word, from)| named(word, from))
+        .collect();
+    images.sort();
+    images.dedup();
+    images
+}
+
+/// The image the word names from its byte `from` on: an open part is the `*` of a pattern, and
+/// a name left open whole is `*`, an unresolved side.
+fn named(word: &[Part], from: usize) -> Option<String> {
+    let mut name = String::new();
+    for part in word {
+        match part {
+            Part::Text(text) if text.contains('*') => return None,
+            Part::Text(text) => name += text,
+            Part::Open(_) if name.ends_with('*') => {}
+            Part::Open(_) => name.push('*'),
+        }
+    }
+    normalize_name(name.get(from..)?, true)
 }
 
 /// Whether `execution` runs a local path for the workload side `consumer` in its root: a module
@@ -724,7 +888,78 @@ fn normalize_name(written: &str, pattern: bool) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{evaluated, matches, normalize};
+    use super::{evaluated, matches, normalize, pushed};
+
+    #[test]
+    fn a_command_publishes_the_image_a_push_names_and_each_tag_of_a_build_that_pushes() {
+        let env = |name: &str| (name == "IMAGE").then_some("ghcr.io/acme/orders");
+        let published = |script: &str| -> Vec<String> {
+            let commands = crate::iac::actions::run::commands(script, env).unwrap();
+            commands.iter().flat_map(|c| pushed(c)).collect()
+        };
+        let cases: &[(&str, &[&str])] = &[
+            (
+                "docker push ghcr.io/acme/orders:v1",
+                &["ghcr.io/acme/orders"],
+            ),
+            ("docker push Acme/API", &["docker.io/acme/api"]),
+            (
+                "docker push -q --all-tags \"$IMAGE\"",
+                &["ghcr.io/acme/orders"],
+            ),
+            (
+                "docker push --platform linux/amd64 $IMAGE:$TAG",
+                &["ghcr.io/acme/orders"],
+            ),
+            (
+                "docker push --platform=linux/amd64 ${{ env.IMAGE }}@$DIGEST",
+                &["ghcr.io/acme/orders"],
+            ),
+            // A part of the name left open is a pattern, the whole name an unresolved side.
+            (
+                "docker push ghcr.io/$OWNER/orders:v1",
+                &["ghcr.io/*/orders"],
+            ),
+            ("docker push $OTHER", &["*"]),
+            ("docker push ${{ inputs.image }}:${{ github.sha }}", &["*"]),
+            // The word after an option the row does not know is its value, and two names fit
+            // no `docker push`.
+            ("docker push --unknown ghcr.io/acme/orders", &[]),
+            ("docker push ghcr.io/acme/a ghcr.io/acme/b", &[]),
+            ("docker push", &[]),
+            ("docker push 'ghcr.io/acme/*'", &[]),
+            ("docker push https://ghcr.io/acme/orders", &[]),
+            ("docker image push ghcr.io/acme/orders", &[]),
+            ("echo docker push ghcr.io/acme/orders", &[]),
+            // A build publishes only with `--push`, and only what its tag options name.
+            ("docker build -t ghcr.io/acme/orders .", &[]),
+            ("docker build --push -t ghcr.io/acme/orders .", &[]),
+            ("docker buildx build -t ghcr.io/acme/orders .", &[]),
+            ("docker buildx build --push .", &[]),
+            (
+                "docker buildx build --output type=registry -t ghcr.io/acme/orders .",
+                &[],
+            ),
+            (
+                "docker buildx build --push -t ghcr.io/acme/b:v1 --tag ghcr.io/acme/a \
+                 --tag=$IMAGE:${{ github.sha }} .",
+                &["ghcr.io/acme/a", "ghcr.io/acme/b", "ghcr.io/acme/orders"],
+            ),
+            (
+                "docker buildx build -t ghcr.io/acme/orders -t ghcr.io/acme/orders:v1 \
+                 --build-arg BASE=ghcr.io/$OWNER/base --label image=$OTHER --push .",
+                &["ghcr.io/acme/orders"],
+            ),
+            ("docker buildx build --push -t $OTHER .", &["*"]),
+            (
+                "docker buildx build --push --tag=ghcr.io/acme/${{ matrix.name }} .",
+                &["ghcr.io/acme/*"],
+            ),
+        ];
+        for (script, images) in cases {
+            assert_eq!(published(script), *images, "{script}");
+        }
+    }
 
     #[test]
     fn a_wholly_unknown_image_has_no_literal_matching_evidence() {

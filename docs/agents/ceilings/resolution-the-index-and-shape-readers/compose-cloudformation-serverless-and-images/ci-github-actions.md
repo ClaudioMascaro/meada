@@ -47,7 +47,8 @@
   expression. A CI runner on Windows defaults to `pwsh`: `runs-on` is not read, and the script
   is read as `bash`. `${{ env.X }}`, `$X` and `${X}` take the literal string of the nearest
   `env` (CI step, CI job, pipeline) that defines the name (a number or a boolean stays open),
-  when it holds only letters, digits, `.`, `_`, `=` and `-`, and when neither the script nor
+  when it holds only letters, digits, `.`, `_`, `=`, `-`, `/`, `:` and `@` (the last three
+  since #833, for an image name), and when neither the script nor
   another script of the file that names the environment file (`GITHUB_ENV`, `github.env`,
   `github[`) mentions the name other than by reading it. A write to it by an action, a called
   script or a script past the length ceiling is not seen, and neither is the environment file

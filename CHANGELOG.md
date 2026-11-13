@@ -69,9 +69,22 @@ All notable changes to Meada are recorded here. The format follows
   when none declares the name. `trace` crosses it both ways, so the CI jobs that run a program
   show above the routes it calls. The manifest reader keeps each console script's name: the
   schema version rises and an index rebuilds on first use. Release level: minor, meada (#832).
+- `docker push <image>` and `docker buildx build --push` (each `-t`, `--tag` and `--tag=`) in a
+  `run` script are image builders, read through the command table (ADR 0028). A tag or digest
+  left open is dropped, an open part of the name makes a pattern and a name left open whole is
+  an unresolved builder. A build without `--push` and text in `echo`, a string, a comment or a
+  script with a heredoc give no side. Release level: minor, meada (#833).
 
 ### Changed
 
+- An image builder read in a pipeline has the CI step that holds the form as its site, no
+  longer the repository (ADR 0028): `docker/build-push-action`, `docker/metadata-action` and ko
+  keep their rule, and the provider row, the link and `context` name the CI step, which `trace`
+  shows below the workload and from which it goes up to the workloads. `context` on the CI step
+  shows `builds <image>` and its runners. Several CI steps of one repository that build an
+  image are one builder with a link each. ko is read through the command table: a command
+  inside `if`, after `&&` or `;` or on a line of several counts. A literal `env` value with
+  `/`, `:` or `@` is read in a `run` script. Release level: minor, meada (#833).
 - In a pipeline or an action of GitHub Actions the key-name rule gives no use any more (ADR
   0028): `with: { bucket: x }` names an input of the action, not an S3 bucket, so the `inferred`
   use, its provisioning link and the orphan lines it fed are gone. A structured identifier (an

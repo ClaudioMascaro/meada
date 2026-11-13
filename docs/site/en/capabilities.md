@@ -580,9 +580,23 @@ literal Maven/Gradle Jib destinations and ko `build --bare` or `publish --bare` 
 `KO_DOCKER_REPO` set in the workflow. Base images are not destinations. Other ko naming modes
 and unread Gradle expressions do not create a guessed builder.
 
+In a pipeline the builder's site is the CI step that holds the form (#833): the workload's link
+names that CI step, `trace` from the workload shows it, and `trace` with `direction=up` from the
+CI step reaches the workloads that run what it builds. Several CI steps of one repository that
+build the same image are one builder, with a link each. A `run` script joins the forms through
+the command table: `docker push <image>` builds that image, `docker buildx build` with `--push`
+builds each image its `-t`, `--tag` and `--tag=` options name, and a ko command is read wherever
+the table reads a command. A tag or digest left open is dropped with the tag, a part of the name
+no literal `env` gives makes a pattern (`ghcr.io/${{ github.repository_owner }}/api` is
+`ghcr.io/*/api`), and a name left open whole is an unresolved builder that links to nothing.
+`docker build`, a `docker buildx build` without `--push`, `docker image push`, `--output
+type=registry`, `docker buildx bake`, `docker compose push` and other tools (Podman, Buildah,
+Kaniko, crane) are not builders, and a CI job is no workload: its `container`, its `services`
+and its `env` give no runner.
+
 Runners are Kubernetes workload containers and init containers, after Kustomize image
 overrides, Compose services and Helm values files' `image.repository`. Helm templates are not
-rendered. `context` shows the image and builder repositories; `trace` crosses the relationship
+rendered. `context` shows the image and its builders; `trace` crosses the relationship
 both ways, reaching code entry points. Overlays using the same workload and image retain a
 runner and its link per evaluation root. Repeated evidence of that image in one workload and
 root forms one side. A local Compose build directly runs the code in the same

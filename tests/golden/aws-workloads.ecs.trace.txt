@@ -1,7 +1,8 @@
 example.com/acme/tasks main.tf:2 aws_ecs_task_definition.worker
   runs code example.com/acme/app . [exact: image::ghcr.io/acme/aws-worker]
     example.com/acme/app send.ts:3 dispatch
-chain: exact · 1 hops · 2 repos · 58 tokens
+  →[exact: image::ghcr.io/acme/aws-worker] example.com/acme/app .github/workflows/build.yml:4 jobs.image.steps[0]
+chain: exact · 2 hops · 2 repos · 87 tokens
 
 example.com/acme/app send.ts:3 dispatch
   runs code [exact: image::ghcr.io/acme/aws-worker] example.com/acme/tasks main.tf:2 aws_ecs_task_definition.worker (root .)

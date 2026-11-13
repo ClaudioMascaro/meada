@@ -379,6 +379,17 @@ impl<'a> Graph<'a> {
             .filter(|link| calls_on_link(link))
             .filter_map(|&link| {
                 let &(n, reached) = self.iac.get(other(link))?;
+                // A link of one evaluation root joins the workload of that root only (an
+                // image, #833): one identity may sit in several roots.
+                let reached = match (link.root.as_deref(), direction) {
+                    (Some(root), Direction::Down) if root != node.root => return None,
+                    (Some(root), Direction::Up) => (self.exports[n].iac.iter())
+                        .find(|x| {
+                            x.root == root && x.path == reached.path && x.address == reached.address
+                        })
+                        .unwrap_or(reached),
+                    _ => reached,
+                };
                 Some((n, reached.clone(), link))
             })
             .collect()

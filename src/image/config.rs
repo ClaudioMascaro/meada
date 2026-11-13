@@ -6,6 +6,7 @@ use super::evaluated;
 const IMAGE_STORED_MAX: usize = 4 * crate::lang::MAX_BYTES;
 use crate::config_values;
 use crate::document::events::{self, Step, Syntax};
+use crate::iac::actions::run;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::Path;
@@ -206,41 +207,42 @@ fn workflow(path: &str, doc: &Value, out: &mut Summary) {
                     .as_str()
                     .is_some_and(|shell| matches!(shell, "bash" | "sh"))
             });
-            if let Some(command) = step
-                .get("run")
-                .and_then(Value::as_str)
-                .filter(|command| known_shell && simple_command(command))
-            {
-                // --bare makes the configured destination the complete image name. Other ko
-                // naming modes add import paths and hashes, so an unresolved command is absent.
-                for line in command.lines() {
-                    let words = line.split_whitespace().collect::<Vec<_>>();
-                    if !(3..=4).contains(&words.len())
-                        || words[0] != "ko"
-                        || !matches!(words[1], "build" | "publish")
-                        || words[2..].iter().filter(|&&word| word == "--bare").count() != 1
-                        || words[2..].iter().any(|word| {
-                            *word != "--bare" && (word.starts_with('-') || word.contains("..."))
-                        })
-                    {
-                        continue;
-                    }
-                    let image = [step, value, doc]
-                        .into_iter()
-                        .find_map(|scope| scope.get("env").and_then(|v| v.get("KO_DOCKER_REPO")));
-                    if let Some(image) = image.and_then(Value::as_str) {
-                        let at = format!(
-                            "{path}#{}",
-                            config_values::key_path(&[
-                                Step::Key("jobs".into()),
-                                Step::Key(job.clone()),
-                                Step::Key("steps".into()),
-                                Step::Index(index),
-                                Step::Key("run".into())
-                            ])
-                        );
-                        builder(out, image, &at, false);
-                    }
+            // The gate of the command table says which lines are commands (ADR 0028).
+            let commands = (step.get("run").and_then(Value::as_str))
+                .filter(|script| known_shell && script.len() <= config_values::VALUE_MAX)
+                .and_then(|script| run::commands(script, |_| None));
+            // --bare makes the configured destination the complete image name. Other ko
+            // naming modes add import paths and hashes, so an unresolved command is absent.
+            for command in commands.iter().flatten() {
+                let words: Option<Vec<&str>> = command.iter().map(|w| run::literal(w)).collect();
+                let Some(words) = words else {
+                    continue;
+                };
+                if !(3..=4).contains(&words.len())
+                    || words[0] != "ko"
+                    || !matches!(words[1], "build" | "publish")
+                    || words[2..].iter().filter(|&&word| word == "--bare").count() != 1
+                    || words[2..].iter().any(|word| {
+                        *word != "--bare" && (word.starts_with('-') || word.contains("..."))
+                    })
+                {
+                    continue;
+                }
+                let image = [step, value, doc]
+                    .into_iter()
+                    .find_map(|scope| scope.get("env").and_then(|v| v.get("KO_DOCKER_REPO")));
+                if let Some(image) = image.and_then(Value::as_str) {
+                    let at = format!(
+                        "{path}#{}",
+                        config_values::key_path(&[
+                            Step::Key("jobs".into()),
+                            Step::Key(job.clone()),
+                            Step::Key("steps".into()),
+                            Step::Index(index),
+                            Step::Key("run".into())
+                        ])
+                    );
+                    builder(out, image, &at, false);
                 }
             }
             let action = step
@@ -292,19 +294,6 @@ fn workflow(path: &str, doc: &Value, out: &mut Summary) {
             }
         }
     }
-}
-
-/// Only one literal command is read. Shell blocks, quotes, substitutions and redirections
-/// need shell evaluation; in particular, text inside a heredoc is not a build invocation.
-fn simple_command(command: &str) -> bool {
-    command
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .count()
-        == 1
-        && command
-            .bytes()
-            .all(|b| b.is_ascii_whitespace() || b.is_ascii_alphanumeric() || b"_-./".contains(&b))
 }
 
 fn maven(path: &str, src: &[u8], out: &mut Summary) {

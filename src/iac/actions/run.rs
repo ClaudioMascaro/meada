@@ -146,7 +146,7 @@ pub(crate) fn commands<'v>(
     env: impl Fn(&str) -> Option<&'v str>,
 ) -> Option<Vec<Vec<Word>>> {
     let plain = |v: &&str| {
-        !v.is_empty() && (v.bytes()).all(|b| b.is_ascii_alphanumeric() || b"._=-".contains(&b))
+        !v.is_empty() && (v.bytes()).all(|b| b.is_ascii_alphanumeric() || b"._=-/:@".contains(&b))
     };
     // ponytail: the literals read add at most the script's own length and one value's, so a
     // script of `$X` alone never grows past a constant factor; past that a variable stays open.
@@ -408,6 +408,8 @@ mod tests {
             "PKG" => Some("acme-lib"),
             "KW" => Some("then"),
             "SPACED" => Some("acme-lib acme-tool"),
+            "IMAGE" => Some("ghcr.io/acme/app:v1@sha256"),
+            "GLOB" => Some("acme/*"),
             "EMPTY" => Some(""),
             _ => None,
         };
@@ -796,9 +798,14 @@ mod tests {
                 Some(&["echo <$((1 + (2)))>"]),
             ),
             (
-                "a value the shell would split",
-                "pip install $SPACED $EMPTY",
-                Some(&["pip install <$SPACED> <$EMPTY>"]),
+                "a value the shell would split or expand",
+                "pip install $SPACED $EMPTY $GLOB",
+                Some(&["pip install <$SPACED> <$EMPTY> <$GLOB>"]),
+            ),
+            (
+                "a value with a slash, a colon and an at sign",
+                "docker push $IMAGE \"${{ env.IMAGE }}\"",
+                Some(&["docker push ghcr.io/acme/app:v1@sha256 ghcr.io/acme/app:v1@sha256"]),
             ),
             ("expression left open", "pip install ${{ env.PKG", None),
             ("substitution left open", "pip install $(cat name", None),

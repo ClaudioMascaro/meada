@@ -29,7 +29,7 @@
   "links": [
     {
       "consumer": "example.com/acme/deploy::deployment.yaml::Deployment.apps/shop/orders",
-      "provider": "example.com/acme/app",
+      "provider": "example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/acme/orders",
       "level": "exact",
       "reason": "image::ghcr.io/acme/orders",

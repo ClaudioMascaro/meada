@@ -157,7 +157,7 @@ test.each(['en', 'pt-BR'] as const)('new kind views keep orphan sides visible an
 
 test.each([
   { view: 'images', golden: 'images.workflow', title: 'Image links', from: 'Builder', to: 'Runner',
-    contract: 'image::ghcr.io/acme/orders', provider: 'example.com/acme/app',
+    contract: 'image::ghcr.io/acme/orders', provider: 'example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0]',
     consumer: 'example.com/acme/deploy::deployment.yaml::Deployment.apps/shop/orders (root .)' },
   { view: 'alerts', golden: 'alerts.equality', title: 'Alert links', from: 'Emitter', to: 'Matcher',
     contract: 'alert::support::team-b', provider: 'example.com/acme/monitoring::rules.yaml::groups[0].rules[0]',

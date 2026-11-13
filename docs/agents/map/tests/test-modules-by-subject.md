@@ -444,7 +444,9 @@
   trace in both directions, scope-aware orphans, segment-bounded patterns, ambiguous image
   open items, safe-path and symlink refresh, plus export/context/trace goldens. The
   `image-evaluation-roots` fixture preserves identical-image runners in two overlays and
-  collapses repeated evidence in one root after refresh.
+  collapses repeated evidence in one root after refresh. A builder of a pipeline on its CI
+  step, `docker push` and `docker buildx build --push` in a `run` script with their silent
+  controls, and two CI steps of one repository as one builder (#833).
 
 - `gcp.rs` (#667): sibling GCP infrastructure/app fixtures cover complete provisioners and
   config uses, disjoint Pub/Sub subscriptions and filtered delivery, instance-qualified SQL

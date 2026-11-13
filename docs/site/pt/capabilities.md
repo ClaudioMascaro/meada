@@ -581,9 +581,23 @@ Jib literais em Maven/Gradle e comandos ko `build --bare` ou `publish --bare` co
 `KO_DOCKER_REPO` definido no workflow. Imagens-base não são destinos. Comandos ko com outro
 modo de nomeação e expressões Gradle não lidas não criam um construtor por suposição.
 
+Em um pipeline, o site do construtor é o passo de CI que contém a forma (#833): a ligação da
+carga de trabalho nomeia esse passo de CI, o `trace` a partir da carga o mostra, e o `trace` com
+`direction=up` a partir do passo de CI chega às cargas que executam o que ele constrói. Vários
+passos de CI de um mesmo repositório que constroem a mesma imagem são um só construtor, com uma
+ligação para cada. Um script `run` entra pela tabela de comandos: `docker push <imagem>`
+constrói essa imagem, `docker buildx build` com `--push` constrói cada imagem que suas opções
+`-t`, `--tag` e `--tag=` nomeiam, e um comando ko é lido onde a tabela lê um comando. Uma tag ou
+um digest em aberto sai junto com a tag, uma parte do nome que nenhum `env` literal dá vira
+padrão (`ghcr.io/${{ github.repository_owner }}/api` é `ghcr.io/*/api`), e um nome inteiro em
+aberto é um construtor não resolvido, sem ligação. `docker build`, `docker buildx build` sem
+`--push`, `docker image push`, `--output type=registry`, `docker buildx bake`, `docker compose
+push` e outras ferramentas (Podman, Buildah, Kaniko, crane) não são construtores, e um job de CI
+não é carga de trabalho: seu `container`, seus `services` e seu `env` não dão executor.
+
 Os executores são containers e init containers de cargas Kubernetes, com os overrides de
 imagem do Kustomize aplicados, serviços Compose e `image.repository` de arquivos de valores
-Helm. Templates Helm não são renderizados. `context` mostra a imagem e os repositórios
+Helm. Templates Helm não são renderizados. `context` mostra a imagem e seus
 construtores; `trace` percorre a relação nos dois sentidos, até as entradas do código.
 Overlays que usam a mesma carga e a mesma imagem preservam um executor e sua ligação por
 raiz de avaliação. Evidências repetidas da mesma imagem na mesma carga e raiz formam um só lado.

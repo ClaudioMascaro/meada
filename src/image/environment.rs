@@ -60,7 +60,10 @@ impl<'a> Environments<'a> {
                     link.contract.clone(),
                 ))
                 .or_default()
-                .insert(link.provider.as_str(), link.level != Level::Ambiguous);
+                .insert(
+                    super::repository(&link.provider),
+                    link.level != Level::Ambiguous,
+                );
         }
         let mut executions = BTreeMap::<_, Vec<_>>::new();
         for x in exports.iter().flat_map(|e| &e.executions) {

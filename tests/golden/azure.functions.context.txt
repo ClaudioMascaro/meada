@@ -16,7 +16,7 @@ example.com/azure/infra main.tf:14 resource.azurerm_linux_function_app.image.sit
 example.com/azure/infra main.tf:15 resource.azurerm_linux_function_app.image.site_config.application_stack.docker.image_name = "azure/functions"
 example.com/azure/infra main.tf:16 resource.azurerm_linux_function_app.image.site_config.application_stack.docker.image_tag = var.tag
 image: image::ghcr.io/azure/functions
-  builder: example.com/azure/app [inferred: image::ghcr.io/azure/functions; image: main.tf#resource.azurerm_linux_function_app.image (var.tag main.tf:1)]
+  builder: example.com/azure/app::.github/workflows/image.yaml::jobs.image.steps[0] [inferred: image::ghcr.io/azure/functions; image: main.tf#resource.azurerm_linux_function_app.image (var.tag main.tf:1)]
 env image LITERAL_QUEUE -> Terraform environment: https://sqs.us-east-1.amazonaws.com/123456789012/tasks
 env image SECRET_QUEUE -> Key Vault secret api-key (redacted): unresolved
 env image TASK_QUEUE -> Terraform aws_sqs_queue tasks: channel::sqs::tasks

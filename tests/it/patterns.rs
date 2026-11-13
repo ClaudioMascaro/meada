@@ -462,7 +462,8 @@ fn a_rejected_builder_name_does_not_create_a_second_runner_choice() {
             .unwrap()
             .iter()
             .any(|l| l["contract"] == "image::ghcr.io/pattern/orders-west"
-                && l["provider"] == "example.com/pattern/other"
+                && l["provider"]
+                    == "example.com/pattern/other::.github/workflows/build.yml::jobs.image.steps[0]"
                 && l["level"] == "decided")
     );
     let builder = items
@@ -507,19 +508,19 @@ fn a_rejected_builder_name_does_not_create_a_second_runner_choice() {
         [
             (
                 "example.com/pattern/infra::compose.yaml::services.east",
-                "example.com/pattern/app",
+                "example.com/pattern/app::.github/workflows/build.yml::jobs.image.steps[0]",
                 "image::ghcr.io/pattern/orders-east",
                 "ambiguous",
             ),
             (
                 "example.com/pattern/infra::compose.yaml::services.east",
-                "example.com/pattern/other",
+                "example.com/pattern/other::.github/workflows/build.yml::jobs.image.steps[0]",
                 "image::ghcr.io/pattern/orders-east",
                 "ambiguous",
             ),
             (
                 "example.com/pattern/infra::compose.yaml::services.west",
-                "example.com/pattern/other",
+                "example.com/pattern/other::.github/workflows/build.yml::jobs.image.steps[0]",
                 "image::ghcr.io/pattern/orders-west",
                 "ambiguous",
             ),
@@ -606,19 +607,19 @@ fn an_inactive_builder_pattern_is_not_a_candidate_through_its_repositorys_litera
         [
             (
                 "example.com/pattern/infra::compose.yaml::services.east",
-                "example.com/pattern/app",
+                "example.com/pattern/app::.github/workflows/build.yml::jobs.image.steps[0]",
                 "image::ghcr.io/pattern/orders-east",
                 "decided",
             ),
             (
                 "example.com/pattern/infra::compose.yaml::services.west",
-                "example.com/pattern/app",
+                "example.com/pattern/app::.github/workflows/build.yml::jobs.image.steps[0]",
                 "image::ghcr.io/pattern/orders-west",
                 "ambiguous",
             ),
             (
                 "example.com/pattern/infra::compose.yaml::services.west",
-                "example.com/pattern/other",
+                "example.com/pattern/other::.github/workflows/build.yml::jobs.image.steps[0]",
                 "image::ghcr.io/pattern/orders-west",
                 "ambiguous",
             ),

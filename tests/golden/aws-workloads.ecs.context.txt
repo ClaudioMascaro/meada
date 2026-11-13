@@ -11,6 +11,6 @@ example.com/acme/tasks main.tf:4 resource.aws_ecs_task_definition.worker.contain
 image: image::docker.io/library/redis
 image: image::ghcr.io/acme/aws-sidecar
 image: image::ghcr.io/acme/aws-worker
-  builder: example.com/acme/app [exact: image::ghcr.io/acme/aws-worker]
+  builder: example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0] [exact: image::ghcr.io/acme/aws-worker]
 env sidecar QUEUE_NAME -> Terraform environment: sidecar
 env worker QUEUE_NAME -> Terraform environment: orders

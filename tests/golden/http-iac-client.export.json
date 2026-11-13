@@ -76,7 +76,7 @@
   "providers": [
     {
       "contract": "image::ghcr.io/http-iac/client",
-      "site": "example.com/http-iac/client",
+      "site": "example.com/http-iac/client::.github/workflows/build.yml::jobs.image.steps[0]",
       "at": ".github/workflows/build.yml#jobs.image.steps[0].with.tags"
     }
   ],
@@ -95,6 +95,17 @@
       "contract": "http::GET::/orders",
       "site": "example.com/http-iac/client::client.ts::workloadOrders::fetch#0",
       "via": "env:ORDERS_URL"
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/http-iac/client::.github/workflows/build.yml::jobs.image.steps[0]",
+      "address": "jobs.image.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/build.yml",
+      "path": ".github/workflows/build.yml",
+      "line": 4,
+      "end_line": 6
     }
   ],
   "links": [
@@ -121,7 +132,7 @@
     },
     {
       "consumer": "example.com/http-iac/deploy::workloads.yaml::Deployment.apps/shop/client",
-      "provider": "example.com/http-iac/client",
+      "provider": "example.com/http-iac/client::.github/workflows/build.yml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/http-iac/client",
       "level": "exact",
       "reason": "image::ghcr.io/http-iac/client",

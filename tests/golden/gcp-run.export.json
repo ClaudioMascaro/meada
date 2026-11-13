@@ -343,7 +343,7 @@
     },
     {
       "contract": "image::ghcr.io/acme/gcp-worker",
-      "site": "example.com/gcp/app",
+      "site": "example.com/gcp/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "at": ".github/workflows/build.yml#jobs.image.steps[0].with.tags"
     }
   ],
@@ -357,6 +357,17 @@
       "contract": "resource::cloudsql::orders-db/orders",
       "site": "example.com/gcp/app",
       "via": null
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "example.com/gcp/app::.github/workflows/build.yml::jobs.image.steps[0]",
+      "address": "jobs.image.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/build.yml",
+      "path": ".github/workflows/build.yml",
+      "line": 4,
+      "end_line": 6
     }
   ],
   "uses": [
@@ -414,7 +425,7 @@
   "links": [
     {
       "consumer": "example.com/gcp/infra::run.tf::google_cloud_run_service.v1",
-      "provider": "example.com/gcp/app",
+      "provider": "example.com/gcp/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/acme/gcp-worker",
       "level": "exact",
       "reason": "image::ghcr.io/acme/gcp-worker",
@@ -422,7 +433,7 @@
     },
     {
       "consumer": "example.com/gcp/infra::run.tf::google_cloud_run_v2_job.batch",
-      "provider": "example.com/gcp/app",
+      "provider": "example.com/gcp/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/acme/gcp-worker",
       "level": "exact",
       "reason": "image::ghcr.io/acme/gcp-worker",
@@ -430,7 +441,7 @@
     },
     {
       "consumer": "example.com/gcp/infra::run.tf::google_cloud_run_v2_service.v2",
-      "provider": "example.com/gcp/app",
+      "provider": "example.com/gcp/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/acme/gcp-worker",
       "level": "inferred",
       "reason": "image::ghcr.io/acme/gcp-worker; image: run.tf#resource.google_cloud_run_v2_service.v2 (var.image run.tf:1)",

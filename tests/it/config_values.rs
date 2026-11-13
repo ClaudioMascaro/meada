@@ -223,7 +223,7 @@ fn values_stay_out_of_the_export_and_a_secret_out_of_the_index() {
     assert_eq!(
         written["providers"],
         serde_json::json!([
-            {"contract": "image::ghcr.io/acme/app", "site": "example.com/acme/app", "at": ".github/workflows/ci.yml#jobs.image.steps[0].with.tags"},
+            {"contract": "image::ghcr.io/acme/app", "site": "example.com/acme/app::.github/workflows/ci.yml::jobs.image.steps[0]", "at": ".github/workflows/ci.yml#jobs.image.steps[0].with.tags"},
             {"contract": "package::npm::app", "site": "example.com/acme/app::package.json"}
         ])
     );

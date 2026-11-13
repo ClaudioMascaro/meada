@@ -6,11 +6,12 @@ example.com/azure/infra main.tf:3 azurerm_linux_function_app.image
     example.com/azure/app app.ts:3 task
     example.com/azure/app app.ts:5 unknown
       example.com/azure/app app.ts:5 produces channel::sqs (unresolved)
+  →[inferred: image::ghcr.io/azure/functions; image: main.tf#resource.azurerm_linux_function_app.image (var.tag main.tf:1)] example.com/azure/app .github/workflows/image.yaml:4 jobs.image.steps[0]
   example.com/azure/infra main.tf:2 aws_sqs_queue.tasks
     provisions channel::sqs::tasks [inferred: channel::sqs::tasks; workload:example.com/azure/infra::main.tf::azurerm_linux_function_app.image (root .), env:LITERAL_QUEUE] example.com/azure/app app.ts:4 literal
     provisions channel::sqs::tasks [inferred: channel::sqs::tasks; workload:example.com/azure/infra::main.tf::azurerm_linux_function_app.image (root .), env:TASK_QUEUE] example.com/azure/app app.ts:3 task
     provisions channel::sqs::tasks [exact: channel::sqs::tasks; config main.tf#resource.azurerm_linux_function_app.image.app_settings.LITERAL_QUEUE] example.com/azure/infra use main.tf#resource.azurerm_linux_function_app.image.app_settings.LITERAL_QUEUE (line 7) [exact]
-chain: inferred · 4 hops · 2 repos · 333 tokens
+chain: inferred · 5 hops · 2 repos · 383 tokens
 
 example.com/azure/app app.ts:3 task
   runs code [inferred: image::ghcr.io/azure/functions; image: main.tf#resource.azurerm_linux_function_app.image (var.tag main.tf:1)] example.com/azure/infra main.tf:3 azurerm_linux_function_app.image (root .)
