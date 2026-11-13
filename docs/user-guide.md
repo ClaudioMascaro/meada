@@ -1490,6 +1490,20 @@ o arquivo pode existir no ref que a chamada nomeia. Uma chamada a uma pasta que 
 `Dockerfile` e nenhum arquivo de action, e um `uses` em nenhuma das formas acima (um pipeline em
 uma subpasta de `.github/workflows/`), não têm lado e, portanto, não têm marca.
 
+**O script `run`.** O `run` de um passo de CI é lido pela tabela de comandos, sem avaliar shell: sob
+`shell: bash`, `sh` ou nenhum shell declarado (o do passo de CI, senão o `defaults.run.shell` do job
+de CI, senão o do pipeline), cada linha é um comando, e também o que vem depois de `&&` ou `;`,
+dentro de `if` e de laços. Um script com heredoc ou com mais de 1024 bytes não é lido, e texto em
+`echo`, em uma string ou em um comentário não dá lado. `pip install`, `pip3 install`, `python -m pip
+install`, `uv pip install`, `pipx install` e `uv tool install` fazem do passo de CI um consumidor de
+`package::pypi::<nome>` quando um repositório do workspace fornece o pacote, com a faixa como
+escrita: `context` no pacote lista o passo de CI, e a ligação segue a regra da seção 8.5 (`exact`
+para um único provedor em outro repositório). Um caminho, uma URL, `-e`, o arquivo de `-r` e o valor
+de uma opção não dão lado. Um nome com uma parte que nenhum `env` literal dá (`shared-${{ vars.X
+}}`) é um padrão, ligado como `inferred` ao único pacote que cabe nele; um nome inteiro assim (`pip
+install $PKG`) é um consumidor não resolvido, um item aberto que diz a causa e não tem candidato. O
+Meada não segue uma variável que o script atribui, `cd`, uma função nem um script chamado.
+
 **Outros sistemas de CI.** O Meada lê o GitHub Actions. Para um sistema que ele não lê (GitLab
 CI, Jenkins, Azure Pipelines), declare o vínculo à mão com `[[resource]]` e `via` na chave que
 faz a chamada (seção 4):

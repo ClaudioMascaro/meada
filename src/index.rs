@@ -2907,6 +2907,9 @@ pub(crate) struct Export {
     pub(crate) links: Vec<Link>,
     pub(crate) provisioners: Vec<iac::provision::Side>,
     pub(crate) config_uses: Vec<iac::config_uses::Side>,
+    /// The `run` scripts of the CI steps, as the gate of the command table reads them (ADR
+    /// 0028), by CI step. Not exported: the kinds read their sides from the commands.
+    pub(crate) scripts: Vec<iac::actions::run::Script>,
     /// Declared key locations read at query time, without the config values themselves.
     pub(crate) config_sites: Vec<config_values::sites::Site>,
     pub(crate) configurations: Vec<(String, serde_json::Value)>,
@@ -3457,6 +3460,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
             })
         })
         .collect();
+    let (config_uses, scripts) = iac::config_uses::read(db, identity)?;
     Ok(Export {
         repository: identity.to_string(),
         root: PathBuf::new(),
@@ -3483,7 +3487,8 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         communities: Vec::new(),
         links: Vec::new(),
         provisioners: iac::provision::read(db, identity)?,
-        config_uses: iac::config_uses::read(db, identity)?,
+        config_uses,
+        scripts,
         config_sites: Vec::new(),
         configurations: db
             .prepare("SELECT path, summary FROM contract_configs ORDER BY path")?

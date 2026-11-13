@@ -25,6 +25,8 @@ use crate::document::events::{self, Step, Syntax};
 use crate::lang::MAX_BYTES;
 use crate::render::rank;
 
+pub(crate) mod run;
+
 /// Where GitHub reads pipelines from: the files of this folder, none below it.
 const WORKFLOWS: &str = ".github/workflows/";
 

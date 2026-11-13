@@ -317,6 +317,14 @@ this file, and a change to these modules updates it.
   (address, type, name, `id`, `uses`) over the nodes of an export, for `ci.rs`, `iac::hits` leaves these rows out of kind `iac`, and
   `names` lets `iac::named` take a file path for a file node and a selector
   (`jobs.build.steps[id=login]`) for a CI step.
+- `iac/actions/run.rs` (#831, ADR 0028): the gate of the command table, a pure seam: `commands`
+  takes the `run` script of a CI step and gives its commands, each a list of `Word`s whose
+  `Part`s are text or open (as written). `iac::config_uses::read` calls it at export load for
+  each stored `<step>.run` value, under the shell gate (`<step>.shell`, else
+  `defaults.run.shell` of the CI job, then of the pipeline), with the literal `env` of the CI
+  step, its CI job and its pipeline (`given`), and gives `Export::scripts` (`Script`: the CI
+  step's identity and its commands). Nothing is stored. The rows that give a command its side
+  live in the kinds: `package/pypi.rs` (`Ecosystem::installs`) is the first.
 - `iac/serverless.rs` (#654, ADR 0025): Serverless Framework services as IaC nodes, one unit per
   `serverless.{yml,yaml,json}` (root: its path). `wanted`, `is_file` and `is_service` decide,
   `evaluate(path, bytes)` reads it with `document::events::read_keyed`, expands the file's

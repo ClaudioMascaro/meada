@@ -73,6 +73,15 @@ All notable changes to Meada are recorded here. The format follows
   expression in the name of an AWS form makes a pattern, and `vars.X` and `secrets.X` are never
   matched by name.
   Every other file answers as before. Release level: minor, meada (#828).
+- The `run` script of a CI step is read through the command table (ADR 0028), with no shell
+  evaluated: under `bash`, `sh` or no declared shell, a command is the first word of a line or
+  the one after `&&` or `;`, also inside `if` or a loop, and a script with a heredoc or past 1024
+  bytes is not read. `pip install`, `pip3 install`, `python -m pip install`, `uv pip install`,
+  `pipx install` and `uv tool install` make the CI step a consumer of `package::pypi::<name>`
+  for a package of the workspace, at the package kind's level and with the range as written, and
+  `context` on the package lists the CI step. A name with an unresolved part is a pattern, and a
+  name left open whole an unresolved consumer with its cause. The index stores nothing new.
+  Release level: minor, meada (#831).
 - The values cache (`values.db`, ADR 0027) stores each entry deflated, and gives back the pages
   that replaced or dropped entries free once they are most of the file: on Meada's own repository
   it holds 4.1 MB instead of 30.2 MB. An existing cache shrinks on the first refresh, which

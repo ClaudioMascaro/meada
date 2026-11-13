@@ -16,12 +16,13 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use super::{
-    Ecosystem, Entry, Flag, How, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers, Resolution,
-    Resolved, Summary, bare_directory, directory, holding,
+    Ecosystem, Entry, Flag, How, Install, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers,
+    Resolution, Resolved, Summary, bare_directory, directory, holding,
     npm::{MAX_RANGE, split},
     owner, pattern_fits, pep440, sourced,
 };
 use crate::contract::Level;
+use crate::iac::actions::run::{self, Part, Word};
 use crate::index::Export;
 use crate::lang::python;
 use crate::lang::python::pyproject::{Pyproject, Requirement, UvSource};
@@ -49,9 +50,12 @@ pub fn normalize(name: &str) -> Option<String> {
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c));
-    if !valid {
-        return None;
-    }
+    valid.then(|| folded(name))
+}
+
+/// The characters of `name` as PEP 503 writes them: lower case, each run of `-`, `_` and `.`
+/// one `-`. Any other character stays (the `*` of a pattern).
+fn folded(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     for c in name.chars() {
         match c {
@@ -60,7 +64,99 @@ pub fn normalize(name: &str) -> Option<String> {
             c => out.push(c.to_ascii_lowercase()),
         }
     }
-    Some(out)
+    out
+}
+
+/// The commands that install a package by its name, by their leading words (ADR 0028, "The
+/// `run` script and the command table").
+const INSTALLS: [&[&str]; 6] = [
+    &["pip", "install"],
+    &["pip3", "install"],
+    &["python", "-m", "pip", "install"],
+    &["uv", "pip", "install"],
+    &["pipx", "install"],
+    &["uv", "tool", "install"],
+];
+
+/// The options of those commands that take no value. The word after any other option is its
+/// value, never a name: a flag missing here costs the name after it, and gives no wrong one.
+const FLAGS: [&str; 22] = [
+    "-U",
+    "--upgrade",
+    "-q",
+    "--quiet",
+    "-v",
+    "--verbose",
+    "-I",
+    "--ignore-installed",
+    "--user",
+    "--pre",
+    "--no-deps",
+    "--no-cache-dir",
+    "--no-cache",
+    "--force-reinstall",
+    "--no-input",
+    "--disable-pip-version-check",
+    "--break-system-packages",
+    "--prefer-binary",
+    "--no-build-isolation",
+    "--system",
+    "--force",
+    "--include-deps",
+];
+
+/// How a consumer says its name is a pattern (`Consumer::via`).
+const PATTERN: &str = "pattern";
+
+/// What the argument `word` of an install names: a requirement by name with its range as
+/// written, a pattern of the name when a part of it is open, or the name left open whole.
+/// `None` for anything else: a path, a URL, a direct reference.
+fn installed(word: &[Part]) -> Option<Install> {
+    let entry = |name, range, via: Option<&str>| {
+        let via = via.map(str::to_string);
+        Install::Named(Entry {
+            name,
+            range,
+            via,
+            ..Entry::default()
+        })
+    };
+    if let Some(text) = run::literal(word) {
+        let (name, range) = requirement(text)?;
+        return Some(entry(name, range, None));
+    }
+    // The name runs to the first character a name cannot hold; the rest is read as written.
+    let (mut name, mut rest, mut open) = (String::new(), String::new(), String::new());
+    let mut parts = word.iter();
+    for part in parts.by_ref() {
+        match part {
+            Part::Open(written) => {
+                name.push('*');
+                open += written;
+            }
+            Part::Text(text) => {
+                let named = |c: char| c.is_ascii_alphanumeric() || "-_.".contains(c);
+                let end = text.find(|c| !named(c)).unwrap_or(text.len());
+                name += &text[..end];
+                if end < text.len() {
+                    rest += &text[end..];
+                    break;
+                }
+            }
+        }
+    }
+    for part in parts {
+        let (Part::Text(text) | Part::Open(text)) = part;
+        rest += text;
+    }
+    let name = folded(&name).replace("**", "*");
+    // The rest, after a name that stands for this one: extras, then the range.
+    let (_, range) = requirement(&format!("x{rest}"))?;
+    if name.bytes().all(|b| b == b'*') {
+        return Some(Install::Open(open));
+    }
+    normalize(&name.replace('*', "x"))?;
+    Some(entry(name, range, Some(PATTERN)))
 }
 
 /// The module name a distribution's import is spelled with when it follows the convention:
@@ -384,14 +480,57 @@ impl Ecosystem for Pypi {
         )
     }
 
-    /// A uv source (`uv_source`) keeps the provider it names, as Cargo's does (`sourced`).
+    /// A uv source (`uv_source`) keeps the provider it names, as Cargo's does (`sourced`). A
+    /// pattern of a name has no source.
     fn reaches(
         &self,
         (via, _): (Option<&str>, Option<&str>),
         from: (&str, &Path),
         to: ((&str, &Path), &str),
     ) -> bool {
-        sourced(via, from, to)
+        via == Some(PATTERN) || sourced(via, from, to)
+    }
+
+    /// A pattern fits the names its literal parts leave (`iac::pattern`, the glossary's
+    /// Pattern): at least three letters or digits, each `*` a whole segment.
+    fn fits(&self, wanted: &str, provided: &str) -> bool {
+        match wanted.contains('*') {
+            true => crate::iac::pattern::matches(wanted, provided),
+            false => wanted == provided,
+        }
+    }
+
+    fn uncertainty(&self, via: Option<&str>) -> Option<(&'static str, Level)> {
+        (via == Some(PATTERN)).then_some(("a pattern of the name", Level::Inferred))
+    }
+
+    /// The names the command installs, when its leading words are a row of `INSTALLS`: each
+    /// argument that is no option and no option's value (`installed`).
+    fn installs(&self, command: &[Word]) -> Vec<Install> {
+        let leads = |row: &&&[&str]| {
+            let mut words = row.iter().zip(command);
+            row.len() <= command.len() && words.all(|(a, b)| run::literal(b) == Some(a))
+        };
+        let Some(row) = INSTALLS.iter().find(leads) else {
+            return Vec::new();
+        };
+        let (mut found, mut options) = (Vec::new(), true);
+        let mut words = command[row.len()..].iter();
+        while let Some(word) = words.next() {
+            let option = match word.first() {
+                Some(Part::Text(text)) if options && text.starts_with('-') => text,
+                _ => {
+                    found.extend(installed(word));
+                    continue;
+                }
+            };
+            options = run::literal(word) != Some("--");
+            let flag = run::literal(word).is_some_and(|text| FLAGS.contains(&text));
+            if options && !flag && !option.contains('=') {
+                words.next();
+            }
+        }
+        found
     }
 
     /// Names the member of the consumer's uv workspace that a `workspace = true` entry of a

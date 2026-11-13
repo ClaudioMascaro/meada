@@ -18,6 +18,20 @@
   schema version does (`tests/golden/schema.txt` has no `go.mod` sample), so the new links appear
   after the first edit of that `go.mod` or the next schema change.
 
+- `package/pypi.rs` (#831, ADR 0028): the install row of the command table reads six commands
+  by their leading words (`pip install`, `pip3 install`, `python -m pip install`,
+  `uv pip install`, `pipx install`, `uv tool install`); another spelling (`python3 -m pip`, an
+  option before `install`, a prefix) is outside the table. An option of `FLAGS` takes no value
+  and any other takes the next word, so a flag missing from the list costs the name after it
+  and never gives a wrong one. An argument is a requirement by name: a path, a URL, a direct
+  reference, `-e` and the file of `-r` (not followed) give no side, and a wheel or a folder
+  written with no slash reads as a name. A name the workspace provides wins over a public
+  package of the same name: one provider in another repository is `exact`, whatever index
+  serves the install, and one in the CI step's own repository is `inferred`, as for a manifest
+  entry with no source. A name with an open part is a pattern within `iac/pattern.rs`'s limits
+  (`inferred` to the one package it fits, `ambiguous` to several, no side when it fits none); a
+  name left open whole is one unresolved consumer per CI step, with what is written as its
+  `via`, a cause and no candidate. The first install of a name by a CI step gives its range.
 - `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_NAME`
   (214 bytes; a longer name is no package) and `MAX_BYTES` (under `lang/mod.rs`). A range is
   stored as written, with no length limit beyond `MAX_BYTES`; npm's `flag` (`package/npm.rs`) checks only one of at most

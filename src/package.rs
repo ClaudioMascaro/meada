@@ -33,6 +33,7 @@ use serde_json::Value;
 
 use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search, Site};
 use crate::entry;
+use crate::iac::actions::run::{Script, Word};
 use crate::index::{self, CallSite, Consumer, Export, Indexed, Provider};
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
 use crate::lang::{Call, MAX_BYTES};
@@ -119,9 +120,16 @@ trait Ecosystem {
         wanted == provided
     }
 
-    /// Why the dependency's source cannot establish an exact coordinate, if any.
-    fn uncertainty(&self, _via: Option<&str>) -> Option<&'static str> {
+    /// Why the dependency's source cannot establish an exact coordinate, if any, and the level
+    /// of its link when one provider fits.
+    fn uncertainty(&self, _via: Option<&str>) -> Option<(&'static str, Level)> {
         None
+    }
+
+    /// What `command`, a command of a CI step's `run` script, installs by name: its row of the
+    /// command table (ADR 0028). None by default.
+    fn installs(&self, _command: &[Word]) -> Vec<Install> {
+        Vec::new()
     }
 
     /// Why a lone provider in the consumer's own repository is not certain, if any: the entry's
@@ -1549,20 +1557,54 @@ fn consume(exports: &mut [Export], providers: &Providers) {
         .map(|(n, export)| {
             let mut consumers = Vec::new();
             let mut dependencies = Vec::new();
+            // Whether a provider of the workspace, other than the manifest `own`, is what the
+            // entry `e` names.
+            let provided = |ecosystem: &dyn Ecosystem, e: &Entry, own: Option<(usize, usize)>| {
+                let source = (e.via.as_deref(), e.range.as_deref());
+                let mut of = providers.matching(ecosystem, e);
+                of.retain(|&p| Some(p) != own);
+                of.iter().any(|&(m, i)| {
+                    let at = &exports[m].manifests[i];
+                    ecosystem.reaches(source, export.place(), (exports[m].place(), &at.path))
+                })
+            };
+            for script in &export.scripts {
+                let consumer = |contract, via, range| Consumer {
+                    identity: None,
+                    contract,
+                    site: script.site.clone(),
+                    via,
+                    shape: None,
+                    method: range,
+                    fragments: Vec::new(),
+                    hops: Vec::new(),
+                    root: None,
+                };
+                let (mut named, mut open) = (HashSet::new(), Vec::new());
+                for (ecosystem, install) in installs(script) {
+                    match install {
+                        Install::Open(written) => open.push(written),
+                        // The first install of a package by the CI step gives its range.
+                        Install::Named(e) => {
+                            let contract = contract(ecosystem, &e.name);
+                            if provided(ecosystem, &e, None) && named.insert(contract.clone()) {
+                                consumers.push(consumer(Some(contract), e.via, e.range));
+                            }
+                        }
+                    }
+                }
+                if !open.is_empty() {
+                    open.dedup();
+                    consumers.push(consumer(None, Some(open.join(", ")), None));
+                }
+            }
             for (i, manifest) in export.manifests.iter().enumerate() {
                 let Some(ecosystem) = of(&manifest.path) else {
                     continue;
                 };
                 for e in &manifest.summary.dependencies {
-                    let source = (e.via.as_deref(), e.range.as_deref());
                     // A manifest is never a candidate of its own dependency.
-                    let mut of = providers.matching(ecosystem, e);
-                    of.retain(|&p| p != (n, i));
-                    let reaches = |&&(m, i): &&(usize, usize)| {
-                        let at = &exports[m].manifests[i];
-                        ecosystem.reaches(source, export.place(), (exports[m].place(), &at.path))
-                    };
-                    if !of.iter().any(|p| reaches(&p)) {
+                    if !provided(ecosystem, e, Some((n, i))) {
                         continue;
                     }
                     consumers.push(Consumer {
@@ -1608,6 +1650,29 @@ fn consume(exports: &mut [Export], providers: &Providers) {
         export.dependencies = dependencies;
     }
 }
+
+/// What a command of a CI step's `run` script installs by name (`Ecosystem::installs`).
+enum Install {
+    /// A package by its name, or by a pattern of it with `*` for each part left open (its `via`
+    /// then says so to `Ecosystem::uncertainty`), and the range as written.
+    Named(Entry),
+    /// A name left open whole, as written: an unresolved consumer.
+    Open(String),
+}
+
+/// What the commands of `script` install by name, each with its ecosystem.
+fn installs(script: &Script) -> Vec<(&'static dyn Ecosystem, Install)> {
+    let mut found = Vec::new();
+    for command in &script.commands {
+        for ecosystem in ECOSYSTEMS {
+            found.extend((ecosystem.installs(command).into_iter()).map(|i| (*ecosystem, i)));
+        }
+    }
+    found
+}
+
+/// Why a CI step's install of a name left open has no candidate.
+const OPEN_INSTALL: &str = "the package name is not a literal, and no literal `env` gives it";
 
 /// What checking a dependency range against the provider's version found, when it is not a
 /// plain accept.
@@ -1881,6 +1946,49 @@ impl ContractKind for Packages {
         into(links, symbol).map(|l| l.consumer.clone()).collect()
     }
 
+    /// A name a CI step installs and leaves open whole (`Install::Open`) fits no provider.
+    fn unresolved_causes(&self, exports: &[Export]) -> HashMap<String, &'static str> {
+        let open = |s: &&Script| (installs(s).iter()).any(|(_, i)| matches!(i, Install::Open(_)));
+        let scripts = exports.iter().flat_map(|e| &e.scripts).filter(open);
+        scripts.map(|s| (s.site.clone(), OPEN_INSTALL)).collect()
+    }
+
+    /// On a CI step, the packages its `run` script installs: `consumes <contract>`, then a
+    /// `provider:` line per link with its level and reason; a name left open says why it has
+    /// none. Elsewhere, `context_sections`.
+    fn context_at(
+        &self,
+        exports: &[Export],
+        repos: &[Repository],
+        links: &[Link],
+        site: &str,
+        _root: Option<&str>,
+    ) -> Vec<String> {
+        let mut lines = self.context_sections(exports, repos, links, site);
+        let scripts = exports
+            .iter()
+            .filter(|e| e.scripts.iter().any(|s| s.site == site));
+        for consumer in (scripts.flat_map(|e| &e.consumers)).filter(|c| c.site == site) {
+            match (&consumer.contract, &consumer.via) {
+                (Some(contract), _) if contract.starts_with(PREFIX) => {
+                    lines.push(format!("consumes {contract}"));
+                    let found =
+                        (links.iter()).filter(|l| l.consumer == site && l.contract == *contract);
+                    lines.extend(found.map(|l| {
+                        let level = l.level.name();
+                        let at = l.provider.replacen("::", " ", 1);
+                        format!("  provider: {at} [{level}: {}]", l.reason)
+                    }));
+                }
+                (None, Some(written)) if self.unresolved_causes(exports).contains_key(site) => {
+                    lines.push(format!("consumes (unresolved) {written}: {OPEN_INSTALL}"));
+                }
+                _ => {}
+            }
+        }
+        lines
+    }
+
     /// `consumers:` with the calls that reach `symbol` through a package import (spec #22),
     /// from any repository of the workspace, as `<repository> <path>:<line> <caller>`, then
     /// ` [<level>, <range flag>]` when the link is not exact or the dependency's range does not
@@ -1969,7 +2077,7 @@ impl ContractKind for Packages {
                     && at.is_some_and(|manifest| ecosystem.reaches(source, from, (to, manifest)))
             })
             .collect();
-        let uncertain = ecosystem.uncertainty(consumer.via.as_deref());
+        let (uncertain, uncertain_level) = ecosystem.uncertainty(consumer.via.as_deref()).unzip();
         // The one fit shares the consumer's repository and no source names it: a candidate only.
         let unsourced = match fits.as_slice() {
             [(repo, _)] if uncertain.is_none() && repo.identity == from.identity => {
@@ -1980,8 +2088,7 @@ impl ContractKind for Packages {
         let (level, n) = match fits.len() {
             0 => return Vec::new(),
             1 if unsourced.is_some() => (Level::Inferred, None),
-            1 if uncertain.is_none() => (Level::Exact, None),
-            1 => (Level::Ambiguous, None),
+            1 => (uncertain_level.unwrap_or(Level::Exact), None),
             n => (Level::Ambiguous, Some(n)),
         };
         fits.into_iter()
@@ -2917,6 +3024,7 @@ mod tests {
             links: Vec::new(),
             provisioners: Vec::new(),
             config_uses: Vec::new(),
+            scripts: Vec::new(),
             config_sites: Vec::new(),
             subscriptions: Vec::new(),
             provisions: Vec::new(),

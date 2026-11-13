@@ -1483,6 +1483,20 @@ the file may exist at the ref the call names. A call to a folder that holds a `D
 action file, and a `uses` in none of the forms above (a pipeline in a subfolder of
 `.github/workflows/`), hold no side and so no mark.
 
+**The `run` script.** The `run` of a CI step is read through the command table, with no shell
+evaluated: under `shell: bash`, `sh` or no declared shell (the CI step's, else the
+`defaults.run.shell` of the CI job, else the pipeline's), each line is a command, and so is what
+follows `&&` or `;`, inside `if` and loops too. A script with a heredoc or past 1024 bytes is not
+read, and text in `echo`, in a string or in a comment gives no side. `pip install`, `pip3 install`,
+`python -m pip install`, `uv pip install`, `pipx install` and `uv tool install` make the CI step a
+consumer of `package::pypi::<name>` when a repository of the workspace provides the package, with
+the range as written: `context` on the package lists the CI step, and the link follows the rule of
+section 8.5 (`exact` for a single provider in another repository). A path, a URL, `-e`, the file of
+`-r` and the value of an option give no side. A name with a part no literal `env` gives (`shared-${{
+vars.X }}`) is a pattern, linked `inferred` to the one package it fits; a whole name like that (`pip
+install $PKG`) is an unresolved consumer, an open item that says its cause and has no candidate.
+Meada follows no variable the script assigns, no `cd`, no function and no called script.
+
 **Other CI systems.** Meada reads GitHub Actions. For a system it does not read (GitLab CI,
 Jenkins, Azure Pipelines), declare the link by hand with `[[resource]]` and `via` on the key
 that makes the call (section 4):

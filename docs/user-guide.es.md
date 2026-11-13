@@ -1513,6 +1513,21 @@ tiene un `Dockerfile` y ningún archivo de action, y un `uses` en ninguna de las
 (un pipeline en una subcarpeta de `.github/workflows/`), no tienen lado y, por tanto, tampoco
 marca.
 
+**El script `run`.** El `run` de un paso de CI se lee con la tabla de comandos, sin evaluar shell:
+bajo `shell: bash`, `sh` o ningún shell declarado (el del paso de CI, si no el `defaults.run.shell`
+del job de CI, si no el del pipeline), cada línea es un comando, y también lo que sigue a `&&` o
+`;`, dentro de `if` y de bucles. Un script con heredoc o de más de 1024 bytes no se lee, y el texto
+en `echo`, en una cadena o en un comentario no da lado. `pip install`, `pip3 install`, `python -m
+pip install`, `uv pip install`, `pipx install` y `uv tool install` hacen del paso de CI un
+consumidor de `package::pypi::<nombre>` cuando un repositorio del workspace provee el paquete, con
+el rango como está escrito: `context` en el paquete lista el paso de CI, y el enlace sigue la regla
+de la sección 8.5 (`exact` para un único proveedor en otro repositorio). Una ruta, una URL, `-e`, el
+archivo de `-r` y el valor de una opción no dan lado. Un nombre con una parte que ningún `env`
+literal da (`shared-${{ vars.X }}`) es un patrón, enlazado como `inferred` al único paquete que
+encaja; un nombre entero así (`pip install $PKG`) es un consumidor no resuelto, un ítem abierto que
+dice su causa y no tiene candidato. Meada no sigue una variable que el script asigna, `cd`, una
+función ni un script llamado.
+
 **Otros sistemas de CI.** Meada lee GitHub Actions. Para un sistema que no lee (GitLab CI,
 Jenkins, Azure Pipelines), declare el vínculo a mano con `[[resource]]` y `via` en la clave que
 hace la llamada (sección 4):

@@ -134,7 +134,13 @@
   `roots` and the console `scripts`, `[project.scripts]` else `[tool.poetry.scripts]`, as
   `(module, function)`) and a `requirements*.txt` (line by line, comments, option lines, URLs and paths
   skipped), each name normalized as PEP 503 does (`normalize`) and each specifier kept as
-  written, extras and markers dropped (`requirement`). A PyPI range is checked by
+  written, extras and markers dropped (`requirement`). A CI step that installs by name is a
+  consumer too (#831, ADR 0028): `consume` asks `Ecosystem::installs` for each command of
+  `Export::scripts`, and PyPI's row (`INSTALLS`, `FLAGS`, `installed`) gives a name, a pattern
+  (`via` `pattern`, fitted by `iac::pattern` and linked `inferred` through
+  `Ecosystem::uncertainty`, which now carries the level) or a name left open, an unresolved
+  consumer whose cause `Packages::unresolved_causes` gives; `Packages::context_at` shows them
+  on the CI step. A PyPI range is checked by
   `package/pep440.rs` (`Pypi::flag`, a hand-written subset: a comma-separated set of `==`, `!=`,
   `<`, `<=`, `>`, `>=`, `~=`, `==X.*` and `===`, over PEP 440 versions with epoch, pre-, post-,
   dev-releases and local labels, no crate: the subset is small, and the evaluator stays inside the clean-room rules and the

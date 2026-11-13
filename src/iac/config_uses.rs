@@ -7,6 +7,7 @@ use std::ops::Bound;
 use meada_core::export::{Level, Use};
 use rusqlite::Connection;
 
+use super::actions::run::{self, Script};
 use super::types;
 use crate::Result;
 
@@ -58,7 +59,10 @@ fn evaluated<'v>(value: &str, env: impl Fn(&str) -> Option<&'v str>) -> String {
     out + rest
 }
 
-pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
+/// The config uses of the repository, and the `run` scripts of its CI steps as the gate of the
+/// command table reads them (ADR 0028): both come from the stored strings, so a script past
+/// the value length ceiling is not read.
+pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<Script>)> {
     // A creation's defining name is its provisioner, not a second side using itself.
     // Other config attributes in the same IaC file can still name resources they use.
     let mut definitions = std::collections::HashSet::new();
@@ -121,7 +125,16 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     for (path, key) in others.iter().filter(|row| owned.contains_key(&row.0)) {
         entries.entry(path).or_default().insert(key, None);
     }
+    // The `run` scripts of each owned file that write to `GITHUB_ENV`: a name one of them
+    // rebinds reaches the CI steps after it, so no literal `env` gives it.
+    let mut written = HashMap::<&str, Vec<&str>>::new();
+    for (path, key, value, _) in rows.iter().filter(|row| owned.contains_key(&row.0)) {
+        if key.ends_with(".run") && value.contains("GITHUB_ENV") {
+            written.entry(path).or_default().push(value);
+        }
+    }
     let mut uses = Vec::new();
+    let mut scripts = Vec::new();
     for (path, key, value, line) in &rows {
         if definitions.contains(&(path.clone(), key.clone())) {
             continue;
@@ -135,14 +148,43 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
             holders.sort_by_key(|node| std::cmp::Reverse(node.len()));
             holders
         });
+        // The `env` of the CI step, of its CI job, then of the pipeline (an action's file holds
+        // none at its root).
+        let scopes = |holders: &[&str], key: &str| -> Vec<String> {
+            let pipeline = owned[path].1.then(|| key.to_string());
+            let scopes = holders.iter().map(|node| format!("{node}.{key}"));
+            scopes.chain(pipeline).collect()
+        };
+        // A CI step is the one node whose address ends in an index.
+        let step = holders.as_ref().and_then(|holders| holders.first());
+        if let (Some(holders), Some(step)) = (&holders, step.filter(|step| step.ends_with(']')))
+            && key.strip_prefix(*step) == Some(".run")
+        {
+            let file = &entries[path.as_str()];
+            // The shell: the CI step's, else `defaults.run.shell` of its CI job, then of the
+            // pipeline. `bash`, `sh` or none declared is read; any other shell is not.
+            let mut shells = vec![format!("{step}.shell")];
+            shells.extend(scopes(&holders[1..], "defaults.run.shell"));
+            let shell = shells.iter().find_map(|key| file.get(key.as_str()));
+            let envs = scopes(holders, "env.");
+            let env = |name: &str| {
+                let mut found = envs.iter().filter_map(|scope| given(file, scope, name));
+                let mut scripts = written.get(path.as_str()).into_iter().flatten();
+                (found.next().flatten()).filter(|_| !scripts.any(|s| run::rebinds(s, name)))
+            };
+            let commands = (shell.is_none_or(|shell| matches!(shell, Some("bash" | "sh"))))
+                .then(|| run::commands(value, env))
+                .flatten();
+            if let Some(commands) = commands.filter(|commands| !commands.is_empty()) {
+                let site = format!("{repository}::{path}::{step}");
+                scripts.push(Script { site, commands });
+            }
+        }
         let text = match &holders {
             // A written asterisk is no unresolved part: such a value is read as before.
             Some(holders) if value.contains("${{") && !value.contains('*') => {
-                // The `env` of the CI step, of its CI job, then of the pipeline (an action's
-                // file holds none at its root); never the one the key itself is written in.
-                let pipeline = owned[path].1.then(|| "env.".to_string());
-                let scopes = holders.iter().map(|node| format!("{node}.env."));
-                let scopes: Vec<String> = scopes.chain(pipeline).collect();
+                // Never the `env` the key itself is written in.
+                let scopes = scopes(holders, "env.");
                 evaluated(value, |name| {
                     let outer = scopes
                         .iter()
@@ -191,7 +233,8 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     }
     uses.sort();
     uses.dedup();
-    Ok(uses)
+    scripts.sort_by(|a, b| a.site.cmp(&b.site));
+    Ok((uses, scripts))
 }
 
 /// What the `env` map at `scope` (a key path that ends in `.`) gives `name` among the keys of
