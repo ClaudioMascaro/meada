@@ -305,6 +305,33 @@ fn a_uses_outside_the_workspace_holds_no_side_on_any_surface() {
     assert_golden("ci-calls.status.txt", &status);
 }
 
+/// The sides of a CI node come before its values: a pipeline of many CI steps shows who calls
+/// it under the default budget, where its values alone would spend it (#829's verification).
+#[test]
+fn context_on_a_long_pipeline_lists_its_callers_under_the_default_budget() {
+    let [workflows, _, app_a, ..] = reproduction("ci_calls_long");
+    let mut text = fs::read_to_string(workflows.join(PUBLISH)).unwrap();
+    for n in 0..80 {
+        text.push_str(&format!("      - name: Step {n}\n        run: echo {n}\n"));
+    }
+    fs::write(workflows.join(PUBLISH), text).unwrap();
+    let engine = Engine::open(&app_a).unwrap();
+    let answer = engine.context(PUBLISH, None).unwrap();
+    assert!(
+        answer.contains("raise budget"),
+        "the answer is cut: {answer}"
+    );
+    assert_eq!(listed(&answer, "  consumer: ").len(), 4, "{answer}");
+    let (sides, values) = (answer.find("provides ci::"), answer.find("\nvalues:"));
+    assert!(sides < values, "{answer}");
+    // A consumer too: the pipeline it calls is above its own values.
+    let answer = engine
+        .context(&format!("{CI}::jobs.publish"), None)
+        .unwrap();
+    let (sides, values) = (answer.find("consumes ci::"), answer.find("\nvalues:"));
+    assert!(sides.is_some() && sides < values, "{answer}");
+}
+
 /// An index knows only its own repository: alone, a call names no repository of the workspace.
 #[test]
 fn a_caller_indexed_alone_holds_no_side_until_its_peer_is_in_the_workspace() {

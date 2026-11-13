@@ -1324,15 +1324,21 @@ impl Engine {
                     if let [(n, node)] = &nodes[..] {
                         let identity = node.identity(&repos[*n].identity);
                         let links = self.links(&partial.exports);
-                        for kind in KINDS {
-                            lines.extend(kind.context_at(
-                                &partial.exports,
-                                repos,
-                                &links,
-                                &identity,
-                                Some(&node.root),
-                            ));
-                        }
+                        let sides: Vec<String> = (KINDS.iter())
+                            .flat_map(|kind| {
+                                let root = Some(&*node.root);
+                                kind.context_at(&partial.exports, repos, &links, &identity, root)
+                            })
+                            .collect();
+                        // A CI node shows its sides above its values, the last block of
+                        // `lines`: who calls a pipeline is what its reader asks, and the values
+                        // of a long file would spend the budget first.
+                        let values = |l: &String| l == "values:" || l == "values: none";
+                        let at = (iac::actions::owns(node))
+                            .then(|| lines.iter().rposition(values))
+                            .flatten()
+                            .unwrap_or(lines.len());
+                        lines.splice(at..at, sides);
                         let provisions = iac::provision::links(&partial.exports);
                         lines.extend(iac::provision::decision_context(
                             &provisions,

@@ -95,8 +95,13 @@
   no `env` at its root, so a composite action reads only the `env` of its CI steps). That
   `env` gives a literal only as a string with no expression and no `*`, not cut: a number, a
   boolean, a list, a map and an `env` written as one expression define the name with no
-  literal, so the part is unresolved and never read from an `env` farther up. A null or blank
-  entry stores no config value: it is not seen, and the lookup goes on to the `env` above. An
+  literal, so the part is unresolved and never read from an `env` farther up. A null entry, and a
+  list or a map that holds no value, keep no config value and define the name all the same: the
+  CI job or the CI step records such names (`Facts::hollow`), so the part is unresolved, where
+  GitHub gives a null the empty string. A scalar the YAML reader keeps as a string is a literal
+  as written, though GitHub may read it as a number (`0x1F`, `0o17`, `.inf`: not checked against
+  GitHub). The `with` of a CI job that calls a reusable pipeline resolves `env.X` from the
+  pipeline's `env`, where GitHub gives that key no `env` context and rejects the file. An
   unresolved part is `*`: in the name of an AWS form (an ARN, a queue URL, `s3://`) it makes a
   pattern under ADR 0026's limits, and such a use opens the orphan scope as any use does; in a
   `gs://` name, a Pub/Sub or Secret Manager path (its project included) and an Azure URL,

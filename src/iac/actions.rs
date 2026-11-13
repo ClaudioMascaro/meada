@@ -56,6 +56,31 @@ pub(crate) struct Facts {
     /// The keys of `secrets` beside a `uses`, as written, sorted, or the word `inherit`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secrets: Option<Secrets>,
+    /// The names its `env` defines with no config value: a null, or a list or a map that holds
+    /// none. Such a name keeps no row and still hides the ones of an `env` farther up.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hollow: Vec<String>,
+}
+
+/// The names the `env` mapping `value` defines with no config value, among the names an
+/// expression can read (letters, digits and `_`).
+fn hollow(value: Option<&Value>) -> Vec<String> {
+    fn empty(value: &Value) -> bool {
+        match value {
+            Value::Null => true,
+            Value::Array(items) => items.iter().all(empty),
+            Value::Object(map) => map.values().all(empty),
+            _ => false,
+        }
+    }
+    let Some(Value::Object(map)) = value else {
+        return Vec::new();
+    };
+    let read = |key: &str| {
+        key.len() <= VALUE_MAX && key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+    };
+    let names = map.iter().filter(|(key, value)| read(key) && empty(value));
+    names.map(|(key, _)| key.clone()).collect()
 }
 
 /// The keys of the mapping `value`, each short enough to be kept and free of control
@@ -191,6 +216,7 @@ impl Unit<'_> {
         let mut facts = Facts {
             id: text(body.get("id")),
             uses: text(body.get("uses")),
+            hollow: hollow(body.get("env")),
             ..Facts::default()
         };
         // What a call passes: the keys only, the values stay config values.
@@ -212,7 +238,7 @@ impl Unit<'_> {
         let size = [&name, &facts.id, &facts.uses]
             .iter()
             .map(|s| s.as_ref().map_or(0, String::len))
-            .chain(passed.map(String::len))
+            .chain(passed.chain(&facts.hollow).map(String::len))
             .sum::<usize>();
         if !self.take(address.len() + size) {
             return false;

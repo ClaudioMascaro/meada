@@ -53,8 +53,10 @@ weakest:
 
 ## CI (GitHub Actions)
 
-A pipeline or an action that other files call with `uses` provides the CI contract
-`ci::<repository>/<path>`; each CI job or CI step of the workspace that calls it consumes it.
+A pipeline or an action that other files call with `uses` provides a CI contract, named as a
+`uses` names it without the ref: `ci::<repository>/<file path>` for a pipeline,
+`ci::<repository>[/<folder>]` for an action. Each CI job or CI step of the workspace that calls
+it consumes it.
 
 - **Find** a pipeline, an action, a CI job or a CI step with `search` and `kind: "ci"`, by type
   (`workflow`, `action`, `job`, `step`), address (`jobs.publish`, `jobs.build.steps[2]`), id,
@@ -65,12 +67,14 @@ A pipeline or an action that other files call with `uses` provides the CI contra
   repository outside it is unknown to Meada.
 - **Chain.** `trace` with `direction: "up"` reaches every caller through intermediate reusable
   pipelines and composite actions. Three starts give the same chain: the file's path, its node
-  (`<repository>::<path>::.`) and the contract (`ci::...`).
+  (`<repository>::<file path>::.`) and the contract (`ci::...`).
 - **Git ref.** A link reads `[exact: @main (indexed 1a2b3c4)]`: `@main` is the ref the caller
   wrote, `1a2b3c4` the commit Meada read the called file at. Meada resolves no ref, so `exact`
   says the caller names that file, not that it runs the indexed version. `, ref mismatch` marks
   a caller pinned to a full commit id other than the indexed one: read the file at that commit
-  before you state what that caller runs.
-- **`(absent at the indexed commit)`.** The call names a path that holds no pipeline or action
-  at the indexed commit. The file may exist at the caller's ref: report a call to check, not a
+  before you state what that caller runs. `(indexed commit unknown)` is server mode over a
+  checkout that was not clean: no commit is known there, and no mismatch is ever flagged.
+- **`(absent at the indexed commit)`.** The call names a file or folder that is not there at
+  the indexed commit, or, with `: the file is no reusable pipeline there`, a pipeline without
+  `workflow_call`. The file may exist at the caller's ref: report a call to check, not a
   broken one.

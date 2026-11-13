@@ -477,6 +477,57 @@ jobs:
     );
 }
 
+/// A nearer entry that stores no config value still defines its name: a null, an empty list or
+/// map, and a list or a map that holds only those (#829's verification).
+#[test]
+fn a_nearer_env_entry_with_no_value_hides_the_ones_above() {
+    let (_, app) = workspace("ci_owned_hollow");
+    let pipeline = "\
+on: push
+env:
+  EMPTY: v1
+  TILDE: v1
+  LIST: v1
+  MAP: v1
+  NESTED: v1
+  STEP: v1
+  FAR: v1
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      EMPTY:
+      TILDE: ~
+      LIST: []
+      MAP: {}
+      NESTED: [{a: }, []]
+      STEP: v2
+    steps:
+      - uses: other-org/upload@v1
+        env:
+          STEP:
+        with:
+          empty: s3://cache-${{ env.EMPTY }}/x
+          tilde: s3://cache-${{ env.TILDE }}/x
+          list: s3://cache-${{ env.LIST }}/x
+          map: s3://cache-${{ env.MAP }}/x
+          nested: s3://cache-${{ env.NESTED }}/x
+          step: s3://cache-${{ env.STEP }}/x
+          far: s3://cache-${{ env.FAR }}/x
+";
+    write(&app, DEPLOY, pipeline);
+    let step = format!("{APP}::{DEPLOY}::jobs.deploy.steps[0]");
+    let key = |name: &str| format!("jobs.deploy.steps[0].with.{name}");
+    let mut found = uses(&exported(&app), DEPLOY);
+    found.sort();
+    let hidden = ["empty", "list", "map", "nested", "step", "tilde"];
+    let mut expected: Vec<_> = (hidden.iter())
+        .map(|name| row("resource::s3::cache-*", &step, &key(name)))
+        .collect();
+    expected.push(row("resource::s3::cache-v1", &step, &key("far")));
+    assert_eq!(found, expected);
+}
+
 /// An action's metadata holds no `env` of its own: a composite action reads only the `env` of
 /// its CI steps.
 #[test]

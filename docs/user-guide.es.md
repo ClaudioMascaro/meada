@@ -1180,7 +1180,7 @@ y a `trace`:
 | Canal | `channel::<broker>::<nombre>` | `channel::kafka::orders.created` |
 | Paquete | `package::<ecosistema>::<nombre>` | `package::npm::@example/shared` |
 | Recurso | `resource::<tipo>::<id>` | `resource::postgres::orders` |
-| CI | `ci::<identidad del repositorio>/<ruta>` | `ci::github.com/acme/workflows/.github/workflows/publish.yml` |
+| CI | `ci::<identidad del repositorio>/<ruta del archivo>` para un pipeline, `ci::<identidad del repositorio>[/<carpeta>]` para una action | `ci::github.com/acme/workflows/.github/workflows/publish.yml` |
 
 Los documentos OpenAPI y AsyncAPI no son un tipo aparte: aportan rutas y canales a los tipos de
 arriba (sección 8.3).
@@ -1449,8 +1449,11 @@ motivo iniciado por `<n> providers fit`.
 
 Un **contrato de CI** une un archivo de CI que otros reutilizan con quien lo llama. El proveedor
 es un pipeline reutilizable o una action, y el consumidor es cada job de CI o paso de CI del
-workspace cuyo `uses` lo nombra. La identidad es `ci::<identidad del repositorio>/<ruta>`, sin el
-ref Git: un contrato reúne todas las llamadas a un archivo, sean cuales sean los refs.
+workspace cuyo `uses` lo nombra. La identidad es lo que un `uses` escribe después del repositorio,
+sin el ref Git: `ci::<identidad del repositorio>/<ruta del archivo>` para un pipeline y
+`ci::<identidad del repositorio>/<carpeta>` para una action (solo
+`ci::<identidad del repositorio>` cuando la action está en la raíz), nunca la ruta de su
+`action.yml`. Un contrato reúne todas las llamadas a un archivo, sean cuales sean los refs.
 
 **Qué se lee.** Un archivo `.yml` o `.yaml` directamente en `.github/workflows/` que tenga `jobs`
 es un pipeline, y un `action.yml` o `action.yaml` que tenga `runs` es una action, en cualquier
@@ -1490,20 +1493,28 @@ provides ci::github.com/acme/workflows/.github/workflows/publish.yml
 
 Meada nunca resuelve un ref: `exact` dice que la llamada nombra ese archivo, no que ejecuta la
 versión indexada. Cuando el ref es un id de commit completo distinto del commit indexado, el
-motivo termina en `, ref mismatch`. `trace` con `direction=up` sigue la cadena a través de los
-pipelines reutilizables intermedios y de las actions compuestas, hasta cada job de CI que llama;
-la ruta del archivo, el nodo del archivo (`<repositorio>::<ruta>::.`) y el contrato inician la
-misma cadena.
+motivo termina en `, ref mismatch`. En el modo servidor el commit indexado es el que
+`meada index --workspace` registró, y no registra ninguno para un checkout que no está limpio
+(`git status` lista un archivo, incluso ignorado): el motivo dice entonces
+`@<ref> (indexed commit unknown)` y nunca lleva `ref mismatch`. `trace` con `direction=up` sigue
+la cadena a través de los pipelines reutilizables intermedios y de las actions compuestas, hasta
+cada job de CI que llama; la ruta del archivo, el nodo del archivo
+(`<repositorio>::<ruta del archivo>::.`) y el contrato inician la misma cadena.
 
 **Huérfanos y la marca de ausente.** `meada status` lista como huérfano el pipeline reutilizable
 o la action que nada llama, solo cuando el alcance visible tiene al menos un proveedor y un
-consumidor del contrato de CI: un repositorio de actions indexado solo no imprime huérfanos. Una
-llamada cuyo repositorio está en el workspace y cuya ruta no nombra proveedor allí lleva la marca
-` (absent at the indexed commit)` en el lado del consumidor, y `"absent": true` en
-`meada export`. Ausente no es roto: el archivo puede existir en el ref que la llamada nombra.
+consumidor de un contrato de CI: un repositorio de actions indexado solo no imprime huérfanos.
+Una llamada cuyo repositorio está en el workspace y cuyo archivo o carpeta no está allí lleva la
+marca ` (absent at the indexed commit)` en el lado del consumidor, y `"absent": true` en
+`meada export`. Un archivo de pipeline que está allí sin `on.workflow_call` la lleva con su
+motivo: ` (absent at the indexed commit: the file is no reusable pipeline there)`. Ausente no es
+roto: el archivo puede existir en el ref que la llamada nombra. Una llamada a una carpeta que
+tiene un `Dockerfile` y ningún archivo de action, y un `uses` en ninguna de las formas de arriba
+(un pipeline en una subcarpeta de `.github/workflows/`), no tienen lado y, por tanto, tampoco
+marca.
 
 **Otros sistemas de CI.** Meada lee GitHub Actions. Para un sistema que no lee (GitLab CI,
-Jenkins, Azure Pipelines), declara el vínculo a mano con `[[resource]]` y `via` en la clave que
+Jenkins, Azure Pipelines), declare el vínculo a mano con `[[resource]]` y `via` en la clave que
 hace la llamada (sección 4):
 
 ```toml
@@ -1526,8 +1537,9 @@ via = [".gitlab-ci.yml#include[0].file"]
 
 El enlace es `declared`, con un lado por clave, sin ref Git y sin cadena: un `trace` desde el
 pipeline se detiene en sus llamadores directos, y un llamador que nadie declaró queda invisible.
-La misma declaración sobre una clave de un pipeline de GitHub Actions sigue valiendo, junto al
-contrato de CI.
+Donde el archivo no tiene clave que nombrar (un `Jenkinsfile`), omita `via`: el lado es el
+repositorio. La misma declaración sobre una clave de un pipeline de GitHub Actions sigue
+valiendo, junto al contrato de CI.
 
 ## 9. Lenguajes
 

@@ -67,8 +67,13 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     // (ADR 0028), each with the addresses of its CI jobs and CI steps and whether it is a
     // pipeline.
     let mut owned = HashMap::<String, (Vec<String>, bool)>::new();
+    // The `env` keys of a CI job or a CI step that hold no config value and define their name.
+    let mut others = Vec::new();
     for node in super::nodes(db)? {
         if super::actions::owns(&node) {
+            let hollow = node.actions.iter().flat_map(|facts| &facts.hollow);
+            let keys = hollow.map(|name| format!("{}.env.{name}", node.address));
+            others.extend(keys.map(|key| (node.path.clone(), key)));
             let (nodes, pipeline) = owned.entry(node.path).or_default();
             if node.address == "." {
                 *pipeline = node.ty != super::actions::ACTION;
@@ -101,14 +106,13 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     let rows = rows.collect::<rusqlite::Result<Vec<_>>>()?;
     // What a `${{ env.X }}` of an owned file reads: each key of that file, with its value when
     // it is a literal string. A key that holds anything else still defines its name.
-    let mut others = Vec::new();
     if !owned.is_empty() {
         let mut query = db.prepare(
             "SELECT path, key FROM config_values \
              WHERE type != 'string' OR value IS NULL OR cut != 0",
         )?;
         let keys = query.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
-        others = keys.collect::<rusqlite::Result<Vec<(String, String)>>>()?;
+        others.extend(keys.collect::<rusqlite::Result<Vec<(String, String)>>>()?);
     }
     let mut entries = HashMap::<&str, BTreeMap<&str, Option<&str>>>::new();
     for (path, key, value, _) in rows.iter().filter(|row| owned.contains_key(&row.0)) {

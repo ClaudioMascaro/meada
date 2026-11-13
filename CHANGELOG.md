@@ -55,11 +55,12 @@ All notable changes to Meada are recorded here. The format follows
 - The console and server mode show the CI kind as the CLI and stdio do. The console's graph
   gains the view "CI links": the CI contracts with their sides and the link of each call, with
   the Git ref in its reason and the absent mark, and a legend in the console's languages; its
-  query page takes the kind `ci`. Over HTTP, `meada mcp --listen` answers every flow of the kind
-  as stdio does, and the sides follow the manifest, the grant, the generation and the named
-  workspace: one that does not hold the provider's repository shows no link to it and no
-  consumer of it. The Meada skill and the user guide teach the kind. Release level: minor,
-  meada (#829).
+  playground takes the kind `ci`. `context` on a CI node lists its sides above its values. Over
+  HTTP, `meada mcp --listen` answers every flow of the kind as stdio does, but for a provider
+  whose checkout was not clean when indexed (`indexed commit unknown`, never `ref mismatch`),
+  and the sides follow the manifest, the grant, the generation and the named workspace: one
+  without the provider's repository shows no link to it and no consumer of it. The Meada skill
+  and the user guide teach the kind. Release level: minor, meada (#829).
 
 ### Changed
 

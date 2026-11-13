@@ -33,14 +33,19 @@
   the file's `ROOT_STORED_MAX`; a `secrets` that is neither a mapping nor the word `inherit` gives
   none. The indexed commit is the checkout's `HEAD` even when the checkout is dirty, read with
   one `git` call per repository that holds a reusable pipeline on each query; a provider whose
-  repository records no commit (none made yet, a server-mode index without its recorded commit)
-  reads `@<ref> (indexed commit unknown)`, with no flag. A `uses` that holds a
+  repository records no commit reads `@<ref> (indexed commit unknown)`, with no flag: none made
+  yet, or a server-mode index, whose commit `meada index --workspace` records only for a clean
+  checkout (#512: `git status` lists nothing, not even an ignored file such as a `.meada/` left
+  there), so over such a checkout MCP over HTTP differs from stdio in the reason and flags no
+  `ref mismatch`, and `index --workspace` says nothing of it. A `uses` that holds a
   control character names no pipeline, and a key of `with` or `secrets` that holds one is left
   out: GitHub takes neither, and each would break a line of `context`. On that line a key named
   `inherit` reads like the word, and a key that holds `, ` or `; ` like several; `meada export`
-  tells them apart. The side lines close `context` on a pipeline, after its values, so a
-  pipeline of many CI steps shows them only under a larger `budget`. A `uses` with two `@` has
-  the ref after the first. `trace` (#825) follows a CI call only between CI nodes of the
+  tells them apart. On a CI node the side lines of every kind come above its values, the last block of
+  `context`, so the `budget` cuts the values first; on any other IaC node they close the answer,
+  as before. A path and address that two repositories of the workspace hold fit two IaC nodes,
+  even asked at the endpoint of one of them: the answer asks to pick one by its identity. A
+  `uses` with two `@` has the ref after the first. `trace` (#825) follows a CI call only between CI nodes of the
   workspace and adds no cap for GitHub's ten levels of nesting: a chain ends at a cycle mark or
   at the budget, and the walk from an IaC node has no depth limit of its own. It reads the
   whole chain before the budget cuts the answer, so a chain of thousands of pipelines costs

@@ -6,6 +6,11 @@ overridable: none
 references:
 github.com/acme/workflows .github/workflows/publish.yml:15 jobs.publish
 referenced by: none
+provides ci::github.com/acme/workflows/.github/workflows/publish.yml
+  consumer: github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish [exact: @main (indexed 2344e45)] with: package, registry; secrets: inherit
+  consumer: github.com/acme/app-b .github/workflows/ci.yml:11 jobs["publish-prd"] [exact: @v1 (indexed 2344e45)] with: package; secrets: token
+  consumer: github.com/acme/app-b .github/workflows/ci.yml:18 jobs["publish-stg"] [exact: @main (indexed 2344e45)] with: package
+  consumer: github.com/acme/wrapper .github/workflows/release.yml:5 jobs.release [exact: @main (indexed 2344e45)] with: package; secrets: inherit
 values:
 github.com/acme/workflows .github/workflows/publish.yml:1 name = "Publish"
 github.com/acme/workflows .github/workflows/publish.yml:6 on.workflow_call.inputs.package.required = true
@@ -16,11 +21,6 @@ github.com/acme/workflows .github/workflows/publish.yml:13 permissions.contents 
 github.com/acme/workflows .github/workflows/publish.yml:16 jobs.publish["runs-on"] = "ubuntu-latest"
 github.com/acme/workflows .github/workflows/publish.yml:18 jobs.publish.steps[0].uses = "actions/checkout@v4"
 github.com/acme/workflows .github/workflows/publish.yml:19 jobs.publish.steps[1].run = "echo publish ${{ inputs.package }}"
-provides ci::github.com/acme/workflows/.github/workflows/publish.yml
-  consumer: github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish [exact: @main (indexed 2344e45)] with: package, registry; secrets: inherit
-  consumer: github.com/acme/app-b .github/workflows/ci.yml:11 jobs["publish-prd"] [exact: @v1 (indexed 2344e45)] with: package; secrets: token
-  consumer: github.com/acme/app-b .github/workflows/ci.yml:18 jobs["publish-stg"] [exact: @main (indexed 2344e45)] with: package
-  consumer: github.com/acme/wrapper .github/workflows/release.yml:5 jobs.release [exact: @main (indexed 2344e45)] with: package; secrets: inherit
 
 github.com/acme/app-a .github/workflows/ci.yml:12-21 jobs.publish
 type: job
@@ -31,6 +31,8 @@ references:
 github.com/acme/app-a .github/workflows/ci.yml:4 jobs.build via needs
 referenced by:
 github.com/acme/app-a .github/workflows/ci.yml:1 .
+consumes ci::github.com/acme/workflows/.github/workflows/publish.yml @main with: package, registry; secrets: inherit
+  provider: github.com/acme/workflows .github/workflows/publish.yml:1 . [exact: @main (indexed 2344e45)]
 values:
 github.com/acme/app-a .github/workflows/ci.yml:13 jobs.publish.needs = "build"
 github.com/acme/app-a .github/workflows/ci.yml:15 jobs.publish.permissions["id-token"] = "write"
@@ -39,8 +41,6 @@ github.com/acme/app-a .github/workflows/ci.yml:17 jobs.publish.uses = "acme/work
 github.com/acme/app-a .github/workflows/ci.yml:19 jobs.publish.with.package = "app-a"
 github.com/acme/app-a .github/workflows/ci.yml:20 jobs.publish.with.registry = "internal"
 github.com/acme/app-a .github/workflows/ci.yml:21 jobs.publish.secrets = "inherit"
-consumes ci::github.com/acme/workflows/.github/workflows/publish.yml @main with: package, registry; secrets: inherit
-  provider: github.com/acme/workflows .github/workflows/publish.yml:1 . [exact: @main (indexed 2344e45)]
 
 ci::github.com/acme/workflows/.github/workflows/publish.yml
   github.com/acme/workflows provider .github/workflows/publish.yml:1 .

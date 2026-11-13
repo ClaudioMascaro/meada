@@ -1163,7 +1163,7 @@ Every contract identity starts with its kind, and that identity is what you pass
 | Channel | `channel::<broker>::<name>` | `channel::kafka::orders.created` |
 | Package | `package::<ecosystem>::<name>` | `package::npm::@example/shared` |
 | Resource | `resource::<kind>::<id>` | `resource::postgres::orders` |
-| CI | `ci::<repository identity>/<path>` | `ci::github.com/acme/workflows/.github/workflows/publish.yml` |
+| CI | `ci::<repository identity>/<file path>` for a pipeline, `ci::<repository identity>[/<folder>]` for an action | `ci::github.com/acme/workflows/.github/workflows/publish.yml` |
 
 OpenAPI and AsyncAPI documents are not a separate kind: they give routes and channels to the kinds
 above (section 8.3).
@@ -1423,8 +1423,10 @@ reason starting with `<n> providers fit`.
 
 A **CI contract** links a CI file that others reuse to whoever calls it. The provider is a
 reusable pipeline or an action, and the consumer is each CI job or CI step of the workspace whose
-`uses` names it. The identity is `ci::<repository identity>/<path>`, without the Git ref: one
-contract gathers every call to a file, whatever the refs.
+`uses` names it. The identity is what a `uses` writes after the repository, without the Git ref:
+`ci::<repository identity>/<file path>` for a pipeline and `ci::<repository identity>/<folder>`
+for an action (`ci::<repository identity>` alone when the action is at the root), never the path
+of its `action.yml`. One contract gathers every call to a file, whatever the refs.
 
 **What is read.** A `.yml` or `.yaml` file directly under `.github/workflows/` that holds `jobs`
 is a pipeline, and an `action.yml` or `action.yaml` that holds `runs` is an action, in any
@@ -1463,16 +1465,23 @@ provides ci::github.com/acme/workflows/.github/workflows/publish.yml
 
 Meada never resolves a ref: `exact` says the call names that file, not that it runs the indexed
 version. When the ref is a full commit id other than the indexed commit, the reason ends with
-`, ref mismatch`. `trace` with `direction=up` follows the chain through intermediate reusable
-pipelines and composite actions, up to every calling CI job; the file's path, the file's node
-(`<repository>::<path>::.`) and the contract start the same chain.
+`, ref mismatch`. In server mode the indexed commit is the one `meada index --workspace` recorded,
+and it records none for a checkout that is not clean (`git status` lists a file, even an ignored
+one): the reason then reads `@<ref> (indexed commit unknown)` and never carries `ref mismatch`.
+`trace` with `direction=up` follows the chain through intermediate reusable pipelines and
+composite actions, up to every calling CI job; the file's path, the file's node
+(`<repository>::<file path>::.`) and the contract start the same chain.
 
 **Orphans and the absent mark.** `meada status` lists a reusable pipeline or an action that
 nothing calls as an orphan, only when the visible scope holds at least one provider and one
-consumer of the CI contract: a repository of actions indexed alone prints no orphan. A call whose
-repository is in the workspace and whose path names no provider there carries the mark
+consumer of a CI contract: a repository of actions indexed alone prints no orphan. A call whose
+repository is in the workspace and whose file or folder is not there carries the mark
 ` (absent at the indexed commit)` on the consumer's side, and `"absent": true` in `meada export`.
-Absent is not broken: the file may exist at the ref the call names.
+A pipeline file that is there without `on.workflow_call` carries it with its reason:
+` (absent at the indexed commit: the file is no reusable pipeline there)`. Absent is not broken:
+the file may exist at the ref the call names. A call to a folder that holds a `Dockerfile` and no
+action file, and a `uses` in none of the forms above (a pipeline in a subfolder of
+`.github/workflows/`), hold no side and so no mark.
 
 **Other CI systems.** Meada reads GitHub Actions. For a system it does not read (GitLab CI,
 Jenkins, Azure Pipelines), declare the link by hand with `[[resource]]` and `via` on the key
@@ -1497,7 +1506,8 @@ via = [".gitlab-ci.yml#include[0].file"]
 ```
 
 The link is `declared`, with one side per key, no Git ref and no chain: a `trace` from the
-pipeline stops at its direct callers, and a caller nobody declared stays invisible. The same
+pipeline stops at its direct callers, and a caller nobody declared stays invisible. Where the
+file has no key to name (a `Jenkinsfile`), leave `via` out: the side is the repository. The same
 declaration on a key of a GitHub Actions pipeline still holds, beside the CI contract.
 
 ## 9. Languages

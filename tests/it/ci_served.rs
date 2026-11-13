@@ -111,10 +111,11 @@ fn flows() -> Vec<(&'static str, &'static str, Value)> {
         (WORKFLOWS, "trace", up(&node)),
         (WORKFLOWS, "trace", up(CONTRACT)),
         (APP_A, down.0, down.1),
+        // By its identity: the wrapper holds a CI job at the same path and address.
         (
             APP_C,
             "trace",
-            json!({"from": ".github/workflows/release.yml::jobs.release"}),
+            json!({"from": format!("{APP_C}::.github/workflows/release.yml::jobs.release")}),
         ),
         // The absent mark and an unresolved CI step with its cause.
         (
@@ -147,10 +148,11 @@ async fn mcp_over_http_answers_every_flow_of_the_kind_as_stdio_does() {
             text(&over_stdio),
             "{identity} {tool} {arguments}"
         );
-        // No flow is compared empty.
+        // No flow is compared empty, or as a request to pick a node.
+        let answer = text(&over_http);
         assert!(
-            text(&over_http).contains("acme/"),
-            "{identity} {tool} {arguments}"
+            answer.contains("acme/") && !answer.contains("pass one of"),
+            "{identity} {tool} {arguments}: {answer}"
         );
     }
 }

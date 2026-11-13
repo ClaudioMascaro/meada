@@ -189,8 +189,8 @@ fn cloudformation_long(name: &str, reference: &str, between: &str) -> usize {
     ))
 }
 
-/// The bytes of the addresses, names, selectors, passed keys and references the CI nodes of
-/// `text`, a lone pipeline (#823), store.
+/// The bytes of the addresses, names, selectors, passed and hollow keys and references the CI
+/// nodes of `text`, a lone pipeline (#823), store.
 fn pipeline(text: String) -> usize {
     let (nodes, references) =
         crate::iac::actions::evaluate(".github/workflows/ci.yml", &file(text));
@@ -200,7 +200,8 @@ fn pipeline(text: String) -> usize {
                 Some(meada_core::export::Secrets::Keys(keys)) => keys.as_slice(),
                 _ => &[],
             };
-            let keys = f.with.iter().chain(secrets).map(String::len).sum::<usize>();
+            let keys = f.with.iter().chain(secrets).chain(&f.hollow);
+            let keys = keys.map(String::len).sum::<usize>();
             f.id.as_ref().map_or(0, String::len) + f.uses.as_ref().map_or(0, String::len) + keys
         });
         n.address.len() + n.name.as_ref().map_or(0, String::len) + facts
