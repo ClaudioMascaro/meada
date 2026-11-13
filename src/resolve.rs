@@ -5204,6 +5204,20 @@ impl<'a> Code<'a> {
         done
     }
 
+    /// What the work `Code::apart` runs has spent of `file`'s budget.
+    pub(crate) fn spent_apart(&self, file: &'a str) -> usize {
+        self.folded_apart
+            .borrow()
+            .get(file)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// Sets what the work `Code::apart` runs has spent of `file`'s budget.
+    pub(crate) fn set_spent_apart(&self, file: &'a str, spent: usize) {
+        self.folded_apart.borrow_mut().insert(file, spent);
+    }
+
     /// The language pack whose files these are.
     pub fn pack(&self) -> &'static dyn LanguagePack {
         self.pack

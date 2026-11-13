@@ -27,7 +27,10 @@
   constants and the ones C#'s `bound` keeps); a parameter, a field and a package variable are
   never followed. The rows of a transaction run inside `Code::apart` and trace their clients
   with an `Origins` of their own, so what they fold is charged to a second per-file budget and
-  the other calls of the file keep theirs. A Java builder held in a local or
+  the other calls of the file keep theirs. Each row of one call starts from what the call found
+  spent (`Code::spent_apart`, `set_spent_apart`) and the call is charged the sum of its rows, so
+  what the writer row spent does not cut the reader row short; once a row runs out of the budget,
+  the call's later rows are not read (#784). A Java builder held in a local or
   a `final` field that a call outside the request's call sets again (a step setting a member of
   the name's path, before or after the request, anywhere in a chain off the builder or off a
   local holding it: `b.message(..).topicArn(..)`, `var e = b.message(..); e.topicArn(..)`,
@@ -121,6 +124,9 @@ SSM hierarchy queries stay unresolved instead of naming the path as a parameter;
 transaction condition checks are readers. Java, Go and .NET read transactions (#719) through
 one `Service` row per direction of a method: `TransactItems[].Put|Update|Delete.TableName`
 writes, `TransactItems[].ConditionCheck.TableName` and `TransactItems[].Get.TableName` read.
+A value held in a name on a path of entries (`TransactItems[]..`, `Entries[]..`) is followed only
+when its function mentions the name twice (`held_changed` in Go and C#, `Walk::lists` in Java,
+where a method's name is no mention, #773).
 `A|B` before a field's last member names the variants an element may set; `request` skips a
 whole element that sets none of them (a Java chain from `TransactWriteItem.builder()`, a Go or
 C# literal), and one it cannot see whole keeps an unresolved side. Computed object keys are

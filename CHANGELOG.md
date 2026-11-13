@@ -104,6 +104,19 @@ All notable changes to Meada are recorded here. The format follows
   `search` on the item's line (#801).
 - An `ambiguous-link` decision written for such a call goes stale; a `dynamic-url` decision that
   names one of its candidates applies (#801).
+- A list of EventBridge entries held in a name and changed in place before `PutEvents` (an
+  element replaced, the list cleared and filled again, a helper that replaces an element, and in
+  Go and C# an element replaced through the request) no longer names its first bus at `exact` in
+  Java, Go and C#: the rule DynamoDB transactions follow, a value held in a name is followed only
+  when its function mentions the name twice, holds on every path of entries, so a list mentioned
+  a third time (logged) has no bus either. A Java method's name is no mention of a local of the
+  same name (`.entries(entries)`, `.transactItems(transactItems)`, `.put(put.build())`), so such
+  a list or builder made and passed straight keeps its bus, or now its tables (#773).
+- In a file of more DynamoDB transaction calls than the evaluation budget covers, the call where
+  the budget ends no longer gets an unresolved reader beside the writer of its write entries,
+  and names its `ConditionCheck` entries when its writer row was read whole. Each row of a call
+  reads the request on the budget the call started with, and the rows after one the budget cuts
+  are not read (#784).
 
 ## [1.3.0] - 2026-11-11
 

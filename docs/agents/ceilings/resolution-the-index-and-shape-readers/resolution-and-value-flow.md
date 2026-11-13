@@ -89,30 +89,35 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   file keep their sides whatever the transactions spend. About 1,700 to 2,200 transaction
   calls in one file spend it (with each value held in a name, the first 1,725 calls are named
   in Java, 1,928 in Go, 2,185 in C#; a hundred calls of 25 inline entries each do not): the
-  transaction calls after that have no side, and the one where it ends may carry an unresolved
-  reader though it has no `ConditionCheck` (#719). A Java builder held in a `final` field is read in its own
+  transaction calls after that have no side. At the one where it ends, each row of the call reads
+  the request on the budget the call started with, and the call spends what its rows spend
+  together, so a call of write entries keeps its writer and gets no reader, and a call of `Put`
+  and `ConditionCheck` entries names both (#784). Where the budget ends inside a row, the call's
+  later rows are not read, as the calls after it are not: a call whose writer row it cuts has a
+  writer, named or unresolved, and no reader, a `ConditionCheck` included. A Java builder held in a `final` field is read in its own
   file, and a call on its name from another Java file leaves it unresolved; one handed to a call
   or aliased there, or reached by reflection from there, is not seen, and the field keeps its
   first name. A request type is the SDK's unless a type of its directory, an import or a
   variable says otherwise: one of the same package in another source root is not seen (#719).
-  A request, a list, an item or an entry on a DynamoDB transaction's path held in a name is
-  followed only when the function that declares the name mentions it twice. In Go and C#, one
-  mentioned a third time (logged, read by two requests), one held in a parameter, a field or a
-  package variable, the first name the path meets when any file of the repository assigns
-  the field read through it (`q.TableName = ..` on any variable of any type, in any package or
-  class; a write of another field does not count), and a C# request filled by
-  property assignments have no table; nor have Go locals declared together (`p, q := ..`), a
-  Go entry declared in a loop body and a Go request held by value and passed by address. In
-  Java the rule covers a list or an array: one mentioned a third time or held in a field has
-  no table (a `List.of` list cannot change and keeps its tables), and neither has a
-  `new T[]{..}` array or a `new ArrayList<>(..)` copy mentioned twice. A Java local named as a
-  method its function calls is mentioned there too, so a list `transactItems` passed to
-  `transactItems(..)` and a builder `put` built in `.put(put.build())` have no table. A Java
-  list, array or single entry that is the one argument of `transactItems(..)` and comes in a
-  parameter has no mentions to count and no table, one a wrapper only passes on included
-  (`write(List.of(..))`, #772); two entries passed as two arguments, and a table name in a
-  parameter, keep their tables. Outside transactions a list of entries held in a name is not judged in Java, Go
-  or C#: an EventBridge entries list with an element replaced keeps its first bus (#719).
+  A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB
+  transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that
+  declares the name mentions it twice. In Go and C#, one mentioned a third time (logged, read by two
+  requests), one held in a parameter, a field or a package variable, the first name the path meets
+  when any file of the repository assigns the field read through it (`q.TableName = ..` on any
+  variable of any type, in any package or class; a write of another field does not count), and a C#
+  request filled by property assignments have no table or bus; nor have Go locals declared together (`p, q
+  := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.
+  In Java the rule covers a list or an array: one mentioned a third time or held in a field has no
+  table or bus (a `List.of` list cannot change and keeps them), and neither has a `new T[]{..}` array
+  or a `new ArrayList<>(..)` copy mentioned twice. A method's name is no mention in Java: a list
+  `entries` passed to `.entries(entries)`, a list `transactItems` passed to
+  `.transactItems(transactItems)` and a builder `put` in `.put(put.build())` are each mentioned once
+  there (#773). A Java list, array or
+  single entry that is the one argument of the step that sets the list (`transactItems(..)`,
+  `entries(..)`) and comes in a parameter has no mentions to count and no table, one a wrapper only
+  passes on included (`write(List.of(..))`, #772); two entries passed as two arguments, and a table
+  name in a parameter, keep their tables. A path with no list of entries (a list of names: SSM
+  `Names[]`, Secrets Manager `SecretIdList[]`) keeps the rule it had.
   `EVAL_DEPTH` (256): a value
   folded deeper than that, through the items of lists and objects, the constants it names and
   the arguments callers pass, is unknown, and a value traced through more constants,
