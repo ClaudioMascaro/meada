@@ -40,7 +40,7 @@ fn routes(export: &Value) -> Vec<&str> {
 }
 
 #[test]
-fn routes_a_test_registers_are_no_providers_and_the_calls_link_to_the_real_server() {
+fn routes_a_test_registers_are_no_providers_and_the_calls_reach_only_the_real_server() {
     let (web, api) = pair("test_routes_default");
 
     let (web_export, api_export) = (export(&web), export(&api));
@@ -51,7 +51,7 @@ fn routes_a_test_registers_are_no_providers_and_the_calls_link_to_the_real_serve
         ["example.com/test-routes/api::main.go::main.GET /orders"]
     );
     let links = web_export["links"].as_array().unwrap();
-    assert_eq!(links.len(), 2);
+    assert_eq!(links.len(), 1);
     for link in links {
         assert_eq!(
             link["provider"],
@@ -65,6 +65,16 @@ fn routes_a_test_registers_are_no_providers_and_the_calls_link_to_the_real_serve
                 .contains("the only repository serving it")
         );
     }
+    // The Go client joins a base only its test sets (`c.base`) with the path: an open item whose
+    // one candidate is the real server, never the test's fake upstream (#801).
+    let items = Engine::open(&web).unwrap().open_items().unwrap();
+    let candidates: Vec<&str> = (items.iter())
+        .flat_map(|i| i.candidates.iter().map(|c| c.site.as_str()))
+        .collect();
+    assert_eq!(
+        candidates,
+        ["example.com/test-routes/api::main.go::main.GET /orders"]
+    );
     // No entry point or process of a route a test registers either.
     let entries = |e: &Value| -> Vec<String> {
         let processes = e["processes"].as_array().into_iter().flatten();
