@@ -12,6 +12,10 @@
 //! that may not run (an `if`, a lambda inside the block) or a method that is no `HttpMethod`
 //! member is an unknown method, and the consumer is unresolved. A `defaultRequest { url(base)
 //! }` in the configuration of the client the call comes from is the base of its relative URLs.
+//! Over a base Meada did not read (a `defaultRequest` that is no string, a client only its type
+//! names), a path from the root is the path alone, as Ktor's `defaultRequest` replaces the base's
+//! path with it, and a relative one leaves the consumer an open item that names the client's base
+//! (#801).
 //! A client wrapper is read at each of its call sites (`Code::expand`, through any number of
 //! levels), the URL and the method it takes from its parameters substituted there. A base
 //! Spring injects with `@Value("\${key}")` into a property or a constructor property is read
@@ -118,14 +122,13 @@ impl<'c, 'a> Clients<'c, 'a> {
     }
 
     /// The base URL `clients` share, `None` when none is set. A hole when they differ or one is
-    /// not known.
+    /// not known, as for a client only its type names: its `defaultRequest`, if any, was not read.
     fn base(&self, clients: &[Client<'a>]) -> Option<Vec<Part>> {
         let mut bases: Vec<Option<Vec<Part>>> = Vec::new();
         for client in clients {
             let base = match client {
                 Client::Made(path, index) => self.configured(path, *index),
-                Client::Typed => None,
-                Client::Unknown => Some(crate::http::client_base()),
+                Client::Typed | Client::Unknown => Some(crate::http::client_base()),
             };
             if !bases.contains(&base) {
                 bases.push(base);
@@ -260,7 +263,12 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
                     REQUEST_FUNCTION => requested(kwargs, given),
                     verb => text(verb.to_uppercase()),
                 };
-                fetches(&[based(base.as_deref(), &url), method])
+                // A path from the root replaces the path of a base Meada did not read (#801).
+                let url = match base.as_deref() {
+                    Some(base) if crate::http::rooted_over_unread(base, &url) => url,
+                    base => based(base, &url),
+                };
+                fetches(&[url, method])
             };
             for Expanded {
                 site: (site, at),
@@ -320,22 +328,25 @@ mod tests {
         f(&code, &indexed)
     }
 
-    /// A path the reader joins after a base Meada did not read (#801): a `defaultRequest` base
-    /// that is no string leaves the consumer an open item that names the client's base, and a
-    /// template that starts with a call's return value names the callee.
+    /// A path the reader joins after a base Meada did not read (#801): over a `defaultRequest`
+    /// base that is no string, or a client only its type names, a relative path leaves the
+    /// consumer an open item that names the client's base, and a path from the root is the path
+    /// alone, as Ktor replaces the base's path with it; a template that starts with a call's
+    /// return value names the callee.
     #[test]
     fn a_path_after_a_base_meada_did_not_read_is_an_open_item_that_names_it() {
         let body = "import io.ktor.client.plugins.defaultRequest\n\
-            fun base(): String = System.getenv(\"API_URL\") + \"/v2\"\n\
+            fun base(): String = System.getenv(\"API_URL\") + \"/v2/\"\n\
             val client = HttpClient(CIO) { defaultRequest { url(base()) } }\n\
-            suspend fun f() {\n    client.get(\"/orders\")\n    \
+            suspend fun f(typed: HttpClient) {\n    client.get(\"orders\")\n    \
+            client.get(\"/health\")\n    typed.get(\"v1/items\")\n    typed.get(\"/ping\")\n    \
             HttpClient(CIO).get(\"${base()}/items\")\n}\n";
         let mut found: Vec<_> = with_code(body, |code, indexed| {
             (consumers(code, indexed).into_iter())
                 .map(|f| (f.contract, f.lead))
                 .collect()
         });
-        found.sort_by_key(|(_, lead)| lead.as_ref().map(|l| l.path.clone()));
+        found.sort_by_key(|(contract, lead)| (contract.clone(), lead.clone().map(|l| l.path)));
         let lead = |limit: Limit, path: &str| {
             Some(Lead {
                 limit,
@@ -347,6 +358,9 @@ mod tests {
             [
                 (None, lead(Limit::Returned("base".into()), "/items")),
                 (None, lead(Limit::ClientBase, "/orders")),
+                (None, lead(Limit::ClientBase, "/v1/items")),
+                (Some("http::GET::/health".into()), None),
+                (Some("http::GET::/ping".into()), None),
             ]
         );
     }

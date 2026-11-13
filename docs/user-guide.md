@@ -1223,12 +1223,13 @@ Como a ligação é escolhida, conforme o que a URL mostra:
    `[serve] hosts`. O elo é `exact`. Se nenhum repositório serve esse host, não há elo.
 2. **Variável de ambiente.** A URL começa por uma leitura de ambiente (`API_URL`) que um par
    declara em `base_url_env`. O elo é `inferred`; o valor no ambiente do processo nunca é lido.
-3. **Host desconhecido.** A URL não diz de onde vem, mas o caminho é certo: ela é escrita sem
-   base (`fetch('/orders')`), ou a biblioteca a junta à base de modo que um caminho a partir da
-   raiz troca o caminho da base (`new URL('/orders', base)` em TypeScript, uma URI de requisição
-   a partir da raiz num `HttpClient` de C#, uma rota de Retrofit a partir da raiz). Quando só um
-   repositório do workspace serve esse método e esse caminho, o elo é `inferred`, com o motivo
-   `the only repository serving it is`.
+3. **Host desconhecido.** A URL não diz de onde vem, mas o caminho é certo: ela é escrita sem base
+   (`fetch('/orders')`), ou a biblioteca a junta à base de modo que um caminho a partir da raiz
+   troca o caminho da base (`new URL('/orders', base)` em TypeScript, uma URI de requisição a partir
+   da raiz num `HttpClient` de C#, uma rota de Retrofit a partir da raiz, uma requisição a partir da
+   raiz num cliente Ktor com `defaultRequest` ou numa sessão aiohttp, `URL(string:relativeTo:)` em
+   Swift). Quando só um repositório do workspace serve esse método e esse caminho, o elo é
+   `inferred`, com o motivo `the only repository serving it is`.
 4. **Vários provedores.** O elo é `ambiguous`, e o Meada lista todos os candidatos, um elo por
    candidato. É um item aberto que `meada decide` resolve.
 

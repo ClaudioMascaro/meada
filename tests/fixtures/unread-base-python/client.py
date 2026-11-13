@@ -1,3 +1,4 @@
+import aiohttp
 import httpx
 import requests
 
@@ -12,3 +13,9 @@ def via_client():
 
 def via_call():
     return requests.get(load_base() + "/items")
+
+
+async def via_session():
+    async with aiohttp.ClientSession(base_url=BASE) as session:
+        await session.get("/orders")
+        await session.get("items")

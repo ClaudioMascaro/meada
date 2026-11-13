@@ -531,11 +531,7 @@ fn injected<'a>(
 /// `/v1/orders`). Over a base whose origin Meada could not read, a path from the root is the
 /// path alone (#801).
 fn based_on(base: Vec<Part>, url: Value) -> Value {
-    let rooted = |p: &[Part]| matches!(p.first(), Some(Part::Text(t)) if t.starts_with('/') && !t.starts_with("//"));
-    if let Value::Str(parts) = &url
-        && rooted(parts)
-        && crate::http::unknown_origin(&base)
-    {
+    if crate::http::rooted_over_unread(&base, &url) {
         return url;
     }
     // A base read from configuration (`Part::EnvOr`) joins on the literal it defaults to.

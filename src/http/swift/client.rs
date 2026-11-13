@@ -10,7 +10,8 @@
 //! depends on its parameters, makes each of its call sites a consumer with its arguments
 //! substituted, through any number of levels. The URL folds like any value (`lang/swift/values.rs`:
 //! literals, interpolation, `+`, `let` and `static let` constants), through `URL(string:)`,
-//! `URL(string:relativeTo:)` (resolved as RFC 3986 does) and `appendingPathComponent`. A request
+//! `URL(string:relativeTo:)` (resolved as RFC 3986 does: over a base Meada did not read, a path
+//! from the root is the path alone, #801) and `appendingPathComponent`. A request
 //! is `URLRequest(url:)` or `HTTPClientRequest(url:)`, its method the one the pack records for
 //! the statement that assigns it (`httpMethod = ..`, `method = ..`, `Facts::bound`), `GET` when
 //! none does; an assignment that may not run, or a second one, leaves the method unknown, and
@@ -287,7 +288,14 @@ impl Reads<'_, '_> {
             return match keyword(call, "relativeTo") {
                 None => Some(parts),
                 Some(base) => {
-                    let base = text_parts(&self.url(base))?;
+                    let base = text_parts(&self.url(base));
+                    // A path from the root replaces the path of a base Meada did not read (#801).
+                    let unread = crate::http::client_base();
+                    let read = base.as_deref().unwrap_or(&unread);
+                    if crate::http::rooted_over_unread(read, &Value::Str(parts.clone())) {
+                        return Some(parts);
+                    }
+                    let base = base?;
                     // A parameter on either side is resolved at the wrapper's call sites.
                     resolve(&base, &parts).or_else(|| depends(&base, &parts))
                 }

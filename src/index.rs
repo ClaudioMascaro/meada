@@ -4676,10 +4676,11 @@ mod tests {
         assert_eq!(small.as_deref(), Some(&b"{}"[..]));
     }
 
-    /// What an index stores: `SCHEMA`, then the facts each pack stores for its sample in
-    /// `tests/fixtures/schema/`, then the summary of each provider document and manifest sample,
-    /// then the outcome and rows of the config values sample, then the IaC nodes of the
-    /// kustomization sample.
+    /// What an index stores: `SCHEMA`, then the JSON forms of a receiver identity and of an
+    /// unresolved consumer's lead (`contracts.identity`, `contracts.lead`), then the facts each
+    /// pack stores for its sample in `tests/fixtures/schema/`, then the summary of each provider
+    /// document and manifest sample, then the outcome and rows of the config values sample, then
+    /// the IaC nodes of the kustomization sample.
     /// Its golden is the schema version's source (`schema_version`), so a change fails until
     /// `MEADA_BLESS=1` rewrites the golden, which changes the version.
     #[test]
@@ -4702,6 +4703,20 @@ mod tests {
         actual += &format!(
             "\nreceiver_identity\n{}\n",
             serde_json::to_string_pretty(&identity).unwrap()
+        );
+        let lead = |limit: lang::Limit, path: &str| crate::contract::Lead {
+            limit,
+            path: path.into(),
+        };
+        let leads = [
+            lead(lang::Limit::Returned("c.baseV2".into()), "/orders"),
+            lead(lang::Limit::Parameter("base".into()), "/items/{}"),
+            lead(lang::Limit::ClientBase, "/orders"),
+            lead(lang::Limit::Other, "/"),
+        ];
+        actual += &format!(
+            "\nlead\n{}\n",
+            serde_json::to_string_pretty(&leads).unwrap()
         );
         for pack in lang::packs() {
             let name = format!("sample.{}", pack.extensions()[0]);

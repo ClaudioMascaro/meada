@@ -464,7 +464,7 @@ fn base(create: &Invocation, held: Option<&Value>) -> Vec<Part> {
 /// path of the base; a relative one follows it; an absolute URL stands as it is. Over a base whose
 /// origin Meada could not read, a route from the root is the path alone (#801).
 fn retrofit_url(base: &[Part], route: &str) -> Value {
-    if route.starts_with('/') && crate::http::unknown_origin(base) {
+    if crate::http::rooted_over_unread(base, &text(route)) {
         return text(&join("", route));
     }
     // The text the base starts with, whole: `HOST + "/v1/"` arrives as two parts.

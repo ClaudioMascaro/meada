@@ -294,6 +294,32 @@ fn a_decision_for_a_candidate_of_an_unread_base_applies() {
     );
 }
 
+/// An `ambiguous-link` decision written for such a call goes stale, and the item stays open.
+#[test]
+fn an_ambiguous_link_decision_for_an_unread_base_goes_stale() {
+    let go = unread_base("items_unread_base_stale", "unread-base-go");
+    common::decisions(&go, "unread-base-go-ambiguous");
+    let engine = Engine::open(&go).unwrap();
+
+    assert_eq!(
+        items_of(&engine),
+        [
+            "client.go::Client.ViaMethodPrefix::http.Get#0: GET /api/orders, GET /orders, GET /v2/orders"
+        ]
+    );
+    let (listed, _, ok) = meada(&go, &["decide", "--list"], "", |c| {
+        c.env("LANG", "en_US.UTF-8");
+    });
+    assert!(ok);
+    assert!(
+        listed.contains(
+            "stale decision: example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0 \
+             -> example.com/acme/api::http::GET::/v2/orders (item no longer open)"
+        ),
+        "{listed}"
+    );
+}
+
 /// Each open item as its call and the limit it names.
 fn limits_of(engine: &Engine) -> Vec<String> {
     (engine.open_items().unwrap().iter())
@@ -309,7 +335,9 @@ fn limits_of(engine: &Engine) -> Vec<String> {
 
 /// A Python `httpx` client built with a `base_url` Meada does not read (it comes from another
 /// module), and a URL that starts with a call's return value, are open items that name the
-/// client's base and the callee; neither links to a guessed route.
+/// client's base and the callee; neither links to a guessed route. An aiohttp session joins as
+/// RFC 3986 does: over such a base, a relative path is an open item and a path from the root
+/// keeps the hostless link.
 #[test]
 fn a_python_base_meada_did_not_read_makes_open_items_that_name_it() {
     let python = unread_base("items_unread_base_python", "unread-base-python");
@@ -320,6 +348,7 @@ fn a_python_base_meada_did_not_read_makes_open_items_that_name_it() {
         [
             "client.py::via_call::requests.get#0: GET /api/orders/items, GET /items",
             "client.py::via_client::client.get#0: GET /api/orders, GET /orders, GET /v2/orders",
+            "client.py::via_session::session.get#1: GET /api/orders/items, GET /items",
         ]
     );
     assert_eq!(
@@ -327,13 +356,21 @@ fn a_python_base_meada_did_not_read_makes_open_items_that_name_it() {
         [
             "client.py::via_call::requests.get#0: base from the return value of load_base",
             "client.py::via_client::client.get#0: base of a client Meada did not read",
+            "client.py::via_session::session.get#1: base of a client Meada did not read",
         ]
     );
-    assert_eq!(links_of(&engine), Vec::<String>::new());
+    assert_eq!(
+        links_of(&engine),
+        [
+            "client.py::via_session::session.get#0 -> http::GET::/orders [host unresolved; the only \
+          repository serving it is example.com/acme/api]"
+        ]
+    );
 }
 
 /// Swift: a URL that starts with a call's return value, and a path component appended to a URL
-/// Meada did not read, are open items that name the callee and the client's base.
+/// Meada did not read, are open items that name the callee and the client's base; a path from
+/// the root resolved over such a URL (`URL(string:relativeTo:)`) keeps the hostless link.
 #[test]
 fn a_swift_base_meada_did_not_read_makes_open_items_that_name_it() {
     let swift = unread_base("items_unread_base_swift", "unread-base-swift");
@@ -362,5 +399,11 @@ fn a_swift_base_meada_did_not_read_makes_open_items_that_name_it() {
             ),
         ]
     );
-    assert_eq!(links_of(&engine), Vec::<String>::new());
+    assert_eq!(
+        links_of(&engine),
+        [format!(
+            "{at}::viaRelative()::URLSession.shared.data#0 -> http::GET::/orders [host \
+             unresolved; the only repository serving it is example.com/acme/api]"
+        )]
+    );
 }

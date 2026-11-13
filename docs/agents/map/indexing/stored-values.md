@@ -31,7 +31,10 @@ links and structured inference explanations are transient query values, never st
   passed (`Facts::usings`, set by a join and stamped into the stored facts after it, which
   `meada status` names), whether the grammar misread a Kotlin file (`Facts::misparsed`, which
   `meada status` names), the literal URL path fragments and the
-  method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the SDK operation
+  method of an unresolved consumer (`contracts.fragments`, `contracts.method`), the lead of an
+  unresolved consumer whose URL starts with a part Meada could not read (`contracts.lead`, #801:
+  why it could not, with the callee as written or the parameter's name, and the literal path
+  written after that part), the SDK operation
   of a code use (`contracts.method`, #660) and its unresolved environment variable (`contracts.via`,
   also carried by providers in the export), the field paths
   of the shape the code gives a side and its source file (`contracts.shape`: the fields an HTTP

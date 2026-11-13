@@ -115,7 +115,9 @@
   base that is a wrapper's parameter is resolved at its call sites, and a URL left unknown is an
   unresolved consumer. A path appended to a base Meada did not read (a `+` or an interpolation
   after a call's return value, an `appendingPathComponent` on a URL it did not read) makes an
-  open item that names the limit (#801). UIKit, AppKit, SwiftUI and Cocoa spell Foundation's names (they re-export it). `URLRequest(url:)` takes its method from an `httpMethod`
+  open item that names the limit, and a path from the root that `URL(string:relativeTo:)`
+  resolves over a URL it did not read is the path alone (`rooted_over_unread`, #801); a relative
+  one there stays an unknown URL. UIKit, AppKit, SwiftUI and Cocoa spell Foundation's names (they re-export it). `URLRequest(url:)` takes its method from an `httpMethod`
   assignment, `HTTPClientRequest(url:)` from `method`, Alamofire from `method:`; GET when absent.
   Not read: `dataTask(with:)`, `AF.download` and `AF.upload`, a request mutated through an
   `inout` or an alias, a request with `url` assigned afterwards (unknown URL), a method that is

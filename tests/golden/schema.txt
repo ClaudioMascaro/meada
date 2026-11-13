@@ -105,6 +105,30 @@ receiver_identity
   }
 ]
 
+lead
+[
+  {
+    "limit": {
+      "Returned": "c.baseV2"
+    },
+    "path": "/orders"
+  },
+  {
+    "limit": {
+      "Parameter": "base"
+    },
+    "path": "/items/{}"
+  },
+  {
+    "limit": "ClientBase",
+    "path": "/orders"
+  },
+  {
+    "limit": "Other",
+    "path": "/"
+  }
+]
+
 sample.ts
 {
   "defs": [

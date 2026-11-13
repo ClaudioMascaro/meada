@@ -397,11 +397,15 @@ pub(in crate::http) fn client_base() -> Vec<Part> {
     vec![Part::Limit(Limit::ClientBase)]
 }
 
-/// Whether the origin of `base` is a part Meada could not read: it starts with one, and no
-/// literal `://` places a host after it. A path from the root joined to it as RFC 3986 does
-/// replaces whatever path it has, so that URL's path is certain and its host unresolved (#801).
-pub(in crate::http) fn unknown_origin(base: &[Part]) -> bool {
-    base.first().is_some_and(unknown)
+/// Whether `url` is a path from the root (`/orders`, not `//host`) over a `base` whose origin is
+/// a part Meada could not read (it starts with one, and no literal `://` places a host after
+/// it). A library that joins as RFC 3986 does (C#'s `Uri`, Retrofit, Ktor's `defaultRequest`,
+/// aiohttp, Foundation's `URL(string:relativeTo:)`) replaces whatever path the base has with it,
+/// so that URL is its path alone: certain, with its host unresolved (#801).
+pub(in crate::http) fn rooted_over_unread(base: &[Part], url: &Value) -> bool {
+    let rooted = |t: &str| t.starts_with('/') && !t.starts_with("//");
+    matches!(url, Value::Str(parts) if matches!(parts.first(), Some(Part::Text(t)) if rooted(t)))
+        && base.first().is_some_and(unknown)
         && !(base.iter()).any(|p| matches!(p, Part::Text(t) if t.contains("://")))
 }
 

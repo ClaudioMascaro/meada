@@ -18,8 +18,10 @@
   routes of the call's method with a suffix that starts at a `/` and equals the known part (`/`
   alone fits every route). A URL written with no base keeps the hostless rule, and so does one
   whose join keeps the path certain: an absolute-path reference over an unknown origin
-  (TypeScript's `new URL`, `opaque_lead`; a C# request URI from the root, `based_on`; a Retrofit
-  route from the root, `retrofit_url`). An environment read written in place keeps its own rule
+  (TypeScript's `new URL`, `opaque_lead`; through `rooted_over_unread`, a C# request URI from the
+  root, `based_on`, a Retrofit route from the root, `retrofit_url`, a request from the root on a
+  Ktor `defaultRequest` base or an aiohttp session, and Swift's `URL(string:relativeTo:)`). An
+  environment read written in place keeps its own rule
   and reason. Ceilings: the first unknown part names the limit; a call's return value is named by
   its callee only where the pack keeps the call in the string (TypeScript, Go, Python, Kotlin and
   Swift, and a value the resolver evaluates), any other part is "a base Meada could not read"; a
@@ -135,9 +137,11 @@
   an unresolved consumer. The base of a client made by a call is the `url(..)` of the
   `defaultRequest { }` in the configuration lambda of that call (Ktor 2 and 3
   `io.ktor.client.plugins.defaultRequest`, Ktor 1 `io.ktor.client.features.defaultRequest`),
-  folded in its scope: a base Meada did not read (`client_base`, so a request on it is an open
-  item that names the client's base, #801) when it is set more than once or not by a string, none
-  for a client known by its type alone. `request` sends the method its block assigns: the pack records any
+  folded in its scope: a base Meada did not read (`client_base`, #801) when it is set more than
+  once or not by a string, and for a client known by its type alone. Over such a base a relative
+  path makes an open item that names the client's base, and a path from the root is the path
+  alone, as Ktor's `defaultRequest` replaces the base's path with it (`rooted_over_unread`); over a
+  base it read, a path from the root is still appended to the base's path. `request` sends the method its block assigns: the pack records any
   property assignment `p = v` or `this.p = v` written as a statement of a lambda argument as the
   `p=` key of that call's `Call::kwargs` (`kotlin::assigned`, a key no Kotlin name matches and the
   pack names no property; `given` in `http/kotlin.rs` and in `http/kotlin/client.rs` ignores keys
@@ -414,7 +418,9 @@
   but a call (`self.http = http`, marked in `lang/python.rs`) is not read; a parameter given a
   client takes the base of every caller that passes one, and several different bases, or a
   `base_url=` that does not fold, make it a base Meada did not read: httpx appends the path, so
-  the consumer is an open item that names the client's base (#801).
+  the consumer is an open item that names the client's base, and so does a relative path on an
+  aiohttp session, whose `URL.join` (RFC 3986) makes a path from the root the path alone
+  (`rooted_over_unread`, #801); over a base it read, a path from the root is still appended.
 - `http/ts/clients.rs` (`joined`, #686): a first argument `new URL(reference, base)` of the
   global `URL` (`Value::New` of `GLOBAL_URL`, so a file's own `URL` is left alone) is replaced
   by the join of the two before the `fetch` is read, in the argument, through a constant and in

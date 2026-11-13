@@ -1240,12 +1240,13 @@ Cómo se elige el enlace, según lo que muestra la URL:
    enlace.
 2. **Variable de entorno.** La URL empieza por una lectura de entorno (`API_URL`) que un par
    declara en `base_url_env`. El enlace es `inferred`; nunca se lee el valor del entorno del proceso.
-3. **Host desconocido.** La URL no dice de dónde viene, pero su ruta es cierta: se escribe sin
-   base (`fetch('/orders')`), o la biblioteca la une a la base de modo que una ruta desde la raíz
-   reemplaza la ruta de la base (`new URL('/orders', base)` en TypeScript, una URI de petición
-   desde la raíz en un `HttpClient` de C#, una ruta de Retrofit desde la raíz). Cuando solo un
-   repositorio del workspace sirve ese método y esa ruta, el enlace es `inferred`, con el motivo
-   `the only repository serving it is`.
+3. **Host desconocido.** La URL no dice de dónde viene, pero su ruta es cierta: se escribe sin base
+   (`fetch('/orders')`), o la biblioteca la une a la base de modo que una ruta desde la raíz
+   reemplaza la ruta de la base (`new URL('/orders', base)` en TypeScript, una URI de petición desde
+   la raíz en un `HttpClient` de C#, una ruta de Retrofit desde la raíz, una petición desde la raíz
+   en un cliente Ktor con `defaultRequest` o en una sesión aiohttp, `URL(string:relativeTo:)` en
+   Swift). Cuando solo un repositorio del workspace sirve ese método y esa ruta, el enlace es
+   `inferred`, con el motivo `the only repository serving it is`.
 4. **Varios proveedores.** El enlace es `ambiguous`, y Meada lista todos los candidatos, un
    enlace por candidato. Es un ítem abierto que `meada decide` resuelve.
 

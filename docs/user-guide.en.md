@@ -1223,9 +1223,10 @@ How the link is chosen, depending on what the URL shows:
 3. **Unknown host.** The URL does not say which host it targets, but its path is certain: it is
    written with no base (`fetch('/orders')`), or the library joins it to the base so that a path
    from the root replaces the base's path (`new URL('/orders', base)` in TypeScript, a request URI
-   from the root on a C# `HttpClient`, a Retrofit route from the root). When only one repository in
-   the workspace serves that method and that path, the link is `inferred`, with the reason `the
-   only repository serving it is`.
+   from the root on a C# `HttpClient`, a Retrofit route from the root, a request from the root on a
+   Ktor client with `defaultRequest` or on an aiohttp session, `URL(string:relativeTo:)` in Swift).
+   When only one repository in the workspace serves that method and that path, the link is
+   `inferred`, with the reason `the only repository serving it is`.
 4. **Several providers.** The link is `ambiguous`, and Meada lists all the candidates, one link per
    candidate. It is an open item that `meada decide` resolves.
 
