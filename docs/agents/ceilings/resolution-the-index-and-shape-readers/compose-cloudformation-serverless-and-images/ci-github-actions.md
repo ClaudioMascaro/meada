@@ -32,8 +32,11 @@
   command, and what follows `||`, a pipe, `&`, a redirection or a parenthesis is not read up
   to the next line, `&&` or `;`. A parenthesis that opens a command is a subshell, `((` an
   arithmetic command with no command inside, and any other one (an array, a function's `()`)
-  is passed over to the one that closes it. Between parentheses (an array, a command
-  substitution) a `#` after a blank starts a comment to the end of its line and a `${...}` is
+  is passed over to the one that closes it. The name of a function before its `()` and a
+  pattern of `case` are no command (#832's verification); the command on a pattern's own line
+  (`a) cmd ;;`) is not read, and after `;&` a pattern that opens with `(` is taken for a
+  subshell. Between parentheses (an array, a command
+  substitution) a `#` after a blank or the parenthesis starts a comment to the end of its line and a `${...}` is
   passed whole; a backtick there is no quote, and a `#` after a blank inside the parentheses of
   a `[[ =~ ]]` pattern is taken for a comment, which may leave the script unread. A heredoc (`<<`, also the left shift of an
   arithmetic expansion or command) leaves the whole script unread, and so does a quote, a

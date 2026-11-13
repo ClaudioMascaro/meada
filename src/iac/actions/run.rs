@@ -104,7 +104,7 @@ fn closed(bytes: &[u8], at: usize) -> Option<usize> {
                     i += 1 + usize::from(quote == b'"' && bytes[i] == b'\\');
                 }
             }
-            b'#' if opens == b'(' && b" \t\n".contains(&bytes[i - 1]) => {
+            b'#' if opens == b'(' && b" \t\n(".contains(&bytes[i - 1]) => {
                 i += bytes[i..].iter().position(|&b| b == b'\n')?;
             }
             b'$' if opens == b'(' && bytes.get(i + 1) == Some(&b'{') => {
@@ -121,12 +121,18 @@ fn closed(bytes: &[u8], at: usize) -> Option<usize> {
     }
 }
 
+/// The first word of a command, when it has no open part.
+fn first(words: &[Word]) -> Option<&str> {
+    words.first().and_then(|word| literal(word))
+}
+
 /// The commands of `script`: a command is the first word of a line or the one after `&&` or
 /// `;` (a trailing `\` joins two lines), with the words up to the next operator. What follows
 /// `||`, a pipe, `&`, a redirection or a parenthesis is not read up to the next line, `&&` or
 /// `;`. A parenthesis that opens a command is a subshell, whose commands count; two of them
 /// are an arithmetic command, and any other parenthesis (an array, a function's `()`) is
-/// passed over to the one that closes it, lines included. A reserved word written bare opens
+/// passed over to the one that closes it, lines included. The name of a function before its
+/// `()` and a pattern of `case` are no command. A reserved word written bare opens
 /// no command of its own (`KEYWORDS`); quoted, escaped or given by a variable it is a word
 /// like any other. Text in a string or a comment gives no command. `None` for a script that
 /// is not read: one that holds a heredoc (also the `<<` of an arithmetic expansion) or leaves
@@ -164,6 +170,8 @@ pub(crate) fn commands<'v>(
     let mut bare = true;
     // The subshells left open.
     let mut subshells = 0usize;
+    // Whether the next word is a pattern of `case`: after its `in` and after each `;;`.
+    let mut patterns = false;
     // The word read joins its command, unless it is a reserved word that opens it.
     let finish = |words: &mut Vec<Word>, word: &mut Option<Word>, bare: &mut bool, reading| {
         let keyword = |w: &Word| literal(w).is_some_and(|t| KEYWORDS.contains(&t));
@@ -203,19 +211,46 @@ pub(crate) fn commands<'v>(
             }
             b'\n' | b';' => (ends, i) = (Some(true), i + 1),
             b'&' if rest.starts_with("&&") => (ends, i) = (Some(true), i + 2),
+            // A `|` between two patterns of `case`: what it follows is no command.
+            b'|' if patterns => {
+                finish(&mut words, &mut word, &mut bare, reading);
+                match first(&words) {
+                    Some("esac") => ends = Some(false),
+                    _ => words.clear(),
+                }
+                i += 1;
+            }
             b'&' | b'|' => (ends, i) = (Some(false), i + 1),
-            // A `)` with no subshell open closes a pattern of `case`.
+            // It closes a subshell, or a pattern of `case`, whose words are no command: where
+            // one is due, where no subshell is open and right after `case ... in`.
             b')' => {
-                subshells = subshells.saturating_sub(1);
+                finish(&mut words, &mut word, &mut bare, reading);
+                let header = first(&words) == Some("case");
+                if first(&words) != Some("esac") && (patterns || subshells == 0 || header) {
+                    words.clear();
+                    patterns = false;
+                } else {
+                    subshells = subshells.saturating_sub(1);
+                }
                 (ends, i) = (Some(false), i + 1);
             }
+            // The parenthesis a pattern of `case` may open with.
+            b'(' if patterns && word.is_none() && words.is_empty() => i += 1,
             b'(' if word.is_none() && words.is_empty() && reading => match bytes.get(i + 1) {
                 // Arithmetic: no command inside.
                 Some(b'(') => (ends, i) = (Some(false), closed(bytes, i)?),
                 // A subshell, whose commands the CI step runs.
                 _ => (subshells, i) = (subshells + 1, i + 1),
             },
-            b'(' => (ends, i) = (Some(false), closed(bytes, i)?),
+            b'(' => {
+                let end = closed(bytes, i)?;
+                // `name()` defines a function: the name is no command.
+                if script[i + 1..end - 1].trim().is_empty() {
+                    word = None;
+                    words.clear();
+                }
+                (ends, i) = (Some(false), end);
+            }
             b'<' if rest.starts_with("<<<") => (ends, i) = (Some(false), i + 3),
             b'<' if rest.starts_with("<<") => return None,
             b'<' | b'>' => {
@@ -288,6 +323,12 @@ pub(crate) fn commands<'v>(
         }
         if let Some(next) = ends {
             finish(&mut words, &mut word, &mut bare, reading);
+            match first(&words) {
+                Some("case") => patterns = true,
+                Some("esac") => patterns = false,
+                _ => {}
+            }
+            patterns |= rest.starts_with(";;");
             out.extend(Some(std::mem::take(&mut words)).filter(|w| !w.is_empty()));
             reading = next;
         }
@@ -520,20 +561,43 @@ mod tests {
                 "(cd x && pip install a) && pip install b",
                 Some(&["cd x", "pip install a", "pip install b"]),
             ),
+            // The name of a function a script defines is no command.
             (
                 "function",
                 "f() {\n  pip install a\n}",
-                Some(&["f", "pip install a", "}"]),
+                Some(&["pip install a", "}"]),
             ),
+            ("function on a line", "f() { pip install a; }", Some(&["}"])),
             (
-                "function on a line",
-                "f() { pip install a; }",
-                Some(&["f", "}"]),
+                "function, its forms",
+                "g ()\n{\n  y\n}\nh(){ x; }\ni() (\n  x\n)\nz",
+                Some(&["y", "}", "}", "z"]),
             ),
+            // Nor is a pattern of `case`, with `|`, quotes or its opening parenthesis.
             (
                 "case",
                 "case $1 in\n  a) pip install a ;;\n  *)\n    pip install b\n    ;;\nesac",
-                Some(&["case <$1> in", "a", "*", "pip install b", "esac"]),
+                Some(&["case <$1> in", "pip install b", "esac"]),
+            ),
+            (
+                "case, its patterns",
+                "case $1 in\n  a|b) x ;;\n  \"c\" | d) x ;;\n  (e) x ;;\n  f)\n    y\n    ;;\n  *) ;;\nesac\n(z)",
+                Some(&["case <$1> in", "y", "esac", "z"]),
+            ),
+            (
+                "case on a line",
+                "case $1 in a) x ;; b|c) y ;; esac; z",
+                Some(&["esac", "z"]),
+            ),
+            (
+                "case in a subshell",
+                "(case $1 in\n  a) x ;;\nesac)\nz",
+                Some(&["case <$1> in", "esac", "z"]),
+            ),
+            (
+                "case in a case",
+                "case $1 in\n  a)\n    case $2 in\n      b) x ;;\n    esac ;;\n  (c) x ;;\nesac | tee log\n(z)",
+                Some(&["case <$1> in", "case <$2> in", "esac", "esac", "z"]),
             ),
             // A reserved word opens no command of its own only when it is written bare.
             (
@@ -599,6 +663,11 @@ mod tests {
             (
                 "parenthesis in an expansion of an array",
                 "CMD=( ${x%)} pip install a )\npip install b",
+                Some(&["CMD=", "pip install b"]),
+            ),
+            (
+                "comment right after the parenthesis",
+                "CMD=(#c )\npip install a\n)\npip install b",
                 Some(&["CMD=", "pip install b"]),
             ),
             // The comment holds the parenthesis that would close the array.
@@ -775,8 +844,9 @@ mod tests {
     fn a_script_of_operators_alone_is_read_in_one_pass() {
         // One pass over the bytes: no rule looks back further than the word it is in, and a
         // parenthesis left open ends the reading at once.
+        // The first line's word stands before a `()`, as a function's name: no command.
         let script = "$(".repeat(400) + &")".repeat(400) + &"();|&\n".repeat(200);
-        assert_eq!(read(&script).map(|c| c.len()), Some(1));
+        assert_eq!(read(&script).map(|c| c.len()), Some(0));
         assert_eq!(read(&"\\".repeat(1001)), Some(vec!["\\".repeat(500)]));
         assert_eq!(read(&("(".repeat(1000) + " pip install a")), None);
         assert_eq!(read(&"x(".repeat(1000)), None);

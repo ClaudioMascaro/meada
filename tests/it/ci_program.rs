@@ -228,6 +228,72 @@ fn a_script_name_too_many_packages_declare_gives_no_side() {
     assert_eq!(sides(&export, file), []);
 }
 
+/// A word the shell does not run is no command: the pattern of a `case` and the name of a
+/// function a script defines give no side, whatever console script they are named like. A
+/// script the CI step runs on two lines is one row and one link.
+#[test]
+fn a_case_pattern_or_a_function_name_runs_no_program_and_a_script_run_twice_links_once() {
+    let [_, _, workflows, ..] = chain("ci_program_words");
+    let file = ".github/workflows/words.yml";
+    let pipeline = r#"name: words
+on: push
+jobs:
+  silent:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pip install core-sdk
+      - run: |
+          case "$TOOL" in
+            core-publish) echo "publishing is disabled here" ;;
+            core-health|core-lint) echo off ;;
+            "core-publish" | x) echo off ;;
+            (core-publish) echo off ;;
+          esac
+      - run: |
+          core-publish() { echo "dry run"; }
+          core-health ()
+          {
+            echo "dry run"
+          }
+          core-lint() (
+            echo "dry run"
+          )
+  twice:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          pip install core-sdk
+          core-publish a
+          core-publish b
+"#;
+    fs::write(workflows.join(file), pipeline).unwrap();
+    let export = exported(&Engine::open(&workflows).unwrap());
+    let found = sides(&export, file);
+    let at = |address: &str| -> Vec<_> {
+        (found.iter().filter(|s| s.0 == address))
+            .map(|s| (s.1.as_str(), s.2.as_deref()))
+            .collect()
+    };
+    assert_eq!(at("jobs.silent.steps[0]"), [("core-sdk", None)]);
+    assert_eq!(at("jobs.silent.steps[1]"), []);
+    assert_eq!(at("jobs.silent.steps[2]"), []);
+    assert_eq!(
+        at("jobs.twice.steps[0]"),
+        [("core-sdk", None), ("core-sdk", Some("run core-publish a"))]
+    );
+    let twice: Vec<_> = (links(&export, file).into_iter())
+        .filter(|(address, ..)| address == "jobs.twice.steps[0]")
+        .map(|(_, provider, level)| (provider, level))
+        .collect();
+    assert_eq!(
+        twice,
+        [
+            (program(CLI, "publish_main"), "exact".to_string()),
+            (format!("{SDK}::pyproject.toml"), "exact".to_string()),
+        ]
+    );
+}
+
 /// The program link is never stronger than the package link it continues: a package of the CI
 /// step's own repository is `inferred` (the package kind's rule for an entry with no source),
 /// install or not.

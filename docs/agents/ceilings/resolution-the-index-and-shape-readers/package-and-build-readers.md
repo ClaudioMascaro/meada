@@ -52,16 +52,22 @@
   the package as the next word: `--from`, `--spec`, another option first, `<package>@<version>`
   and `uv tool run` give no side, and a range after the package (`uvx 'core-sdk>=1'`) gives
   the package and no program. A script whose function is no program entry point of its
-  repository (a module outside the declared roots, a class, generated code) gives no side.
+  repository (a module outside the declared roots, generated code) gives no side, and neither
+  does a Poetry script written as a table (`{ callable = ... }`, `{ reference = ... }`), an
+  object reference with blanks (`"mod : fn"`) or a script run inside a command substitution.
   The evidence for `exact` is an install by a literal name in an earlier command of the same CI
   job, in file order of its CI steps: an install in a later CI step, in another CI job, in a
   called script or a composite action, by a pattern, by `-e .`, by `-r` or by a path is not
   seen, and neither is an `if:` that skips the installing CI step. With no install the name
   alone links `inferred`, so a script of the workspace wins over a shell builtin or a public
   tool of the same name. `MAX_DECLARING` (8): a name more packages of the workspace declare
-  gives no side at all. The link is at the weaker of the evidence's level and the package
-  link's, and its range is the install's. `context` on the program's symbol lists no CI step
-  (`callers` are calls in code): `trace` up from it does.
+  gives no side at all, even when the CI job installs one of them. The link is at the weaker of
+  the evidence's level and the package link's, and its range is the install's. A script a CI
+  step runs again on the same evidence adds no row, so the consumer's text is its first
+  command. The reason says "in the CI job" for the CI steps of a composite action too.
+  `context` on the program's symbol lists no CI step (`callers` are calls in code): `trace` up
+  from it does. The `consumers` count of `search` is of links to the manifest, so a CI step
+  that runs a script and installs nothing is not in it.
 - `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_NAME`
   (214 bytes; a longer name is no package) and `MAX_BYTES` (under `lang/mod.rs`). A range is
   stored as written, with no length limit beyond `MAX_BYTES`; npm's `flag` (`package/npm.rs`) checks only one of at most

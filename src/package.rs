@@ -1612,7 +1612,7 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                     root: None,
                 };
                 let installed = installed.entry(step_of(&script.site).0).or_default();
-                // The rows the CI step holds already: a package once, a command once.
+                // The rows the CI step holds already: a package once, a script once.
                 let (mut named, mut open) = (HashSet::new(), Vec::new());
                 let commands =
                     (script.commands.iter()).flat_map(|c| ECOSYSTEMS.iter().map(move |e| (c, *e)));
@@ -1705,7 +1705,9 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                             .collect()
                     };
                     for (contract, range, hops) in rows {
-                        if named.insert(format!("{contract} {text}")) {
+                        // A script the CI step runs again on the same evidence adds no row.
+                        let how = hops.first().map_or("", |hop| hop.how.as_str());
+                        if named.insert(format!("{contract} {how}")) {
                             consumers.push(consumer(
                                 Some(contract),
                                 Some(text.clone()),
