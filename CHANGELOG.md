@@ -81,6 +81,13 @@ All notable changes to Meada are recorded here. The format follows
   `search` on the item's line (#801).
 - An `ambiguous-link` decision written for such a call goes stale; a `dynamic-url` decision that
   names one of its candidates applies (#801).
+- A list of EventBridge entries held in a name and changed in place before `PutEvents` (an
+  element replaced, the list cleared and filled again, a helper that replaces an element, an
+  element replaced through the request) no longer names its first bus at `exact` in Java, Go and
+  C#: the rule DynamoDB transactions follow, a value held in a name is followed only when its
+  function mentions the name twice, holds on every path of entries. A Java local named as the
+  setter it is passed to (`.entries(entries)`) counts once there, so a list made and passed
+  straight keeps its buses (#773).
 
 ## [1.3.0] - 2026-11-11
 

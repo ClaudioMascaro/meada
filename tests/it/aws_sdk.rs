@@ -578,6 +578,75 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
     }
 }
 
+/// A list of EventBridge entries held in a name and changed in place before the call (an
+/// element replaced, the list cleared and filled again, a helper that replaces an element, an
+/// element replaced through the request) names no bus: the call sends to the later entries
+/// (#773). A list made and passed straight to the request keeps its buses, also a Java local
+/// named as the setter it is passed to (`.entries(entries)`).
+#[test]
+fn sdk_entry_lists_changed_in_place_name_no_bus() {
+    let repo = fixture_repo(
+        "aws_sdk_entry_lists",
+        "aws-sdk",
+        Some("https://example.com/aws/app.git"),
+    );
+    std::fs::write(
+        repo.join("go.mod"),
+        "module example.com/lists\n\ngo 1.22\n\nrequire github.com/aws/aws-sdk-go-v2 v1.30.0\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("lists.go"),
+        "package main\n\nimport (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/aws\"\n\t\"github.com/aws/aws-sdk-go-v2/config\"\n\t\"github.com/aws/aws-sdk-go-v2/service/eventbridge\"\n\t\"github.com/aws/aws-sdk-go-v2/service/eventbridge/types\"\n)\n\n\
+         func replaced(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tentries := []types.PutEventsRequestEntry{{EventBusName: aws.String(\"old-list-go\")}}\n\tentries[0] = types.PutEventsRequestEntry{EventBusName: aws.String(\"new-list-go\")}\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: entries})\n}\n\n\
+         func swap(entries []types.PutEventsRequestEntry) {\n\tentries[0] = types.PutEventsRequestEntry{EventBusName: aws.String(\"new-helper-go\")}\n}\n\n\
+         func helped(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tentries := []types.PutEventsRequestEntry{{EventBusName: aws.String(\"old-helper-go\")}}\n\tswap(entries)\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: entries})\n}\n\n\
+         func through(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tin := &eventbridge.PutEventsInput{Entries: []types.PutEventsRequestEntry{{EventBusName: aws.String(\"old-request-go\")}}}\n\tin.Entries[0] = types.PutEventsRequestEntry{EventBusName: aws.String(\"new-request-go\")}\n\tclient.PutEvents(ctx, in)\n}\n\n\
+         func kept(ctx context.Context) {\n\tcfg, _ := config.LoadDefaultConfig(ctx)\n\tclient := eventbridge.NewFromConfig(cfg)\n\tentries := []types.PutEventsRequestEntry{{EventBusName: aws.String(\"kept-list-go\")}}\n\tclient.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: entries})\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("Lists.cs"),
+        "using System.Collections.Generic;\nusing Amazon.EventBridge;\nusing Amazon.EventBridge.Model;\n\
+         class Lists {\n\
+         async System.Threading.Tasks.Task Cleared() { var events = new AmazonEventBridgeClient(); var entries = new List<PutEventsRequestEntry> { new PutEventsRequestEntry { EventBusName = \"old-list-cs\" } }; entries.Clear(); entries.Add(new PutEventsRequestEntry { EventBusName = \"new-list-cs\" }); await events.PutEventsAsync(new PutEventsRequest { Entries = entries }); }\n\
+         async System.Threading.Tasks.Task Through() { var events = new AmazonEventBridgeClient(); var request = new PutEventsRequest { Entries = new List<PutEventsRequestEntry> { new PutEventsRequestEntry { EventBusName = \"old-request-cs\" } } }; request.Entries[0] = new PutEventsRequestEntry { EventBusName = \"new-request-cs\" }; await events.PutEventsAsync(request); }\n\
+         async System.Threading.Tasks.Task Kept() { var events = new AmazonEventBridgeClient(); var entries = new List<PutEventsRequestEntry> { new PutEventsRequestEntry { EventBusName = \"kept-list-cs\" } }; await events.PutEventsAsync(new PutEventsRequest { Entries = entries }); }\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("Lists.java"),
+        "import java.util.Arrays;\nimport java.util.List;\n\
+         import software.amazon.awssdk.services.eventbridge.EventBridgeClient;\n\
+         import software.amazon.awssdk.services.eventbridge.model.PutEventsRequest;\n\
+         import software.amazon.awssdk.services.eventbridge.model.PutEventsRequestEntry;\n\
+         class Lists {\n\
+         void replaced() { var events = EventBridgeClient.create(); List<PutEventsRequestEntry> entries = Arrays.asList(PutEventsRequestEntry.builder().eventBusName(\"old-list-java\").build()); entries.set(0, PutEventsRequestEntry.builder().eventBusName(\"new-list-java\").build()); events.putEvents(PutEventsRequest.builder().entries(entries).build()); }\n\
+         void kept() { var events = EventBridgeClient.create(); List<PutEventsRequestEntry> entries = Arrays.asList(PutEventsRequestEntry.builder().eventBusName(\"kept-list-java\").build()); events.putEvents(PutEventsRequest.builder().entries(entries).build()); }\n\
+         void listed() { var events = EventBridgeClient.create(); List<PutEventsRequestEntry> list = List.of(PutEventsRequestEntry.builder().eventBusName(\"kept-of-java\").build()); events.putEvents(PutEventsRequest.builder().entries(list).build()); }\n}\n",
+    )
+    .unwrap();
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let contracts = ["providers", "consumers"]
+        .iter()
+        .flat_map(|side| export[side].as_array().unwrap())
+        .map(|s| s["contract"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert!(
+        contracts.iter().all(|c| !c.contains("old-")),
+        "{contracts:?}"
+    );
+    for kept in [
+        "channel::eventbridge::kept-list-go",
+        "channel::eventbridge::kept-list-cs",
+        "channel::eventbridge::kept-list-java",
+        "channel::eventbridge::kept-of-java",
+    ] {
+        assert!(contracts.contains(&kept), "{kept}: {contracts:?}");
+    }
+}
+
 /// ADR 0026: an EventBridge entry without `EventBusName` sends to `default`, and an SNS phone
 /// publish names no topic, in Java, Go and C# as in TypeScript and Python. A request whose
 /// fields Meada cannot all see (a `toBuilder()`, a helper's result, a factory of the
@@ -1251,7 +1320,7 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
             "lambdaStored writer resource::dynamodb",
             "listAlias writer resource::dynamodb",
             "listImmutable writer resource::dynamodb::list-of",
-            "listOther writer channel::eventbridge::list-other",
+            "listOther writer channel::eventbridge",
             "listPlain writer resource::dynamodb::list-plain",
             "listSet writer resource::dynamodb",
             "localClass writer resource::dynamodb",

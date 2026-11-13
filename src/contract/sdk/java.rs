@@ -537,7 +537,7 @@ pub(super) fn changed<'a>(
     builders: &Builders<'a>,
 ) -> bool {
     let setter = super::setter(selector);
-    // The list of a transaction's path is its first member (`TransactItems[]`).
+    // The list of a path of entries is its first member (`Entries[]`, `TransactItems[]`).
     let list = super::setter(selector.split('.').next().unwrap_or(selector));
     let mut walk = Walk {
         code,
@@ -545,7 +545,7 @@ pub(super) fn changed<'a>(
         path,
         scope,
         setter: &setter,
-        lists: super::transaction(selector).then_some(&list),
+        lists: super::entries(selector).then_some(&list),
         uses: builders.uses(code, path),
         seen: std::collections::HashSet::new(),
         depth: 0,
@@ -568,8 +568,8 @@ struct Walk<'a, 'c> {
     path: &'a str,
     scope: &'a str,
     setter: &'c dyn Fn(&str) -> bool,
-    /// The step that sets the list of a transaction's path (`transactItems`): on such a path a
-    /// list held in a name is judged (`replaced`, `passed`).
+    /// The step that sets the list of a path of entries (`entries`, `transactItems`): on such a
+    /// path a list held in a name is judged (`replaced`, `passed`).
     lists: Option<&'c dyn Fn(&str) -> bool>,
     uses: std::rc::Rc<Uses<'a>>,
     /// Each named value judged, with how it was reached (`on`, `shared`).

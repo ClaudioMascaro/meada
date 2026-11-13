@@ -218,7 +218,7 @@ pub(crate) fn extract<'a>(
                         &written,
                         &builders,
                     ) || (language != Language::Java
-                        && transaction
+                        && entries(operation.field)
                         && held_changed(code, path, index, operation.field, language, {
                             counts.get_or_init(|| {
                                 (code.mentioned(path).iter())
@@ -316,11 +316,17 @@ fn setter(selector: &str) -> impl Fn(&str) -> bool + '_ {
     }
 }
 
-/// Whether the path is a transaction's: three members. Its sides are new with the rule that
-/// follows a request, a list, an item or an entry held in a name by the mentions of that name
-/// (#719); the shorter paths keep the rule they had.
+/// Whether the path is a transaction's: three members. Its rows fold on a budget of their own
+/// (`Code::apart`).
 fn transaction(selector: &str) -> bool {
     selector.matches('.').count() == 2
+}
+
+/// Whether the path reads a list of entries (`Entries[].EventBusName`, a transaction's
+/// `TransactItems[]`): a request, a list, an item or an entry held in a name on it is followed by
+/// the mentions of that name (#719, #773). The other paths keep the rule they had.
+fn entries(selector: &str) -> bool {
+    selector.contains("[].")
 }
 
 /// Whether a wrapper's caller passes the request on as a value that changed (Java): the request
@@ -404,8 +410,7 @@ fn changed_request<'a>(
     false
 }
 
-/// Whether a name on the path to a transaction entry's table may hold a value that changed (Go
-/// and C#). A request, a list, an item and an entry change in place through any name that holds
+/// Whether a name on a path of entries (`entries`) may hold a value that changed (Go and C#). A request, a list, an item and an entry change in place through any name that holds
 /// them: a write past the first member, an element replaced, `append`, `Add`, a helper. So a
 /// name is followed only when the function that declares it writes it twice, where it is declared
 /// and where the path reads it (`Facts::mentioned`). Any other mention is a change this reader

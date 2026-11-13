@@ -121,6 +121,9 @@ SSM hierarchy queries stay unresolved instead of naming the path as a parameter;
 transaction condition checks are readers. Java, Go and .NET read transactions (#719) through
 one `Service` row per direction of a method: `TransactItems[].Put|Update|Delete.TableName`
 writes, `TransactItems[].ConditionCheck.TableName` and `TransactItems[].Get.TableName` read.
+A value held in a name on a path of entries (`TransactItems[]..`, `Entries[]..`) is followed only
+when its function mentions the name twice (`held_changed` in Go and C#, `Walk::lists` in Java,
+where a method's name is no mention, #773).
 `A|B` before a field's last member names the variants an element may set; `request` skips a
 whole element that sets none of them (a Java chain from `TransactWriteItem.builder()`, a Go or
 C# literal), and one it cannot see whole keeps an unresolved side. Computed object keys are

@@ -408,7 +408,8 @@ class Forms {
             TransactWriteItem.builder().put(Put.builder().tableName("wrapped-second").build()).build());
     }
 
-    // A shorter path keeps the name it had: its lists are not judged.
+    // A list of entries mentioned a third time (logged) has no bus, as a transaction's list has
+    // no table (#773).
     void listOther() {
         var events = EventBridgeClient.create();
         var entries = Arrays.asList(PutEventsRequestEntry.builder().eventBusName("list-other").build());
