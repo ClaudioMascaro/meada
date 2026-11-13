@@ -105,7 +105,10 @@
   "dynamic-url"`, its `target` a CI provider) is accepted for any CI provider of the workspace,
   an action or a reusable pipeline alike: it adds a `decided` link that `trace` and the
   provider's `context` follow and closes the item, while `context` on the CI step still says
-  `consumes (unresolved)`.
+  `consumes (unresolved)`. The export row of an unresolved CI step holds no `with` and no
+  `secrets`: they are copied to a consumer with a CI contract only. On the pinned corpus (#835)
+  all 32 unresolved CI steps are of this kind, 10 of them after a literal checkout of the own
+  repository into a named `path` (`./<path>/<folder>`), which the value of `path` would resolve.
   `$/<path>` reads on every host, though GitHub Enterprise Server does not have it. A path is
   normalised by the path rule of `iac::joined` in every form (`.`, `..`, inner and trailing
   empty segments), which GitHub may refuse in a call by owner and name; one that leaves the

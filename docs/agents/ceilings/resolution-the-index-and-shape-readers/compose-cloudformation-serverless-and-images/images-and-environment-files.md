@@ -22,7 +22,9 @@
   `docker build` (also with `--push`), `docker image push`, `--push=true`, `--output
   type=registry`, `-o`, `docker buildx bake`, `docker compose push`, a global option before the
   subcommand, a prefix (`sudo`, `time`), a tag glued to `-t`, a `docker push` with a word left
-  open whole (`$ARGS`, counted as a second image), Podman, Buildah, Kaniko, crane and Skopeo.
+  open whole (`$ARGS`, counted as a second image), Podman, Buildah, Kaniko, crane and Skopeo,
+  an image a release tool pushes from its own configuration (GoReleaser), and the `docker://`
+  image an action's `runs.image` names.
   In a `buildx` command a word left open whole is skipped (the tags it may hold are not read,
   the written ones are), `-t` and `--tag` take the next word as their value (`-t --push`
   pushes nothing) and a name that starts with `-` is none; a word that reads `--push` or `-t`

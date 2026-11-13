@@ -123,6 +123,36 @@ the input of #835's precision check.
 | `ci-osv-scanner` (`google/osv-scanner`) | a caller across repositories: it calls `ci-slsa` at a tag and `ci-osv-action` at two branches, and holds composite actions in folders |
 | `ci-osv-action` (`google/osv-scanner-action`) | a root action beside folder actions, and a pipeline that calls its own reusable pipelines by full name at a commit id other than the pin: `ref mismatch` in the wild |
 
+### Measured (#835)
+
+The three entries at the commits of `infra.tsv`, as one workspace, with a debug build of the A9
+branch at `41b1c6d`; the base is main at `3639207`. A fresh checker listed the 400 `uses` of the
+95 CI files with its own script, wrote its expected answer from the source and GitHub's
+documentation, then read every row of the export against it.
+
+| What | Count |
+|---|---|
+| CI nodes | 211, 17 and 11 |
+| `ci::` links | 150, all `exact`: 150 correct, 0 wrong |
+| per form of `uses` | to a pipeline by full name 15 (4 across repositories), to a local pipeline 5, to an action by full name 89, to a local action 41 |
+| unresolved consumers | 32, all `./<checkout directory>/<folder>`: 10 after a literal checkout of the own repository with `path` (the files resolve them, Meada does not: ADR 0028, ceiling of #826), 18 after a checkout whose repository is decided at run time, 4 inside an action file |
+| calls with no row | 2, `./../<directory>`: the path leaves the root (ceiling of #826) |
+| external calls | 216 to 33 repositories, none with a side |
+| absent marks | 0, and none called for |
+| `ref mismatch` | 7 of 7 right, none missing |
+| `permissions mismatch` | 0, and none called for over the 20 links from a CI job; the 20 `permissions` blocks equal the files |
+| `orphan ci::` lines | 28: 26 agree with the links, 2 name an action only an unresolved CI step calls (ceiling of #827) |
+| F2 sides | 0 installs, 0 program links, 0 image builders: none of the 169 `run` scripts names a package, a console script or an image of the three, and the checker found no side that should exist under a rule Meada reads |
+| uses removed by the ownership rule (#828) | 0 of 0: neither binary reads a use in these repositories, so the corpus does not measure the rule |
+| against the base | no row gone and no site moved; the new rows are CI nodes, consumers, providers and links, and `status` differs by the 28 orphan lines |
+| index time, peak RSS | 19.9 s and 232 MB against 19.7 s and 231 MB (one run each, debug builds) |
+| export size | 15.20 against 14.98 MB, 8.14 against 8.12 MB, and 30.6 against 18.2 kB for `ci-osv-action`, whose every file is CI (x1.68, past the x1.5 budget on 12 kB of predicted CI rows) |
+
+Not exercised by this corpus: a link at `inferred` or `ambiguous`, an absent mark, a
+`permissions mismatch` that fires, a calling CI job with no block of its own, `secrets`, a root
+action called from the workspace, the `$/` form. The content at the named refs was not read
+(shallow clones). This flow against the base binary in GitHub Actions is still pending.
+
 ## Done looks like
 
 `checks.json` with every check passed, `receipt.md` saying so, and each raw export, status and
