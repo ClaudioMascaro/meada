@@ -4427,6 +4427,7 @@ sample.alert.yaml
         "unknown_tags": false
       }
     ],
+    "stream": true,
     "truncated": false
   },
   "http": [],

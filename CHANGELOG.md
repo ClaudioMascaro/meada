@@ -66,7 +66,8 @@ All notable changes to Meada are recorded here. The format follows
   rule file, an Alertmanager configuration, a `PrometheusRule` or `AlertmanagerConfig` object of a
   Kubernetes stream, a provider document) no longer feeds the key-name rule: a rule's `queue` label
   is no longer the use of a queue, which hid a queue nobody uses when the names matched. A
-  structured identifier there is still an `exact` use, and the values stay config values (#800).
+  structured identifier there is still an `exact` use, and the values stay config values. An
+  existing index is rebuilt on its first open by this version (#800).
 
 ## [1.3.0] - 2026-11-11
 
