@@ -200,7 +200,11 @@ aprovisionamiento** conserva cada uso enlazado con cada aprovisionador, con raí
 
 **Enlaces de imágenes** muestra constructor → ejecutor: el repositorio que publica la imagen y
 la carga de trabajo que la ejecuta. **Enlaces de alertas** muestra emisor → matcher: la etiqueta
-o tag y la condición que la comprueba. Estas vistas incluyen enlaces dentro del mismo
+o tag y la condición que la comprueba. **Enlaces de CI** muestra pipeline o action →
+llamador: el pipeline reutilizable o la action y el job de CI o paso de CI que lo llama, con
+el ref Git tal como está escrito y el commit indexado en el motivo; una llamada cuya ruta no
+nombra proveedor aparece en la tabla de contratos con la marca
+` (absent at the indexed commit)`. Estas vistas incluyen enlaces dentro del mismo
 repositorio y entre repositorios; la vista general conserva su alcance entre repositorios.
 Las tablas de contratos de cada tipo también muestran lados sin contraparte, sin inventar
 enlaces para ellos. La leyenda explica los roles y las tablas de enlaces conservan nivel y motivo.
@@ -208,7 +212,7 @@ enlaces para ellos. La leyenda explica los roles y las tablas de enlaces conserv
 Usa Tab para llegar al selector de vista y las tablas; las flechas eligen la vista y desplazan
 la tabla enfocada. Cada tabla tiene nombre accesible y encabezados. Las vistas de infraestructura
 aparecen cuando el export contiene los lados o enlaces correspondientes. Recargar conserva la
-vista seleccionada, o vuelve a comunidades si dejó de estar disponible. El playground ofrece los filtros `value`, `iac` y `alert`, junto a `image`
+vista seleccionada, o vuelve a comunidades si dejó de estar disponible. El playground ofrece los filtros `value`, `iac`, `alert` y `ci`, junto a `image`
 y los tipos existentes, y muestra la respuesta de la API sin reescribirla. La interfaz está en
 portugués e inglés.
 

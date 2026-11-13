@@ -200,7 +200,11 @@ mantém cada uso ligado a cada provisionador, com a raiz, o nível e o motivo.
 
 **Ligações de imagens** mostra construtor → executor: o repositório que publica a imagem e a
 carga de trabalho que a executa. **Ligações de alertas** mostra emissor → correspondente: o
-rótulo ou tag e a condição que o testa. Essas visões incluem ligações dentro do mesmo
+rótulo ou tag e a condição que o testa. **Ligações de CI** mostra pipeline ou action →
+chamador: o pipeline reutilizável ou a action e o job de CI ou passo de CI que o chama, com o
+ref Git como escrito e o commit indexado no motivo; uma chamada cujo caminho não nomeia
+provedor aparece na tabela de contratos com a marca ` (absent at the indexed commit)`.
+Essas visões incluem ligações dentro do mesmo
 repositório e entre repositórios, sem mudar a visão geral de ligações entre repositórios.
 As tabelas de contratos de cada tipo também mostram lados sem contraparte; não há ligação
 inventada para eles. A legenda explica os papéis e as tabelas de ligações preservam nível e motivo.
@@ -208,7 +212,7 @@ inventada para eles. A legenda explica os papéis e as tabelas de ligações pre
 Use Tab para chegar ao seletor de visão e às tabelas; as setas escolhem a visão e rolam a tabela
 em foco. Cada tabela tem nome acessível e cabeçalhos. As visões de infraestrutura aparecem
 quando o export contém os lados ou as ligações correspondentes. Recarregar mantém a visão
-selecionada, ou volta a comunidades se ela deixou de existir. O playground oferece os filtros `value`, `iac` e `alert`, além de `image`
+selecionada, ou volta a comunidades se ela deixou de existir. O playground oferece os filtros `value`, `iac`, `alert` e `ci`, além de `image`
 e dos tipos existentes, e mostra a resposta da API sem reescrevê-la.
 
 ## Frota e diagnóstico

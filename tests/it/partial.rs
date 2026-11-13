@@ -16,7 +16,7 @@ use serde_json::Value;
 const BUDGET: Option<usize> = Some(1_000_000);
 
 /// The `search` kinds, `None` being every kind but the early ones.
-const KINDS: [Option<&str>; 16] = [
+const KINDS: [Option<&str>; 17] = [
     None,
     Some("symbol"),
     Some("contract"),
@@ -33,6 +33,7 @@ const KINDS: [Option<&str>; 16] = [
     Some("unresolved"),
     Some("value"),
     Some("iac"),
+    Some("ci"),
 ];
 
 /// At most this many symbols, call sites and contracts of a repository are queried, spread
@@ -171,6 +172,14 @@ fn the_chain_answers_alike() {
     decisions(&web, "chain-web");
     for repo in [&web, &gateway, &catalog, &common::worker(&web)] {
         answers_alike(repo);
+    }
+}
+
+/// The CI kind (#829): the reproduction of #816, its pipelines, an intermediate one and callers.
+#[test]
+fn the_ci_reproduction_answers_alike() {
+    for repo in crate::ci_calls::reproduction("partial_ci") {
+        answers_alike(&repo);
     }
 }
 

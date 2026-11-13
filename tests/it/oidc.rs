@@ -720,6 +720,117 @@ fn a_grant_scopes_the_workspace_of_a_generation() {
     }
 }
 
+/// The CI kind under a grant (#829, ADR 0028), on a node at `url` that serves the reproduction of
+/// #816: behind a caller, a grant that reads the repository of the pipelines reads the link, and
+/// one that does not reads no link to it and no consumer of it; behind the pipelines, `context`
+/// and `trace` list only the consumers of a repository the grant reads.
+fn ci_grants(url: &str, issuer: &str, signing: &EncodingKey) {
+    use crate::ci_served::{APP_A, APP_B, PUBLISH, WORKFLOWS, about_the_call, no_provider};
+    // The two CI jobs of `APP_B` that call `PUBLISH`, as `context` on it lists them.
+    const CONSUMERS_OF_APP_B: [&str; 2] = [
+        "github.com/acme/app-b .github/workflows/ci.yml:11 jobs[\"publish-prd\"] \
+         [exact: @v1 (indexed 2344e45)] with: package; secrets: token",
+        "github.com/acme/app-b .github/workflows/ci.yml:18 jobs[\"publish-stg\"] \
+         [exact: @main (indexed 2344e45)] with: package",
+    ];
+
+    let read = |identity: &str, identities: &[&str], call: (&'static str, Value)| {
+        let claims = claims(issuer, identity, identities);
+        let token = sign(signing, "k1", Algorithm::ES256, &claims);
+        let at = format!("{url}/{identity}");
+        traced(&ask(&at, Some(&token), &[], Some(call)))
+    };
+    let [context, ..] = about_the_call();
+    let linked = read(APP_A, &["*"], context);
+    let provider =
+        format!("  provider: {WORKFLOWS} {PUBLISH}:1 . [exact: @main (indexed 2344e45)]");
+    assert!(linked.lines().any(|line| line == provider), "{linked}");
+    for call in about_the_call() {
+        no_provider(&read(APP_A, &[APP_A, APP_B], call));
+    }
+    let granted = [WORKFLOWS, APP_B];
+    let callers = read(WORKFLOWS, &granted, ("context", json!({"symbol": PUBLISH})));
+    assert_eq!(
+        crate::ci_calls::listed(&callers, "  consumer: "),
+        CONSUMERS_OF_APP_B,
+        "{callers}"
+    );
+    let up = json!({"from": PUBLISH, "direction": "up"});
+    let up = read(WORKFLOWS, &granted, ("trace", up));
+    let reached = "github.com/acme/app-b .github/workflows/ci.yml:11 jobs[\"publish-prd\"]";
+    assert!(up.contains(reached), "{up}");
+    for hidden in ["acme/app-a", "acme/wrapper", "acme/app-c", "missing peer"] {
+        assert!(!callers.contains(hidden), "{hidden} in: {callers}");
+        assert!(!up.contains(hidden), "{hidden} in: {up}");
+    }
+}
+
+/// A grant scopes the CI sides (#829) as it scopes every answer.
+#[test]
+fn a_grant_scopes_the_ci_sides_of_every_answer() {
+    use crate::ci_served::{LISTED, listed};
+
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let dir = listed("oidc_grant_ci", &LISTED);
+    assert!(run(&dir, "index").2);
+    append(&dir, MANIFEST, &issuer.base);
+    let server = start(&dir);
+    ci_grants(&server.url, &issuer.base, &signing);
+}
+
+/// The same grants over a generation made by hand, and its named workspaces (#342): one whose
+/// version records the callers with the repository of the pipelines answers the link, and one
+/// that records the callers alone answers no link to it and no consumer of it, to a token that
+/// reads every repository.
+#[cfg(feature = "snapshot")]
+#[test]
+fn a_grant_and_a_named_workspace_scope_the_ci_sides_of_a_generation() {
+    use crate::ci_served::{
+        APP_A, APP_B, LISTED, PUBLISH, WORKFLOWS, about_the_call, listed, no_provider,
+    };
+    const CALLERS: &str = "c000000000000001";
+    const WHOLE: &str = "c000000000000002";
+
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let dir = listed("oidc_generation_ci", &LISTED);
+    let (manifest, local) = crate::serving::hand_node_of(&dir, &LISTED);
+    let pointer = fs::read_to_string(local.join("current")).unwrap();
+    let file = local.join(pointer.split(' ').next().unwrap());
+    let file = file.join("generation.json");
+    let mut document: Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+    let context = |id: &str, repositories: &[&str]| {
+        let entries: Vec<Value> = (repositories.iter())
+            .map(|repo| json!({"repo": repo, "blocks": {}}))
+            .collect();
+        json!({"id": id, "version": "0000000000000001", "repositories": entries})
+    };
+    document["contexts"] = json!([
+        context(CALLERS, &[APP_A, APP_B]),
+        context(WHOLE, &[WORKFLOWS, APP_A, APP_B]),
+    ]);
+    fs::write(&file, serde_json::to_vec(&document).unwrap()).unwrap();
+    append(&dir, &manifest, &issuer.base);
+    let server = crate::serving::serve(&dir, &manifest);
+    ci_grants(&server.url, &issuer.base, &signing);
+
+    let claims = claims(&issuer.base, APP_A, &["*"]);
+    let token = sign(&signing, "k1", Algorithm::ES256, &claims);
+    let read = |id: &str, call: (&'static str, Value)| {
+        let at = format!("{}/-/workspaces/{id}/{APP_A}", server.url);
+        traced(&ask(&at, Some(&token), &[], Some(call)))
+    };
+    let [context, ..] = about_the_call();
+    let linked = read(WHOLE, context);
+    let provider =
+        format!("  provider: {WORKFLOWS} {PUBLISH}:1 . [exact: @main (indexed 2344e45)]");
+    assert!(linked.lines().any(|line| line == provider), "{linked}");
+    for call in about_the_call() {
+        no_provider(&read(CALLERS, call));
+    }
+}
+
 /// A grant of three of twelve repositories reads those three, and a grant of all of them reads
 /// the whole chain: past ten repositories the grant still decides what an answer exposes.
 fn wide_grants(dir: &Path, manifest: &str, issuer: &Issuer, signing: &EncodingKey) {

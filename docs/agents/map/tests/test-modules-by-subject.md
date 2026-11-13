@@ -493,6 +493,12 @@
   controls that keep the key-name rule, every scalar still a config value, `vars.X` never matched
   across repositories, a pattern that fits two names as an open item, and the `env` lookup: the
   nearest that defines the name, literal or not, and none at an action's root.
+- `ci_served.rs` (#829): the CI kind in server mode over the reproduction of #816: MCP over HTTP
+  equal to stdio for every flow of the kind, and a manifest without the provider's repository
+  giving no link to it and no consumer of it. Its helpers (`listed`, `about_the_call`,
+  `no_provider`) carry the same questions to the grants of `oidc.rs` (a node, a hand-made
+  generation and its named workspaces), to the console in `ui/playground.rs` and `ui/oidc.rs`,
+  and `partial.rs` runs the reproduction and the kind `ci` through the partial export.
 
 - `patterns.rs` (#674): sibling `pattern-infra`/`pattern-app` fixtures cover channel and
   resource anchors, ambiguous literal names, short/interior and pattern-to-pattern negatives,

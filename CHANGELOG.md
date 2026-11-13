@@ -52,6 +52,14 @@ All notable changes to Meada are recorded here. The format follows
   `on.workflow_call` gets the mark with that reason. A call to a folder that holds a
   `Dockerfile` and no action file now holds no side. Existing indexes are rebuilt once on first
   use. Release level: minor, meada and meada-core (#827).
+- The console and server mode show the CI kind as the CLI and stdio do. The console's graph
+  gains the view "CI links": the CI contracts with their sides and the link of each call, with
+  the Git ref in its reason and the absent mark, and a legend in the console's languages; its
+  query page takes the kind `ci`. Over HTTP, `meada mcp --listen` answers every flow of the kind
+  as stdio does, and the sides follow the manifest, the grant, the generation and the named
+  workspace: one that does not hold the provider's repository shows no link to it and no
+  consumer of it. The Meada skill and the user guide teach the kind. Release level: minor,
+  meada (#829).
 
 ### Changed
 

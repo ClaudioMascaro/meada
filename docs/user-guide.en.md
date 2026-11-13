@@ -1150,7 +1150,7 @@ which always appear (like `repository`, which is text).
 
 ## 8. Contract kinds
 
-A **contract** is what one repository exposes and another uses. Meada reads five kinds, and each
+A **contract** is what one repository exposes and another uses. Meada reads six kinds, and each
 has its own linking rule. This section says what each kind links and where it stops, so you can
 tell a link that is missing because of a known limit from one that is missing because of a bug.
 
@@ -1163,6 +1163,7 @@ Every contract identity starts with its kind, and that identity is what you pass
 | Channel | `channel::<broker>::<name>` | `channel::kafka::orders.created` |
 | Package | `package::<ecosystem>::<name>` | `package::npm::@example/shared` |
 | Resource | `resource::<kind>::<id>` | `resource::postgres::orders` |
+| CI | `ci::<repository identity>/<path>` | `ci::github.com/acme/workflows/.github/workflows/publish.yml` |
 
 OpenAPI and AsyncAPI documents are not a separate kind: they give routes and channels to the kinds
 above (section 8.3).
@@ -1417,6 +1418,87 @@ Details per ecosystem:
 
 When two providers serve the same name, the link is `ambiguous`, one per candidate, with the
 reason starting with `<n> providers fit`.
+
+### 8.6 CI: GitHub Actions
+
+A **CI contract** links a CI file that others reuse to whoever calls it. The provider is a
+reusable pipeline or an action, and the consumer is each CI job or CI step of the workspace whose
+`uses` names it. The identity is `ci::<repository identity>/<path>`, without the Git ref: one
+contract gathers every call to a file, whatever the refs.
+
+**What is read.** A `.yml` or `.yaml` file directly under `.github/workflows/` that holds `jobs`
+is a pipeline, and an `action.yml` or `action.yaml` that holds `runs` is an action, in any
+folder. The file, each CI job and each CI step are nodes that `search` with `kind=ci` finds and
+`context` explains. A pipeline is a provider when its `on` holds `workflow_call`, and an action
+always is. Nothing is run and no ref is fetched: Meada reads the files of the checkout.
+
+**The forms of `uses`.**
+
+| `uses` | On | Links to |
+| --- | --- | --- |
+| `<owner>/<repo>/.github/workflows/<file>@<ref>` | CI job | the reusable pipeline of that repository of the workspace |
+| `<owner>/<repo>[/<folder>]@<ref>` | CI step | the action of that folder, or of the root, of that repository of the workspace |
+| `./.github/workflows/<file>` | CI job | the pipeline of its own repository, with the reason `own repository` |
+| `./<folder>` | CI step | the action of its own repository, only after a default `actions/checkout` in the same CI job |
+| `docker://<image>` | CI step | nothing: it holds no CI contract |
+
+A `uses` writes no host, so the host is the one of the calling repository. A CI step's
+`./<folder>` is read in the CI runner's workspace, which is the step's own repository only after
+a checkout with no `repository` and no `path`. In a reusable pipeline, in a composite action or
+without that checkout, the step stays unresolved: an open item with no candidate, which `search`
+with `kind=unresolved` shows with its cause. The other forms and the limits are in
+[Capabilities and limits](site/en/capabilities.md#github-actions).
+
+**External files.** A `uses` whose repository is not in the workspace (`actions/checkout`, a
+pipeline of another organization) holds no side: it is no orphan, no open item and no contract.
+
+**The Git ref.** The link is `exact`, and its reason shows the ref as written and the commit
+Meada read the provider at. `context` on the pipeline's path lists its callers:
+
+```text
+provides ci::github.com/acme/workflows/.github/workflows/publish.yml
+  consumer: github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish [exact: @main (indexed 1a2b3c4)] with: package, registry; secrets: inherit
+  consumer: github.com/acme/app-b .github/workflows/ci.yml:11 jobs["publish-prd"] [exact: @v1 (indexed 1a2b3c4)] with: package; secrets: token
+```
+
+Meada never resolves a ref: `exact` says the call names that file, not that it runs the indexed
+version. When the ref is a full commit id other than the indexed commit, the reason ends with
+`, ref mismatch`. `trace` with `direction=up` follows the chain through intermediate reusable
+pipelines and composite actions, up to every calling CI job; the file's path, the file's node
+(`<repository>::<path>::.`) and the contract start the same chain.
+
+**Orphans and the absent mark.** `meada status` lists a reusable pipeline or an action that
+nothing calls as an orphan, only when the visible scope holds at least one provider and one
+consumer of the CI contract: a repository of actions indexed alone prints no orphan. A call whose
+repository is in the workspace and whose path names no provider there carries the mark
+` (absent at the indexed commit)` on the consumer's side, and `"absent": true` in `meada export`.
+Absent is not broken: the file may exist at the ref the call names.
+
+**Other CI systems.** Meada reads GitHub Actions. For a system it does not read (GitLab CI,
+Jenkins, Azure Pipelines), declare the link by hand with `[[resource]]` and `via` on the key
+that makes the call (section 4):
+
+```toml
+# in the repository of the shared pipeline
+[[resource]]
+kind = "pipeline"
+id = "acme/ci-templates/publish"
+role = "write"
+via = ["templates/publish.yml#publish.script"]
+```
+
+```toml
+# in each repository that calls it
+[[resource]]
+kind = "pipeline"
+id = "acme/ci-templates/publish"
+role = "read"
+via = [".gitlab-ci.yml#include[0].file"]
+```
+
+The link is `declared`, with one side per key, no Git ref and no chain: a `trace` from the
+pipeline stops at its direct callers, and a caller nobody declared stays invisible. The same
+declaration on a key of a GitHub Actions pipeline still holds, beside the CI contract.
 
 ## 9. Languages
 

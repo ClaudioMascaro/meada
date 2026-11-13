@@ -507,6 +507,8 @@ In a pipeline or an action the CI reader decides what a key means. A plain name 
 
 `trace` follows a chain of CI calls both ways, across repositories and through intermediate reusable pipelines and composite actions (a CI step calls an action whose CI step calls another). Up from a reusable pipeline it reaches each CI job that calls it, then the pipeline of that CI job's file and, when that file is reusable too, the CI jobs that call it. Down from a CI job it reaches the pipeline it calls, then that pipeline's CI jobs and CI steps and what they call. The CI contract identifier, the pipeline's file node (`<repository>::<path>::.`) and the file's path start the same chain. A pipeline that reaches itself ends at the walk's `(cycle)` mark, and the walk enters only repositories of the workspace.
 
+The console and server mode show the kind as the CLI and MCP over stdio do. The console's graph has the view **CI links**: the CI contracts with their sides and the link of each call, with the Git ref in its reason and the absent mark, and the query page takes the kind `ci`. In server mode (`meada mcp --listen`), MCP over HTTP answers every query of the kind as stdio does, and the sides follow the manifest, the grant, the generation and the named workspace: one that does not hold the provider's repository shows no link to it and no consumer of it, in `context`, `trace`, the graph and the export.
+
 ## Communities and processes
 
 A community groups symbols that call each other more than the rest. `meada export` computes these groups with Leiden, without randomness and using integer arithmetic. Names follow the directory containing most members (`src`, `src#2`), identically on every machine.

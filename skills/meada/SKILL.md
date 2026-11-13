@@ -1,6 +1,6 @@
 ---
 name: meada
-description: Code graph over MCP (Meada's `search`, `context`, `trace`). Use when finding where a symbol lives, who calls it, what a change touches, or how repositories connect through routes, queues, packages and shared resources.
+description: Code graph over MCP (Meada's `search`, `context`, `trace`). Use when finding where a symbol lives, who calls it, what a change touches, or how repositories connect through routes, queues, packages, shared resources and CI pipelines.
 ---
 
 # Meada
@@ -12,9 +12,9 @@ map: it names files and lines, and the files stay the territory.
 ## Steps
 
 1. **Find** with `search`. `query` is a name, case-insensitive; `kind` narrows it (`symbol`,
-   `route`, `contract`, `channel`, `resource`, `package`, `process`, `duplicate`). Done when you
-   hold the identity (`<repository>::<path>::<name>`) or the contract (`http::GET::/users/{}`) of
-   what you are after.
+   `route`, `contract`, `channel`, `resource`, `package`, `process`, `duplicate`, `ci`). Done when
+   you hold the identity (`<repository>::<path>::<name>`) or the contract
+   (`http::GET::/users/{}`) of what you are after.
 2. **Describe** with `context` on that identity: source, callers, callees, contracts,
    community, processes. Done when you know its callers and callees, each with its level.
 3. **Follow** with `trace` when the question spans more than one hop: `from` plus `direction`,
@@ -50,3 +50,27 @@ weakest:
   propose the command to the user.
 - **No matches.** The name may differ, or the language may not be indexed. `meada status` in a
   shell shows each repository of the workspace and its index state.
+
+## CI (GitHub Actions)
+
+A pipeline or an action that other files call with `uses` provides the CI contract
+`ci::<repository>/<path>`; each CI job or CI step of the workspace that calls it consumes it.
+
+- **Find** a pipeline, an action, a CI job or a CI step with `search` and `kind: "ci"`, by type
+  (`workflow`, `action`, `job`, `step`), address (`jobs.publish`, `jobs.build.steps[2]`), id,
+  `name` or `uses`. A search with no `kind` leaves them out.
+- **Callers.** `context` on the file's path (`.github/workflows/publish.yml`) lists one
+  `consumer:` line per caller in the workspace: repository, file, address, the link, and the
+  keys of `with` and `secrets` it passes. The list covers the workspace: a caller in a
+  repository outside it is unknown to Meada.
+- **Chain.** `trace` with `direction: "up"` reaches every caller through intermediate reusable
+  pipelines and composite actions. Three starts give the same chain: the file's path, its node
+  (`<repository>::<path>::.`) and the contract (`ci::...`).
+- **Git ref.** A link reads `[exact: @main (indexed 1a2b3c4)]`: `@main` is the ref the caller
+  wrote, `1a2b3c4` the commit Meada read the called file at. Meada resolves no ref, so `exact`
+  says the caller names that file, not that it runs the indexed version. `, ref mismatch` marks
+  a caller pinned to a full commit id other than the indexed one: read the file at that commit
+  before you state what that caller runs.
+- **`(absent at the indexed commit)`.** The call names a path that holds no pipeline or action
+  at the indexed commit. The file may exist at the caller's ref: report a call to check, not a
+  broken one.

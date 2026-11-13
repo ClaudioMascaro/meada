@@ -1167,7 +1167,7 @@ repositorio.)
 
 ## 8. Tipos de contrato
 
-Un **contrato** es lo que un repositorio expone y otro usa. Meada lee cinco tipos, y cada uno
+Un **contrato** es lo que un repositorio expone y otro usa. Meada lee seis tipos, y cada uno
 tiene su propia regla de enlace. Esta sección dice qué une cada tipo y dónde se detiene, para que
 usted distinga un enlace que falta por un límite conocido de un enlace que falta por un bug.
 
@@ -1180,6 +1180,7 @@ y a `trace`:
 | Canal | `channel::<broker>::<nombre>` | `channel::kafka::orders.created` |
 | Paquete | `package::<ecosistema>::<nombre>` | `package::npm::@example/shared` |
 | Recurso | `resource::<tipo>::<id>` | `resource::postgres::orders` |
+| CI | `ci::<identidad del repositorio>/<ruta>` | `ci::github.com/acme/workflows/.github/workflows/publish.yml` |
 
 Los documentos OpenAPI y AsyncAPI no son un tipo aparte: aportan rutas y canales a los tipos de
 arriba (sección 8.3).
@@ -1443,6 +1444,90 @@ Detalles por ecosistema:
 
 Cuando dos proveedores sirven el mismo nombre, el enlace es `ambiguous`, uno por candidato, con el
 motivo iniciado por `<n> providers fit`.
+
+### 8.6 CI: GitHub Actions
+
+Un **contrato de CI** une un archivo de CI que otros reutilizan con quien lo llama. El proveedor
+es un pipeline reutilizable o una action, y el consumidor es cada job de CI o paso de CI del
+workspace cuyo `uses` lo nombra. La identidad es `ci::<identidad del repositorio>/<ruta>`, sin el
+ref Git: un contrato reúne todas las llamadas a un archivo, sean cuales sean los refs.
+
+**Qué se lee.** Un archivo `.yml` o `.yaml` directamente en `.github/workflows/` que tenga `jobs`
+es un pipeline, y un `action.yml` o `action.yaml` que tenga `runs` es una action, en cualquier
+carpeta. El archivo, cada job de CI y cada paso de CI son nodos que `search` con `kind=ci`
+encuentra y `context` explica. Un pipeline es proveedor cuando su `on` tiene `workflow_call`, y
+una action lo es siempre. Nada se ejecuta y ningún ref se descarga: Meada lee los archivos del
+checkout.
+
+**Las formas de `uses`.**
+
+| `uses` | En | Enlaza con |
+| --- | --- | --- |
+| `<owner>/<repo>/.github/workflows/<archivo>@<ref>` | job de CI | el pipeline reutilizable de ese repositorio del workspace |
+| `<owner>/<repo>[/<carpeta>]@<ref>` | paso de CI | la action de esa carpeta, o de la raíz, de ese repositorio del workspace |
+| `./.github/workflows/<archivo>` | job de CI | el pipeline del propio repositorio, con el motivo `own repository` |
+| `./<carpeta>` | paso de CI | la action del propio repositorio, solo después de un `actions/checkout` por defecto en el mismo job de CI |
+| `docker://<imagen>` | paso de CI | nada: no tiene contrato de CI |
+
+Un `uses` no escribe host, así que el host es el del repositorio que llama. El `./<carpeta>` de
+un paso de CI se lee en el workspace del runner de CI, que solo es el propio repositorio después
+de un checkout sin `repository` ni `path`. En un pipeline reutilizable, en una action compuesta o
+sin ese checkout, el paso queda sin resolver: un ítem abierto sin candidato, que `search` con
+`kind=unresolved` muestra con la causa. Las demás formas y los límites están en
+[Capacidades y límites](site/es/capabilities.md#github-actions).
+
+**Archivos externos.** Un `uses` cuyo repositorio no está en el workspace (`actions/checkout`, un
+pipeline de otra organización) no tiene lado: no es huérfano, ni ítem abierto, ni contrato.
+
+**El ref Git.** El enlace es `exact`, y el motivo muestra el ref tal como está escrito y el
+commit en que Meada leyó el proveedor. `context` en la ruta del pipeline lista quién lo llama:
+
+```text
+provides ci::github.com/acme/workflows/.github/workflows/publish.yml
+  consumer: github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish [exact: @main (indexed 1a2b3c4)] with: package, registry; secrets: inherit
+  consumer: github.com/acme/app-b .github/workflows/ci.yml:11 jobs["publish-prd"] [exact: @v1 (indexed 1a2b3c4)] with: package; secrets: token
+```
+
+Meada nunca resuelve un ref: `exact` dice que la llamada nombra ese archivo, no que ejecuta la
+versión indexada. Cuando el ref es un id de commit completo distinto del commit indexado, el
+motivo termina en `, ref mismatch`. `trace` con `direction=up` sigue la cadena a través de los
+pipelines reutilizables intermedios y de las actions compuestas, hasta cada job de CI que llama;
+la ruta del archivo, el nodo del archivo (`<repositorio>::<ruta>::.`) y el contrato inician la
+misma cadena.
+
+**Huérfanos y la marca de ausente.** `meada status` lista como huérfano el pipeline reutilizable
+o la action que nada llama, solo cuando el alcance visible tiene al menos un proveedor y un
+consumidor del contrato de CI: un repositorio de actions indexado solo no imprime huérfanos. Una
+llamada cuyo repositorio está en el workspace y cuya ruta no nombra proveedor allí lleva la marca
+` (absent at the indexed commit)` en el lado del consumidor, y `"absent": true` en
+`meada export`. Ausente no es roto: el archivo puede existir en el ref que la llamada nombra.
+
+**Otros sistemas de CI.** Meada lee GitHub Actions. Para un sistema que no lee (GitLab CI,
+Jenkins, Azure Pipelines), declara el vínculo a mano con `[[resource]]` y `via` en la clave que
+hace la llamada (sección 4):
+
+```toml
+# en el repositorio del pipeline compartido
+[[resource]]
+kind = "pipeline"
+id = "acme/ci-templates/publish"
+role = "write"
+via = ["templates/publish.yml#publish.script"]
+```
+
+```toml
+# en cada repositorio que lo llama
+[[resource]]
+kind = "pipeline"
+id = "acme/ci-templates/publish"
+role = "read"
+via = [".gitlab-ci.yml#include[0].file"]
+```
+
+El enlace es `declared`, con un lado por clave, sin ref Git y sin cadena: un `trace` desde el
+pipeline se detiene en sus llamadores directos, y un llamador que nadie declaró queda invisible.
+La misma declaración sobre una clave de un pipeline de GitHub Actions sigue valiendo, junto al
+contrato de CI.
 
 ## 9. Lenguajes
 
