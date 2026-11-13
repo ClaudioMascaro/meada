@@ -1,7 +1,8 @@
 //! Directionless config uses (ADR 0026, #661), derived from non-secret, uncut stored strings.
-//! Only a structured cloud identifier or a final typed key gives evidence of a contract. One in
-//! the resource list of an IAM policy statement is a policy grant instead, and a value under a
-//! keyword of a JSON Schema document gives no side (ADR 0026, "Orphan sides").
+//! Only a structured cloud identifier or a final typed key gives evidence of a contract, and a
+//! final typed key gives none in a document the reader of a contract kind recognizes as its own.
+//! An identifier in the resource list of an IAM policy statement is a policy grant instead, and a
+//! value under a keyword of a JSON Schema document gives no side (ADR 0026, "Orphan sides").
 
 use std::collections::HashMap;
 
@@ -116,6 +117,85 @@ fn schemas(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
     Ok(schemas)
 }
 
+/// The documents the reader of a contract kind recognizes as its own, by file, which the key-name
+/// rule does not read: a provider document whole (`None`), and each document of a configuration
+/// file that is no IaC source and that the alert reader takes a rule, a route or a receiver from
+/// (`alert::documents`).
+fn owned(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
+    let mut owned = HashMap::<_, Vec<_>>::new();
+    let mut query = db.prepare("SELECT path FROM documents")?;
+    for path in query.query_map([], |row| row.get::<_, String>(0))? {
+        owned.entry(path?).or_default().push(None);
+    }
+    let mut query = db.prepare("SELECT path, summary FROM contract_configs")?;
+    let rows = query.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    for row in rows {
+        let (path, summary) = row?;
+        if super::is_source(&path) {
+            continue;
+        }
+        let documents = crate::alert::documents(&serde_json::from_str(&summary)?);
+        if !documents.is_empty() {
+            owned.entry(path).or_default().extend(documents);
+        }
+    }
+    Ok(owned)
+}
+
+/// The key-name rule (#661): a value under a final typed key names a contract at `inferred`,
+/// through an Azure or Google Cloud alias, or as a plain name under `queue`, `topic`, `bucket` or
+/// `table`.
+fn key_name(key: &str, value: &str) -> Option<(String, Level)> {
+    // Whether the key path ends with the step `name`: alone, after a `.`, or quoted.
+    let last = |name: &str| {
+        key == name || key.ends_with(&format!(".{name}")) || key.ends_with(&format!("[\"{name}\"]"))
+    };
+    crate::contract::azure::ALIASES
+        .iter()
+        .find_map(|alias| {
+            last(alias)
+                .then(|| crate::contract::azure::typed(alias, value))
+                .flatten()
+        })
+        .map(|contract| (contract, Level::Inferred))
+        .or_else(|| {
+            let alias = [
+                "pubsub_topic",
+                "pubsub_subscription",
+                "gcs_bucket",
+                "cloudsql_instance",
+                "cloudsql_database",
+                "gcpsecretmanager_secret",
+            ]
+            .into_iter()
+            .find(|alias| last(alias));
+            if let Some(contract) =
+                alias.and_then(|alias| crate::contract::gcp::typed(alias, value))
+            {
+                return Some((contract, Level::Inferred));
+            }
+            if value.is_empty()
+                || !value
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
+            {
+                return None;
+            }
+            let kind = [
+                ("queue", "channel::sqs"),
+                ("topic", "channel::sns"),
+                ("bucket", "resource::s3"),
+                ("table", "resource::dynamodb"),
+            ]
+            .into_iter()
+            .find(|(step, _)| last(step))?
+            .1;
+            Some((format!("{kind}::{value}"), Level::Inferred))
+        })
+}
+
 /// The config use sides of a repository, then its policy grants.
 pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<Side>)> {
     // A creation's defining name is its provisioner, not a second side using itself.
@@ -146,6 +226,7 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
         ))
     })?;
     let schemas = schemas(db)?;
+    let owned = owned(db)?;
     let mut uses = Vec::new();
     let mut grants = Vec::new();
     for row in rows {
@@ -153,6 +234,11 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
         if definitions.contains(&(path.clone(), key.clone())) {
             continue;
         }
+        // Whether `documents` (by index in a stream, `None` for a whole file) hold this row.
+        let document = crate::config_values::leading_index(&key);
+        let holds = |documents: &Vec<Option<usize>>| {
+            documents.contains(&None) || document.is_some_and(|n| documents.contains(&Some(n)))
+        };
         // The object key after a bucket is opaque; punctuation there cannot change the
         // resource identity. Validate the structured resource name, not that suffix.
         let named = types::identified(&value)
@@ -165,72 +251,16 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
                 })
             })
             .map(|c| (c, Level::Exact))
-            .or_else(|| {
-                crate::contract::azure::ALIASES
-                    .iter()
-                    .find_map(|alias| {
-                        (key == *alias
-                            || key.ends_with(&format!(".{alias}"))
-                            || key.ends_with(&format!("[\"{alias}\"]")))
-                        .then(|| crate::contract::azure::typed(alias, &value))
-                        .flatten()
-                    })
-                    .map(|contract| (contract, Level::Inferred))
-            })
-            .or_else(|| {
-                let alias = [
-                    "pubsub_topic",
-                    "pubsub_subscription",
-                    "gcs_bucket",
-                    "cloudsql_instance",
-                    "cloudsql_database",
-                    "gcpsecretmanager_secret",
-                ]
-                .into_iter()
-                .find(|alias| {
-                    key == *alias
-                        || key.ends_with(&format!(".{alias}"))
-                        || key.ends_with(&format!("[\"{alias}\"]"))
-                });
-                if let Some(contract) =
-                    alias.and_then(|alias| crate::contract::gcp::typed(alias, &value))
-                {
-                    return Some((contract, Level::Inferred));
-                }
-                if value.is_empty()
-                    || !value
-                        .bytes()
-                        .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
-                {
-                    return None;
-                }
-                let kind = [
-                    ("queue", "channel::sqs"),
-                    ("topic", "channel::sns"),
-                    ("bucket", "resource::s3"),
-                    ("table", "resource::dynamodb"),
-                ]
-                .into_iter()
-                .find(|(step, _)| {
-                    key == *step
-                        || key.ends_with(&format!(".{step}"))
-                        || key.ends_with(&format!("[\"{step}\"]"))
-                })?
-                .1;
-                Some((format!("{kind}::{value}"), Level::Inferred))
+            // A document the reader of a contract kind recognizes means what that reader says.
+            .or_else(|| match owned.get(&path).is_some_and(holds) {
+                true => None,
+                false => key_name(&key, &value),
             });
         let Some((contract, level)) = named else {
             continue;
         };
         let steps = parts_without_selectors(&key).unwrap_or_default();
-        let document = match steps.first() {
-            Some(Step::Index(n)) => Some(*n),
-            _ => None,
-        };
-        let schema = schemas.get(&path).is_some_and(|docs| {
-            docs.contains(&None) || document.is_some_and(|n| docs.contains(&Some(n)))
-        });
-        if schema && schema_keyword(&steps) {
+        if schemas.get(&path).is_some_and(holds) && schema_keyword(&steps) {
             continue;
         }
         let side = Side {

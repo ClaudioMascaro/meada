@@ -32,6 +32,29 @@ pub(crate) fn takes(path: &str, src: &[u8]) -> bool {
     !(summary.rules.is_empty() && summary.routes.is_empty() && summary.forwardings.is_empty())
 }
 
+/// The documents of a configuration file that the alert reader takes a rule, a route or a
+/// receiver from, each once, read from the file's stored summaries (`contract_configs`): `None`
+/// for the only document of a file, else the index of each such document of a stream (ADR 0026,
+/// "Orphan sides").
+pub(crate) fn documents(summaries: &Value) -> Vec<Option<usize>> {
+    let Some(summary) = (summaries.get("alert").cloned())
+        .and_then(|s| serde_json::from_value::<config::Summary>(s).ok())
+    else {
+        return Vec::new();
+    };
+    let rules = (summary.rules.iter()).map(|r| crate::config_values::leading_index(&r.key));
+    let routes = (summary.routes.iter()).map(|r| Some(r.document));
+    let receivers = (summary.forwardings.iter()).map(|f| Some(f.document));
+    let taken = rules.chain(routes).chain(receivers);
+    let mut documents: Vec<_> = match summary.stream {
+        true => taken.collect(),
+        false => taken.take(1).map(|_| None).collect(),
+    };
+    documents.sort();
+    documents.dedup();
+    documents
+}
+
 // ponytail: regex source length bounds compilation input; `ALERT_SCAN_MAX` bounds matching.
 const ALERT_REGEX_MAX: usize = 4096;
 /// The bytes the automata and search caches of one routing scope may take, shared equally by
@@ -1115,6 +1138,42 @@ fn regex(pattern: &str) -> Option<regex::Regex> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The documents the alert reader takes a rule, a route or a receiver from (#800): the only
+    /// document of a file is `None`, a document of a stream its index, a receiver's too.
+    #[test]
+    fn documents_are_those_a_rule_a_route_or_a_receiver_comes_from() {
+        let documents = |path: &str, src: &str| {
+            let summary = serde_json::to_value(config::read(path, src.as_bytes())).unwrap();
+            super::documents(&serde_json::json!({ "alert": summary }))
+        };
+        let none = Vec::<Option<usize>>::new();
+        let rule = "groups:\n- name: g\n  rules:\n  - alert: Down\n    expr: up == 0\n";
+        let receiver = "receivers:\n- name: pd\n  pagerduty_configs:\n  - routing_key: k\n";
+        let route = "route:\n  receiver: team\nreceivers:\n- name: team\n";
+        let operator = "apiVersion: monitoring.coreos.com/v1alpha1\nkind: AlertmanagerConfig\n\
+                        metadata:\n  name: jobs\nspec:\n  route:\n    receiver: jobs\n  \
+                        receivers:\n  - name: jobs\n";
+        assert_eq!(documents("rules.yaml", rule), [None]);
+        assert_eq!(documents("pd.yaml", receiver), [None]);
+        assert_eq!(documents("alertmanager.yml", route), [None]);
+        assert_eq!(documents("values.yaml", "queue: jobs\n"), none);
+        assert_eq!(
+            documents(
+                "stream.yaml",
+                &format!("{receiver}---\nqueue: jobs\n---\n{rule}")
+            ),
+            [Some(0), Some(2)]
+        );
+        assert_eq!(
+            documents("k8s.yaml", &format!("kind: ConfigMap\n---\n{operator}")),
+            [Some(1)]
+        );
+        // A file past the reader's budget keeps nothing, so no document of it is the reader's.
+        let wide = serde_json::json!({"route": {"receiver": "x".repeat(400_000),
+            "routes": vec![serde_json::json!({}); 50_000]}, "receivers": []});
+        assert_eq!(documents("alerts.json", &wide.to_string()), none);
+    }
 
     #[test]
     fn nonselected_incident_receivers_use_the_shared_evaluation_ceiling() {

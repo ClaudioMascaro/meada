@@ -820,6 +820,12 @@ fn prefixed(document: usize, key: &str) -> String {
     }
 }
 
+/// The index a stored key path starts with: its document in a file of several (`prefixed`), an
+/// item of the root sequence or array in a file of one.
+pub(crate) fn leading_index(key: &str) -> Option<usize> {
+    key.strip_prefix('[')?.split_once(']')?.0.parse().ok()
+}
+
 /// An ASCII letter or `_`, then ASCII letters, digits or `_`: what jq reads as `.key`.
 fn plain(key: &str) -> bool {
     let mut bytes = key.bytes();

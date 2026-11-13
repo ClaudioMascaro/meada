@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Serialize, Deserialize)]
 pub(super) struct Receiver {
     name: String,
-    document: usize,
+    pub(super) document: usize,
     stream: Stream,
     tags: Option<String>,
     details: BTreeMap<String, String>,

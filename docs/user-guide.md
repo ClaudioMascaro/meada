@@ -564,6 +564,17 @@ de `uses`. Num documento JSON Schema (com `$schema` na raiz), um valor sob `exam
 `enum` ou `const` documenta uma forma e não é lado nenhum: continua sendo um valor de configuração
 que o `search` acha.
 
+Num documento que o leitor de um tipo de contrato reconhece como seu, o Meada não infere uso pelo
+nome de uma chave: um arquivo de regras do Prometheus ou do Loki (`groups` com `rules`), um arquivo
+de regras de alerta do Grafana, uma configuração do Alertmanager, um objeto `PrometheusRule` ou
+`AlertmanagerConfig` (só esse documento do stream) e um documento de provedor (um arquivo OpenAPI ou
+AsyncAPI de um repositório com `[serve]`). Ali, o rótulo `queue: jobs` de uma regra é um rótulo de
+alerta, não o uso de uma fila; um identificador estruturado (um ARN) continua sendo um uso `exact`,
+e os valores continuam sendo valores de configuração que o `search` acha. Os arquivos de IaC
+(Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose e os outros documentos de um stream
+do Kubernetes) continuam dando esses usos, e o mesmo rótulo num arquivo que nenhum leitor reconhece
+continua sendo um uso `inferred`.
+
 ### Provisionadores Terraform
 
 Um `resource` `aws_sqs_queue` provisiona `channel::sqs::<nome>` pelo argumento `name`;

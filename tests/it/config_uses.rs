@@ -329,3 +329,202 @@ fn config_uses_and_workload_images_keep_their_own_edges_on_refresh() {
     fs::write(values, before).unwrap();
     assert_eq!(engine.export().unwrap(), original);
 }
+
+/// The `at` of every config use of the repository at `repo`.
+fn uses_at(repo: &std::path::Path) -> Vec<String> {
+    let text = Engine::open(repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+    (json["uses"].as_array().into_iter().flatten())
+        .map(|u| u["at"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// A document the reader of a contract kind recognizes means what that reader says (ADR 0026,
+/// "Orphan sides", #800): a Prometheus rule's `queue` label is an alert label, no use of a
+/// queue, while a queue ARN in the same rule is still a use at `exact`.
+#[test]
+fn a_rule_file_the_alert_reader_takes_feeds_no_key_name_rule() {
+    let repo = fixture_repo(
+        "config_use_alert_rule",
+        "orphan-alert-rule",
+        Some("https://example.com/acme/o5.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+    let (_, reports) = engine.status_report().unwrap();
+    let orphans = (reports.into_iter().flatten())
+        .filter(|l| l.starts_with("orphan "))
+        .collect::<Vec<_>>();
+    assert_eq!(orphans, Vec::<String>::new());
+    let jobs = engine.context("channel::sqs::jobs", None).unwrap();
+    assert!(!jobs.contains("alerts/app.rules.yaml"), "{jobs}");
+    let alerts = engine.search("JobFailures", Some("alert"), None).unwrap();
+    assert!(
+        alerts.contains(
+            "example.com/acme/o5 alerts/app.rules.yaml#groups[0].rules[0] \
+             alert::alertname::JobFailures"
+        ),
+        "{alerts}"
+    );
+    let values = engine.search("jobs", Some("value"), None).unwrap();
+    assert!(
+        values.contains("o5 alerts/app.rules.yaml:8 groups[0].rules[0].labels.queue = \"jobs\""),
+        "{values}"
+    );
+    // Named `jobs`, the provisioned queue keeps its provisioner alone.
+    std::fs::write(
+        repo.join("infra/main.tf"),
+        "resource \"aws_sqs_queue\" \"jobs\" {\n  name = \"jobs\"\n}\n",
+    )
+    .unwrap();
+    let jobs = Engine::open(&repo)
+        .unwrap()
+        .context("channel::sqs::jobs", None)
+        .unwrap();
+    let lines = jobs.lines().collect::<Vec<_>>();
+    assert!(
+        lines.len() == 2
+            && lines[1].starts_with(
+                "  example.com/acme/o5 provisioner infra/main.tf:1 aws_sqs_queue.jobs (root infra)"
+            ),
+        "{jobs}"
+    );
+    // A queue ARN in the rule is a use at `exact`; the same label in a file no reader recognizes
+    // keeps its `inferred` use.
+    let rule = std::fs::read_to_string(repo.join("alerts/app.rules.yaml")).unwrap();
+    std::fs::write(
+        repo.join("alerts/app.rules.yaml"),
+        format!("{rule}      queue_arn: arn:aws:sqs:us-east-1:123456789012:jobs\n"),
+    )
+    .unwrap();
+    std::fs::create_dir_all(repo.join("config")).unwrap();
+    std::fs::write(
+        repo.join("config/app.yaml"),
+        "labels:\n  severity: error\n  queue: jobs\n",
+    )
+    .unwrap();
+    assert_eq!(
+        uses_at(&repo),
+        [
+            "alerts/app.rules.yaml#groups[0].rules[0].labels.queue_arn",
+            "config/app.yaml#labels.queue"
+        ]
+    );
+    let jobs = Engine::open(&repo)
+        .unwrap()
+        .context("channel::sqs::jobs", None)
+        .unwrap();
+    assert!(
+        jobs.contains(
+            "use alerts/app.rules.yaml#groups[0].rules[0].labels.queue_arn (line 9) [exact]"
+        ) && jobs.contains("use config/app.yaml#labels.queue (line 3) [inferred]"),
+        "{jobs}"
+    );
+}
+
+/// In a Kubernetes stream only the document the alert reader takes a rule from is its own: the
+/// key-name rule still reads the stream's other documents (#800).
+#[test]
+fn only_the_rule_document_of_a_stream_is_kept_from_the_key_name_rule() {
+    let repo = fixture_repo(
+        "config_use_rule_stream",
+        "orphan-alert-rule",
+        Some("https://example.com/acme/o5.git"),
+    );
+    std::fs::remove_file(repo.join("alerts/app.rules.yaml")).unwrap();
+    std::fs::create_dir_all(repo.join("k8s")).unwrap();
+    std::fs::write(
+        repo.join("k8s/app.yaml"),
+        "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: worker\ndata:\n  queue: jobs\n---\n\
+         apiVersion: monitoring.coreos.com/v1\nkind: PrometheusRule\nmetadata:\n  name: app\n\
+         spec:\n  groups:\n  - name: app\n    rules:\n    - alert: JobFailures\n      \
+         expr: up == 0\n      labels:\n        queue: jobs\n",
+    )
+    .unwrap();
+    assert_eq!(uses_at(&repo), ["k8s/app.yaml#[0].data.queue"]);
+}
+
+/// A provider document (an OpenAPI file of a repository with a `[serve]` table) is the HTTP
+/// kind's own; without the table the same file is configuration the key-name rule reads (#800).
+#[test]
+fn a_provider_document_feeds_no_key_name_rule() {
+    let repo = fixture_repo(
+        "config_use_provider_document",
+        "orphan-alert-rule",
+        Some("https://example.com/acme/o5.git"),
+    );
+    std::fs::remove_file(repo.join("alerts/app.rules.yaml")).unwrap();
+    std::fs::write(
+        repo.join("openapi.yaml"),
+        "openapi: 3.0.3\ninfo:\n  title: Jobs\n  version: 1.0.0\npaths: {}\nx-messaging:\n  \
+         queue: jobs\n",
+    )
+    .unwrap();
+    std::fs::write(repo.join("meada.toml"), "[serve]\n").unwrap();
+    assert_eq!(uses_at(&repo), Vec::<String>::new());
+    std::fs::remove_file(repo.join("meada.toml")).unwrap();
+    assert_eq!(uses_at(&repo), ["openapi.yaml#[\"x-messaging\"].queue"]);
+}
+
+/// Each document the alert reader takes something from (a Loki rule file, a Grafana alert rule
+/// file, an Alertmanager configuration, an `AlertmanagerConfig` object of a stream) feeds no
+/// key-name rule, while a Terraform `grafana_rule_group` (an IaC source) and a promtool test file
+/// (which no reader takes) are still read.
+#[test]
+fn each_document_the_alert_reader_takes_feeds_no_key_name_rule() {
+    let repo = fixture_repo(
+        "config_use_alert_documents",
+        "orphan-alert-rule",
+        Some("https://example.com/acme/o5.git"),
+    );
+    let files = [
+        (
+            "loki/rules.yaml",
+            "groups:\n- name: logs\n  rules:\n  - alert: JobErrors\n    \
+             expr: 'sum(rate({app=\"worker\"} |= \"error\" [5m])) > 0'\n    \
+             labels:\n      queue: jobs\n",
+        ),
+        (
+            "grafana/alerts.yaml",
+            "apiVersion: 1\ngroups:\n- orgId: 1\n  name: jobs\n  folder: alerts\n  interval: 1m\n  \
+             rules:\n  - uid: job-failures\n    title: JobFailures\n    condition: A\n    \
+             data:\n    - refId: A\n      datasourceUid: prom\n      model:\n        \
+             expr: job_failures_total > 0\n    labels:\n      queue: jobs\n",
+        ),
+        (
+            "alertmanager/alertmanager.yml",
+            "route:\n  receiver: team\n  routes:\n  - receiver: jobs\n    match:\n      \
+             queue: jobs\nreceivers:\n- name: team\n- name: jobs\n",
+        ),
+        (
+            "k8s/alerting.yaml",
+            "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: worker\ndata:\n  queue: jobs\n---\n\
+             apiVersion: monitoring.coreos.com/v1alpha1\nkind: AlertmanagerConfig\nmetadata:\n  \
+             name: jobs\n  labels:\n    queue: jobs\nspec:\n  route:\n    receiver: jobs\n  \
+             receivers:\n  - name: jobs\n",
+        ),
+        (
+            "infra/alerts.tf",
+            "resource \"grafana_rule_group\" \"jobs\" {\n  name = \"jobs\"\n  rule {\n    \
+             name   = \"JobFailures\"\n    labels = { queue = \"jobs\" }\n  }\n}\n",
+        ),
+        (
+            "alerts/app_test.yaml",
+            "rule_files:\n- app.rules.yaml\ntests:\n- interval: 1m\n  alert_rule_test:\n  \
+             - eval_time: 5m\n    alertname: JobFailures\n    exp_alerts:\n    - exp_labels:\n        \
+             queue: jobs\n",
+        ),
+    ];
+    for (path, text) in files {
+        let path = repo.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    }
+    assert_eq!(
+        uses_at(&repo),
+        [
+            "alerts/app_test.yaml#tests[0].alert_rule_test[0].exp_alerts[0].exp_labels.queue",
+            "infra/alerts.tf#resource.grafana_rule_group.jobs.rule.labels.queue",
+            "k8s/alerting.yaml#[0].data.queue",
+        ]
+    );
+}

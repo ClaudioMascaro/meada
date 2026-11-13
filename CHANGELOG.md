@@ -62,6 +62,11 @@ All notable changes to Meada are recorded here. The format follows
   the workspace builds some other image. A group that lacks builders or runners prints no orphan
   line, and its sides carry `no builder in the workspace` or `no runner in the workspace` in
   `context` and `search` (#799).
+- A document that the reader of a contract kind recognizes as its own (a Prometheus, Loki or Grafana
+  rule file, an Alertmanager configuration, a `PrometheusRule` or `AlertmanagerConfig` object of a
+  Kubernetes stream, a provider document) no longer feeds the key-name rule: a rule's `queue` label
+  is no longer the use of a queue, which hid a queue nobody uses when the names matched. A
+  structured identifier there is still an `exact` use, and the values stay config values (#800).
 
 ## [1.3.0] - 2026-11-11
 
