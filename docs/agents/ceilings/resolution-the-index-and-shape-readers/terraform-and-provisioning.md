@@ -221,14 +221,25 @@
   default as Terraform does where 1.13+ converts once, so no value is certain for it: when an
   override retypes it (in any of `override.tf`, `*_override.tf`, `override.tf.json`,
   `override.tofu`, `*_override.tofu`, `override.tofu.json`) the default is unresolved where the
-  two conversions hold other elements (compared once converted, so `[10, 9]` and `["10", "9"]`
-  are the same under `set(string)`) or another kind of collection, and exact where they agree
-  (no override, an override restating the set, an override with its own default of the final
-  type, a var file's value, and every default no set type touches: Meada converts no other
-  type, so a `list(T)`, a tuple or an untyped default stays as it is written). An override in
-  a file only OpenTofu reads is applied as OpenTofu applies it, also over a declaration
+  two conversions spell other elements (compared as a name spells them, so `[10, 9]` and
+  `["10", "9"]` are the same, while `["010", "9"]` declared `list(number)` and retyped
+  `list(string)` or `any` spells `10` converted twice and `010` once) or are another kind of
+  collection, and exact where they agree (no override, an override restating the set, an
+  override with its own default of the final type, a var file's value, and a default its types
+  convert alike once and twice). An override in a file only OpenTofu reads is applied as
+  OpenTofu applies it, also over a declaration
   Terraform reads, though Terraform ignores that file: `main.tf` with the set above and an
   `override.tofu` giving `default = ["c"]` names `0-c`, OpenTofu's instance, where Terraform
   names `0-a` and `1-b`. A module is judged by its own files,
   whatever calls it: a module of `.tf` files called only from a root written in `.tofu` follows
   Terraform though Terraform cannot read that root, and OpenTofu's answer differs.
+- A variable's declared type converts what it receives (a default, a var file's value, a module
+  argument) where Meada can make the conversion with certainty: a `set(T)` converts its elements,
+  sorts and deduplicates them, and a `list(T)` of `string`, `number` or `bool` converts its
+  elements in their order (`["010", "1.50"]` under `list(number)` names `10` and `1.5`, #770).
+  An element Meada cannot convert with certainty leaves the whole value unresolved, `-0` under
+  `number` among them: Terraform keeps a zero's sign and Meada's numbers do not. Meada converts
+  no other type: a primitive, a `list(any)`, a list of collections or objects, a tuple, a map
+  and an object keep the value as written, and a name read from one is exact even where
+  Terraform converts an element and spells it otherwise (`"010"` given to `type = number`
+  names `010`, where Terraform names `10`).

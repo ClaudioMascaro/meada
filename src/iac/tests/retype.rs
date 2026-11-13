@@ -212,6 +212,37 @@ fn a_value_entering_a_declared_set_is_converted_to_its_element_type() {
     assert_eq!(by(&set("set(string)", "[[\"a\"]]")), UNRESOLVED);
 }
 
+/// A value that enters a variable declared `list(T)` of a primitive `T` has its elements
+/// converted to `T`, in their order (#770): Terraform v1.17.1 and OpenTofu v1.13.9 agree on every
+/// row, refuse `x` and `yes`, and name the last row `0-9`, `1--0`.
+#[test]
+fn a_value_entering_a_declared_list_is_converted_to_its_element_type() {
+    let by = |main: &str| answer(main, "var.s", &[]);
+    let list = |ty: &str, default: &str| {
+        format!("variable \"s\" {{\n  type = list({ty})\n  default = {default}\n}}\n")
+    };
+    assert_eq!(
+        by(&list("number", r#"["010", "9", "9", "1.50", "+5", "1e2"]"#)),
+        "queue-0-10, queue-1-9, queue-2-9, queue-3-1.5, queue-4-5, queue-5-100"
+    );
+    assert_eq!(
+        by(&list("string", "[1.50, true]")),
+        "queue-0-1.5, queue-1-true"
+    );
+    assert_eq!(
+        by(&list("bool", r#"["true", "false"]"#)),
+        "queue-0-true, queue-1-false"
+    );
+    let declared = "variable \"s\" {\n  type = list(number)\n}\n";
+    let given = [("terraform.tfvars", "s = [\"010\"]\n")];
+    assert_eq!(answer(declared, "var.s", &given), "queue-0-10");
+    // An element Meada cannot convert with certainty leaves the value unresolved: one the type
+    // does not take, and `-0`, whose sign Meada's numbers do not keep.
+    assert_eq!(by(&list("number", r#"["x"]"#)), UNRESOLVED);
+    assert_eq!(by(&list("bool", r#"["yes"]"#)), UNRESOLVED);
+    assert_eq!(by(&list("number", r#"["9", "-0"]"#)), UNRESOLVED);
+}
+
 /// The default, a var file's value and a module argument of a declared `set(string)` are one set,
 /// read by `tolist`, by `length` as a `count`, by `join` and by `for_each`.
 #[test]

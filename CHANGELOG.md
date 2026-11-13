@@ -44,6 +44,11 @@ All notable changes to Meada are recorded here. The format follows
   table older than the one in `meada.toml`: a refresh reads the table when it starts, not when
   its call opened the index, so a call that read the file before an edit no longer writes the
   index back by the older table (#758).
+- A value given to a variable declared `list(string)`, `list(number)` or `list(bool)` has its
+  elements converted as Terraform converts them: `["010", "1.50"]` under `list(number)` names
+  `10` and `1.5`, where Meada kept the strings and gave `010` and `1.50` at `exact`. An element
+  Meada cannot convert with certainty (`-0`, whose sign Terraform keeps) leaves the value
+  unresolved, from a default, a var file or a module argument alike (#770).
 
 ## [1.3.0] - 2026-11-11
 

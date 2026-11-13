@@ -494,8 +494,9 @@ impl Named {
 enum Declared {
     /// `set(T)`: the elements converted to `T`, then sorted and deduplicated.
     Set(Elem),
-    /// `list(T)`: a set that came before it (an override retyping a declared set) becomes a list
-    /// of `T` in its order; a value no set touched stays as it is.
+    /// `list(T)`: the elements converted to `T`, in their order, where `T` is a primitive type
+    /// (`string`, `number`, `bool`) or a set came before it (an override retyping a declared
+    /// set); a list of another type that no set touched stays as it is.
     List(Elem),
     /// `any`: the value keeps its own type.
     Any,
@@ -533,6 +534,15 @@ impl Declared {
             _ => Declared::Other,
         }
     }
+
+    /// Whether this type converts a value no set has touched: a set, or a list of a primitive
+    /// type.
+    fn converts(self) -> bool {
+        matches!(
+            self,
+            Declared::Set(_) | Declared::List(Elem::String | Elem::Number | Elem::Bool)
+        )
+    }
 }
 
 /// `value` converted through the declared types `steps` in turn, as Terraform converts a default
@@ -547,9 +557,9 @@ fn converted_through(mut value: Value, steps: &[Declared]) -> Option<Value> {
                 value = functions::to_set(&value, elem).ok()?;
                 set = true;
             }
-            // A list converts only a set that came before it (an override retyping a declared
-            // set); a value no set has touched stays as it is, whatever its elements are.
-            Declared::List(elem) if set => {
+            // A list of a primitive type converts any value; a list of another type converts only
+            // a set that came before it (an override retyping a declared set).
+            Declared::List(elem) if set || step.converts() => {
                 value = functions::to_list(&value, elem).ok()?;
                 set = false;
             }
@@ -596,19 +606,20 @@ fn converted_once(value: Value, ty: Option<Declared>) -> Option<Value> {
 /// type of its declaring block and again to each override's. A variable with a block in a file
 /// only OpenTofu reads (`.tofu`, `.tofu.json`) is one Terraform does not read whole, and OpenTofu
 /// 1.13 and later convert the default once, to the final type, where 1.12 and earlier convert it
-/// as Terraform does: the default is unresolved where the two hold other elements, or another
-/// kind of collection, so that no tool's answer is taken for certain. An override in such a file
-/// is merged as OpenTofu merges it, also over a declaration Terraform reads.
+/// as Terraform does: the default is unresolved where the two spell other elements (`spelled`),
+/// or are another kind of collection, so that no tool's answer is taken for certain. An override
+/// in such a file is merged as OpenTofu merges it, also over a declaration Terraform reads.
 fn declared_default(found: Evaluated, variable: &Variable) -> Evaluated {
-    // Only a set type converts a value here, so a default no set type touches is one value.
-    let set = (variable.through.iter()).any(|t| matches!(t, Declared::Set(_)));
-    if let (true, true, Val::Known(v)) = (variable.opentofu, set, &found.val) {
+    // Only a set or a list of a primitive type converts a value here: a default no such type
+    // touches is one value.
+    let converts = (variable.through.iter()).any(|t| t.converts());
+    if let (true, true, Val::Known(v)) = (variable.opentofu, converts, &found.val) {
         let (twice, once) = (
             converted_through(v.clone(), &variable.through),
             converted_once(v.clone(), variable.ty),
         );
         let same_kind = ends_in_set(&variable.through) == ends_in_set(variable.ty.as_slice());
-        if twice != once || !same_kind {
+        if twice.as_ref().map(spelled) != once.as_ref().map(spelled) || !same_kind {
             return Evaluated {
                 val: Val::Unknown,
                 through: found.through,
@@ -616,6 +627,21 @@ fn declared_default(found: Evaluated, variable: &Variable) -> Evaluated {
         }
     }
     declared(found, &variable.through)
+}
+
+/// `value` with each scalar as the text a template shows of it, so that two conversions whose
+/// elements a name spells alike compare equal: `[10, 9]` and `["10", "9"]` do, `["010"]` and
+/// `[10]` do not.
+fn spelled(value: &Value) -> Value {
+    match value {
+        Value::Array(items) => Value::Array(items.iter().map(spelled).collect()),
+        Value::Object(map) => {
+            Value::Object(map.iter().map(|(k, v)| (k.clone(), spelled(v))).collect())
+        }
+        Value::Number(n) => Value::String(n.to_string()),
+        Value::Bool(b) => Value::String(b.to_string()),
+        _ => value.clone(),
+    }
 }
 
 /// A `variable` block: its default, whether it is sensitive, and where it is declared.

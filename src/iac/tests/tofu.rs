@@ -283,10 +283,10 @@ fn a_declaration_terraform_reads_retyped_by_a_file_only_opentofu_reads_is_compar
     }
 }
 
-/// A default no set type touches is converted by neither rule, so a block in a file only OpenTofu
-/// reads changes nothing: it names what the same variable names in `.tf` files, whatever its
-/// elements are written as. Terraform v1.17.1 (the files renamed) and OpenTofu v1.13.9 agree on
-/// every row.
+/// A default no set type touches converts to one value by either rule in these rows (a list of a
+/// primitive type converts its elements alike once or twice, any other type keeps the value), so a
+/// block in a file only OpenTofu reads changes nothing: it names what the same variable names in
+/// `.tf` files. Terraform v1.17.1 (the files renamed) and OpenTofu v1.13.9 agree on every row.
 #[test]
 fn a_default_no_set_type_touches_is_exact_with_a_block_only_opentofu_reads() {
     let variable = |ty: &str, default: &str| {
@@ -390,6 +390,36 @@ fn a_default_no_set_type_touches_is_exact_with_a_block_only_opentofu_reads() {
     for (row, files, want) in rows {
         assert_eq!(answer(&files), want, "{row}");
     }
+}
+
+/// A list of a primitive type converts its elements (#770), so an override in a file only OpenTofu
+/// reads that retypes it can spell other elements once and twice converted: `["010", "9"]`
+/// declared `list(number)` and retyped `list(string)` or `any` names `f-0-10`, `f-1-9` in
+/// Terraform v1.17.1 (the override in `override.tf`) and `f-0-010`, `f-1-9` in OpenTofu v1.13.9.
+/// `["10", "9"]` names `f-0-10`, `f-1-9` in both, numbers once and strings twice converted.
+#[test]
+fn a_list_an_opentofu_override_retypes_is_unresolved_where_the_conversions_differ() {
+    let main = |default: &str| {
+        format!("variable \"s\" {{\n  type = list(number)\n  default = {default}\n}}\n{READ}")
+    };
+    let written = main(r#"["010", "9"]"#);
+    for ty in ["list(string)", "any"] {
+        let retype = format!("variable \"s\" {{\n  type = {ty}\n}}\n");
+        let opentofu = [
+            ("main.tf", written.as_str()),
+            ("override.tofu", retype.as_str()),
+        ];
+        assert_eq!(answer(&opentofu), UNRESOLVED, "{ty}");
+        let terraform = [
+            ("main.tf", written.as_str()),
+            ("override.tf", retype.as_str()),
+        ];
+        assert_eq!(answer(&terraform), "f-0-10, f-1-9", "{ty}");
+    }
+    let canonical = main(r#"["10", "9"]"#);
+    let any = "variable \"s\" {\n  type = any\n}\n";
+    let opentofu = [("main.tf", canonical.as_str()), ("override.tofu", any)];
+    assert_eq!(answer(&opentofu), "f-0-10, f-1-9");
 }
 
 /// The last block that gives a default decides it: one an override file Terraform reads gives
