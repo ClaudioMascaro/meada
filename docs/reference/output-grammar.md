@@ -257,6 +257,8 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | `<ci-passed>` | ` with: <ci-keys>` | The keys of the call's `with`, never their values. |
 | `<ci-passed>` | ` secrets: <ci-keys>` | The keys of the call's `secrets`, or the word `inherit`. |
 | `<ci-passed>` | ` with: <ci-keys>; secrets: <ci-keys>` | Both. |
+| `<ci-passed>` | ` permissions: <ci-block>` | For a CI job, the `permissions` block that governs it. It closes the parts, after `; ` when `with` or `secrets` come before it. |
+| `<ci-block>` | `<text>` | A `permissions` block as declared, never as granted: `read-all`, `write-all`, `{}`, or its permissions as `<name>: <level>`, sorted and joined by `, `. `not declared` when neither the CI job nor its pipeline declares one that Meada reads. |
 | `<ci-keys>` | `<text>` | Keys as written, sorted, joined by `, `. |
 | `<shown-value>` | `<text>` | A string quoted as JSON (`"team-b"`), a number or a boolean as written, an HCL `expression` or `template` as written, a line break as `\n` (`var.env`, `"${var.env}-orders"`), or `redacted` for a value a format marks secret. |
 
@@ -359,6 +361,7 @@ words:
 | linked reader | `  reader: <identity><mark>` | A reader linked to the selected resource writer. |
 | linked writer | `  writer: <identity><mark>` | A writer linked to the selected resource reader. |
 | ci consumer | `  consumer: <repository> <place> <address> [<level>: <reason>]<ci-passed?>` | Under a pipeline's or an action's `provides`: a CI job or a CI step that calls it, with the link's level and reason and the keys the call passes. |
+| ci permissions | `  permissions: <ci-block>` | Under a reusable pipeline's `provides`: what its CI jobs declare together, the highest level of each permission, which each consumer's block is held against. |
 | ci consumes | `consumes <contract><ci-ref?><ci-passed?><orphan-note?>` | The selected CI job calls the reusable pipeline of the contract, or the selected CI step its action, at the Git ref and with the keys it wrote. With the absent mark no `ci provider` line follows: no repository of the workspace provides the contract. |
 | ci unresolved | `consumes (unresolved) <text>: <reason>` | The selected CI step names `./<folder>`, read in a workspace Meada does not know: its `uses` as written, then why. It is an open item with no candidate. |
 | ci provider | `  provider: <repository> <place> <address> [<level>: <reason>]` | Under a CI job's or a CI step's `consumes`: the pipeline or the action that provides the contract, with the link's level and reason. |
