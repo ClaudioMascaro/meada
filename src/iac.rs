@@ -1973,6 +1973,7 @@ fn elements(
         }
         Expression::Object(object) => {
             let each = (object.iter()).map(|(k, v)| {
+                // The key is bound as a string, its quotes counted as a bound object's are.
                 let key = match k {
                     ObjectKey::Ident(i) => i.as_str().len() + 2,
                     ObjectKey::Expression(e) => cost(e, roots, iters, overhead),
