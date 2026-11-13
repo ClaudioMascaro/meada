@@ -241,8 +241,10 @@ this file, and a change to these modules updates it.
   value's kind (`Eval::holds_set`, and `Eval::is_tuple` for a `for_each` both tools refuse);
   `tests/terraform-oracle/modules/` holds cases for the first three.
   `Eval::keys` evaluates `count` and `for_each` while instances are made (no module output read
-  yet), and `Eval::root` evaluates the names once every instance exists. `Repository::read` reads
-  the files, `Repository::units` gives each root with the directories of its unit, and `refresh`
+  yet), and `Eval::root` evaluates the names once every instance exists; it starts each root with
+  none of the root before's memos, which key an instance by its place in its root (#783).
+  `Repository::read` reads the files, `Repository::units` gives each root with the directories of
+  its unit, and `refresh`
   (called by `index::refresh_keeping` with the directories a Terraform file or var file changed in)
   evaluates again the roots whose unit holds one, and the roots not stored yet.
 - `kube.rs` (#651, ADR 0025): Kubernetes objects and Kustomize trees, into the same nodes

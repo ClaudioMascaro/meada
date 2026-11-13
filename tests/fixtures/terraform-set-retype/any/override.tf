@@ -1,0 +1,3 @@
+variable "s" {
+  type = any
+}

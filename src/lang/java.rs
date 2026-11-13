@@ -1222,7 +1222,9 @@ fn repeated(root: Node) -> Vec<Range<usize>> {
     out
 }
 
-/// How often each of `names` is written as an identifier under `root`, in the order given.
+/// How often each of `names` is written as an identifier under `root`, in the order given. A
+/// method's name is no mention: a local `entries` passed to `.entries(entries)` is written once
+/// there (#773).
 fn mentions(root: Node, src: &[u8], names: &[&str]) -> Vec<u32> {
     let index: BTreeMap<&str, usize> = names.iter().enumerate().map(|(n, s)| (*s, n)).collect();
     let mut counts = vec![0; names.len()];
@@ -1234,8 +1236,11 @@ fn mentions(root: Node, src: &[u8], names: &[&str]) -> Vec<u32> {
             }
             continue;
         }
+        let method = (node.kind() == "method_invocation")
+            .then(|| node.child_by_field_name("name"))
+            .flatten();
         let mut cursor = node.walk();
-        stack.extend(node.children(&mut cursor));
+        stack.extend(node.children(&mut cursor).filter(|c| Some(*c) != method));
     }
     counts
 }

@@ -507,6 +507,42 @@ fn a_refresh_with_no_terraform_file_changed_keeps_the_nodes() {
     assert!(fresh.contains("(aws_sns_topic, "), "{fresh}");
 }
 
+/// #740's rows through the indexer (#783): the `terraform-set-retype` fixture holds one root per
+/// row, as the probe `a7-tf-set` of prove-meada does, a variable declared `set(string)` and
+/// retyped or given a default by override files, read by `for_each = { for k, v in var.s : k =>
+/// v }`. Each root's exact names are the ones Terraform v1.17.1 creates (the maintainer's column
+/// in #740); the roots Terraform rejects and those keyed by a set's elements, which Meada leaves
+/// unresolved, have none.
+#[test]
+fn each_root_of_a_retyped_set_names_what_terraform_creates() {
+    let repo = fixture_repo("iac_set_retype", "terraform-set-retype", ORIGIN);
+    let text = Engine::open(&repo).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let mut exact = std::collections::BTreeMap::<&str, Vec<&str>>::new();
+    for p in json["provisioners"].as_array().unwrap() {
+        let name = p["contract"].as_str().unwrap();
+        let name = name.strip_prefix("channel::sqs::").unwrap();
+        if !name.contains('*') {
+            exact
+                .entry(p["root"].as_str().unwrap())
+                .or_default()
+                .push(name);
+        }
+    }
+    exact.values_mut().for_each(|names| names.sort());
+    let terraform = [
+        ("default-then-list", vec!["queue-0-a", "queue-1-b"]),
+        ("list", vec!["queue-0-a", "queue-1-b"]),
+        (
+            "list-own-default",
+            vec!["queue-0-b", "queue-1-a", "queue-2-a"],
+        ),
+        ("list-pair", vec!["queue-0-a", "queue-1-b"]),
+        ("tolist", vec!["queue-0-a", "queue-1-b"]),
+    ];
+    assert_eq!(exact, terraform.into_iter().collect());
+}
+
 /// Compose (#652): a project is a Compose file with its override, each service a node
 /// `services.<name>` with `depends_on`, `links` and shared networks as references, its image and
 /// build context recorded; `${VAR:-default}` is marked overridable, `${VAR}` stays unresolved, and
