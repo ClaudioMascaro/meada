@@ -347,12 +347,12 @@ is no side at all: it stays a config value that `search` finds.
 In a document that the reader of a contract kind recognizes as its own, Meada infers no use from a
 key name: a Prometheus or Loki rule file (`groups` holding `rules`), a Grafana alert rule file, an
 Alertmanager configuration, a `PrometheusRule` or `AlertmanagerConfig` object (that document of the
-stream only) and a provider document (an OpenAPI or AsyncAPI file of a repository with `[serve]`).
-There, a rule's `queue: jobs` label is an alert label, not the use of a queue; a structured
-identifier (an ARN) is still an `exact` use, and the values stay config values that `search` finds.
-IaC files (Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose and the other documents of
-a Kubernetes stream) still give such uses, and the same label in a file no reader recognizes is
-still an `inferred` use.
+stream only) and a provider document (an OpenAPI or AsyncAPI document that Meada reads, in a
+repository with `[serve]`). There, a rule's `queue: jobs` label is an alert label, not the use of a
+queue; a structured identifier (an ARN) is still an `exact` use, and the values stay config values
+that `search` finds. IaC files (Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose and
+the other documents of a Kubernetes stream) still give such uses, and the same label in a file no
+reader recognizes is still an `inferred` use.
 
 ### Terraform provisioners
 

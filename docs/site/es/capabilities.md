@@ -352,12 +352,12 @@ En un documento que el lector de un tipo de contrato reconoce como suyo, Meada n
 del nombre de una clave: un archivo de reglas de Prometheus o de Loki (`groups` con `rules`), un
 archivo de reglas de alerta de Grafana, una configuración de Alertmanager, un objeto
 `PrometheusRule` o `AlertmanagerConfig` (solo ese documento del stream) y un documento de proveedor
-(un archivo OpenAPI o AsyncAPI de un repositorio con `[serve]`). Allí, la etiqueta `queue: jobs` de
-una regla es una etiqueta de alerta, no el uso de una cola; un identificador estructurado (un ARN)
-sigue siendo un uso `exact`, y los valores siguen siendo valores de configuración que `search`
-encuentra. Los archivos de IaC (Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose y los
-otros documentos de un stream de Kubernetes) siguen dando esos usos, y la misma etiqueta en un
-archivo que ningún lector reconoce sigue siendo un uso `inferred`.
+(un documento OpenAPI o AsyncAPI que Meada lee, en un repositorio con `[serve]`). Allí, la etiqueta
+`queue: jobs` de una regla es una etiqueta de alerta, no el uso de una cola; un identificador
+estructurado (un ARN) sigue siendo un uso `exact`, y los valores siguen siendo valores de
+configuración que `search` encuentra. Los archivos de IaC (Terraform, OpenTofu, CloudFormation, SAM,
+Serverless, Compose y los otros documentos de un stream de Kubernetes) siguen dando esos usos, y la
+misma etiqueta en un archivo que ningún lector reconoce sigue siendo un uso `inferred`.
 
 ### Provisionadores Terraform
 

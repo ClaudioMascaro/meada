@@ -118,14 +118,22 @@ fn schemas(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
 }
 
 /// The documents the reader of a contract kind recognizes as its own, by file, which the key-name
-/// rule does not read: a provider document whole (`None`), and each document of a configuration
-/// file that is no IaC source and that the alert reader takes a rule, a route or a receiver from
-/// (`alert::documents`).
+/// rule does not read: the first document of a file the document reader read (its summary names a
+/// format; it reads no later document of a stream, and a file it ignored is none of its own), and
+/// each document of a configuration file that is no IaC source and that the alert reader takes a
+/// rule, a route or a receiver from (`alert::documents`).
 fn owned(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
     let mut owned = HashMap::<_, Vec<_>>::new();
-    let mut query = db.prepare("SELECT path FROM documents")?;
-    for path in query.query_map([], |row| row.get::<_, String>(0))? {
-        owned.entry(path?).or_default().push(None);
+    let mut query = db.prepare("SELECT path, summary FROM documents")?;
+    let rows = query.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    for row in rows {
+        let (path, summary) = row?;
+        let summary: crate::document::Summary = serde_json::from_str(&summary)?;
+        if summary.format.is_some() {
+            owned.entry(path).or_default().push(Some(0));
+        }
     }
     let mut query = db.prepare("SELECT path, summary FROM contract_configs")?;
     let rows = query.query_map([], |row| {
@@ -234,10 +242,11 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
         if definitions.contains(&(path.clone(), key.clone())) {
             continue;
         }
-        // Whether `documents` (by index in a stream, `None` for a whole file) hold this row.
-        let document = crate::config_values::leading_index(&key);
+        // Whether `documents` (by index in a stream, `None` for a whole file) hold this row; a key
+        // with no leading index is in the only document of its file, the first.
+        let document = crate::config_values::leading_index(&key).unwrap_or(0);
         let holds = |documents: &Vec<Option<usize>>| {
-            documents.contains(&None) || document.is_some_and(|n| documents.contains(&Some(n)))
+            documents.contains(&None) || documents.contains(&Some(document))
         };
         // The object key after a bucket is opaque; punctuation there cannot change the
         // resource identity. Validate the structured resource name, not that suffix.

@@ -465,6 +465,44 @@ fn a_provider_document_feeds_no_key_name_rule() {
     assert_eq!(uses_at(&repo), ["openapi.yaml#[\"x-messaging\"].queue"]);
 }
 
+/// Only what the document reader reads is a provider document (#800): a file it ignores, listed
+/// in `[serve] documents` or named like a document (a Swagger 2.0 `openapi.yaml`), and the
+/// documents of a stream after the first, which it never reads, keep the key-name rule.
+#[test]
+fn what_the_document_reader_does_not_read_keeps_the_key_name_rule() {
+    let repo = fixture_repo(
+        "config_use_unread_documents",
+        "orphan-alert-rule",
+        Some("https://example.com/acme/o6.git"),
+    );
+    std::fs::remove_file(repo.join("alerts/app.rules.yaml")).unwrap();
+    let write = |path: &str, text: &str| {
+        let path = repo.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    };
+    write("meada.toml", "[serve]\ndocuments = [\"conf/app.yaml\"]\n");
+    write("conf/app.yaml", "worker:\n  queue: plain\n");
+    write(
+        "legacy/openapi.yaml",
+        "swagger: \"2.0\"\ninfo:\n  title: Jobs\n  version: 1.0.0\npaths: {}\nx-messaging:\n  \
+         queue: legacy\n",
+    );
+    write(
+        "openapi.yaml",
+        "openapi: 3.0.3\ninfo:\n  title: Jobs\n  version: 1.0.0\npaths: {}\nx-messaging:\n  \
+         queue: qa\n---\nworker:\n  queue: qb\n",
+    );
+    assert_eq!(
+        uses_at(&repo),
+        [
+            "legacy/openapi.yaml#[\"x-messaging\"].queue",
+            "conf/app.yaml#worker.queue",
+            "openapi.yaml#[1].worker.queue",
+        ]
+    );
+}
+
 /// Each document the alert reader takes something from (a Loki rule file, a Grafana alert rule
 /// file, an Alertmanager configuration, an `AlertmanagerConfig` object of a stream) feeds no
 /// key-name rule, while a Terraform `grafana_rule_group` (an IaC source) and a promtool test file
