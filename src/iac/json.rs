@@ -120,6 +120,7 @@ impl Read<'_> {
                     path: self.path.into(),
                     line,
                     terraform: None,
+                    terraform_only: false,
                 };
                 self.module.declare(names[0], variable, false);
             }

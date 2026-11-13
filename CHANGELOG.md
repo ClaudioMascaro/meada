@@ -63,6 +63,10 @@ All notable changes to Meada are recorded here. The format follows
   `exact`. Where both give one value of one type it stays exact, and where OpenTofu refuses the
   directory (a string no number spells in a default a `.tofu` block retypes as numbers) Meada
   reads it as Terraform does (#767).
+- A variable declared both in a `.tf` file and in a `.tofu` file, which OpenTofu refuses, is the
+  `.tf` block with the override files Terraform reads, in either order of the two files: `a.tf`
+  declaring `["x"]` and `b.tofu` declaring `["b", "a", "a"]` names `0-x`, where Meada gave the
+  block of the file it read last at `exact` (#768).
 
 ## [1.3.0] - 2026-11-11
 

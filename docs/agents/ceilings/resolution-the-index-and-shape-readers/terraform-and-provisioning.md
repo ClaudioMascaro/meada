@@ -251,9 +251,12 @@
   (`["z"]` declared `list(string)` names `0-z`, and Terraform's instances of a var file's value). A
   default Terraform refuses under a type only OpenTofu reads names nothing exactly. A local
   overridden in a `.tofu` file keeps OpenTofu's value (`"b"` in `override.tofu` over `"a"` names
-  `f-b`, Terraform `f-a`): only variables are compared. A module is judged by its own files,
-  whatever calls it: a module of `.tf` files called only from a root written in `.tofu` follows
-  Terraform though Terraform cannot read that root, and OpenTofu's answer differs.
+  `f-b`, Terraform `f-a`): only variables are compared. A variable declared in a file Terraform
+  reads and again in a file only OpenTofu reads, which OpenTofu refuses ("Duplicate variable
+  declaration"), is the `.tf` block with the override files Terraform reads, in either order of the
+  files (#768). A module is judged by its own files, whatever calls it: a module of `.tf` files
+  called only from a root written in `.tofu` follows Terraform though Terraform cannot read that
+  root, and OpenTofu's answer differs.
 - A variable's declared type converts what it receives (a default, a var file's value, a module
   argument) where Meada can make the conversion with certainty: a `set(T)` converts its elements,
   sorts and deduplicates them, and a `list(T)` of `string`, `number` or `bool` converts its

@@ -672,6 +672,10 @@ struct Variable {
     /// Terraform's reading of the variable where it is declared in a file Terraform reads and a
     /// later block is in a file only OpenTofu reads: its blocks without those files' (#767).
     terraform: Option<Box<Variable>>,
+    /// Whether it is declared both in a file Terraform reads and in one only OpenTofu reads, which
+    /// OpenTofu refuses ("Duplicate variable declaration"): it is then the block Terraform reads,
+    /// with no block of a file only OpenTofu reads (#768).
+    terraform_only: bool,
 }
 
 impl Variable {
@@ -737,24 +741,38 @@ impl Module {
     /// into the declaration, its default replacing the declared one, or with none is left out, as
     /// Terraform refuses it. A variable any of its blocks marks sensitive stays sensitive. Where
     /// a block in a file only OpenTofu reads follows a declaration Terraform reads, Terraform's
-    /// reading is kept apart, made of the blocks it reads (`Variable::terraform`).
+    /// reading is kept apart, made of the blocks it reads (`Variable::terraform`). A variable
+    /// declared both in a file Terraform reads and in one only OpenTofu reads is Terraform's
+    /// reading alone (`Variable::terraform_only`).
     fn declare(&mut self, name: &str, mut variable: Variable, overriding: bool) {
-        let Some(declared) = self.variables.get_mut(name) else {
-            if !overriding {
-                // A default is converted to the type its block declares when it is decoded.
-                variable.through = variable.default.iter().flat_map(|_| variable.ty).collect();
-                variable.opentofu = config_values::only_opentofu(&variable.path);
-                self.variables.insert(name.to_string(), variable);
-            }
-            return;
-        };
         let tofu = config_values::only_opentofu(&variable.path);
-        if tofu && !declared.opentofu {
-            declared.terraform = Some(Box::new(declared.clone()));
-        } else if let Some(terraform) = declared.terraform.as_mut().filter(|_| !tofu) {
-            terraform.merge(variable.clone(), overriding);
+        if let Some(declared) = self.variables.get_mut(name) {
+            let twice = !overriding && tofu != config_values::only_opentofu(&declared.path);
+            match (twice, tofu) {
+                // A declaration Terraform reads replaces one only OpenTofu reads.
+                (true, false) => variable.terraform_only = true,
+                (true, true) => {
+                    declared.terraform_only = true;
+                    return;
+                }
+                (false, true) if declared.terraform_only => return,
+                (false, _) => {
+                    if tofu && !declared.opentofu {
+                        declared.terraform = Some(Box::new(declared.clone()));
+                    } else if let Some(terraform) = declared.terraform.as_mut().filter(|_| !tofu) {
+                        terraform.merge(variable.clone(), overriding);
+                    }
+                    declared.merge(variable, overriding);
+                    return;
+                }
+            }
+        } else if overriding {
+            return;
         }
-        declared.merge(variable, overriding);
+        // A default is converted to the type its block declares when it is decoded.
+        variable.through = variable.default.iter().flat_map(|_| variable.ty).collect();
+        variable.opentofu = tofu;
+        self.variables.insert(name.to_string(), variable);
     }
 
     /// Each variable OpenTofu refuses (`Variable::opentofu_refuses`) as Terraform reads it, the
@@ -1495,6 +1513,7 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
                     path: path.to_string(),
                     line: line(b.span().map_or(0, |s| s.start)),
                     terraform: None,
+                    terraform_only: false,
                 };
                 module.declare(name, variable, overriding);
                 continue;

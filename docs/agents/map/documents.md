@@ -229,7 +229,7 @@ this file, and a change to these modules updates it.
   converts them in their order; `any` keeps the value), a module argument is evaluated
   in the caller, an override file's `type` and `default` replace the declared ones (`Module::declare`: Terraform
   converts the default to the declaring block's type and again to the override's, which Meada
-  follows; OpenTofu 1.13+ converts once, a ceiling; a variable with a block in a `.tofu` or `.tofu.json` file is unresolved where they differ: `declared_default`; declared in a file Terraform reads, it keeps Terraform's reading apart, `Variable::terraform`, and `Eval::var` compares the two, #767), a var file's value replaces the default, and a default the final type refuses leaves any value
+  follows; OpenTofu 1.13+ converts once, a ceiling; a variable with a block in a `.tofu` or `.tofu.json` file is unresolved where they differ: `declared_default`; declared in a file Terraform reads, it keeps Terraform's reading apart, `Variable::terraform`, and `Eval::var` compares the two, #767; declared in a file of each kind, it is the `.tf` block's, `Variable::terraform_only`, #768), a var file's value replaces the default, and a default the final type refuses leaves any value
   unresolved (`Eval::received`). Check each against Terraform's rule when a change decides on a
   value's kind (`Eval::holds_set`, and `Eval::is_tuple` for a `for_each` both tools refuse);
   `tests/terraform-oracle/modules/` holds cases for the first three.

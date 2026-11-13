@@ -189,20 +189,42 @@ fn a_declaration_only_opentofu_reads_is_exact_where_the_two_conversions_agree() 
     }
 }
 
-/// Two declarations of one variable, in either order of their files.
+/// One variable declared in a file Terraform reads and again in a file only OpenTofu reads
+/// (#768): OpenTofu refuses the directory ("Duplicate variable declaration") and Terraform reads
+/// the `.tf` block alone, in either order of the two files, with the override files it reads and
+/// none only OpenTofu reads. Terraform v1.17.1 names `0-x` on every row; OpenTofu v1.13.9 refuses
+/// each.
 #[test]
-fn a_variable_declared_twice_keeps_every_files_kind_whatever_the_order() {
-    let tf = "variable \"s\" {\n  type = set(string)\n}\n";
-    let tofu = "variable \"s\" {\n  default = [\"x\"]\n}\n";
-    for files in [
-        [("a.tf", tf), ("b.tofu", tofu)],
-        [("a.tofu", tofu), ("b.tf", tf)],
-    ] {
-        let bytes: Vec<(String, Vec<u8>)> = (files.iter())
-            .map(|(p, t)| (p.to_string(), t.as_bytes().to_vec()))
-            .collect();
-        let repository = Repository::read(&bytes);
-        assert!(repository.modules[""].variables["s"].opentofu, "{files:?}");
+fn a_variable_declared_in_a_file_of_each_tool_is_the_block_terraform_reads() {
+    let tf = format!("variable \"s\" {{\n  type = set(string)\n  default = [\"x\"]\n}}\n{READ}");
+    let tofu = "variable \"s\" {\n  type = set(string)\n  default = [\"b\", \"a\", \"a\"]\n}\n";
+    let c = "variable \"s\" {\n  default = [\"c\"]\n}\n";
+    let rows: Vec<(&str, Vec<(&str, &str)>)> = vec![
+        ("a.tf, b.tofu", vec![("a.tf", &tf), ("b.tofu", tofu)]),
+        ("a.tofu, b.tf", vec![("a.tofu", tofu), ("b.tf", &tf)]),
+        (
+            "a.tf, b.tofu.json",
+            vec![("a.tf", &tf), ("b.tofu.json", DECLARED_JSON)],
+        ),
+        (
+            "a.tf, b.tofu, an override.tf",
+            vec![("a.tf", &tf), ("b.tofu", tofu), ("override.tf", LIST)],
+        ),
+        (
+            "a.tofu, b.tf, an override.tf",
+            vec![("a.tofu", tofu), ("b.tf", &tf), ("override.tf", LIST)],
+        ),
+        (
+            "a.tf, b.tofu, an override.tofu",
+            vec![("a.tf", &tf), ("b.tofu", tofu), ("override.tofu", c)],
+        ),
+        (
+            "a.tofu, b.tf, an override.tofu",
+            vec![("a.tofu", tofu), ("b.tf", &tf), ("override.tofu", c)],
+        ),
+    ];
+    for (row, files) in rows {
+        assert_eq!(answer(&files), "f-0-x", "{row}");
     }
 }
 
