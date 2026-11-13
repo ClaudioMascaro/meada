@@ -72,3 +72,12 @@ link. `index::Export::dockerfiles` (table `dockerfiles`, rewritten when the walk
 folders with a `Dockerfile` or a `dockerfile` differs) lets `workspace_step` drop the resolved
 consumer of a call to such a folder with no action file: GitHub builds that action and Meada
 reads none.
+
+Declared permissions (#834): `iac::actions::Facts::permissions` holds the block that governs a
+CI job (its own, else its pipeline's, copied into the job's body by `evaluate`; `None` is `not
+declared`), as `meada_core::export::Permissions` (a word or a map of `Access`). `asked` folds
+the CI jobs of a provider's file into the highest level per permission, `mismatch` compares it
+with the consumer CI job's block at the link, and `link` appends `permissions mismatch: ...`
+after the ref text. `passed` writes the block on the `consumer:` line, `context_at` the
+provider's `permissions:` line under `provides`, and `written` the `permissions` field of the
+consumer row of `meada export`.

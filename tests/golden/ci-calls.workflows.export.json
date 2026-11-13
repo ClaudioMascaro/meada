@@ -246,7 +246,7 @@
       "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
       "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
       "level": "exact",
-      "reason": "@v1 (indexed 2344e45)"
+      "reason": "@v1 (indexed 2344e45), permissions mismatch: id-token write against none"
     },
     {
       "consumer": "github.com/acme/app-b::.github/workflows/ci.yml::jobs[\"publish-stg\"]",

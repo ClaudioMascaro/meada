@@ -78,11 +78,13 @@ builds it lands, and that ticket changes the driver, never the reverse:
 - Three cases. `job_not_reusable` carries the absent mark and `step_docker_only` holds no side
   at all (#827 settled both). `solo_remote` holds no side at all, and its peer's pipeline is an
   orphan in the scope seen from `solo`.
-- F3 (#834 confirms or corrects each): the consumer row's field is `PERMISSIONS`, and any shape
+- F3 (#834 confirmed each): the consumer row's field is `PERMISSIONS`, and any shape
   that holds each declared name and level passes, so a shorthand (`read-all`, `write-all`, `{}`)
   is keyed by its flags alone; `flagged()` takes the flags in either order and fixes no wording
-  beyond #820's (`permissions mismatch`, the permission, both levels as whole words); #820 says
-  a side that is `not declared` is shown so, and where a provider's is shown is not keyed.
+  beyond #820's (`permissions mismatch`, the permission, both levels as whole words). #834
+  writes `, permissions mismatch: <permission> <the provider's level> against <the consumer's>`
+  after `, ref mismatch`, the consumer's block at the end of its `consumer:` line, and the
+  provider's side as one `permissions:` line under `provides`, which is not keyed.
 - F2 (#831 to #833), where a row is recorded: the range (searched in every row that names the CI
   step), the unresolved variable (through `search` kind `unresolved`, by its bare name: `FLAVOR`
   for `vars.FLAVOR`) and a program's arguments (not keyed at all).

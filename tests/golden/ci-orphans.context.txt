@@ -6,7 +6,7 @@ overridable: none
 references: none
 referenced by:
 github.com/acme/app-a .github/workflows/absent.yml:1 .
-consumes ci::github.com/acme/workflows/.github/workflows/missing.yml @main (absent at the indexed commit)
+consumes ci::github.com/acme/workflows/.github/workflows/missing.yml @main permissions: not declared (absent at the indexed commit)
 values:
 github.com/acme/app-a .github/workflows/absent.yml:4 jobs.missing.uses = "acme/workflows/.github/workflows/missing.yml@main"
 
@@ -18,7 +18,7 @@ overridable: none
 references: none
 referenced by:
 github.com/acme/app-a .github/workflows/absent.yml:1 .
-consumes ci::github.com/acme/workflows/.github/workflows/internal.yml @main (absent at the indexed commit: the file is no reusable pipeline there)
+consumes ci::github.com/acme/workflows/.github/workflows/internal.yml @main permissions: not declared (absent at the indexed commit: the file is no reusable pipeline there)
 values:
 github.com/acme/app-a .github/workflows/absent.yml:6 jobs.plain.uses = "acme/workflows/.github/workflows/internal.yml@main"
 

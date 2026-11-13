@@ -729,9 +729,11 @@ fn ci_grants(url: &str, issuer: &str, signing: &EncodingKey) {
     // The two CI jobs of `APP_B` that call `PUBLISH`, as `context` on it lists them.
     const CONSUMERS_OF_APP_B: [&str; 2] = [
         "github.com/acme/app-b .github/workflows/ci.yml:11 jobs[\"publish-prd\"] \
-         [exact: @v1 (indexed 2344e45)] with: package; secrets: token",
+         [exact: @v1 (indexed 2344e45), permissions mismatch: id-token write against none] \
+         with: package; secrets: token; permissions: contents: read",
         "github.com/acme/app-b .github/workflows/ci.yml:18 jobs[\"publish-stg\"] \
-         [exact: @main (indexed 2344e45)] with: package",
+         [exact: @main (indexed 2344e45)] with: package; \
+         permissions: contents: read, id-token: write",
     ];
 
     let read = |identity: &str, identities: &[&str], call: (&'static str, Value)| {

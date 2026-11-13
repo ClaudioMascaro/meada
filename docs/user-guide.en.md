@@ -1460,8 +1460,9 @@ Meada read the provider at. `context` on the pipeline's path lists its callers:
 
 ```text
 provides ci::github.com/acme/workflows/.github/workflows/publish.yml
-  consumer: github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish [exact: @main (indexed 1a2b3c4)] with: package, registry; secrets: inherit
-  consumer: github.com/acme/app-b .github/workflows/ci.yml:11 jobs["publish-prd"] [exact: @v1 (indexed 1a2b3c4)] with: package; secrets: token
+  permissions: contents: read, id-token: write
+  consumer: github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish [exact: @main (indexed 1a2b3c4)] with: package, registry; secrets: inherit; permissions: contents: read, id-token: write
+  consumer: github.com/acme/app-b .github/workflows/ci.yml:11 jobs["publish-prd"] [exact: @v1 (indexed 1a2b3c4), permissions mismatch: id-token write against none] with: package; secrets: token; permissions: contents: read
 ```
 
 Meada never resolves a ref: `exact` says the call names that file, not that it runs the indexed
@@ -1472,6 +1473,17 @@ one): the reason then reads `@<ref> (indexed commit unknown)` and never carries 
 `trace` with `direction=up` follows the chain through intermediate reusable pipelines and
 composite actions, up to every calling CI job; the file's path, the file's node
 (`<repository>::<file path>::.`) and the contract start the same chain.
+
+**Declared permissions.** Each calling CI job shows the `permissions` block that governs it: its
+own, else its pipeline's, else `not declared`. A block is closed, so a permission it does not
+name is `none`; `read-all`, `write-all` and `{}` read as the blocks they stand for. Under
+`provides`, the `permissions:` line is what the CI jobs of the called pipeline declare together,
+the highest level for each permission. When that is above what the caller's block holds, the
+link's reason ends with `permissions mismatch` and names the permission and both levels
+(`id-token write against none`: the called pipeline declares `write`, the caller holds `none`).
+A side that declares nothing reads `not declared` and is never compared: Meada reads no default
+of a repository or of an organization. These are the permissions the files declare at the
+indexed commit, not the effective ones of a run, and a CI step that calls an action carries none.
 
 **Orphans and the absent mark.** `meada status` lists a reusable pipeline or an action that
 nothing calls as an orphan, only when the visible scope holds at least one provider and one

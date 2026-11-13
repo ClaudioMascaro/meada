@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
-use meada_core::export::{Inherit, Secrets};
+use meada_core::export::{Access, AllPermissions, Inherit, Permissions, Secrets};
 use rusqlite::Transaction;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -33,7 +33,7 @@ const WORKFLOWS: &str = ".github/workflows/";
 /// The node types of this format. Prose says pipeline, action, CI job and CI step (ADR 0028).
 const WORKFLOW: &str = "workflow";
 pub(crate) const ACTION: &str = "action";
-const JOB: &str = "job";
+pub(crate) const JOB: &str = "job";
 pub(crate) const STEP: &str = "step";
 
 /// The condition that a row of `iac_nodes` is a node of this format: its unit is its file, which
@@ -62,6 +62,40 @@ pub(crate) struct Facts {
     /// none. Such a name keeps no row and still hides the ones of an `env` farther up.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hollow: Vec<String>,
+    /// The `permissions` block that governs a CI job: its own, else its pipeline's. None when
+    /// neither declares one, or when the one that governs is not read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permissions: Option<Permissions>,
+}
+
+/// The `permissions` block `value` declares: one of the words `read-all` and `write-all`, or a
+/// mapping whose every level is `none`, `read` or `write` (`{}` names none) and whose every
+/// name is letters, digits, `-` and `_`, so that a name writes no level of its own in an
+/// answer. Any other value is not read, as a block not declared: Meada guesses no level.
+fn permissions(value: Option<&Value>) -> Option<Permissions> {
+    match value? {
+        Value::String(word) => match word.as_str() {
+            "read-all" => Some(Permissions::All(AllPermissions::ReadAll)),
+            "write-all" => Some(Permissions::All(AllPermissions::WriteAll)),
+            _ => None,
+        },
+        Value::Object(map) => {
+            let level = |value: &Value| match value.as_str()? {
+                "none" => Some(Access::None),
+                "read" => Some(Access::Read),
+                "write" => Some(Access::Write),
+                _ => None,
+            };
+            let name = |b: u8| b.is_ascii_alphanumeric() || b == b'-' || b == b'_';
+            let kept =
+                |key: &String| !key.is_empty() && key.len() <= VALUE_MAX && key.bytes().all(name);
+            let named = map
+                .iter()
+                .map(|(key, value)| Some((kept(key).then(|| key.clone())?, level(value)?)));
+            named.collect::<Option<_>>().map(Permissions::Named)
+        }
+        _ => None,
+    }
 }
 
 /// The names the `env` mapping `value` defines with no config value, among the names an
@@ -233,15 +267,23 @@ impl Unit<'_> {
                     .map(Secrets::Keys),
             };
         }
+        if ty == JOB {
+            facts.permissions = permissions(body.get("permissions"));
+        }
         let passed = match &facts.secrets {
             Some(Secrets::Keys(keys)) => keys.iter().chain(&facts.with),
             _ => [].iter().chain(&facts.with),
+        };
+        let named = match &facts.permissions {
+            Some(Permissions::Named(named)) => named.keys().map(String::len).sum(),
+            _ => 0,
         };
         let size = [&name, &facts.id, &facts.uses]
             .iter()
             .map(|s| s.as_ref().map_or(0, String::len))
             .chain(passed.chain(&facts.hollow).map(String::len))
-            .sum::<usize>();
+            .sum::<usize>()
+            + named;
         if !self.take(address.len() + size) {
             return false;
         }
@@ -387,6 +429,10 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
         // A CI job is found by its id, which its address may quote.
         let mut body = job.clone();
         body.insert("id".into(), Value::String(id.clone()));
+        // The block that governs a CI job is its own, else its pipeline's.
+        if let (false, Some(block)) = (job.contains_key("permissions"), doc.get("permissions")) {
+            body.insert("permissions".into(), block.clone());
+        }
         if !unit.node(&at, JOB, &body, lines) {
             break;
         }

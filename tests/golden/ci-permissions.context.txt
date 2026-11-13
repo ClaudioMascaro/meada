@@ -1,0 +1,2 @@
+consumes ci::github.com/acme/workflows/.github/workflows/publish.yml @0123456789abcdef0123456789abcdef01234567 permissions: contents: read
+  provider: github.com/acme/workflows .github/workflows/publish.yml:1 . [exact: @0123456789abcdef0123456789abcdef01234567 (indexed <indexed>), ref mismatch, permissions mismatch: id-token write against none]

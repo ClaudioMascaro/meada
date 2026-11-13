@@ -19,6 +19,7 @@ mod ci;
 mod ci_calls;
 mod ci_orphans;
 mod ci_owned;
+mod ci_permissions;
 mod ci_program;
 mod ci_run;
 mod ci_served;

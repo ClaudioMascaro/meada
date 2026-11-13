@@ -34,7 +34,7 @@ W = '.github/workflows/'
 # The optional fields of a consumer row in `meada export`, as #824 named them.
 REF, WITH, SECRETS = 'ref', 'with', 'secrets'
 ABSENT = 'absent at the indexed commit'  # #820's words for the mark
-# The consumer row's field for the declared permissions. #820 leaves the name to #834: this is the name it confirms or corrects.
+# The consumer row's field for the declared permissions, as #834 named it.
 PERMISSIONS = 'permissions'
 NOT_DECLARED, PMISMATCH = 'not declared', 'permissions mismatch'  # #820's words
 LEVELS = ('none', 'read', 'write')  # #820: the levels, in their order

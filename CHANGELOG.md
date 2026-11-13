@@ -74,6 +74,15 @@ All notable changes to Meada are recorded here. The format follows
   left open is dropped, an open part of the name makes a pattern and a name left open whole is
   an unresolved builder. A build without `--push` and text in `echo`, a string, a comment or a
   script with a heredoc give no side. Release level: minor, meada (#833).
+- A CI job that calls a reusable pipeline shows the `permissions` block that governs it (its
+  own, else its pipeline's, else `not declared`), and `context` on the pipeline shows what its CI
+  jobs declare together (ADR 0028). A block is closed, and `read-all`, `write-all` and `{}` read
+  as the blocks they stand for. When a CI job of the called pipeline declares a permission above
+  what the caller's block holds, the link's reason ends with `permissions mismatch` and names the
+  permission and both levels, after `ref mismatch` when both hold. A side that declares nothing
+  is never compared: these are declared permissions, not effective ones. `meada export` gains
+  the optional consumer field `permissions`. Existing indexes are rebuilt once on first use.
+  Release level: minor, meada and meada-core (#834).
 
 ### Changed
 

@@ -106,7 +106,7 @@ fn a_call_to_a_path_with_no_provider_is_marked_absent_on_its_side() {
     assert_eq!(
         listed(&missing, "consumes "),
         [format!(
-            "{WORKFLOWS}/.github/workflows/missing.yml @main{MARK}"
+            "{WORKFLOWS}/.github/workflows/missing.yml @main permissions: not declared{MARK}"
         )],
         "{missing}"
     );
@@ -116,7 +116,7 @@ fn a_call_to_a_path_with_no_provider_is_marked_absent_on_its_side() {
     assert_eq!(
         listed(&plain, "consumes "),
         [format!(
-            "{WORKFLOWS}/.github/workflows/internal.yml @main (absent at the indexed commit: the file is no reusable pipeline there)"
+            "{WORKFLOWS}/.github/workflows/internal.yml @main permissions: not declared (absent at the indexed commit: the file is no reusable pipeline there)"
         )],
         "{plain}"
     );

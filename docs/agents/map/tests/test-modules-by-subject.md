@@ -504,6 +504,10 @@
   `programs.yml` per row of the level table, the command as text on the consumer row
   (`ci-programs.workflows.export.json`), the limit of declaring packages, a program of the CI
   step's own repository, `context` from both ends and `trace` both ways (`ci-programs.trace.txt`).
+- `ci_permissions.rs` (#834): declared permissions on the reproduction of #816 (the table of
+  the ticket, `not declared`, the export rows), the closed block and the shorthands over pairs
+  of pipelines written inline, the fixed order of both flags (`ci-permissions.context.txt`) and
+  an edited block on either side against a cold index.
 - `ci_served.rs` (#829): the CI kind in server mode over the reproduction of #816: MCP over HTTP
   equal to stdio for every flow of the kind, and a manifest without the provider's repository
   giving no link to it and no consumer of it. Its helpers (`listed`, `about_the_call`,

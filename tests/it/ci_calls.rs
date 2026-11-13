@@ -75,16 +75,16 @@ fn a_reusable_pipeline_lists_every_ci_job_of_the_workspace_that_calls_it() {
         listed(&answer, "  consumer: "),
         [
             format!(
-                "github.com/acme/app-a {ci}:12 jobs.publish [exact: @main (indexed {at})] with: package, registry; secrets: inherit"
+                "github.com/acme/app-a {ci}:12 jobs.publish [exact: @main (indexed {at})] with: package, registry; secrets: inherit; permissions: contents: read, id-token: write"
             ),
             format!(
-                "github.com/acme/app-b {ci}:11 jobs[\"publish-prd\"] [exact: @v1 (indexed {at})] with: package; secrets: token"
+                "github.com/acme/app-b {ci}:11 jobs[\"publish-prd\"] [exact: @v1 (indexed {at}), permissions mismatch: id-token write against none] with: package; secrets: token; permissions: contents: read"
             ),
             format!(
-                "github.com/acme/app-b {ci}:18 jobs[\"publish-stg\"] [exact: @main (indexed {at})] with: package"
+                "github.com/acme/app-b {ci}:18 jobs[\"publish-stg\"] [exact: @main (indexed {at})] with: package; permissions: contents: read, id-token: write"
             ),
             format!(
-                "github.com/acme/wrapper .github/workflows/release.yml:5 jobs.release [exact: @main (indexed {at})] with: package; secrets: inherit"
+                "github.com/acme/wrapper .github/workflows/release.yml:5 jobs.release [exact: @main (indexed {at})] with: package; secrets: inherit; permissions: contents: read, id-token: write"
             ),
         ],
         "{answer}"
@@ -130,9 +130,9 @@ fn a_pipeline_provides_only_with_workflow_call_and_its_identifier_is_lower_cased
     assert_eq!(
         listed(&scan, "  consumer: "),
         [
-            format!("github.com/acme/app-a {CI}:24 jobs.scan [exact: @v2 (indexed {at})]"),
+            format!("github.com/acme/app-a {CI}:24 jobs.scan [exact: @v2 (indexed {at})] permissions: not declared"),
             // The `$/` call of `forms.yml` (#826), inside the repository: no ref.
-            "github.com/acme/workflows .github/workflows/forms.yml:8 jobs.rooted [exact: own repository]"
+            "github.com/acme/workflows .github/workflows/forms.yml:8 jobs.rooted [exact: own repository] permissions: not declared"
                 .to_string(),
         ],
         "{scan}"
@@ -156,7 +156,10 @@ fn a_pipeline_provides_only_with_workflow_call_and_its_identifier_is_lower_cased
         let answer = engine.context(job, None).unwrap();
         assert_eq!(
             listed(&answer, "consumes "),
-            [format!("{} @main {mark}", file(name))],
+            [format!(
+                "{} @main permissions: not declared {mark}",
+                file(name)
+            )],
             "{answer}"
         );
         assert!(listed(&answer, "  provider: ").is_empty(), "{answer}");
@@ -202,7 +205,7 @@ fn the_host_of_a_call_is_the_consumers_own() {
     assert_eq!(
         listed(&answer, "  consumer: "),
         [format!(
-            "git.example.com/acme/app-a {CI}:12 jobs.publish [exact: @main (indexed {at})] with: package, registry; secrets: inherit"
+            "git.example.com/acme/app-a {CI}:12 jobs.publish [exact: @main (indexed {at})] with: package, registry; secrets: inherit; permissions: contents: read, id-token: write"
         )],
         "{answer}"
     );
@@ -253,7 +256,7 @@ fn a_reason_shows_the_ref_and_flags_only_another_full_commit_id() {
         .map(|(n, (id, written, flag))| {
             let line = 3 + 2 * n;
             format!(
-                "github.com/acme/app-c .github/workflows/refs.yml:{line} jobs.{id} [exact: @{written} (indexed {at}){flag}]"
+                "github.com/acme/app-c .github/workflows/refs.yml:{line} jobs.{id} [exact: @{written} (indexed {at}){flag}] permissions: not declared"
             )
         })
         .collect();
@@ -359,13 +362,15 @@ fn a_caller_indexed_alone_holds_no_side_until_its_peer_is_in_the_workspace() {
     let at = indexed(&workflows);
     assert_eq!(
         listed(&answer, "consumes "),
-        [format!("{CONTRACT} @v1 with: package; secrets: token")],
+        [format!(
+            "{CONTRACT} @v1 with: package; secrets: token; permissions: contents: read"
+        )],
         "{answer}"
     );
     assert_eq!(
         listed(&answer, "  provider: "),
         [format!(
-            "github.com/acme/workflows {PUBLISH}:1 . [exact: @v1 (indexed {at})]"
+            "github.com/acme/workflows {PUBLISH}:1 . [exact: @v1 (indexed {at}), permissions mismatch: id-token write against none]"
         )],
         "{answer}"
     );
@@ -563,7 +568,7 @@ fn a_key_or_a_ref_with_a_control_character_writes_no_line_of_its_own() {
     assert!(
         consumers.contains(
             &format!(
-                "github.com/acme/app-a .github/workflows/forged.yml:3 jobs.keys [exact: @main (indexed {at})] with: kept"
+                "github.com/acme/app-a .github/workflows/forged.yml:3 jobs.keys [exact: @main (indexed {at})] with: kept; permissions: not declared"
             )
             .as_str()
         ),
@@ -591,7 +596,7 @@ fn trace_up_from_a_reusable_pipeline_reaches_its_callers_through_an_intermediate
             format!("  →[exact: @main (indexed {at})] github.com/acme/app-a {CI}:12 jobs.publish"),
             format!("    github.com/acme/app-a {CI}:1 ."),
             format!(
-                "  →[exact: @v1 (indexed {at})] github.com/acme/app-b {CI}:11 jobs[\"publish-prd\"]"
+                "  →[exact: @v1 (indexed {at}), permissions mismatch: id-token write against none] github.com/acme/app-b {CI}:11 jobs[\"publish-prd\"]"
             ),
             format!("    github.com/acme/app-b {CI}:1 ."),
             format!(

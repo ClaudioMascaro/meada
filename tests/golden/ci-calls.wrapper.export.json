@@ -21,7 +21,11 @@
       "with": [
         "package"
       ],
-      "secrets": "inherit"
+      "secrets": "inherit",
+      "permissions": {
+        "contents": "read",
+        "id-token": "write"
+      }
     }
   ],
   "iac_nodes": [

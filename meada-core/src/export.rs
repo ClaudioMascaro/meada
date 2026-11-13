@@ -3,7 +3,7 @@
 //! export written again is the same bytes. What the build needs and never writes (where the
 //! repository stands, the manifests read, the gateways of a route) stays in the binary.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -266,6 +266,68 @@ pub struct Consumer {
     /// ref: absent is not broken.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub absent: bool,
+    /// The `permissions` block that governs the CI job of a CI call: its own, else its
+    /// pipeline's. Left out when neither declares one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permissions: Option<Permissions>,
+}
+
+/// A `permissions` block as a pipeline file declares it (ADR 0028): one of the words
+/// `read-all` and `write-all` (`"permissions": "read-all"`), or the permissions it names with
+/// their levels (`"permissions": {"contents": "read"}`). The block is closed: a permission it
+/// does not name is `none`. Declared, never granted: no setting of a repository or of an
+/// organization is read.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum Permissions {
+    All(AllPermissions),
+    Named(BTreeMap<String, Access>),
+}
+
+impl Permissions {
+    /// The level the block gives every permission it does not name.
+    pub fn rest(&self) -> Access {
+        match self {
+            Self::All(AllPermissions::ReadAll) => Access::Read,
+            Self::All(AllPermissions::WriteAll) => Access::Write,
+            Self::Named(_) => Access::None,
+        }
+    }
+
+    /// The level the block gives `permission`.
+    pub fn level(&self, permission: &str) -> Access {
+        match self {
+            Self::Named(named) => named.get(permission).copied().unwrap_or(Access::None),
+            Self::All(_) => self.rest(),
+        }
+    }
+}
+
+/// The words that give every permission one level.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AllPermissions {
+    ReadAll,
+    WriteAll,
+}
+
+/// The level of a permission, in GitHub's order: `none`, `read`, `write`.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "lowercase")]
+pub enum Access {
+    None,
+    Read,
+    Write,
+}
+
+impl Access {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Read => "read",
+            Self::Write => "write",
+        }
+    }
 }
 
 /// The secrets a CI job passes to the reusable pipeline it calls (ADR 0028): the word `inherit`

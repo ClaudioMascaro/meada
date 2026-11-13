@@ -8,9 +8,10 @@
 //! and never resolved. A CI step's `./<folder>` is read in the CI runner's workspace, so it is
 //! unresolved wherever that is not known to be the file's repository (`workspace_causes`).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use meada_core::export as written;
+use meada_core::export::{Access, AllPermissions, Permissions};
 
 use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search};
 use crate::iac::{Node, actions};
@@ -230,7 +231,93 @@ fn reason(git_ref: Option<&str>, indexed: Option<&str>) -> String {
     format!("@{git_ref} (indexed {short}){mismatch}")
 }
 
-/// The keys a call passes, as an answer shows them after it: ` with: a, b; secrets: inherit`.
+/// A `permissions` block as an answer shows it: its word, or what it names (`{}` for none).
+fn block(permissions: &Permissions) -> String {
+    match permissions {
+        Permissions::All(AllPermissions::ReadAll) => "read-all".into(),
+        Permissions::All(AllPermissions::WriteAll) => "write-all".into(),
+        Permissions::Named(named) if named.is_empty() => "{}".into(),
+        Permissions::Named(named) => {
+            let levels = named
+                .iter()
+                .map(|(name, level)| format!("{name}: {}", level.name()));
+            levels.collect::<Vec<_>>().join(", ")
+        }
+    }
+}
+
+/// What the CI jobs of the pipeline `file` of `export` declare together: the highest level one
+/// of them gives every permission none names, and each permission one names. None when no CI
+/// job there holds a block: nothing is declared, and Meada guesses no default.
+fn asked<'e>(export: &'e Export, file: &str) -> Option<(Access, BTreeMap<&'e str, Access>)> {
+    let blocks: Vec<&Permissions> = (export.iac.iter())
+        .filter(|n| actions::owns(n) && n.ty == actions::JOB && n.path == file)
+        .filter_map(|n| n.actions.as_ref()?.permissions.as_ref())
+        .collect();
+    let rest = blocks.iter().map(|block| block.rest()).max()?;
+    let names = blocks.iter().flat_map(|block| match block {
+        Permissions::Named(named) => named.keys().collect(),
+        Permissions::All(_) => Vec::new(),
+    });
+    let highest = |name: &str| blocks.iter().map(|block| block.level(name)).max();
+    let named = names.map(|name| (name.as_str(), highest(name).unwrap_or(rest)));
+    Some((rest, named.collect()))
+}
+
+/// The line of a reusable pipeline's `context` that says what its CI jobs declare together.
+fn asked_line(export: &Export, file: &str) -> String {
+    let Some((rest, named)) = asked(export, file) else {
+        return "  permissions: not declared".into();
+    };
+    let word = match rest {
+        Access::None => None,
+        Access::Read => Some("read-all".to_string()),
+        Access::Write => Some("write-all".to_string()),
+    };
+    let above = named.iter().filter(|(_, level)| **level != rest);
+    let parts: Vec<String> = (word.into_iter())
+        .chain(above.map(|(name, level)| format!("{name}: {}", level.name())))
+        .collect();
+    match parts.is_empty() {
+        true => "  permissions: {}".into(),
+        false => format!("  permissions: {}", parts.join(", ")),
+    }
+}
+
+/// The permissions a CI job of the provider at the site `provider` declares above what the
+/// block of the CI job at `consumer` holds, each with both levels. None when either side
+/// declares nothing, and for a CI step, which calls an action: only a CI job is compared.
+fn mismatch(exports: &[Export], consumer: &str, provider: &str) -> Vec<String> {
+    let held = node_at(exports, consumer)
+        .filter(|(_, node)| node.ty == actions::JOB)
+        .and_then(|(_, node)| node.actions.as_ref()?.permissions.as_ref());
+    let pipeline = node_at(exports, provider).and_then(|(repository, file)| {
+        let export = exports.iter().find(|e| e.repository == repository)?;
+        asked(export, &file.path)
+    });
+    let (Some(held), Some((rest, named))) = (held, pipeline) else {
+        return Vec::new();
+    };
+    let own: Vec<&str> = match held {
+        Permissions::Named(own) => own.keys().map(String::as_str).collect(),
+        Permissions::All(_) => Vec::new(),
+    };
+    let names: BTreeSet<&str> = named.keys().copied().chain(own).collect();
+    let level = |name: &str| named.get(name).copied().unwrap_or(rest);
+    let against =
+        |what: &str, a: Access, b: Access| format!("{what} {} against {}", a.name(), b.name());
+    let mut above: Vec<String> = (names.into_iter())
+        .filter(|name| level(name) > held.level(name))
+        .map(|name| against(name, level(name), held.level(name)))
+        .collect();
+    if rest > held.rest() {
+        above.push(against("every other permission", rest, held.rest()));
+    }
+    above
+}
+
+/// The keys a call passes and, for a CI job, the `permissions` block that governs it, as an
+/// answer shows them after it: ` with: a, b; secrets: inherit; permissions: contents: read`.
 fn passed(node: &Node) -> String {
     let Some(facts) = &node.actions else {
         return String::new();
@@ -243,6 +330,12 @@ fn passed(node: &Node) -> String {
         Some(written::Secrets::Inherit(_)) => parts.push("secrets: inherit".into()),
         Some(written::Secrets::Keys(keys)) => parts.push(format!("secrets: {}", keys.join(", "))),
         None => {}
+    }
+    // Declared, never granted: a CI job with no block of its own or of its pipeline says so.
+    if node.ty == actions::JOB {
+        let declared = facts.permissions.as_ref().map(block);
+        let declared = declared.unwrap_or_else(|| "not declared".into());
+        parts.push(format!("permissions: {declared}"));
     }
     if parts.is_empty() {
         return String::new();
@@ -435,12 +528,17 @@ impl ContractKind for Ci {
                 let indexed = (exports.iter())
                     .find(|e| e.repository == repository.identity)
                     .and_then(|e| e.commit.as_deref());
+                let mut reason = reason(uses.git_ref(), indexed);
+                let above = mismatch(exports, &consumer.site, &provider.site);
+                if !above.is_empty() {
+                    reason.push_str(&format!(", permissions mismatch: {}", above.join(", ")));
+                }
                 Link::new(
                     consumer.site.clone(),
                     provider.site.clone(),
                     contract.into(),
                     Level::Exact,
-                    reason(uses.git_ref(), indexed),
+                    reason,
                     None,
                     None,
                     None,
@@ -477,6 +575,9 @@ impl ContractKind for Ci {
                 (export.providers.iter()).filter(|p| p.site == site && ours(&p.contract));
             for provider in provided {
                 lines.push(format!("provides {}", provider.contract));
+                // What its CI jobs declare together, which each consumer's block is held against.
+                let file = node_at(exports, site).filter(|(_, n)| n.ty != actions::ACTION);
+                lines.extend(file.map(|(_, file)| asked_line(export, &file.path)));
                 let calling = (links.iter())
                     .filter(|l| l.provider == site && l.contract == provider.contract);
                 lines.extend(calling.filter_map(|l| side("consumer", &l.consumer, l)));
@@ -531,6 +632,7 @@ impl ContractKind for Ci {
             if let Some(facts) = calling.get(&consumer.site).and_then(|n| n.actions.as_ref()) {
                 consumer.with = facts.with.clone();
                 consumer.secrets = facts.secrets.clone();
+                consumer.permissions = facts.permissions.clone();
             }
         }
     }

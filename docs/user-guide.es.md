@@ -1488,8 +1488,9 @@ commit en que Meada leyó el proveedor. `context` en la ruta del pipeline lista 
 
 ```text
 provides ci::github.com/acme/workflows/.github/workflows/publish.yml
-  consumer: github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish [exact: @main (indexed 1a2b3c4)] with: package, registry; secrets: inherit
-  consumer: github.com/acme/app-b .github/workflows/ci.yml:11 jobs["publish-prd"] [exact: @v1 (indexed 1a2b3c4)] with: package; secrets: token
+  permissions: contents: read, id-token: write
+  consumer: github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish [exact: @main (indexed 1a2b3c4)] with: package, registry; secrets: inherit; permissions: contents: read, id-token: write
+  consumer: github.com/acme/app-b .github/workflows/ci.yml:11 jobs["publish-prd"] [exact: @v1 (indexed 1a2b3c4), permissions mismatch: id-token write against none] with: package; secrets: token; permissions: contents: read
 ```
 
 Meada nunca resuelve un ref: `exact` dice que la llamada nombra ese archivo, no que ejecuta la
@@ -1501,6 +1502,18 @@ motivo termina en `, ref mismatch`. En el modo servidor el commit indexado es el
 la cadena a través de los pipelines reutilizables intermedios y de las actions compuestas, hasta
 cada job de CI que llama; la ruta del archivo, el nodo del archivo
 (`<repositorio>::<ruta del archivo>::.`) y el contrato inician la misma cadena.
+
+**Permisos declarados.** Cada job de CI que llama muestra el bloque `permissions` que lo
+gobierna: el suyo, si no el del pipeline, si no `not declared`. Un bloque es cerrado: el permiso
+que no nombra es `none`; `read-all`, `write-all` y `{}` valen por los bloques que representan.
+Bajo `provides`, la línea `permissions:` es lo que los jobs de CI del pipeline llamado declaran
+juntos, el nivel más alto de cada permiso. Cuando eso queda por encima de lo que contiene el
+bloque de quien llama, el motivo del enlace termina con `permissions mismatch` y nombra el
+permiso y los dos niveles (`id-token write against none`: el pipeline llamado declara `write`,
+quien llama tiene `none`). Un lado que no declara nada aparece como `not declared` y nunca se
+compara: Meada no lee el valor por defecto de un repositorio ni de una organización. Son los
+permisos que los archivos declaran en el commit indexado, no los efectivos de una ejecución, y un
+paso de CI que llama a una action no lleva ninguno.
 
 **Huérfanos y la marca de ausente.** `meada status` lista como huérfano el pipeline reutilizable
 o la action que nada llama, solo cuando el alcance visible tiene al menos un proveedor y un

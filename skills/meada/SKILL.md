@@ -74,6 +74,14 @@ it consumes it.
   a caller pinned to a full commit id other than the indexed one: read the file at that commit
   before you state what that caller runs. `(indexed commit unknown)` is server mode over a
   checkout that was not clean: no commit is known there, and no mismatch is ever flagged.
+- **Permissions.** A `consumer:` line of a CI job ends with the `permissions` block that governs
+  it: its own, else its pipeline's, else `not declared`. The `permissions:` line under
+  `provides` is what the CI jobs of the called pipeline declare together. A reason that ends
+  with `permissions mismatch: id-token write against none` marks a caller whose block holds
+  less than the called pipeline declares (`write` there, `none` here): name that caller before
+  the pipeline comes to depend on the permission. Say "declares", as the files do at the
+  indexed commit: the effective permissions of a run also follow settings Meada does not read,
+  so `not declared` is unknown, never `none`.
 - **Programs.** A CI step whose command is a console script of a PyPI package of the workspace
   links to the function the script names, so `trace` with `direction: "up"` from a symbol or a
   route reaches the CI jobs that run it, and `direction: "down"` from a CI job enters the

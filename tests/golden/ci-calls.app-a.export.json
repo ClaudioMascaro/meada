@@ -35,7 +35,11 @@
         "package",
         "registry"
       ],
-      "secrets": "inherit"
+      "secrets": "inherit",
+      "permissions": {
+        "contents": "read",
+        "id-token": "write"
+      }
     },
     {
       "contract": "ci::github.com/acme/workflows/.github/workflows/scan.yml",

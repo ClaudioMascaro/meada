@@ -54,7 +54,7 @@ overridable: none
 references: none
 referenced by:
 github.com/acme/workflows .github/workflows/forms.yml:1 .
-consumes ci::github.com/acme/workflows/.github/workflows/lint.yml
+consumes ci::github.com/acme/workflows/.github/workflows/lint.yml permissions: not declared
   provider: github.com/acme/workflows .github/workflows/lint.yml:1 . [exact: own repository]
 values:
 github.com/acme/workflows .github/workflows/forms.yml:7 jobs.local.uses = "./.github/workflows/lint.yml"

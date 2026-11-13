@@ -21,11 +21,15 @@ jobs:
       - run: make build
   publish-prd:
     needs: build
+    permissions:
+      id-token: write
+      contents: read
     uses: acme/workflows/.github/workflows/publish.yml@v1
     with:
       package: sample
     secrets:
       token: ${{ secrets.TOKEN }}
   publish-stg:
+    permissions: read-all
     uses: acme/workflows/.github/workflows/publish.yml@main
     secrets: inherit
