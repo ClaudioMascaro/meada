@@ -1792,8 +1792,10 @@ fn cost(
     match expr {
         Expression::Null(_) | Expression::Bool(_) | Expression::Number(_) => 8,
         Expression::String(s) => s.len() + 2,
+        // An element costs a byte at least (a template of no text costs nothing), so a list's
+        // cost bounds how many elements it holds, as `join` and `formatlist` read it (#764).
         Expression::Array(items) => (items.iter())
-            .map(|e| cost(e, roots, iters, overhead))
+            .map(|e| cost(e, roots, iters, overhead).max(1))
             .fold(2, add),
         Expression::Object(object) => (object.iter())
             .map(|(k, v)| {
@@ -1804,15 +1806,13 @@ fn cost(
                 add(key, cost(v.expr(), roots, iters, overhead))
             })
             .fold(2, add),
-        // A template makes a string, its quotes counted as `size` counts them: one of no text
-        // still makes an element, so no element of a list costs nothing (#764).
         Expression::StringTemplate(t) => {
             *overhead = add(*overhead, parse_cost(t.span(), t, iters));
-            add(template_cost(t, roots, iters, overhead), 2)
+            template_cost(t, roots, iters, overhead)
         }
         Expression::HeredocTemplate(h) => {
             *overhead = add(*overhead, parse_cost(h.span(), &h.template, iters));
-            add(template_cost(&h.template, roots, iters, overhead), 2)
+            template_cost(&h.template, roots, iters, overhead)
         }
         Expression::Parenthesis(p) => cost(p.inner(), roots, iters, overhead),
         Expression::Variable(v) => match iters.iter().rev().find(|(n, _)| n == v.as_str()) {
@@ -5203,26 +5203,32 @@ mod tests {
     }
 
     /// What the square of their arguments named before #764 stays named: a `formatlist` over a
-    /// list of no known length and a `replace` of two variables. Each name is the one Terraform
-    /// v1.17.1's `console` gives (the #764 verifier's cases p1, p2b and p3).
+    /// list of no known length, a `replace` of two variables, and one of two templates at the
+    /// edge of the ceiling (a template's cost is what it was). Each name is the one Terraform
+    /// v1.17.1's `console` gives (the #764 verifier's cases p1, p2b, p3 and d1).
     #[test]
     fn a_join_formatlist_or_replace_the_square_accepted_stays_named() {
         let items = |n: usize| (0..n).map(|i| format!("\"i-{i:02}\"")).collect::<Vec<_>>();
         let (p, q) = (items(60).join(", "), items(70).join(", "));
         let (s, t) = ("b".repeat(398), "y".repeat(398));
+        let (u, w) = ("b".repeat(500), "y".repeat(507));
         let main = format!(
             "variable \"p\" {{ default = [{p}] }}\n\
              variable \"q\" {{ default = [{q}] }}\n\
              variable \"s\" {{ default = \"{s}\" }}\n\
              variable \"t\" {{ default = \"{t}\" }}\n\
+             variable \"u\" {{ default = \"{u}\" }}\n\
+             variable \"w\" {{ default = \"{w}\" }}\n\
              resource \"a\" \"p\" {{ name = formatlist(\"q-%s\", [for x in var.p : x])[0] }}\n\
              resource \"a\" \"e\" {{ name = element(formatlist(\"q-%s\", tolist(var.q)), 0) }}\n\
-             resource \"a\" \"t\" {{ name = replace(var.s, \"a\", var.t) }}\n"
+             resource \"a\" \"t\" {{ name = replace(var.s, \"a\", var.t) }}\n\
+             resource \"a\" \"d\" {{ name = replace(\"${{var.u}}\", \"a\", \"${{var.w}}\") }}\n"
         );
         let want = [
             "a.p = \"q-i-00\" [var.p main.tf:1]".to_string(),
             "a.e = \"q-i-00\" [var.q main.tf:2]".to_string(),
             format!("a.t = \"{s}\" [var.s main.tf:3] [var.t main.tf:4]"),
+            format!("a.d = \"{u}\" [var.u main.tf:5] [var.w main.tf:6]"),
         ];
         assert_eq!(names(&[("main.tf", &main)]), want);
     }

@@ -19,9 +19,9 @@
   element of its shortest literal or bound list (else as many rows as its costliest argument of
   no known kind), each row the format, `WIDTH_MAX` per argument and six bytes per byte of what
   it formats (`%q` escapes), a list's elements once and any other argument in each row; with an
-  expanded last argument (`f(x...)`) the three are still charged that square, a template
-  counts its two quotes as `size` counts a string's (one of no text is still an element of a
-  list), and a call's charge counts again in the call around it, so by a reading of `cost`
+  expanded last argument (`f(x...)`) the three are still charged that square, a list literal
+  counts each element a byte at least (a template of no text costs nothing), so its cost
+  bounds how many elements it holds, and a call's charge counts again in the call around it, so by a reading of `cost`
   eight nested one-element `join`s are refused where Terraform names `a`; past `EVAL_COST_MAX`
   `hcl-rs` does not evaluate the expression, only its
   template parts resolve; the implementer measured about 0.2 s for an expression at the ceiling
