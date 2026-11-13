@@ -5,5 +5,5 @@ example.com/orphan/infra (.) indexed, 0 files
 example.com/orphan/app (../orphan-app) indexed, 1 files
   resource::s3::archive is unlinked: no writer and reader in different repositories
   resource::s3::unmanaged is unlinked: no writer and reader in different repositories
-  orphan channel::sqs::unmanaged: no provisioner; app.ts::sendUnmanaged::SendMessageCommand#0
-  orphan resource::s3::unmanaged: no provisioner; (repository-level)
+  orphan channel::sqs::unmanaged: no provisioner; app.ts::sendUnmanaged::SendMessageCommand#0 [exact]
+  orphan resource::s3::unmanaged: no provisioner; (repository-level) [declared]

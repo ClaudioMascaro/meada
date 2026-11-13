@@ -1,0 +1,8 @@
+groups:
+- name: app
+  rules:
+  - alert: JobFailures
+    expr: sum(rate(job_failures_total[5m])) > 0
+    labels:
+      severity: error
+      queue: jobs

@@ -135,6 +135,7 @@ pub enum Msg<'a> {
     OrphanUse {
         contract: &'a str,
         place: &'a str,
+        level: meada_core::export::Level,
     },
     /// The missing reads of the repository's consumers against the routes they call (spec #23).
     Drift(usize),
@@ -1828,11 +1829,14 @@ impl Msg<'_> {
                 format!("órfão {contract}: nenhum uso; {place}"),
                 format!("huérfano {contract}: ningún uso; {place}"),
             ),
-            Msg::OrphanUse { contract, place } => pick(
-                format!("orphan {contract}: no provisioner; {place}"),
-                format!("órfão {contract}: nenhum provisionador; {place}"),
-                format!("huérfano {contract}: ningún provisionador; {place}"),
-            ),
+            Msg::OrphanUse { contract, place, level } => {
+                let level = level.name();
+                pick(
+                    format!("orphan {contract}: no provisioner; {place} [{level}]"),
+                    format!("órfão {contract}: nenhum provisionador; {place} [{level}]"),
+                    format!("huérfano {contract}: ningún provisionador; {place} [{level}]"),
+                )
+            }
             Msg::OrphanAlert { contract, place, emitter } => {
                 let (en, pt, es) = if *emitter { ("emitter", "emissor", "emisor") } else { ("matcher", "matcher", "matcher") };
                 pick(format!("orphan {contract}: no {en}; {place}"), format!("órfão {contract}: nenhum {pt}; {place}"), format!("huérfano {contract}: ningún {es}; {place}"))

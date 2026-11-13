@@ -16,6 +16,10 @@ pub(super) struct Summary {
     pub truncated: bool,
     #[serde(default)]
     pub forwardings: Vec<super::forwarding::Receiver>,
+    /// Whether the file is a stream of several documents, whose key paths start with the
+    /// document's index.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub stream: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -307,6 +311,7 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
     }) else {
         return out;
     };
+    out.stream = docs.len() > 1;
     let mut bytes = 0;
     for (d, doc) in docs.iter().enumerate() {
         let prefix = if docs.len() > 1 {

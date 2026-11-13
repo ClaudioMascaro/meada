@@ -19,7 +19,10 @@ this file, and a change to these modules updates it.
 - Orphans (#657): `iac::orphans::Scope` groups provisioners and uses by
   `ContractKind::provisioned_group` (contract kind plus broker or resource kind). Status lists
   unmatched sides only in groups with both roles in the visible exports, using provisioning
-  links to preserve pattern and root semantics. Search and context mark sides when their
+  links to preserve pattern and root semantics. A config use at `inferred` (a key-name match,
+  left out of `provision::orphan_uses`) opens no group's scope and is never a line, though it
+  counts for the marks and keeps its provisioning links (#797); a `no provisioner` line ends
+  with its side's level. Search and context mark sides when their
   group's other role is absent. Unresolved sides have no group; existing resource diagnostics
   are unchanged. The scope is the engine's already filtered workspace, never another index.
 

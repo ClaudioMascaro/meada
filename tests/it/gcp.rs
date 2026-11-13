@@ -411,7 +411,8 @@ fn gcp_config_refresh_keeps_privacy_cut_values_and_complete_orphan_scope() {
         .lines()
         .filter(|l| l.starts_with("orphan "))
         .collect::<Vec<_>>();
-    assert_eq!(orphan_rows.len(), 4, "{reports}");
+    // `gcs_bucket: absent` is `inferred` and no line; `gs://absent/` is `exact` (#797).
+    assert_eq!(orphan_rows.len(), 3, "{reports}");
     let orphans = orphan_rows
         .iter()
         .map(|l| l.split(';').next().unwrap())

@@ -2921,6 +2921,7 @@ mod tests {
             links: Vec::new(),
             provisioners: Vec::new(),
             config_uses: Vec::new(),
+            policy_grants: Vec::new(),
             config_sites: Vec::new(),
             subscriptions: Vec::new(),
             provisions: Vec::new(),

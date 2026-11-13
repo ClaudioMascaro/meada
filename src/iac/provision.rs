@@ -130,6 +130,19 @@ pub(crate) fn uses(export: &Export) -> impl Iterator<Item = (&str, &str)> {
         )
 }
 
+/// The uses that open an orphan scope and that an orphan line may name, with their level: every
+/// directed use, and every config use but a name match, a plain name under a key that names the
+/// type (`inferred`), which still links (ADR 0026, "Orphan sides").
+pub(crate) fn orphan_uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
+    directed_uses(export).chain(
+        export
+            .config_uses
+            .iter()
+            .filter(|u| u.level != Level::Inferred)
+            .map(|u| (u.site.as_str(), u.contract.as_str(), u.level)),
+    )
+}
+
 fn directed_uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
     export
         .providers

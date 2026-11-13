@@ -479,10 +479,16 @@ a symbolic link, a source with a variable, a form it does not parse) leaves the 
 `inferred`, and the reason says it was not read. `.dockerignore` is not read. Paths never cross
 symbolic links.
 
-`meada status` lists image orphans only when the scope contains both builder and runner. With
-one role, `search` and `context` show `no builder in the workspace` or `no runner in the workspace`.
-Export keeps `format: 1`, retains builder locations and workload roots, and includes `executions`
-for direct paths; the console graph shows the image contracts and workload code.
+`meada status` asks for image orphans per registry and namespace (the first segment of the
+repository path of the normalized name): `ghcr.io/acme/shop` and `ghcr.io/acme/tools/lint` are in
+`ghcr.io/acme`, `docker.io/library/postgres` is in `docker.io/library`, and an image whose path has
+one segment is grouped by its registry alone. A name read as a pattern
+(`ghcr.io/${{ github.repository }}` reads `ghcr.io/*`) is in every group its text before the `*` can
+start. It lists image orphans only for a group that contains both builder and runner; in a group
+with one role, `search` and `context` show `no builder in the workspace` or
+`no runner in the workspace`. Export keeps `format: 1`, retains builder locations and workload
+roots, and includes `executions` for direct paths; the console graph shows the image contracts and
+workload code.
 
 ### CloudFormation and SAM
 
@@ -537,6 +543,34 @@ IaC-only repository produces no such lines; `search` and `context` mark the side
 `no provisioner in the workspace` or `no use in the workspace`. Provisioning links, including
 patterns and independent root modules, determine whether a counterpart exists. Existing
 warnings about declared resources without writers and readers remain separate.
+
+A use Meada only infers from a key name (a plain value under `queue`, `topic`, `bucket`, `table`
+or a typed alias, `inferred`) opens no orphan scope for its group and is never an orphan line: a
+name match proves neither a use nor its absence. It still links to the provisioner of the same
+name, which is therefore no `no use`, and `context` still shows it with `[inferred]`. A
+`no provisioner` line ends with its side's level in brackets, as `context` writes it (`[exact]`,
+`[declared]`), and the `uses` rows of `meada export` carry `level`.
+
+A structured identifier in the resource list of an IAM policy statement (`Resource` or
+`NotResource` of an entry of `Statement`, in a policy file or in a policy document inside a
+template, and `resources` or `not_resources` of a `statement` block of an
+`aws_iam_policy_document`) is a **policy grant**, not a use: it says who may touch the resource,
+with no direction. `context` on the resource lists it with the role `policy grant` and its place,
+with no orphan note (`context` on that place shows it too); it links to no provisioner, opens no
+orphan scope and is never an orphan line, and `meada export` lists it in the `policy_grants`
+array, apart from `uses`. In a JSON Schema document (one with `$schema` at its root), a value
+under `examples`, `default`, `enum` or `const` documents a shape and is no side at all: it stays a
+config value that `search` finds.
+
+In a document that the reader of a contract kind recognizes as its own, Meada infers no use from a
+key name: a Prometheus or Loki rule file (`groups` holding `rules`), a Grafana alert rule file, an
+Alertmanager configuration, a `PrometheusRule` or `AlertmanagerConfig` object (that document of the
+stream only) and a provider document (an OpenAPI or AsyncAPI document that Meada reads, in a
+repository with `[serve]`). There, a rule's `queue: jobs` label is an alert label, not the use of a
+queue; a structured identifier (an ARN) is still an `exact` use, and the values stay config values
+that `search` finds. IaC files (Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose and
+the other documents of a Kubernetes stream) still give such uses, and the same label in a file no
+reader recognizes is still an `inferred` use.
 
 ### Terraform provisioners
 

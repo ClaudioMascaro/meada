@@ -329,6 +329,33 @@ IaC-only repository produces no such lines; `search` and `context` mark the side
 patterns and independent root modules, determine whether a counterpart exists. Existing
 warnings about declared resources without writers and readers remain separate.
 
+A use Meada only infers from a key name (a plain value under `queue`, `topic`, `bucket`, `table`
+or a typed alias, `inferred`) opens no orphan scope for its group and is never an orphan line: a
+name match proves neither a use nor its absence. It still links to the provisioner of the same
+name, which is therefore no `no use`, and `context` still shows it with `[inferred]`. A
+`no provisioner` line ends with its side's level in brackets, as `context` writes it (`[exact]`,
+`[declared]`), and the `uses` rows of `meada export` carry `level`.
+
+A structured identifier in the resource list of an IAM policy statement (`Resource` or
+`NotResource` of an entry of `Statement`, in a policy file or in a policy document inside a
+template, and `resources` or `not_resources` of a `statement` block of an
+`aws_iam_policy_document`) is a **policy grant**, not a use: it says who may touch the resource,
+with no direction. `context` on the resource lists it with the role `policy grant` and its place;
+it links to no provisioner, opens no orphan scope and is never an orphan line, and `meada export`
+lists it in the `policy_grants` array, apart from `uses`. In a JSON Schema document (one with
+`$schema` at its root), a value under `examples`, `default`, `enum` or `const` documents a shape and
+is no side at all: it stays a config value that `search` finds.
+
+In a document that the reader of a contract kind recognizes as its own, Meada infers no use from a
+key name: a Prometheus or Loki rule file (`groups` holding `rules`), a Grafana alert rule file, an
+Alertmanager configuration, a `PrometheusRule` or `AlertmanagerConfig` object (that document of the
+stream only) and a provider document (an OpenAPI or AsyncAPI document that Meada reads, in a
+repository with `[serve]`). There, a rule's `queue: jobs` label is an alert label, not the use of a
+queue; a structured identifier (an ARN) is still an `exact` use, and the values stay config values
+that `search` finds. IaC files (Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose and
+the other documents of a Kubernetes stream) still give such uses, and the same label in a file no
+reader recognizes is still an `inferred` use.
+
 ### Terraform provisioners
 
 An `aws_sqs_queue` resource provisions `channel::sqs::<name>` through its `name` argument;
@@ -572,13 +599,13 @@ and through no symbolic link, or at `inferred` when the context or the Dockerfil
 an overridable value. A Dockerfile that cannot be read leaves the whole context at `inferred`, and
 the reason says so. `.dockerignore` is not read.
 
-Literals link at `exact`; Compose defaults and Helm values at `inferred`, with their source in
-the reason. Unresolved parts remain patterns and match only literal names at segment
-boundaries; several candidates remain `ambiguous` and can receive a decision. `status` lists
-image orphans only when the visible scope contains builders and runners. Otherwise `search`
-and `context` mark the side with no counterpart. Export stays at format 1, adding builder `at`
-locations and direct-path `executions`; the console graph shows image contracts, their links
-and workload code.
+Literals link at `exact`; Compose defaults and Helm values at `inferred`, with their source in the
+reason. Unresolved parts remain patterns and match only literal names at segment boundaries; several
+candidates remain `ambiguous` and can receive a decision. `status` lists image orphans only for a
+registry and namespace (`ghcr.io/acme`) that holds builders and runners in the visible scope.
+Otherwise `search` and `context` mark the side with no counterpart. Export stays at format 1, adding
+builder `at` locations and direct-path `executions`; the console graph shows image contracts, their
+links and workload code.
 
 ### Partially resolved names
 

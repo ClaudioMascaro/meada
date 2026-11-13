@@ -57,7 +57,7 @@ referenced by: none
 values:
 example.com/acme/infra stack/compose.override.yaml:9 services.cache.image = "redis:7"
 example.com/acme/infra stack/compose.override.yaml:11 services.cache.depends_on[0] = "db"
-image: image::docker.io/library/redis
+image: image::docker.io/library/redis (no builder in the workspace)
 
 example.com/acme/infra tools/docker-compose.yml:2-3 services.escape
 type: service

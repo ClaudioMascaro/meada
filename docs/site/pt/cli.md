@@ -42,7 +42,8 @@ trace(from="orders.py::orders", direction="up")
 Se dois overlays usam a mesma carga e imagem, a exportação mantém uma ligação por raiz.
 Nas consultas IaC, acrescente a raiz ao endereço, por exemplo `Pod/common (root overlays/right)`.
 
-Um Compose com `build: ./src` também chega ao código sem publicar uma imagem. `status` usa o
-escopo visível para os órfãos; um construtor isolado recebe a marca `no runner in the workspace`
-na consulta. No console, a visão de contratos mostra imagens e suas origens; a visão de código
-das cargas de trabalho mostra os caminhos diretos. Veja os formatos em [Capacidades](capabilities.md).
+Um Compose com `build: ./src` também chega ao código sem publicar uma imagem. `status` pergunta
+pelos órfãos de imagens no escopo visível por registro e namespace da imagem (`ghcr.io/acme`); um
+construtor sem executor no seu grupo recebe a marca `no runner in the workspace` na consulta. No
+console, a visão de contratos mostra imagens e suas origens; a visão de código das cargas de
+trabalho mostra os caminhos diretos. Veja os formatos em [Capacidades](capabilities.md).

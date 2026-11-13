@@ -82,7 +82,8 @@
     {
       "contract": "channel::sqs::tasks",
       "site": "example.com/azure/infra",
-      "at": "main.tf#resource.azurerm_linux_function_app.image.app_settings.LITERAL_QUEUE"
+      "at": "main.tf#resource.azurerm_linux_function_app.image.app_settings.LITERAL_QUEUE",
+      "level": "exact"
     }
   ],
   "links": [

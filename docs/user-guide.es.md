@@ -486,10 +486,16 @@ Meada no puede leer (ausente, tras un enlace simbólico, un origen con variable,
 analiza) deja el contexto entero en `inferred`, y el motivo dice que no se leyó. `.dockerignore` no
 se lee. Las rutas no cruzan enlaces simbólicos.
 
-`meada status` solo lista imágenes huérfanas si el ámbito contiene builder y runner. Con un solo
-papel, `search` y `context` muestran `no builder in the workspace` o `no runner in the workspace`.
-El export conserva `format: 1`, guarda ubicaciones de builders y raíces de workloads e incluye
-`executions` para rutas directas; el grafo de la consola muestra contratos y código de workloads.
+`meada status` pregunta por las imágenes huérfanas por registro y namespace (el primer segmento de
+la ruta del repositorio en el nombre normalizado): `ghcr.io/acme/shop` y `ghcr.io/acme/tools/lint`
+están en `ghcr.io/acme`, `docker.io/library/postgres` en `docker.io/library`, y una imagen cuya ruta
+tiene un solo segmento se agrupa solo por su registro. Un nombre leído como patrón
+(`ghcr.io/${{ github.repository }}` se lee `ghcr.io/*`) está en todo grupo que su texto antes del
+`*` puede empezar. Solo lista imágenes huérfanas de un grupo que contiene builder y runner; en un
+grupo con un solo papel, `search` y `context` muestran `no builder in the workspace` o
+`no runner in the workspace`. El export conserva `format: 1`, guarda ubicaciones de builders y
+raíces de workloads e incluye `executions` para rutas directas; el grafo de la consola muestra
+contratos y código de workloads.
 
 ### CloudFormation y SAM
 
@@ -544,6 +550,36 @@ código o solo de IaC no genera esas líneas; `search` y `context` marcan el pro
 `no provisioner in the workspace` o `no use in the workspace`. Los vínculos de aprovisionamiento,
 incluidos patrones y módulos raíz independientes, determinan si hay contraparte. Los avisos
 existentes de recursos declarados sin escritores y lectores siguen separados.
+
+Un uso que Meada solo infiere por el nombre de una clave (un valor simple bajo `queue`, `topic`,
+`bucket`, `table` o un alias tipado, `inferred`) no abre el ámbito de huérfanos de su grupo y
+nunca es una línea de huérfano: una coincidencia de nombre no prueba ni el uso ni su ausencia.
+Sigue vinculado al provisionador del mismo nombre, que por eso no es un `no use`, y `context` lo
+sigue mostrando con `[inferred]`. Una línea `no provisioner` termina con el nivel de su lado entre
+corchetes, como lo escribe `context` (`[exact]`, `[declared]`), y las filas `uses` de
+`meada export` llevan `level`.
+
+Un identificador estructurado en la lista de recursos de una declaración de política IAM
+(`Resource` o `NotResource` de una entrada de `Statement`, en un archivo de política o en un
+documento de política dentro de una plantilla, y `resources` o `not_resources` de un bloque
+`statement` de un `aws_iam_policy_document`) es un **policy grant**, no un uso: dice quién puede
+tocar el recurso, sin dirección. `context` sobre el recurso lo lista con el rol `policy grant` y su
+lugar, sin nota de huérfano (`context` sobre ese lugar también lo muestra); no se enlaza con ningún
+aprovisionador, no abre ámbito de huérfanos y nunca es una línea de huérfano, y `meada export` lo
+lista en el array `policy_grants`, aparte de `uses`. En un documento JSON Schema (con `$schema` en
+su raíz), un valor bajo `examples`, `default`, `enum` o `const` documenta una forma y no es ningún
+lado: sigue siendo un valor de configuración que `search` encuentra.
+
+En un documento que el lector de un tipo de contrato reconoce como suyo, Meada no infiere ningún uso
+del nombre de una clave: un archivo de reglas de Prometheus o de Loki (`groups` con `rules`), un
+archivo de reglas de alerta de Grafana, una configuración de Alertmanager, un objeto
+`PrometheusRule` o `AlertmanagerConfig` (solo ese documento del stream) y un documento de proveedor
+(un documento OpenAPI o AsyncAPI que Meada lee, en un repositorio con `[serve]`). Allí, la etiqueta
+`queue: jobs` de una regla es una etiqueta de alerta, no el uso de una cola; un identificador
+estructurado (un ARN) sigue siendo un uso `exact`, y los valores siguen siendo valores de
+configuración que `search` encuentra. Los archivos de IaC (Terraform, OpenTofu, CloudFormation, SAM,
+Serverless, Compose y los otros documentos de un stream de Kubernetes) siguen dando esos usos, y la
+misma etiqueta en un archivo que ningún lector reconoce sigue siendo un uso `inferred`.
 
 ### Provisionadores Terraform
 

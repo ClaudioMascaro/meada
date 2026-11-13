@@ -481,10 +481,16 @@ link simbólico, origem com variável, forma que não interpreta) deixa o contex
 `inferred`, e o motivo diz que não foi lido. O `.dockerignore` não é lido. Caminhos não atravessam
 links simbólicos.
 
-`meada status` só lista imagens órfãs quando o escopo contém builder e runner. Com apenas um
-papel, `search` e `context` mostram `no builder in the workspace` ou `no runner in the workspace`.
-O export conserva `format: 1`, guarda locais dos builders e raízes dos workloads e inclui
-`executions` para caminhos diretos; o grafo da console mostra contratos e código dos workloads.
+`meada status` pergunta pelos órfãos de imagens por registro e namespace (o primeiro segmento do
+caminho do repositório no nome normalizado): `ghcr.io/acme/shop` e `ghcr.io/acme/tools/lint` ficam
+em `ghcr.io/acme`, `docker.io/library/postgres` em `docker.io/library`, e uma imagem cujo caminho
+tem um só segmento fica só com o registro. Um nome lido como padrão
+(`ghcr.io/${{ github.repository }}` vira `ghcr.io/*`) fica em todo grupo que o seu texto antes do
+`*` pode começar. Só lista imagens órfãs de um grupo que contém builder e runner; num grupo com
+apenas um papel, `search` e `context` mostram `no builder in the workspace` ou
+`no runner in the workspace`. O export conserva `format: 1`, guarda locais dos builders e raízes dos
+workloads e inclui `executions` para caminhos diretos; o grafo da console mostra contratos e código
+dos workloads.
 
 ### CloudFormation e SAM
 
@@ -538,6 +544,36 @@ código ou só de IaC não gera essas linhas; `search` e `context` marcam o pró
 `no provisioner in the workspace` ou `no use in the workspace`. As ligações de provisionamento,
 inclusive padrões e módulos raiz independentes, determinam se há contraparte. Os avisos
 existentes de recursos declarados sem escritor e leitor continuam separados.
+
+Um uso que o Meada só infere pelo nome de uma chave (um valor simples sob `queue`, `topic`,
+`bucket`, `table` ou um alias tipado, `inferred`) não abre o escopo de órfãos do seu grupo e
+nunca vira linha de órfão: uma coincidência de nome não prova nem o uso nem a falta dele. Ele
+continua ligado ao provisionador do mesmo nome, que por isso não é um `no use`, e o `context`
+continua a mostrá-lo com `[inferred]`. Uma linha `no provisioner` termina com o nível do seu lado
+entre colchetes, como o `context` o escreve (`[exact]`, `[declared]`), e as linhas `uses` do
+`meada export` trazem `level`.
+
+Um identificador estruturado na lista de recursos de uma declaração de política IAM (`Resource` ou
+`NotResource` de um item de `Statement`, num arquivo de política ou num documento de política
+dentro de um template, e `resources` ou `not_resources` de um bloco `statement` de um
+`aws_iam_policy_document`) é um **policy grant**, não um uso: diz quem pode tocar o recurso, sem
+direção. O `context` do recurso o lista com o papel `policy grant` e o seu lugar, sem nota de
+órfão (o `context` desse lugar também o mostra); ele não se liga a provisionador, não abre escopo
+de órfãos e nunca vira linha de órfão, e o `meada export` o lista no array `policy_grants`, à parte
+de `uses`. Num documento JSON Schema (com `$schema` na raiz), um valor sob `examples`, `default`,
+`enum` ou `const` documenta uma forma e não é lado nenhum: continua sendo um valor de configuração
+que o `search` acha.
+
+Num documento que o leitor de um tipo de contrato reconhece como seu, o Meada não infere uso pelo
+nome de uma chave: um arquivo de regras do Prometheus ou do Loki (`groups` com `rules`), um arquivo
+de regras de alerta do Grafana, uma configuração do Alertmanager, um objeto `PrometheusRule` ou
+`AlertmanagerConfig` (só esse documento do stream) e um documento de provedor (um documento OpenAPI
+ou AsyncAPI que o Meada lê, num repositório com `[serve]`). Ali, o rótulo `queue: jobs` de uma regra
+é um rótulo de alerta, não o uso de uma fila; um identificador estruturado (um ARN) continua sendo
+um uso `exact`, e os valores continuam sendo valores de configuração que o `search` acha. Os
+arquivos de IaC (Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose e os outros
+documentos de um stream do Kubernetes) continuam dando esses usos, e o mesmo rótulo num arquivo que
+nenhum leitor reconhece continua sendo um uso `inferred`.
 
 ### Provisionadores Terraform
 

@@ -12,82 +12,98 @@
     {
       "contract": "channel::eventhubs::events",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#eventhubs_hub"
+      "at": "settings.yaml#eventhubs_hub",
+      "level": "inferred"
     },
     {
       "contract": "channel::eventhubs::events",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#hub_id"
+      "at": "settings.yaml#hub_id",
+      "level": "exact"
     },
     {
       "contract": "channel::servicebus::events",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#servicebus_topic"
+      "at": "settings.yaml#servicebus_topic",
+      "level": "inferred"
     },
     {
       "contract": "channel::servicebus::events",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#topic_id"
+      "at": "settings.yaml#topic_id",
+      "level": "exact"
     },
     {
       "contract": "channel::servicebus::orders",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#queue_id"
+      "at": "settings.yaml#queue_id",
+      "level": "exact"
     },
     {
       "contract": "channel::servicebus::orders",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#servicebus_queue"
+      "at": "settings.yaml#servicebus_queue",
+      "level": "inferred"
     },
     {
       "contract": "channel::servicebus::subscription:events/audit",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#servicebus_subscription"
+      "at": "settings.yaml#servicebus_subscription",
+      "level": "inferred"
     },
     {
       "contract": "channel::servicebus::subscription:events/audit",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#subscription_id"
+      "at": "settings.yaml#subscription_id",
+      "level": "exact"
     },
     {
       "contract": "resource::azureblob::assetsstore",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#azureblob_container"
+      "at": "settings.yaml#azureblob_container",
+      "level": "inferred"
     },
     {
       "contract": "resource::azureblob::assetsstore",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#blob_url"
+      "at": "settings.yaml#blob_url",
+      "level": "exact"
     },
     {
       "contract": "resource::azureblob::assetsstore",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#container_id"
+      "at": "settings.yaml#container_id",
+      "level": "exact"
     },
     {
       "contract": "resource::azurestorage::assetsstore",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#account_id"
+      "at": "settings.yaml#account_id",
+      "level": "exact"
     },
     {
       "contract": "resource::azurestorage::assetsstore",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#azurestorage_account"
+      "at": "settings.yaml#azurestorage_account",
+      "level": "inferred"
     },
     {
       "contract": "resource::keyvault::api-key",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#keyvault_secret"
+      "at": "settings.yaml#keyvault_secret",
+      "level": "inferred"
     },
     {
       "contract": "resource::keyvault::api-key",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#secret_id"
+      "at": "settings.yaml#secret_id",
+      "level": "exact"
     },
     {
       "contract": "resource::keyvault::api-key",
       "site": "example.com/azure/app",
-      "at": "settings.yaml#secret_url"
+      "at": "settings.yaml#secret_url",
+      "level": "exact"
     }
   ],
   "links": [],

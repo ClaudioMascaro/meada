@@ -329,6 +329,35 @@ código ou só de IaC não gera essas linhas; `search` e `context` marcam o pró
 inclusive padrões e módulos raiz independentes, determinam se há contraparte. Os avisos
 existentes de recursos declarados sem escritor e leitor continuam separados.
 
+Um uso que o Meada só infere pelo nome de uma chave (um valor simples sob `queue`, `topic`,
+`bucket`, `table` ou um alias tipado, `inferred`) não abre o escopo de órfãos do seu grupo e
+nunca vira linha de órfão: uma coincidência de nome não prova nem o uso nem a falta dele. Ele
+continua ligado ao provisionador do mesmo nome, que por isso não é um `no use`, e o `context`
+continua a mostrá-lo com `[inferred]`. Uma linha `no provisioner` termina com o nível do seu lado
+entre colchetes, como o `context` o escreve (`[exact]`, `[declared]`), e as linhas `uses` do
+`meada export` trazem `level`.
+
+Um identificador estruturado na lista de recursos de uma declaração de política IAM (`Resource` ou
+`NotResource` de um item de `Statement`, num arquivo de política ou num documento de política
+dentro de um template, e `resources` ou `not_resources` de um bloco `statement` de um
+`aws_iam_policy_document`) é um **policy grant**, não um uso: diz quem pode tocar o recurso, sem
+direção. O `context` do recurso o lista com o papel `policy grant` e o seu lugar; ele não se liga a
+provisionador, não abre escopo de órfãos e nunca vira linha de órfão, e o `meada export` o lista no
+array `policy_grants`, à parte de `uses`. Num documento JSON Schema (com `$schema` na raiz), um
+valor sob `examples`, `default`, `enum` ou `const` documenta uma forma e não é lado nenhum: continua
+sendo um valor de configuração que o `search` acha.
+
+Num documento que o leitor de um tipo de contrato reconhece como seu, o Meada não infere uso pelo
+nome de uma chave: um arquivo de regras do Prometheus ou do Loki (`groups` com `rules`), um arquivo
+de regras de alerta do Grafana, uma configuração do Alertmanager, um objeto `PrometheusRule` ou
+`AlertmanagerConfig` (só esse documento do stream) e um documento de provedor (um documento OpenAPI
+ou AsyncAPI que o Meada lê, num repositório com `[serve]`). Ali, o rótulo `queue: jobs` de uma regra
+é um rótulo de alerta, não o uso de uma fila; um identificador estruturado (um ARN) continua sendo
+um uso `exact`, e os valores continuam sendo valores de configuração que o `search` acha. Os
+arquivos de IaC (Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose e os outros
+documentos de um stream do Kubernetes) continuam dando esses usos, e o mesmo rótulo num arquivo que
+nenhum leitor reconhece continua sendo um uso `inferred`.
+
 ### Provisionadores Terraform
 
 Um `resource` `aws_sqs_queue` provisiona `channel::sqs::<nome>` pelo argumento `name`;
@@ -574,13 +603,13 @@ o contexto ou o caminho do Dockerfile passou por um valor sobrescrevível. Um Do
 pode ser lido deixa o contexto inteiro em `inferred`, e o motivo diz isso. O `.dockerignore` não
 é lido.
 
-Literais ligam em `exact`; defaults Compose e valores Helm em `inferred`, com sua origem no
-motivo. Trechos não resolvidos permanecem padrões e só correspondem a nomes literais nos
-limites de segmentos; vários candidatos ficam `ambiguous` e podem receber uma decisão.
-`status` só lista imagens órfãs quando o escopo visível tem construtores e executores.
-Sem um desses lados, `search` e `context` marcam o lado sem contraparte. A exportação mantém
-formato 1, com `at` nos construtores e `executions` para os caminhos diretos; o grafo do console
-mostra os contratos de imagem, as ligações e o código das cargas de trabalho.
+Literais ligam em `exact`; defaults Compose e valores Helm em `inferred`, com sua origem no motivo.
+Trechos não resolvidos permanecem padrões e só correspondem a nomes literais nos limites de
+segmentos; vários candidatos ficam `ambiguous` e podem receber uma decisão. `status` só lista
+imagens órfãs de um registro e namespace (`ghcr.io/acme`) que tem construtores e executores no
+escopo visível. Sem um desses lados no grupo, `search` e `context` marcam o lado sem contraparte. A
+exportação mantém formato 1, com `at` nos construtores e `executions` para os caminhos diretos; o
+grafo do console mostra os contratos de imagem, as ligações e o código das cargas de trabalho.
 
 ### Nomes parcialmente resolvidos
 

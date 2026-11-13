@@ -74,3 +74,17 @@
   second block renames the key path of the first. A `.tf` file a `.tofu` one shadows is neither
   read nor counted. The old value of a variable made sensitive later stays in SQLite's free
   pages until they are reused (`secure_delete` is off).
+
+- `iac/config_uses.rs` (#661, ADR 0026 "Orphan sides"): a config use comes from a non-secret, uncut
+  stored string. The key-name rule (a plain name under `queue`, `topic`, `bucket` or `table`, or a
+  value under a typed Azure or Google Cloud alias, all `inferred`) does not read a document the
+  reader of a contract kind recognizes as its own (#800): the first document of a file the document
+  reader read (a `documents` row whose summary names a format, in a repository with `[serve]`; a
+  file it ignored and the later documents of a stream, which it never reads, keep the rule), and
+  each document, by its index in a stream, of a YAML or JSON file that is no IaC source
+  (`iac::is_source`) and that the alert reader takes a rule, a route or a receiver from
+  (`alert::documents`); a structured identifier there is still a use at `exact`. What is given up: a
+  file past the alert reader's budget keeps no rule, route or receiver (its summary is `truncated`),
+  so the key-name rule reads it as any other file, and a file no reader recognizes, such as a
+  promtool test (`exp_labels`), is read whole (#797 keeps its `inferred` uses out of the orphan
+  lines).

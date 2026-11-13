@@ -1,0 +1,1 @@
+example.com/acme/o3 policy grant infra/policy.json#Statement[0].Resource[0] (line 2) resource::s3::acme-exports
