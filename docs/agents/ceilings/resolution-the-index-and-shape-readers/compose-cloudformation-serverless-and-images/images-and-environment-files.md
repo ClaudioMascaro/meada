@@ -16,24 +16,39 @@
   costs the image and gives no wrong one), `docker buildx build` with a literal `--push` and
   each `-t <image>`, `--tag <image>` and `--tag=<image>`, and `ko build` or `ko publish` with
   one `--bare`, at most one literal package and `KO_DOCKER_REPO` in an `env` of the document
-  (read at index time, with no `env` literal in its words). Not read: `docker build` (also with
-  `--push`), `docker image push`, `--push=true`, `--output type=registry`, `-o`, `docker buildx
-  bake`, `docker compose push`, a global option before the subcommand, a prefix (`sudo`,
-  `time`), a tag glued to `-t`, a word left open whole that may hold the options (`$ARGS`),
-  Podman, Buildah, Kaniko, crane and Skopeo. A `buildx` word that reads `--push` or `-t` as
-  the value of another option is taken for the option. `docker/build-push-action`,
+  (read at index time, with no `env` literal in its words). A `run` script of the file that
+  binds `KO_DOCKER_REPO` (an assignment, `export`, `unset`, a line for the environment file)
+  costs every ko builder of the file: the script may name another destination. Not read:
+  `docker build` (also with `--push`), `docker image push`, `--push=true`, `--output
+  type=registry`, `-o`, `docker buildx bake`, `docker compose push`, a global option before the
+  subcommand, a prefix (`sudo`, `time`), a tag glued to `-t`, a `docker push` with a word left
+  open whole (`$ARGS`, counted as a second image), Podman, Buildah, Kaniko, crane and Skopeo.
+  In a `buildx` command a word left open whole is skipped (the tags it may hold are not read,
+  the written ones are), `-t` and `--tag` take the next word as their value (`-t --push`
+  pushes nothing) and a name that starts with `-` is none; a word that reads `--push` or `-t`
+  as the value of another option is taken for the option. A name Docker refuses for its tag or
+  digest (`x:`, `x:v1@`) is read as the image. `docker/build-push-action`,
   `docker/metadata-action` and `ko` are read in a pipeline file only, never in a composite
-  action, while `docker push` and `docker buildx build` are read in both. A builder's site is
-  its CI step when the CI reader gives the file that node, else the repository; the builders of
-  Compose, Skaffold and Jib stay on the repository. A CI job is no workload: `container`,
+  action, while `docker push` and `docker buildx build` are read in both. Those three sit on
+  their CI step when the CI reader gives the file that node, else on the repository; `docker
+  push` and `docker buildx build` are read in the scripts of CI nodes only, so past
+  `NODES_MAX` they give no builder. An image a reusable pipeline or a composite action pushes
+  is built by the repository that holds that file, whose code the workload then runs, though
+  the caller's checkout is what the step packs. The builders of Compose, Skaffold and Jib stay
+  on the repository. A CI job is no workload: `container`,
   `services` and its `env` give no runner. A workload links to each CI step of a repository
   that builds its image and runs the repository's code once; `trace` down from the workload
   shows each such CI step. Of the sites of one repository that build one image, only those on
   its best evidence link (the level first, then a literal name before one that is evidence): a
   Compose service whose image is a default, beside a CI step that names the image, adds no
   link, and two CI steps on the same evidence both link. An image a script pushes under two
-  tags is one side; `ko` and `docker push` of one image in one script are two rows. On a CI
-  step `context` shows `builds <image>` and each runner linked to it, a pattern included.
+  tags is one side, as are two ko commands of one step; `ko` and `docker push` of one image in
+  one script are two rows. An open item lists a repository once per image, however many of its
+  CI steps build it: a decision names the repository, the decided link goes to its first step
+  by site, and the other steps keep `builds` with no runner. On a CI step `context` shows
+  `builds <image>` and each runner linked to it, a pattern included (a step that holds a
+  pattern and a literal it fits lists the literal's runner under both). An image contract is no
+  `trace` start: it is listed by its sides, and a builder's CI step is the start.
 
 - `PATHS_MAX`, `WORK_MAX` (`image/dockerfile.rs`) and `LIST_MAX` (`contract.rs`, #744): a Compose
   build runs the paths its Dockerfile takes from the context. A Dockerfile naming more than

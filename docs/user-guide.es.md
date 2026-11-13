@@ -1658,8 +1658,9 @@ En el paso de CI, `context` muestra `builds image::ghcr.io/acme/orders` y cada r
 con él.
 
 Un tag o un digest sin resolver (`$IMAGE:${{ github.sha }}`) se quita con el tag. Una parte del
-nombre que ningún `env` literal da se vuelve patrón, enlazado en `inferred`; un nombre entero
-así es un builder no resuelto, sin enlace. Varios pasos de CI de un mismo repositorio que
+nombre que ningún `env` literal da se vuelve patrón, enlazado en `inferred` con el único nombre
+de imagen en el que cabe (`ambiguous`, con un ítem abierto, cuando cabe en varios); un nombre
+entero así es un builder no resuelto, sin enlace. Varios pasos de CI de un mismo repositorio que
 construyen la misma imagen son un solo builder, con un enlace para cada uno. `docker build`, un
 build sin `--push`, `docker image push`, `--output type=registry`, `docker buildx bake`, `docker
 compose push`, Podman, Buildah, Kaniko y crane no se leen, y el valor de cualquier otra opción

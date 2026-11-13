@@ -625,13 +625,13 @@ fn pushed(command: &[Word]) -> Vec<String> {
             }
             tags.truncate(usize::from(tags.len() == 1));
         }
-        [Some("docker"), Some("buildx"), Some("build"), rest @ ..] => {
-            if !rest.contains(&Some("--push")) {
-                return Vec::new();
-            }
+        [Some("docker"), Some("buildx"), Some("build"), ..] => {
+            // A `--push` that is the value of a tag option pushes nothing.
+            let mut push = false;
             let mut rest = command[3..].iter();
             while let Some(word) = rest.next() {
                 match word.as_slice() {
+                    [Part::Text(option)] if option == "--push" => push = true,
                     [Part::Text(option)] if option == "-t" || option == "--tag" => {
                         tags.extend(rest.next().map(|tag| (tag, 0)));
                     }
@@ -640,6 +640,9 @@ fn pushed(command: &[Word]) -> Vec<String> {
                     }
                     _ => {}
                 }
+            }
+            if !push {
+                return Vec::new();
             }
         }
         _ => {}
@@ -664,7 +667,11 @@ fn named(word: &[Part], from: usize) -> Option<String> {
             Part::Open(_) => name.push('*'),
         }
     }
-    normalize_name(name.get(from..)?, true)
+    // A name that starts as an option is none: Docker refuses it.
+    normalize_name(
+        name.get(from..).filter(|name| !name.starts_with('-'))?,
+        true,
+    )
 }
 
 /// Whether `execution` runs a local path for the workload side `consumer` in its root: a module
@@ -1015,6 +1022,13 @@ mod tests {
                 &["ghcr.io/acme/orders"],
             ),
             ("docker buildx build --push -t $OTHER .", &["*"]),
+            // A tag option takes the word after it, also `--push` (found by the verifier of
+            // #833): nothing is pushed, and an option is no image name.
+            ("docker buildx build -t --push .", &[]),
+            ("docker buildx build --tag --push .", &[]),
+            ("docker buildx build --push -t --load .", &[]),
+            ("docker buildx build --push --tag=-x .", &[]),
+            ("docker push -- -x", &[]),
             (
                 "docker buildx build --push --tag=ghcr.io/acme/${{ matrix.name }} .",
                 &["ghcr.io/acme/*"],

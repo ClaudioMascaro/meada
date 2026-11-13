@@ -601,11 +601,12 @@ pub(crate) fn read_executions(partial: &mut Partial, links: &[Link]) -> Result<(
     Ok(())
 }
 
-/// The IaC node that provides the contract `from` names, when the contract's consumers call
-/// their provider (`ContractKind::calls_from_definition`) and no kind starts a trace from it by
-/// itself: a CI contract starts at its pipeline, as the node's own name does (#825).
+/// The IaC node that provides the contract `from` names, when its kind starts a trace there
+/// (`ContractKind::starts_at_provider`) and no kind starts a trace from it by itself: a CI
+/// contract starts at its pipeline, as the node's own name does (#825). An image, which several
+/// CI steps may build, stays listed by its sides.
 pub(crate) fn provider_node(exports: &[Export], from: &str) -> Option<String> {
-    if !contract::calls_from_definition(Some(from)) {
+    if !contract::kind_of(from).is_some_and(|kind| kind.starts_at_provider()) {
         return None;
     }
     let providers: Vec<(&str, &str)> = (exports.iter())

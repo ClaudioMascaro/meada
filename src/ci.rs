@@ -394,6 +394,10 @@ impl ContractKind for Ci {
     fn calls_from_definition(&self) -> bool {
         true
     }
+    /// A CI contract is the name of the one pipeline that provides it.
+    fn starts_at_provider(&self) -> bool {
+        true
+    }
     /// The sides of every repository, read from its CI nodes once the workspace is known: a
     /// call is a consumer only when the repository it names is one of the workspace.
     fn workspace_step(&self, exports: &mut [Export], repositories: &[Repository]) {

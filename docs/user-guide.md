@@ -1633,7 +1633,8 @@ No passo de CI, o `context` mostra `builds image::ghcr.io/acme/orders` e cada ru
 ele.
 
 Uma tag ou um digest em aberto (`$IMAGE:${{ github.sha }}`) sai junto com a tag. Uma parte do
-nome que nenhum `env` literal dá vira padrão, ligado em `inferred`; um nome inteiro assim é um
+nome que nenhum `env` literal dá vira padrão, ligado em `inferred` ao único nome de imagem em
+que cabe (`ambiguous`, com um item aberto, quando cabe em vários); um nome inteiro assim é um
 builder não resolvido, sem ligação. Vários passos de CI de um mesmo repositório que constroem a
 mesma imagem são um só builder, com uma ligação para cada. `docker build`, um build sem
 `--push`, `docker image push`, `--output type=registry`, `docker buildx bake`, `docker compose

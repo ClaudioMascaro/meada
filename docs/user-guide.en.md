@@ -1622,7 +1622,8 @@ On the CI step, `context` shows `builds image::ghcr.io/acme/orders` and each run
 it.
 
 A tag or digest left open (`$IMAGE:${{ github.sha }}`) is dropped with the tag. A part of the
-name no literal `env` gives makes a pattern, linked `inferred`; a whole name like that is an
+name no literal `env` gives makes a pattern, linked `inferred` to the one image name it fits
+(`ambiguous`, with an open item, when it fits several); a whole name like that is an
 unresolved builder with no link. Several CI steps of one repository that build the same image
 are one builder, with a link each. `docker build`, a build without `--push`, `docker image
 push`, `--output type=registry`, `docker buildx bake`, `docker compose push`, Podman, Buildah,

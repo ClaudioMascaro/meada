@@ -229,9 +229,10 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
             // The label of a route orders as its method then path: the space sorts before
             // every method letter and before the slash.
             candidates.sort_by_cached_key(|c| (c.repository.clone(), c.label(), c.site.clone()));
-            candidates.dedup_by(|a, b| {
-                a.repository == b.repository && a.contract == b.contract && a.site == b.site
-            });
+            // A decision names a repository and a contract (no site): the sites of one
+            // repository that serve one contract are one candidate.
+            let mut listed = HashSet::new();
+            candidates.retain(|c| listed.insert((c.repository.clone(), c.contract.clone())));
             items.push(OpenItem {
                 id: consumer.item_site().into_owned(),
                 kind,

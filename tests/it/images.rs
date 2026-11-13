@@ -517,6 +517,40 @@ fn ko_script_text_is_not_a_builder_and_plain_commands_refresh() {
         ("ko build --bare --unknown ./cmd/orders", None, false),
         ("ko build --bare ./cmd/orders", Some("python"), false),
         ("ko build --bare ./cmd/orders", Some("bash"), true),
+        // The script gives ko another destination than the `env` of the document (found by
+        // the verifier of #833): the image it pushes is not the one the `env` names.
+        (
+            "export KO_DOCKER_REPO=ghcr.io/acme/other\nko build --bare ./cmd/orders\n",
+            None,
+            false,
+        ),
+        (
+            "KO_DOCKER_REPO=ghcr.io/acme/other\nko build --bare ./cmd/orders\n",
+            None,
+            false,
+        ),
+        (
+            "unset KO_DOCKER_REPO\nko build --bare ./cmd/orders\n",
+            None,
+            false,
+        ),
+        (
+            "echo KO_DOCKER_REPO=ghcr.io/acme/other >> \"$GITHUB_ENV\"\nko build --bare ./cmd/orders\n",
+            None,
+            false,
+        ),
+        // Reading the name binds nothing.
+        (
+            "echo \"$KO_DOCKER_REPO\"\nko build --bare ./cmd/orders\n",
+            None,
+            true,
+        ),
+        // Two ko commands of one step build one image: one side.
+        (
+            "ko build --bare ./cmd/orders\nko publish --bare ./cmd/orders\n",
+            None,
+            true,
+        ),
     ] {
         let mut step = serde_json::json!({
             "run": command,
@@ -721,6 +755,16 @@ fn a_workload_links_to_each_ci_step_of_the_repository_that_builds_its_image() {
         .trace(Start::From("jobs.push.steps[1]"), Direction::Up, None)
         .unwrap();
     assert!(up.contains("Deployment.apps/shop/orders"), "{up}");
+    // The image itself is listed by its sides: several steps may build it, so it is no start.
+    for direction in [Direction::Up, Direction::Down] {
+        let refused = engine
+            .trace(Start::From("image::ghcr.io/acme/orders"), direction, None)
+            .unwrap();
+        assert!(
+            refused.contains("is a image, and a trace starts from"),
+            "{refused}"
+        );
+    }
     // On the CI step, the image it builds and the workload that runs it.
     let context = engine.context(&step(1), None).unwrap();
     let side = "builds image::ghcr.io/acme/orders\n  runner: \
@@ -1127,6 +1171,62 @@ fn two_image_ambiguities_can_be_decided_independently() {
         1,
         "{export}"
     );
+}
+
+/// Several CI steps of one repository that build one image are one builder, and a decision
+/// names a repository: an open item lists that repository once (found by the verifier of #833).
+#[test]
+fn a_repository_that_builds_an_image_in_two_ci_steps_is_one_candidate() {
+    let case = "images_two_steps_one_candidate";
+    let job = |id: &str| {
+        format!("  {id}:\n    steps:\n      - run: docker push ghcr.io/acme/orders:v2\n")
+    };
+    let file = ".github/workflows/build.yml";
+    repo(
+        case,
+        &[(
+            file,
+            &format!("on: push\njobs:\n{}{}", job("one"), job("two")),
+        )],
+    );
+    let second = fixture_repo(
+        case,
+        "image-dockerfile",
+        Some("https://example.com/acme/second.git"),
+    );
+    write(&second, file, &format!("on: push\njobs:\n{}", job("only")));
+    let deploy = fixture_repo(
+        case,
+        "image-deploy",
+        Some("https://example.com/acme/deploy.git"),
+    );
+    std::fs::remove_file(deploy.join("values.yaml")).unwrap();
+    std::fs::remove_file(deploy.join("overlays/prod/kustomization.yaml")).unwrap();
+    let peers =
+        "[[peer]]\nrepo = \"example.com/acme/app\"\n[[peer]]\nrepo = \"example.com/acme/second\"\n";
+    write(&deploy, "meada.toml", peers);
+    let engine = Engine::open(&deploy).unwrap();
+    let items = engine.open_items().unwrap();
+    assert!(!items.is_empty());
+    for item in &items {
+        let listed: Vec<&str> = (item.candidates.iter())
+            .map(|c| c.repository.as_str())
+            .collect();
+        assert_eq!(
+            listed,
+            ["example.com/acme/app", "example.com/acme/second"],
+            "{}",
+            item.id
+        );
+    }
+    // Each CI step is still a side of its own, and the workload links to each.
+    let export = export(&deploy);
+    let links = export["links"].as_array().unwrap();
+    let steps: std::collections::BTreeSet<&str> = (links.iter())
+        .map(|l| l["provider"].as_str().unwrap())
+        .collect();
+    assert_eq!(steps.len(), 3, "{export}");
+    assert!(links.iter().all(|l| l["level"] == "ambiguous"), "{export}");
 }
 
 #[test]

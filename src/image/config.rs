@@ -184,6 +184,14 @@ pub(super) fn read(
 }
 
 fn workflow(path: &str, doc: &Value, out: &mut Summary) {
+    // A `run` script that binds `KO_DOCKER_REPO` (an assignment, `export`, `unset`, a line for
+    // the environment file) may give ko another destination than the `env` of the document.
+    let rebound = (doc.get("jobs").and_then(Value::as_object).into_iter())
+        .flat_map(|jobs| jobs.values())
+        .flat_map(|job| job.get("steps").and_then(Value::as_array))
+        .flatten()
+        .filter_map(|step| step.get("run").and_then(Value::as_str))
+        .any(|script| run::rebound(script).contains("KO_DOCKER_REPO"));
     for (job, value) in doc
         .get("jobs")
         .and_then(Value::as_object)
@@ -231,7 +239,7 @@ fn workflow(path: &str, doc: &Value, out: &mut Summary) {
                 let image = [step, value, doc]
                     .into_iter()
                     .find_map(|scope| scope.get("env").and_then(|v| v.get("KO_DOCKER_REPO")));
-                if let Some(image) = image.and_then(Value::as_str) {
+                if let Some(image) = image.and_then(Value::as_str).filter(|_| !rebound) {
                     let at = format!(
                         "{path}#{}",
                         config_values::key_path(&[
@@ -243,6 +251,8 @@ fn workflow(path: &str, doc: &Value, out: &mut Summary) {
                         ])
                     );
                     builder(out, image, &at, false);
+                    // Every ko command of a step pushes to the one destination: one side.
+                    break;
                 }
             }
             let action = step

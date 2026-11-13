@@ -389,6 +389,12 @@ pub trait ContractKind {
         false
     }
 
+    /// Whether a contract of the kind starts a `trace` at the node that provides it: a contract
+    /// that names its one provider. Any other contract is listed by its sides.
+    fn starts_at_provider(&self) -> bool {
+        false
+    }
+
     /// Whether data travels from the provider to its consumer: a write reaches its reader,
     /// or a message its handler. A consumer at a call is then a receiving operation.
     fn flows_to_consumer(&self) -> bool {
