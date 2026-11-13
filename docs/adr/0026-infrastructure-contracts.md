@@ -89,7 +89,9 @@ amends these tables.
   Such a side states **no direction**: it is neither producer nor consumer, writer nor reader,
   so it takes part only in provisioning links (to each provisioner of its contract) and in
   orphans, never in a producer to consumer link. Its site is the repository, located by
-  `<file>#<key path>`.
+  `<file>#<key path>`. Which of these sides open an orphan scope or name an orphan line, and the
+  resource list of an IAM policy statement, a policy grant rather than a use side, are settled
+  in "Orphan sides".
 - **Subscriptions.** SNS to SQS subscriptions, EventBridge rules and their targets, Pub/Sub
   subscriptions and Service Bus subscriptions are read from IaC and followed like a RabbitMQ
   binding: a consumer of the target links to the producers of the source, `exact` for an
@@ -162,6 +164,8 @@ execution, context, trace, orphan and export seams and the shared 1.3.0 minor re
   a Lambda source directory or archive, a Compose build) runs that code directly, at `exact`,
   with no image contract between them. A Compose build runs the paths its Dockerfile takes from
   the context, not the whole context (see "Compose build contexts read through the Dockerfile").
+- **Orphans.** The image kind asks its orphan scope per registry and namespace (see "Orphan
+  sides").
 
 ### Environment entries
 
@@ -235,6 +239,7 @@ execution, context, trace, orphan and export seams and the shared 1.3.0 minor re
   with no status line.
 - `meada status` also counts the config and IaC files read and skipped, the values redacted
   (ADR 0025) and the IaC nodes.
+- Which sides open the scope and which an orphan line may name: see "Orphan sides".
 
 ### Export
 
@@ -245,7 +250,8 @@ These enter `meada export`, each as an optional field that is left out when empt
   label and span. IaC nodes with no contract stay out.
 - `provisioners`: the provisioner sides, each a contract and the node that provisions it.
 - `uses`: the use sides read from config values, each a contract, the repository as its site
-  and `at`, the `<file>#<key path>` it was read from. The config values themselves stay out.
+  and `at`, the `<file>#<key path>` it was read from. The config values themselves stay out. Its
+  `level` and the array `policy_grants` are added in "Orphan sides".
 - `provisions`: the provisioning links, each the other side, the provisioner, the contract, the
   level and the reason.
 - `subscriptions`: the subscriptions read from IaC, each a source and a target contract and the
@@ -611,3 +617,86 @@ layout, one service with `build: .` and `COPY . .`, does hold the whole reposito
 whole-repository `inferred` execution still widens environment-entry scopes. Reading the
 Dockerfile of a CI image build is a follow-up; the image contract's builder side stays a
 repository.
+
+### Orphan sides (#796, 2026-11-12)
+
+A dogfooding pass of 1.3.0 over 23 repositories found most `meada status` orphan lines false (in
+its neutral repository, 13 of 16): a guess counted as a finding, a policy that names a resource
+without using it, a public image no repository could build, and a rule file read as if it were
+configuration. Each follows from a rule above, so this amendment decides which sides may open the
+orphan scope and be named by an orphan line, one rule per cause. It amends "Config values as use
+sides" (Use sides), "Workloads and the image kind", "Orphans" and "Export". #797, #798, #799 and
+#800 implement it, one cause each; #795 measures the result against an answer key a person
+writes over real mixed repositories, since an ADR cannot be its own answer key.
+
+1. **Level.** A use side read from a config value at `inferred` (a plain name under a key that
+   names the type) does not count when the orphan scope of its group is decided and is never an
+   orphan line. It keeps its provisioning link, at `inferred`, to each provisioner of its
+   contract, so such a provisioner is no `no use` line: a name match proves neither a use nor its
+   absence. `context` and `search` show it as before, with `[inferred]`, and the marks they put
+   on a side (`no provisioner in the workspace`, `no use in the workspace`) still count every
+   side. The level of a side shows wherever the side does: a `no provisioner` line names it in
+   the bracket form `context` uses, and each `uses` row of the export carries an added optional
+   `level`. Directed sides (an SDK call, a declared `[[resource]]`) stay out of this rule: they
+   open the scope and are listed as before, whatever their level.
+   Not taken: showing the level on the orphan line alone, which still asks the reader to sort
+   guesses from findings by hand; and counting `inferred` sides apart in one line per
+   repository, which still opens the scope on a guess and gives a count nobody can act on. An
+   orphan line says that something is missing, and said of a name match it is a guess about a
+   guess.
+2. **Role.** A structured identifier in the resource list of an IAM policy statement is a
+   **policy grant**, not a use side: `Resource` and `NotResource` of an entry of `Statement`,
+   wherever the config reader gives that key path (a policy file, a policy document inside a
+   template), and `resources` and `not_resources` of a `statement` block of an
+   `aws_iam_policy_document`. A policy grant has no direction. `context` on the resource lists
+   it under its own role, with its place; it takes part in no provisioning link, opens no orphan
+   scope and is no orphan line. The export lists policy grants in an added optional array of
+   their own (`policy_grants`: `contract`, `site`, `at`), so that `uses` keeps its meaning. The
+   name is qualified because a grant alone is what the console lets a subject read (ADR 0024).
+   In a JSON Schema document, one whose root holds a `$schema` key, a value under `examples`,
+   `default`, `enum` or `const` yields no side: it documents a shape and stays a config value
+   that `search` finds. A structured identifier anywhere else is a use side at `exact`, as
+   before. Access policies of other clouds hold no policy grant until a case shows one.
+   Not taken: no side at all for a policy statement, since who may touch a resource is worth
+   showing on it, and today a policy grant's provisioning link also hides a real `no use`
+   orphan; and a policy grant for a schema example, since an example names nothing anyone may
+   touch.
+3. **External image.** The orphan scope of the image kind is asked per registry and namespace,
+   not once for the kind. The namespace is the first segment of the repository path of the
+   normalized name: `ghcr.io/acme/shop` and `ghcr.io/acme/tools/lint` are in `ghcr.io/acme`, and
+   `docker.io/library/postgres` is in `docker.io/library`. An image whose path has one segment is
+   grouped by its registry alone. Orphan lines are printed for a group that holds at least one
+   builder and one runner in the visible workspace, and for no other group; a side of a group
+   that lacks the other role prints no orphan line and carries its mark in `context` and
+   `search` (`no builder in the workspace`, `no runner in the workspace`), as a side does today
+   when the whole kind lacks that role. The groups come from what the workspace builds and runs,
+   with no list to keep. Images the kind holds as unresolved stay out of orphans, as before.
+   Not taken: a list of registries each repository declares in `meada.toml`, one more setting to
+   keep right whose absence brings the noise back; and a built-in list of public registries, an
+   exception by name and a tuned constant that cannot tell `ghcr.io/acme` from a public image of
+   the same host.
+4. **A file a reader owns.** A document that the reader of a contract kind recognizes as a
+   document of its kind is not read by the key-name rule: a plain name under `queue`, `topic`,
+   `bucket`, `table` or a typed alias in it makes no use side. A structured identifier in it is
+   still a use side at `exact`, and its values stay config values that `search` finds. The unit
+   is the document, one of a YAML stream. The readers that recognize a whole document as one of
+   their kind, as the code has them on 2026-11-12 (`fdb8b5a1`):
+   - the alert reader: a YAML or JSON document that is no IaC file and that it takes a rule, a
+     route or a receiver from, by its content: a Prometheus or Loki rule file (`groups` holding
+     `rules`), a Grafana alert rule file, an Alertmanager configuration, and a `PrometheusRule` or
+     `AlertmanagerConfig` object, which is one document of a Kubernetes stream (the rules it reads
+     from Terraform, `grafana_rule_group` in a `.tf`, `.tofu` or `.tf.json` file, are IaC's);
+   - the provider document reader: a provider document, an OpenAPI or AsyncAPI file of a
+     repository with a `[serve]` table, found by its name or listed in `[serve] documents`, which
+     the HTTP and channel kinds read whole.
+   IaC files are not such documents: a Terraform, OpenTofu, CloudFormation, SAM or Serverless
+   file, a Compose file and every other document of a Kubernetes stream. An IaC reader takes
+   nodes out of them and gives no meaning to their other values, so the key-name rule keeps
+   reading them; the Terraform state bucket (`backend "s3"`, `terraform_remote_state`) is a
+   key-name use side that rule 1 covers. Neither are the files the image reader takes builders
+   and runners from by name (a workflow, a Skaffold file, a Helm values file), the package
+   manifests or the configuration files a language pack reads: their readers take a few keys
+   out, and the rest is configuration, the key-name rule's own input.
+   Not taken: no generic use side at all from such a document, structured identifiers included,
+   since an ARN in a rule label names its resource exactly; and a skip list by file name,
+   extension or path, one more rule to keep for each format.
