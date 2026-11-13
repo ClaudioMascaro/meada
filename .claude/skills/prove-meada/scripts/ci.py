@@ -767,9 +767,10 @@ def file_of(site):
 
 def owned(section, row, own_files):
     """A row the spec lets differ from the base: a `ci::` row, a CI node, an unresolved consumer on a CI
-    node, a use read from a CI file. Any other side or link sited on a pipeline file is the base's."""
+    node, a use read from a CI file and its provisioning link. Any other side or link sited on a pipeline
+    file is the base's."""
     contract = row.get('contract')
-    return ((contract or '').startswith('ci::') or section == 'uses' and row.get('at', '').split('#')[0] in own_files
+    return ((contract or '').startswith('ci::') or section in ('uses', 'provisions') and (row.get('at') or '').split('#')[0] in own_files
             or section == 'iac_nodes' and file_of(row.get('identity')) in own_files
             or section == 'consumers' and contract is None and file_of(row.get('site')) in own_files)
 
@@ -950,7 +951,8 @@ def drive(run, http):
     run.check('use_other_file: another file of `.github/` keeps its use', len(at('head', 'storage.bucket')) == 1, at('head', 'storage.bucket'))
 
     run.check('control: the base gives the typed key a use', len(at('base', '.with.bucket')) == 1, at('base', '.with.bucket'))
-    run.check('control: the base gives the role ARN a use', len(at('base', 'role-to-assume"]')) == 1, at('base', 'role-to-assume"]'))
+    # IAM is in no row of the type table: the role ARN is no use on the base either (#828 recorded it).
+    run.check('control: the base gives the role ARN no use either', not at('base', 'role-to-assume"]'), at('base', 'role-to-assume"]'))
     structured = [{key: value for key, value in row.items() if key != 'site'} for side in ('base', 'head') for row in at(side, '.with.target')]
     run.check('control: the base has the structured use on the repository, the same row but for its site',
               [row['site'] for row in at('base', '.with.target')] == [f'{HOST}/forms'] and structured[:1] == structured[1:], at('base', '.with.target'))

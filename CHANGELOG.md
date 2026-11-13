@@ -55,6 +55,14 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- In a pipeline or an action of GitHub Actions the key-name rule gives no use any more (ADR
+  0028): `with: { bucket: x }` names an input of the action, not an S3 bucket, so the `inferred`
+  use, its provisioning link and the orphan lines it fed are gone. A structured identifier (an
+  ARN, a queue URL, `s3://`, `gs://`) stays an `exact` use, and `meada export` writes the CI
+  step or CI job that holds its key as the `site` of the use and the `side` of its provisioning
+  link, in place of the repository. A `${{ env.X }}` a literal `env` gives resolves, any other
+  expression in a name makes a pattern, and `vars.X` and `secrets.X` are never matched by name.
+  Every other file answers as before. Release level: minor, meada (#828).
 - The values cache (`values.db`, ADR 0027) stores each entry deflated, and gives back the pages
   that replaced or dropped entries free once they are most of the file: on Meada's own repository
   it holds 4.1 MB instead of 30.2 MB. An existing cache shrinks on the first refresh, which

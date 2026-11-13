@@ -18,6 +18,7 @@ mod channels_jobs;
 mod ci;
 mod ci_calls;
 mod ci_orphans;
+mod ci_owned;
 mod ci_uses;
 mod cli;
 mod community_queries;

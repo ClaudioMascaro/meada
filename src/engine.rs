@@ -230,12 +230,22 @@ impl Engine {
             .collect();
         let links = all.into_iter();
         let links = links.filter(|l| contract::link_in_repository(l, &self.identity));
+        // A use read from a pipeline or an action sits on the CI node that holds its key.
+        let holders: HashMap<&str, &str> = (exports.iter().flat_map(|e| &e.config_uses))
+            .filter_map(|u| Some((u.site.as_str(), u.holder.as_deref()?)))
+            .collect();
         let provisions = iac::provision::links(&exports)
             .into_iter()
             .filter(|l| {
                 l.side == self.identity
                     || l.side.starts_with(&here)
                     || l.provisioner.starts_with(&here)
+            })
+            .map(|mut link| {
+                if let Some(holder) = holders.get(link.side.as_str()) {
+                    link.side = holder.to_string();
+                }
+                link
             })
             .collect();
         let mut export = exports.swap_remove(0);

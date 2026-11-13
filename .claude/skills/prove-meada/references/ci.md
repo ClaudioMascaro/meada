@@ -41,7 +41,7 @@ with #820's table of the four consumers of `publish.yml`.
 | `trace` through `wrapper` | new | #820 | up from the contract, the file path and a CI node; down from `app-c`; a control from `on-string.yml` |
 | External files | new | #820 | no contract of any export section, no line of any `meada status`, no answer of `search` kinds `ambiguous` and `unresolved` from any repository names one; controls: their `uses` lines are config values, and the hub sees a peer's open item |
 | Orphan, absent file, `ref mismatch` | new | #820, each with its control | `orphan ci::` lines; `absent at the indexed commit` in `context` on the consumer; the end of the reason in the export and in `context` |
-| The files the CI reader owns | existing | the base binary; allowed: the typed-key uses removed, the site of an `exact` use | `uses` rows of `forms` on both binaries |
+| The files the CI reader owns | existing | the base binary; allowed: the typed-key uses removed, the site of an `exact` use and the side of its provisioning link; a role ARN is no use on either binary | `uses` rows of `forms` on both binaries |
 | `uses` lines as config values, `[[resource]] via`, `search` kind `iac`, the default search | existing | the base binary | byte-equal answers from the hub |
 | Every other row of every export | existing | the base binary | `parity`: all sections but `ci::` rows, CI nodes, unresolved consumers on a CI node and uses read from a CI file. Another kind's side or link sited on a pipeline file (an image builder) is the base's |
 | MCP over HTTP | copies stdio | the same binary's stdio answers | every answer asked in the `calls` workspace, again at the same repository, byte for byte |

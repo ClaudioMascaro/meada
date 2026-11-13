@@ -3021,6 +3021,7 @@ impl Export {
                 || out.providers.iter().any(|p| p.site == identity)
                 || out.bindings.iter().any(|b| b.site == identity)
                 || self.executions.iter().any(|x| x.workload == identity)
+                || (self.config_uses.iter()).any(|u| u.holder.as_deref() == Some(&identity))
             {
                 let mut written = written::IacNode::default();
                 written.identity = identity;
@@ -3042,9 +3043,12 @@ impl Export {
             .map(|mut link| {
                 // Internal key identities let trace start at one key. The wire format uses
                 // the repository as the side, with the locator kept separately (ADR 0026).
-                if link.at.is_some()
-                    && let Some((repository, _)) = link.side.split_once("::")
-                {
+                // A use the engine placed on its CI node keeps it (ADR 0028).
+                let key = link
+                    .at
+                    .as_ref()
+                    .and_then(|at| link.side.strip_suffix(at.as_str()));
+                if let Some(repository) = key.and_then(|side| side.strip_suffix("::")) {
                     link.side = repository.to_string();
                 }
                 link

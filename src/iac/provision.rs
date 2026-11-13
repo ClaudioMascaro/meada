@@ -329,7 +329,8 @@ enum Source<'a> {
 struct Locations<'a> {
     spans: HashMap<&'a str, &'a Span>,
     nodes: HashMap<String, &'a Node>,
-    keys: HashMap<&'a str, &'a crate::config_values::sites::Site>,
+    /// The place of a use at a config key: path, line and key path.
+    keys: HashMap<&'a str, (&'a str, usize, &'a str)>,
 }
 
 impl<'a> Locations<'a> {
@@ -356,7 +357,13 @@ impl<'a> Locations<'a> {
         }
         let mut keys = HashMap::new();
         for key in &export.config_sites {
-            keys.entry(key.id.as_str()).or_insert(key);
+            let place = (key.path.as_str(), key.line, key.key.as_str());
+            keys.entry(key.id.as_str()).or_insert(place);
+        }
+        // A patterned use read from a pipeline (ADR 0028) is placed as a declared one is.
+        for u in &export.config_uses {
+            let place = (u.path.as_str(), u.line, u.key.as_str());
+            keys.entry(u.site.as_str()).or_insert(place);
         }
         Self { spans, nodes, keys }
     }
@@ -399,14 +406,14 @@ impl Source<'_> {
         files: &mut crate::render::Files,
     ) -> (String, Option<usize>, String) {
         if let Self::Use { site, contract } = self
-            && let Some(key) = locations.keys.get(site)
+            && let Some(&(path, line, key)) = locations.keys.get(site)
         {
             // A source line can contain redacted/cut values, even beside an ordinary key.
             // Keep declaration metadata without rereading any configuration payload.
             return (
-                key.path.clone(),
-                Some(key.line),
-                format!("{contract} at {}#{}", key.path, key.key),
+                path.into(),
+                Some(line),
+                format!("{contract} at {path}#{key}"),
             );
         }
         let span = self.span(locations, files);

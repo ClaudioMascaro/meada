@@ -76,3 +76,23 @@
   second block renames the key path of the first. A `.tf` file a `.tofu` one shadows is neither
   read nor counted. The old value of a variable made sensitive later stays in SQLite's free
   pages until they are reused (`secure_delete` is off).
+- `iac/config_uses.rs` (#828, ADR 0028): the key-name rule skips the files the CI reader owns
+  (a pipeline, an action), by the reader's own file node and never by name: a file under
+  `.github/workflows/` with no `jobs`, an `action.yml` with no `runs`, and one the reader could
+  not read keep the rule. In an owned file only a structured identifier is a use. Its holder is
+  the nearest CI node whose address starts the key path: a CI step, else its CI job, else the
+  file node. The holder is the `site` of `uses` and the `side` of `provisions` in `meada
+  export` alone: `context`, `search` and `trace` place the use by its key as before, so
+  `trace` from the key does not climb to the callers of its pipeline. A `${{ }}` expression is
+  closed at the first `}}` (one that holds `}}` in a string is cut there) and one left open
+  leaves the value as written. Only `env.<name>` alone resolves, the name of letters, digits
+  and `_` in the case written: `env['X']`, another case, a function or an operator are
+  unresolved. The literal is a string of `<node>.env.<name>` or of the pipeline's `env.<name>`,
+  the nearest above the key and never the map the key is written in; a number or a boolean, a
+  redacted or cut value and one that holds an expression or a `*` are no literal, and a
+  composite action reads only the `env` of its own CI steps. An unresolved part is `*`: in the
+  name it makes a pattern under ADR 0026's limits, as the whole name no use and no open item
+  (the config value alone names the variable), outside the name (an ARN's account, the object
+  key after a bucket) nothing. A value with a written `*` is not evaluated. A role ARN gives no
+  use because IAM is in no row of the type table, in any file: nothing reads `with` apart. The
+  image builder forms keep the repository as their site until #831.
