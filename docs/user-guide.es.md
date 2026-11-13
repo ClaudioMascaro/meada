@@ -489,11 +489,13 @@ se lee. Las rutas no cruzan enlaces simbólicos.
 `meada status` pregunta por las imágenes huérfanas por registro y namespace (el primer segmento de
 la ruta del repositorio en el nombre normalizado): `ghcr.io/acme/shop` y `ghcr.io/acme/tools/lint`
 están en `ghcr.io/acme`, `docker.io/library/postgres` en `docker.io/library`, y una imagen cuya ruta
-tiene un solo segmento se agrupa solo por su registro. Solo lista imágenes huérfanas de un grupo que
-contiene builder y runner; en un grupo con un solo papel, `search` y `context` muestran
-`no builder in the workspace` o `no runner in the workspace`. El export conserva `format: 1`, guarda
-ubicaciones de builders y raíces de workloads e incluye `executions` para rutas directas; el grafo
-de la consola muestra contratos y código de workloads.
+tiene un solo segmento se agrupa solo por su registro. Un nombre leído como patrón
+(`ghcr.io/${{ github.repository }}` se lee `ghcr.io/*`) está en todo grupo que su texto antes del
+`*` puede empezar. Solo lista imágenes huérfanas de un grupo que contiene builder y runner; en un
+grupo con un solo papel, `search` y `context` muestran `no builder in the workspace` o
+`no runner in the workspace`. El export conserva `format: 1`, guarda ubicaciones de builders y
+raíces de workloads e incluye `executions` para rutas directas; el grafo de la consola muestra
+contratos y código de workloads.
 
 ### CloudFormation y SAM
 

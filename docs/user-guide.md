@@ -484,8 +484,10 @@ links simbólicos.
 `meada status` pergunta pelos órfãos de imagens por registro e namespace (o primeiro segmento do
 caminho do repositório no nome normalizado): `ghcr.io/acme/shop` e `ghcr.io/acme/tools/lint` ficam
 em `ghcr.io/acme`, `docker.io/library/postgres` em `docker.io/library`, e uma imagem cujo caminho
-tem um só segmento fica só com o registro. Só lista imagens órfãs de um grupo que contém builder e
-runner; num grupo com apenas um papel, `search` e `context` mostram `no builder in the workspace` ou
+tem um só segmento fica só com o registro. Um nome lido como padrão
+(`ghcr.io/${{ github.repository }}` vira `ghcr.io/*`) fica em todo grupo que o seu texto antes do
+`*` pode começar. Só lista imagens órfãs de um grupo que contém builder e runner; num grupo com
+apenas um papel, `search` e `context` mostram `no builder in the workspace` ou
 `no runner in the workspace`. O export conserva `format: 1`, guarda locais dos builders e raízes dos
 workloads e inclui `executions` para caminhos diretos; o grafo da console mostra contratos e código
 dos workloads.

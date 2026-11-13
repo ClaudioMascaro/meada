@@ -148,6 +148,25 @@ fn image_orphans_require_both_roles_in_the_visible_scope_and_refresh() {
         .collect::<Vec<_>>()
         .join("\n");
     assert!(!status.contains("orphan image::"), "{status}");
+    // Only `docker.io/library` runs: the builder of `ghcr.io/acme` keeps its mark.
+    std::fs::write(
+        repo.join("compose.yaml"),
+        "services:\n  cache:\n    image: redis:7\n",
+    )
+    .unwrap();
+    let search = engine
+        .search("image::ghcr.io/acme/orders", Some("image"), None)
+        .unwrap();
+    assert!(search.contains("no runner in the workspace"), "{search}");
+    let status = engine
+        .status_report()
+        .unwrap()
+        .1
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(!status.contains("orphan image::"), "{status}");
     std::fs::write(
         repo.join("compose.yaml"),
         "services:\n  cache:\n    image: redis:7\n  worker:\n    image: ghcr.io/acme/worker:1\n",
@@ -223,6 +242,45 @@ fn an_image_is_an_orphan_only_in_a_group_that_builds_and_runs() {
         orphans(),
         ["orphan image::ghcr.io/acme/worker: no builder; docker-compose.yaml::services.worker"]
     );
+}
+
+/// A builder whose name is a pattern (`ghcr.io/${{ github.repository }}` reads `ghcr.io/*`) is in
+/// the groups of the names it can take, so a runner of such a name carries no `no builder` mark.
+#[test]
+fn a_pattern_builder_is_in_the_groups_of_the_images_it_can_name() {
+    let repo = fixture_repo(
+        "images_pattern_groups",
+        "orphan-image",
+        Some("https://example.com/acme/o4.git"),
+    );
+    std::fs::write(
+        repo.join("docker-compose.yaml"),
+        "services:\n  app:\n    image: ghcr.io/acme/shop\n  cache:\n    image: redis:7.2\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(repo.join(".github/workflows")).unwrap();
+    std::fs::write(
+        repo.join(".github/workflows/build.yml"),
+        "jobs:\n  image:\n    steps:\n      - uses: docker/build-push-action@v6\n        with:\n          \
+         tags: ghcr.io/${{ github.repository }}:latest\n",
+    )
+    .unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    let shop = engine.context("image::ghcr.io/acme/shop", None).unwrap();
+    assert!(
+        shop.contains("runner docker-compose.yaml:2 services.app")
+            && !shop.contains("in the workspace"),
+        "{shop}"
+    );
+    let search = engine.search("ghcr.io", Some("image"), None).unwrap();
+    assert!(
+        search.contains("image::ghcr.io/*") && !search.contains("in the workspace"),
+        "{search}"
+    );
+    let redis = engine
+        .context("image::docker.io/library/redis", None)
+        .unwrap();
+    assert!(redis.contains("(no builder in the workspace)"), "{redis}");
 }
 
 #[test]

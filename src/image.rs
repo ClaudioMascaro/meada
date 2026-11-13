@@ -338,11 +338,22 @@ impl ContractKind for Image {
         exports: &[Export],
         _: &[Link],
     ) -> Vec<String> {
-        // Asked per group: a side whose group lacks a builder or a runner is no orphan.
-        let scoped = |contract: &str| {
-            contract.starts_with("image::")
-                && !self.unresolved(contract)
-                && roles(exports, contract) == (true, true)
+        // Asked per group: a side whose group lacks a builder or a runner is no orphan. A
+        // literal image has its group's roles, asked once per group.
+        let mut asked = std::collections::HashMap::<String, (bool, bool)>::new();
+        let mut scoped = |contract: &str| {
+            if !resolved(contract) {
+                return false;
+            }
+            let key = match contract.contains('*') {
+                true => contract,
+                false => group(contract),
+            };
+            let found = match asked.get(key) {
+                Some(found) => *found,
+                None => *asked.entry(key.into()).or_insert(roles(exports, contract)),
+            };
+            found == (true, true)
         };
         let mut rows = std::collections::BTreeSet::new();
         for p in export.providers.iter().filter(|p| scoped(&p.contract)) {
@@ -361,7 +372,9 @@ impl ContractKind for Image {
                 );
             }
         }
-        for c in (export.consumers.iter()).filter(|c| c.contract.as_deref().is_some_and(scoped)) {
+        for c in
+            (export.consumers.iter()).filter(|c| c.contract.as_deref().is_some_and(&mut scoped))
+        {
             let contract = c.contract.as_deref().unwrap_or_default();
             if !exports
                 .iter()
@@ -566,9 +579,7 @@ fn images(export: &Export) -> Vec<(&crate::iac::Node, &str, Option<String>)> {
 /// Whether the scope holds a builder and a runner of a resolved image name in the group of
 /// `contract`, the image's orphan scope (ADR 0026, "Orphan sides").
 fn roles(exports: &[Export], contract: &str) -> (bool, bool) {
-    let side = |c: &str| {
-        c.starts_with("image::") && !crate::contract::unresolved(c) && same_group(c, contract)
-    };
+    let side = |c: &str| resolved(c) && same_group(c, contract);
     (
         (exports.iter().flat_map(|e| &e.providers)).any(|p| side(&p.contract)),
         (exports.iter().flat_map(|e| &e.consumers))
@@ -671,10 +682,27 @@ fn group(contract: &str) -> &str {
     }
 }
 
-/// Whether two images are in one group, a pattern's group taking the groups it matches.
+/// Whether two images are in one group. A pattern (a name with an unresolved part, `*`) is in
+/// every group whose names its text before the `*` can start: `ghcr.io/*` is in `ghcr.io/acme`,
+/// `ghcr.io/acme-*` is not.
 fn same_group(a: &str, b: &str) -> bool {
-    let (a, b) = (group(a), group(b));
-    a == b || crate::iac::pattern::matches(a, b) || crate::iac::pattern::matches(b, a)
+    if !a.contains('*') && !b.contains('*') {
+        return group(a) == group(b);
+    }
+    let start = |c: &str| {
+        let name = c.strip_prefix("image::").unwrap_or(c);
+        match name.split_once('*') {
+            Some((start, _)) => start.to_string(),
+            None => format!("{}/", group(name)),
+        }
+    };
+    let (a, b) = (start(a), start(b));
+    a.starts_with(&b) || b.starts_with(&a)
+}
+
+/// Whether `contract` is an image the kind resolved, a name or a pattern it links by.
+fn resolved(contract: &str) -> bool {
+    contract.starts_with("image::") && !crate::contract::unresolved(contract)
 }
 
 /// The registry and repository of an image, without its deployment tag or digest.
@@ -760,9 +788,16 @@ mod tests {
         assert!(same_group(shop, "image::ghcr.io/acme/tools/lint"));
         assert!(!same_group(shop, redis));
         assert!(!same_group(shop, "image::ghcr.io/other/shop"));
-        // A pattern's group is matched as a pattern: `ghcr.io/*` takes `ghcr.io/acme`.
+        // A pattern is in the groups its text before the `*` can start.
         assert!(same_group("image::ghcr.io/*/orders", shop));
+        assert!(same_group("image::ghcr.io/*", shop));
         assert!(same_group("image::ghcr.io/acme/orders-*", shop));
+        assert!(same_group(shop, "image::ghcr.io/acme/orders-*"));
+        assert!(!same_group("image::ghcr.io/acme-*", shop));
+        assert!(same_group(
+            "image::ghcr.io/acme-*",
+            "image::ghcr.io/acme-tools/lint"
+        ));
         assert!(!same_group("image::ghcr.io/*/orders", redis));
     }
 
