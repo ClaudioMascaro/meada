@@ -1763,18 +1763,25 @@ fn aws_origin_chains_and_inline_factories_stay_bounded_at_the_file_size_ceiling(
 }
 
 /// The transaction calls of a file fold on a budget of their own: however many they are, the
-/// other calls of the file keep the sides they have without them, of every kind (#719). The call
-/// where that budget ends has the sides its entries give: a writer, and no reader (#784).
+/// other calls of the file keep the sides they have without them, of every kind (#719). The calls
+/// before the one where that budget ends keep their names, and that call has the sides its
+/// entries give: a writer and no reader for `Put` entries, a writer and a reader for `Put` and
+/// `ConditionCheck` entries (#784).
 #[test]
 fn transaction_calls_leave_the_other_sides_of_their_file_named() {
-    let repeated = |template: &str, count: usize| -> String {
+    // `$CHECK` declares a `ConditionCheck` entry of table `c$K`, `$ITEM` adds it to the call.
+    let repeated = |template: &str, count: usize, check: Option<(&str, &str)>| -> String {
+        let (declared, item) = check.unwrap_or_default();
+        let template = template.replace("$CHECK", declared).replace("$ITEM", item);
         (0..count)
             .map(|k| template.replace("$K", &k.to_string()))
             .collect()
     };
-    let java = format!(
-        r#"import software.amazon.awssdk.core.sync.RequestBody;
+    let sources = |checked: bool| {
+        let java = format!(
+            r#"import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
@@ -1801,16 +1808,20 @@ class Budget {{
     }}
 }}
 "#,
-        repeated(
-            r#"        var p$K = Put.builder().tableName("t$K");
+            repeated(
+                r#"        var p$K = Put.builder().tableName("t$K");
         var e$K = p$K.build();
-        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(e$K).build()).build());
+$CHECK        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(TransactWriteItem.builder().put(e$K).build()$ITEM).build());
 "#,
-            2000
-        )
-    );
-    let go = format!(
-        r#"package app
+                2000,
+                checked.then_some((
+                    "        var c$K = ConditionCheck.builder().tableName(\"c$K\").build();\n",
+                    ", TransactWriteItem.builder().conditionCheck(c$K).build()",
+                )),
+            )
+        );
+        let go = format!(
+            r#"package app
 
 import (
     "context"
@@ -1835,20 +1846,24 @@ func last(ctx context.Context) {{
     topics.Publish(ctx, &sns.PublishInput{{TopicArn: aws.String("topic")}})
 }}
 "#,
-        repeated(
-            r#"
+            repeated(
+                r#"
 func f$K(ctx context.Context) {
     p := &types.Put{TableName: aws.String("t$K")}
-    items := []types.TransactWriteItem{{Put: p}}
+$CHECK    items := []types.TransactWriteItem{{Put: p}$ITEM}
     in := &dynamodb.TransactWriteItemsInput{TransactItems: items}
     client.TransactWriteItems(ctx, in)
 }
 "#,
-            2500
-        )
-    );
-    let csharp = format!(
-        r#"using System.Collections.Generic;
+                2500,
+                checked.then_some((
+                    "    c := &types.ConditionCheck{TableName: aws.String(\"c$K\")}\n",
+                    ", {ConditionCheck: c}",
+                )),
+            )
+        );
+        let csharp = format!(
+            r#"using System.Collections.Generic;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
@@ -1870,72 +1885,96 @@ class Budget {{
     }}
 }}
 "#,
-        repeated(
-            r#"    async Task F$K() {
+            repeated(
+                r#"    async Task F$K() {
         var p = new Put { TableName = "t$K" };
-        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = p } };
+$CHECK        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = p }$ITEM };
         var request = new TransactWriteItemsRequest { TransactItems = items };
         await db.TransactWriteItemsAsync(request);
     }
 "#,
-            2500
-        )
-    );
-    for (language, file, source) in [
-        ("java", "Budget.java", java),
-        ("go", "budget.go", go),
-        ("csharp", "Budget.cs", csharp),
-    ] {
-        let repo = fixture_repo(
-            &format!("aws_sdk_transaction_budget_{language}"),
-            "aws-sdk-controls",
-            None,
+                2500,
+                checked.then_some((
+                    "        var c = new ConditionCheck { TableName = \"c$K\" };\n",
+                    ", new TransactWriteItem { ConditionCheck = c }",
+                )),
+            )
         );
-        std::fs::write(repo.join(file), source).unwrap();
-        let text = Engine::open(&repo).unwrap().export().unwrap();
-        let export: Value = serde_json::from_str(&text).unwrap();
-        for (sides, contract) in [
-            ("providers", "resource::dynamodb::t0"),
-            ("providers", "resource::dynamodb::last"),
-            ("consumers", "resource::dynamodb::get"),
-            ("providers", "resource::s3::bucket"),
-            ("providers", "channel::sns::topic"),
-        ] {
-            let named =
-                (export[sides].as_array().unwrap().iter()).any(|s| s["contract"] == contract);
-            assert!(named, "{language}: no {contract} in {sides}");
+        [
+            ("java", "Budget.java", java, 2000),
+            ("go", "budget.go", go, 2500),
+            ("csharp", "Budget.cs", csharp, 2500),
+        ]
+    };
+    // Measured with each value held in a name (the ceilings topic): the calls named in each
+    // language before the budget ends, `Put` entries only.
+    let measured = [("java", 1725), ("go", 1928), ("csharp", 2185)];
+    for checked in [false, true] {
+        for (language, file, source, calls) in sources(checked) {
+            let repo = fixture_repo(
+                &format!("aws_sdk_transaction_budget_{language}_{checked}"),
+                "aws-sdk-controls",
+                None,
+            );
+            std::fs::write(repo.join(file), source).unwrap();
+            let text = Engine::open(&repo).unwrap().export().unwrap();
+            let export: Value = serde_json::from_str(&text).unwrap();
+            for (sides, contract) in [
+                ("providers", "resource::dynamodb::t0"),
+                ("providers", "resource::dynamodb::last"),
+                ("consumers", "resource::dynamodb::get"),
+                ("providers", "resource::s3::bucket"),
+                ("providers", "channel::sns::topic"),
+            ] {
+                let named =
+                    (export[sides].as_array().unwrap().iter()).any(|s| s["contract"] == contract);
+                assert!(named, "{language}: no {contract} in {sides}");
+            }
+            // The tables named on one side, by number, and its unresolved sides.
+            let listed = |kind: &str, table: &str| -> (Vec<usize>, usize) {
+                let contracts = (export[kind].as_array().unwrap().iter())
+                    .map(|s| s["contract"].as_str().unwrap());
+                let mut named: Vec<usize> = (contracts.clone())
+                    .filter_map(|c| c.strip_prefix(table)?.parse().ok())
+                    .collect();
+                named.sort_unstable();
+                let unnamed = contracts.filter(|&c| c == "resource::dynamodb").count();
+                (named, unnamed)
+            };
+            let case = format!("{language}, ConditionCheck entries {checked}");
+            let (writers, unnamed_writers) = listed("providers", "resource::dynamodb::t");
+            let (readers, unnamed_readers) = listed("consumers", "resource::dynamodb::c");
+            // The calls before the one where the budget ends keep their names.
+            assert!(
+                writers.iter().copied().eq(0..writers.len()),
+                "{case}: {writers:?}"
+            );
+            assert!(
+                readers.iter().copied().eq(0..readers.len()),
+                "{case}: {readers:?}"
+            );
+            assert!(writers.len() < calls, "{case}: the budget did not end");
+            let sides = (
+                writers.len(),
+                unnamed_writers,
+                readers.len(),
+                unnamed_readers,
+            );
+            if checked {
+                // Every call with a named writer has a reader, named or unresolved: an entry the
+                // budget leaves unread at the call where it ends gives each row one unresolved
+                // side at most.
+                let reader_sides = readers.len() + unnamed_readers;
+                assert_eq!(reader_sides, writers.len(), "{case}: {sides:?}");
+                assert!(
+                    unnamed_writers <= 1 && unnamed_readers <= 1,
+                    "{case}: {sides:?}"
+                );
+            } else {
+                let (_, measured) = measured.iter().find(|(l, _)| *l == language).unwrap();
+                assert_eq!(sides, (*measured, 0, 0, 0), "{case}");
+            }
         }
-        // The call where the budget ends has the sides its entries give, a writer and no
-        // reader, and the calls before it keep their names (#784).
-        let sides = |kind: &str| -> Vec<(String, String)> {
-            (export[kind].as_array().unwrap().iter())
-                .map(|s| (s["site"].to_string(), s["contract"].to_string()))
-                .collect()
-        };
-        let mut named: Vec<usize> = (sides("providers").iter())
-            .filter_map(|(_, c)| {
-                c.trim_matches('"')
-                    .strip_prefix("resource::dynamodb::t")?
-                    .parse()
-                    .ok()
-            })
-            .collect();
-        named.sort_unstable();
-        assert!(
-            named.iter().copied().eq(0..named.len()),
-            "{language}: a gap in {named:?}"
-        );
-        let unnamed: Vec<_> = (sides("providers").into_iter())
-            .filter(|(_, c)| c == "\"resource::dynamodb\"")
-            .collect();
-        let readers: Vec<_> = (sides("consumers").into_iter())
-            .filter(|(_, c)| c != "\"resource::dynamodb::get\"")
-            .collect();
-        assert!(
-            readers.is_empty(),
-            "{language}: {} writers named, unnamed {unnamed:?}, readers {readers:?}",
-            named.len()
-        );
     }
 }
 

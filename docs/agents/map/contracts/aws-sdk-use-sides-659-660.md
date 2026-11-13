@@ -27,8 +27,9 @@
   constants and the ones C#'s `bound` keeps); a parameter, a field and a package variable are
   never followed. The rows of a transaction run inside `Code::apart` and trace their clients
   with an `Origins` of their own, so what they fold is charged to a second per-file budget and
-  the other calls of the file keep theirs. `Code::apart` also tells whether that budget ran out
-  in the row: such a row adds no side to a call an earlier row gave one (#784). A Java builder held in a local or
+  the other calls of the file keep theirs. Each row of one call starts from what the call found
+  spent (`Code::spent_apart`, `set_spent_apart`) and the call is charged the sum of its rows, so
+  what the writer row spent does not cut the reader row short (#784). A Java builder held in a local or
   a `final` field that a call outside the request's call sets again (a step setting a member of
   the name's path, before or after the request, anywhere in a chain off the builder or off a
   local holding it: `b.message(..).topicArn(..)`, `var e = b.message(..); e.topicArn(..)`,

@@ -89,10 +89,12 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   file keep their sides whatever the transactions spend. About 1,700 to 2,200 transaction
   calls in one file spend it (with each value held in a name, the first 1,725 calls are named
   in Java, 1,928 in Go, 2,185 in C#; a hundred calls of 25 inline entries each do not): the
-  transaction calls after that have no side. At the one where it ends, a row the budget cuts adds
-  no side once an earlier row gave the call one (a `Put`-only call keeps its writer and gets no
-  reader, #784); a call whose first row it cuts keeps that row's unresolved side, and a cut
-  reader row of a call with a writer adds none, a `ConditionCheck` included. A Java builder held in a `final` field is read in its own
+  transaction calls after that have no side. At the one where it ends, each row of the call reads
+  the request on the budget the call started with, and the call spends what its rows spend
+  together: a `Put`-only call keeps its writer and gets no reader, and a call of `Put` and
+  `ConditionCheck` entries has a writer and a reader (#784). An entry the budget leaves unread
+  there gives each row an unresolved side beside the names it read, a reader beside `Put` entries
+  included. A Java builder held in a `final` field is read in its own
   file, and a call on its name from another Java file leaves it unresolved; one handed to a call
   or aliased there, or reached by reflection from there, is not seen, and the field keeps its
   first name. A request type is the SDK's unless a type of its directory, an import or a

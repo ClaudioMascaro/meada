@@ -4991,8 +4991,6 @@ pub struct Code<'a> {
     /// `folded` and `field_reads` for the work `Code::apart` runs.
     folded_apart: RefCell<HashMap<&'a str, usize>>,
     field_reads_apart: RefCell<HashMap<Field<'a>, Value>>,
-    /// Whether a charge found its file's budget spent since `Code::apart` last started.
-    short: Cell<bool>,
     /// Each file of `full` by name, built the first time a name is looked up in it.
     by_name: HashMap<&'a str, OnceCell<ByName<'a>>>,
     /// The marker constants of the literals that set each field (`field_values`), by field name
@@ -5174,7 +5172,6 @@ impl<'a> Code<'a> {
             folded: RefCell::new(HashMap::new()),
             folded_apart: RefCell::new(HashMap::new()),
             field_reads_apart: RefCell::new(HashMap::new()),
-            short: Cell::new(false),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
             literals: OnceCell::new(),
             field_reads: RefCell::new(HashMap::new()),
@@ -5190,27 +5187,35 @@ impl<'a> Code<'a> {
         let mut folded = self.folded.borrow_mut();
         let spent = folded.entry(file).or_default();
         *spent = spent.saturating_add(cost);
-        let within = *spent <= EVAL_BUDGET;
-        if !within {
-            self.short.set(true);
-        }
-        within
+        *spent <= EVAL_BUDGET
     }
 
     /// `work` on an `EVAL_BUDGET` of its own for each file, with the field reads it folds kept
     /// to itself: whatever it spends, every other reader of a file folds what it folds without
-    /// it. Not to be nested. Also whether that budget ran out during `work`: what it read may
-    /// then be cut short.
-    pub(crate) fn apart<T>(&self, work: impl FnOnce() -> T) -> (T, bool) {
+    /// it. Not to be nested.
+    pub(crate) fn apart<T>(&self, work: impl FnOnce() -> T) -> T {
         let swap = || {
             self.folded.swap(&self.folded_apart);
             self.field_reads.swap(&self.field_reads_apart);
         };
         swap();
-        self.short.set(false);
         let done = work();
         swap();
-        (done, self.short.get())
+        done
+    }
+
+    /// What the work `Code::apart` runs has spent of `file`'s budget.
+    pub(crate) fn spent_apart(&self, file: &'a str) -> usize {
+        self.folded_apart
+            .borrow()
+            .get(file)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// Sets what the work `Code::apart` runs has spent of `file`'s budget.
+    pub(crate) fn set_spent_apart(&self, file: &'a str, spent: usize) {
+        self.folded_apart.borrow_mut().insert(file, spent);
     }
 
     /// The language pack whose files these are.
