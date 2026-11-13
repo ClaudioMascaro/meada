@@ -229,8 +229,10 @@ this file, and a change to these modules updates it.
   converts them in their order; `any` keeps the value), a module argument is evaluated
   in the caller, an override file's `type` and `default` replace the declared ones (`Module::declare`: Terraform
   converts the default to the declaring block's type and again to the override's, which Meada
-  follows; OpenTofu 1.13+ converts once, a ceiling; a variable with a block in a `.tofu` or `.tofu.json` file is unresolved where they differ: `declared_default`), a var file's value replaces the default. Check each against Terraform's rule when a change decides on a
-  value's kind (`Eval::holds_set`); `tests/terraform-oracle/modules/` holds cases for the first three.
+  follows; OpenTofu 1.13+ converts once, a ceiling; a variable with a block in a `.tofu` or `.tofu.json` file is unresolved where they differ: `declared_default`), a var file's value replaces the default, and a default the final type refuses leaves any value
+  unresolved (`Eval::received`). Check each against Terraform's rule when a change decides on a
+  value's kind (`Eval::holds_set`, and `Eval::is_tuple` for a `for_each` both tools refuse);
+  `tests/terraform-oracle/modules/` holds cases for the first three.
   `Eval::keys` evaluates `count` and `for_each` while instances are made (no module output read
   yet), and `Eval::root` evaluates the names once every instance exists. `Repository::read` reads
   the files, `Repository::units` gives each root with the directories of its unit, and `refresh`

@@ -49,6 +49,13 @@ All notable changes to Meada are recorded here. The format follows
   `10` and `1.5`, where Meada kept the strings and gave `010` and `1.50` at `exact`. An element
   Meada cannot convert with certainty (`-0`, whose sign Terraform keeps) leaves the value
   unresolved, from a default, a var file or a module argument alike (#770).
+- A variable whose default its final type refuses (a `set(string)` default an override retypes
+  as a tuple, `["x"]` under `list(number)`) names nothing exactly, whatever gives its value:
+  Terraform and OpenTofu refuse the configuration, where a var file's value or a module argument
+  still named every instance at `exact`. A `for_each` over a tuple gives no exact name either,
+  as both tools refuse it: a tuple written out, or a variable that holds one (a var file's value
+  or a default under `any` or no type, a declared tuple type, a module argument that is a tuple)
+  (#769).
 
 ## [1.3.0] - 2026-11-11
 

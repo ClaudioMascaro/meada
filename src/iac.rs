@@ -1000,16 +1000,21 @@ fn is_set(expr: &Expression, named: &mut dyn FnMut(&Ref) -> bool) -> bool {
             _ => false,
         },
         Expression::Conditional(c) => is_set(&c.true_expr, named) || is_set(&c.false_expr, named),
-        Expression::Traversal(t) => match &t.expr {
-            Expression::Variable(root) if t.operators.len() == 1 => {
-                let ops: Vec<&TraversalOperator> = t.operators.iter().map(|o| o.value()).collect();
-                reference(root.as_str(), &ops)
-                    .is_some_and(|r| matches!(r, Ref::Var(_) | Ref::Local(_)) && named(&r))
-            }
-            _ => false,
-        },
+        Expression::Traversal(_) => lone_ref(expr).is_some_and(|r| named(&r)),
         _ => false,
     }
+}
+
+/// The variable or local `expr` reads whole (`var.x`, `local.x`), not an attribute or an index of
+/// it.
+fn lone_ref(expr: &Expression) -> Option<Ref> {
+    let Expression::Traversal(t) = expr else {
+        return None;
+    };
+    let (Expression::Variable(root), [op]) = (&t.expr, &t.operators[..]) else {
+        return None;
+    };
+    reference(root.as_str(), &[op.value()]).filter(|r| matches!(r, Ref::Var(_) | Ref::Local(_)))
 }
 
 impl Exact<'_, '_> {
@@ -2289,7 +2294,8 @@ impl<'m> Eval<'m> {
 
     /// The instances the `count` or `for_each` of `block` gives in the instance `at`, sorted
     /// by key as Terraform sorts them; `None` for a block with neither, or with one that does
-    /// not resolve to a number, an object or a list of strings, or past `EXPANSION_MAX`.
+    /// not resolve to a number, an object or a list of strings, for a list known to be a tuple
+    /// (`is_tuple`: Terraform and OpenTofu refuse it), or past `EXPANSION_MAX`.
     fn keys(&mut self, at: usize, block: &'m Block) -> Option<Vec<Each>> {
         if let Some(count) = &block.count {
             let found = self.value(at, None, count, 0);
@@ -2304,9 +2310,11 @@ impl<'m> Eval<'m> {
             };
             return Some((0..n).map(each).collect());
         }
-        let found = self.value(at, None, block.for_each.as_ref()?, 0);
+        let for_each = block.for_each.as_ref()?;
+        let found = self.value(at, None, for_each, 0);
         let entries: BTreeMap<String, Value> = match found.val {
             Val::Known(Value::Object(map)) => map.into_iter().collect(),
+            Val::Known(Value::Array(_)) if self.is_tuple(at, for_each) => return None,
             Val::Known(Value::Array(items)) => (items.into_iter())
                 .map(|v| match v {
                     Value::String(s) => Some((s.clone(), Value::String(s))),
@@ -2405,6 +2413,40 @@ impl<'m> Eval<'m> {
         found
     }
 
+    /// Whether `expr`, in the instance `at`, is known to be a tuple, which `for_each` refuses: a
+    /// tuple written out (`[...]`, `[for ...]`), or a variable read whole that holds one. A tuple
+    /// that arrives any other way (a local, an output, a function's result) is a ceiling (#717).
+    fn is_tuple(&self, at: usize, expr: &Expression) -> bool {
+        match expr {
+            Expression::Array(_) => true,
+            Expression::ForExpr(f) => f.key_expr.is_none(),
+            Expression::Parenthesis(p) => self.is_tuple(at, p.inner()),
+            _ => matches!(lone_ref(expr), Some(Ref::Var(n)) if self.holds_tuple(at, &n)),
+        }
+    }
+
+    /// Whether `var.<n>` in the instance `at` holds a tuple: a value of a declared tuple type (or
+    /// of a type a list does not convert to, which the tools refuse), or under `any` or no type a
+    /// value no set or list converted: a var file's, a default's, or a module argument that is a
+    /// tuple in its caller.
+    fn holds_tuple(&self, at: usize, n: &str) -> bool {
+        let module = &self.modules[self.instances[at].dir];
+        let Some(v) = module.variables.get(n) else {
+            return false;
+        };
+        let converts = |t: &Declared| matches!(t, Declared::Set(_) | Declared::List(_));
+        let literal = !v.through.iter().any(converts);
+        match (v.ty, self.instances[at].parent) {
+            (Some(Declared::Other), _) => true,
+            (Some(Declared::Set(_) | Declared::List(_)), _) => false,
+            (_, Some((caller, block))) => match block.args.get(n) {
+                Some(arg) => self.is_tuple(caller, &arg.expr),
+                None => literal,
+            },
+            (_, None) => module.given.contains_key(n) || literal,
+        }
+    }
+
     /// The value of `var.<n>` in the instance `at`: in a module called locally, the call's
     /// argument evaluated in the caller (else the variable's default, which the repository
     /// fixes); in a root, the value its var files give or else its default, either of which a
@@ -2419,7 +2461,7 @@ impl<'m> Eval<'m> {
             return match (block.args.get(n), &variable.default) {
                 (Some(arg), _) => {
                     let found = self.value(caller, call.as_ref(), &arg.expr, depth + 1);
-                    declared(found, variable.ty.as_slice())
+                    self.received(at, found, variable, depth)
                 }
                 (None, Some(default)) => {
                     let found = self.value(at, None, default, depth + 1);
@@ -2440,7 +2482,7 @@ impl<'m> Eval<'m> {
                     through: BTreeSet::new(),
                 };
                 (
-                    declared(found, variable.ty.as_slice()),
+                    self.received(at, found, variable, depth),
                     &given.path,
                     given.line,
                     true,
@@ -2464,6 +2506,30 @@ impl<'m> Eval<'m> {
             tfvars,
         });
         found
+    }
+
+    /// `found`, the value a module argument or a var file gives `variable` in the instance `at`,
+    /// converted to its final type. Unresolved where the variable's default does not convert to
+    /// its types (`converted_through`): Terraform and OpenTofu refuse the configuration whatever
+    /// gives the value. A variable with a block in a file only OpenTofu reads is left to #767.
+    fn received(
+        &mut self,
+        at: usize,
+        found: Evaluated,
+        variable: &'m Variable,
+        depth: usize,
+    ) -> Evaluated {
+        if !variable.opentofu
+            && let Some(default) = &variable.default
+            && let Val::Known(v) = self.value(at, None, default, depth + 1).val
+            && converted_through(v, &variable.through).is_none()
+        {
+            return Evaluated {
+                val: Val::Unknown,
+                through: found.through,
+            };
+        }
+        declared(found, variable.ty.as_slice())
     }
 
     /// The value of `module.<name>` in the instance `at`, holding the outputs `outs` of each of

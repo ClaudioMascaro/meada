@@ -147,8 +147,13 @@
   (`terraform.tfvars`, `terraform.tfvars.json`, `*.auto.tfvars`, `*.auto.tfvars.json`): a
   `-var-file` is not read, and a JSON var file's value line is the first occurrence of its key.
   A value cut at `EVAL_DEPTH_MAX` or around a cycle is memoized for its instance, so a shallower
-  reader of the same local gets the cut value. A `for_each` over a list of strings expands
-  (`toset` gives a list too, so a list Terraform refuses cannot be told apart). `tolist`, `toset`
+  reader of the same local gets the cut value. A `for_each` over a list of strings expands unless
+  Meada knows it is a tuple, which Terraform and OpenTofu refuse (#769): one written out (`[...]`,
+  `[for ...]`), or a variable read whole that holds one (a var file's value or a default under
+  `any` or no type, a declared tuple type, a module argument that is a tuple in its caller). Any
+  other list of strings expands (`toset` gives a list too), so a list or a tuple both tools
+  refuse, from a declared `list(...)`, a local or a function (`concat`, `keys`, `tolist`), names
+  its elements at `exact`. `tolist`, `toset`
   and `tomap` convert their elements to one type as cty unifies them (scalars with a string
   become strings, objects of one set of attributes attribute by attribute and others to a map,
   tuples of one length element by element and others to a list, a number with a bool refused). A
