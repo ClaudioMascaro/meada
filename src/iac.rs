@@ -1936,7 +1936,8 @@ fn template_cost(
 }
 
 /// How many elements the collection `expr` gives at most, and the bytes one of them (or its key)
-/// holds at most: exact for a bound value, else its cost for both.
+/// holds at most: exact for a bound value, a literal list or object's count and its costliest
+/// element, else its cost for both.
 fn elements(
     expr: &Expression,
     roots: &Roots<'_>,
@@ -1963,6 +1964,22 @@ fn elements(
             let (a, x) = elements(&c.true_expr, roots, iters, overhead);
             let (b, y) = elements(&c.false_expr, roots, iters, overhead);
             return (a.max(b), x.max(y));
+        }
+        // A literal holds as many elements as it lists, each costed alone: its whole cost for
+        // each element squared it (#716).
+        Expression::Array(items) => {
+            let each = (items.iter()).map(|e| cost(e, roots, iters, overhead));
+            return (items.len(), each.max().unwrap_or(0));
+        }
+        Expression::Object(object) => {
+            let each = (object.iter()).map(|(k, v)| {
+                let key = match k {
+                    ObjectKey::Ident(i) => i.as_str().len() + 2,
+                    ObjectKey::Expression(e) => cost(e, roots, iters, overhead),
+                };
+                key.max(cost(v.expr(), roots, iters, overhead))
+            });
+            return (object.len(), each.max().unwrap_or(0));
         }
         _ => {}
     }
@@ -4968,6 +4985,43 @@ mod tests {
         assert!(got.iter().all(|n| n.contains(" = \"q-s")), "{got:?}");
     }
 
+    /// A `for` over a literal list or object costs as a `for` over a bound one (#716): its element
+    /// count times its largest element. Forty inline objects expand, in a list and in an object,
+    /// where the literal's whole cost taken as the count and as each element passed
+    /// `EVAL_COST_MAX`; a `for` in a `for` over two literal lists of 400, which would make more
+    /// than `EVAL_COST_MAX` (160,000 strings of 10 bytes), is still refused.
+    #[test]
+    fn a_for_over_a_literal_collection_costs_as_over_a_bound_one() {
+        let list = (0..40)
+            .map(|i| format!("{{ name = \"s{i:02}\", size = {i} }}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let object = (0..40)
+            .map(|i| format!("s{i:02} = {{ size = {i}, tier = \"backend-tier\" }}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let numbers = (0..400).map(|i| i.to_string()).collect::<Vec<_>>();
+        let numbers = numbers.join(", ");
+        let main = format!(
+            "resource \"a\" \"l\" {{\n  for_each = {{ for o in [{list}] : o.name => o }}\n  name = \"l-${{each.key}}\"\n}}\n\
+             resource \"a\" \"o\" {{\n  for_each = {{ for k, v in {{ {object} }} : k => v }}\n  name = \"o-${{each.key}}\"\n}}\n\
+             resource \"a\" \"n\" {{\n  name = \"n-${{length([for a in [{numbers}] : [for b in [{numbers}] : \"abcdefgh\"]])}}\"\n}}\n"
+        );
+        let got = names(&[("main.tf", &main)]);
+        let of = |address: &str| -> Vec<String> {
+            (got.iter().filter(|n| n.starts_with(address)).cloned()).collect()
+        };
+        let named = |r: &str| -> Vec<String> {
+            (0..40)
+                .map(|i| format!("a.{r}[\"s{i:02}\"] = \"{r}-s{i:02}\""))
+                .collect()
+        };
+        assert_eq!(
+            (of("a.l"), of("a.o"), of("a.n")),
+            (named("l"), named("o"), vec!["a.n ~ \"n-*\"".to_string()])
+        );
+    }
+
     /// A key bound over `toset(...)` is the element in Terraform, where Meada's set is a list
     /// whose key is the index: unresolved, in a `for` and in a `%{ for }` directive.
     #[test]
@@ -5132,18 +5186,18 @@ mod tests {
             given(tfvars, format!("x = \"{long}\"\n")),
             given("terraform.tfvars.json", format!("{{\"x\": \"{long}\"}}")),
         ];
-        // A `for` in a `for` over two lists of 30 could make about 700,000 bytes (`cost`), which
+        // A `for` in a `for` over two lists of 270 could make about 876,000 bytes (`cost`), which
         // each such value spends before its unknown `z` leaves it out: four times as many as the
         // work holds spend it (those refused spend nothing), and a value after them costing more
-        // than the work left is given but unresolved.
-        let thirty = (0..30)
+        // than the work left (about 1,022,000, its strings longer) is given but unresolved.
+        let many = (0..270)
             .map(|i| i.to_string())
             .collect::<Vec<_>>()
             .join(", ");
-        let costly = format!("[for a in [{thirty}] : [for b in [{thirty}] : z]]");
+        let costly = format!("[for a in [{many}] : [for b in [{many}] : z]]");
         let n = 4 * EVAL_WORK_MAX / EVAL_COST_MAX;
         let values: String = (0..n).map(|i| format!("x{i} = {costly}\n")).collect();
-        let last = format!("[for a in [{thirty}] : [for b in [{thirty}] : \"ok-ok-ok\"]][0][0]");
+        let last = format!("[for a in [{many}] : [for b in [{many}] : \"ok-ok-ok\"]][0][0]");
         let values = format!("first = \"ok\"\n{values}last = {last}\n");
         let main = concat!(
             "variable \"first\" { default = \"\" }\nvariable \"last\" { default = \"\" }\n",
