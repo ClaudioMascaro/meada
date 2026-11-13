@@ -4,8 +4,11 @@
 //! convert the default once, to the final type, where 1.12 and earlier convert it as Terraform
 //! does: where the two give different elements or another kind of collection the name is
 //! unresolved, never one tool's. A variable all of whose blocks Terraform reads keeps following
-//! Terraform. Each expected value for a `.tf` row is Terraform v1.17.1's, for a `.tofu` row
-//! OpenTofu v1.13.9's (`0-b`, `1-a`, `2-a` for the retyping rows).
+//! Terraform. One declared in a file Terraform reads also has Terraform's reading, the directory
+//! without the `.tofu` files: it is unresolved where that reading gives another value or type,
+//! and is the variable's where OpenTofu refuses the directory (#767). Each expected value for a
+//! `.tf` row is Terraform v1.17.1's, for a `.tofu` row OpenTofu v1.13.9's (`0-b`, `1-a`, `2-a`
+//! for the retyping rows), and where they differ the row says so.
 
 use super::*;
 
@@ -186,45 +189,109 @@ fn a_declaration_only_opentofu_reads_is_exact_where_the_two_conversions_agree() 
     }
 }
 
-/// Two declarations of one variable, in either order of their files.
+/// One variable declared in a file Terraform reads and again in a file only OpenTofu reads
+/// (#768): OpenTofu refuses the directory ("Duplicate variable declaration") and Terraform reads
+/// the `.tf` block alone, in either order of the two files, with the override files it reads and
+/// none only OpenTofu reads. Terraform v1.17.1 names `0-x` on every row; OpenTofu v1.13.9 refuses
+/// each. A `sensitive` the block only OpenTofu reads gives still holds, as any block's does:
+/// Terraform names `0-x` there too, and Meada names nothing exactly.
 #[test]
-fn a_variable_declared_twice_keeps_every_files_kind_whatever_the_order() {
-    let tf = "variable \"s\" {\n  type = set(string)\n}\n";
-    let tofu = "variable \"s\" {\n  default = [\"x\"]\n}\n";
+fn a_variable_declared_in_a_file_of_each_tool_is_the_block_terraform_reads() {
+    let tf = format!("variable \"s\" {{\n  type = set(string)\n  default = [\"x\"]\n}}\n{READ}");
+    let tofu = "variable \"s\" {\n  type = set(string)\n  default = [\"b\", \"a\", \"a\"]\n}\n";
+    let c = "variable \"s\" {\n  default = [\"c\"]\n}\n";
+    let rows: Vec<(&str, Vec<(&str, &str)>)> = vec![
+        ("a.tf, b.tofu", vec![("a.tf", &tf), ("b.tofu", tofu)]),
+        ("a.tofu, b.tf", vec![("a.tofu", tofu), ("b.tf", &tf)]),
+        (
+            "a.tf, b.tofu.json",
+            vec![("a.tf", &tf), ("b.tofu.json", DECLARED_JSON)],
+        ),
+        (
+            "a.tf.json, b.tofu",
+            vec![
+                (
+                    "a.tf.json",
+                    r#"{"variable": {"s": {"type": "set(string)", "default": ["x"]}}}"#,
+                ),
+                ("read.tf", READ),
+                ("b.tofu", tofu),
+            ],
+        ),
+        (
+            "a.tofu.json, b.tf",
+            vec![("a.tofu.json", DECLARED_JSON), ("b.tf", &tf)],
+        ),
+        (
+            "a.tf, b.tofu, an override.tf",
+            vec![("a.tf", &tf), ("b.tofu", tofu), ("override.tf", LIST)],
+        ),
+        (
+            "a.tofu, b.tf, an override.tf",
+            vec![("a.tofu", tofu), ("b.tf", &tf), ("override.tf", LIST)],
+        ),
+        (
+            "a.tf, b.tofu, an override.tofu",
+            vec![("a.tf", &tf), ("b.tofu", tofu), ("override.tofu", c)],
+        ),
+        (
+            "a.tofu, b.tf, an override.tofu",
+            vec![("a.tofu", tofu), ("b.tf", &tf), ("override.tofu", c)],
+        ),
+    ];
+    for (row, files) in rows {
+        assert_eq!(answer(&files), "f-0-x", "{row}");
+    }
+    let secret = "variable \"s\" {\n  sensitive = true\n}\n";
     for files in [
-        [("a.tf", tf), ("b.tofu", tofu)],
-        [("a.tofu", tofu), ("b.tf", tf)],
+        vec![("a.tf", tf.as_str()), ("b.tofu", secret)],
+        vec![("a.tofu", secret), ("b.tf", &tf)],
+        vec![("a.tf", &tf), ("b.tofu", tofu), ("override.tofu", secret)],
     ] {
-        let bytes: Vec<(String, Vec<u8>)> = (files.iter())
-            .map(|(p, t)| (p.to_string(), t.as_bytes().to_vec()))
-            .collect();
-        let repository = Repository::read(&bytes);
-        assert!(repository.modules[""].variables["s"].opentofu, "{files:?}");
+        assert_eq!(answer(&files), UNRESOLVED, "{files:?}");
     }
 }
 
-/// A set that a `.tofu` override retypes is compared even when its declaration is a `.tf` file:
-/// Terraform does not read the override, so its answer is the set, and OpenTofu's is the list.
+/// A declaration Terraform reads, changed by a block in a file only OpenTofu reads (#767):
+/// Terraform reads the directory without that file and OpenTofu with it, so where the two give the
+/// variable another value or another type no name is exact. Terraform v1.17.1 and OpenTofu v1.13.9
+/// name other instances on every row (the issue's three: `default = ["c"]`, `0-a` and `1-b`
+/// against `0-c`; `set(number)` over `["10", "9"]`, `0-10` and `1-9` against `0-9` and `1-10`; a
+/// list retyped a set, `0-b`, `1-a` and `2-a` against `0-a` and `1-b`; a string retyped a number
+/// and a map of strings retyped a map of numbers, `f-010` and `f-a-010` against `f-10` and
+/// `f-a-10`) but the last, a list of strings retyped a list of numbers, where both name `0-10`,
+/// `1-9` and `2-10`.
 #[test]
-fn a_declaration_terraform_reads_retyped_by_a_file_only_opentofu_reads_is_compared() {
+fn a_declaration_terraform_reads_is_unresolved_where_a_file_only_opentofu_reads_changes_it() {
     let main = format!("{DECLARED}{READ}");
-    let set = "variable \"s\" {\n  type = set(string)\n}\n";
+    let read = |declaration: &str| format!("{declaration}{READ}");
+    let typed = |ty: &str| format!("variable \"s\" {{\n  type = {ty}\n}}\n");
+    let (set, numbers, any) = (typed("set(string)"), typed("list(number)"), typed("any"));
+    let (set_number, number) = (typed("set(number)"), typed("number"));
+    let map_number = typed("map(number)");
     let own = "variable \"s\" {\n  type = list(string)\n  default = [\"b\", \"a\", \"a\"]\n}\n";
-    let rows: Vec<Row> = vec![
+    let c = "variable \"s\" {\n  default = [\"c\"]\n}\n";
+    let ten = read("variable \"s\" {\n  type = set(string)\n  default = [\"10\", \"9\"]\n}\n");
+    let list = read(own);
+    let strings =
+        read("variable \"s\" {\n  type = list(string)\n  default = [\"10\", \"9\", \"10\"]\n}\n");
+    let x = read("variable \"s\" {\n  type = set(string)\n  default = [\"x\"]\n}\n");
+    let child = read(&set);
+    let call = "module \"m\" {\n  source = \"./m\"\n  s = [\"b\", \"a\", \"a\"]\n}\n";
+    let scalar = "variable \"s\" {\n  type = string\n  default = \"010\"\n}\nresource \"a\" \"f\" {\n  name = \"f-${var.s}\"\n}\n";
+    let map = "variable \"s\" {\n  type = map(string)\n  default = { a = \"010\" }\n}\nresource \"a\" \"f\" {\n  for_each = var.s\n  name = \"f-${each.key}-${each.value}\"\n}\n";
+    let rows: Vec<(&str, Vec<(&str, &str)>)> = vec![
         (
             "override.tofu",
             vec![("main.tf", &main), ("override.tofu", LIST)],
-            UNRESOLVED,
         ),
         (
             "override.tofu.json",
             vec![("main.tf", &main), ("override.tofu.json", LIST_JSON)],
-            UNRESOLVED,
         ),
         (
             "x_override.tofu",
             vec![("main.tf", &main), ("x_override.tofu", LIST)],
-            UNRESOLVED,
         ),
         (
             "a .tf.json declaration, override.tofu",
@@ -233,7 +300,6 @@ fn a_declaration_terraform_reads_retyped_by_a_file_only_opentofu_reads_is_compar
                 ("read.tf", READ),
                 ("override.tofu", LIST),
             ],
-            UNRESOLVED,
         ),
         (
             "a .tf.json declaration, override.tofu.json",
@@ -242,7 +308,6 @@ fn a_declaration_terraform_reads_retyped_by_a_file_only_opentofu_reads_is_compar
                 ("read.tf", READ),
                 ("override.tofu.json", LIST_JSON),
             ],
-            UNRESOLVED,
         ),
         (
             "a child module",
@@ -251,31 +316,204 @@ fn a_declaration_terraform_reads_retyped_by_a_file_only_opentofu_reads_is_compar
                 ("m/main.tf", &main),
                 ("m/override.tofu", LIST),
             ],
-            UNRESOLVED,
         ),
-        // The override's own default, of the final type: one value under both conversions, read
-        // as OpenTofu reads it (Terraform ignores the override, a ceiling).
         (
             "an override.tofu giving its own default",
             vec![("main.tf", &main), ("override.tofu", own)],
-            "f-0-b, f-1-a, f-2-a",
         ),
         (
             "an override.tofu giving only a default",
+            vec![("main.tf", &main), ("override.tofu", c)],
+        ),
+        (
+            "an override.tofu.json giving only a default",
+            vec![
+                ("main.tf", &main),
+                (
+                    "override.tofu.json",
+                    r#"{"variable": {"s": {"default": ["c"]}}}"#,
+                ),
+            ],
+        ),
+        (
+            "a child module's default",
+            vec![
+                ("main.tf", MODULE),
+                ("m/main.tf", &main),
+                ("m/override.tofu", c),
+            ],
+        ),
+        (
+            "a set retyped a set of numbers",
+            vec![("main.tf", &ten), ("override.tofu", &set_number)],
+        ),
+        (
+            "a list retyped a set",
+            vec![("main.tf", &list), ("override.tofu", &set)],
+        ),
+        (
+            "a .tf override's default, then a .tofu one's",
+            vec![
+                ("main.tf", &main),
+                (
+                    "a_override.tf",
+                    "variable \"s\" {\n  default = [\"e\", \"d\", \"d\"]\n}\n",
+                ),
+                ("b_override.tofu", c),
+            ],
+        ),
+        (
+            "a .tf override's type, then a .tofu one's",
+            vec![
+                ("main.tf", &main),
+                ("a_override.tf", LIST),
+                ("b_override.tofu", &any),
+            ],
+        ),
+        (
+            "a var file's value under another type",
+            vec![
+                ("main.tf", &x),
+                ("override.tofu", LIST),
+                ("terraform.tfvars", "s = [\"b\", \"a\", \"a\"]\n"),
+            ],
+        ),
+        (
+            "a module argument under another type",
+            vec![
+                ("main.tf", call),
+                ("m/main.tf", &child),
+                ("m/override.tofu", LIST),
+            ],
+        ),
+        (
+            "a string retyped a number",
+            vec![("main.tf", scalar), ("override.tofu", &number)],
+        ),
+        (
+            "a map of strings retyped a map of numbers",
+            vec![("main.tf", map), ("override.tofu", &map_number)],
+        ),
+        (
+            "strings retyped numbers, spelled alike",
+            vec![("main.tf", &strings), ("override.tofu", &numbers)],
+        ),
+    ];
+    for (row, files) in rows {
+        assert_eq!(answer(&files), UNRESOLVED, "{row}");
+    }
+}
+
+/// Where Terraform's reading of the directory and OpenTofu's give the variable one value of one
+/// type, a declaration Terraform reads stays exact beside a block only OpenTofu reads (#767):
+/// Terraform v1.17.1 and OpenTofu v1.13.9 name `0-a` and `1-b` on every row, and `0-b`, `1-a`,
+/// `2-a` for a variable with no `type` that the override types `any`, which keeps the value too.
+#[test]
+fn a_declaration_terraform_reads_is_exact_where_both_tools_read_one_value() {
+    let main = format!("{DECLARED}{READ}");
+    let x = format!("variable \"s\" {{\n  type = set(string)\n  default = [\"x\"]\n}}\n{READ}");
+    let set = "variable \"s\" {\n  type = set(string)\n}\n";
+    let restated = "variable \"s\" {\n  default = [\"b\", \"a\", \"a\"]\n}\n";
+    let y = "variable \"s\" {\n  default = [\"y\"]\n}\n";
+    let call = "module \"m\" {\n  source = \"./m\"\n  s = [\"b\", \"a\", \"a\"]\n}\n";
+    let rows: Vec<(&str, Vec<(&str, &str)>)> = vec![
+        (
+            "an override.tofu restating the set",
+            vec![("main.tf", &main), ("override.tofu", set)],
+        ),
+        (
+            "an override.tofu restating the set, spaced otherwise",
             vec![
                 ("main.tf", &main),
                 (
                     "override.tofu",
-                    "variable \"s\" {\n  default = [\"c\"]\n}\n",
+                    "variable \"s\" {\n  type = set( string )\n}\n",
                 ),
             ],
-            "f-0-c",
         ),
-        // The two rules give one set.
         (
-            "an override.tofu restating the set",
-            vec![("main.tf", &main), ("override.tofu", set)],
-            TERRAFORM,
+            "an override.tofu restating the default",
+            vec![("main.tf", &main), ("override.tofu", restated)],
+        ),
+        (
+            "a .tofu override's type, then a .tf one's",
+            vec![
+                ("main.tf", &main),
+                ("a_override.tofu", LIST),
+                ("b_override.tf", set),
+            ],
+        ),
+        (
+            "a child module, the default restated",
+            vec![
+                ("main.tf", MODULE),
+                ("m/main.tf", &main),
+                ("m/override.tofu", restated),
+            ],
+        ),
+        (
+            "a var file's value under one type",
+            vec![
+                ("main.tf", &x),
+                ("override.tofu", y),
+                ("terraform.tfvars", "s = [\"b\", \"a\"]\n"),
+            ],
+        ),
+        (
+            "a module argument under one type",
+            vec![("main.tf", call), ("m/main.tf", &x), ("m/override.tofu", y)],
+        ),
+    ];
+    for (row, files) in rows {
+        assert_eq!(answer(&files), TERRAFORM, "{row}");
+    }
+    let untyped = format!("variable \"s\" {{\n  default = [\"b\", \"a\", \"a\"]\n}}\n{READ}");
+    let any = "variable \"s\" {\n  type = any\n}\n";
+    let files = [("main.tf", untyped.as_str()), ("override.tofu", any)];
+    assert_eq!(answer(&files), "f-0-b, f-1-a, f-2-a");
+}
+
+/// A directory OpenTofu refuses is read as Terraform reads it, the only tool that runs it (#767):
+/// a default with a string no number spells, under a list or a set of numbers only a `.tofu`
+/// override gives. OpenTofu v1.13.9 refuses each such row ("Invalid default value for variable"),
+/// and Terraform v1.17.1 names what each expects. A default Terraform refuses, under a type only
+/// OpenTofu reads, names nothing exactly: Terraform refuses, and Meada follows it (#740).
+#[test]
+fn a_directory_opentofu_refuses_is_read_as_terraform_reads_it() {
+    let read = |declaration: &str| format!("{declaration}{READ}");
+    let z = read("variable \"s\" {\n  type = list(string)\n  default = [\"z\"]\n}\n");
+    let x = read("variable \"s\" {\n  type = set(string)\n  default = [\"x\"]\n}\n");
+    let refused = read("variable \"s\" {\n  type = list(number)\n  default = [\"z\"]\n}\n");
+    let numbers = "variable \"s\" {\n  type = list(number)\n}\n";
+    let set_number = "variable \"s\" {\n  type = set(number)\n}\n";
+    let rows: Vec<Row> = vec![
+        (
+            "a list of numbers, the default",
+            vec![("main.tf", &z), ("override.tofu", numbers)],
+            "f-0-z",
+        ),
+        (
+            "a list of numbers, a var file's value",
+            vec![
+                ("main.tf", &z),
+                ("override.tofu", numbers),
+                ("terraform.tfvars", "s = [\"10\", \"9\", \"10\"]\n"),
+            ],
+            "f-0-10, f-1-9, f-2-10",
+        ),
+        (
+            "a set of numbers, a var file's value",
+            vec![
+                ("main.tf", &x),
+                ("override.tofu", set_number),
+                ("terraform.tfvars", "s = [\"10\", \"9\"]\n"),
+            ],
+            "f-0-10, f-1-9",
+        ),
+        (
+            "a default Terraform refuses",
+            vec![("main.tf", &refused), ("override.tofu", LIST)],
+            UNRESOLVED,
         ),
     ];
     for (row, files, want) in rows {
@@ -283,10 +521,10 @@ fn a_declaration_terraform_reads_retyped_by_a_file_only_opentofu_reads_is_compar
     }
 }
 
-/// A default no set type touches is converted by neither rule, so a block in a file only OpenTofu
-/// reads changes nothing: it names what the same variable names in `.tf` files, whatever its
-/// elements are written as. Terraform v1.17.1 (the files renamed) and OpenTofu v1.13.9 agree on
-/// every row.
+/// A default no set type touches converts to one value by either rule in these rows (a list of a
+/// primitive type converts its elements alike once or twice, any other type keeps the value), so a
+/// block in a file only OpenTofu reads changes nothing: it names what the same variable names in
+/// `.tf` files. Terraform v1.17.1 (the files renamed) and OpenTofu v1.13.9 agree on every row.
 #[test]
 fn a_default_no_set_type_touches_is_exact_with_a_block_only_opentofu_reads() {
     let variable = |ty: &str, default: &str| {
@@ -298,7 +536,6 @@ fn a_default_no_set_type_touches_is_exact_with_a_block_only_opentofu_reads() {
     };
     let read = |ty: &str, default: &str| format!("{}{READ}", variable(ty, default));
     let numbers = read("list(string)", "[10, 9, 10]");
-    let strings = read("list(string)", "[\"10\", \"9\", \"10\"]");
     let list = read("list(string)", "[\"b\", \"a\", \"a\"]");
     let untyped = read("", "[\"b\", \"a\", \"a\"]");
     let tuple = read("tuple([string, number])", "[\"b\", 1]");
@@ -343,17 +580,6 @@ fn a_default_no_set_type_touches_is_exact_with_a_block_only_opentofu_reads() {
             "f-0-10, f-1-9, f-2-10",
         ),
         (
-            "a list(string) in main.tf retyped list(number) by override.tofu",
-            vec![
-                ("main.tf", &strings),
-                (
-                    "override.tofu",
-                    "variable \"s\" {\n  type = list(number)\n}\n",
-                ),
-            ],
-            "f-0-10, f-1-9, f-2-10",
-        ),
-        (
             "a list in main.tf, the same default in override.tofu",
             vec![
                 ("main.tf", &list),
@@ -390,6 +616,59 @@ fn a_default_no_set_type_touches_is_exact_with_a_block_only_opentofu_reads() {
     for (row, files, want) in rows {
         assert_eq!(answer(&files), want, "{row}");
     }
+}
+
+/// A list of a primitive type converts its elements (#770), so an override in a file only OpenTofu
+/// reads that retypes it can spell other elements once and twice converted: `["010", "9"]`
+/// declared `list(number)` and retyped `list(string)` or `any` names `f-0-10`, `f-1-9` in
+/// Terraform v1.17.1 (the override in `override.tf`) and `f-0-010`, `f-1-9` in OpenTofu v1.13.9.
+/// `["10", "9"]` retyped `any` names `f-0-10`, `f-1-9` in both, strings once and numbers twice
+/// converted, and is OpenTofu's value where only OpenTofu reads the declaration: a read that tells
+/// `"10"` from `10` names `f-0-ten` in OpenTofu, `f-0-other` in Terraform. Declared in a `.tf`
+/// file, the variable is one Terraform reads without the override, a list of numbers where
+/// OpenTofu holds strings, so no name is exact (#767).
+#[test]
+fn a_list_an_opentofu_override_retypes_is_unresolved_where_the_conversions_differ() {
+    let main = |default: &str| {
+        format!("variable \"s\" {{\n  type = list(number)\n  default = {default}\n}}\n{READ}")
+    };
+    let written = main(r#"["010", "9"]"#);
+    for ty in ["list(string)", "any"] {
+        let retype = format!("variable \"s\" {{\n  type = {ty}\n}}\n");
+        for declared in ["main.tf", "main.tofu"] {
+            let opentofu = [
+                (declared, written.as_str()),
+                ("override.tofu", retype.as_str()),
+            ];
+            assert_eq!(answer(&opentofu), UNRESOLVED, "{ty}, {declared}");
+        }
+        let terraform = [
+            ("main.tf", written.as_str()),
+            ("override.tf", retype.as_str()),
+        ];
+        assert_eq!(answer(&terraform), "f-0-10, f-1-9", "{ty}");
+    }
+    let canonical = main(r#"["10", "9"]"#);
+    let any = "variable \"s\" {\n  type = any\n}\n";
+    let opentofu = [("main.tofu", canonical.as_str()), ("override.tofu", any)];
+    assert_eq!(answer(&opentofu), "f-0-10, f-1-9");
+    let both = [("main.tf", canonical.as_str()), ("override.tofu", any)];
+    assert_eq!(answer(&both), UNRESOLVED);
+    let typed = r#"variable "s" {
+  type = list(number)
+  default = ["10", "9"]
+}
+resource "a" "f" {
+  for_each = toset([for k, v in tolist(var.s) : "${k}-${v == "10" ? "ten" : "other"}"])
+  name = "f-${each.value}"
+}
+"#;
+    let opentofu = [("main.tofu", typed), ("override.tofu", any)];
+    assert_eq!(answer(&opentofu), "f-0-ten, f-1-other");
+    let both = [("main.tf", typed), ("override.tofu", any)];
+    assert_eq!(answer(&both), UNRESOLVED);
+    let terraform = [("main.tf", typed), ("override.tf", any)];
+    assert_eq!(answer(&terraform), "f-0-other, f-1-other");
 }
 
 /// The last block that gives a default decides it: one an override file Terraform reads gives
@@ -470,4 +749,18 @@ fn a_declaration_only_opentofu_reads_is_exact_where_the_elements_are_the_same_on
     for (row, files, want) in rows {
         assert_eq!(answer(&files), want, "{row}");
     }
+}
+
+/// A ceiling: only a variable's blocks are compared with Terraform's reading (#767). A local
+/// overridden in a file only OpenTofu reads keeps OpenTofu's value: `"a"` in `main.tf` and `"b"`
+/// in `override.tofu` names `f-b`, OpenTofu v1.13.9's instance, where Terraform v1.17.1 names
+/// `f-a`.
+#[test]
+fn a_local_an_opentofu_override_gives_keeps_opentofu_s_value() {
+    let main = "locals {\n  l = \"a\"\n}\nresource \"a\" \"f\" {\n  name = \"f-${local.l}\"\n}\n";
+    let files = [
+        ("main.tf", main),
+        ("override.tofu", "locals {\n  l = \"b\"\n}\n"),
+    ];
+    assert_eq!(answer(&files), "f-b");
 }
