@@ -1,0 +1,86 @@
+Waits for ADR 0029 to be accepted. Written against main at 3639207, applied nowhere yet.
+When applying: set the date of invariant 7 ("Added 2026-11-13") to the day of acceptance.
+Apply with: git apply docs/drafts/0029/on-accept.diff
+
+diff --git a/AGENTS.md b/AGENTS.md
+index e03a040..1d3417c 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -25,6 +25,7 @@ constants stay out of this repo and out of your reading.
+ The product invariants (no LLM or network in indexing; local-first, with a model only in the
+ opt-in `meada decide` command; writes only inside its own index; a compact MCP server with no
+-write tools; one index per repository; determinism) live in
+-`docs/adr/0002-product-invariants.md`. A change that breaks one starts with a new ADR.
++write tools; one index per repository; determinism; a wrong statement is worse than a missing
++one) live in `docs/adr/0002-product-invariants.md`. A change that breaks one starts with a new
++ADR.
+
+ ## Workflow
+@@ -60,4 +61,7 @@ write tools; one index per repository; determinism) live in
+ - Prose separates clauses with commas, colons or parentheses rather than em dashes.
+ - Decisions are recorded as ADRs in `docs/adr/`.
++- A new contract kind, or a new origin of one (a language pack, a package ecosystem, a row of a
++  command table), is specified with its yardstick ticket, and its tickets become
++  `ready-for-agent` when the gate of ADR 0029 allows: read its stop rule first.
+ - Domain terms are defined in `GLOSSARY.md`. Use them in code, docs and issues.
+ - Repository routing index in `docs/agents/architecture.md`: read it before exploring or changing
+diff --git a/CONTRIBUTING.en.md b/CONTRIBUTING.en.md
+index c4ef733..5f9cf16 100644
+--- a/CONTRIBUTING.en.md
++++ b/CONTRIBUTING.en.md
+@@ -37,6 +37,6 @@ change and what the project expects of you. By taking part, you agree to follow
+ - The project's decisions live in [`docs/adr`](docs/adr). A change that goes against one of them
+   starts with a new ADR. In particular, the product invariants (no LLM or network in indexing,
+-  local-first, no write tools in MCP, one index per repository, determinism) are in
+-  [ADR 0002](docs/adr/0002-product-invariants.md).
++  local-first, no write tools in MCP, one index per repository, determinism, a wrong statement
++  is worse than a missing one) are in [ADR 0002](docs/adr/0002-product-invariants.md).
+
+ ## Clean-room rule
+diff --git a/CONTRIBUTING.es.md b/CONTRIBUTING.es.md
+index 0e72f7d..14ef2e6 100644
+--- a/CONTRIBUTING.es.md
++++ b/CONTRIBUTING.es.md
+@@ -39,5 +39,6 @@ qué espera el proyecto de ti. Al participar, aceptas seguir el
+   empieza con un nuevo ADR. En particular, los invariantes del producto (sin LLM ni red en la
+   indexación, local primero, sin herramientas de escritura en MCP, un índice por repositorio,
+-  determinismo) están en el [ADR 0002](docs/adr/0002-product-invariants.md).
++  determinismo, una afirmación errónea es peor que una ausente) están en el
++  [ADR 0002](docs/adr/0002-product-invariants.md).
+
+ ## Regla de clean room
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 50e4a71..3ba7342 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -38,5 +38,6 @@ que o projeto espera de você. Ao participar, você concorda em seguir o
+   começa com um novo ADR. Em especial, os invariantes do produto (sem LLM nem rede na
+   indexação, local primeiro, sem ferramentas de escrita no MCP, um índice por repositório,
+-  determinismo) estão no [ADR 0002](docs/adr/0002-product-invariants.md).
++  determinismo, uma afirmação errada é pior que uma ausente) estão no
++  [ADR 0002](docs/adr/0002-product-invariants.md).
+
+ ## Regra de clean room
+diff --git a/docs/adr/0002-product-invariants.md b/docs/adr/0002-product-invariants.md
+index 3e03bfa..9e69690 100644
+--- a/docs/adr/0002-product-invariants.md
++++ b/docs/adr/0002-product-invariants.md
+@@ -15,5 +15,6 @@ it never drifts into that cost profile.
+ Scoping v1 (ADR 0003) added one more aim: the same map every time, with the few judgments a
+ deterministic core cannot make recorded in git instead of recomputed. Two invariants were
+-amended for it (2 and 4) and one was added (6).
++amended for it (2 and 4) and one was added (6). ADR 0029 added one more (7), after a dogfooding
++report found statements nobody had measured.
+
+ ## Decision
+@@ -63,4 +64,10 @@ amended for it (2 and 4) and one was added (6).
+    that differs in `commit` and `dirty` alone. Both are read from local git state, with no
+    network and no clock.)
++7. A wrong statement is worse than a missing one. A statement is a link or an orphan line, and a
++   statement of absence (an orphan line, a `no use` or `no provisioner` mark) follows the same
++   rule. A wrong `exact` link is a bug. What Meada knows it does not read shows as an open item
++   or as a named ceiling. A silent absence a yardstick finds becomes a fix or a ceiling. Recall
++   is not promised. (Added 2026-11-13; ADR 0029, which keeps every number outside the invariant,
++   as a threshold of a yardstick.)
+
+ ## Consequences
