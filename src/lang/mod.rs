@@ -1543,8 +1543,50 @@ pub enum Part {
         key: String,
         then: Vec<String>,
     },
+    /// An expression inside a string that value flow stops at, with why (#801). Its value is
+    /// never known, as `Hole`'s.
+    Limit(Limit),
     /// Any other expression inside a string.
     Hole,
+}
+
+impl Part {
+    /// What a string holds where it embeds `value` and cannot read its text: the return value of
+    /// a call names its callee, anything else is a hole.
+    pub fn unread(value: &Value) -> Part {
+        match value {
+            Value::Call(call) => Part::Limit(Limit::Returned(call.callee.clone())),
+            Value::Await(inner) => Part::unread(inner),
+            _ => Part::Hole,
+        }
+    }
+}
+
+/// Why value flow stops at a part of a string (`Part::Limit`), which a consumer whose URL starts
+/// there names (#801).
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum Limit {
+    /// The return value of a call Meada does not evaluate: its callee as written (`c.baseV2`).
+    Returned(String),
+    /// A parameter no call site binds: its name.
+    Parameter(String),
+    /// The base of a client Meada did not read.
+    ClientBase,
+    /// Any other part Meada could not read (a `Hole` or an undecided `Read`); only a consumer's
+    /// lead names it, never a string.
+    Other,
+}
+
+impl Limit {
+    /// The limit as `search` names it on an open item's line: `base from the parameter base`.
+    pub fn describe(&self) -> String {
+        match self {
+            Limit::Returned(callee) => format!("base from the return value of {callee}"),
+            Limit::Parameter(name) => format!("base from the parameter {name}"),
+            Limit::ClientBase => "base of a client Meada did not read".into(),
+            Limit::Other => "base Meada could not read".into(),
+        }
+    }
 }
 
 // Facts helpers the JVM packs and Swift share.

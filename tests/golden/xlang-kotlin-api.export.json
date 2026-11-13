@@ -780,7 +780,7 @@
       "via": "host:web.example.com"
     },
     {
-      "contract": "http::GET::/api/mirror",
+      "contract": null,
       "site": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api.MirrorClient.mirror()::client.get#0",
       "via": null
     },

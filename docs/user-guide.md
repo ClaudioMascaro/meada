@@ -886,6 +886,18 @@ src/status.ts:3  fetch("/api/health")
   2) example.com/acme/worker GET /api/health
 ```
 
+Um item cuja URL começa por uma base que o Meada não conseguiu ler nomeia esse limite numa linha
+própria (seção 8.1):
+
+```text
+example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0
+client.go:16  http.Get(c.baseV2() + "/orders")
+  limite: base vinda do retorno de c.baseV2
+  1) example.com/acme/api GET /api/orders
+  2) example.com/acme/api GET /orders
+  3) example.com/acme/api GET /v2/orders
+```
+
 ### O arquivo `meada.decisions.toml`
 
 Fica na raiz, é versionado no git como um lockfile, e o diff dele é o que se revisa. A
@@ -1247,9 +1259,13 @@ Como a ligação é escolhida, conforme o que a URL mostra:
    `[serve] hosts`. O elo é `exact`. Se nenhum repositório serve esse host, não há elo.
 2. **Variável de ambiente.** A URL começa por uma leitura de ambiente (`API_URL`) que um par
    declara em `base_url_env`. O elo é `inferred`; o valor no ambiente do processo nunca é lido.
-3. **Host desconhecido.** A URL não diz de onde vem (um caminho relativo, por exemplo) e só um
-   repositório do workspace serve esse método e esse caminho. O elo é `inferred`, com o motivo
-   `the only repository serving it is`.
+3. **Host desconhecido.** A URL não diz de onde vem, mas o caminho é certo: ela é escrita sem base
+   (`fetch('/orders')`), ou a biblioteca a junta à base de modo que um caminho a partir da raiz
+   troca o caminho da base (`new URL('/orders', base)` em TypeScript, uma URI de requisição a partir
+   da raiz num `HttpClient` de C#, uma rota de Retrofit a partir da raiz, uma requisição a partir da
+   raiz num cliente Ktor com `defaultRequest` ou numa sessão aiohttp, `URL(string:relativeTo:)` em
+   Swift). Quando só um repositório do workspace serve esse método e esse caminho, o elo é
+   `inferred`, com o motivo `the only repository serving it is`.
 4. **Vários provedores.** O elo é `ambiguous`, e o Meada lista todos os candidatos, um elo por
    candidato. É um item aberto que `meada decide` resolve.
 
@@ -1259,6 +1275,19 @@ consegue calcular, mesmo depois de dobrar constantes e argumentos de funções q
 cliente, é um **consumidor não resolvido**: aparece no `search`, no `context` e no export, nunca
 liga, e é um item aberto. Uma função que monta a URL a partir dos seus parâmetros vira um
 consumidor em cada chamada dela, com os argumentos substituídos, em qualquer profundidade.
+
+Uma URL cuja base o Meada não conseguiu ler, com o caminho acrescentado a ela, também é um
+consumidor não resolvido: `` fetch(`${base}/orders`) `` com `base` um parâmetro que nenhuma
+chamada liga, `http.Get(c.base() + "/orders")`, uma requisição num cliente cuja URL base o Meada
+não leu. Essa base pode ter um caminho próprio, então só o fim do caminho é conhecido. O item
+aberto oferece como candidatos as rotas do método da chamada cujo caminho termina com a parte
+conhecida a partir de uma `/` (`/items` aceita `GET /items` e `GET /api/orders/items`, não `GET
+/api/lineitems`), e nomeia o limite que parou o Meada: o retorno de uma chamada (com quem é
+chamado), um parâmetro (com o nome dele), a base de um cliente que o Meada não leu, ou outra
+parte que ele não conseguiu ler. `meada decide --list` mostra o limite numa linha `limite:`, e
+`search` com `kind: unresolved` na linha do item. Uma base que é uma leitura de ambiente escrita
+no lugar (`os.Getenv("API_URL") + "/orders"`) continua ligando pela variável, com ou sem um par
+que a declare.
 
 Por que um elo pode faltar:
 

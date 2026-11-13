@@ -193,7 +193,7 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | value | `<repository> <place> <key-path> = <shown-value>` | A config value, at its file and line. |
 | iac node | `<repository> <place> <address> (<iac-type><iac-name?>, root <iac-root>)<orphan-note?>` | An IaC node, at its block's first line, with its type, its physical name and its root module. |
 | copies | `<n> copies` | A group of duplicates; one symbol line per copy follows. |
-| open item | `` <repository> <place> (<item-kind>) candidates: <n>; run `meada decide --item <call-site>` `` | An open item and the command that closes it. |
+| open item | `` <repository> <place> (<item-kind>) candidates: <n>;<item-limit?> run `meada decide --item <call-site>` `` | An open item and the command that closes it. |
 | no matches | `` no matches for `<query?>` `` | Nothing matched. |
 
 | Field | Form | Meaning |
@@ -226,6 +226,7 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | `<entry-kind>` | `program` | A program start a language pack declares or a manifest names. |
 | `<item-kind>` | `ambiguous` | An ambiguous link: several providers fit. |
 | `<item-kind>` | `unresolved` | An unresolved consumer, such as a dynamic URL. |
+| `<item-limit>` | ` limit: <text>;` | Why Meada could not read the start of a dynamic URL, whose path it appends to an unknown base: `base from the return value of <callee>`, `base from the parameter <name>`, `base of a client Meada did not read` or `base Meada could not read` (#801). |
 | `<key-path>` | `<text>` | Where the value sits in its file, jq style: `spec.containers[0].image`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` in a file of several documents. |
 | `<shown-value>` | `<text> (cut)` | A string past 1 KiB, quoted as JSON and cut. |
 | `<address>` | `<word>` | An IaC node's address: `aws_sqs_queue.orders`, `data.aws_iam_policy_document.p`, `module.orders.aws_sqs_queue.this`, `aws_sqs_queue.dlq[0]`, and for a Kubernetes object `<Kind>[.<group>]/<namespace>/<name>`: `Deployment.apps/shop/api`, `Service/shop/api`, `ClusterRole.rbac.authorization.k8s.io/reader`. |

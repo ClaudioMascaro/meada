@@ -716,6 +716,7 @@ pub(crate) fn items(
                     expression,
                     enclosing: None,
                     candidates: choices.candidates.get(id).cloned().unwrap_or_default(),
+                    limit: None,
                 },
                 decided.contains(id.as_str()),
             ));

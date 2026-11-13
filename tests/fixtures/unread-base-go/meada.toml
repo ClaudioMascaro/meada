@@ -1,0 +1,4 @@
+[[peer]]
+repo = "example.com/acme/api"
+path = "../unread-base-api"
+base_url_env = ["API_URL"]

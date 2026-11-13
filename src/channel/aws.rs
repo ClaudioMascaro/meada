@@ -118,6 +118,7 @@ impl Operation {
             method: None,
             fragments: Vec::new(),
             shape: None,
+            lead: None,
         }
     }
 }

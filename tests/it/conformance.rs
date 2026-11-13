@@ -3273,7 +3273,7 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             &file("Local", "localBase()", "client.get#0"),
         ),
         (
-            "http::GET::/var-base",
+            "unresolved",
             "",
             &file("Local", "varBase()", "(call_expression).get#0"),
         ),
@@ -5125,7 +5125,7 @@ fn csharp_typed_clients_and_refit_methods_are_consumers() {
             "host:inventory.example.com",
             &remote("IInventoryApi.Delete(string)"),
         ),
-        ("http::GET::/reports", "", &remote("IReportsApi.All()")),
+        ("unresolved", "", &remote("IReportsApi.All()")),
         (
             "http::GET::/orders",
             "host:orders.example.com",
@@ -9508,14 +9508,11 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
             "host:bare.example.com",
             &rest("Separate", &chain("Get", 1)),
         ),
-        // A client written as a type has no base; a client of two bases has an unknown one.
-        ("http::GET::/typed", "", &rest("Typed", &chain("Get", 0))),
-        ("http::GET::/typed-request", "", &rest("Typed", "r.Get#0")),
-        (
-            "http::GET::/items",
-            "",
-            &rest("Gateway.Items", &chain("Get", 0)),
-        ),
+        // A client written as a type has a base Meada did not read, so the path after it is an
+        // open item (#801); a client of two bases has an unknown one.
+        ("unresolved", "", &rest("Typed", &chain("Get", 0))),
+        ("unresolved", "", &rest("Typed", "r.Get#0")),
+        ("unresolved", "", &rest("Gateway.Items", &chain("Get", 0))),
         (
             "http::GET::/plain",
             api,
@@ -9526,7 +9523,7 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
             "host:returned.example.com",
             &rest("Returned", &chain("Get", 0)),
         ),
-        ("http::GET::/reused", "", &rest("Reused", &chain("Get", 0))),
+        ("unresolved", "", &rest("Reused", &chain("Get", 0))),
         (
             "http::GET::/wrapped-rest",
             "host:billing.example.com",
@@ -9540,8 +9537,8 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
             &rest("Factory", &chain("Get", 1)),
         ),
         ("http::GET::/from-b", "", &rest("Factory", &chain("Get", 0))),
-        ("http::GET::/m1", "", &rest("Mixed", "fetchBase#0")),
-        ("http::GET::/m2", "", &rest("Mixed", "fetchBase#1")),
+        ("unresolved", "", &rest("Mixed", "fetchBase#0")),
+        ("unresolved", "", &rest("Mixed", "fetchBase#1")),
         // A base URL read from the environment, by `os.Getenv` and by `os.LookupEnv` with a
         // fallback.
         (
@@ -9568,45 +9565,17 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
             "host:ledger.example.com",
             &field("Ledger.Entries", &chain("Get", 0)),
         ),
-        (
-            "http::GET::/sync",
-            "",
-            &field("Mirror.Sync", &chain("Get", 0)),
-        ),
-        (
-            "http::GET::/forward",
-            "",
-            &field("Proxy.Forward", &chain("Get", 0)),
-        ),
-        (
-            "http::POST::/send",
-            "",
-            &field("Relay.Send", &chain("Post", 0)),
-        ),
-        (
-            "http::POST::/push",
-            "",
-            &field("Queue.Push", &chain("Post", 0)),
-        ),
-        (
-            "http::GET::/left",
-            "",
-            &field("Pair.Left", &chain("Get", 0)),
-        ),
-        (
-            "http::GET::/ping",
-            "",
-            &field("Pool.Lease", &chain("Get", 0)),
-        ),
-        (
-            "http::GET::/poll",
-            "",
-            &field("Unset.Idle", &chain("Get", 0)),
-        ),
+        ("unresolved", "", &field("Mirror.Sync", &chain("Get", 0))),
+        ("unresolved", "", &field("Proxy.Forward", &chain("Get", 0))),
+        ("unresolved", "", &field("Relay.Send", &chain("Post", 0))),
+        ("unresolved", "", &field("Queue.Push", &chain("Post", 0))),
+        ("unresolved", "", &field("Pair.Left", &chain("Get", 0))),
+        ("unresolved", "", &field("Pool.Lease", &chain("Get", 0))),
+        ("unresolved", "", &field("Unset.Idle", &chain("Get", 0))),
         // A package variable another package writes through a selector (`config.Base = ..`,
         // `&config.Path`, `config.Mode += ..`) is no constant; `Host` of a request is no write
         // to the constant `Host`.
-        ("http::GET::/a", "", &net("Written", "http.Get#0")),
+        ("unresolved", "", &net("Written", "http.Get#0")),
         ("unresolved", "", &net("Written", "http.Get#1")),
         ("unresolved", "", &net("Written", "http.Get#2")),
         ("http::GET::/stable", api, &net("Written", "http.Get#3")),
@@ -10168,13 +10137,9 @@ fn rust_values_derived_from_a_client_and_name_matches_are_no_consumers() {
             &site("send_named", "reqwest.get#0"),
         ),
         // A `{base}` that a loop or a closure parameter binds is not the `let base` around it.
-        ("http::GET::/loop", "", &site("shadowed", "reqwest.get#0")),
-        (
-            "http::GET::/closure",
-            "",
-            &site("shadowed", "reqwest.get#1"),
-        ),
-        ("http::GET::/outer", "", &site("shadowed", "reqwest.get#2")),
+        ("unresolved", "", &site("shadowed", "reqwest.get#0")),
+        ("unresolved", "", &site("shadowed", "reqwest.get#1")),
+        ("unresolved", "", &site("shadowed", "reqwest.get#2")),
     ]);
     assert_eq!(rust_clients("rust_http_derived", "derived.rs"), expected);
 }
@@ -10249,9 +10214,9 @@ fn rust_base_urls_from_the_environment_are_the_variable_meada_never_reads() {
         ("http::GET::/else", "env:ELSE_URL", &site("fallbacks", 1)),
         ("http::GET::/trim", "env:TRIM_URL", &site("fallbacks", 2)),
         // A second read in the fallback leaves a hole, and `option_env!` is not read.
-        ("http::GET::/two", "", &site("two_reads", 0)),
-        ("http::GET::/macro-fallback", "", &site("two_reads", 1)),
-        ("http::GET::/optional", "", &site("optional", 0)),
+        ("unresolved", "", &site("two_reads", 0)),
+        ("unresolved", "", &site("two_reads", 1)),
+        ("unresolved", "", &site("optional", 0)),
         // A read in the middle of the URL is a hole in the path, not the base.
         (
             "http::GET::/{}/mid",
@@ -10271,14 +10236,14 @@ fn rust_calls_spelled_like_an_environment_read_but_not_one_are_not_read() {
     let expected = triples(&[
         // An `env` the file defines, and `env::var` with no `use std::env` in scope: the base is a
         // hole, not a variable.
-        ("http::GET::/own", "", &site("own_module")),
-        ("http::GET::/bare", "", &site("other.bare")),
+        ("unresolved", "", &site("own_module")),
+        ("unresolved", "", &site("other.bare")),
         // A parameter or a closure named `var` hides `use std::env::var`.
-        ("http::GET::/parameter", "", &site("hidden.parameter")),
-        ("http::GET::/closure", "", &site("hidden.closure")),
+        ("unresolved", "", &site("hidden.parameter")),
+        ("unresolved", "", &site("hidden.closure")),
         // A `var`, an `env!` and a `format!` imported from a path outside `std`.
-        ("http::GET::/foreign", "", &site("foreign.read")),
-        ("http::GET::/macro", "", &site2("foreign.read", 1)),
+        ("unresolved", "", &site("foreign.read")),
+        ("unresolved", "", &site2("foreign.read", 1)),
         ("unresolved", "", &site2("foreign.read", 2)),
     ]);
     assert_eq!(rust_clients("rust_http_not_env", "not_env.rs"), expected);
@@ -10312,10 +10277,7 @@ fn an_environment_read_under_a_deep_chain_is_a_hole() {
         .iter()
         .map(|(c, v, _)| (c.as_str(), v.as_str()))
         .collect();
-    assert_eq!(
-        reads,
-        [("http::GET::/long", ""), ("http::GET::/nested", "")]
-    );
+    assert_eq!(reads, [("unresolved", ""), ("unresolved", "")]);
 }
 
 /// A crate's exports are the `pub` items reachable from its root through `pub` modules and
@@ -11081,10 +11043,15 @@ fn python_environment_reads_name_the_base_url_variable() {
         (orders, env, &site("named", "requests.get#0")),
         (orders, env, &site("interpolated", "requests.get#0")),
         (orders, env, &site("client_base_url", "client.get#0")),
-        // Two variables, or a name only known at run time, name no base.
-        (orders, "", &site("two_variables", "requests.get#0")),
-        (orders, "", &site("default_reads_another", "requests.get#0")),
-        (orders, "", &site("computed_name", "requests.get#0")),
+        // Two variables, or a name only known at run time, name no base: the path after it is an
+        // open item (#801).
+        ("unresolved", "", &site("two_variables", "requests.get#0")),
+        (
+            "unresolved",
+            "",
+            &site("default_reads_another", "requests.get#0"),
+        ),
+        ("unresolved", "", &site("computed_name", "requests.get#0")),
     ]);
 
     assert_eq!(
@@ -13462,11 +13429,7 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
             api,
             &mutated("URLSession.shared.data#2"),
         ),
-        (
-            "http::GET::/global",
-            "",
-            &mutated("URLSession.shared.data#3"),
-        ),
+        ("unresolved", "", &mutated("URLSession.shared.data#3")),
         // A `do` block runs its statements in place.
         (
             "http::POST::/do",

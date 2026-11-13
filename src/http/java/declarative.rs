@@ -18,7 +18,9 @@
 //! the `Retrofit.Builder().baseUrl(base)` chain of each `create(Api.class)` that makes it, read
 //! whole like a WebClient's (`Expand::Chain`, through constants, `final` fields and `@Value`);
 //! one consumer per base, and an interface no `create` names has an unknown base. A path that
-//! starts with `/` replaces the base's own path, as Retrofit resolves it. `@HTTP` is not read.
+//! starts with `/` replaces the base's own path, as Retrofit resolves it, so over a base Meada did
+//! not read it is the path alone, and a relative one leaves the consumer an open item that names
+//! the client's base (#801). `@HTTP` is not read.
 // ponytail: `name` is the literal one (`value`, or the first argument); a placeholder in it is
 // kept as written.
 
@@ -190,7 +192,7 @@ impl Base {
             // An empty `url` is none.
             Some(Some(parts)) if literal(&parts).is_some_and(|u| u.is_empty()) => None,
             Some(Some(parts)) => Some(schemed(parts)),
-            Some(None) => Some(vec![Part::Hole]),
+            Some(None) => Some(crate::http::client_base()),
         };
         let prefix = match client.keyword("path").map(resolved) {
             None => String::new(),
@@ -363,12 +365,13 @@ fn retrofit_clients<'a>(
             }
         }
     }
+    let unread = crate::http::client_base();
     for (&(path, interface), endpoints) in &interfaces {
         // An interface no `create` names has an unknown base.
         let created = bases.get(&(path, interface)).filter(|b| !b.is_empty());
-        let bases: Vec<Option<&[Part]>> = match created {
-            Some(bases) => bases.iter().map(|b| Some(b.as_slice())).collect(),
-            None => vec![None],
+        let bases: Vec<&[Part]> = match created {
+            Some(bases) => bases.iter().map(Vec::as_slice).collect(),
+            None => vec![&unread],
         };
         for endpoint in endpoints {
             for (route, base) in
@@ -377,7 +380,7 @@ fn retrofit_clients<'a>(
                 // An empty route is Retrofit's dynamic `@Url`: the URL is the argument's.
                 let url = match route.is_empty() {
                     true => Value::Unknown,
-                    false => retrofit_url(*base, route),
+                    false => retrofit_url(base, route),
                 };
                 let Some(reads) = fetches(&[url, text(endpoint.verb)]) else {
                     continue;
@@ -453,16 +456,17 @@ fn base(create: &Invocation, held: Option<&Value>) -> Vec<Part> {
         (Some(Value::Ref(name)), _) | (None, Some(Value::Ref(name))) => {
             vec![Part::Ref(name.clone())]
         }
-        _ => vec![Part::Hole],
+        _ => crate::http::client_base(),
     }
 }
 
 /// The URL of the endpoint `route` of a Retrofit with `base`. A route from the root replaces the
-/// path of the base; a relative one follows it; an absolute URL stands as it is.
-fn retrofit_url(base: Option<&[Part]>, route: &str) -> Value {
-    let Some(base) = base else {
+/// path of the base; a relative one follows it; an absolute URL stands as it is. Over a base whose
+/// origin Meada could not read, a route from the root is the path alone (#801).
+fn retrofit_url(base: &[Part], route: &str) -> Value {
+    if crate::http::rooted_over_unread(base, &text(route)) {
         return text(&join("", route));
-    };
+    }
     // The text the base starts with, whole: `HOST + "/v1/"` arrives as two parts.
     let lead: String = (base.iter())
         .map_while(|p| match p {
@@ -487,9 +491,9 @@ fn retrofit_url(base: Option<&[Part]>, route: &str) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contract::Site;
-    use crate::lang::LanguagePack;
+    use crate::contract::{Lead, Site};
     use crate::lang::java::Java;
+    use crate::lang::{LanguagePack, Limit};
     use crate::resolve::Resolver;
     use std::collections::BTreeMap;
 
@@ -510,6 +514,28 @@ mod tests {
         others: &[(&str, &str)],
         configs: &[(&str, &str)],
     ) -> Vec<Sent> {
+        let mut found: Vec<Sent> = (found_in(imports, body, others, configs).into_iter())
+            .map(|f| (site(f.site), f.contract, f.via))
+            .collect();
+        found.sort();
+        found
+    }
+
+    /// The name of a consumer's definition.
+    fn site(site: Site) -> String {
+        match site {
+            Site::Def { name, .. } => name,
+            _ => "(not a definition)".into(),
+        }
+    }
+
+    /// `sent_in`'s consumers as they are found.
+    fn found_in(
+        imports: &str,
+        body: &str,
+        others: &[(&str, &str)],
+        configs: &[(&str, &str)],
+    ) -> Vec<Found> {
         let src = format!("package a;\n{imports}\n{body}\n");
         let at = "api/src/main/java/a/C.java";
         let mut parsed = vec![(at, Java.parse(at, src.as_bytes()).unwrap())];
@@ -530,17 +556,7 @@ mod tests {
             configs: &configs,
             symlinks: &[],
         };
-        let mut found: Vec<Sent> = (consumers(&code, &indexed).into_iter())
-            .map(|f| {
-                let site = match f.site {
-                    Site::Def { name, .. } => name,
-                    _ => "(not a definition)".into(),
-                };
-                (site, f.contract, f.via)
-            })
-            .collect();
-        found.sort();
-        found
+        consumers(&code, &indexed)
     }
 
     fn sent(imports: &str, body: &str) -> Vec<Sent> {
@@ -856,20 +872,13 @@ mod tests {
 
     #[test]
     fn an_interface_no_builder_creates_has_an_unknown_base() {
+        // Its relative routes follow a base Meada did not read (#801).
         let found = sent(RETROFIT, API);
         assert_eq!(
             found,
             [
-                (
-                    "a.Api.get(String)".into(),
-                    Some("http::GET::/orders/{}".into()),
-                    None
-                ),
-                (
-                    "a.Api.place()".into(),
-                    Some("http::POST::/orders".into()),
-                    None
-                ),
+                ("a.Api.get(String)".into(), None, None),
+                ("a.Api.place()".into(), None, None),
             ]
         );
         // A builder that is no Retrofit's, a Retrofit held in a parameter, an unreadable base.
@@ -891,6 +900,46 @@ mod tests {
                 .count(),
             0
         );
+    }
+
+    /// A base Meada did not read (#801). Feign appends the path to `url`, so a `url` it cannot
+    /// fold leaves the method an open item that names the client's base. Retrofit resolves a
+    /// route from the root over the base, replacing its path, so over a base it did not read (one
+    /// no `create` gives, or one it cannot fold) that route is its path alone; a relative one
+    /// follows the unknown path and is an open item.
+    #[test]
+    fn an_unread_base_names_the_client_where_the_path_follows_it() {
+        let leads = |imports: &str, body: &str| {
+            let mut out: Vec<_> = (found_in(imports, body, &[], &[]).into_iter())
+                .map(|f| (site(f.site), f.contract, f.lead))
+                .collect();
+            out.sort_by(|a, b| a.0.cmp(&b.0));
+            out
+        };
+        let unread = |path: &str| {
+            Some(Lead {
+                limit: Limit::ClientBase,
+                path: path.into(),
+            })
+        };
+        let feign = client("name = \"orders\", url = Config.URL", GET);
+        assert_eq!(
+            leads(FEIGN, &feign),
+            [(LIST.into(), None, unread("/orders"))]
+        );
+        let api = "interface Api { @GET(\"/health\") Object a(); @GET(\"list\") Object b(); }";
+        let rooted = (
+            "a.Api.a()".to_string(),
+            Some("http::GET::/health".to_string()),
+            None,
+        );
+        let open = ("a.Api.b()".to_string(), None, unread("/list"));
+        assert_eq!(leads(RETROFIT, api), [rooted.clone(), open.clone()]);
+        let unfolded = format!(
+            "{api} class Factory {{ static Api api() {{ return new Retrofit.Builder()\
+             .baseUrl(Config.url()).build().create(Api.class); }} }}"
+        );
+        assert_eq!(leads(RETROFIT, &unfolded), [rooted, open]);
     }
 
     #[test]

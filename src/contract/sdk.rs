@@ -286,6 +286,7 @@ pub(crate) fn extract<'a>(
                                 method: Some(operation.method.into()),
                                 fragments: Vec::new(),
                                 shape: None,
+                                lead: None,
                             });
                         }
                     }

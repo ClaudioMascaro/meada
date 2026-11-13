@@ -1,1 +1,2 @@
 example.com/acme/client src/client.ts:13 (unresolved) fetch
+example.com/acme/client src/client.ts:19 (unresolved) fetch

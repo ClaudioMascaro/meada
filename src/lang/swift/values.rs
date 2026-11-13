@@ -107,7 +107,7 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
                     Some(n) => match value_at(n, src, ctx, depth + 1) {
                         Value::Str(parts) => parts,
                         Value::Ref(name) => vec![Part::Ref(name)],
-                        _ => vec![Part::Hole],
+                        other => vec![Part::unread(&other)],
                     },
                     None => vec![Part::Hole],
                 };
@@ -252,7 +252,7 @@ fn env(value: Value) -> Value {
 /// The parts of `value` when it is one environment read.
 pub(super) fn read(value: &Value) -> Option<&[Part]> {
     match value {
-        Value::Str(p) if matches!(p[..], [Part::Env(_) | Part::Hole]) => Some(p),
+        Value::Str(p) if matches!(p[..], [Part::Env(_) | Part::Hole | Part::Limit(_)]) => Some(p),
         _ => None,
     }
 }
@@ -262,9 +262,8 @@ pub(super) fn read(value: &Value) -> Option<&[Part]> {
 /// not), at any depth of a call.
 fn may_read(value: &Value) -> bool {
     match value {
-        Value::Str(parts) => {
-            (parts.iter()).any(|p| matches!(p, Part::Env(_) | Part::Hole | Part::Ref(_)))
-        }
+        Value::Str(parts) => (parts.iter())
+            .any(|p| matches!(p, Part::Env(_) | Part::Hole | Part::Limit(_) | Part::Ref(_))),
         Value::Ref(name) => !name.starts_with(char::is_uppercase),
         Value::Call(call) => (call.args.iter())
             .chain(call.kwargs.iter().map(|(_, v)| v))
@@ -288,7 +287,7 @@ fn string(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Vec<Part> {
             {
                 Some(Value::Ref(name)) => Part::Ref(name),
                 Some(Value::Str(mut read)) if matches!(read[..], [Part::Env(_)]) => read.remove(0),
-                _ => Part::Hole,
+                other => other.as_ref().map_or(Part::Hole, Part::unread),
             },
             _ => Part::Hole,
         };

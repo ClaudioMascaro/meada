@@ -7218,7 +7218,7 @@ impl<'a> Code<'a> {
                     false => out.push(Part::Hole),
                 },
                 Value::Ref(name) => out.push(Part::Ref(name)),
-                _ => out.push(Part::Hole),
+                other => out.push(Part::unread(&other)),
             }
         }
         Value::Str(out)
@@ -7667,7 +7667,8 @@ fn unbind(value: Value, chain: bool) -> Value {
             parts
                 .into_iter()
                 .map(|p| match p {
-                    Part::Ref(_) => Part::Hole,
+                    // What remains a name is a parameter no call site binds (#801).
+                    Part::Ref(name) => Part::Limit(crate::lang::Limit::Parameter(name)),
                     p => p,
                 })
                 .collect(),

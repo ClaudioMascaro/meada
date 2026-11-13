@@ -9,6 +9,24 @@
   Swift's `Tests/` (the match is case-sensitive), Go `testdata/` or Gradle `src/integrationTest`.
   A fake defined in a non-test helper file stays a provider. Channel providers and every other
   kind are untouched. `test_routes = true` keeps every one.
+- `http.rs` (`locate`, `tail_fits`, #801): a URL whose leading part Meada could not read (a hole,
+  an undecided read, or a `Part::Limit`: the return value of a call the pack keeps, a parameter no
+  call site binds, the base of a client a reader did not read) with the rest appended to it is an
+  unresolved consumer, an open item of the kind dynamic URL that names the limit
+  (`Limit::describe` on the `search` line, `Msg::ItemLimit` in `decide --list`). Its known part is
+  the rest, normalized (`Lead::path`): a tail of the path, never the path. Its candidates are the
+  routes of the call's method with a suffix that starts at a `/` and equals the known part (`/`
+  alone fits every route). A URL written with no base keeps the hostless rule, and so does one
+  whose join keeps the path certain: an absolute-path reference over an unknown origin
+  (TypeScript's `new URL`, `opaque_lead`; through `rooted_over_unread`, a C# request URI from the
+  root, `based_on`, a Retrofit route from the root, `retrofit_url`, a request from the root on a
+  Ktor `defaultRequest` base or an aiohttp session, and Swift's `URL(string:relativeTo:)`). An
+  environment read written in place keeps its own rule
+  and reason. Ceilings: the first unknown part names the limit; a call's return value is named by
+  its callee only where the pack keeps the call in the string (TypeScript, Go, Python, Kotlin and
+  Swift, and a value the resolver evaluates), any other part is "a base Meada could not read"; a
+  rest that does not start with `/`, `?` or `#` (`${base}orders`) leaves a consumer with no known
+  part and no limit.
 - `http/java.rs` (spec #26, #86): a Spring MVC route is read from `Call::decorates` on a method
   of a `@RestController` or `@Controller` class, under the class's `@RequestMapping` prefix
   (nested classes do not inherit the outer prefix). An annotation or `RequestMethod.X` counts
@@ -119,8 +137,11 @@
   an unresolved consumer. The base of a client made by a call is the `url(..)` of the
   `defaultRequest { }` in the configuration lambda of that call (Ktor 2 and 3
   `io.ktor.client.plugins.defaultRequest`, Ktor 1 `io.ktor.client.features.defaultRequest`),
-  folded in its scope: a hole when it is set more than once or not by a string, none for a client
-  known by its type alone. `request` sends the method its block assigns: the pack records any
+  folded in its scope: a base Meada did not read (`client_base`, #801) when it is set more than
+  once or not by a string, and for a client known by its type alone. Over such a base a relative
+  path makes an open item that names the client's base, and a path from the root is the path
+  alone, as Ktor's `defaultRequest` replaces the base's path with it (`rooted_over_unread`); over a
+  base it read, a path from the root is still appended to the base's path. `request` sends the method its block assigns: the pack records any
   property assignment `p = v` or `this.p = v` written as a statement of a lambda argument as the
   `p=` key of that call's `Call::kwargs` (`kotlin::assigned`, a key no Kotlin name matches and the
   pack names no property; `given` in `http/kotlin.rs` and in `http/kotlin/client.rs` ignores keys
@@ -163,7 +184,8 @@
   imported on demand counts through its one candidate in the kind's table (`Outside::candidates`,
   now also for a head only the file's outside names bind). A WebClient's base is read off the
   folded chain (`Expand::Chain`), through constants, `final` fields and a wrapper parameter's
-  arguments; a client held in a local has an unknown base, so the consumer links by path. The
+  arguments; a client held in a local has a base Meada did not read, so the consumer is an open
+  item that names the client's base (#801). The
   Java pack keeps a `final` instance field's one value (its initializer, or the single `this.f =
   v` or `f = v` of all its constructors; two give none) as a `Const` of its class, outside
   `statics`, a constructor's value read in that constructor (`Const::scope`): its parameters
@@ -211,7 +233,10 @@
   Retrofit's); the base is the folded `Retrofit.Builder().baseUrl(..)` chain of each
   `retrofit.create(Api.class)` (`Expand::Chain`, climbing wrapper callers while the base holds a
   `Part::Ref`), the receiver proved Retrofit by its type or by its `new Retrofit.Builder()`
-  chain; one consumer per creation, none gives an unknown base. Its annotations name the path by
+  chain; one consumer per creation, none gives a base Meada did not read, over which a route from
+  `/` is its path alone and a relative one an open item that names the client's base (#801). A
+  Feign `url` that does not fold is such a base too (Feign appends the path). Its annotations name
+  the path by
   `value` alone, and a route with a brace open past its segment is not read (`balanced`, as for
   Spring, JAX-RS and Feign). A route from `/` replaces the
   base's path (read over the base's leading text parts, so `HOST + "/v1/"` counts), and an empty
@@ -253,8 +278,9 @@
   back through that many calls, names and struct fields (`New().SetX().R().SetY()`, `b := a`,
   `c.rc`); past it the base is unknown and the request is no consumer (the chain is no longer
   known to be resty's). A request on a client only written as a type (a parameter, or a field
-  no composite literal sets) is a consumer with no host, and so is one on a parameter some
-  caller passes an untraced client to (the base is unknown). A field's literals are those of
+  no composite literal sets), or on a parameter some caller passes an untraced client to, has a
+  base Meada did not read: resty appends the path to it, so the consumer is an open item that
+  names the limit (#801). A field's literals are those of
   its type: a literal of an alias or a defined type (`type B = T`, `type B T`) written by
   position, and a conversion from another struct type (`T(other)`), are not seen as setting
   the fields of `T` (`Code::field_values`), and a literal nested deeper than `VALUE_DEPTH`
@@ -331,7 +357,8 @@
 - `http/kotlin/client.rs` (spec #27, #99): `url { path(..) }`, `url(..)` and `takeFrom` inside a
   request block, `HttpRequestBuilder` values, `submitForm`, the `prepare*` forms, an aliased
   import (`import .. as k`) and a client the call reaches through `with(client) { get(..) }`
-  are not read. A `defaultRequest` base given by a parameter of a client factory is a hole. A
+  are not read. A `defaultRequest` base given by a parameter of a client factory is a base Meada
+  did not read (an open item, #801). A
   local client is followed only when its `val` is written with the constructor call (or a
   `let`, `also` or `use` receiver): `val b = a` and a `var` are not, and a local named like a
   property of its class, of an enclosing class or of its file is typed unknown by the pack, so it is not either. A nested lambda's
@@ -389,8 +416,11 @@
   non-raw string with doubled backslashes yields nothing. Python clients: a receiver that is the
   result of a call (`Session().get(...)`, `make().get(...)`) or an attribute set from anything
   but a call (`self.http = http`, marked in `lang/python.rs`) is not read; a parameter given a
-  client takes the base of every caller that passes one, and several different bases make it a
-  hole.
+  client takes the base of every caller that passes one, and several different bases, or a
+  `base_url=` that does not fold, make it a base Meada did not read: httpx appends the path, so
+  the consumer is an open item that names the client's base, and so does a relative path on an
+  aiohttp session, whose `URL.join` (RFC 3986) makes a path from the root the path alone
+  (`rooted_over_unread`, #801); over a base it read, a path from the root is still appended.
 - `http/ts/clients.rs` (`joined`, #686): a first argument `new URL(reference, base)` of the
   global `URL` (`Value::New` of `GLOBAL_URL`, so a file's own `URL` is left alone) is replaced
   by the join of the two before the `fetch` is read, in the argument, through a constant and in
@@ -401,7 +431,8 @@
   `https://h/api` is `/orders`), each losing its dot segments. Over a base that is an
   environment read or a hole as its whole origin (`${API_URL}`, or followed by a path, even one
   holding a URL such as a proxy's `${X}/fetch/https://h/`) only an absolute-path reference is
-  read, `opaque_lead`: `/orders` keeps the lead (`http::GET::/orders`, `via env:API_URL`).
+  read, `opaque_lead`: `/orders` keeps an environment read as its lead (`http::GET::/orders`, `via
+  env:API_URL`) and drops any other unknown origin, so it links as a hostless URL (#801).
   Unknown, so unresolved: a relative reference or a `//host/x` over an opaque base, a reference
   that starts with a read or a hole, a query or a fragment alone (they keep a path the join does
   not place, even over a literal base), a base with its authority half opaque (`https://${H}` is

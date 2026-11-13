@@ -336,6 +336,7 @@ pub(crate) fn extract(code: &Code, channels: bool) -> Vec<Found> {
                 method: Some(method.into()),
                 fragments: Vec::new(),
                 shape: None,
+                lead: None,
             });
         }
     }

@@ -1297,6 +1297,7 @@ fn import(exports: &mut [Export], providers: &Providers) {
                         fragments: Vec::new(),
                         hops,
                         root: None,
+                        lead: None,
                     });
                 }
             }
@@ -1533,6 +1534,7 @@ fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
                     method: Some(local.clone()),
                     fragments: Vec::new(),
                     shape: Some(shape),
+                    lead: None,
                 });
             }
         }
@@ -1581,6 +1583,7 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                         fragments: Vec::new(),
                         hops: Vec::new(),
                         root: None,
+                        lead: None,
                     });
                     let mut dependency = Dependency::default();
                     dependency.manifest = manifest.path.clone();
@@ -1800,6 +1803,7 @@ impl ContractKind for Packages {
                         method: Some(chain),
                         fragments: Vec::new(),
                         shape: None,
+                        lead: None,
                     });
                 }
             }
@@ -2077,6 +2081,7 @@ mod tests {
                 fragments: Vec::new(),
                 hops: Vec::new(),
                 root: None,
+                lead: None,
             }],
             calls: vec![call_site],
             ..Export::default()
@@ -2662,6 +2667,7 @@ mod tests {
             fragments: Vec::new(),
             hops: Vec::new(),
             root: None,
+            lead: None,
         };
         let repo = Repository {
             root: "/nonexistent".into(),

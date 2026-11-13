@@ -299,7 +299,7 @@ fn sends(client: &Client, call: &Invocation, held: Option<&Value>) -> (Value, Va
 /// `baseUrl(base)` of a `WebClient.builder()` chain ending in `build()`; `None` without one,
 /// unknown for a client made any other way or not read.
 fn base(client: Option<&Value>) -> Option<Vec<Part>> {
-    let hole = Some(vec![Part::Hole]);
+    let hole = Some(crate::http::client_base());
     let Some(Value::Call(top)) = client else {
         return hole;
     };
@@ -315,7 +315,7 @@ fn base(client: Option<&Value>) -> Option<Vec<Part>> {
         Some(Value::Str(parts)) => Some(parts.clone()),
         // A wrapper's parameter: read at each caller.
         Some(Value::Ref(name)) => Some(vec![Part::Ref(name.clone())]),
-        Some(_) => Some(vec![Part::Hole]),
+        Some(_) => Some(crate::http::client_base()),
     };
     match member(&start.callee) {
         "create" if made && steps.len() == 1 => given(start),
@@ -658,8 +658,8 @@ mod tests {
         assert_eq!(
             sent(body),
             [
+                open(Some("DELETE")),
                 open(Some("GET")),
-                to("http::DELETE::/d"),
                 via("http::GET::/f", "other.example.com"),
                 via("http::GET::/v1/a/{}", "made.example.com"),
                 via("http::PATCH::/c", "built.example.com"),
@@ -681,7 +681,7 @@ mod tests {
             sent_with(wild, body, &[]),
             [
                 to("http::DELETE::/r"),
-                (Some("http::GET::/w".into()), host.clone(), None)
+                (Some("http::GET::/w".into()), host.clone(), None),
             ]
         );
         // A wildcard of the repository that brings its own `RestTemplate` may be the one.
@@ -705,12 +705,12 @@ mod tests {
         assert_eq!(
             sent(body),
             [
+                open(Some("GET")),
                 (
                     Some("http::GET::/x".into()),
                     Some("host:orders.example.com".into()),
                     None
                 ),
-                to("http::GET::/y"),
             ]
         );
     }
@@ -738,10 +738,10 @@ mod tests {
         assert_eq!(
             sent(body),
             [
+                open(Some("GET")),
+                open(Some("GET")),
                 via("http::GET::/f", "f.example.com"),
                 via("http::GET::/g", "g.example.com"),
-                to("http::GET::/h"),
-                to("http::GET::/p"),
             ]
         );
     }
@@ -925,11 +925,11 @@ mod tests {
         assert_eq!(
             injected(&body, CONFIGURED, &[]),
             [
-                to("http::GET::/l"),
-                to("http::GET::/m"),
+                open(Some("GET")),
+                open(Some("GET")),
+                open(Some("GET")),
+                open(Some("GET")),
                 via("http::GET::/n", "host:lit.example.com"),
-                to("http::GET::/p"),
-                to("http::GET::/s"),
             ]
         );
         // Another `Value` annotation, and a module without the key's configuration.
@@ -940,7 +940,7 @@ mod tests {
         let configs = [(CONFIG, CONFIGURED)];
         assert_eq!(
             sent_in(MODULE, &imports, &other, &[], &configs),
-            [to("http::GET::/o")]
+            [open(Some("GET"))]
         );
         let elsewhere = "web/src/main/java/a/C.java";
         let spring = format!("{IMPORTS}{SPRING}");
@@ -994,9 +994,9 @@ mod tests {
         assert_eq!(
             found,
             [
-                to("http::GET::/r"),
+                open(Some("GET")),
+                open(Some("GET")),
                 via("http::GET::/r", "host:lit.example.com"),
-                to("http::GET::/w"),
                 via("http::GET::/w", "host:lit.example.com"),
             ]
         );
@@ -1018,7 +1018,7 @@ mod tests {
             sent(&body),
             [
                 via("http::GET::/a", "env:WEB_URL"),
-                via("http::GET::/b", "env:WEB_URL")
+                via("http::GET::/b", "env:WEB_URL"),
             ]
         );
         // A `var` local too.
@@ -1038,7 +1038,7 @@ mod tests {
         let assigned = format!("{body}\nvoid h(String o) {{ base = o; }}");
         assert_eq!(
             sent(&assigned),
-            [to("http::GET::/a"), via("http::GET::/b", "env:WEB_URL")]
+            [open(Some("GET")), via("http::GET::/b", "env:WEB_URL")]
         );
         let shared = format!("{body}\nString url;");
         assert_eq!(
@@ -1051,7 +1051,7 @@ mod tests {
              if (rest != null) {{ String base = \"x\"; }}\n\
              rest.getForObject(base + \"/a\", String.class);\n}}"
         );
-        assert_eq!(sent(&again), [to("http::GET::/a")]);
+        assert_eq!(sent(&again), [open(Some("GET"))]);
         // A lambda parameter or a `catch` parameter of its name hides the bound too.
         for other in [
             "xs.forEach(base -> use(base));",
@@ -1061,7 +1061,7 @@ mod tests {
                 "{REST}void f() {{\nString base = System.getenv(\"WEB_URL\");\n{other}\n\
                  rest.getForObject(base + \"/a\", String.class);\n}}"
             );
-            assert_eq!(sent(&body), [to("http::GET::/a")], "{other}");
+            assert_eq!(sent(&body), [open(Some("GET"))], "{other}");
         }
     }
 
@@ -1084,16 +1084,13 @@ mod tests {
             [via("http::GET::/a", "env:WEB_URL")]
         );
         let hostile = chain(EVAL_DEPTH * 4);
-        assert_eq!(sent(&hostile), [to("http::GET::/a")]);
+        assert_eq!(sent(&hostile), [open(Some("GET"))]);
         let with_after = format!(
             "{hostile}\nvoid after() {{ rest.getForObject(System.getenv(\"AFTER_URL\") + \"/after\", String.class); }}"
         );
         assert_eq!(
             sent(&with_after),
-            [
-                to("http::GET::/a"),
-                via("http::GET::/after", "env:AFTER_URL")
-            ]
+            [open(Some("GET")), via("http::GET::/after", "env:AFTER_URL")]
         );
     }
 
@@ -1109,15 +1106,15 @@ mod tests {
         assert_eq!(
             sent(&body),
             [
+                open(Some("GET")),
                 via("http::GET::/a", "env:WEB_URL"),
                 via("http::GET::/b", "env:WEB_URL"),
-                to("http::GET::/c"),
             ]
         );
         let hidden = [
-            to("http::GET::/a"),
+            open(Some("GET")),
+            open(Some("GET")),
             via("http::GET::/b", "env:WEB_URL"),
-            to("http::GET::/c"),
         ];
         let imports = format!("{IMPORTS}import org.acme.System;\n");
         assert_eq!(sent_with(&imports, &body, &[]), hidden);
@@ -1161,11 +1158,7 @@ mod tests {
         ];
         assert_eq!(
             injected("", CONFIGURED, &others),
-            [
-                to("http::GET::/Anonymous"),
-                to("http::GET::/Base"),
-                to("http::GET::/Delegated"),
-            ]
+            [open(Some("GET")), open(Some("GET")), open(Some("GET"))]
         );
     }
 

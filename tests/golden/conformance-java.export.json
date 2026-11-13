@@ -5667,7 +5667,7 @@
       "via": null
     },
     {
-      "contract": "http::GET::/d",
+      "contract": null,
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Assigned.java::example.clients.Assigned.send()::rest.getForObject#0",
       "via": null
     },
@@ -5737,7 +5737,7 @@
       "via": "host:orders.example.com"
     },
     {
-      "contract": "http::GET::/api/reassigned",
+      "contract": null,
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)::rest.getForObject#0",
       "via": null
     },
@@ -5812,7 +5812,7 @@
       "via": "host:orders.example.com"
     },
     {
-      "contract": "http::GET::/ja",
+      "contract": null,
       "site": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified.a()",
       "via": null
     }
@@ -7386,8 +7386,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Assigned.java::example.clients.Assigned.send()::rest.getForObject#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/d"
+          "mark": "unresolved"
         }
       ]
     },
@@ -7676,8 +7675,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)::rest.getForObject#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/api/reassigned"
+          "mark": "unresolved"
         }
       ]
     },
@@ -7974,8 +7972,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified.a()",
-          "mark": "no-provider",
-          "contract": "http::GET::/ja"
+          "mark": "unresolved"
         }
       ]
     },

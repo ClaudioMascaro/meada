@@ -883,6 +883,18 @@ src/status.ts:3  fetch("/api/health")
   2) example.com/acme/worker GET /api/health
 ```
 
+An item whose URL starts with a base Meada could not read names that limit on a line of its own
+(section 8.1):
+
+```text
+example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0
+client.go:16  http.Get(c.baseV2() + "/orders")
+  limit: base from the return value of c.baseV2
+  1) example.com/acme/api GET /api/orders
+  2) example.com/acme/api GET /orders
+  3) example.com/acme/api GET /v2/orders
+```
+
 ### The `meada.decisions.toml` file
 
 It sits at the root and is versioned in git like a lockfile, and its diff is what gets reviewed.
@@ -1242,8 +1254,12 @@ How the link is chosen, depending on what the URL shows:
    `[serve] hosts`. The link is `exact`. If no repository serves that host, there is no link.
 2. **Environment variable.** The URL starts with an environment read (`API_URL`) that a peer
    declares in `base_url_env`. The link is `inferred`; the process environment value is never read.
-3. **Unknown host.** The URL does not say which host it targets (a relative path, for example)
-   and only one repository in the workspace serves that method and that path. The link is
+3. **Unknown host.** The URL does not say which host it targets, but its path is certain: it is
+   written with no base (`fetch('/orders')`), or the library joins it to the base so that a path
+   from the root replaces the base's path (`new URL('/orders', base)` in TypeScript, a request URI
+   from the root on a C# `HttpClient`, a Retrofit route from the root, a request from the root on a
+   Ktor client with `defaultRequest` or on an aiohttp session, `URL(string:relativeTo:)` in Swift).
+   When only one repository in the workspace serves that method and that path, the link is
    `inferred`, with the reason `the only repository serving it is`.
 4. **Several providers.** The link is `ambiguous`, and Meada lists all the candidates, one link per
    candidate. It is an open item that `meada decide` resolves.
@@ -1254,6 +1270,18 @@ compute, even after folding constants and the arguments of functions that wrap t
 **unresolved consumer**: it appears in `search`, in `context` and in the export, never links, and
 is an open item. A function that builds the URL from its parameters becomes a consumer at each
 call of it, with the arguments substituted, at any depth.
+
+A URL whose base Meada could not read, with the path appended to it, is also an unresolved
+consumer: `` fetch(`${base}/orders`) `` with `base` a parameter no call binds,
+`http.Get(c.base() + "/orders")`, a request on a client whose base URL Meada did not read. That
+base may hold a path of its own, so only the end of the path is known. The open item offers as
+candidates the routes of the call's method whose path ends with the known part at a `/` (`/items`
+takes `GET /items` and `GET /api/orders/items`, not `GET /api/lineitems`), and it names the limit
+that stopped Meada: the return value of a call (with the callee), a parameter (with its name), the
+base of a client Meada did not read, or another part it could not read. `meada decide --list`
+prints the limit on a `limit:` line, and `search` with `kind: unresolved` on the item's line. A
+base that is an environment read written in place (`os.Getenv("API_URL") + "/orders"`) still links
+by its variable, whether or not a peer declares it.
 
 Why a link may be missing:
 

@@ -209,6 +209,7 @@ impl ContractKind for Alert {
                         fragments: Vec::new(),
                         hops: Vec::new(),
                         root: None,
+                        lead: None,
                     });
                 }
                 if identities.insert(node.identity(&repo.identity)) {

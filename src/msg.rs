@@ -1350,6 +1350,8 @@ pub enum Msg<'a> {
     DecideNoItems,
     DecideUnknownItem(&'a str),
     DecideNoCandidates,
+    /// The line of an open item's block that names why value flow stopped at its URL (#801).
+    ItemLimit(&'a crate::lang::Limit),
     DecidePrompt(usize),
     DecideRetry(usize),
     DecideNothing,
@@ -5149,6 +5151,32 @@ impl Msg<'_> {
                 "nenhum candidato serve; pulado".into(),
                 "ningún candidato sirve; omitido".into(),
             ),
+            Msg::ItemLimit(limit) => {
+                use crate::lang::Limit;
+                let (pt, es) = match limit {
+                    Limit::Returned(callee) => (
+                        format!("base vinda do retorno de {callee}"),
+                        format!("base del valor de retorno de {callee}"),
+                    ),
+                    Limit::Parameter(name) => (
+                        format!("base vinda do parâmetro {name}"),
+                        format!("base del parámetro {name}"),
+                    ),
+                    Limit::ClientBase => (
+                        "base de um cliente que o Meada não leu".into(),
+                        "base de un cliente que Meada no leyó".into(),
+                    ),
+                    Limit::Other => (
+                        "base que o Meada não conseguiu ler".into(),
+                        "base que Meada no pudo leer".into(),
+                    ),
+                };
+                pick(
+                    format!("limit: {}", limit.describe()),
+                    format!("limite: {pt}"),
+                    format!("límite: {es}"),
+                )
+            }
             Msg::DecidePrompt(n) => pick(
                 format!("pick 1-{n}, or s to skip:"),
                 format!("escolha 1-{n}, ou s para pular:"),
