@@ -154,7 +154,8 @@
     {
       "contract": "channel::sqs::orders",
       "site": "example.com/provision/infra",
-      "at": "envs/prod/terraform.tfvars#queue"
+      "at": "envs/prod/terraform.tfvars#queue",
+      "level": "inferred"
     }
   ],
   "links": [],

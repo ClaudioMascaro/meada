@@ -698,8 +698,9 @@ workloads that run it, the name normalized (Docker Hub short names expanded, tag
 lowercase). Its **builder** is the provider, the repository whose CI or build configuration
 publishes the image; its **runner** is the consumer, the workload whose image field names it.
 Its orphan scope is asked per registry and namespace, the first segment of the repository path
-(the registry alone for a path of one segment), so a runner of a public image is no orphan where
-the workspace builds nothing in that namespace.
+(the registry alone for a path of one segment; a name read as a pattern is in every group its text
+before the `*` can start), so a runner of a public image is no orphan where the workspace builds
+nothing in that namespace.
 _Avoid_: container, artifact; publisher and deployer (for builder and runner)
 
 **Alert contract**:

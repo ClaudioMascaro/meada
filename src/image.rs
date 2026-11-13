@@ -323,8 +323,8 @@ impl ContractKind for Image {
     fn link_candidate(&self, provider: &Provider, link: &Link, exports: &[Export]) -> bool {
         provider.site == link.provider && patterns::active_match(exports, provider, &link.contract)
     }
-    fn side_note(&self, exports: &[Export], _: &str, role: Role) -> &'static str {
-        let (built, run) = roles(exports);
+    fn side_note(&self, exports: &[Export], contract: &str, role: Role) -> &'static str {
+        let (built, run) = roles(exports, contract);
         match role {
             Role::Provider if !run => " (no runner in the workspace)",
             Role::Consumer if !built => " (no builder in the workspace)",
@@ -338,15 +338,25 @@ impl ContractKind for Image {
         exports: &[Export],
         _: &[Link],
     ) -> Vec<String> {
-        if roles(exports) != (true, true) {
-            return Vec::new();
-        }
+        // Asked per group: a side whose group lacks a builder or a runner is no orphan. A
+        // literal image has its group's roles, asked once per group.
+        let mut asked = std::collections::HashMap::<String, (bool, bool)>::new();
+        let mut scoped = |contract: &str| {
+            if !resolved(contract) {
+                return false;
+            }
+            let key = match contract.contains('*') {
+                true => contract,
+                false => group(contract),
+            };
+            let found = match asked.get(key) {
+                Some(found) => *found,
+                None => *asked.entry(key.into()).or_insert(roles(exports, contract)),
+            };
+            found == (true, true)
+        };
         let mut rows = std::collections::BTreeSet::new();
-        for p in export
-            .providers
-            .iter()
-            .filter(|p| p.contract.starts_with("image::") && !self.unresolved(&p.contract))
-        {
+        for p in export.providers.iter().filter(|p| scoped(&p.contract)) {
             if !exports.iter().flat_map(|e| &e.consumers).any(|c| {
                 c.contract
                     .as_deref()
@@ -362,11 +372,9 @@ impl ContractKind for Image {
                 );
             }
         }
-        for c in export.consumers.iter().filter(|c| {
-            c.contract
-                .as_deref()
-                .is_some_and(|c| c.starts_with("image::") && !self.unresolved(c))
-        }) {
+        for c in
+            (export.consumers.iter()).filter(|c| c.contract.as_deref().is_some_and(&mut scoped))
+        {
             let contract = c.contract.as_deref().unwrap_or_default();
             if !exports
                 .iter()
@@ -568,9 +576,10 @@ fn images(export: &Export) -> Vec<(&crate::iac::Node, &str, Option<String>)> {
     out
 }
 
-/// Whether the scope holds a builder and a runner of a resolved image name.
-fn roles(exports: &[Export]) -> (bool, bool) {
-    let side = |c: &str| c.starts_with("image::") && !crate::contract::unresolved(c);
+/// Whether the scope holds a builder and a runner of a resolved image name in the group of
+/// `contract`, the image's orphan scope (ADR 0026, "Orphan sides").
+fn roles(exports: &[Export], contract: &str) -> (bool, bool) {
+    let side = |c: &str| resolved(c) && same_group(c, contract);
     (
         (exports.iter().flat_map(|e| &e.providers)).any(|p| side(&p.contract)),
         (exports.iter().flat_map(|e| &e.consumers))
@@ -609,6 +618,7 @@ fn runner(
         fragments: Vec::new(),
         hops: Vec::new(),
         root: Some(root.into()),
+        lead: None,
     }
 }
 
@@ -657,6 +667,60 @@ fn evaluated(written: &str) -> Option<String> {
     }
     out.push_str(rest);
     normalize_name(&out, true)
+}
+
+/// The registry and namespace an image's orphan scope is asked in: the registry and the first
+/// segment of the repository path (`ghcr.io/acme/shop` and `ghcr.io/acme/tools/lint` are in
+/// `ghcr.io/acme`), or the registry alone for a path of one segment.
+fn group(contract: &str) -> &str {
+    let name = contract.strip_prefix("image::").unwrap_or(contract);
+    let Some((registry, path)) = name.split_once('/') else {
+        return name;
+    };
+    match path.split_once('/') {
+        Some((namespace, _)) => &name[..registry.len() + 1 + namespace.len()],
+        None => registry,
+    }
+}
+
+/// Whether two images are in one group. A name is in its own group; a pattern (a name with an
+/// unresolved part, `*`) is in every group whose names its text before the `*` can start:
+/// `ghcr.io/*` is in `ghcr.io/acme` and in `ghcr.io` (names of one segment), `ghcr.io/acme-*` is
+/// not in `ghcr.io/acme`, nor `ghcr.io/acme/*` in `ghcr.io`.
+fn same_group(a: &str, b: &str) -> bool {
+    // What the names of an image's groups start with, and whether they end one segment later
+    // (the group of a registry alone).
+    let start = |c: &str| {
+        let name = c.strip_prefix("image::").unwrap_or(c);
+        match name.split_once('*') {
+            Some((start, _)) => (start.to_string(), false),
+            None => (format!("{}/", group(name)), !group(name).contains('/')),
+        }
+    };
+    let (a, b) = (start(a), start(b));
+    let ((short, single), (long, _)) = match a.0.len() <= b.0.len() {
+        true => (a, b),
+        false => (b, a),
+    };
+    if let Some(rest) = long.strip_prefix(short.as_str()) {
+        return !single || !rest.contains('/');
+    }
+    // Starts that part ways share a group only where what they share already holds one: a
+    // registry and a namespace, or a registry while neither start goes past one segment.
+    let shared = (short.bytes().zip(long.bytes()))
+        .take_while(|(x, y)| x == y)
+        .filter(|(x, _)| *x == b'/')
+        .count();
+    match shared {
+        0 => false,
+        1 => short.matches('/').count() == 1 && long.matches('/').count() == 1,
+        _ => true,
+    }
+}
+
+/// Whether `contract` is an image the kind resolved, a name or a pattern it links by.
+fn resolved(contract: &str) -> bool {
+    contract.starts_with("image::") && !crate::contract::unresolved(contract)
 }
 
 /// The registry and repository of an image, without its deployment tag or digest.
@@ -724,7 +788,58 @@ fn normalize_name(written: &str, pattern: bool) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{evaluated, matches, normalize};
+    use super::{evaluated, group, matches, normalize, same_group};
+
+    #[test]
+    fn an_image_is_grouped_by_its_registry_and_namespace() {
+        for (contract, expected) in [
+            ("image::ghcr.io/acme/shop", "ghcr.io/acme"),
+            ("image::ghcr.io/acme/tools/lint", "ghcr.io/acme"),
+            ("image::docker.io/library/postgres", "docker.io/library"),
+            ("image::localhost:5000/orders", "localhost:5000"),
+            ("image::localhost:5000/acme/shop", "localhost:5000/acme"),
+        ] {
+            assert_eq!(group(contract), expected, "{contract}");
+        }
+        let shop = "image::ghcr.io/acme/shop";
+        let redis = "image::docker.io/library/redis";
+        assert!(same_group(shop, "image::ghcr.io/acme/tools/lint"));
+        assert!(!same_group(shop, redis));
+        assert!(!same_group(shop, "image::ghcr.io/other/shop"));
+        // A pattern is in the groups its text before the `*` can start.
+        assert!(same_group("image::ghcr.io/*/orders", shop));
+        assert!(same_group("image::ghcr.io/*", shop));
+        assert!(same_group("image::ghcr.io/acme/orders-*", shop));
+        assert!(same_group(shop, "image::ghcr.io/acme/orders-*"));
+        assert!(!same_group("image::ghcr.io/acme-*", shop));
+        assert!(same_group(
+            "image::ghcr.io/acme-*",
+            "image::ghcr.io/acme-tools/lint"
+        ));
+        assert!(!same_group("image::ghcr.io/*/orders", redis));
+        // The group of one-segment names takes a pattern only while it stays in one segment.
+        let orders = "image::localhost:5000/orders";
+        assert!(same_group("image::localhost:5000/*", orders));
+        assert!(same_group(orders, "image::localhost:5000/ord-*"));
+        assert!(!same_group("image::localhost:5000/acme/*", orders));
+        assert!(!same_group(orders, "image::localhost:5000/acme/*"));
+        assert!(!same_group("image::localhost:5000/acme/shop", orders));
+        // Two patterns share a group when one start leads to the other, or when what they share
+        // holds a registry and a namespace, or a registry while neither goes past one segment.
+        assert!(same_group(
+            "image::ghcr.io/acme/orders-*",
+            "image::ghcr.io/acme/billing-*"
+        ));
+        assert!(same_group("image::ghcr.io/acme-*", "image::ghcr.io/zeta-*"));
+        assert!(!same_group(
+            "image::ghcr.io/acme/*",
+            "image::ghcr.io/zeta-*"
+        ));
+        assert!(!same_group(
+            "image::ghcr.io/acme/*",
+            "image::docker.io/acme/*"
+        ));
+    }
 
     #[test]
     fn a_wholly_unknown_image_has_no_literal_matching_evidence() {

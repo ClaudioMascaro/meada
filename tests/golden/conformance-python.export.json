@@ -10091,7 +10091,7 @@
       "via": "env:ORDERS_URL"
     },
     {
-      "contract": "http::GET::/orders",
+      "contract": null,
       "site": "example.com/acme/conformance::clients/environment.py::computed_name::requests.get#0",
       "via": null
     },
@@ -10106,7 +10106,7 @@
       "via": "env:ORDERS_URL"
     },
     {
-      "contract": "http::GET::/orders",
+      "contract": null,
       "site": "example.com/acme/conformance::clients/environment.py::default_reads_another::requests.get#0",
       "via": null
     },
@@ -10156,7 +10156,7 @@
       "via": "env:ORDERS_URL"
     },
     {
-      "contract": "http::GET::/orders",
+      "contract": null,
       "site": "example.com/acme/conformance::clients/environment.py::two_variables::requests.get#0",
       "via": null
     },
@@ -12035,8 +12035,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::clients/environment.py::computed_name::requests.get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/orders"
+          "mark": "unresolved"
         }
       ]
     },
@@ -12104,8 +12103,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::clients/environment.py::default_reads_another::requests.get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/orders"
+          "mark": "unresolved"
         }
       ]
     },
@@ -12334,8 +12332,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::clients/environment.py::two_variables::requests.get#0",
-          "mark": "no-provider",
-          "contract": "http::GET::/orders"
+          "mark": "unresolved"
         }
       ]
     },

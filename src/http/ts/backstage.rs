@@ -146,7 +146,7 @@ pub(super) fn base<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<Strin
                 _ => None,
             }
         }
-        Part::Hole => {
+        Part::Hole | Part::Limit(_) => {
             // A call written in another argument (`{ headers: ... }`) is not the URL's.
             let mut elsewhere = Vec::new();
             fetch.args[1..]
@@ -190,7 +190,7 @@ pub(super) fn based(args: &[Value], id: &str) -> Option<Vec<Value>> {
     let Some(Value::Str(parts)) = args.first_mut() else {
         return None;
     };
-    let first @ Part::Hole = parts.first_mut()? else {
+    let first @ (Part::Hole | Part::Limit(_)) = parts.first_mut()? else {
         return None;
     };
     *first = Part::Text(mount(id));

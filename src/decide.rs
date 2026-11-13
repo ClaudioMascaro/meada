@@ -47,6 +47,9 @@ pub(crate) fn items(engine: &Engine, only: Option<&str>) -> Result<Vec<OpenItem>
 fn show(item: &OpenItem, out: &mut impl Write) -> Result<()> {
     writeln!(out, "{}", item.id)?;
     writeln!(out, "{}  {}", item.location(), item.expression)?;
+    if let Some(limit) = &item.limit {
+        writeln!(out, "  {}", Msg::ItemLimit(limit).text())?;
+    }
     for (n, c) in item.candidates.iter().enumerate() {
         writeln!(out, "  {}) {}", n + 1, c.describe())?;
     }

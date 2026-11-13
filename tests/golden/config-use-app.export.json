@@ -10,37 +10,44 @@
     {
       "contract": "channel::sns::events",
       "site": "example.com/config-use/app",
-      "at": "application.yml#spring.messaging.destination"
+      "at": "application.yml#spring.messaging.destination",
+      "level": "exact"
     },
     {
       "contract": "channel::sns::events",
       "site": "example.com/config-use/app",
-      "at": "values.yaml#worker.topic"
+      "at": "values.yaml#worker.topic",
+      "level": "inferred"
     },
     {
       "contract": "channel::sqs::orders",
       "site": "example.com/config-use/app",
-      "at": "application.yml#spring.messaging.endpoint"
+      "at": "application.yml#spring.messaging.endpoint",
+      "level": "exact"
     },
     {
       "contract": "channel::sqs::orders",
       "site": "example.com/config-use/app",
-      "at": "values.yaml#worker.queue"
+      "at": "values.yaml#worker.queue",
+      "level": "inferred"
     },
     {
       "contract": "resource::dynamodb::orders",
       "site": "example.com/config-use/app",
-      "at": "values.yaml#worker.table"
+      "at": "values.yaml#worker.table",
+      "level": "inferred"
     },
     {
       "contract": "resource::s3::archive",
       "site": "example.com/config-use/app",
-      "at": "application.yml#spring.storage.location"
+      "at": "application.yml#spring.storage.location",
+      "level": "exact"
     },
     {
       "contract": "resource::s3::archive",
       "site": "example.com/config-use/app",
-      "at": "values.yaml#worker.bucket"
+      "at": "values.yaml#worker.bucket",
+      "level": "inferred"
     }
   ],
   "links": [],

@@ -1,0 +1,4 @@
+resource::dynamodb::acme-sessions
+  example.com/acme/o3 policy grant infra/main.tf#data.aws_iam_policy_document.reader.statement.resources[1] (line 23)
+  example.com/acme/o3 policy grant infra/template.yaml#Resources.ReadPolicy.Properties.PolicyDocument.Statement[0].Resource[0] (line 12)
+  example.com/acme/o3 provisioner infra/main.tf:5 aws_dynamodb_table.sessions (root infra) (no use in the workspace)

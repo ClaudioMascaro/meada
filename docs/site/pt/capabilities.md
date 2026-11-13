@@ -120,6 +120,8 @@ O Meada liga consumidores e provedores, inclusive entre linguagens e atrás de g
 | C# | `HttpClient`, typed clients, Refit | ASP.NET Core (controllers, minimal APIs) |
 | Swift | `URLSession`, Alamofire, AsyncHTTPClient | Vapor, Hummingbird |
 
+Uma URL cuja base o Meada não conseguiu ler, com um caminho acrescentado a ela, é um consumidor não resolvido: um item aberto que nomeia o limite (o retorno de uma chamada, com quem é chamado; um parâmetro que nenhuma chamada liga, com o nome dele; a base de um cliente que o Meada não leu, como as bases desconhecidas desta seção; ou outra parte que ele não leu). Essa base pode ter um caminho próprio, então os candidatos são as rotas do método da chamada cujo caminho termina com a parte conhecida a partir de uma `/`. O caminho continua certo, e o vínculo `inferred` com o motivo `host unresolved`, quando a URL não tem base ou quando a junção da biblioteca troca o caminho da base por um caminho a partir da raiz: `new URL('/x', base)` em TypeScript, uma URI de requisição a partir da raiz num `HttpClient` de C#, uma rota de Retrofit a partir da raiz, uma requisição a partir da raiz num cliente Ktor com `defaultRequest` ou numa sessão aiohttp, e `URL(string:relativeTo:)` em Swift. Uma leitura de ambiente escrita no lugar continua ligando pela variável.
+
 Em TypeScript e JavaScript, um `fetch` cuja URL é montada por uma função do repositório é um consumidor quando a função só devolve uma string: uma arrow function com corpo de expressão, ou um corpo de um único `return`. A chamada (`fetch(url("api/vets"))`), ou uma constante que a guarda (`const u = url("api/owners"); fetch(u)`), dobra para a string com os parâmetros da função trocados pelos argumentos da chamada, também quando a função vem de outro módulo. Só dobra uma chamada que resolve exatamente. Uma função de mais de uma instrução, uma `async`, uma que devolve algo que não é uma string, e uma string com uma parte que não dobra (uma base lida de `process.env`, um condicional sobre uma global de build) deixam o consumidor sem resolver.
 
 Em TypeScript e JavaScript, `new URL(x)` com um argumento é lido como `x`, como a especificação WHATWG URL define, somente para o `URL` global sem reatribuição ou o export nomeado `URL` de `url` ou `node:url` por `import` ou `require` não ocultado. Um construtor de pacote desconhecido, alias de repositório ou outro export fica opaco. `u.toString()`, `u.href` e `String(u)` repassam a URL, assim como `${u}` em uma template string, esteja a URL em uma constante ou montada no próprio lugar (`fetch(new URL(BASE + "/api/vets").toString())`), e um wrapper de cliente chamado com uma delas dobra em seus pontos de chamada. Uma base lida do ambiente mostra o seu `via`. Mudanças por `u.searchParams`, `u.search` e `u.hash` mantêm o caminho; uma escrita em qualquer outro membro de uma constante criada por `new URL` (`u.pathname = ..`, `u.host += ..`), em qualquer ponto do arquivo, deixa o consumidor sem resolver, assim como uma mutação dentro de uma função que recebe a URL, que o Meada não vê. `new URL(ref, base)` com dois argumentos é a junção dos dois, como a especificação WHATWG URL define (RFC 3986 seção 5.2 para essas referências): um `ref` absoluto é ele mesmo, `//host/x` toma o host de `ref`, `/orders` substitui o caminho da base e `orders` se junta ao diretório da base (`https://h/api/` dá `/api/orders`, `https://h/api` dá `/orders`). Sobre uma base lida do ambiente ou um buraco, `/orders` mantém a base como cabeça (`http::GET::/orders`, com `via env:API_URL` para `process.env.API_URL`); um `ref` relativo, um que começa com uma leitura, e uma query ou um fragmento sozinhos deixam o consumidor sem resolver, e um parâmetro em qualquer lado é resolvido nos pontos de chamada, como em um wrapper de cliente. `.href`, `toString()` e `String(u)` de um `new URL` de dois argumentos não são lidos.
@@ -326,6 +328,35 @@ código ou só de IaC não gera essas linhas; `search` e `context` marcam o pró
 `no provisioner in the workspace` ou `no use in the workspace`. As ligações de provisionamento,
 inclusive padrões e módulos raiz independentes, determinam se há contraparte. Os avisos
 existentes de recursos declarados sem escritor e leitor continuam separados.
+
+Um uso que o Meada só infere pelo nome de uma chave (um valor simples sob `queue`, `topic`,
+`bucket`, `table` ou um alias tipado, `inferred`) não abre o escopo de órfãos do seu grupo e
+nunca vira linha de órfão: uma coincidência de nome não prova nem o uso nem a falta dele. Ele
+continua ligado ao provisionador do mesmo nome, que por isso não é um `no use`, e o `context`
+continua a mostrá-lo com `[inferred]`. Uma linha `no provisioner` termina com o nível do seu lado
+entre colchetes, como o `context` o escreve (`[exact]`, `[declared]`), e as linhas `uses` do
+`meada export` trazem `level`.
+
+Um identificador estruturado na lista de recursos de uma declaração de política IAM (`Resource` ou
+`NotResource` de um item de `Statement`, num arquivo de política ou num documento de política
+dentro de um template, e `resources` ou `not_resources` de um bloco `statement` de um
+`aws_iam_policy_document`) é um **policy grant**, não um uso: diz quem pode tocar o recurso, sem
+direção. O `context` do recurso o lista com o papel `policy grant` e o seu lugar; ele não se liga a
+provisionador, não abre escopo de órfãos e nunca vira linha de órfão, e o `meada export` o lista no
+array `policy_grants`, à parte de `uses`. Num documento JSON Schema (com `$schema` na raiz), um
+valor sob `examples`, `default`, `enum` ou `const` documenta uma forma e não é lado nenhum: continua
+sendo um valor de configuração que o `search` acha.
+
+Num documento que o leitor de um tipo de contrato reconhece como seu, o Meada não infere uso pelo
+nome de uma chave: um arquivo de regras do Prometheus ou do Loki (`groups` com `rules`), um arquivo
+de regras de alerta do Grafana, uma configuração do Alertmanager, um objeto `PrometheusRule` ou
+`AlertmanagerConfig` (só esse documento do stream) e um documento de provedor (um documento OpenAPI
+ou AsyncAPI que o Meada lê, num repositório com `[serve]`). Ali, o rótulo `queue: jobs` de uma regra
+é um rótulo de alerta, não o uso de uma fila; um identificador estruturado (um ARN) continua sendo
+um uso `exact`, e os valores continuam sendo valores de configuração que o `search` acha. Os
+arquivos de IaC (Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose e os outros
+documentos de um stream do Kubernetes) continuam dando esses usos, e o mesmo rótulo num arquivo que
+nenhum leitor reconhece continua sendo um uso `inferred`.
 
 ### Provisionadores Terraform
 
@@ -572,13 +603,13 @@ o contexto ou o caminho do Dockerfile passou por um valor sobrescrevível. Um Do
 pode ser lido deixa o contexto inteiro em `inferred`, e o motivo diz isso. O `.dockerignore` não
 é lido.
 
-Literais ligam em `exact`; defaults Compose e valores Helm em `inferred`, com sua origem no
-motivo. Trechos não resolvidos permanecem padrões e só correspondem a nomes literais nos
-limites de segmentos; vários candidatos ficam `ambiguous` e podem receber uma decisão.
-`status` só lista imagens órfãs quando o escopo visível tem construtores e executores.
-Sem um desses lados, `search` e `context` marcam o lado sem contraparte. A exportação mantém
-formato 1, com `at` nos construtores e `executions` para os caminhos diretos; o grafo do console
-mostra os contratos de imagem, as ligações e o código das cargas de trabalho.
+Literais ligam em `exact`; defaults Compose e valores Helm em `inferred`, com sua origem no motivo.
+Trechos não resolvidos permanecem padrões e só correspondem a nomes literais nos limites de
+segmentos; vários candidatos ficam `ambiguous` e podem receber uma decisão. `status` só lista
+imagens órfãs de um registro e namespace (`ghcr.io/acme`) que tem construtores e executores no
+escopo visível. Sem um desses lados no grupo, `search` e `context` marcam o lado sem contraparte. A
+exportação mantém formato 1, com `at` nos construtores e `executions` para os caminhos diretos; o
+grafo do console mostra os contratos de imagem, as ligações e o código das cargas de trabalho.
 
 ### Nomes parcialmente resolvidos
 

@@ -67,6 +67,43 @@ All notable changes to Meada are recorded here. The format follows
   `.tf` block with the override files Terraform reads, in either order of the two files: `a.tf`
   declaring `["x"]` and `b.tofu` declaring `["b", "a", "a"]` names `0-x`, where Meada gave the
   block of the file it read last at `exact` (#768).
+- `meada status` no longer reports orphans from a use Meada only infers from a key name (a plain
+  value under `queue`, `topic`, `bucket`, `table` or a typed alias): such a use side opens no
+  orphan scope and is never an orphan line, though it still links to a provisioner of its name
+  and `context` still shows it with `[inferred]`. A `no provisioner` line ends with its side's
+  level, and the `uses` rows of `meada export` carry `level`, an added optional field (#797).
+- A structured identifier in the resource list of an IAM policy statement (`Resource` or
+  `NotResource` of a `Statement` entry, `resources` or `not_resources` of an
+  `aws_iam_policy_document` statement) is a policy grant, no longer a use side: it gives no
+  orphan line, opens no orphan scope and no longer links to the provisioner it names, which hid a
+  real `no use` line. `context` lists it with the role `policy grant`, on the resource and at its
+  place, and `meada export` lists it in `policy_grants`, an added optional array. A value under
+  `examples`, `default`, `enum` or `const` of a JSON Schema document gives no side and stays a
+  config value (#798).
+- `meada status` asks for image orphans per registry and namespace (`ghcr.io/acme`,
+  `docker.io/library`), so a runner of a public image is no longer a `no builder` line because
+  the workspace builds some other image. A group that lacks builders or runners prints no orphan
+  line, and its sides carry `no builder in the workspace` or `no runner in the workspace` in
+  `context` and `search` (#799).
+- A document that the reader of a contract kind recognizes as its own (a Prometheus, Loki or Grafana
+  rule file, an Alertmanager configuration, a `PrometheusRule` or `AlertmanagerConfig` object of a
+  Kubernetes stream, a provider document) no longer feeds the key-name rule: a rule's `queue` label
+  is no longer the use of a queue, which hid a queue nobody uses when the names matched. A
+  structured identifier there is still an `exact` use, and the values stay config values. An
+  existing index is rebuilt on its first open by this version (#800).
+- A URL whose base Meada could not read (the return value of a call, a parameter no call binds,
+  the base of a client a reader did not read) with a path appended to it is an open item that
+  names that limit, no longer a consumer of the path's known end that linked to a guessed route
+  (`http.Get(c.baseV2() + "/orders")` linked to `GET /orders` when the base held `/v2`). Its
+  candidates are the routes that end with the known part at a `/`. A URL with no base, an
+  absolute path the library resolves over an unknown base (TypeScript's `new URL`, a C# request,
+  a Retrofit route, a Ktor `defaultRequest` or aiohttp request from the root, Swift's
+  `URL(string:relativeTo:)`) and an environment read written in place link as before. An
+  existing index is rebuilt on its first open by this version (#801).
+- `meada decide --list` prints the limit of such an open item on a line of its block, and
+  `search` on the item's line (#801).
+- An `ambiguous-link` decision written for such a call goes stale; a `dynamic-url` decision that
+  names one of its candidates applies (#801).
 
 ## [1.3.0] - 2026-11-11
 

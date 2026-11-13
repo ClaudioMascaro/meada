@@ -481,10 +481,16 @@ link simbólico, origem com variável, forma que não interpreta) deixa o contex
 `inferred`, e o motivo diz que não foi lido. O `.dockerignore` não é lido. Caminhos não atravessam
 links simbólicos.
 
-`meada status` só lista imagens órfãs quando o escopo contém builder e runner. Com apenas um
-papel, `search` e `context` mostram `no builder in the workspace` ou `no runner in the workspace`.
-O export conserva `format: 1`, guarda locais dos builders e raízes dos workloads e inclui
-`executions` para caminhos diretos; o grafo da console mostra contratos e código dos workloads.
+`meada status` pergunta pelos órfãos de imagens por registro e namespace (o primeiro segmento do
+caminho do repositório no nome normalizado): `ghcr.io/acme/shop` e `ghcr.io/acme/tools/lint` ficam
+em `ghcr.io/acme`, `docker.io/library/postgres` em `docker.io/library`, e uma imagem cujo caminho
+tem um só segmento fica só com o registro. Um nome lido como padrão
+(`ghcr.io/${{ github.repository }}` vira `ghcr.io/*`) fica em todo grupo que o seu texto antes do
+`*` pode começar. Só lista imagens órfãs de um grupo que contém builder e runner; num grupo com
+apenas um papel, `search` e `context` mostram `no builder in the workspace` ou
+`no runner in the workspace`. O export conserva `format: 1`, guarda locais dos builders e raízes dos
+workloads e inclui `executions` para caminhos diretos; o grafo da console mostra contratos e código
+dos workloads.
 
 ### CloudFormation e SAM
 
@@ -538,6 +544,36 @@ código ou só de IaC não gera essas linhas; `search` e `context` marcam o pró
 `no provisioner in the workspace` ou `no use in the workspace`. As ligações de provisionamento,
 inclusive padrões e módulos raiz independentes, determinam se há contraparte. Os avisos
 existentes de recursos declarados sem escritor e leitor continuam separados.
+
+Um uso que o Meada só infere pelo nome de uma chave (um valor simples sob `queue`, `topic`,
+`bucket`, `table` ou um alias tipado, `inferred`) não abre o escopo de órfãos do seu grupo e
+nunca vira linha de órfão: uma coincidência de nome não prova nem o uso nem a falta dele. Ele
+continua ligado ao provisionador do mesmo nome, que por isso não é um `no use`, e o `context`
+continua a mostrá-lo com `[inferred]`. Uma linha `no provisioner` termina com o nível do seu lado
+entre colchetes, como o `context` o escreve (`[exact]`, `[declared]`), e as linhas `uses` do
+`meada export` trazem `level`.
+
+Um identificador estruturado na lista de recursos de uma declaração de política IAM (`Resource` ou
+`NotResource` de um item de `Statement`, num arquivo de política ou num documento de política
+dentro de um template, e `resources` ou `not_resources` de um bloco `statement` de um
+`aws_iam_policy_document`) é um **policy grant**, não um uso: diz quem pode tocar o recurso, sem
+direção. O `context` do recurso o lista com o papel `policy grant` e o seu lugar, sem nota de
+órfão (o `context` desse lugar também o mostra); ele não se liga a provisionador, não abre escopo
+de órfãos e nunca vira linha de órfão, e o `meada export` o lista no array `policy_grants`, à parte
+de `uses`. Num documento JSON Schema (com `$schema` na raiz), um valor sob `examples`, `default`,
+`enum` ou `const` documenta uma forma e não é lado nenhum: continua sendo um valor de configuração
+que o `search` acha.
+
+Num documento que o leitor de um tipo de contrato reconhece como seu, o Meada não infere uso pelo
+nome de uma chave: um arquivo de regras do Prometheus ou do Loki (`groups` com `rules`), um arquivo
+de regras de alerta do Grafana, uma configuração do Alertmanager, um objeto `PrometheusRule` ou
+`AlertmanagerConfig` (só esse documento do stream) e um documento de provedor (um documento OpenAPI
+ou AsyncAPI que o Meada lê, num repositório com `[serve]`). Ali, o rótulo `queue: jobs` de uma regra
+é um rótulo de alerta, não o uso de uma fila; um identificador estruturado (um ARN) continua sendo
+um uso `exact`, e os valores continuam sendo valores de configuração que o `search` acha. Os
+arquivos de IaC (Terraform, OpenTofu, CloudFormation, SAM, Serverless, Compose e os outros
+documentos de um stream do Kubernetes) continuam dando esses usos, e o mesmo rótulo num arquivo que
+nenhum leitor reconhece continua sendo um uso `inferred`.
 
 ### Provisionadores Terraform
 
@@ -848,6 +884,18 @@ example.com/acme/web::src/status.ts::health::fetch#0
 src/status.ts:3  fetch("/api/health")
   1) example.com/acme/api GET /api/health
   2) example.com/acme/worker GET /api/health
+```
+
+Um item cuja URL começa por uma base que o Meada não conseguiu ler nomeia esse limite numa linha
+própria (seção 8.1):
+
+```text
+example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0
+client.go:16  http.Get(c.baseV2() + "/orders")
+  limite: base vinda do retorno de c.baseV2
+  1) example.com/acme/api GET /api/orders
+  2) example.com/acme/api GET /orders
+  3) example.com/acme/api GET /v2/orders
 ```
 
 ### O arquivo `meada.decisions.toml`
@@ -1211,9 +1259,13 @@ Como a ligação é escolhida, conforme o que a URL mostra:
    `[serve] hosts`. O elo é `exact`. Se nenhum repositório serve esse host, não há elo.
 2. **Variável de ambiente.** A URL começa por uma leitura de ambiente (`API_URL`) que um par
    declara em `base_url_env`. O elo é `inferred`; o valor no ambiente do processo nunca é lido.
-3. **Host desconhecido.** A URL não diz de onde vem (um caminho relativo, por exemplo) e só um
-   repositório do workspace serve esse método e esse caminho. O elo é `inferred`, com o motivo
-   `the only repository serving it is`.
+3. **Host desconhecido.** A URL não diz de onde vem, mas o caminho é certo: ela é escrita sem base
+   (`fetch('/orders')`), ou a biblioteca a junta à base de modo que um caminho a partir da raiz
+   troca o caminho da base (`new URL('/orders', base)` em TypeScript, uma URI de requisição a partir
+   da raiz num `HttpClient` de C#, uma rota de Retrofit a partir da raiz, uma requisição a partir da
+   raiz num cliente Ktor com `defaultRequest` ou numa sessão aiohttp, `URL(string:relativeTo:)` em
+   Swift). Quando só um repositório do workspace serve esse método e esse caminho, o elo é
+   `inferred`, com o motivo `the only repository serving it is`.
 4. **Vários provedores.** O elo é `ambiguous`, e o Meada lista todos os candidatos, um elo por
    candidato. É um item aberto que `meada decide` resolve.
 
@@ -1223,6 +1275,19 @@ consegue calcular, mesmo depois de dobrar constantes e argumentos de funções q
 cliente, é um **consumidor não resolvido**: aparece no `search`, no `context` e no export, nunca
 liga, e é um item aberto. Uma função que monta a URL a partir dos seus parâmetros vira um
 consumidor em cada chamada dela, com os argumentos substituídos, em qualquer profundidade.
+
+Uma URL cuja base o Meada não conseguiu ler, com o caminho acrescentado a ela, também é um
+consumidor não resolvido: `` fetch(`${base}/orders`) `` com `base` um parâmetro que nenhuma
+chamada liga, `http.Get(c.base() + "/orders")`, uma requisição num cliente cuja URL base o Meada
+não leu. Essa base pode ter um caminho próprio, então só o fim do caminho é conhecido. O item
+aberto oferece como candidatos as rotas do método da chamada cujo caminho termina com a parte
+conhecida a partir de uma `/` (`/items` aceita `GET /items` e `GET /api/orders/items`, não `GET
+/api/lineitems`), e nomeia o limite que parou o Meada: o retorno de uma chamada (com quem é
+chamado), um parâmetro (com o nome dele), a base de um cliente que o Meada não leu, ou outra
+parte que ele não conseguiu ler. `meada decide --list` mostra o limite numa linha `limite:`, e
+`search` com `kind: unresolved` na linha do item. Uma base que é uma leitura de ambiente escrita
+no lugar (`os.Getenv("API_URL") + "/orders"`) continua ligando pela variável, com ou sem um par
+que a declare.
 
 Por que um elo pode faltar:
 

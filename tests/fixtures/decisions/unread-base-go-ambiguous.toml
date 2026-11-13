@@ -1,0 +1,7 @@
+# A decision written for the issue's call as an ambiguous link: the call is an open item of the
+# kind dynamic URL now (#801), so the decision is stale.
+[[decision]]
+kind = "ambiguous-link"
+call = "example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0"
+target = "example.com/acme/api::http::GET::/v2/orders"
+by = "human"

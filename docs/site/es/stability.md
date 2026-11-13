@@ -137,6 +137,8 @@ El export de un repositorio es JSON con sangría y terminado en un salto de lín
 | `links` | `consumer`, `provider`, `contract`, `level`, `reason`, `by`, `p`, `drift` (`missing`, `unchecked`). |
 | `processes` | `entry_point`, `kind` (`route`, `export`, `channel` o `program`), `label`, `steps`. |
 | `stale_decisions` | `call`, `target`, `cause`. |
+| `uses` | `contract`, `site`, `at`, `level` (`exact` o `inferred`). |
+| `policy_grants` | `contract`, `site`, `at`. |
 
 Los campos de `shape` (`source`, `fields`, `open`, `scalars`, `declared`, `optional`, `guessed`) y de cada paso de `steps` (`depth`, `repository`, `level`, `via`, `node`, `reason`, `mark`, `candidates`, `contract`) son parte del formato, y también estos valores:
 

@@ -8402,7 +8402,7 @@
       "via": "host:orders.example.com"
     },
     {
-      "contract": "http::GET::/reports",
+      "contract": null,
       "site": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi.All()",
       "via": null
     },
@@ -11527,8 +11527,7 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi.All()",
-          "mark": "no-provider",
-          "contract": "http::GET::/reports"
+          "mark": "unresolved"
         }
       ]
     },

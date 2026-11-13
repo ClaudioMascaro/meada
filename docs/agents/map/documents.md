@@ -173,6 +173,13 @@ this file, and a change to these modules updates it.
   array keeps the repository-level site and its `at` locator; no scalar text is exported.
   `provision::uses` shares
   these sides with provisioning and orphan scope; directed kind matching never sees them.
+  `read` returns the policy grants apart (#798): an `exact` identifier in the resource list of an
+  IAM policy statement (`policy_resource`), which only `context`, `search` and the
+  `policy_grants` export array show; a value under a keyword of a JSON Schema document
+  (`schemas`, `schema_keyword`) gives no side.
+  A document the reader of a contract kind recognizes as its own (`owned`: the first document of
+  a file the document reader read, each document `alert::documents` names) gives no key-name use
+  (`key_name`, #800).
 - `iac/provision.rs`, `iac/pattern.rs` (#656): `crate::iac::provision::read` derives provisioner
   sides from stored
   IaC names using the embedded `iac/types.toml` table; `crate::iac::provision::links` joins them

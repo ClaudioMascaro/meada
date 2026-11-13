@@ -5381,7 +5381,7 @@
       "via": "host:api.example.com"
     },
     {
-      "contract": "http::GET::/global",
+      "contract": null,
       "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::mutated(id:)::URLSession.shared.data#3",
       "via": null
     },

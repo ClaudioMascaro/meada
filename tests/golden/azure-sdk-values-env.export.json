@@ -412,27 +412,32 @@
     {
       "contract": "channel::eventhubs::events-env",
       "site": "local/azure-sdk-values-env",
-      "at": "pods.yaml#[0].spec.containers[1].env[0].value"
+      "at": "pods.yaml#[0].spec.containers[1].env[0].value",
+      "level": "exact"
     },
     {
       "contract": "channel::servicebus::wrong",
       "site": "local/azure-sdk-values-env",
-      "at": "pods.yaml#[0].spec.containers[0].env[4].value"
+      "at": "pods.yaml#[0].spec.containers[0].env[4].value",
+      "level": "exact"
     },
     {
       "contract": "channel::servicebus::wrong",
       "site": "local/azure-sdk-values-env",
-      "at": "pods.yaml#[0].spec.containers[1].env[4].value"
+      "at": "pods.yaml#[0].spec.containers[1].env[4].value",
+      "level": "exact"
     },
     {
       "contract": "resource::azureblob::uploads-env",
       "site": "local/azure-sdk-values-env",
-      "at": "pods.yaml#[0].spec.containers[1].env[1].value"
+      "at": "pods.yaml#[0].spec.containers[1].env[1].value",
+      "level": "exact"
     },
     {
       "contract": "resource::keyvault::token-env",
       "site": "local/azure-sdk-values-env",
-      "at": "pods.yaml#[0].spec.containers[1].env[3].value"
+      "at": "pods.yaml#[0].spec.containers[1].env[3].value",
+      "level": "exact"
     }
   ],
   "links": [

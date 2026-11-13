@@ -15557,17 +15557,17 @@
       "via": "host:api.example.com"
     },
     {
-      "contract": "http::GET::/loop",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#0",
       "via": null
     },
     {
-      "contract": "http::GET::/closure",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#1",
       "via": null
     },
     {
-      "contract": "http::GET::/outer",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#2",
       "via": null
     },
@@ -15637,17 +15637,17 @@
       "via": "host:api.example.com"
     },
     {
-      "contract": "http::GET::/optional",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/env.rs::optional::reqwest.get#0",
       "via": null
     },
     {
-      "contract": "http::GET::/two",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/env.rs::two_reads::reqwest.get#0",
       "via": null
     },
     {
-      "contract": "http::GET::/macro-fallback",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/env.rs::two_reads::reqwest.get#1",
       "via": null
     },
@@ -15707,12 +15707,12 @@
       "via": "host:api.example.com"
     },
     {
-      "contract": "http::GET::/foreign",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::reqwest.get#0",
       "via": null
     },
     {
-      "contract": "http::GET::/macro",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::reqwest.get#1",
       "via": null
     },
@@ -15722,22 +15722,22 @@
       "via": null
     },
     {
-      "contract": "http::GET::/closure",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.closure::reqwest.get#0",
       "via": null
     },
     {
-      "contract": "http::GET::/parameter",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.parameter::reqwest.get#0",
       "via": null
     },
     {
-      "contract": "http::GET::/bare",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/not_env.rs::other.bare::reqwest.get#0",
       "via": null
     },
     {
-      "contract": "http::GET::/own",
+      "contract": null,
       "site": "example.com/acme/conformance::crates/worker/src/not_env.rs::own_module::reqwest.get#0",
       "via": null
     },

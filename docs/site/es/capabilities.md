@@ -121,6 +121,8 @@ Meada conecta consumidores y proveedores entre lenguajes, incluso detrás de gat
 | C# | `HttpClient`, typed clients, Refit | ASP.NET Core (controllers, minimal APIs) |
 | Swift | `URLSession`, Alamofire, AsyncHTTPClient | Vapor, Hummingbird |
 
+Una URL cuya base Meada no pudo leer, con una ruta añadida a ella, es un consumidor no resuelto: un ítem abierto que nombra el límite (el valor de retorno de una llamada, con quién es llamado; un parámetro que ninguna llamada liga, con su nombre; la base de un cliente que Meada no leyó, como las bases desconocidas de esta sección; u otra parte que no leyó). Esa base puede tener una ruta propia, así que los candidatos son las rutas del método de la llamada cuya ruta termina con la parte conocida a partir de una `/`. La ruta sigue siendo cierta, y el enlace `inferred` con el motivo `host unresolved`, cuando la URL no tiene base o cuando la unión de la biblioteca reemplaza la ruta de la base por una ruta desde la raíz: `new URL('/x', base)` en TypeScript, una URI de petición desde la raíz en un `HttpClient` de C#, una ruta de Retrofit desde la raíz, una petición desde la raíz en un cliente Ktor con `defaultRequest` o en una sesión aiohttp, y `URL(string:relativeTo:)` en Swift. Una lectura de entorno escrita en el lugar sigue enlazando por su variable.
+
 En TypeScript y JavaScript, un `fetch` cuya URL la arma una función del repositorio es un consumidor cuando la función solo devuelve una cadena: una arrow function con cuerpo de expresión, o un cuerpo de un único `return`. La llamada (`fetch(url("api/vets"))`), o una constante que la guarda (`const u = url("api/owners"); fetch(u)`), se pliega a la cadena con los parámetros de la función reemplazados por los argumentos de la llamada, también cuando la función viene de otro módulo. Solo se pliega una llamada que resuelve exactamente. Una función de más de una instrucción, una `async`, una que devuelve algo que no es una cadena, y una cadena con una parte que no se pliega (una base leída de `process.env`, un condicional sobre una global de build) dejan el consumidor sin resolver.
 
 En TypeScript y JavaScript, `new URL(x)` con un argumento se lee como `x`, como lo define la especificación WHATWG URL, solo para el `URL` global sin reasignación o el export nombrado `URL` de `url` o `node:url` por `import` o `require` no ocultado. Un constructor de paquete desconocido, alias de repositorio u otro export queda opaco. `u.toString()`, `u.href` y `String(u)` pasan la URL, igual que `${u}` en una template string, esté la URL en una constante o armada en el lugar (`fetch(new URL(BASE + "/api/vets").toString())`), y un wrapper de cliente llamado con una de ellas se pliega en sus puntos de llamada. Una base leída del entorno muestra su `via`. Los cambios por `u.searchParams`, `u.search` y `u.hash` conservan la ruta; una escritura en cualquier otro miembro de una constante creada con `new URL` (`u.pathname = ..`, `u.host += ..`), en cualquier punto del archivo, deja el consumidor sin resolver, igual que una mutación dentro de una función que recibe la URL, que Meada no ve. `new URL(ref, base)` con dos argumentos es la unión de ambos, como lo define la especificación WHATWG URL (RFC 3986 sección 5.2 para estas referencias): un `ref` absoluto es él mismo, `//host/x` toma el host de `ref`, `/orders` reemplaza la ruta de la base y `orders` se une al directorio de la base (`https://h/api/` da `/api/orders`, `https://h/api` da `/orders`). Sobre una base leída del entorno o un hueco, `/orders` conserva la base como cabeza (`http::GET::/orders`, con `via env:API_URL` para `process.env.API_URL`); un `ref` relativo, uno que empieza con una lectura, y una query o un fragmento solos dejan el consumidor sin resolver, y un parámetro en cualquier lado se resuelve en los puntos de llamada, como en un wrapper de cliente. `.href`, `toString()` y `String(u)` de un `new URL` de dos argumentos no se leen.
@@ -328,6 +330,36 @@ código o solo de IaC no genera esas líneas; `search` y `context` marcan el pro
 `no provisioner in the workspace` o `no use in the workspace`. Los vínculos de aprovisionamiento,
 incluidos patrones y módulos raíz independientes, determinan si hay contraparte. Los avisos
 existentes de recursos declarados sin escritores y lectores siguen separados.
+
+Un uso que Meada solo infiere por el nombre de una clave (un valor simple bajo `queue`, `topic`,
+`bucket`, `table` o un alias tipado, `inferred`) no abre el ámbito de huérfanos de su grupo y
+nunca es una línea de huérfano: una coincidencia de nombre no prueba ni el uso ni su ausencia.
+Sigue vinculado al provisionador del mismo nombre, que por eso no es un `no use`, y `context` lo
+sigue mostrando con `[inferred]`. Una línea `no provisioner` termina con el nivel de su lado entre
+corchetes, como lo escribe `context` (`[exact]`, `[declared]`), y las filas `uses` de
+`meada export` llevan `level`.
+
+Un identificador estructurado en la lista de recursos de una declaración de política IAM
+(`Resource` o `NotResource` de una entrada de `Statement`, en un archivo de política o en un
+documento de política dentro de una plantilla, y `resources` o `not_resources` de un bloque
+`statement` de un `aws_iam_policy_document`) es un **policy grant**, no un uso: dice quién puede
+tocar el recurso, sin dirección. `context` sobre el recurso lo lista con el rol `policy grant` y su
+lugar; no se enlaza con ningún aprovisionador, no abre ámbito de huérfanos y nunca es una línea de
+huérfano, y `meada export` lo lista en el array `policy_grants`, aparte de `uses`. En un documento
+JSON Schema (con `$schema` en su raíz), un valor bajo `examples`, `default`, `enum` o `const`
+documenta una forma y no es ningún lado: sigue siendo un valor de configuración que `search`
+encuentra.
+
+En un documento que el lector de un tipo de contrato reconoce como suyo, Meada no infiere ningún uso
+del nombre de una clave: un archivo de reglas de Prometheus o de Loki (`groups` con `rules`), un
+archivo de reglas de alerta de Grafana, una configuración de Alertmanager, un objeto
+`PrometheusRule` o `AlertmanagerConfig` (solo ese documento del stream) y un documento de proveedor
+(un documento OpenAPI o AsyncAPI que Meada lee, en un repositorio con `[serve]`). Allí, la etiqueta
+`queue: jobs` de una regla es una etiqueta de alerta, no el uso de una cola; un identificador
+estructurado (un ARN) sigue siendo un uso `exact`, y los valores siguen siendo valores de
+configuración que `search` encuentra. Los archivos de IaC (Terraform, OpenTofu, CloudFormation, SAM,
+Serverless, Compose y los otros documentos de un stream de Kubernetes) siguen dando esos usos, y la
+misma etiqueta en un archivo que ningún lector reconoce sigue siendo un uso `inferred`.
 
 ### Provisionadores Terraform
 
@@ -576,13 +608,13 @@ incluso sin `image`, dentro de la raíz y sin atravesar enlaces simbólicos, o e
 el contexto o la ruta del Dockerfile pasó por un valor reemplazable. Un Dockerfile que no se puede
 leer deja el contexto entero en `inferred`, y el motivo lo dice. `.dockerignore` no se lee.
 
-Los literales enlazan en `exact`; los defaults Compose y valores Helm, en `inferred`, con su
-origen en el motivo. Las partes no resueltas permanecen patrones y solo corresponden a nombres
-literales en límites de segmentos; varios candidatos quedan `ambiguous` y admiten una decisión.
-`status` solo enumera imágenes huérfanas cuando el ámbito visible tiene constructores y
-ejecutores. En caso contrario, `search` y `context` marcan el lado sin contraparte. La
-exportación mantiene el formato 1, con ubicaciones `at` y `executions` para rutas directas;
-el grafo del console muestra contratos de imagen, enlaces y código de cargas de trabajo.
+Los literales enlazan en `exact`; los defaults Compose y valores Helm, en `inferred`, con su origen
+en el motivo. Las partes no resueltas permanecen patrones y solo corresponden a nombres literales en
+límites de segmentos; varios candidatos quedan `ambiguous` y admiten una decisión. `status` solo
+enumera imágenes huérfanas de un registro y namespace (`ghcr.io/acme`) que tiene constructores y
+ejecutores en el ámbito visible. En caso contrario, `search` y `context` marcan el lado sin
+contraparte. La exportación mantiene el formato 1, con ubicaciones `at` y `executions` para rutas
+directas; el grafo del console muestra contratos de imagen, enlaces y código de cargas de trabajo.
 
 ### Nombres parcialmente resueltos
 

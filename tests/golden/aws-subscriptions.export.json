@@ -378,17 +378,20 @@
     {
       "contract": "channel::sns::alerts",
       "site": "example.com/aws/infra",
-      "at": "routes/main.tf#resource.aws_sns_topic_subscription.filtered.topic_arn"
+      "at": "routes/main.tf#resource.aws_sns_topic_subscription.filtered.topic_arn",
+      "level": "exact"
     },
     {
       "contract": "channel::sqs::filtered-jobs",
       "site": "example.com/aws/infra",
-      "at": "routes/main.tf#resource.aws_sns_topic_subscription.filtered.endpoint"
+      "at": "routes/main.tf#resource.aws_sns_topic_subscription.filtered.endpoint",
+      "level": "exact"
     },
     {
       "contract": "channel::sqs::pattern-jobs",
       "site": "example.com/aws/infra",
-      "at": "routes/main.tf#resource.aws_cloudwatch_event_target.pattern.arn"
+      "at": "routes/main.tf#resource.aws_cloudwatch_event_target.pattern.arn",
+      "level": "exact"
     }
   ],
   "links": [],
