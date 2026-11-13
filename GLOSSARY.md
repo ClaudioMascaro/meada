@@ -63,6 +63,11 @@ lockfiles and names it. A Terraform or OpenTofu file, or one a reader of a kind 
 (a template, a Kubernetes object, a document), is never one.
 _Avoid_: large config file, dump
 
+**Ceiling**:
+A named limit of what Meada reads or evaluates, kept with its value and its reason. What lies
+past it is cut, left unresolved or left out, never guessed.
+_Avoid_: limitation, known issue, cap, threshold
+
 **Key path**:
 Where a config value sits in its file, jq style: keys joined by dots, list items `[n]` from 0, a
 key that is not a plain identifier written `["..."]`, and a document index first in a file of
@@ -727,6 +732,20 @@ A structured identifier in the resource list of an IAM policy statement (`Resour
 _Avoid_: grant alone (a subject's grant is what the console lets it read), permission, policy
 use, access
 
+**Orphan**:
+A side of a contract whose counterpart the workspace does not hold: a provisioned resource with
+no use, a use with no provisioner and, for the image and alert kinds, a side with no counterpart
+(ADR 0026). It is a statement of absence, not of a defect. An **orphan line** is the line of
+`meada status` that names one.
+_Avoid_: dangling, unused, dead (for an orphan); warning, finding (for an orphan line)
+
+**Orphan scope**:
+The group in which orphans are asked: a repository or the workspace, per contract kind and
+broker, and per registry and namespace for the image kind. Orphan lines are printed only for a
+scope that holds at least one side of each role; elsewhere a side carries its mark in `context`
+and `search`.
+_Avoid_: orphan group, orphan set
+
 **Level**:
 How well a link is established: exact, declared, inferred, decided or ambiguous. It is a name,
 not a score.
@@ -795,6 +814,48 @@ A checked-in file holding the expected output of the query engine over a fixture
 export or a rendered answer. Tests compare against it; it changes only through the explicit
 bless mode (`MEADA_BLESS=1`) and is reviewed as a diff.
 _Avoid_: snapshot, expected output
+
+**Answer key**:
+The expected answers a proof or a measurement is judged against, written from a source other
+than Meada's own answers and rules: a person's reading, the documented behaviour of the tool
+emulated, a record of an execution. A golden file is not one: it holds what Meada answered.
+_Avoid_: ground truth, gold standard, labels
+
+**Precision**:
+Of what Meada states over a pinned set of repositories, the share its answer key confirms:
+counted over links per contract kind and level, and over orphan lines per contract kind. It
+says nothing of what Meada missed.
+_Avoid_: accuracy, confidence, score, quality
+
+**Statement**:
+A link or an orphan line: what Meada asserts about a workspace, and the unit a yardstick judges.
+_Avoid_: claim, finding, result
+
+**Pair**:
+A contract kind and a statement type (links, or orphan lines): what one yardstick measures and
+one line of the gate list (ADR 0029).
+_Avoid_: kind alone (a kind has two pairs), category
+
+**Yardstick**:
+The measurement of a pair: a pinned corpus of public code, an answer key, thresholds written
+before the run and a report the maintainer approves (ADR 0029).
+_Avoid_: ruler, benchmark, eval, audit
+
+**Origin**:
+Where the statements of a pair come from: a registered module (a language pack, a package
+ecosystem, a kind's module for one language) or a row of a command or format table. A yardstick
+counts per origin.
+_Avoid_: source, reader (the code that reads; an origin is what a report counts by)
+
+**Unmeasured**:
+Said of a pair, a level or an origin with fewer judged statements than the floor in the last
+approved report of its yardstick. It is neither approval nor failure.
+_Avoid_: untested, unknown, pending
+
+**Silent absence**:
+A statement the answer key shows that Meada neither makes nor names by an open item or a
+ceiling. An **open miss** is one that an open item or a ceiling does name.
+_Avoid_: false negative, gap, miss alone; coverage (ingestion's word)
 
 ### Roadmap
 
