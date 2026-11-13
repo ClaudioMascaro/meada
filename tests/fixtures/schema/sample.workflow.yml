@@ -17,6 +17,7 @@ jobs:
           registry: ghcr.io
         env:
           MODE: sample
+          UNSET:
       - run: make build
   publish-prd:
     needs: build
