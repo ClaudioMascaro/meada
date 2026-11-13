@@ -11,7 +11,7 @@ use rusqlite::Connection;
 use super::types;
 use crate::Result;
 use crate::config_values::sites::parts_without_selectors;
-use crate::document::events::Step;
+use crate::document::events::{Step, Syntax};
 
 /// Internal key identity and evidence; the public use keeps a repository-level site.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -70,24 +70,29 @@ fn policy_resource(steps: &[Step]) -> bool {
     )
 }
 
-/// Under a JSON Schema keyword whose value documents a shape; a key of that name under
-/// `properties` or its kin names a subschema instead.
+/// Under a JSON Schema keyword whose value documents a shape, read from the document's root:
+/// the key after `properties` or its kin names a property, whatever its name.
 fn schema_keyword(steps: &[Step]) -> bool {
-    let key = |n: Option<usize>| match n.and_then(|n| steps.get(n)) {
-        Some(Step::Key(key)) => key.as_str(),
-        _ => "",
-    };
-    (0..steps.len()).any(|n| {
-        matches!(key(Some(n)), "examples" | "default" | "enum" | "const")
-            && !matches!(
-                key(n.checked_sub(1)),
-                "properties" | "patternProperties" | "$defs" | "definitions" | "dependentSchemas"
-            )
-    })
+    let mut name = false;
+    for step in steps {
+        let Step::Key(key) = step else { continue };
+        if std::mem::take(&mut name) {
+            continue;
+        }
+        match key.as_str() {
+            "examples" | "default" | "enum" | "const" => return true,
+            "properties" | "patternProperties" | "$defs" | "definitions" | "dependentSchemas"
+            | "dependencies" => name = true,
+            _ => {}
+        }
+    }
+    false
 }
 
 /// The JSON Schema documents, by file: those whose root holds `$schema`, as a document index
-/// (`None` for a file of one document).
+/// (`None` for a file of one document). A JSON file is one document, so a leading index there is
+/// an item of its root array; in YAML it is a document of a stream, or an item of a root sequence,
+/// which writes its keys the same way (ADR 0025).
 fn schemas(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
     let mut query =
         db.prepare("SELECT path, key FROM config_values WHERE key LIKE '%[\"$schema\"]'")?;
@@ -99,7 +104,11 @@ fn schemas(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
         let (path, key) = row?;
         let document = match parts_without_selectors(&key).as_deref() {
             Some([Step::Key(key)]) if key == "$schema" => None,
-            Some([Step::Index(n), Step::Key(key)]) if key == "$schema" => Some(*n),
+            Some([Step::Index(n), Step::Key(key)])
+                if key == "$schema" && Syntax::of(&path) == Syntax::Yaml =>
+            {
+                Some(*n)
+            }
             _ => continue,
         };
         schemas.entry(path).or_default().push(document);
@@ -142,17 +151,6 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
     for row in rows {
         let (path, key, value, line) = row?;
         if definitions.contains(&(path.clone(), key.clone())) {
-            continue;
-        }
-        let steps = parts_without_selectors(&key).unwrap_or_default();
-        let document = match steps.first() {
-            Some(Step::Index(n)) => Some(*n),
-            _ => None,
-        };
-        let schema = schemas.get(&path).is_some_and(|docs| {
-            docs.contains(&None) || document.is_some_and(|n| docs.contains(&Some(n)))
-        });
-        if schema && schema_keyword(&steps) {
             continue;
         }
         // The object key after a bucket is opaque; punctuation there cannot change the
@@ -221,20 +219,32 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
                 .1;
                 Some((format!("{kind}::{value}"), Level::Inferred))
             });
-        if let Some((contract, level)) = named {
-            let side = Side {
-                contract,
-                site: format!("{repository}::{path}#{key}"),
-                path,
-                key,
-                line,
-                level,
-            };
-            if level == Level::Exact && policy_resource(&steps) {
-                grants.push(side);
-            } else {
-                uses.push(side);
-            }
+        let Some((contract, level)) = named else {
+            continue;
+        };
+        let steps = parts_without_selectors(&key).unwrap_or_default();
+        let document = match steps.first() {
+            Some(Step::Index(n)) => Some(*n),
+            _ => None,
+        };
+        let schema = schemas.get(&path).is_some_and(|docs| {
+            docs.contains(&None) || document.is_some_and(|n| docs.contains(&Some(n)))
+        });
+        if schema && schema_keyword(&steps) {
+            continue;
+        }
+        let side = Side {
+            contract,
+            site: format!("{repository}::{path}#{key}"),
+            path,
+            key,
+            line,
+            level,
+        };
+        if level == Level::Exact && policy_resource(&steps) {
+            grants.push(side);
+        } else {
+            uses.push(side);
         }
     }
     for sides in [&mut uses, &mut grants] {
@@ -244,13 +254,18 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<(Vec<Side>, Vec<
     Ok((uses, grants))
 }
 
-/// Key-specific starts accept the full identity or its repository-relative locator.
-pub(crate) fn found<'e>(exports: &'e [crate::index::Export], name: &str) -> Vec<(usize, &'e Side)> {
+/// The sides `of` each export holds (its uses, or its policy grants) at a key: its full
+/// identity or its repository-relative locator.
+pub(crate) fn found<'e>(
+    exports: &'e [crate::index::Export],
+    name: &str,
+    of: impl Fn(&'e crate::index::Export) -> &'e [Side],
+) -> Vec<(usize, &'e Side)> {
     exports
         .iter()
         .enumerate()
         .flat_map(|(n, e)| {
-            e.config_uses.iter().filter_map(move |u| {
+            of(e).iter().filter_map(move |u| {
                 (u.site == name
                     || u.site.strip_prefix(&format!("{}::", e.repository)) == Some(name))
                 .then_some((n, u))

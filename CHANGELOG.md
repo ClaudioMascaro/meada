@@ -53,9 +53,10 @@ All notable changes to Meada are recorded here. The format follows
   `NotResource` of a `Statement` entry, `resources` or `not_resources` of an
   `aws_iam_policy_document` statement) is a policy grant, no longer a use side: it gives no
   orphan line, opens no orphan scope and no longer links to the provisioner it names, which hid a
-  real `no use` line. `context` lists it with the role `policy grant`, and `meada export` lists it
-  in `policy_grants`, an added optional array. A value under `examples`, `default`, `enum` or
-  `const` of a JSON Schema document gives no side and stays a config value (#798).
+  real `no use` line. `context` lists it with the role `policy grant`, on the resource and at its
+  place, and `meada export` lists it in `policy_grants`, an added optional array. A value under
+  `examples`, `default`, `enum` or `const` of a JSON Schema document gives no side and stays a
+  config value (#798).
 
 ## [1.3.0] - 2026-11-11
 

@@ -551,11 +551,12 @@ Um identificador estruturado na lista de recursos de uma declaração de políti
 `NotResource` de um item de `Statement`, num arquivo de política ou num documento de política
 dentro de um template, e `resources` ou `not_resources` de um bloco `statement` de um
 `aws_iam_policy_document`) é um **policy grant**, não um uso: diz quem pode tocar o recurso, sem
-direção. O `context` do recurso o lista com o papel `policy grant` e o seu lugar; ele não se liga a
-provisionador, não abre escopo de órfãos e nunca vira linha de órfão, e o `meada export` o lista no
-array `policy_grants`, à parte de `uses`. Num documento JSON Schema (com `$schema` na raiz), um
-valor sob `examples`, `default`, `enum` ou `const` documenta uma forma e não é lado nenhum: continua
-sendo um valor de configuração que o `search` acha.
+direção. O `context` do recurso o lista com o papel `policy grant` e o seu lugar, sem nota de
+órfão (o `context` desse lugar também o mostra); ele não se liga a provisionador, não abre escopo
+de órfãos e nunca vira linha de órfão, e o `meada export` o lista no array `policy_grants`, à parte
+de `uses`. Num documento JSON Schema (com `$schema` na raiz), um valor sob `examples`, `default`,
+`enum` ou `const` documenta uma forma e não é lado nenhum: continua sendo um valor de configuração
+que o `search` acha.
 
 ### Provisionadores Terraform
 

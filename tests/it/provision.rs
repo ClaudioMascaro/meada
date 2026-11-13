@@ -628,13 +628,20 @@ fn a_policy_grant_and_a_schema_example_are_no_use_side() {
             ),
         ]
     );
-    // A property named `default` holds a subschema, not the keyword's value.
+    // A property named `default` holds a subschema, not the keyword's value, and the subschema
+    // of a property named `properties` holds the keyword.
     assert_eq!(
         rows("uses"),
-        [row(
-            "channel::sqs::acme-named",
-            "schemas/Topic.schema.json#properties.default.description"
-        )]
+        [
+            row(
+                "channel::sqs::acme-dependent",
+                "schemas/Subscription.v1.schema.json#dependencies.default.description"
+            ),
+            row(
+                "channel::sqs::acme-named",
+                "schemas/Topic.schema.json#properties.default.description"
+            ),
+        ]
     );
     assert!(export.get("provisions").is_none(), "{export}");
     assert_golden(
@@ -681,5 +688,79 @@ fn a_policy_grant_and_a_schema_example_are_no_use_side() {
                 && u["at"] == "config/examples.json#examples[0].topicArn"
                 && u["level"] == "exact"),
         "{export}"
+    );
+}
+
+/// `context` finds a policy grant on its resource and at its place, and a grant carries no
+/// orphan note: nothing provisions a queue in the fixture, yet `acme-dead`'s grant is no orphan.
+#[test]
+fn a_policy_grant_is_found_at_its_place_and_carries_no_orphan_note() {
+    let repo = fixture_repo(
+        "orphan_grant_place",
+        "orphan-grant",
+        Some("https://example.com/acme/o3.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+    let grant =
+        "example.com/acme/o3 policy grant infra/policy.json#Statement[0].Resource[0] (line 2)";
+    let resource = engine.context("resource::s3::acme-exports", None).unwrap();
+    assert!(
+        resource.contains(grant) && !resource.contains(" use "),
+        "{resource}"
+    );
+    assert_golden(
+        "orphan-grant.context-place.txt",
+        &(engine.context("infra/policy.json#Statement[0].Resource[0]", None)).unwrap(),
+    );
+    let named = engine.context("channel::sqs::acme-named", None).unwrap();
+    assert!(
+        named.contains("(no provisioner in the workspace)"),
+        "{named}"
+    );
+    for answer in [
+        engine.context("channel::sqs::acme-dead", None).unwrap(),
+        engine.search("acme-dead", Some("channel"), None).unwrap(),
+    ] {
+        assert!(
+            answer.contains("policy grant infra/writer.tf#") && !answer.contains("(no provisioner"),
+            "{answer}"
+        );
+    }
+}
+
+/// A document whose root holds `$schema` is a schema: one document of a YAML stream, but not
+/// an item of a JSON file's root array, which is one document.
+#[test]
+fn only_a_document_whose_root_holds_a_schema_key_is_a_schema() {
+    let repo = fixture_repo(
+        "orphan_grant_schema",
+        "orphan-grant",
+        Some("https://example.com/acme/o3.git"),
+    );
+    fs::create_dir_all(repo.join("config")).unwrap();
+    fs::write(
+        repo.join("config/stream.yaml"),
+        "$schema: https://json-schema.org/draft/2020-12/schema\nexamples:\n  \
+         - arn:aws:sns:us-east-1:123456789012:acme-schema\n---\nexamples:\n  \
+         - arn:aws:sns:us-east-1:123456789012:acme-stream\n",
+    )
+    .unwrap();
+    fs::write(
+        repo.join("config/list.json"),
+        r#"[ { "$schema": "https://json-schema.org/draft/2020-12/schema",
+               "examples": [ "arn:aws:sns:us-east-1:123456789012:acme-list" ] } ]"#,
+    )
+    .unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    let export: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let config: Vec<_> = (export["uses"].as_array().unwrap().iter())
+        .filter_map(|u| u["at"].as_str().filter(|at| at.starts_with("config/")))
+        .collect();
+    assert_eq!(
+        config,
+        [
+            "config/list.json#[0].examples[0]",
+            "config/stream.yaml#[1].examples[0]"
+        ]
     );
 }

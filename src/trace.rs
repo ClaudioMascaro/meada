@@ -514,7 +514,7 @@ pub(crate) fn no_start(from: &str) -> String {
 /// every visible repository's match, with each canonical key entering the trace once.
 fn config_starts<'a>(exports: &'a [Export], from: &str) -> Vec<&'a str> {
     let declared = crate::config_values::sites::found(exports, from);
-    let uses = crate::iac::config_uses::found(exports, from);
+    let uses = crate::iac::config_uses::found(exports, from, |e| &e.config_uses);
     let mut seen = HashSet::new();
     declared
         .into_iter()
