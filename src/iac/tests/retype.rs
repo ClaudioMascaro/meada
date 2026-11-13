@@ -634,20 +634,23 @@ fn a_list_meada_does_not_know_as_a_tuple_still_expands() {
 /// evaluated first, its resource `a.p`; the root `b` second, its resource `a.q`.
 #[test]
 fn each_root_knows_its_own_sets() {
-    let p = |declaring: &str| format!("{declaring}{}", reader("var.s").replace("\"q\"", "\"p\""));
-    let q = |declaring: &str| format!("{declaring}{}", reader("var.s"));
+    let root_a = |declaring: &str| {
+        let resource = reader("var.s").replace("resource \"a\" \"q\"", "resource \"a\" \"p\"");
+        format!("{declaring}{resource}")
+    };
+    let root_b = |declaring: &str| format!("{declaring}{}", reader("var.s"));
     let set = declared("[\"b\", \"a\", \"a\"]");
     let list = "variable \"s\" {\n  type = list(string)\n  default = [\"b\", \"a\", \"a\"]\n}\n";
     let retype = over("  type = list(string)\n");
     let after_a_set = [
-        ("a/main.tf", p(&set)),
-        ("b/main.tf", q(&set)),
+        ("a/main.tf", root_a(&set)),
+        ("b/main.tf", root_b(&set)),
         ("b/override.tf", retype),
     ];
-    let after_a_list = [("a/main.tf", p(list)), ("b/main.tf", q(&set))];
+    let after_a_list = [("a/main.tf", root_a(list)), ("b/main.tf", root_b(&set))];
     let answers = [&after_a_set[..], &after_a_list[..]].map(|files| {
-        let list: Vec<(&str, &str)> = files.iter().map(|(f, s)| (*f, s.as_str())).collect();
-        exact_names(&list, "a.q")
+        let files: Vec<(&str, &str)> = files.iter().map(|(f, s)| (*f, s.as_str())).collect();
+        exact_names(&files, "a.q")
     });
     // A set in the root before leaves the list `b` retypes it to named; a list in the root before
     // names no instance of `b`'s set by index.
