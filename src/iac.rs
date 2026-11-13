@@ -1965,22 +1965,27 @@ fn elements(
             let (b, y) = elements(&c.false_expr, roots, iters, overhead);
             return (a.max(b), x.max(y));
         }
-        // A literal holds as many elements as it lists, each costed alone: its whole cost for
-        // each element squared it (#716).
+        // A literal holds as many elements as it lists, each costed alone (its whole cost for
+        // each element squared it), and is made once, whatever its `for` reads of it (#716).
         Expression::Array(items) => {
-            let each = (items.iter()).map(|e| cost(e, roots, iters, overhead));
-            return (items.len(), each.max().unwrap_or(0));
+            let costs = (items.iter()).map(|e| cost(e, roots, iters, overhead));
+            let costs: Vec<usize> = costs.collect();
+            *overhead = (costs.iter()).fold(*overhead, |a, &c| a.saturating_add(c));
+            return (items.len(), costs.into_iter().max().unwrap_or(0));
         }
         Expression::Object(object) => {
-            let each = (object.iter()).map(|(k, v)| {
+            let mut each = 0;
+            for (k, v) in object.iter() {
                 // The key is bound as a string, its quotes counted as a bound object's are.
                 let key = match k {
                     ObjectKey::Ident(i) => i.as_str().len() + 2,
                     ObjectKey::Expression(e) => cost(e, roots, iters, overhead),
                 };
-                key.max(cost(v.expr(), roots, iters, overhead))
-            });
-            return (object.len(), each.max().unwrap_or(0));
+                let value = cost(v.expr(), roots, iters, overhead);
+                *overhead = overhead.saturating_add(key).saturating_add(value);
+                each = each.max(key).max(value);
+            }
+            return (object.len(), each);
         }
         _ => {}
     }
@@ -5021,6 +5026,30 @@ mod tests {
             (of("a.l"), of("a.o"), of("a.n")),
             (named("l"), named("o"), vec!["a.n ~ \"n-*\"".to_string()])
         );
+    }
+
+    /// A literal's elements are made once, whatever its `for` reads of them (#716): a `for` over
+    /// a one-element list or object holding a `for` in a `for` over two literal lists of 400
+    /// (160,000 strings of 10 bytes) is refused, as that `for` alone is, and so is one holding
+    /// three levels of them (64 million values), without being evaluated.
+    #[test]
+    fn a_literal_collection_is_charged_its_elements_once() {
+        let numbers = (0..400).map(|i| i.to_string()).collect::<Vec<_>>();
+        let numbers = numbers.join(", ");
+        let two = format!("[for a in [{numbers}] : [for b in [{numbers}] : \"abcdefgh\"]]");
+        let main = format!(
+            "resource \"a\" \"u\" {{ name = \"u-${{length([for x in [{two}] : 1])}}\" }}\n\
+             resource \"a\" \"w\" {{ name = \"w-${{length([for k, v in {{ x = {two} }} : 1])}}\" }}\n"
+        );
+        assert_eq!(
+            names(&[("main.tf", &main)]),
+            ["a.u ~ \"u-*\"", "a.w ~ \"w-*\""]
+        );
+        let three = format!(
+            "length([for x in [[for a in [{numbers}] : [for b in [{numbers}] : [for c in [{numbers}] : 1]]]] : 1])"
+        );
+        let expr = parser::parse_expr(&three).unwrap();
+        assert!(steps(&expr, &Map::new()) > EVAL_COST_MAX);
     }
 
     /// A key bound over `toset(...)` is the element in Terraform, where Meada's set is a list

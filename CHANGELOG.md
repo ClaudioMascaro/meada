@@ -68,10 +68,10 @@ All notable changes to Meada are recorded here. The format follows
   declaring `["x"]` and `b.tofu` declaring `["b", "a", "a"]` names `0-x`, where Meada gave the
   block of the file it read last at `exact` (#768).
 - A `for` over a literal list or object is costed as one over a variable's value, its element
-  count times its costliest element, where the literal's whole cost stood for both and squared
-  it: a `for_each` over forty inline objects names its forty instances, where it gave one
-  pattern name. A `for` whose output would pass the estimate's ceiling is still refused before
-  it is evaluated (#716).
+  count times its costliest element, plus its elements once, where the literal's whole cost
+  stood for both and squared it: a `for_each` over forty inline objects names its forty
+  instances, where it gave one pattern name. A `for` whose output would pass the estimate's
+  ceiling is still refused before it is evaluated, and so is a literal holding one (#716).
 - `meada status` no longer reports orphans from a use Meada only infers from a key name (a plain
   value under `queue`, `topic`, `bucket`, `table` or a typed alias): such a use side opens no
   orphan scope and is never an orphan line, though it still links to a provisioner of its name

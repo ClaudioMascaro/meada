@@ -95,8 +95,8 @@
   repeated a few times is refused), and a byte of the root object a traversal reads (`hcl-rs`
   clones `var`, `local`, `each` or `module` whole to read `var.x[0]`); a template outside every
   `for` is not charged its parse; a `for` collection counts its own elements through any root,
-  a literal list or object as many as it lists at its costliest element's cost (#716), a
-  conditional its larger branch; past it `hcl-rs` does not evaluate the expression, only its
+  a literal list or object as many as it lists at its costliest element's cost, and its
+  elements once, read or not (#716), a conditional its larger branch; past it `hcl-rs` does not evaluate the expression, only its
   template parts resolve; the implementer measured about 0.2 s for an expression at the ceiling
   (15abf1c0, debug)) and `EVAL_WORK_MAX` (64 MiB of cost per root module; past it every value left is
   unresolved, but for a literal name that fits `EVAL_VALUE_MAX`. A refusal spends an upper
