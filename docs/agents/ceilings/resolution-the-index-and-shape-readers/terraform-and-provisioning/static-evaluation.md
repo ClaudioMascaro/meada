@@ -11,14 +11,17 @@
   `for` is not charged its parse; a `for` collection counts its own elements through any root,
   a literal list or object as many as it lists at its costliest element's cost, and its
   elements once, read or not (#716), a conditional its larger branch; `join`, `replace` and
-  `formatlist` are charged their arguments and the output they can make (#764): `join` its
-  lists times the separator plus two (a number it shows takes up to three times the 8 bytes
-  counted for it), `replace` its string times the replacement plus one, `formatlist` a row per
+  `formatlist` are charged their arguments and the output they can make (#764), a string
+  argument at what it shows (a literal its length, anything else three times its cost: a
+  number shown takes up to 24 bytes, where 8 are counted): `join` its lists times the separator
+  plus three, `replace` its string times the replacement plus one, `formatlist` a row per
   element of its shortest literal or bound list (else as many rows as its costliest argument of
   no known kind), each row the format, `WIDTH_MAX` per argument and six bytes per byte of what
   it formats (`%q` escapes), a list's elements once and any other argument in each row; with an
   expanded last argument (`f(x...)`) the three are still charged the square of their
-  arguments; past it `hcl-rs` does not evaluate the expression, only its
+  arguments, and a call's charge counts again in the call around it, so by a reading of `cost`
+  eight nested one-element `join`s are refused where Terraform names `a`; past `EVAL_COST_MAX`
+  `hcl-rs` does not evaluate the expression, only its
   template parts resolve; the implementer measured about 0.2 s for an expression at the ceiling
   (15abf1c0, debug)) and `EVAL_WORK_MAX` (64 MiB of cost per root module; past it every value left is
   unresolved, but for a literal name that fits `EVAL_VALUE_MAX`. A refusal spends an upper

@@ -1848,14 +1848,19 @@ fn cost(
                 ("formatlist" | "join" | "replace", _) if f.args.expand_final() => {
                     sum.saturating_mul(sum)
                 }
-                // An element and a separator per byte of the lists at most; a number it shows
-                // takes up to three times the 8 bytes counted for it (#764).
+                // At most an element per byte of the lists, each shown in up to three times
+                // its cost, and a separator after each (#764).
                 ("join", [sep, lists @ ..]) => {
+                    let sep = shown_len(f.args.iter().next(), *sep);
                     let lists = lists.iter().copied().fold(0, add);
-                    add(sum, lists.saturating_mul(add(*sep, 2)))
+                    add(sum, lists.saturating_mul(add(sep, 3)))
                 }
                 // A literal, non-empty substring matches at most once per byte (#764).
-                ("replace", [s, _, to]) => add(sum, s.saturating_mul(add(*to, 1))),
+                ("replace", [s, _, to]) => {
+                    let s = shown_len(f.args.iter().next(), *s);
+                    let to = shown_len(f.args.iter().nth(2), *to);
+                    add(sum, s.saturating_mul(add(to, 1)))
+                }
                 ("formatlist", [_, ..]) => add(sum, formatlist_cost(f, &args, roots, iters)),
                 ("format", _) => add(sum, args.len().saturating_mul(functions::WIDTH_MAX)),
                 ("jsonencode", _) => sum.saturating_mul(6),
@@ -1894,17 +1899,18 @@ fn cost(
 }
 
 /// The bytes `formatlist` makes from its arguments (`costs`, the format's first): a row per
-/// element of its lists, which share one length or it makes none (as many rows as its costliest
-/// argument of no known kind without one), each row the format, a width up to `WIDTH_MAX` per
-/// argument and what it formats escaped (`%q`, up to six bytes a byte): a list's elements once
-/// in all, any other argument whole in each row (#764).
+/// element of its lists, which share one length or it makes none (without one, as many rows as
+/// its costliest argument of no known kind), each row what the format shows, a width up to
+/// `WIDTH_MAX` per argument and what it formats escaped (`%q`, up to six bytes a byte): a list's
+/// elements once in all, any other argument whole in each row (#764).
 fn formatlist_cost(
     f: &hcl_edit::expr::FuncCall,
     costs: &[usize],
     roots: &Roots<'_>,
     iters: &[(String, usize)],
 ) -> usize {
-    let (mut rows, mut most, mut lists, mut each) = (None, 1, 0usize, 0usize);
+    let (mut rows, mut unknown_rows) = (None, 1);
+    let (mut lists, mut repeated) = (0usize, 0usize);
     for (e, &c) in f.args.iter().zip(costs).skip(1) {
         let value = match e {
             Expression::Traversal(t) => unshadowed(t, roots, iters),
@@ -1921,7 +1927,7 @@ fn formatlist_cost(
                 lists = lists.saturating_add(c);
             }
             None => {
-                each = each.saturating_add(c);
+                repeated = repeated.saturating_add(c);
                 let scalar = value.is_some()
                     || matches!(
                         e,
@@ -1931,18 +1937,27 @@ fn formatlist_cost(
                             | Expression::Null(_)
                     );
                 if !scalar {
-                    most = most.max(c);
+                    unknown_rows = unknown_rows.max(c);
                 }
             }
         }
     }
     let row = (costs.len() - 1).saturating_mul(functions::WIDTH_MAX);
     let row = row
-        .saturating_add(costs[0])
-        .saturating_add(each.saturating_mul(6));
-    let rows = rows.unwrap_or(most);
+        .saturating_add(shown_len(f.args.iter().next(), costs[0]))
+        .saturating_add(repeated.saturating_mul(6));
+    let rows = rows.unwrap_or(unknown_rows);
     rows.saturating_mul(row)
         .saturating_add(lists.saturating_mul(6))
+}
+
+/// The most bytes the string argument `e`, costed `cost`, shows: a literal its length, anything
+/// else three times its cost (a number shown takes up to 24 bytes, where 8 are counted).
+fn shown_len(e: Option<&Expression>, cost: usize) -> usize {
+    match e {
+        Some(Expression::String(s)) => s.len(),
+        _ => cost.saturating_mul(3),
+    }
 }
 
 /// What parsing the template `t` again costs at one evaluation in a `for` (`iters`), its text
@@ -5148,18 +5163,31 @@ mod tests {
         assert_eq!(names(&[("main.tf", &main)]), want);
     }
 
-    /// A `join`, a `formatlist` and a `replace` whose output would pass `EVAL_COST_MAX` (two
-    /// million bytes: a separator, a scalar or a replacement of 1,000 to 2,000 bytes once per
-    /// element or match) are refused before they are evaluated (#764).
+    /// A `join`, a `formatlist` and a `replace` whose output would pass `EVAL_COST_MAX` (one to
+    /// two million bytes: a separator, a scalar or a replacement of 1,000 to 2,000 bytes once per
+    /// element or match) are refused before they are evaluated (#764): as written, expanded
+    /// (`f(x...)`), over a list of no known length, through `%q` escapes, and with a template
+    /// whose number shows 22 bytes where 8 are counted.
     #[test]
     fn a_join_formatlist_or_replace_past_the_cost_ceiling_is_refused() {
         let (wide, a, to) = ("x".repeat(2000), "a".repeat(2000), "y".repeat(1000));
         let list = (0..1000).map(|i| i.to_string()).collect::<Vec<_>>();
         let list = list.join(", ");
+        let escaped = vec![format!("\"{}\"", "\\u0001".repeat(200)); 1000].join(", ");
+        let n = "${1.7976931348623157e308}";
+        let (empty, many) = (vec!["\"\""; 6300].join(", "), vec!["\"\""; 975].join(", "));
         for text in [
             format!("join(\"{wide}\", [{list}])"),
             format!("formatlist(\"%s-%s\", \"{wide}\", [{list}])"),
             format!("replace(\"{a}\", \"a\", \"{to}\")"),
+            format!("join([\"{wide}\", [{list}]]...)"),
+            format!("formatlist([\"%s-%s\", \"{wide}\", [{list}]]...)"),
+            format!("replace([\"{a}\", \"a\", \"{to}\"]...)"),
+            format!("formatlist(\"%s-%s\", \"{wide}\", [for i in [{list}] : i])"),
+            format!("formatlist(\"%q\", [{escaped}])"),
+            format!("replace(\"{}\", \"a\", \"x{n}\")", "a".repeat(95_000)),
+            format!("join(\"{}\", [{empty}])", n.repeat(10)),
+            format!("formatlist(\"x{}\", [{many}])", n.repeat(100)),
         ] {
             let expr = parser::parse_expr(&text).unwrap();
             assert!(steps(&expr, &Map::new()) > EVAL_COST_MAX, "{text}");
