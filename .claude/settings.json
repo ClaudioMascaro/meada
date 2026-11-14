@@ -23,7 +23,10 @@
     ]
   },
   "skillOverrides": {
+    "audit-prove-it": "user-invocable-only",
+    "create-prove-it": "user-invocable-only",
     "git-guardrails-claude-code": "off",
+    "maintain-prove-it": "user-invocable-only",
     "migrate-to-shoehorn": "off",
     "scaffold-exercises": "off",
     "setup-pre-commit": "off"
