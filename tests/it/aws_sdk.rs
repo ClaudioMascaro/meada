@@ -1425,34 +1425,54 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     );
 }
 
-/// A repository that declares its own `List` makes `x.Count` its code (#774): the read that
-/// changes nothing is a mention again, and a list read so names no table; one never read so keeps
-/// it.
+/// The #774 forms that need a repository of their own. One that declares its own `List`, or
+/// names a type so with a using alias, makes `x.Count` its code: the read that changes nothing is
+/// a mention again, and a list read so names no table; one never read so keeps it. A Go list two
+/// inline requests send keeps its table unless it changes between the sends (the named fixture
+/// writes `.Put` elsewhere, which unnames any list held in a name).
 #[test]
-fn csharp_count_of_a_repository_list_type_is_a_mention() {
-    let repo = fixture_repo(
-        "aws_sdk_transactions_list_type",
-        "aws-sdk-transactions-list-type",
-        None,
-    );
-    let export: Value =
-        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
-    let mut sides: Vec<String> = (export["providers"].as_array().unwrap().iter())
-        .map(|s| {
-            let site = s["site"].as_str().unwrap();
-            let method = site.rsplit("::").nth(1).unwrap_or(site);
-            format!("{method} {}", s["contract"].as_str().unwrap())
-        })
-        .collect();
-    sides.sort();
-    assert_eq!(
-        sides,
-        [
-            "ListType.OwnList() resource::dynamodb",
-            "ListType.OwnListPlain() resource::dynamodb::own-list-plain",
-        ],
-        "{export}"
-    );
+fn transaction_reads_in_a_repository_of_their_own() {
+    let cases: [(&str, &str, &[&str]); 3] = [
+        (
+            "aws_sdk_transactions_list_type",
+            "aws-sdk-transactions-list-type",
+            &[
+                "ListType.OwnList() resource::dynamodb",
+                "ListType.OwnListPlain() resource::dynamodb::own-list-plain",
+            ],
+        ),
+        (
+            "aws_sdk_transactions_list_alias",
+            "aws-sdk-transactions-list-alias",
+            &[
+                "Alias.AliasCount() resource::dynamodb",
+                "Alias.AliasPlain() resource::dynamodb::alias-plain",
+            ],
+        ),
+        (
+            "aws_sdk_transactions_inline",
+            "aws-sdk-transactions-inline",
+            &[
+                "sentThenSet resource::dynamodb",
+                "sentThenSet resource::dynamodb",
+                "sentTwice resource::dynamodb::sent-twice",
+                "sentTwice resource::dynamodb::sent-twice",
+            ],
+        ),
+    ];
+    for (name, fixture, expected) in cases {
+        let repo = fixture_repo(name, fixture, None);
+        let export: Value =
+            serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+        let mut sides: Vec<String> = (export["providers"].as_array().unwrap().iter())
+            .map(|s| {
+                let method = s["site"].as_str().unwrap().split("::").nth(2).unwrap();
+                format!("{method} {}", s["contract"].as_str().unwrap())
+            })
+            .collect();
+        sides.sort();
+        assert_eq!(sides, expected, "{fixture}: {export}");
+    }
 }
 
 #[test]

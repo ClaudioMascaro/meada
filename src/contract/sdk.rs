@@ -443,7 +443,8 @@ fn changed_request<'a>(
 
 /// What the repository declares that the language packs' mention counts take for the
 /// platform's own (#774): the Go packages (directories) a file of which declares `len` or `cap`,
-/// and whether a C# file declares a type `List`.
+/// and whether a C# file declares a type `List` or names one so with a using alias
+/// (`using List = Mine;`, which a `global using` or a project file may give every file).
 struct Hidden<'a> {
     packages: BTreeSet<&'a str>,
     list: bool,
@@ -461,7 +462,8 @@ impl<'a> Hidden<'a> {
             list |= (facts.defs.iter()).any(|d| {
                 let name = d.name.split('<').next().unwrap_or_default();
                 d.kind == crate::lang::Kind::Class && (name == "List" || name.ends_with(".List"))
-            });
+            }) || path.ends_with(".cs")
+                && (facts.imports.iter()).any(|i| i.local == "List");
         }
         Self { packages, list }
     }

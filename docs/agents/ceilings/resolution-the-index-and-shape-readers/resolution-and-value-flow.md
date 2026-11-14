@@ -104,9 +104,9 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   declares the name mentions it twice. In Go and C#, a use that reads it and changes nothing is
   no mention (#774): Go's `len(x)` and `cap(x)` (unless a file of the package binds or declares
   `len` or `cap`), C#'s `x.Count` where every binding of `x` is a `List<T>` (not called, assigned
-  or stepped, and unless a file declares a type `List`), and another transaction call of the same
-  function that sends the name as its request or as an inline request's list (a C# form: Go names
-  no table for an inline request holding a named list). One mentioned a third time for any other
+  or stepped, and unless a file declares a type `List` or a using alias names one so: a `List`
+  of a library the code imports is taken for the platform's), and another transaction call of the
+  same function that sends the name as its request or as an inline request's list. One mentioned a third time for any other
   reason (logged, `x.Count()`, held by a second request in a name), one held in a parameter, a
   field or a package variable, the first name the path meets when any file of the repository
   assigns the field read through it (`q.TableName = ..` on any

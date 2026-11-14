@@ -1426,7 +1426,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // `x.Count` reads a list's size and changes nothing (#774): not called (`x.Count()`),
     // assigned or stepped (`x.Count++`), and only where every binding of `x` is a `List<T>`, whose
     // own property no extension property stands for (the SDK reader checks that no file declares
-    // a type `List`, `sdk::Hidden`).
+    // a type `List` or names one so with a using alias, `sdk::Hidden`).
     let mut lists: HashMap<&str, bool> = HashMap::new();
     for b in &bound {
         let list = matches!(&b.value, Value::New(ty, _) if ty == "List" || ty.ends_with(".List"));
