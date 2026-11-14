@@ -15,6 +15,11 @@ All notable changes to Meada are recorded here. The format follows
   paid the estimate again. A refused expression spends the evaluation budget for each root by
   its own reads, so reading `count.index` no longer counts as copying every variable: forty
   refused instances no longer leave the names after them unresolved (#765).
+- Terraform evaluation no longer parses a template's text again each time it evaluates it: a
+  template is evaluated as its parts, each charged a few steps in a `for` instead of 32 steps a
+  byte of its text, so a 17 KB template in a `for` over two elements, a `%{ if }` template in a
+  `for` over 2,000 elements and 40 interpolations in a `for` over 198 elements are named
+  exactly again, as before 1.3.0 (#763).
 
 ## [1.4.0] - 2026-11-13
 

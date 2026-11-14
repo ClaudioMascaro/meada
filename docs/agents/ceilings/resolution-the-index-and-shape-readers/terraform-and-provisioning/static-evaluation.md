@@ -4,13 +4,14 @@
   as `iac::size` counts it; past it, the value is unresolved, and a template past it is `*`
   whole), `EVAL_COST_MAX` (1 MiB of evaluation steps one expression could take, `iac::cost`'s
   upper bound, #714: a step is a byte made or, each time it runs in a `for`, one of the steps
-  that make none: `TEMPLATE_PARSE_COST` (32) per byte of a template's text, whatever the text
-  holds (`hcl-rs` parses a template again at each evaluation, so a long literal template
-  repeated a few times is refused), and a byte of the root object a traversal reads (`hcl-rs`
-  clones `var`, `local`, `each` or `module` whole to read `var.x[0]`); a template outside every
-  `for` is not charged its parse; a `for` collection counts its own elements through any root,
-  a literal list or object as many as it lists at its costliest element's cost, and its
-  elements once, read or not (#716), a conditional its larger branch; `join`, `replace` and
+  that make none: `TEMPLATE_PART_COST` (8) per part of a template (a literal, an
+  interpolation or a directive), whatever bytes it makes (`iac::Exact` makes a template the call
+  of its parts, so `hcl-rs` never parses one again, #763), and a byte of the root object a
+  traversal reads (`hcl-rs` clones `var`, `local`, `each` or `module` whole to read
+  `var.x[0]`); a template outside every `for` is charged no part; a `for` collection counts
+  its own elements through any root, a literal list or object as many as it lists at its costliest
+  element's cost, and its elements once, read or not (#716), a conditional its larger branch;
+  `join`, `replace` and
   `formatlist` are charged their arguments and the output they can make (#764), never more
   than the square of their arguments they were charged before, a string argument at what it
   shows (a literal its length, anything else three times its cost: a
@@ -36,13 +37,15 @@
   at b045c759, all debug), and a long expression refused in each instance of a `count` stops
   once its text has spent the work. The steps it charges bound a root of expressions near the
   ceiling: 80 resources took 16.6 s (the implementer's, 1bdcc75d, debug). It does not charge
-  what no step counts: a template outside every `for` is parsed again once per `count` or
-  `for_each` instance (10,000 interpolations: 0.72 s at `count = 1`, 4.41 s at 10, 48.4 s at
-  100, the implementer's, 1bdcc75d, debug), one 1 MiB template of 130,000 interpolations took
-  8.8 s, the work is per root, not per repository (20 roots of 80 resources near the ceiling
-  took 234.75 s; both measured by a black-box verifier on a debug build), and the estimate
-  itself is charged nothing, though it sizes each bound value it reads once per expression
-  (#765), and a known name that reads neither `each` nor `count` is evaluated once for every
+  what no step counts: a template outside every `for` that reads `each` or `count` is
+  evaluated again in each instance, its parts with no parse since #763 (10,000 interpolations
+  and `count.index`: 0.60 s at `count = 1`, 1.25 s at 10 and 8.45 s at 100 with #763, where
+  the parse took 0.89 s and 3.75 s at 60db9e4d, the implementer's, debug), one 1 MiB template
+  of 130,000 interpolations, `*` past `EVAL_VALUE_MAX`, takes 6.4 s (9.4 s at 60db9e4d), the
+  work is per root, not per repository (20 roots of 80 resources near the ceiling took
+  234.75 s; both measured by a black-box verifier on a debug build), and the estimate itself is
+  charged nothing, though it sizes each bound value it reads once per expression (#765), and a known
+  name that reads neither `each` nor `count` is evaluated once for every
   instance of its block (20,000 reads of a 21,000-element variable in a `for` over an empty
   collection: 1.31 s at `count = 1` and 1.50 s at 10 at 7f413fdb, where each instance paid the
   estimate again: 2.74 s and 16.59 s at b8778732, debug, one run each); a name that is not known
