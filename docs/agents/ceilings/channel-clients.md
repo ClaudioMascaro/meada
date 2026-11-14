@@ -100,9 +100,10 @@
   so is a named value an inline request holds on the name's path (a Java entry builder a
   request step takes). The C# and Go checks go by field name across the group, so a write in an
   unrelated function makes every named request of that field opaque (`PutItem`'s `TableName`).
-  On a path of entries (EventBridge `Entries[]`, a DynamoDB transaction) they judge each name
+  On a path of entries (EventBridge `Entries[]`, a DynamoDB transaction) Go judges each name
   by its own mentions instead (#774, `resolution-and-value-flow.md`): a write through another
-  name changes nothing, and one entry they do not follow makes its whole list name nothing. An SQS command a TypeScript
+  name changes nothing there. C# applies both rules, and in either language one entry not
+  followed makes its whole list name nothing. An SQS command a TypeScript
   variable holds reads its input where it is made, not at the `send`. Operations not in
   the documented table do not. A hierarchy query (`GetParametersByPath`) has no physical
   parameter name and stays unresolved. RDS and ElastiCache control-plane clients establish

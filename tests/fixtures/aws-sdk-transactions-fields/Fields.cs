@@ -5,9 +5,10 @@ using Amazon.DynamoDBv2.Model;
 using Amazon.EventBridge;
 using Amazon.EventBridge.Model;
 
-// A property written through one name reaches no value that another method's local holds alone:
-// on a transaction's path each name is judged by its own mentions (#774). The writes through
-// other names are in `Record`, `PutWritten`, the twins and the class `Other`.
+// Unlike Go, C# keeps the rule that a property written anywhere leaves the first name on a
+// transaction's path unresolved (#774): a class derived from an SDK type can keep `this`
+// (`TrackedPut` in Other.cs), so a write through another name may reach a local's value. The
+// writes are in `Record`, `PutWritten`, `TrackedPut`, the twins and the class `Other`.
 class Fields {
     async Task HeldEntry() {
         var db = new AmazonDynamoDBClient();
@@ -37,6 +38,15 @@ class Fields {
         var events = new AmazonEventBridgeClient();
         var entries = new List<PutEventsRequestEntry> { new PutEventsRequestEntry { EventBusName = "held-bus" } };
         await events.PutEventsAsync(new PutEventsRequest { Entries = entries });
+    }
+
+    // The entry is a class of the repository that keeps each instance: `Retarget` writes it
+    // through that list, with no third mention of `put`.
+    async Task TrackedEntry() {
+        var db = new AmazonDynamoDBClient();
+        var put = new TrackedPut { TableName = "tracked-old" };
+        TrackedPut.Retarget();
+        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { Put = put } } });
     }
 
     // The twins: the same values written in place, a third mention of their names.

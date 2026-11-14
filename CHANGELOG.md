@@ -83,10 +83,10 @@ All notable changes to Meada are recorded here. The format follows
   is never compared: these are declared permissions, not effective ones. `meada export` gains
   the optional consumer field `permissions`. Existing indexes are rebuilt once on first use.
   Release level: minor, meada and meada-core (#834).
-- Go and C#: a request, a list or an entry of a DynamoDB transaction or of EventBridge
-  `PutEvents` held in a local keeps its table or bus when another function, class or package
-  writes the same field through another name (`q.TableName = ..`). The value written through
-  its own name, and a named request that is no list of entries, stay unresolved (#774).
+- Go: a request, a list or an entry of a DynamoDB transaction or of EventBridge `PutEvents`
+  held in a local keeps its table or bus when another function or package writes the same field
+  through another name (`q.TableName = ..`). The value written through its own name, and a
+  named request that is no list of entries, stay unresolved; C# keeps its rule (#774).
 
 ### Changed
 

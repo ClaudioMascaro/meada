@@ -103,7 +103,11 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that
   declares the name mentions it twice. In Go and C#, one mentioned a third time (logged, read by two
   requests), one held in a parameter, a field or a package variable, and a C# request filled by
-  property assignments have no table or bus; nor have Go locals declared together (`p, q := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.
+  property assignments have no table or bus; in C# so has the first name the path meets when any
+  file of the repository assigns the property read through it (`q.TableName = ..` on any variable
+  of any type, in any class; a write of another property does not count), since a class derived
+  from an SDK type can keep `this` (Go judges a name by its own mentions alone, #774); nor have
+  Go locals declared together (`p, q := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.
   In Java the rule covers a list or an array: one mentioned a third time or held in a field has no
   table or bus (a `List.of` list cannot change and keeps them), and neither has a `new T[]{..}` array
   or a `new ArrayList<>(..)` copy mentioned twice. A method's name is no mention in Java: a list

@@ -1013,13 +1013,15 @@ fn sides_by_extension(export: &Value) -> std::collections::BTreeMap<String, Vec<
     by_extension
 }
 
-/// On a path of entries (a DynamoDB transaction's, EventBridge `PutEvents`' `Entries[]`) each
-/// name is judged by its own mentions in Go and C# (#774): a field written through another name,
-/// in any function, class or package of the repository, reaches no value a local holds alone,
-/// so a request, a list or an entry held in a local mentioned twice keeps its table or bus. Its
-/// twin written through its own name or through a second local stays unresolved, and so does a
-/// named request that is no list of entries, whose `TableName` some file writes. Go's two locals
-/// of one name in one function are counted together (C# allows none).
+/// On a path of entries (a DynamoDB transaction's, EventBridge `PutEvents`' `Entries[]`) Go judges
+/// each name by its own mentions alone (#774): a field written through another name, in any
+/// function or package of the repository, reaches no value a local holds alone, so a request, a
+/// list or an entry held in a local mentioned twice keeps its table or bus. Its twin written
+/// through its own name or through a second local stays unresolved, and so does a named request
+/// that is no list of entries, whose `TableName` some file writes. Go's two locals of one name
+/// in one function are counted together. C# keeps the repository-wide rule as well: a class
+/// derived from an SDK type can keep `this`, and a write through that reference changes a value
+/// its local mentions twice (`trackedentry`).
 #[test]
 fn a_field_written_through_another_name_leaves_a_held_entry_its_table() {
     let repo = fixture_repo(
@@ -1030,8 +1032,9 @@ fn a_field_written_through_another_name_leaves_a_held_entry_its_table() {
     let export: Value =
         serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
     let by_language = sides_by_extension(&export);
-    for language in ["go", "cs"] {
-        let expected = [
+    assert_eq!(
+        by_language["go"],
+        [
             "aliasedentry writer resource::dynamodb",
             "heldbus writer channel::eventbridge::held-bus",
             "heldentry writer resource::dynamodb::held-entry",
@@ -1046,12 +1049,29 @@ fn a_field_written_through_another_name_leaves_a_held_entry_its_table() {
             "writtenget reader resource::dynamodb",
             "writtenlist writer resource::dynamodb",
             "writtenrequest writer resource::dynamodb",
-        ];
-        let expected: Vec<&str> = (expected.into_iter())
-            .filter(|side| language == "go" || !side.starts_with("shadowed"))
-            .collect();
-        assert_eq!(by_language[language], expected, "{language}: {export}");
-    }
+        ],
+        "{export}"
+    );
+    assert_eq!(
+        by_language["cs"],
+        [
+            "aliasedentry writer resource::dynamodb",
+            "heldbus writer channel::eventbridge",
+            "heldentry writer resource::dynamodb",
+            "heldget reader resource::dynamodb",
+            "heldlist writer resource::dynamodb",
+            "heldrequest writer resource::dynamodb",
+            "plainput writer resource::dynamodb",
+            "putwritten writer resource::dynamodb",
+            "trackedentry writer resource::dynamodb",
+            "writtenbus writer channel::eventbridge",
+            "writtenentry writer resource::dynamodb",
+            "writtenget reader resource::dynamodb",
+            "writtenlist writer resource::dynamodb",
+            "writtenrequest writer resource::dynamodb",
+        ],
+        "{export}"
+    );
 }
 
 /// A transaction entry held in a named value and changed after it is made names no table, as

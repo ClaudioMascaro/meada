@@ -21,7 +21,8 @@
   shares the existing field-write index. Both check a named request by its field name across the
   group (`changed_request`): one `request.TableName = ..` anywhere makes every named request read
   at that field opaque. A path of entries (`reads_entries`: EventBridge `Entries[]`, a
-  transaction's three members) is judged by `held_changed` alone (#774): a request, a list, an
+  transaction's three members) is judged by `held_changed`, alone in Go (#774) and beside
+  `changed_request` in C# (a class derived from an SDK type can keep `this`): a request, a list, an
   item or an entry held in a name is followed only when the function that declares the name
   mentions it twice, where it is declared and where the path reads it (`lang::mentioned` fills
   `Facts::mentioned` for the locals Go keeps as constants and the ones C#'s `bound` keeps); a
