@@ -18,14 +18,15 @@
   operation calls. Java request folding shares Spring injection with channel forms. Runtime
   environment aliases keep verified provenance. C# selector writes are indexed lazily once
   across the group to invalidate named request objects even through another receiver alias; Go
-  shares the existing field-write index. Both check a named value by its field name across the
-  group: one `entry.EventBusName = ..` anywhere makes every named entry opaque, and a list holding
-  one opaque entry names nothing for its inline entries either. A transaction's path of three
-  members adds `held_changed`: a request, a list, an item or an entry held in a name is followed
-  only when the function that declares the name mentions it twice, where it is declared and where
-  the path reads it (`lang::mentioned` fills `Facts::mentioned` for the locals Go keeps as
-  constants and the ones C#'s `bound` keeps); a parameter, a field and a package variable are
-  never followed. The rows of a transaction run inside `Code::apart` and trace their clients
+  shares the existing field-write index. Both check a named request by its field name across the
+  group (`changed_request`): one `request.TableName = ..` anywhere makes every named request read
+  at that field opaque. A path of entries (`reads_entries`: EventBridge `Entries[]`, a
+  transaction's three members) is judged by `held_changed` alone (#774): a request, a list, an
+  item or an entry held in a name is followed only when the function that declares the name
+  mentions it twice, where it is declared and where the path reads it (`lang::mentioned` fills
+  `Facts::mentioned` for the locals Go keeps as constants and the ones C#'s `bound` keeps); a
+  parameter, a field and a package variable are never followed, and a list holding one entry not
+  followed names nothing for its inline entries either. The rows of a transaction run inside `Code::apart` and trace their clients
   with an `Origins` of their own, so what they fold is charged to a second per-file budget and
   the other calls of the file keep theirs. Each row of one call starts from what the call found
   spent (`Code::spent_apart`, `set_spent_apart`) and the call is charged the sum of its rows, so

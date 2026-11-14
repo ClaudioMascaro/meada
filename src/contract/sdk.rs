@@ -210,23 +210,29 @@ pub(crate) fn extract<'a>(
                     {
                         return;
                     }
-                    let changed = changed_request(
-                        code,
-                        path,
-                        index,
-                        operation.field,
-                        language,
-                        &written,
-                        &builders,
-                    ) || (language != Language::Java
-                        && reads_entries(operation.field)
-                        && held_changed(code, path, index, operation.field, language, {
+                    // In Go and C# a path of entries judges each name by its own mentions
+                    // (`held_changed`): a field written through another name, anywhere, reaches
+                    // no value a local holds alone (#774). The other paths keep the rule that
+                    // counts a write of the field in any file.
+                    let changed = if language != Language::Java && reads_entries(operation.field) {
+                        held_changed(code, path, index, operation.field, language, {
                             counts.get_or_init(|| {
                                 (code.mentioned(path).iter())
                                     .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
                                     .collect()
                             })
-                        }));
+                        })
+                    } else {
+                        changed_request(
+                            code,
+                            path,
+                            index,
+                            operation.field,
+                            language,
+                            &written,
+                            &builders,
+                        )
+                    };
                     let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
                         let [Value::Call(call)] = args else {
                             return Some(vec![Name::default()]);
@@ -370,7 +376,9 @@ fn passed_changed<'a>(
 }
 
 /// A named request can change after construction, and so can a named value an inline request
-/// holds on the name's path (an EventBridge entry); inline literals cannot change before the call.
+/// holds on the name's path (a Java entry builder); inline literals cannot change before the call.
+/// In Go and C# this judges the paths that read no list of entries (`held_changed` judges those):
+/// a named value met on one changes when any file writes the member read off it.
 fn changed_request<'a>(
     code: &Code<'a>,
     path: &'a str,
