@@ -1792,8 +1792,10 @@ fn cost(
     match expr {
         Expression::Null(_) | Expression::Bool(_) | Expression::Number(_) => 8,
         Expression::String(s) => s.len() + 2,
+        // An element costs a byte at least (a template of no text costs nothing), so a list's
+        // cost bounds how many elements it holds, as `join` and `formatlist` read it (#764).
         Expression::Array(items) => (items.iter())
-            .map(|e| cost(e, roots, iters, overhead))
+            .map(|e| cost(e, roots, iters, overhead).max(1))
             .fold(2, add),
         Expression::Object(object) => (object.iter())
             .map(|(k, v)| {
@@ -1843,12 +1845,32 @@ fn cost(
                 .map(|e| cost(e, roots, iters, overhead))
                 .collect();
             let sum = args.iter().copied().fold(8, add);
-            match f.name.name.as_str() {
-                "formatlist" | "join" | "replace" => sum.saturating_mul(sum),
-                "format" => add(sum, args.len().saturating_mul(functions::WIDTH_MAX)),
-                "jsonencode" => sum.saturating_mul(6),
-                "split" => sum.saturating_mul(4),
-                "upper" | "lower" | "title" => sum.saturating_mul(3),
+            // The three products below are charged their output's bound (#764), never more
+            // than the square of their arguments they were charged before.
+            let square = sum.saturating_mul(sum);
+            match (f.name.name.as_str(), args.as_slice()) {
+                // An expanded last argument (`join(x...)`) may hold any of the others.
+                ("formatlist" | "join" | "replace", _) if f.args.expand_final() => square,
+                // At most an element per byte of the lists, each shown in up to three times
+                // its cost, and a separator after each.
+                ("join", [sep, lists @ ..]) => {
+                    let sep = shown_len(f.args.iter().next(), *sep);
+                    let lists = lists.iter().copied().fold(0, add);
+                    add(sum, lists.saturating_mul(add(sep, 3))).min(square)
+                }
+                // A literal, non-empty substring matches at most once per byte.
+                ("replace", [s, _, to]) => {
+                    let s = shown_len(f.args.iter().next(), *s);
+                    let to = shown_len(f.args.iter().nth(2), *to);
+                    add(sum, s.saturating_mul(add(to, 1))).min(square)
+                }
+                ("formatlist", [_, ..]) => {
+                    add(sum, formatlist_cost(f, &args, roots, iters)).min(square)
+                }
+                ("format", _) => add(sum, args.len().saturating_mul(functions::WIDTH_MAX)),
+                ("jsonencode", _) => sum.saturating_mul(6),
+                ("split", _) => sum.saturating_mul(4),
+                ("upper" | "lower" | "title", _) => sum.saturating_mul(3),
                 _ => sum,
             }
         }
@@ -1878,6 +1900,68 @@ fn cost(
             iters.truncate(depth);
             n.saturating_mul(body)
         }
+    }
+}
+
+/// The bytes `formatlist` makes from its arguments (`costs`, the format's first): a row per
+/// element of its lists, which share one length or it makes none (without one, as many rows as
+/// its costliest argument of no known kind), each row what the format shows, a width up to
+/// `WIDTH_MAX` per argument and what it formats escaped (`%q`, up to six bytes a byte): a list's
+/// elements once in all, any other argument whole in each row (#764).
+fn formatlist_cost(
+    f: &hcl_edit::expr::FuncCall,
+    costs: &[usize],
+    roots: &Roots<'_>,
+    iters: &[(String, usize)],
+) -> usize {
+    let (mut rows, mut unknown_rows) = (None, 1);
+    let (mut lists, mut repeated) = (0usize, 0usize);
+    for (e, &c) in f.args.iter().zip(costs).skip(1) {
+        let value = match e {
+            Expression::Traversal(t) => unshadowed(t, roots, iters),
+            _ => None,
+        };
+        let len = match (e, value) {
+            (Expression::Array(items), _) => Some(items.len()),
+            (_, Some(Value::Array(items))) => Some(items.len()),
+            _ => None,
+        };
+        match len {
+            Some(n) => {
+                rows = Some(rows.map_or(n, |r: usize| r.min(n)));
+                lists = lists.saturating_add(c);
+            }
+            None => {
+                repeated = repeated.saturating_add(c);
+                let scalar = value.is_some()
+                    || matches!(
+                        e,
+                        Expression::String(_)
+                            | Expression::Number(_)
+                            | Expression::Bool(_)
+                            | Expression::Null(_)
+                    );
+                if !scalar {
+                    unknown_rows = unknown_rows.max(c);
+                }
+            }
+        }
+    }
+    let row = (costs.len() - 1).saturating_mul(functions::WIDTH_MAX);
+    let row = row
+        .saturating_add(shown_len(f.args.iter().next(), costs[0]))
+        .saturating_add(repeated.saturating_mul(6));
+    let rows = rows.unwrap_or(unknown_rows);
+    rows.saturating_mul(row)
+        .saturating_add(lists.saturating_mul(6))
+}
+
+/// The most bytes the string argument `e`, costed `cost`, shows: a literal its length, anything
+/// else three times its cost (a number shown takes up to 24 bytes, where 8 are counted).
+fn shown_len(e: Option<&Expression>, cost: usize) -> usize {
+    match e {
+        Some(Expression::String(s)) => s.len(),
+        _ => cost.saturating_mul(3),
     }
 }
 
@@ -1936,7 +2020,8 @@ fn template_cost(
 }
 
 /// How many elements the collection `expr` gives at most, and the bytes one of them (or its key)
-/// holds at most: exact for a bound value, else its cost for both.
+/// holds at most: exact for a bound value, a literal list or object's count and its costliest
+/// element, else its cost for both.
 fn elements(
     expr: &Expression,
     roots: &Roots<'_>,
@@ -1963,6 +2048,28 @@ fn elements(
             let (a, x) = elements(&c.true_expr, roots, iters, overhead);
             let (b, y) = elements(&c.false_expr, roots, iters, overhead);
             return (a.max(b), x.max(y));
+        }
+        // A literal holds as many elements as it lists, each costed alone (its whole cost for
+        // each element squared it), and is made once, whatever its `for` reads of it (#716).
+        Expression::Array(items) => {
+            let costs = (items.iter()).map(|e| cost(e, roots, iters, overhead));
+            let costs: Vec<usize> = costs.collect();
+            *overhead = (costs.iter()).fold(*overhead, |a, &c| a.saturating_add(c));
+            return (items.len(), costs.into_iter().max().unwrap_or(0));
+        }
+        Expression::Object(object) => {
+            let mut each = 0;
+            for (k, v) in object.iter() {
+                // The key is bound as a string, its quotes counted as a bound object's are.
+                let key = match k {
+                    ObjectKey::Ident(i) => i.as_str().len() + 2,
+                    ObjectKey::Expression(e) => cost(e, roots, iters, overhead),
+                };
+                let value = cost(v.expr(), roots, iters, overhead);
+                *overhead = overhead.saturating_add(key).saturating_add(value);
+                each = each.max(key).max(value);
+            }
+            return (object.len(), each);
         }
         _ => {}
     }
@@ -4970,6 +5077,164 @@ mod tests {
         assert!(got.iter().all(|n| n.contains(" = \"q-s")), "{got:?}");
     }
 
+    /// A `for` over a literal list or object costs as a `for` over a bound one (#716): its element
+    /// count times its largest element. Forty inline objects expand, in a list and in an object,
+    /// where the literal's whole cost taken as the count and as each element passed
+    /// `EVAL_COST_MAX`; a `for` in a `for` over two literal lists of 400, which would make more
+    /// than `EVAL_COST_MAX` (160,000 strings of 10 bytes), is still refused.
+    #[test]
+    fn a_for_over_a_literal_collection_costs_as_over_a_bound_one() {
+        let list = (0..40)
+            .map(|i| format!("{{ name = \"s{i:02}\", size = {i} }}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let object = (0..40)
+            .map(|i| format!("s{i:02} = {{ size = {i}, tier = \"backend-tier\" }}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let numbers = (0..400).map(|i| i.to_string()).collect::<Vec<_>>();
+        let numbers = numbers.join(", ");
+        let main = format!(
+            "resource \"a\" \"l\" {{\n  for_each = {{ for o in [{list}] : o.name => o }}\n  name = \"l-${{each.key}}\"\n}}\n\
+             resource \"a\" \"o\" {{\n  for_each = {{ for k, v in {{ {object} }} : k => v }}\n  name = \"o-${{each.key}}\"\n}}\n\
+             resource \"a\" \"n\" {{\n  name = \"n-${{length([for a in [{numbers}] : [for b in [{numbers}] : \"abcdefgh\"]])}}\"\n}}\n"
+        );
+        let got = names(&[("main.tf", &main)]);
+        let of = |address: &str| -> Vec<String> {
+            (got.iter().filter(|n| n.starts_with(address)).cloned()).collect()
+        };
+        let named = |r: &str| -> Vec<String> {
+            (0..40)
+                .map(|i| format!("a.{r}[\"s{i:02}\"] = \"{r}-s{i:02}\""))
+                .collect()
+        };
+        assert_eq!(
+            (of("a.l"), of("a.o"), of("a.n")),
+            (named("l"), named("o"), vec!["a.n ~ \"n-*\"".to_string()])
+        );
+    }
+
+    /// A literal's elements are made once, whatever its `for` reads of them (#716): a `for` over
+    /// a one-element list or object holding a `for` in a `for` over two literal lists of 400
+    /// (160,000 strings of 10 bytes) is refused, as that `for` alone is, and so is one holding
+    /// three levels of them (64 million values), without being evaluated.
+    #[test]
+    fn a_literal_collection_is_charged_its_elements_once() {
+        let numbers = (0..400).map(|i| i.to_string()).collect::<Vec<_>>();
+        let numbers = numbers.join(", ");
+        let two = format!("[for a in [{numbers}] : [for b in [{numbers}] : \"abcdefgh\"]]");
+        let main = format!(
+            "resource \"a\" \"u\" {{ name = \"u-${{length([for x in [{two}] : 1])}}\" }}\n\
+             resource \"a\" \"w\" {{ name = \"w-${{length([for k, v in {{ x = {two} }} : 1])}}\" }}\n"
+        );
+        assert_eq!(
+            names(&[("main.tf", &main)]),
+            ["a.u ~ \"u-*\"", "a.w ~ \"w-*\""]
+        );
+        let three = format!(
+            "length([for x in [[for a in [{numbers}] : [for b in [{numbers}] : [for c in [{numbers}] : 1]]]] : 1])"
+        );
+        let expr = parser::parse_expr(&three).unwrap();
+        assert!(steps(&expr, &Map::new()) > EVAL_COST_MAX);
+    }
+
+    /// `join`, `formatlist` and `replace` are costed by the output they can make, not by their
+    /// arguments' cost squared, which a nested call squared again past `EVAL_COST_MAX` (#764).
+    /// Each name is the one Terraform v1.17.1's `console` gives.
+    #[test]
+    fn join_formatlist_and_replace_are_costed_by_their_output() {
+        let s = "a-".repeat(1000);
+        let n = (0..400)
+            .map(|i| format!("\"item-{i:03}\""))
+            .collect::<Vec<_>>();
+        let n = n.join(", ");
+        let main = format!(
+            "variable \"l\" {{ default = [\"a\", \"b\", \"c\", \"d\"] }}\n\
+             variable \"m\" {{ default = [\"a\", \"b\", \"c\"] }}\n\
+             variable \"n\" {{ default = [{n}] }}\n\
+             variable \"s\" {{ default = \"{s}\" }}\n\
+             resource \"a\" \"j\" {{ name = join(\"-\", [join(\"-\", [join(\",\", [\"a\"])])]) }}\n\
+             resource \"a\" \"k\" {{ name = join(\"-\", [join(\",\", var.l), join(\",\", var.l)]) }}\n\
+             resource \"a\" \"f\" {{ name = \"q-${{join(\"\", [for a in var.m : join(\"\", [for b in var.m : \"${{a}}${{b}}\"])])}}\" }}\n\
+             resource \"a\" \"g\" {{ name = join(\",\", formatlist(\"q-%s\", var.n)) }}\n\
+             resource \"a\" \"r\" {{ name = replace(var.s, \"-\", \"_\") }}\n"
+        );
+        let items: Vec<String> = (0..400).map(|i| format!("q-item-{i:03}")).collect();
+        let want = [
+            "a.j = \"a\"".to_string(),
+            "a.k = \"a,b,c,d-a,b,c,d\" [var.l main.tf:1]".to_string(),
+            "a.f = \"q-aaabacbabbbccacbcc\" [var.m main.tf:2]".to_string(),
+            format!("a.g = \"{}\" [var.n main.tf:3]", items.join(",")),
+            format!("a.r = \"{}\" [var.s main.tf:4]", "a_".repeat(1000)),
+        ];
+        assert_eq!(names(&[("main.tf", &main)]), want);
+    }
+
+    /// A `join`, a `formatlist` and a `replace` whose output would pass `EVAL_COST_MAX` (one to
+    /// two million bytes: a separator, a scalar or a replacement of 1,000 to 2,000 bytes once per
+    /// element or match) are refused before they are evaluated (#764): as written, expanded
+    /// (`f(x...)`), over a list of no known length, through `%q` escapes, and with a template
+    /// whose number shows 22 bytes where 8 are counted.
+    #[test]
+    fn a_join_formatlist_or_replace_past_the_cost_ceiling_is_refused() {
+        let (wide, a, to) = ("x".repeat(2000), "a".repeat(2000), "y".repeat(1000));
+        let list = (0..1000).map(|i| i.to_string()).collect::<Vec<_>>();
+        let list = list.join(", ");
+        let escaped = vec![format!("\"{}\"", "\\u0001".repeat(200)); 1000].join(", ");
+        let n = "${1.7976931348623157e308}";
+        let (empty, many) = (vec!["\"\""; 6300].join(", "), vec!["\"\""; 975].join(", "));
+        let empty_for = vec!["\"%{for x in []}%{endfor}\""; 2000].join(", ");
+        for text in [
+            format!("join(\"{wide}\", [{list}])"),
+            format!("formatlist(\"%s-%s\", \"{wide}\", [{list}])"),
+            format!("replace(\"{a}\", \"a\", \"{to}\")"),
+            format!("join([\"{wide}\", [{list}]]...)"),
+            format!("formatlist([\"%s-%s\", \"{wide}\", [{list}]]...)"),
+            format!("replace([\"{a}\", \"a\", \"{to}\"]...)"),
+            format!("formatlist(\"%s-%s\", \"{wide}\", [for i in [{list}] : i])"),
+            format!("formatlist(\"%q\", [{escaped}])"),
+            format!("replace(\"{}\", \"a\", \"x{n}\")", "a".repeat(95_000)),
+            format!("join(\"{}\", [{empty}])", n.repeat(10)),
+            format!("formatlist(\"x{}\", [{many}])", n.repeat(100)),
+            // A template of no text still makes a string: 2,000 of them joined by 100 KB.
+            format!("join(\"{}\", [{empty_for}])", "x".repeat(100_000)),
+        ] {
+            let expr = parser::parse_expr(&text).unwrap();
+            assert!(steps(&expr, &Map::new()) > EVAL_COST_MAX, "{text}");
+        }
+    }
+
+    /// What the square of their arguments named before #764 stays named: a `formatlist` over a
+    /// list of no known length, a `replace` of two variables, and one of two templates at the
+    /// edge of the ceiling (a template's cost is what it was). Each name is the one Terraform
+    /// v1.17.1's `console` gives (the #764 verifier's cases p1, p2b, p3 and d1).
+    #[test]
+    fn a_join_formatlist_or_replace_the_square_accepted_stays_named() {
+        let items = |n: usize| (0..n).map(|i| format!("\"i-{i:02}\"")).collect::<Vec<_>>();
+        let (p, q) = (items(60).join(", "), items(70).join(", "));
+        let (s, t) = ("b".repeat(398), "y".repeat(398));
+        let (u, w) = ("b".repeat(500), "y".repeat(507));
+        let main = format!(
+            "variable \"p\" {{ default = [{p}] }}\n\
+             variable \"q\" {{ default = [{q}] }}\n\
+             variable \"s\" {{ default = \"{s}\" }}\n\
+             variable \"t\" {{ default = \"{t}\" }}\n\
+             variable \"u\" {{ default = \"{u}\" }}\n\
+             variable \"w\" {{ default = \"{w}\" }}\n\
+             resource \"a\" \"p\" {{ name = formatlist(\"q-%s\", [for x in var.p : x])[0] }}\n\
+             resource \"a\" \"e\" {{ name = element(formatlist(\"q-%s\", tolist(var.q)), 0) }}\n\
+             resource \"a\" \"t\" {{ name = replace(var.s, \"a\", var.t) }}\n\
+             resource \"a\" \"d\" {{ name = replace(\"${{var.u}}\", \"a\", \"${{var.w}}\") }}\n"
+        );
+        let want = [
+            "a.p = \"q-i-00\" [var.p main.tf:1]".to_string(),
+            "a.e = \"q-i-00\" [var.q main.tf:2]".to_string(),
+            format!("a.t = \"{s}\" [var.s main.tf:3] [var.t main.tf:4]"),
+            format!("a.d = \"{u}\" [var.u main.tf:5] [var.w main.tf:6]"),
+        ];
+        assert_eq!(names(&[("main.tf", &main)]), want);
+    }
+
     /// A key bound over `toset(...)` is the element in Terraform, where Meada's set is a list
     /// whose key is the index: unresolved, in a `for` and in a `%{ for }` directive.
     #[test]
@@ -5134,18 +5399,18 @@ mod tests {
             given(tfvars, format!("x = \"{long}\"\n")),
             given("terraform.tfvars.json", format!("{{\"x\": \"{long}\"}}")),
         ];
-        // A `for` in a `for` over two lists of 30 could make about 700,000 bytes (`cost`), which
+        // A `for` in a `for` over two lists of 270 could make about 876,000 bytes (`cost`), which
         // each such value spends before its unknown `z` leaves it out: four times as many as the
         // work holds spend it (those refused spend nothing), and a value after them costing more
-        // than the work left is given but unresolved.
-        let thirty = (0..30)
+        // than the work left (about 1,022,000, its strings longer) is given but unresolved.
+        let many = (0..270)
             .map(|i| i.to_string())
             .collect::<Vec<_>>()
             .join(", ");
-        let costly = format!("[for a in [{thirty}] : [for b in [{thirty}] : z]]");
+        let costly = format!("[for a in [{many}] : [for b in [{many}] : z]]");
         let n = 4 * EVAL_WORK_MAX / EVAL_COST_MAX;
         let values: String = (0..n).map(|i| format!("x{i} = {costly}\n")).collect();
-        let last = format!("[for a in [{thirty}] : [for b in [{thirty}] : \"ok-ok-ok\"]][0][0]");
+        let last = format!("[for a in [{many}] : [for b in [{many}] : \"ok-ok-ok\"]][0][0]");
         let values = format!("first = \"ok\"\n{values}last = {last}\n");
         let main = concat!(
             "variable \"first\" { default = \"\" }\nvariable \"last\" { default = \"\" }\n",

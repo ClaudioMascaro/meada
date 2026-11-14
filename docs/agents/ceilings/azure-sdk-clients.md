@@ -10,7 +10,7 @@ The ADR 0026 inventory is explicit. Event Hubs needs a separately written hub; c
 credentials are never parsed. Blob keeps a known container with an unknown object. Unsupported
 operations, direct URL client constructors and other async/polling families yield no form.
 Known clients with unread names yield unresolved sides. Pure Azure identifiers use the bounded
-helpers listed in [Terraform and provisioning](resolution-the-index-and-shape-readers/terraform-and-provisioning.md).
+helpers listed in [Terraform and provisioning](resolution-the-index-and-shape-readers/terraform-and-provisioning/readers-mappings-and-expansion.md).
 
 Receiver JSON stores only subtype and normalized literal/env/unknown name components. Workload
 companions join by indexed workload/root/container scope, avoiding a workspace-wide Cartesian
