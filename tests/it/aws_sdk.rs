@@ -1422,7 +1422,8 @@ fn a_private_final_field_builder_keeps_its_table_beside_another_file_s_variable(
 
 /// A file that reads fields by reflection reaches a `private` one and may hand it to any other
 /// file: where a Java file of the repository does, a call on the field's name counts from
-/// every file, as before the private-field rule (#775).
+/// every file, as before the private-field rule (#775). The fixture reads the field through a
+/// method reference (`Reached.class::getDeclaredField`): no call spells the method's name.
 #[test]
 fn a_private_field_builder_has_no_table_where_a_file_reads_fields_by_reflection() {
     let fixture = "aws-sdk-private-fields-reflected";
