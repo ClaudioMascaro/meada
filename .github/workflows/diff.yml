@@ -1,0 +1,50 @@
+name: Diff
+
+# A fast answer on a branch push: the static checks and the tests of the changed modules
+# (`scripts/check --scope auto`), on one runner. It is no gate: the pull request's CI runs every
+# check, and a test in a module the change does not touch, or behind a cloud feature, is CI's
+# to find.
+on:
+  push:
+    branches-ignore: [main, 'loop/**']
+
+# A newer push to the branch supersedes its run in progress.
+concurrency:
+  group: diff-${{ github.ref }}
+  cancel-in-progress: true
+
+# The same as `ci.yml`: the cache below is keyed on them.
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TEST_THREADS: '2'
+
+permissions:
+  contents: read
+
+jobs:
+  # A name no other workflow's job has: a check is told from another by its job name alone.
+  diff:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select checks
+        id: scope
+        run: python3 scripts/check --ci
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        if: steps.scope.outputs.deploy == 'true' && steps.scope.outputs.product == 'true'
+        with:
+          version: v3.19.0
+      # The cache `ci.yml`'s `test` job saved on the default branch; a branch saves none.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: steps.scope.outputs.product == 'true'
+        with:
+          shared-key: test
+          save-if: false
+      - name: Static checks and the tests of the changed modules
+        run: |
+          python3 -m venv "$RUNNER_TEMP/check-venv"
+          "$RUNNER_TEMP/check-venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3
+          "$RUNNER_TEMP/check-venv/bin/python" scripts/check --scope auto

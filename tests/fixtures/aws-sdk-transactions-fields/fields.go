@@ -59,6 +59,27 @@ func writtenRequest(ctx context.Context) {
 	client.TransactWriteItems(ctx, in)
 }
 
+// The entry written through a second local: the alias is a third mention of `p`.
+func aliasedEntry(ctx context.Context) {
+	client := dynamodb.NewFromConfig(cfg)
+	p := &types.Put{TableName: aws.String("aliased-entry-old")}
+	q := p
+	q.TableName = aws.String("aliased-entry-new")
+	client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: []types.TransactWriteItem{{Put: p}}})
+}
+
+// A second local of the same name in an inner block: the two are counted together, so the
+// outer one, which nothing changes, names no table either.
+func shadowedEntry(ctx context.Context, prod bool) {
+	client := dynamodb.NewFromConfig(cfg)
+	p := &types.Put{TableName: aws.String("shadowed-entry")}
+	if prod {
+		p := &types.Put{TableName: aws.String("shadowed-inner-old")}
+		p.TableName = aws.String("shadowed-inner-new")
+	}
+	client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: []types.TransactWriteItem{{Put: p}}})
+}
+
 func writtenGet(ctx context.Context) {
 	client := dynamodb.NewFromConfig(cfg)
 	g := &types.Get{TableName: aws.String("written-get-old")}

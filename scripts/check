@@ -160,11 +160,13 @@ def ci_selection(event, payload):
     if event == "push":
         head = commit(payload["after"])
         before = payload.get("before")
-        default = f"refs/remotes/origin/{(payload.get('repository') or {}).get('default_branch')}"
-        loop = str(payload.get("ref", "")).startswith("refs/heads/loop/")
-        if loop and subprocess.run(["git", "rev-parse", "--verify", "-q", default],
-                                   stdout=subprocess.DEVNULL).returncode == 0:
-            # Its pull request's gates: the same check names report on this commit.
+        branch = (payload.get("repository") or {}).get("default_branch")
+        default, ref = f"refs/remotes/origin/{branch}", str(payload.get("ref", ""))
+        # Any branch but the default one is read as its pull request is: its whole change against
+        # the default branch (a loop branch's gates, the `diff` workflow's tests).
+        whole = ref.startswith("refs/heads/") and ref != f"refs/heads/{branch}"
+        if whole and subprocess.run(["git", "rev-parse", "--verify", "-q", default],
+                                    stdout=subprocess.DEVNULL).returncode == 0:
             base = commit(git("merge-base", default, head))
         elif isinstance(before, str) and SHA.fullmatch(before) and set(before) == {"0"}:
             base = empty_tree()
@@ -572,13 +574,15 @@ def selftest():
             refused(lambda: ci_selection("push", {"before": "f" * 40, "after": docs}))
             pushed = ci_selection("push", {"before": "0" * 40, "after": docs})[0]
             assert pushed["routine"] and not pushed["e2e"] and pushed["product"]
-            # A loop branch push gates its whole change against the default branch, as its pull
-            # request does: a later push of docs alone keeps the gates its earlier code needs.
+            # A push to any branch but the default one covers its whole change against the default
+            # branch, as its pull request does: a later push of docs alone keeps the checks its
+            # earlier code needs.
             git("update-ref", "refs/remotes/origin/main", base)
             def pushed_to(ref):
                 return ci_selection("push", {"ref": ref, "before": code, "after": docs,
                                              "repository": {"default_branch": "main"}})[0]
-            assert pushed_to("refs/heads/loop/1")["product"] and pushed_to("refs/heads/loop/1")["base"] == base
+            for ref in ("refs/heads/loop/1", "refs/heads/feat/1"):
+                assert pushed_to(ref)["product"] and pushed_to(ref)["base"] == base
             assert not pushed_to("refs/heads/main")["product"] and pushed_to("refs/heads/main")["base"] == code
             manual = ci_selection("workflow_dispatch", {})[0]
             assert not any(manual[key] for key in FLAGS)
@@ -609,6 +613,12 @@ def selftest():
             assert set(outputs) == set(FLAGS) | {"base", "head", "repos"}
             assert outputs["routine"] == outputs["product"] == "true" and outputs["e2e"] == "false"
             assert "Selected checks" in Path("summary").read_text()
+            # A scoped run in CI reads the event too (the `diff` workflow): the local selection
+            # would refuse this tree's untracked files, and a push of docs alone selects no build.
+            write("event.json", json.dumps({"before": code, "after": docs}))
+            command = subprocess.run([sys.executable, str(old / "scripts/check"), "--scope", "auto"], env=env,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            assert command.returncode == 0 and b"not selected" in command.stdout, command.stderr.decode()
         finally:
             os.chdir(old)
     assert scoped_commands(["iac", "alert"])[-1][-5:] == ("--", "iac", "alert", *ALWAYS_SCOPED)
@@ -666,7 +676,7 @@ def main():
         selftest()
         return
     os.chdir(git("rev-parse", "--show-toplevel"))
-    if options.ci or (options.static and os.environ.get("GITHUB_EVENT_PATH")):
+    if options.ci or ((options.static or options.scope) and os.environ.get("GITHUB_EVENT_PATH")):
         payload = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
         selected, args, paths = ci_selection(os.environ["GITHUB_EVENT_NAME"], payload)
         tree = commit(git("rev-parse", "HEAD"))
@@ -693,6 +703,11 @@ def main():
         if "auto" in options.scope:
             names = sorted(set(names) | set(auto_scopes(paths)))
             print(f"--scope auto: {' '.join(names)}", flush=True)
+        cloud = cloud_features(paths)
+        if cloud:
+            # A scoped run builds the default features: no test behind a cloud feature compiles.
+            print(f"{'::notice::' if os.environ.get('GITHUB_ACTIONS') == 'true' else ''}not run here, the tests "
+                  f"behind the cloud features {' '.join(cloud)}: the pull request's `cloud` job runs them", flush=True)
         for command in scoped_commands(names):
             bounded(*command)
     elif not options.static and selected["product"]:
