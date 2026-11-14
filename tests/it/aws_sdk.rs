@@ -1052,6 +1052,53 @@ fn a_field_written_through_another_name_leaves_a_held_entry_its_table() {
     }
 }
 
+/// A Go wrapper that mentions its parameter twice, where it declares it and where a path of
+/// entries reads it, sends what each caller passes (#774): the request, list or entry the caller
+/// writes in the call or holds in a local it mentions twice keeps its table or bus, through a
+/// function, a method and two wrappers. A third mention in the wrapper (a write, a helper, a new
+/// value) or in the caller leaves it unresolved, and so do more arguments than parameters and a
+/// method whose name another type's method spells. C# is not followed.
+#[test]
+fn a_go_wrapper_s_parameter_is_followed_to_what_its_caller_passes() {
+    let repo = fixture_repo(
+        "aws_sdk_transactions_passed",
+        "aws-sdk-transactions-passed",
+        None,
+    );
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let by_language = sides_by_extension(&export);
+    assert_eq!(
+        by_language["go"],
+        [
+            "changedbycaller writer resource::dynamodb",
+            "changedbywrapper writer resource::dynamodb",
+            "handedbywrapper writer resource::dynamodb",
+            "othershared writer resource::dynamodb",
+            "passedbus writer channel::eventbridge::passed-bus",
+            "passedentry writer resource::dynamodb::passed-entry",
+            "passedgets reader resource::dynamodb::passed-gets",
+            "passedinline writer resource::dynamodb::passed-inline",
+            "passedlist writer resource::dynamodb::passed-list",
+            "passedmethod writer resource::dynamodb::passed-method",
+            "passedrequest writer resource::dynamodb::passed-request",
+            "passedshared writer resource::dynamodb",
+            "passedspread writer resource::dynamodb",
+            "passedtwice writer resource::dynamodb::passed-twice",
+            "resetbywrapper writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+    assert_eq!(
+        by_language["cs"],
+        [
+            "passedinline writer resource::dynamodb",
+            "passedlist writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
 /// A transaction entry held in a named value and changed after it is made names no table, as
 /// the other named values on a name's path do (a Java builder is read per builder). The same
 /// entries left alone keep their tables, so the change is what unnamed them.
