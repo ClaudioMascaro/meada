@@ -96,6 +96,27 @@ change touches, then read the files it names.
 - A wrong answer on Meada's own code is a bug: open an issue with the query, the answer and the
   expected one.
 
+## Library docs
+
+`.mcp.json` also serves the `context7` MCP (locally there may be a claude.ai connector of the same
+name too): `resolve-library-id`, then `query-docs`, give what a third-party library's API looks
+like. It is an aid to the agent, never part of Meada: no build, test, fixture or ceiling depends
+on it (ADR 0002).
+
+- Reach for it for an SDK surface Meada reads but nothing here runs (the AWS, GCP and Azure SDKs
+  in Java, .NET, Python and JS), or before writing against a crate method remembered from another
+  version. For a crate, prefer its docs.rs source (`/websites/rs_<crate>`): a repository's pinned
+  ID can answer with its changelog instead of its API.
+- An answer is the latest release unless the ID pins a version, and pinned versions lag
+  (Terraform's stop at 1.14). Check it against the locked source (`~/.cargo/registry/src` for a
+  crate) before it shapes code, and cite that source, not context7.
+- Never for a rule a tool here settles: Terraform and OpenTofu run locally and
+  `tests/terraform-oracle/` records their answers. A test's expected value never comes from it.
+- At most three calls per question; on a miss, read the primary source.
+- Queries leave the machine: public library names and generic questions only, never paths,
+  repository or issue names, code from this repository, people's names or private terms. Never
+  query GitNexus ("Clean room").
+
 ## Agent skills
 
 ### Issue tracker

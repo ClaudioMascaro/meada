@@ -13,11 +13,13 @@
     "ray-amjad-skills@ray-amjad": false
   },
   "enabledMcpjsonServers": [
-    "meada"
+    "meada",
+    "context7"
   ],
   "permissions": {
     "allow": [
-      "mcp__meada"
+      "mcp__meada",
+      "mcp__context7"
     ]
   },
   "skillOverrides": {
