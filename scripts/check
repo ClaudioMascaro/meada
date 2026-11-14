@@ -419,12 +419,17 @@ def selftest():
     item = "- one change\n" + "  more\n" * CHANGELOG_ITEM_LINES
     assert long_changelog_items("## [Unreleased]\n### Fixed\n" + item + "- short\n## [1.0.0]\n" + item * 2) == ["- one change"]
     assert long_changelog_items("## [Unreleased]\n- short\n  wrapped\n") == []
-    saved = {key: os.environ.get(key) for key in ("PATH", LOCK, HELD)}
+    saved = {key: os.environ.get(key) for key in ("PATH", LOCK, HELD, "GITHUB_ACTIONS")}
     with tempfile.TemporaryDirectory(prefix="meada-check-path-") as empty:
         os.environ["PATH"] = os.pathsep.join([empty, os.path.dirname(shutil.which("true"))])
         os.environ[LOCK] = os.path.join(empty, "lock")
         os.environ.pop(HELD, None)
         try:
+            # CI runs the command directly: its runner holds one job.
+            os.environ["GITHUB_ACTIONS"] = "true"
+            bounded("true")
+            assert not os.path.exists(os.environ[LOCK])
+            del os.environ["GITHUB_ACTIONS"]
             # No `bounded` on PATH: the command runs, under the lock where `flock` and `nice` exist.
             bounded("true")
             assert os.path.exists(os.environ[LOCK]) == bool(shutil.which("flock") and shutil.which("nice"))
