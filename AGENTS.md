@@ -141,3 +141,9 @@ The `mattpocock/skills` set and the prove-it trio of `ray-amjad/skills` live in 
 from its `upstreamTree` carries a local adjustment. An edit to a skill updates its `tree` in the
 lock, and `scripts/check` names the value. The plugins that ship the same skills stay disabled in
 `.claude/settings.json`, so a session lists each skill once.
+
+They are vendor text, written for any repository: where one says to build, start or drive the
+product, or to prove a change before saying done, the Workflow rules above decide where and when
+that happens. The prove-it trio stays at its upstream text and is invoked by the user only
+(`skillOverrides` in `.claude/settings.json`); `/prove-meada` holds this repository's layout for
+proof skills.
