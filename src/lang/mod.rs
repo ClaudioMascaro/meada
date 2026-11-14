@@ -591,9 +591,10 @@ pub struct Facts {
     /// constants) and C# (`mentioned`). Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub mentioned: Vec<Mentioned>,
-    /// The names of the methods the anonymous classes and enum constant bodies of the file
-    /// declare (Java): no definition stands for them, yet a call through their base type may
-    /// dispatch to one (#772). Kept in the index: the SDK reader reads it from every file.
+    /// The names of the methods the file declares that no definition stands for (Java): an
+    /// anonymous class's or an enum constant body's, a class's nested in one, or past the
+    /// definition depth. A call through a base type may dispatch to one (#772). Kept in the
+    /// index: the SDK reader reads it from every file.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub anonymous: Vec<String>,
     /// A stable first binding of a multiple-result call (Go). This is a result projection,

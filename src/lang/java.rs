@@ -262,15 +262,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 matches!(p.kind(), "object_creation_expression" | "enum_constant")
             });
         let defining = definitions && !anonymous && depth < DEFINITION_DEPTH;
-        if anonymous {
-            // No definition stands for an anonymous class's method, yet a call through its base
-            // type may dispatch to it (#772).
-            let methods = named(node).filter(|m| m.kind() == "method_declaration");
-            (facts.anonymous).extend(
-                methods
-                    .filter_map(|m| m.child_by_field_name("name"))
-                    .map(|n| text(n, src).to_string()),
-            );
+        if node.kind() == "method_declaration"
+            && !defining
+            && let Some(name) = node.child_by_field_name("name")
+        {
+            // No definition stands for this method (an anonymous class's or an enum constant
+            // body's, at any depth below one, or past the depth), yet a call through a base type
+            // may dispatch to it (#772).
+            facts.anonymous.push(text(name, src).to_string());
         }
         if anonymous || node.kind() == "lambda_expression" {
             returning = false;
@@ -1685,14 +1684,16 @@ mod tests {
         assert!(!facts.defs.is_empty());
     }
 
-    /// The methods an anonymous class or an enum constant body declares, which no definition
-    /// stands for (#772); a member or local class's are definitions.
+    /// The methods no definition stands for (#772): an anonymous class's or an enum constant
+    /// body's, and those of a class nested in one at any depth; a member or local class's
+    /// elsewhere are definitions.
     #[test]
-    fn anonymous_class_methods_are_listed() {
+    fn methods_with_no_definition_are_listed() {
         let src = "class C { enum E { A { void a() {} } } void h() { \
-            Object o = new Object() { void hold(int x) {} }; class L { void l() {} } } }";
+            Object o = new Object() { void hold(int x) { class K { void k() {} } } \
+            class M { void m() {} } }; class L { void l() {} } } }";
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
-        assert_eq!(facts.anonymous, ["a", "hold"]);
+        assert_eq!(facts.anonymous, ["a", "hold", "k", "m"]);
     }
 
     /// Code that runs when its caller says: every lambda and local or anonymous class, nested ones

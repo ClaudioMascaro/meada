@@ -1446,6 +1446,7 @@ fn java_lists_a_wrapper_passes_on_unchanged_name_their_tables() {
             "loopAfterCall writer resource::dynamodb",
             "midFresh writer resource::dynamodb::mid-fresh",
             "midReceiverCaller writer resource::dynamodb",
+            "nested writer resource::dynamodb",
             "outerSet writer resource::dynamodb",
             "receiverFirst writer resource::dynamodb",
             "recursion writer resource::dynamodb",

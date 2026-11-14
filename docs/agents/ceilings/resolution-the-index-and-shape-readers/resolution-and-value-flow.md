@@ -124,8 +124,9 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   caller's argument at its position, by the same rule, when the wrapper mentions it nowhere that
   runs first, hands it on nowhere else (a recursive call), reads it where it runs, and no other
   method of the repository has its simple name and number of parameters, however their types are
-  spelled, nor does an anonymous class or an enum constant body declare a method of its name (an
-  override a call may dispatch to, `Facts::anonymous`); a wrapper of a wrapper passes it on
+  spelled, nor does a file declare a method of its name that no definition stands for (an
+  anonymous class's, an enum constant body's or a class's nested in one: an override a call may
+  dispatch to, `Facts::anonymous`); a wrapper of a wrapper passes it on
   the same way, up to the expansion's depth. A wrapper that changes the parameter after its read
   takes only a list the caller makes in the call (`List.of`, `Arrays.asList`, `new`, a builder
   chain): a loop, a lambda or a recursion further up may hand a list it holds in again. A varargs

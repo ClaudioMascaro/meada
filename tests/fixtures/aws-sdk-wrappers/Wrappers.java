@@ -263,6 +263,20 @@ class Wrappers {
         holder.hold(List.of(TransactWriteItem.builder().put(Put.builder().tableName("anonymous-old").build()).build()));
     }
 
+    // An override in a class nested in an anonymous class.
+    void nested(Nest target) {
+        Object outer = new Object() {
+            class Inner extends Nest {
+                @Override
+                void nest(List<TransactWriteItem> items) {
+                    items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("nested-new").build()).build());
+                    super.nest(items);
+                }
+            }
+        };
+        target.nest(List.of(TransactWriteItem.builder().put(Put.builder().tableName("nested-old").build()).build()));
+    }
+
     void reorder(List<TransactWriteItem> items) {
         items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("handed-new").build()).build());
     }
@@ -300,6 +314,13 @@ class SpelledKeeper extends Keeper {
 
 class Holder {
     void hold(List<TransactWriteItem> items) {
+        var db = DynamoDbClient.create();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+}
+
+class Nest {
+    void nest(List<TransactWriteItem> items) {
         var db = DynamoDbClient.create();
         db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
     }

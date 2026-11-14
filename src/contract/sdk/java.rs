@@ -81,16 +81,15 @@ pub(crate) struct Builders<'a> {
     /// The file and the directory of every type the repository's Java files declare, nested ones
     /// included, with its name: a type of the package or the file shadows the one an import names.
     types: std::cell::OnceCell<std::collections::HashSet<(&'a str, &'a str)>>,
-    /// How many methods of the repository have each simple name and arity, and each name an
-    /// anonymous class or an enum constant declares a method of (`Facts::anonymous`), with no
-    /// arity (`overridden`).
+    /// How many methods of the repository have each simple name and arity, and each name of a
+    /// method no definition stands for (`Facts::anonymous`), with no arity (`overridden`).
     methods: std::cell::OnceCell<std::collections::HashMap<(&'a str, Option<usize>), u32>>,
 }
 
 impl<'a> Builders<'a> {
     /// Whether a call of the method `def` may run another (#772): a method of the repository with
-    /// its simple name and arity, however its parameters are spelled (an override), or one an
-    /// anonymous class or an enum constant declares.
+    /// its simple name and arity, however its parameters are spelled (an override), or one of its
+    /// name that no definition stands for (an anonymous class's, or a class's nested in one).
     fn overridden(&self, code: &Code<'a>, def: &'a crate::lang::Def) -> bool {
         let simple = |name: &'a str| {
             let own = name[crate::parent(name).len()..].trim_start_matches('.');
