@@ -44,9 +44,12 @@
   itself is charged nothing, though it sizes each bound value it reads once per expression
   (#765), and a known name that reads neither `each` nor `count` is evaluated once for every
   instance of its block (20,000 reads of a 21,000-element variable in a `for` over an empty
-  collection: TIME1 at `count = 1`, TIME10 at 10, debug, where each instance paid the estimate
-  again: 2.7 s and 16.6 s); a name that is refused or partial is evaluated again, and spends
-  again, in each instance, and an evaluation is linear in its text;
+  collection: 1.31 s at `count = 1` and 1.50 s at 10 at 7f413fdb, where each instance paid the
+  estimate again: 2.74 s and 16.59 s at b8778732, debug, one run each); a name that is not known
+  (a pattern or unresolved), or that reads `each` or `count`, and any other attribute read per
+  instance, is evaluated again in each instance, at a cost linear in its text that only a
+  refusal charges (about 0.33 s an instance for that name at b8778732, measured with each read
+  `var.big[0]`, whose estimate was already cheap: 1.75 s at `count = 1`, 4.72 s at 10);
   converting an object literal for `hcl-rs` also spends the square of its keys, so a wide local
   evaluated in many module instances stops there; their nodes stay, named `*`). A var file's
   values are bounded the same way, each file with an `EVAL_WORK_MAX` of its own: a value past

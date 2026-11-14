@@ -2147,7 +2147,7 @@ impl Variables {
     }
 
     /// Whether the expression reads the instance it is evaluated in.
-    fn instance(&self) -> bool {
+    fn reads_instance(&self) -> bool {
         self.0.contains_key("each") || self.0.contains_key("count")
     }
 }
@@ -2325,8 +2325,8 @@ impl<'m> Eval<'m> {
             }
         }
         // A known name that reads neither `each` nor `count` is the same in every instance of
-        // its block: it is evaluated once (#765). A refused or partial one is evaluated again,
-        // and spends again, in each instance.
+        // its block: it is evaluated once (#765). One that is not known (a pattern or
+        // unresolved) is evaluated again, and spends again, in each instance.
         let mut shared: HashMap<(usize, *const Block), Evaluated> = HashMap::new();
         for &(node, instance, block, ref each) in &pending {
             let Some(named) = &block.named else { continue };
@@ -2337,7 +2337,7 @@ impl<'m> Eval<'m> {
                     let found = self.value(instance, each.as_ref(), named, 0);
                     if each.is_some()
                         && matches!(found.val, Val::Known(_))
-                        && !Variables::of(named).instance()
+                        && !Variables::of(named).reads_instance()
                     {
                         shared.insert(key, found.clone());
                     }
@@ -2931,7 +2931,7 @@ impl<'m> Eval<'m> {
         }
         let variables = Variables::of(expr);
         let (mut each_v, mut count_v) = (Map::new(), Map::new());
-        if let Some(e) = each.filter(|_| variables.instance()) {
+        if let Some(e) = each.filter(|_| variables.reads_instance()) {
             through.extend(e.through.iter().cloned());
             each_v.insert("value".to_string(), e.value.clone());
             match &e.key {
