@@ -210,31 +210,29 @@ pub(crate) fn extract<'a>(
                     {
                         return;
                     }
-                    // In Go and C# a path of entries judges each name by its own mentions
-                    // (`held_changed`): a field written through another name, anywhere, reaches
-                    // no value a local holds alone (#774). The other paths keep the rule that
-                    // counts a write of the field in any file.
+                    // A path of entries judges each name by its own mentions (`held_changed`).
+                    // In Go nothing else does: a composite literal a local holds alone has no
+                    // other name, so a field written through another name reaches no such value
+                    // (#774). C# counts a write of the field in any file too: a class derived
+                    // from an SDK model type can keep `this` in its constructor or in a setter,
+                    // and a write through that reference is one.
                     let entries = language != Language::Java && reads_entries(operation.field);
                     let judged = |params: Params<'_, 'a>| {
                         let field = operation.field;
                         held_changed(code, path, index, field, language, &counts, params)
                     };
-                    let changed = if entries {
-                        judged(Params::Unknown)
-                    } else {
-                        changed_request(
-                            code,
-                            path,
-                            index,
-                            operation.field,
-                            language,
-                            &written,
-                            &builders,
-                        )
+                    let changed = match language {
+                        Language::Go if entries => judged(Params::Unknown),
+                        _ => {
+                            let field = operation.field;
+                            changed_request(code, path, index, field, language, &written, &builders)
+                                || (entries && judged(Params::Unknown))
+                        }
                     };
                     // Where only parameters their Go function writes twice stand between the
                     // path and its names, each site is judged by the calls that bind them (#774).
-                    let per_site = entries && changed && !judged(Params::Held);
+                    let per_site =
+                        language == Language::Go && entries && changed && !judged(Params::Held);
                     let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
                         let [Value::Call(call)] = args else {
                             return Some(vec![Name::default()]);
@@ -389,8 +387,9 @@ fn passed_changed<'a>(
 
 /// A named request can change after construction, and so can a named value an inline request
 /// holds on the name's path (a Java entry builder); inline literals cannot change before the call.
-/// In Go and C# this judges the paths that read no list of entries (`held_changed` judges those):
-/// a named value met on one changes when any file writes the member read off it.
+/// In C# this judges every path, and in Go the ones that read no list of entries (`held_changed`
+/// judges those alone): a named value met on one changes when any file writes the member read
+/// off it.
 fn changed_request<'a>(
     code: &Code<'a>,
     path: &'a str,

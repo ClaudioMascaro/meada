@@ -103,7 +103,11 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that
   declares the name mentions it twice. In Go and C#, one mentioned a third time (logged, read by two
   requests), one held in a field or a package variable, one held in a parameter (a Go wrapper's
-  apart, below), and a C# request filled by property assignments have no table or bus; nor have
+  apart, below), and a C# request filled by property assignments have no table or bus; in C# so
+  has the first name the path meets when any file of the repository assigns the property read
+  through it (`q.TableName = ..` on any variable of any type, in any class; a write of another
+  property does not count), since a class derived from an SDK type can keep `this` (Go judges a
+  name by its own mentions alone, #774); nor have
   Go locals declared together (`p, q := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.
   A Go function, or a method whose name no other definition of the repository spells, that
   mentions its parameter twice (declared, read by the path) sends what each exact caller passes

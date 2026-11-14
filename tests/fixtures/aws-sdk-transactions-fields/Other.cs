@@ -13,6 +13,13 @@ static class Other {
     static void Relist(PutEventsRequest request) { request.Entries = new List<PutEventsRequestEntry>(); }
 }
 
+// A class derived from an SDK type that keeps every instance it makes.
+class TrackedPut : Put {
+    public static List<Put> All = new List<Put>();
+    public TrackedPut() { All.Add(this); }
+    public static void Retarget() { foreach (var p in All) { p.TableName = "tracked-new"; } }
+}
+
 // A class of the repository's own with the SDK's property names.
 class Record {
     public string TableName;
