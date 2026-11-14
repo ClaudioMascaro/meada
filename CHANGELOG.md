@@ -116,6 +116,10 @@ All notable changes to Meada are recorded here. The format follows
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
 
+- Go: the system or architecture suffix of a file name is read off the name cut at its first
+  dot, as the Go tools read it. A file such as `store.gen_windows.go`, which Go builds for every
+  target, was left out with all its definitions and calls, and `store_windows.gen.go`, which Go
+  builds for Windows alone, was read (#876).
 - The Dockerfile reader counts every directory entry a wildcard source examines, matched or not,
   and a long wildcard segment as many entries: 255 sources that match none of 4,000 files no
   longer take 47 seconds to index, and fall back to the whole build context as other Dockerfiles
