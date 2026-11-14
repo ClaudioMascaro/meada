@@ -459,6 +459,7 @@ impl<'a> Code<'a> {
         unbind(
             self.eval(path, scope, value, &frames, 0, &mut fold, &mut None),
             true,
+            &[],
         )
     }
 
