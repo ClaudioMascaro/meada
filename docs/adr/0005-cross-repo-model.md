@@ -42,6 +42,16 @@ value an environment entry sets in a repository, and a value a format marks secr
 overridable value, a workload's environment, a Service, a pattern). ADR 0026 records the
 details.
 
+(Amended 2026-11-12; ADR 0028.) CI joins these kinds: a new kind, `ci`
+(`ci::<repository identity>/<path>`), links a reusable pipeline or an action, its provider, to
+the CI jobs and CI steps that call it, the Git ref a consumer writes being its attribute and
+never part of the identifier; and a CI step is a site of sides of the kinds above (a package it
+installs, an image it pushes, a program of the workspace its command starts). A pipeline or an
+action from outside the workspace holds no side. `secrets.X` and `vars.X` fall under the rule on
+environment variables: they have no value in the repository, so they are never matched by name
+across repositories and stay unresolved, naming the variable, until a later slice reads the
+provisioner that declares them. ADR 0028 records the details.
+
 ### Configuration
 
 A `meada.toml` at each repository root declares what that side owns. It is versioned with the

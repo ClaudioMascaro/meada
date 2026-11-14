@@ -1,0 +1,38 @@
+name: Forms
+on: push
+jobs:
+  actions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Actions/Checkout@v4
+      - uses: acme/workflows@v1
+      - uses: Acme/Workflows/tools/setup@v2
+        with:
+          version: 3
+      - uses: ./tools/local
+        with:
+          mode: fast
+      - uses: $/tools/local
+      - uses: docker://alpine:3.20
+      - uses: ./../outside
+      - uses: other-org/tools/setup@v1
+  no-checkout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./tools/local
+      - uses: actions/checkout@v4
+  elsewhere:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: acme/workflows
+      - uses: ./tools/local
+  at-a-path:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          path: tools
+      - uses: ./tools/local

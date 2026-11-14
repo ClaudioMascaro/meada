@@ -3,6 +3,8 @@
 
 pub(crate) use meada_core::drift::{Entry, consumers, counts};
 
+use std::collections::HashSet;
+
 use crate::contract::{self, Hit, Link};
 use crate::index::Export;
 use crate::render::{Files, label};
@@ -10,11 +12,12 @@ use crate::workspace::Repository;
 
 /// Every link of a consumer that read fields (a shape), or has drift.
 fn shown<'a>(exports: &[Export], links: &'a [Link]) -> impl Iterator<Item = &'a Link> {
-    let reads = |link: &Link| {
-        let mut consumers = exports.iter().flat_map(|e| &e.consumers);
-        consumers.any(|c| c.site == link.consumer && c.shape.is_some())
-    };
-    (links.iter()).filter(move |l| meada_core::drift::shown_link(l, reads))
+    let shaped: HashSet<&str> = (exports.iter().flat_map(|e| &e.consumers))
+        .filter(|c| c.shape.is_some())
+        .map(|c| c.site.as_str())
+        .collect();
+    let reads = move |link: &Link| shaped.contains(link.consumer.as_str());
+    (links.iter()).filter(move |l| meada_core::drift::shown_link(l, &reads))
 }
 
 /// The call sites `entries` places: the consumers of the links it shows.

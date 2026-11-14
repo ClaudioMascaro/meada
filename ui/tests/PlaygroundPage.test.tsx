@@ -61,7 +61,7 @@ test.each(['en', 'pt-BR'] as const)('playground controls have names and keyboard
   expect(getByRole(host, 'button', { name: t.run }).tabIndex).toBe(0);
 });
 
-test.each(['value', 'iac', 'alert'])('the playground exposes and sends the %s search kind', async kind => {
+test.each(['value', 'iac', 'alert', 'ci'])('the playground exposes and sends the %s search kind', async kind => {
   const fetch = vi.fn().mockResolvedValue(Response.json({ text: `${kind} answer`, generation: null }));
   vi.stubGlobal('fetch', fetch);
   await act(() => root.render(<PlaygroundPage api={new Api(new Auth(config))} locale="en" />));

@@ -45,6 +45,7 @@ CREATE TABLE config_files (
     summary TEXT NOT NULL
 );
 CREATE TABLE taken (path TEXT PRIMARY KEY);
+CREATE TABLE dockerfiles (folder TEXT PRIMARY KEY);
 CREATE TABLE contract_configs (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT ''
@@ -67,7 +68,7 @@ CREATE TABLE iac_nodes (
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
     subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
-    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT
+    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT, actions TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -3209,6 +3210,7 @@ sample.pyproject.toml
   ],
   "scripts": [
     [
+      "example",
       "example.cli",
       "main"
     ]
@@ -3499,6 +3501,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
         Node {
             address: "Deployment.apps/shop/dev-web",
@@ -3549,6 +3552,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
         Node {
             address: "Service/shop/dev-web",
@@ -3576,6 +3580,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
         Node {
             address: "ServiceAccount/shop/dev-runner",
@@ -3603,6 +3608,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
     ],
     references: [
@@ -3696,6 +3702,7 @@ Output {
                 },
             ),
             ingress: [],
+            actions: None,
         },
         Node {
             address: "CompositeResourceDefinition.apiextensions.crossplane.io/xqueues.acme.io",
@@ -3725,6 +3732,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws",
@@ -3754,6 +3762,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
         Node {
             address: "Queue.acme.io/shop/orders",
@@ -3783,6 +3792,7 @@ Output {
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/queue",
@@ -3826,6 +3836,7 @@ Output {
                 },
             ),
             ingress: [],
+            actions: None,
         },
         Node {
             address: "Composition.apiextensions.crossplane.io/xqueues.aws/topic",
@@ -3871,6 +3882,7 @@ Output {
                 },
             ),
             ingress: [],
+            actions: None,
         },
     ],
     references: [
@@ -3947,6 +3959,7 @@ sample.cloudformation.yaml
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
         Node {
             address: "Worker",
@@ -3990,6 +4003,7 @@ sample.cloudformation.yaml
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
     ],
     [
@@ -4115,6 +4129,7 @@ sample.serverless.yml
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
         Node {
             address: "Queue",
@@ -4149,6 +4164,7 @@ sample.serverless.yml
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
     ],
     [
@@ -4192,6 +4208,7 @@ sample.provision.tf
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
         Node {
             address: "aws_sqs_queue.orders",
@@ -4219,6 +4236,7 @@ sample.provision.tf
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
     ],
     [],
@@ -4262,6 +4280,7 @@ sample.compose.yaml
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
         Node {
             address: "services.inline",
@@ -4298,6 +4317,7 @@ sample.compose.yaml
             images: [],
             provisioned: None,
             ingress: [],
+            actions: None,
         },
     ],
     [
@@ -4348,6 +4368,473 @@ sample.compose.yaml
     "runners": []
   }
 }
+
+sample.workflow.yml
+(
+    [
+        Node {
+            address: ".",
+            root: ".github/workflows/sample.yml",
+            ty: "workflow",
+            name: Some(
+                "Sample",
+            ),
+            pattern: false,
+            overridable: [],
+            path: ".github/workflows/sample.yml",
+            line: 1,
+            end_line: 35,
+            block: "",
+            image: None,
+            build: None,
+            build_image: false,
+            dockerfile: None,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+            actions: Some(
+                Facts {
+                    id: None,
+                    uses: None,
+                    reusable: true,
+                    with: [],
+                    secrets: None,
+                    hollow: [],
+                    permissions: None,
+                },
+            ),
+        },
+        Node {
+            address: "jobs.build",
+            root: ".github/workflows/sample.yml",
+            ty: "job",
+            name: Some(
+                "Build",
+            ),
+            pattern: false,
+            overridable: [],
+            path: ".github/workflows/sample.yml",
+            line: 5,
+            end_line: 21,
+            block: "jobs.build",
+            image: None,
+            build: None,
+            build_image: false,
+            dockerfile: None,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+            actions: Some(
+                Facts {
+                    id: Some(
+                        "build",
+                    ),
+                    uses: None,
+                    reusable: false,
+                    with: [],
+                    secrets: None,
+                    hollow: [],
+                    permissions: None,
+                },
+            ),
+        },
+        Node {
+            address: "jobs.build.steps[0]",
+            root: ".github/workflows/sample.yml",
+            ty: "step",
+            name: None,
+            pattern: false,
+            overridable: [],
+            path: ".github/workflows/sample.yml",
+            line: 12,
+            end_line: 12,
+            block: "jobs.build.steps[0]",
+            image: None,
+            build: None,
+            build_image: false,
+            dockerfile: None,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+            actions: Some(
+                Facts {
+                    id: None,
+                    uses: Some(
+                        "actions/checkout@v4",
+                    ),
+                    reusable: false,
+                    with: [],
+                    secrets: None,
+                    hollow: [],
+                    permissions: None,
+                },
+            ),
+        },
+        Node {
+            address: "jobs.build.steps[1]",
+            root: ".github/workflows/sample.yml",
+            ty: "step",
+            name: Some(
+                "Log in",
+            ),
+            pattern: false,
+            overridable: [],
+            path: ".github/workflows/sample.yml",
+            line: 13,
+            end_line: 20,
+            block: "jobs.build.steps[1]",
+            image: None,
+            build: None,
+            build_image: false,
+            dockerfile: None,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+            actions: Some(
+                Facts {
+                    id: Some(
+                        "login",
+                    ),
+                    uses: Some(
+                        "docker/login-action@v3",
+                    ),
+                    reusable: false,
+                    with: [
+                        "registry",
+                    ],
+                    secrets: None,
+                    hollow: [
+                        "UNSET",
+                    ],
+                    permissions: None,
+                },
+            ),
+        },
+        Node {
+            address: "jobs.build.steps[2]",
+            root: ".github/workflows/sample.yml",
+            ty: "step",
+            name: None,
+            pattern: false,
+            overridable: [],
+            path: ".github/workflows/sample.yml",
+            line: 21,
+            end_line: 21,
+            block: "jobs.build.steps[2]",
+            image: None,
+            build: None,
+            build_image: false,
+            dockerfile: None,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+            actions: None,
+        },
+        Node {
+            address: "jobs[\"publish-prd\"]",
+            root: ".github/workflows/sample.yml",
+            ty: "job",
+            name: None,
+            pattern: false,
+            overridable: [],
+            path: ".github/workflows/sample.yml",
+            line: 22,
+            end_line: 31,
+            block: "jobs[\"publish-prd\"]",
+            image: None,
+            build: None,
+            build_image: false,
+            dockerfile: None,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+            actions: Some(
+                Facts {
+                    id: Some(
+                        "publish-prd",
+                    ),
+                    uses: Some(
+                        "acme/workflows/.github/workflows/publish.yml@v1",
+                    ),
+                    reusable: false,
+                    with: [
+                        "package",
+                    ],
+                    secrets: Some(
+                        Keys(
+                            [
+                                "token",
+                            ],
+                        ),
+                    ),
+                    hollow: [],
+                    permissions: Some(
+                        Named(
+                            {
+                                "contents": Read,
+                                "id-token": Write,
+                            },
+                        ),
+                    ),
+                },
+            ),
+        },
+        Node {
+            address: "jobs[\"publish-stg\"]",
+            root: ".github/workflows/sample.yml",
+            ty: "job",
+            name: None,
+            pattern: false,
+            overridable: [],
+            path: ".github/workflows/sample.yml",
+            line: 32,
+            end_line: 35,
+            block: "jobs[\"publish-stg\"]",
+            image: None,
+            build: None,
+            build_image: false,
+            dockerfile: None,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+            actions: Some(
+                Facts {
+                    id: Some(
+                        "publish-stg",
+                    ),
+                    uses: Some(
+                        "acme/workflows/.github/workflows/publish.yml@main",
+                    ),
+                    reusable: false,
+                    with: [],
+                    secrets: Some(
+                        Inherit(
+                            Inherit,
+                        ),
+                    ),
+                    hollow: [],
+                    permissions: Some(
+                        All(
+                            ReadAll,
+                        ),
+                    ),
+                },
+            ),
+        },
+    ],
+    [
+        Reference {
+            root: ".github/workflows/sample.yml",
+            source: ".",
+            target: "jobs.build",
+            via: None,
+        },
+        Reference {
+            root: ".github/workflows/sample.yml",
+            source: "jobs.build",
+            target: "jobs.build.steps[0]",
+            via: None,
+        },
+        Reference {
+            root: ".github/workflows/sample.yml",
+            source: "jobs.build",
+            target: "jobs.build.steps[1]",
+            via: None,
+        },
+        Reference {
+            root: ".github/workflows/sample.yml",
+            source: "jobs.build",
+            target: "jobs.build.steps[2]",
+            via: None,
+        },
+        Reference {
+            root: ".github/workflows/sample.yml",
+            source: ".",
+            target: "jobs[\"publish-prd\"]",
+            via: None,
+        },
+        Reference {
+            root: ".github/workflows/sample.yml",
+            source: "jobs[\"publish-prd\"]",
+            target: "jobs.build",
+            via: Some(
+                "needs",
+            ),
+        },
+        Reference {
+            root: ".github/workflows/sample.yml",
+            source: ".",
+            target: "jobs[\"publish-stg\"]",
+            via: None,
+        },
+    ],
+)
+
+sample.action.yml
+(
+    [
+        Node {
+            address: ".",
+            root: "tools/setup/action.yml",
+            ty: "action",
+            name: Some(
+                "Sample action",
+            ),
+            pattern: false,
+            overridable: [],
+            path: "tools/setup/action.yml",
+            line: 1,
+            end_line: 8,
+            block: "",
+            image: None,
+            build: None,
+            build_image: false,
+            dockerfile: None,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+            actions: None,
+        },
+        Node {
+            address: "runs.steps[0]",
+            root: "tools/setup/action.yml",
+            ty: "step",
+            name: None,
+            pattern: false,
+            overridable: [],
+            path: "tools/setup/action.yml",
+            line: 5,
+            end_line: 7,
+            block: "runs.steps[0]",
+            image: None,
+            build: None,
+            build_image: false,
+            dockerfile: None,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+            actions: Some(
+                Facts {
+                    id: Some(
+                        "prepare",
+                    ),
+                    uses: None,
+                    reusable: false,
+                    with: [],
+                    secrets: None,
+                    hollow: [],
+                    permissions: None,
+                },
+            ),
+        },
+        Node {
+            address: "runs.steps[1]",
+            root: "tools/setup/action.yml",
+            ty: "step",
+            name: None,
+            pattern: false,
+            overridable: [],
+            path: "tools/setup/action.yml",
+            line: 8,
+            end_line: 8,
+            block: "runs.steps[1]",
+            image: None,
+            build: None,
+            build_image: false,
+            dockerfile: None,
+            role: None,
+            handler: None,
+            events: [],
+            routes: [],
+            subscription: None,
+            environment: [],
+            images: [],
+            provisioned: None,
+            ingress: [],
+            actions: Some(
+                Facts {
+                    id: None,
+                    uses: Some(
+                        "./nested",
+                    ),
+                    reusable: false,
+                    with: [],
+                    secrets: None,
+                    hollow: [],
+                    permissions: None,
+                },
+            ),
+        },
+    ],
+    [
+        Reference {
+            root: "tools/setup/action.yml",
+            source: ".",
+            target: "runs.steps[0]",
+            via: None,
+        },
+        Reference {
+            root: "tools/setup/action.yml",
+            source: ".",
+            target: "runs.steps[1]",
+            via: None,
+        },
+    ],
+)
 
 sample.alert.yaml
 {

@@ -1,0 +1,4 @@
+name: Only yaml
+runs:
+  using: node20
+  main: index.js

@@ -1,0 +1,20 @@
+name: Publish
+on:
+  workflow_call:
+    inputs:
+      package:
+        required: true
+        type: string
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      # An organization variable: unresolved in CI, and no part of the SDK's link to the API.
+      CORE_API_URL: ${{ vars.CORE_API_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install core-sdk
+      - run: core-publish "${{ inputs.package }}"

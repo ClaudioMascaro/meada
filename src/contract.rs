@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::alert::Alert;
 use crate::channel::Channel;
+use crate::ci::Ci;
 use crate::entry::EntryKind;
 use crate::http::Http;
 use crate::image::Image;
@@ -388,6 +389,12 @@ pub trait ContractKind {
         false
     }
 
+    /// Whether a contract of the kind starts a `trace` at the node that provides it: a contract
+    /// that names its one provider. Any other contract is listed by its sides.
+    fn starts_at_provider(&self) -> bool {
+        false
+    }
+
     /// Whether data travels from the provider to its consumer: a write reaches its reader,
     /// or a message its handler. A consumer at a call is then a receiving operation.
     fn flows_to_consumer(&self) -> bool {
@@ -449,6 +456,22 @@ pub trait ContractKind {
     fn own_search(&self, _exports: &[Export], _links: &[Link], _needle: &str) -> Vec<Hit> {
         Vec::new()
     }
+
+    /// Whether `search` with no `kind` lists this kind's contracts. One whose sides sit on nodes
+    /// that only a `kind` finds says no: the kind `contract` and its own word still list them.
+    fn in_default_search(&self) -> bool {
+        true
+    }
+
+    /// Whether the kind reads the indexed commit of a repository that holds one of its
+    /// providers (`Export::commit`), which the engine then learns for it.
+    fn reads_commit(&self) -> bool {
+        false
+    }
+
+    /// What the kind adds to the rows `meada export` writes, given the IaC nodes of the
+    /// repository: optional fields only (ADR 0004).
+    fn written(&self, _nodes: &[crate::iac::Node], _out: &mut meada_core::export::Export) {}
 
     /// The words for a provider and a consumer of this kind when `context` lists a contract
     /// by its sides, such as `("writer", "reader")`; `None` for a kind it does not (routes).
@@ -622,6 +645,12 @@ pub trait ContractKind {
         provider.site == link.provider && serves(provider, &link.contract)
     }
 
+    /// The consumers with no contract that are the kind's own, by site, each with why it is
+    /// unresolved. Such a consumer holds no candidate, and its open item says the cause.
+    fn unresolved_causes(&self, _exports: &[Export]) -> HashMap<String, &'static str> {
+        HashMap::new()
+    }
+
     /// Whether `provider` is a candidate for `consumer`, which has no contract.
     fn candidate(&self, _consumer: &Consumer, _provider: &Provider) -> bool {
         false
@@ -629,7 +658,8 @@ pub trait ContractKind {
 }
 
 /// Every contract kind of this release.
-pub const KINDS: &[&dyn ContractKind] = &[&Http, &Resource, &Channel, &Packages, &Image, &Alert];
+pub const KINDS: &[&dyn ContractKind] =
+    &[&Http, &Resource, &Channel, &Packages, &Image, &Alert, &Ci];
 
 /// Shared phase order for whole exports and answer-sized reads.
 pub(crate) fn workspace_steps(exports: &mut [Export], repositories: &[Repository]) {
@@ -1168,6 +1198,7 @@ mod tests {
                 Search::Own("package"),
                 Search::Filter("image"),
                 Search::Filter("alert"),
+                Search::Own("ci"),
             ]
         );
         let (kind, search) = searched("package").unwrap();

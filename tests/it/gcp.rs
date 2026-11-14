@@ -201,7 +201,7 @@ fn cloud_run_services_and_jobs_scope_images_environment_and_secret_targets() {
             "channel::sqs::tasks-v2"
         } else if site.contains("::batch::") {
             "channel::sqs::tasks-job"
-        } else if site == "example.com/gcp/app" {
+        } else if site == "example.com/gcp/app::.github/workflows/build.yml::jobs.image.steps[0]" {
             "image::ghcr.io/acme/gcp-worker"
         } else {
             "channel::sqs"

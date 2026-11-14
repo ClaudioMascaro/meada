@@ -6,6 +6,112 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Pipelines, actions, CI jobs and CI steps of GitHub Actions are IaC nodes (ADR 0028). A file
+  directly under `.github/workflows/` that holds `jobs` is a pipeline, and an `action.yml` or
+  `action.yaml` that holds `runs` is an action; each CI job (`jobs.build`) and CI step
+  (`jobs.build.steps[2]`, `runs.steps[0]`) is a node with its lines, its config values and its
+  references: a pipeline to its CI jobs, a CI job or a composite action to its CI steps, a CI job
+  to the ones its `needs` names. `search` finds them with the new kind `ci`, by address, type, id,
+  `name` or `uses`, and `context` explains them, a CI step also by a selector
+  (`jobs.build.steps[id=login]`). The kind `iac`, the default search and `meada export` answer as
+  before. The index schema changes, so existing indexes are rebuilt once on first use. Release
+  level: minor, meada (#823).
+- A CI job that calls a reusable pipeline of another repository of the workspace links to it by
+  the new CI contract `ci::<repository identity>/<path>` (ADR 0028): the provider is a pipeline
+  whose `on` holds `workflow_call`, the consumer the CI job whose `uses` names it, with the host
+  of its own repository. The link is `exact`; its reason shows the Git ref as written and the
+  provider's indexed commit (`@main (indexed 1a2b3c4)`), with `, ref mismatch` only for a full
+  commit id other than it, and Meada resolves no ref. `context` on a pipeline lists every CI job
+  that calls it with the keys of `with` and `secrets` it passes, and `meada export` gains the
+  optional consumer fields `ref`, `with` and `secrets`. A `uses` whose repository is not in the
+  workspace holds no side, so it is never an orphan or an open item. Existing indexes are rebuilt
+  once on first use. Release level: minor, meada and meada-core (#824).
+- `trace` follows a chain of CI calls both ways, across repositories and through intermediate
+  reusable pipelines. Up from a reusable pipeline it reaches the CI jobs that call it, the
+  pipeline of each one's file and, when that file is reusable too, its own callers; down from a
+  CI job it reaches the pipeline it calls, with its CI jobs and CI steps. The CI contract
+  identifier, the pipeline's file node and the file's path start the same chain. Every other
+  `trace` answer is unchanged. Release level: minor, meada (#825).
+- Every form of `uses` reads as GitHub resolves it. A CI step that calls an action of the
+  workspace (`<owner>/<repo>[/<folder>]@<ref>`) consumes `ci::<repository identity>[/<folder>]`,
+  which the action's file provides. A CI job's `./.github/workflows/<file>` and a `$/<path>`
+  link inside their repository, with the reason `own repository` and no ref. A CI step's
+  `./<folder>` links only in a pipeline that is not reusable, after a default
+  `actions/checkout` in its CI job; elsewhere it is unresolved: an open item with no candidate
+  and its cause, in `search` kind `unresolved`, `context` and `meada decide --list`.
+  `docker://` holds no CI contract. `trace` crosses composite actions as it crosses reusable
+  pipelines. Release level: minor, meada (#826).
+- `meada status` lists a reusable pipeline or an action that nothing calls as an orphan of the
+  CI contract, only when the visible scope holds a provider and a consumer of it: a repository
+  of actions indexed alone prints none. A call whose repository is in the workspace and whose
+  path names no provider there is marked ` (absent at the indexed commit)` on the consumer's
+  side, in `context` and `search`, and `"absent": true` on its row of `meada export`: the file
+  may exist at the Git ref, so it is no orphan and no open item. A pipeline file with no
+  `on.workflow_call` gets the mark with that reason. A call to a folder that holds a
+  `Dockerfile` and no action file now holds no side. Existing indexes are rebuilt once on first
+  use. Release level: minor, meada and meada-core (#827).
+- The console and server mode show the CI kind as the CLI and stdio do. The console's graph
+  gains the view "CI links": the CI contracts with their sides and the link of each call, with
+  the Git ref in its reason and the absent mark, and a legend in the console's languages; its
+  playground takes the kind `ci`. `context` on a CI node lists its sides above its values. Over
+  HTTP, `meada mcp --listen` answers every flow of the kind as stdio does, but for a provider
+  whose checkout was not clean when indexed (`indexed commit unknown`, never `ref mismatch`),
+  and the sides follow the manifest, the grant, the generation and the named workspace: one
+  without the provider's repository shows no link to it and no consumer of it. The Meada skill
+  and the user guide teach the kind. Release level: minor, meada (#829).
+- A CI step whose command is a console script of a PyPI package of the workspace starts that
+  program (ADR 0028): it consumes the package, with the command as written, and links to the
+  function the script names. The link is `exact` when an earlier command of the same CI job
+  installs the package or the command names it (`uvx <package>`, `pipx run <package>`),
+  `inferred` with no install and one declaring package, `ambiguous` with several, and absent
+  when none declares the name. `trace` crosses it both ways, so the CI jobs that run a program
+  show above the routes it calls. The manifest reader keeps each console script's name: the
+  schema version rises and an index rebuilds on first use. Release level: minor, meada (#832).
+- `docker push <image>` and `docker buildx build --push` (each `-t`, `--tag` and `--tag=`) in a
+  `run` script are image builders, read through the command table (ADR 0028). A tag or digest
+  left open is dropped, an open part of the name makes a pattern and a name left open whole is
+  an unresolved builder. A build without `--push` and text in `echo`, a string, a comment or a
+  script with a heredoc give no side. Release level: minor, meada (#833).
+- A CI job that calls a reusable pipeline shows the `permissions` block that governs it (its
+  own, else its pipeline's, else `not declared`), and `context` on the pipeline shows what its CI
+  jobs declare together (ADR 0028). A block is closed, and `read-all`, `write-all` and `{}` read
+  as the blocks they stand for. When a CI job of the called pipeline declares a permission above
+  what the caller's block holds, the link's reason ends with `permissions mismatch` and names the
+  permission and both levels, after `ref mismatch` when both hold. A side that declares nothing
+  is never compared: these are declared permissions, not effective ones. `meada export` gains
+  the optional consumer field `permissions`. Existing indexes are rebuilt once on first use.
+  Release level: minor, meada and meada-core (#834).
+
+### Changed
+
+- An image builder read in a pipeline has the CI step that holds the form as its site, no
+  longer the repository (ADR 0028): `docker/build-push-action`, `docker/metadata-action` and ko
+  keep their rule, and the provider row, the link and `context` name the CI step, which `trace`
+  shows below the workload and from which it goes up to the workloads. `context` on the CI step
+  shows `builds <image>` and its runners. Several CI steps of one repository that build an
+  image are one builder with a link each. ko is read through the command table: a command
+  inside `if`, after `&&` or `;` or on a line of several counts. A literal `env` value with
+  `/`, `:` or `@` is read in a `run` script. Release level: minor, meada (#833).
+- In a pipeline or an action of GitHub Actions the key-name rule gives no use any more (ADR
+  0028): `with: { bucket: x }` names an input of the action, not an S3 bucket, so the `inferred`
+  use, its provisioning link and the orphan lines it fed are gone. A structured identifier (an
+  ARN, a queue URL, `s3://`, `gs://`) stays an `exact` use, and `meada export` writes the CI
+  step or CI job that holds its key as the `site` of the use and the `side` of its provisioning
+  link, in place of the repository. A `${{ env.X }}` a literal `env` gives resolves, any other
+  expression in the name of an AWS form makes a pattern, and `vars.X` and `secrets.X` are never
+  matched by name.
+  Every other file answers as before. Release level: minor, meada (#828).
+- The `run` script of a CI step is read through the command table (ADR 0028), with no shell
+  evaluated: under `bash`, `sh` or no declared shell, a command is the first word of a line or the
+  one after `&&` or `;`, also inside `if` or a loop, and a script with a heredoc or past 1024 bytes
+  is not read. `pip install`, `pip3 install`, `python -m pip install`, `uv pip install`, `pipx
+  install` and `uv tool install` make the CI step a consumer of `package::pypi::<name>` for a
+  package of the workspace, at the package kind's level and with the range as written, and `context`
+  on the package lists the CI step. A name with an unresolved part is a pattern, and a name left
+  open whole an unresolved consumer with its cause where the workspace provides a PyPI package. The
+  index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
 
 - Terraform evaluation sizes a variable once per expression however many times the expression

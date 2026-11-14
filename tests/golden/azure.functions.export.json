@@ -89,7 +89,7 @@
   "links": [
     {
       "consumer": "example.com/azure/infra::main.tf::azurerm_linux_function_app.image",
-      "provider": "example.com/azure/app",
+      "provider": "example.com/azure/app::.github/workflows/image.yaml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/azure/functions",
       "level": "inferred",
       "reason": "image::ghcr.io/azure/functions; image: main.tf#resource.azurerm_linux_function_app.image (var.tag main.tf:1)",

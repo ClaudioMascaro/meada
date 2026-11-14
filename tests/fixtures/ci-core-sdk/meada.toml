@@ -1,0 +1,4 @@
+# The SDK reads the base URL of the API from the environment.
+[[peer]]
+repo = "github.com/acme/core-api"
+base_url_env = ["CORE_API_URL"]

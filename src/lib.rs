@@ -9,6 +9,7 @@ pub mod audit;
 #[cfg(feature = "workspaces")]
 mod catalog;
 mod channel;
+mod ci;
 mod community;
 mod config;
 mod config_values;

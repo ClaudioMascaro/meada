@@ -16,12 +16,13 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use super::{
-    Ecosystem, Entry, Flag, How, MAX_BYTES, MAX_NAME, Manifest, Provided, Providers, Resolution,
-    Resolved, Summary, bare_directory, directory, holding,
+    Ecosystem, Entry, Flag, How, Install, MAX_BYTES, MAX_NAME, Manifest, Program, Provided,
+    Providers, Resolution, Resolved, Summary, bare_directory, directory, holding,
     npm::{MAX_RANGE, split},
     owner, pattern_fits, pep440, sourced,
 };
 use crate::contract::Level;
+use crate::iac::actions::run::{self, Part, Word};
 use crate::index::Export;
 use crate::lang::python;
 use crate::lang::python::pyproject::{Pyproject, Requirement, UvSource};
@@ -49,9 +50,12 @@ pub fn normalize(name: &str) -> Option<String> {
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c));
-    if !valid {
-        return None;
-    }
+    valid.then(|| folded(name))
+}
+
+/// The characters of `name` as PEP 503 writes them: lower case, each run of `-`, `_` and `.`
+/// one `-`. Any other character stays (the `*` of a pattern).
+fn folded(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     for c in name.chars() {
         match c {
@@ -60,7 +64,122 @@ pub fn normalize(name: &str) -> Option<String> {
             c => out.push(c.to_ascii_lowercase()),
         }
     }
-    Some(out)
+    out
+}
+
+/// The commands that install a package by its name, by their leading words (ADR 0028, "The
+/// `run` script and the command table").
+const INSTALLS: [&[&str]; 6] = [
+    &["pip", "install"],
+    &["pip3", "install"],
+    &["python", "-m", "pip", "install"],
+    &["uv", "pip", "install"],
+    &["pipx", "install"],
+    &["uv", "tool", "install"],
+];
+
+/// The options of those commands that take no value. The word after any other option is its
+/// value, never a name: a flag missing here costs the name after it, and gives no wrong one.
+const FLAGS: [&str; 35] = [
+    "-U",
+    "--upgrade",
+    "-q",
+    "--quiet",
+    "-v",
+    "--verbose",
+    "-I",
+    "--ignore-installed",
+    "--user",
+    "--pre",
+    "--no-deps",
+    "--no-cache-dir",
+    "--no-cache",
+    "--force-reinstall",
+    "--no-input",
+    "--disable-pip-version-check",
+    "--break-system-packages",
+    "--prefer-binary",
+    "--no-build-isolation",
+    "--system",
+    "--force",
+    "--include-deps",
+    "--no-index",
+    "--dry-run",
+    "--require-hashes",
+    "--no-compile",
+    "--reinstall",
+    "--offline",
+    "-qq",
+    "-vv",
+    "--isolated",
+    "--ignore-requires-python",
+    "--no-warn-script-location",
+    "--no-warn-conflicts",
+    "--no-color",
+];
+
+/// How a consumer says its name is a pattern (`Consumer::via`).
+const PATTERN: &str = "pattern";
+
+/// What the argument `word` of an install names: a requirement by name with its range as
+/// written (open parts included), a pattern of the name when a part of it is open, or the name
+/// left open whole. `None` for anything else: a path, a URL, a direct reference, no name.
+fn installed(word: &[Part]) -> Option<Install> {
+    let entry = |name, range, via: Option<&str>| {
+        let via = via.map(str::to_string);
+        Install::Named(Entry {
+            name,
+            range,
+            via,
+            ..Entry::default()
+        })
+    };
+    if let Some(text) = run::literal(word) {
+        let (name, range) = requirement(text)?;
+        return Some(entry(name, range, None));
+    }
+    // The name runs to the first character a name cannot hold; the rest is read as written.
+    let (mut name, mut rest, mut open) = (String::new(), String::new(), String::new());
+    let mut parts = word.iter();
+    for part in parts.by_ref() {
+        match part {
+            Part::Open(written) => {
+                name.push('*');
+                open += written;
+            }
+            Part::Text(text) => {
+                let named = |c: char| c.is_ascii_alphanumeric() || "-_.".contains(c);
+                let end = text.find(|c| !named(c)).unwrap_or(text.len());
+                name += &text[..end];
+                if end < text.len() {
+                    rest += &text[end..];
+                    break;
+                }
+            }
+        }
+    }
+    // Where an open part right after the extras starts the range, whatever it stands for.
+    let mut tail = None;
+    for part in parts {
+        if matches!(part, Part::Open(_)) && rest.ends_with(']') {
+            tail.get_or_insert(rest.len());
+        }
+        let (Part::Text(text) | Part::Open(text)) = part;
+        rest += text;
+    }
+    let name = folded(&name).replace("**", "*");
+    // The rest, after a name that stands for this one: extras, then the range.
+    let (rest, tail) = rest.split_at(tail.unwrap_or(rest.len()));
+    let (_, range) = requirement(&format!("x{rest}"))?;
+    let range = range.or((!tail.is_empty()).then(|| tail.to_string()));
+    if name.bytes().all(|b| b == b'*') {
+        // No name at all (a path under `~`, a lone range) installs nothing by name.
+        return (!name.is_empty()).then_some(Install::Open(open));
+    }
+    normalize(&name.replace('*', "x"))?;
+    // A literal name whose extras or range hold the open part is the package itself.
+    let pattern = name.contains('*').then_some(PATTERN);
+    Some(entry(name, range, pattern))
 }
 
 /// The module name a distribution's import is spelled with when it follows the convention:
@@ -293,35 +412,41 @@ impl Ecosystem for Pypi {
         "pypi"
     }
 
-    /// The program entry points the console scripts of the PyPI manifests name, as the file of the
+    /// The programs the console scripts of the PyPI manifests name, each with the file of the
     /// script's module (the one an import of it from the package finds, `roots`) and the function. A
-    /// script whose module is no file of the package names nothing. Sorted, without repeats.
-    fn programs(&self, manifests: &[Manifest], files: &[&str]) -> Vec<(String, String)> {
+    /// script whose module is no file of the package names nothing. Sorted.
+    fn programs(&self, manifests: &[Manifest], files: &[&str]) -> Vec<Program> {
+        // A set: a manifest of many scripts looks each candidate up once, never scans the files.
+        let files: HashSet<&str> = files.iter().copied().collect();
         let mut found = Vec::new();
-        for manifest in manifests {
+        for (n, manifest) in manifests.iter().enumerate() {
             // A script belongs to the package of a manifest that bounds one.
             let file_name = manifest.path.rsplit('/').next().unwrap_or_default();
             if !(Pypi.is_manifest(file_name) && Pypi.owns(manifest)) {
                 continue;
             }
             let roots = roots(manifest);
-            for (module, function) in &manifest.summary.scripts {
-                let name = module.replace('.', "/");
+            for (name, module, function) in &manifest.summary.scripts {
+                let path = module.replace('.', "/");
                 // The first candidate that exists and is this package's, as `module` finds it: a
                 // file of a nested package is not.
                 let owned = |f: &String| {
-                    files.contains(&f.as_str())
+                    files.contains(f.as_str())
                         && owner(manifests, f, &Pypi)
                             .is_some_and(|m| directory(&m.path) == directory(&manifest.path))
                 };
                 let file = (roots.iter())
-                    .flat_map(|root| python::files(root, &name))
+                    .flat_map(|root| python::files(root, &path))
                     .find(owned);
-                found.extend(file.map(|f| (f, function.clone())));
+                found.extend(file.map(|file| Program {
+                    file,
+                    function: function.clone(),
+                    name: name.clone(),
+                    manifest: n,
+                }));
             }
         }
         found.sort();
-        found.dedup();
         found
     }
 
@@ -379,19 +504,80 @@ impl Ecosystem for Pypi {
     /// A package of the consumer's own repository that no uv source names is not what pip and uv
     /// install: they take the registry's package of the name.
     fn unsourced(&self, via: Option<&str>) -> Option<&'static str> {
-        via.is_none().then_some(
+        // A CI step that runs a console script (`run <command>`) names no source either.
+        via.is_none_or(|via| via.starts_with("run ")).then_some(
             "no uv source names the local package, the registry package is the likely provider",
         )
     }
 
-    /// A uv source (`uv_source`) keeps the provider it names, as Cargo's does (`sourced`).
+    /// A uv source (`uv_source`) keeps the provider it names, as Cargo's does (`sourced`). A
+    /// pattern of a name has no source.
     fn reaches(
         &self,
         (via, _): (Option<&str>, Option<&str>),
         from: (&str, &Path),
         to: ((&str, &Path), &str),
     ) -> bool {
-        sourced(via, from, to)
+        via == Some(PATTERN) || sourced(via, from, to)
+    }
+
+    /// A pattern fits the names its literal parts leave (`iac::pattern`, the glossary's
+    /// Pattern): at least three letters or digits, each `*` a whole segment.
+    fn fits(&self, wanted: &str, provided: &str) -> bool {
+        match wanted.contains('*') {
+            true => crate::iac::pattern::matches(wanted, provided),
+            false => wanted == provided,
+        }
+    }
+
+    fn uncertainty(&self, via: Option<&str>) -> Option<(&'static str, Level)> {
+        (via == Some(PATTERN)).then_some(("a pattern of the name", Level::Inferred))
+    }
+
+    /// A command's first word is the console script it starts. `uvx <package>` and `pipx run
+    /// <package>` start the script named like the package, from that package alone: the next
+    /// word, when it is a literal name and no option.
+    fn runs(&self, command: &[Word]) -> Option<(String, Option<Entry>)> {
+        let literal = |n: usize| command.get(n).and_then(|word| run::literal(word));
+        let package = match (literal(0)?, literal(1)) {
+            ("uvx", _) => 1,
+            ("pipx", Some("run")) => 2,
+            (name, _) => return Some((name.to_string(), None)),
+        };
+        let name = literal(package).filter(|name| !name.starts_with('-'))?;
+        match installed(&command[package])? {
+            Install::Named(entry) if entry.via.is_none() => Some((name.to_string(), Some(entry))),
+            _ => None,
+        }
+    }
+
+    /// The names the command installs, when its leading words are a row of `INSTALLS`: each
+    /// argument that is no option and no option's value (`installed`).
+    fn installs(&self, command: &[Word]) -> Vec<Install> {
+        let leads = |row: &&&[&str]| {
+            let mut words = row.iter().zip(command);
+            row.len() <= command.len() && words.all(|(a, b)| run::literal(b) == Some(a))
+        };
+        let Some(row) = INSTALLS.iter().find(leads) else {
+            return Vec::new();
+        };
+        let (mut found, mut options) = (Vec::new(), true);
+        let mut words = command[row.len()..].iter();
+        while let Some(word) = words.next() {
+            let option = match word.first() {
+                Some(Part::Text(text)) if options && text.starts_with('-') => text,
+                _ => {
+                    found.extend(installed(word));
+                    continue;
+                }
+            };
+            options = run::literal(word) != Some("--");
+            let flag = run::literal(word).is_some_and(|text| FLAGS.contains(&text));
+            if options && !flag && !option.contains('=') {
+                words.next();
+            }
+        }
+        found
     }
 
     /// Names the member of the consumer's uv workspace that a `workspace = true` entry of a
@@ -892,7 +1078,12 @@ serve = "acme.cli:main"
             ]
         );
         assert_eq!(s.roots, ["src"]);
-        assert_eq!(s.scripts, [("acme.cli".to_string(), "main".to_string())]);
+        let script = (
+            "serve".to_string(),
+            "acme.cli".to_string(),
+            "main".to_string(),
+        );
+        assert_eq!(s.scripts, [script]);
         let poetry = read_pyproject(
             "",
             b"[tool.poetry]\nname = \"shared.tools\"\nversion = \"0.3.0\"\n",
@@ -1079,12 +1270,57 @@ serve = "acme.cli:main"
         assert_eq!(resolved(&exports, "lib_c")[0].1[0].2, Level::Exact);
     }
 
+    /// What `Pypi::runs` reads of the one command of `script`: the name it runs, then the
+    /// package and its range when the command names the package.
+    fn ran(script: &str) -> Option<String> {
+        let commands = run::commands(script, |_| None).unwrap();
+        let (name, package) = Pypi.runs(&commands[0])?;
+        Some(match package {
+            Some(e) => format!("{name} of {} {}", e.name, e.range.as_deref().unwrap_or("-")),
+            None => name,
+        })
+    }
+
+    #[test]
+    fn a_command_runs_the_script_of_its_first_word_or_of_the_package_it_names() {
+        let ran = |script: &str| ran(script).unwrap_or_else(|| "nothing".into());
+        assert_eq!(ran("core-publish --to prod x"), "core-publish");
+        // The name stays as written: pip installs the command under it byte for byte.
+        assert_eq!(ran("Core_Publish"), "Core_Publish");
+        assert_eq!(ran("'core-publish' x"), "core-publish");
+        // An install is the command `pipx`, which no package declares.
+        assert_eq!(ran("pipx install core-sdk"), "pipx");
+        assert_eq!(ran("uvx core-sdk status"), "core-sdk of core-sdk -");
+        assert_eq!(ran("pipx run Core_SDK"), "Core_SDK of core-sdk -");
+        assert_eq!(
+            ran("uvx 'core-sdk>=1.0'"),
+            "core-sdk>=1.0 of core-sdk >=1.0"
+        );
+        // No package named as the next word: an option, nothing, a path, an open part.
+        for script in [
+            "uvx --from core-sdk core-publish",
+            "uvx -q core-sdk",
+            "uvx",
+            "pipx run",
+            "pipx run --spec core-sdk core-publish",
+            "uvx ./tools/core",
+            "uvx core-sdk@1.0",
+            "uvx $PKG",
+            "uvx core-${{ matrix.tool }}",
+            "$TOOL run",
+            "${{ vars.TOOL }} x",
+        ] {
+            assert_eq!(ran(script), "nothing", "{script}");
+        }
+    }
+
+    /// A manifest whose console scripts are `scripts`, each named `run-<function>`.
     fn script_manifest(path: &str, scripts: &[(&str, &str)], roots: &[&str]) -> Manifest {
         Manifest {
             path: path.to_string(),
             summary: Summary {
                 scripts: (scripts.iter())
-                    .map(|(m, f)| (m.to_string(), f.to_string()))
+                    .map(|(m, f)| (format!("run-{f}"), m.to_string(), f.to_string()))
                     .collect(),
                 roots: roots.iter().map(|r| r.to_string()).collect(),
                 ..Summary::default()
@@ -1126,14 +1362,20 @@ serve = "acme.cli:main"
 
         // `tool/__init__.py` over `tool.py`, as an import finds it; the `src` root of `lib`;
         // `none` has no file; `outer`'s `inner.py` is its own, and `pkg/cli.py` is not in
-        // `outer`'s reach.
+        // `outer`'s reach. Each keeps the script's name and its manifest (#832).
+        let program = |file: &str, function: &str, manifest| Program {
+            file: file.to_string(),
+            function: function.to_string(),
+            name: format!("run-{function}"),
+            manifest,
+        };
         assert_eq!(
             found,
             [
-                ("app/cli.py".to_string(), "main".to_string()),
-                ("lib/src/pkg/__init__.py".to_string(), "start".to_string()),
-                ("outer/inner.py".to_string(), "go".to_string()),
-                ("tool/__init__.py".to_string(), "run".to_string()),
+                program("app/cli.py", "main", 0),
+                program("lib/src/pkg/__init__.py", "start", 1),
+                program("outer/inner.py", "go", 2),
+                program("tool/__init__.py", "run", 0),
             ]
         );
     }
@@ -1147,9 +1389,11 @@ serve = "acme.cli:main"
         // `inner/mod.py` comes first among the roots but belongs to the nested package.
         let files = ["inner/mod.py", "src/inner/mod.py"];
 
+        let found = Pypi.programs(&all, &files);
+        assert_eq!(found.len(), 1, "{found:?}");
         assert_eq!(
-            Pypi.programs(&all, &files),
-            [("src/inner/mod.py".to_string(), "go".to_string())]
+            (found[0].file.as_str(), found[0].function.as_str()),
+            ("src/inner/mod.py", "go")
         );
     }
 

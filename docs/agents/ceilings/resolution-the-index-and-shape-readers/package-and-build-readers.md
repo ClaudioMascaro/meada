@@ -18,6 +18,56 @@
   schema version does (`tests/golden/schema.txt` has no `go.mod` sample), so the new links appear
   after the first edit of that `go.mod` or the next schema change.
 
+- `package/pypi.rs` (#831, ADR 0028): the install row of the command table reads six commands
+  by their leading words (`pip install`, `pip3 install`, `python -m pip install`,
+  `uv pip install`, `pipx install`, `uv tool install`); another spelling (`python3 -m pip`, an
+  option before `install`, a prefix) is outside the table. An option of `FLAGS` takes no value
+  and any other takes the next word, so a flag missing from the list costs the name after it
+  and never gives a wrong one. An argument is a requirement by name: a path, a URL, a direct
+  reference, `-e` and the file of `-r` (not followed) give no side, and a wheel or a folder
+  written with no slash reads as a name. A name the workspace provides wins over a public
+  package of the same name: one provider in another repository is `exact`, whatever index
+  serves the install, and one in the CI step's own repository is `inferred`, as for a manifest
+  entry with no source. A name with an open part is a pattern within `iac/pattern.rs`'s limits
+  (`inferred` to the one package it fits, `ambiguous` to several, no side when it fits none: an
+  open part glued to a word, `shared-lib$X`, replaces no whole segment and fits nothing); a
+  literal name with an open range or extra, or an open part right after the extras
+  (`shared-lib[fast]$X`), is the package, its range as written and `range unchecked`; a
+  name left open whole is one unresolved consumer per CI step, with what is written as its
+  `via`, a cause and no candidate, and only in a workspace that provides a PyPI package (no
+  side elsewhere). The first install of a name by a CI step gives its range, and a range pip
+  would refuse (`shared-lib==`) links as written. `context` on a package lists the dependents
+  that name it: a pattern that fits it is counted by `search` and shown by `context` on its
+  own CI step only. `trace` walks no package link from a CI step: a manifest is no node of
+  it.
+- `package.rs`, `package/pypi.rs` (#832, ADR 0028): a CI step that runs a console script links
+  to the script's function, never to the handler of a subcommand, and only for PyPI
+  (`[project.scripts]`, else `[tool.poetry.scripts]`): an npm `bin`, a Go or a Cargo binary is
+  not read, nor `gui-scripts` or another entry point group. The command's first word is
+  compared byte for byte with the script's name as written, since pip writes the command under
+  that name unchanged (a probe with pip 26 and setuptools kept `Acme_Tool`, `acme.dotted` and
+  `acme_under`; the specification page was not reachable to cite): a path to the script,
+  `python -m <module>`, `uv run`, `poetry run`, a prefix (`sudo`, `VAR=x`, `time`) and a name
+  with an open part match nothing. `uvx <package>` and `pipx run <package>` are read only with
+  the package as the next word: `--from`, `--spec`, another option first, `<package>@<version>`
+  and `uv tool run` give no side, and a range after the package (`uvx 'core-sdk>=1'`) gives
+  the package and no program. A script whose function is no program entry point of its
+  repository (a module outside the declared roots, generated code) gives no side, and neither
+  does a Poetry script written as a table (`{ callable = ... }`, `{ reference = ... }`), an
+  object reference with blanks (`"mod : fn"`) or a script run inside a command substitution.
+  The evidence for `exact` is an install by a literal name in an earlier command of the same CI
+  job, in file order of its CI steps: an install in a later CI step, in another CI job, in a
+  called script or a composite action, by a pattern, by `-e .`, by `-r` or by a path is not
+  seen, and neither is an `if:` that skips the installing CI step. With no install the name
+  alone links `inferred`, so a script of the workspace wins over a shell builtin or a public
+  tool of the same name. `MAX_DECLARING` (8): a name more packages of the workspace declare
+  gives no side at all, even when the CI job installs one of them. The link is at the weaker of
+  the evidence's level and the package link's, and its range is the install's. A script a CI
+  step runs again on the same evidence adds no row, so the consumer's text is its first
+  command. The reason says "in the CI job" for the CI steps of a composite action too.
+  `context` on the program's symbol lists no CI step (`callers` are calls in code): `trace` up
+  from it does. The `consumers` count of `search` is of links to the manifest, so a CI step
+  that runs a script and installs nothing is not in it.
 - `package.rs`: a manifest never fails indexing, so its reader has fixed limits. `MAX_NAME`
   (214 bytes; a longer name is no package) and `MAX_BYTES` (under `lang/mod.rs`). A range is
   stored as written, with no length limit beyond `MAX_BYTES`; npm's `flag` (`package/npm.rs`) checks only one of at most

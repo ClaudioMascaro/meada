@@ -911,7 +911,7 @@
     },
     {
       "contract": "image::ghcr.io/acme/gcp-sdk-worker",
-      "site": "local/gcp-sdk-env",
+      "site": "local/gcp-sdk-env::.github/workflows/build.yml::jobs.build.steps[0]",
       "at": ".github/workflows/build.yml#jobs.build.steps[0].with.tags"
     }
   ],
@@ -984,6 +984,15 @@
     }
   ],
   "iac_nodes": [
+    {
+      "identity": "local/gcp-sdk-env::.github/workflows/build.yml::jobs.build.steps[0]",
+      "address": "jobs.build.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/build.yml",
+      "path": ".github/workflows/build.yml",
+      "line": 4,
+      "end_line": 6
+    },
     {
       "identity": "local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker",
       "address": "google_cloud_run_v2_service.worker",
@@ -1207,7 +1216,7 @@
     },
     {
       "consumer": "local/gcp-sdk-env::main.tf::google_cloud_run_v2_service.worker",
-      "provider": "local/gcp-sdk-env",
+      "provider": "local/gcp-sdk-env::.github/workflows/build.yml::jobs.build.steps[0]",
       "contract": "image::ghcr.io/acme/gcp-sdk-worker",
       "level": "exact",
       "reason": "image::ghcr.io/acme/gcp-sdk-worker",

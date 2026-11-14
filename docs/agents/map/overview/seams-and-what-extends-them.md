@@ -34,6 +34,9 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   | `unresolved`, `label`, `parts` | whether an identifier is an unresolved side, how it is labelled, the parts `search` ranks |
   | `place` | where this kind's site sits when it is neither a symbol nor a call (packages: manifest and field); dispatch uses only the contract's kind |
   | `search_word`, `own_search` | the word of `search`'s `kind` and, for an own renderer, its hits |
+  | `in_default_search` | whether `search` with no `kind` lists the kind's contracts (CI says no: its sides sit on nodes only a `kind` finds) |
+  | `reads_commit` | whether the kind reads `Export::commit` of a repository that holds one of its providers, which the engine then learns for it (CI: the reason of a link) |
+  | `written` | the optional fields the kind adds to the rows `meada export` writes, given the repository's IaC nodes (CI: `with`, `secrets`, `permissions`) |
   | `sides`, `view`, `related_sides` | the role words and the carried word of `context` on a contract, and the sides that reach it by another name; a contract listed by its providers alone is followed by the linked consumers that read fields, with their drift (the engine's rule: `View::follows_drift`) |
   | `workspace_related_sides` | optional workspace grouping using prepared links, replacing per-repository `related_sides` without repeating routing |
   | `at_call`, `context_sections` | the lines a call adds to a symbol's `contracts:`, and the sections `context` adds after the callees (packages: `consumers:`) |
@@ -41,10 +44,12 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   | `context_reads` | the call sites `context_sections` looks up, which `context` reads first (packages: the consumers of the links into the symbol) |
   | `starts` | the providers a `trace` start text names |
   | `calls_from_definition` | whether a consumer at a symbol (a Feign or Retrofit interface method) calls on its provider, so `trace` follows from the method to it (HTTP; a channel handler is where a link ends) |
+  | `starts_at_provider` | whether a contract starts a `trace` at the node that provides it (CI: a contract names its one provider); any other contract is listed by its sides |
   | `flows_to_consumer` | whether data travels provider to consumer (resource writes to reads, channel producers to handlers), including consumers at call sites |
   | `status`, `scope_status` | the lines `meada status` prints per repository, optionally considering the visible workspace |
   | `workspace_status` | optional per-query status rows in repository order, with `None` preserving the ordinary status hooks and call order |
   | `decidable`, `consumer_item`, `link_candidate`, `serves`, `candidate` | whether a consumer ambiguity remains an open item, whether a provider remains a current link candidate, alias matching and candidates for a consumer with no contract |
+  | `unresolved_causes` | the kind's own consumers with no contract, by site, each with why it is unresolved: such a consumer holds no candidate and its open item says the cause (CI steps, package installs) |
 
   The engine fixes the phase order: each kind's `read_declarations` then `declare`, followed by every `workspace_step`, every `workspace_ready`, then `link`,
   then the decisions replay, then every `after_links`, each in `KINDS` order (decisions are
