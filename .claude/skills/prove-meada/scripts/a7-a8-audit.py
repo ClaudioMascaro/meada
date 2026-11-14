@@ -55,7 +55,9 @@ def git(*args):
 
 
 def keys():
-    return {str(p.relative_to(ROOT)): digest(p) for p in sorted(SKILL.rglob('*'))
+    # This skill and its feature skills (`prove-meada-*`), which hold the answer-key rows of their flows.
+    folders = [SKILL, *sorted(SKILL.parent.glob(SKILL.name + '-*'))]
+    return {str(p.relative_to(ROOT)): digest(p) for folder in folders for p in sorted(folder.rglob('*'))
             if (p.is_file() or p.is_symlink()) and '__pycache__' not in p.parts and p.suffix != '.pyc'}
 
 
