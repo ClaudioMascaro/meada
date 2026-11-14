@@ -23,6 +23,8 @@ Read `.claude/skills/prove-meada/SKILL.md` first: it owns Scope, Sort, the answe
 
 **CI drive**: `python3 $S/prove.py run --base-bin "$RUN/bin/meada-base" --head-bin "$RUN/bin/meada-head" --repos "$REPOS" --run "$RUN" [--http]`, and when Scope listed `tests/golden/`, `python3 $S/prove.py rebless --base "$BASE" --run "$RUN"`. Detail, queries of your own and timings: [references/cli-mcp.md](../prove-meada/references/cli-mcp.md).
 
+`prove.py run` is BLOCKED by itself when an index or export fails or an export has no symbol, so an empty index never reads as "no difference".
+
 **Copies**: nothing. Existing flows answer to the base binary; new resolutions to the issue and the source.
 
 **Done looks like**: `compare.md` shows, per entry, the `Determinism` line all true, every budget within its limit, every export difference predicted by the issue, every sampled resolution confirmed in the source, the tool list unchanged, and every MCP answer equal or its difference predicted. `rebless.md` has each changed golden line matched to an issue line.
@@ -46,7 +48,13 @@ Read `.claude/skills/prove-meada/SKILL.md` first: it owns Scope, Sort, the answe
 
 **Could fool you**: one manifest of several repositories is one workspace, so `search` spans all of them; the script serves each alone for that reason. Keep it that way.
 
+## Verifying a bug fix
+
+The base binary of `prove.py run` is the unchanged code: its export line or MCP answer is the "before" value, so put the probe in `--queries` or name the export line.
+
 ## Try to break it
+
+A probe of source code goes through both binaries with `--overlay DIR`: the files under `DIR` are copied over the entry and committed before either side indexes, so give the probe its own run folder (`--run "$RUN/probe"`). Wire the file in as its language needs: Rust indexes a file only when a `mod` reaches it, so overlay the entry's `src/lib.rs` with `mod zz_prove;` appended.
 
 - the changed construct combined with the others it can meet (`?`, `.await`, chains, aliases, overloads) in one file, every resolution confirmed in the source (#593);
 
@@ -65,3 +73,4 @@ Read `.claude/skills/prove-meada/SKILL.md` first: it owns Scope, Sort, the answe
 - `examples/golden_diff` panics without `origin/main` (#592); `prove.py rebless --base` takes the base explicitly and needs no build.
 
 - `meada decide` has no scripted check: its replay is `tests/it/decisions.rs`'s. Put it under Not covered when Scope reaches `src/decide.rs` or `src/decider/`.
+- Keep the corpus time and memory budgets unchanged. The whole corpus took 98 s with release builds on 2026-11-02; debug builds index several times slower.
