@@ -90,10 +90,11 @@ change touches, then read the files it names.
   name matches, and a missing caller is unproven, since calls inside macros (`assert!`,
   `format!`, `vec!`) are not indexed.
 - The index follows the default features (ADR 0012 keeps the cloud modules behind features) and
-  covers each crate's module tree from `src/lib.rs` and `src/main.rs`. For code under `accounts`,
-  `directory`, `github-app`, `oidc`, `postgres`, `proposals`, `snapshot`, `ui`, `valkey` or
-  `workspaces`, and for anything under `tests/`, `examples/` or `benches/`, go straight to grep: an
-  empty answer there is expected, not a stale index.
+  covers each crate's module tree from `src/lib.rs` and `src/main.rs`. For a module `src/lib.rs`
+  declares behind a cargo feature (today `accounts`, `audit`, `catalog`, `directory`,
+  `github_app`, `grant`, `oidc`, `postgres`, `proposals`, `snapshot`, `ui`, `valkey` and
+  `workspaces`), and for anything under `tests/`, `examples/` or `benches/`, go straight to grep:
+  an empty answer there is expected, not a stale index.
 - Results under `tests/fixtures/` are test data.
 - A wrong answer on Meada's own code is a bug: open an issue with the query, the answer and the
   expected one.
@@ -140,3 +141,9 @@ The `mattpocock/skills` set and the prove-it trio of `ray-amjad/skills` live in 
 from its `upstreamTree` carries a local adjustment. An edit to a skill updates its `tree` in the
 lock, and `scripts/check` names the value. The plugins that ship the same skills stay disabled in
 `.claude/settings.json`, so a session lists each skill once.
+
+They are vendor text, written for any repository: where one says to build, start or drive the
+product, or to prove a change before saying done, the Workflow rules above decide where and when
+that happens. The prove-it trio stays at its upstream text and is invoked by the user only
+(`skillOverrides` in `.claude/settings.json`); `/prove-meada` holds this repository's layout for
+proof skills.
