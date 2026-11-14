@@ -6,6 +6,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Terraform evaluation sizes a variable once per expression however many times the expression
+  reads it, and a name every instance of a `count` or `for_each` shares (one that reads neither
+  `each` nor `count`) is evaluated once when it is known: a name reading a 21,000-element
+  variable 20,000 times indexes as fast at `count = 10` as at `count = 1`, where each instance
+  paid the estimate again. A refused expression spends the evaluation budget for each root by
+  its own reads, so reading `count.index` no longer counts as copying every variable: forty
+  refused instances no longer leave the names after them unresolved (#765).
+
 ## [1.4.0] - 2026-11-13
 
 A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md),

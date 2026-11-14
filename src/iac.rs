@@ -1700,14 +1700,45 @@ fn size(v: &Value) -> usize {
 
 /// The values bound to the root names (`var`, `local`, ...) and the bytes each holds (`size`),
 /// worked out once per expression: `cost` reads a root's size at every traversal in a `for`.
+/// A value read inside them is sized once too, by its address, however many times the
+/// expression reads it (#765).
 struct Roots<'v> {
     values: &'v Map<String, Value>,
     sizes: BTreeMap<&'v str, usize>,
+    read_sizes: RefCell<HashMap<*const Value, usize>>,
+    read_elements: RefCell<HashMap<*const Value, (usize, usize)>>,
 }
 
 impl Roots<'_> {
     fn size(&self, name: &str) -> Option<usize> {
         self.sizes.get(name).copied()
+    }
+
+    /// `size(v)` of a value read inside the roots.
+    fn read_size(&self, v: &Value) -> usize {
+        *(self.read_sizes.borrow_mut())
+            .entry(std::ptr::from_ref(v))
+            .or_insert_with(|| size(v))
+    }
+
+    /// How many elements the value `v` read inside the roots gives a `for`, and the bytes one
+    /// of them (or its key, with its quotes) holds at most.
+    fn read_elements(&self, v: &Value) -> (usize, usize) {
+        let key = std::ptr::from_ref(v);
+        if let Some(&found) = self.read_elements.borrow().get(&key) {
+            return found;
+        }
+        let most = |sizes: &mut dyn Iterator<Item = usize>| sizes.max().unwrap_or(0);
+        let found = match v {
+            Value::Array(items) => (items.len(), most(&mut items.iter().map(size))),
+            Value::Object(map) => (
+                map.len(),
+                most(&mut map.iter().map(|(k, v)| (k.len() + 2).max(size(v)))),
+            ),
+            v => (1, self.read_size(v)),
+        };
+        self.read_elements.borrow_mut().insert(key, found);
+        found
     }
 }
 
@@ -1767,6 +1798,8 @@ fn steps(expr: &Expression, roots: &Map<String, Value>) -> usize {
     let roots = Roots {
         values: roots,
         sizes,
+        read_sizes: RefCell::default(),
+        read_elements: RefCell::default(),
     };
     let mut overhead = 0;
     let made = cost(expr, &roots, &mut Vec::new(), &mut overhead);
@@ -1828,7 +1861,7 @@ fn cost(
             let base = match unshadowed(t, roots, iters) {
                 Some(v) => {
                     *overhead = add(*overhead, copied(t, roots, iters));
-                    size(v)
+                    roots.read_size(v)
                 }
                 None => cost(&t.expr, roots, iters, overhead),
             };
@@ -2087,14 +2120,8 @@ fn elements(
         }
         _ => None,
     };
-    let most = |sizes: &mut dyn Iterator<Item = usize>| sizes.max().unwrap_or(0);
     match found {
-        Some(Value::Array(items)) => (items.len(), most(&mut items.iter().map(size))),
-        Some(Value::Object(map)) => (
-            map.len(),
-            most(&mut map.iter().map(|(k, v)| (k.len() + 2).max(size(v)))),
-        ),
-        Some(v) => (1, size(v)),
+        Some(v) => roots.read_elements(v),
         None => {
             let c = cost(expr, roots, iters, overhead);
             (c, c)
@@ -2102,20 +2129,33 @@ fn elements(
     }
 }
 
-/// Collects the variables an expression names (`each` and `count` say whether it reads the
-/// instance it is evaluated in) and counts its reads of a root object.
+/// How many times an expression reads each variable it names: `each` and `count` say whether
+/// it reads the instance it is evaluated in, a root object's (`var`, `local`, ...) what a
+/// refusal spends on that root.
 #[derive(Default)]
-struct Variables {
-    names: BTreeSet<String>,
-    roots: usize,
+struct Variables(BTreeMap<String, usize>);
+
+impl Variables {
+    fn of(expr: &Expression) -> Variables {
+        let mut variables = Variables::default();
+        variables.visit_expr(expr);
+        variables
+    }
+
+    fn reads(&self, name: &str) -> usize {
+        self.0.get(name).copied().unwrap_or(0)
+    }
+
+    /// Whether the expression reads the instance it is evaluated in.
+    fn instance(&self) -> bool {
+        self.0.contains_key("each") || self.0.contains_key("count")
+    }
 }
 
 impl Visit for Variables {
     fn visit_expr(&mut self, node: &Expression) {
         if let Expression::Variable(v) = node {
-            let root = matches!(v.as_str(), "var" | "local" | "module" | "each" | "count");
-            self.roots += usize::from(root);
-            self.names.insert(v.as_str().to_string());
+            *self.0.entry(v.as_str().to_string()).or_default() += 1;
         }
         visit::visit_expr(self, node);
     }
@@ -2284,9 +2324,26 @@ impl<'m> Eval<'m> {
                 self.nodes[node].provisioned = Some(Projection::default());
             }
         }
+        // A known name that reads neither `each` nor `count` is the same in every instance of
+        // its block: it is evaluated once (#765). A refused or partial one is evaluated again,
+        // and spends again, in each instance.
+        let mut shared: HashMap<(usize, *const Block), Evaluated> = HashMap::new();
         for &(node, instance, block, ref each) in &pending {
             let Some(named) = &block.named else { continue };
-            let found = self.value(instance, each.as_ref(), named, 0);
+            let key = (instance, std::ptr::from_ref(block));
+            let found = match shared.get(&key) {
+                Some(found) => found.clone(),
+                None => {
+                    let found = self.value(instance, each.as_ref(), named, 0);
+                    if each.is_some()
+                        && matches!(found.val, Val::Known(_))
+                        && !Variables::of(named).instance()
+                    {
+                        shared.insert(key, found.clone());
+                    }
+                    found
+                }
+            };
             // A null or a collection is no name; anything else is its text, `*` when unresolved.
             let (name, pattern) = match &found.val {
                 Val::Known(Value::Null | Value::Array(_) | Value::Object(_)) => (None, false),
@@ -2872,14 +2929,9 @@ impl<'m> Eval<'m> {
                 mods.insert(name, v);
             }
         }
-        let mut variables = Variables::default();
-        variables.visit_expr(expr);
+        let variables = Variables::of(expr);
         let (mut each_v, mut count_v) = (Map::new(), Map::new());
-        if let Some(e) = each.filter(|_| {
-            ["each", "count"]
-                .iter()
-                .any(|v| variables.names.contains(*v))
-        }) {
+        if let Some(e) = each.filter(|_| variables.instance()) {
             through.extend(e.through.iter().cloned());
             each_v.insert("value".to_string(), e.value.clone());
             match &e.key {
@@ -2923,15 +2975,19 @@ impl<'m> Eval<'m> {
             }
         } else {
             // Refused, it spends the bytes it went through to decide, not what it would have
-            // made: its own text, and an upper bound for its roots, once copied, once ordered
-            // (`lexical`) and twice at each read of one (`cost` reads the value read; a
-            // resource it names is no root). Never more than the `EVAL_COST_MAX` every
-            // refusal spent before. The parts `partial` evaluates pass this gate themselves.
-            let roots = (roots.values().map(size)).fold(0, usize::saturating_add);
-            let reads = variables.roots.saturating_add(1).saturating_mul(2);
+            // made: its own text, and an upper bound for each root, once copied, once ordered
+            // (`lexical`) and twice at each read of that root (`cost` reads the value read; a
+            // resource it names is no root; `count.index` reads only `count`, #765). Never
+            // more than the `EVAL_COST_MAX` every refusal spent before. The parts `partial`
+            // evaluates pass this gate themselves.
             // An expression built rather than read has no span: its text is written out.
             let text = (expr.span()).map_or_else(|| expr.to_string().len(), |s| s.len());
-            let spent = roots.saturating_mul(reads).saturating_add(text);
+            let spent = (roots.iter())
+                .map(|(name, v)| {
+                    let reads = variables.reads(name).saturating_add(1).saturating_mul(2);
+                    size(v).saturating_mul(reads)
+                })
+                .fold(text, usize::saturating_add);
             self.work = self.work.saturating_sub(spent.min(EVAL_COST_MAX));
         }
         self.partial(at, each, expr, depth)
@@ -5799,6 +5855,76 @@ mod tests {
         let resources = vec!["a.o.id"; 50].join(", ");
         let named = format!("join(\",\", concat(var.big, [{resources}]))");
         assert_eq!(root(40, &named), resolved);
+    }
+
+    /// A known name that reads neither `each` nor `count` is the same in every instance of its
+    /// block and is evaluated once (#765): a name reading a wide variable thousands of times in
+    /// a `for` over an empty list charges the root's work as much at `count = 10` as at
+    /// `count = 1`, where every instance paid it again, and each instance's name is exact.
+    #[test]
+    fn a_known_name_the_instances_share_is_charged_once() {
+        let big = vec!["\"a\""; 2_000].join(", ");
+        let reads = vec!["var.big"; 2_000].join(", ");
+        let spent = |count: usize| {
+            let main = format!(
+                "variable \"big\" {{}}\nvariable \"e\" {{ default = [] }}\nresource \"a\" \"r\" {{\n  count = {count}\n  name  = \"q-${{length([for a in var.e : [{reads}]])}}\"\n}}\n"
+            );
+            let tfvars = format!("big = [{big}]\n");
+            let repository =
+                Repository::read(&files(&[("main.tf", &main), ("terraform.tfvars", &tfvars)]));
+            let mut eval = Eval::new(&repository.modules, &repository.mappings, STORED_MAX);
+            eval.root("");
+            let named: Vec<_> = (eval.nodes.iter())
+                .map(|n| (n.name.as_deref(), n.pattern))
+                .collect();
+            assert_eq!(named, vec![(Some("q-0"), false); count]);
+            EVAL_WORK_MAX - eval.work
+        };
+        let (one, ten) = (spent(1), spent(10));
+        assert!(one > 0 && ten < 2 * one, "{ten} against {one}");
+    }
+
+    /// The estimate sizes a bound value once per expression however many times it reads it
+    /// (#765): 40,000 reads of a 200,000-element variable are estimated in linear time, where
+    /// sizing the variable at each read walked it 40,000 times (eight billion elements).
+    #[test]
+    fn the_estimate_sizes_a_bound_value_once_in_linear_time() {
+        let var = Map::from_iter([
+            (
+                "big".to_string(),
+                Value::Array(vec![Value::from("a"); 200_000]),
+            ),
+            ("e".to_string(), Value::Array(Vec::new())),
+        ]);
+        let roots = Map::from_iter([("var".to_string(), Value::Object(var))]);
+        let reads = vec!["var.big"; 40_000].join(", ");
+        let expr = parser::parse_expr(&format!("length([for a in var.e : [{reads}]])")).unwrap();
+        let start = std::time::Instant::now();
+        let estimated = steps(&expr, &roots);
+        let took = start.elapsed();
+        assert!(estimated < 100, "{estimated}");
+        assert!(took < std::time::Duration::from_secs(2), "{took:?}");
+    }
+
+    /// A refusal counts each root by its own reads (#765): a refused name that reads a 60 KB
+    /// `var.big` once and `count.index` 50 times spends `var.big` four times and the small
+    /// `count` root at each of its reads, not every root at each read up to `EVAL_COST_MAX`, so
+    /// all 40 instances are `q-*` and the name after them resolves.
+    #[test]
+    fn a_refusal_counts_each_root_by_its_own_reads() {
+        let big = vec!["\"a\""; 20_000].join(", ");
+        let row = vec!["a"; 20].join(", ");
+        let index = vec!["count.index"; 50].join(" + ");
+        let main = format!(
+            "variable \"x\" {{ default = \"x\" }}\nvariable \"big\" {{ default = [{big}] }}\nresource \"a\" \"r\" {{\n  count = 40\n  name  = \"q-${{length([for a in var.big : [{row}]]) + {index}}}\"\n}}\nresource \"a\" \"z\" {{ name = \"q-${{var.x}}\" }}\n"
+        );
+        let got = names(&[("main.tf", &main)]);
+        assert_eq!(got.len(), 41);
+        assert!(
+            got[..40].iter().all(|s| s.ends_with(" ~ \"q-*\"")),
+            "{got:?}"
+        );
+        assert_eq!(got[40], "a.z = \"q-x\" [var.x main.tf:1]");
     }
 
     /// A literal skips the evaluation, not `EVAL_VALUE_MAX`: one past it is unresolved as any

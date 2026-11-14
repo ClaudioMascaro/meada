@@ -28,9 +28,9 @@
   (15abf1c0, debug)) and `EVAL_WORK_MAX` (64 MiB of cost per root module; past it every value left is
   unresolved, but for a literal name that fits `EVAL_VALUE_MAX`. A refusal spends an upper
   bound of the bytes it went through to decide, never more than `EVAL_COST_MAX`: its own text,
-  and the size of all the roots times two plus twice its reads of a root (`var`, `local`,
-  `module`, `each`, `count`; a resource it names is none, and a read of `count.index` counts
-  all the roots as a read of `var` does), so 9,999 refusals over a 21,000-element variable stop
+  and the size of each root (`var`, `local`, `module`, `each`, `count`) times two plus twice
+  its reads of that root (a resource it names is none, and a read of `count.index` counts the
+  `count` root alone, #765), so 9,999 refusals over a 21,000-element variable stop
   evaluating after 89 and take 2.3 s in process (1bdcc75d; a cold index of that root took
   4.30 s at b045c759 against 4.17 s on main 05585ce4, then 4.46 s at ae8139de against 4.40 s
   at b045c759, all debug), and a long expression refused in each instance of a `count` stops
@@ -41,10 +41,12 @@
   100, the implementer's, 1bdcc75d, debug), one 1 MiB template of 130,000 interpolations took
   8.8 s, the work is per root, not per repository (20 roots of 80 resources near the ceiling
   took 234.75 s; both measured by a black-box verifier on a debug build), and the estimate
-  itself is charged nothing: by a reading of `cost`, it sizes a bound value at each read of it,
-  so an expression it then accepts pays that again per instance (ae8139de, debug, one run each:
-  20,000 reads of a 21,000-element variable in a `for` over an empty collection took 2.6 s at
-  `count = 1` and 17.3 s at 10, and 1.7 s and 4.8 s when each read is `var.big[0]`);
+  itself is charged nothing, though it sizes each bound value it reads once per expression
+  (#765), and a known name that reads neither `each` nor `count` is evaluated once for every
+  instance of its block (20,000 reads of a 21,000-element variable in a `for` over an empty
+  collection: TIME1 at `count = 1`, TIME10 at 10, debug, where each instance paid the estimate
+  again: 2.7 s and 16.6 s); a name that is refused or partial is evaluated again, and spends
+  again, in each instance, and an evaluation is linear in its text;
   converting an object literal for `hcl-rs` also spends the square of its keys, so a wide local
   evaluated in many module instances stops there; their nodes stay, named `*`). A var file's
   values are bounded the same way, each file with an `EVAL_WORK_MAX` of its own: a value past
