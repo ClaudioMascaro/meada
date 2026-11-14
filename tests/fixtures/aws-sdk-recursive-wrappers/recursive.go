@@ -25,7 +25,14 @@ func placeTable(ctx context.Context) {
 	sendTable(ctx, 1, "table-first", "table-second")
 }
 
-// A list of entries, the same way.
+// A list nobody passes: read where it stands, it is a write and, as a `ConditionCheck` is an
+// entry too, a read of no table.
+func aloneList(ctx context.Context, items []types.TransactWriteItem) {
+	client := dynamodb.NewFromConfig(cfg)
+	client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
+}
+
+// A list of entries, the same way: the call that closes the cycle reads as `aloneList` does.
 func sendList(ctx context.Context, n int, a, b []types.TransactWriteItem) {
 	client := dynamodb.NewFromConfig(cfg)
 	client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: a})

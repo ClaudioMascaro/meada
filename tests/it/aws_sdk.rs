@@ -1018,7 +1018,8 @@ fn sides_by_extension(export: &Value) -> std::collections::BTreeMap<String, Vec<
 /// sends what the first did and the call adds no side. Where it hands on another value in the
 /// parameter the request reads (the second of two names, the second of two lists), what that
 /// turn sends is not followed: the call that closes the cycle is an unresolved side, beside the
-/// names each outside caller gives.
+/// names each outside caller gives. It reads as a wrapper nobody calls does: a list of entries no
+/// caller gives is a write and a read (`aloneList`).
 #[test]
 fn a_recursive_wrapper_that_passes_another_value_on_is_unresolved_at_that_call() {
     let fixture = "aws-sdk-recursive-wrappers";
@@ -1028,6 +1029,8 @@ fn a_recursive_wrapper_that_passes_another_value_on_is_unresolved_at_that_call()
     assert_eq!(
         sides_by_extension(&export)["go"],
         [
+            "alonelist reader resource::dynamodb",
+            "alonelist writer resource::dynamodb",
             "ping writer resource::dynamodb",
             "placechanged writer resource::dynamodb::changed-first",
             "placelist writer resource::dynamodb::list-first",
@@ -1035,6 +1038,7 @@ fn a_recursive_wrapper_that_passes_another_value_on_is_unresolved_at_that_call()
             "placeretry writer resource::dynamodb::retried",
             "placetable writer resource::dynamodb::table-first",
             "placetick writer resource::dynamodb::ticked",
+            "sendlist reader resource::dynamodb",
             "sendlist writer resource::dynamodb",
             "sendtable writer resource::dynamodb",
         ],
