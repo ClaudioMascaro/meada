@@ -12,6 +12,9 @@ All notable changes to Meada are recorded here. The format follows
   and a long wildcard segment as many entries: 255 sources that match none of 4,000 files no
   longer take 47 seconds to index, and fall back to the whole build context as other Dockerfiles
   past the reader's work do (#761).
+- The Dockerfile reader splits an instruction and its sources at ASCII blanks only, as Docker
+  does: a source whose name holds a no-break space or another Unicode blank is one path, not two,
+  and a flag that Docker splits inside such a character leaves the Dockerfile unread (#762).
 
 ## [1.4.0] - 2026-11-13
 

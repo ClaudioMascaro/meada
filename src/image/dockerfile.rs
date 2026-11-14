@@ -22,6 +22,14 @@ const PATHS_MAX: usize = 256;
 // Dockerfile is not read.
 const WORK_MAX: usize = 16_384;
 
+/// The blanks Docker's parser splits an instruction and its arguments at (buildkit's
+/// `[\t\v\f\r ]`): ASCII only, so a no-break space stays inside a word (#762).
+const BLANKS: [char; 5] = ['\t', '\x0b', '\x0c', '\r', ' '];
+
+/// Go's `\s` (`[\t\n\f\r ]`), the blanks Docker's regular expressions allow around a parser
+/// directive's `=` and value and after a heredoc's `<<`.
+const SPACES: [char; 5] = ['\t', '\n', '\x0c', '\r', ' '];
+
 /// The bytes of a wildcard segment one directory entry is examined against for one unit of
 /// `WORK_MAX`: `fits` compares the segment with each entry's name, so a longer segment counts
 /// each entry one unit more per `PATTERN_STEP` bytes, and once more at each listing, where
@@ -40,19 +48,21 @@ const PATTERN_STEP: usize = 32;
 pub(super) fn sources(text: &str) -> Result<Vec<String>, Unread> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     for line in text.lines() {
-        // A parser directive is a comment of the form `# name=value` before anything else.
+        // A parser directive is a comment of the form `# name=value` before anything else:
+        // Docker trims any blank before the `#` and the name, and only `SPACES` around the `=`
+        // and the value (#762).
         let Some((name, value)) = line
-            .trim()
+            .trim_start()
             .strip_prefix('#')
             .and_then(|c| c.split_once('='))
         else {
             break;
         };
-        let name = name.trim();
+        let name = name.trim_start().trim_end_matches(SPACES);
         if name.is_empty() || !name.bytes().all(|b| b.is_ascii_alphanumeric()) {
             break;
         }
-        if name.eq_ignore_ascii_case("escape") && value.trim() != "\\" {
+        if name.eq_ignore_ascii_case("escape") && value.trim_matches(SPACES) != "\\" {
             return Err("an escape directive");
         }
     }
@@ -99,8 +109,10 @@ fn instruction(
     lines: &mut std::str::Lines<'_>,
     found: &mut Vec<String>,
 ) -> Result<(), Unread> {
-    let (word, args) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
-    let (word, args) = (word.to_ascii_uppercase(), args.trim());
+    // Docker splits the instruction from its arguments at `BLANKS`; the flags come before any
+    // other trim (`flags`).
+    let (word, args) = line.split_once(BLANKS).unwrap_or((line, ""));
+    let (word, args) = (word.to_ascii_uppercase(), args.trim_start_matches(BLANKS));
     match word.as_str() {
         "COPY" | "ADD" => copy(word == "ADD", args, found)?,
         "RUN" => run(args, found)?,
@@ -132,8 +144,9 @@ fn instruction(
 fn takes_heredocs(word: &str, args: &str) -> Result<bool, Unread> {
     let (word, args) = match word {
         "ONBUILD" => {
-            let (word, args) = args.split_once(char::is_whitespace).unwrap_or((args, ""));
-            (word.to_ascii_uppercase(), args.trim())
+            let args = args.trim();
+            let (word, args) = args.split_once(BLANKS).unwrap_or((args, ""));
+            (word.to_ascii_uppercase(), args.trim_start_matches(BLANKS))
         }
         _ => (word.to_string(), args),
     };
@@ -154,7 +167,7 @@ fn heredoc(word: &str) -> Option<(String, bool)> {
     let rest = word.trim_start_matches(|c: char| c.is_ascii_digit());
     let rest = rest.strip_prefix("<<")?;
     let (tabs, rest) = rest.strip_prefix('-').map_or((false, rest), |r| (true, r));
-    let rest = rest.trim_start_matches(['\t', '\n', '\x0c', '\r', ' ']);
+    let rest = rest.trim_start_matches(SPACES);
     if rest.contains('<') {
         return None;
     }
@@ -241,19 +254,24 @@ fn variable(
 /// The `--name=value` flags of an instruction, as (lowercase name, value) pairs.
 type Flags = Vec<(String, String)>;
 
-/// The leading flags of an instruction and what follows them.
+/// The leading flags of an instruction and what follows them, trimmed. Docker reads the flags
+/// first, byte by byte: a flag ends at a byte Go's `unicode.IsSpace` takes for a blank, which
+/// `0x85` and `0xA0` are, inside a no-break space too (#762).
 fn flags(mut args: &str) -> Result<(Flags, &str), Unread> {
     let mut out = Vec::new();
     while let Some(rest) = args.strip_prefix("--") {
-        let (flag, tail) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
+        let (flag, tail) = rest.split_once(BLANKS).unwrap_or((rest, ""));
         if flag.contains(['"', '\'']) {
             return Err("a quoted flag");
         }
+        if flag.bytes().any(|b| b == 0x85 || b == 0xa0) {
+            return Err("a flag Docker splits inside a character");
+        }
         let (name, value) = flag.split_once('=').unwrap_or((flag, ""));
         out.push((name.to_ascii_lowercase(), value.to_string()));
-        args = tail.trim_start();
+        args = tail.trim_start_matches(BLANKS);
     }
-    Ok((out, args))
+    Ok((out, args.trim()))
 }
 
 fn copy(add: bool, args: &str, found: &mut Vec<String>) -> Result<(), Unread> {
@@ -268,9 +286,12 @@ fn copy(add: bool, args: &str, found: &mut Vec<String>) -> Result<(), Unread> {
             _ => return Err("a COPY or ADD flag this reader does not know"),
         }
     }
-    // A JSON list is read as one; anything else is split at blanks, as Docker's parser does.
-    let words = serde_json::from_str::<Vec<String>>(args)
-        .unwrap_or_else(|_| args.split_whitespace().map(str::to_string).collect());
+    // A JSON list is read as one; anything else is split at `BLANKS`, as Docker's parser does.
+    let words = serde_json::from_str::<Vec<String>>(args).unwrap_or_else(|_| {
+        (args.split(BLANKS).filter(|w| !w.is_empty()))
+            .map(str::to_string)
+            .collect()
+    });
     let Some((_, sources)) = words.split_last().filter(|(_, s)| !s.is_empty()) else {
         return Err("a COPY or ADD with no destination");
     };
@@ -1301,6 +1322,70 @@ mod tests {
             );
             let _ = std::fs::remove_dir_all(root);
         }
+    }
+
+    /// Docker splits a `COPY` into words at ASCII blanks only (#762): a no-break space stays
+    /// inside a source's name, which `docker build` copies whole.
+    #[test]
+    fn a_no_break_space_stays_inside_a_source() {
+        assert_eq!(
+            ok("COPY backend\u{a0}frontend /out/"),
+            ["backend\u{a0}frontend"]
+        );
+        let files = ["backend\u{a0}frontend", "backend/a.py", "frontend/b.ts"];
+        let root = repo("nbsp", &files);
+        let text = "FROM scratch\nCOPY backend\u{a0}frontend /out/\n";
+        let codes = executions(&root, &node(".", Some((text, true))), usize::MAX);
+        assert_eq!(paths(&codes), ["backend\u{a0}frontend"]);
+        assert!(!codes[0].inferred);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// An instruction ends at an ASCII blank: `COPY` and a no-break space make one word, an
+    /// instruction Docker does not know (#762).
+    #[test]
+    fn a_no_break_space_does_not_end_an_instruction() {
+        assert_eq!(
+            unread("COPY\u{a0}a /x/"),
+            "an instruction this reader does not know"
+        );
+    }
+
+    /// Docker reads the flags before it trims the arguments: a no-break space before a `--`,
+    /// after the instruction or after a flag, makes it no flag, so Docker copies it as a source
+    /// (#762).
+    #[test]
+    fn a_no_break_space_before_a_dash_dash_makes_no_flag() {
+        assert_eq!(ok("COPY \u{a0}--from=x a /x/"), ["--from=x", "a"]);
+        assert_eq!(ok("COPY --chown=1 \u{a0}--from=x a /x/"), ["--from=x", "a"]);
+    }
+
+    /// Docker splits a flag byte by byte, so a no-break space splits a flag inside the character:
+    /// the Dockerfile is not read (#762).
+    #[test]
+    fn a_no_break_space_inside_a_flag_leaves_the_dockerfile_unread() {
+        assert_eq!(
+            unread("COPY --chown=1\u{a0}a /x/"),
+            "a flag Docker splits inside a character"
+        );
+    }
+
+    /// The instruction of an `ONBUILD` ends at an ASCII blank too: `RUN` and a no-break space open
+    /// no heredoc, so the next line is an instruction (#762).
+    #[test]
+    fn a_no_break_space_after_onbuild_run_opens_no_heredoc() {
+        assert_eq!(ok("ONBUILD RUN\u{a0}<<EOF\nCOPY a /x/\n"), ["a"]);
+    }
+
+    /// Docker trims only Go's `\s` around a parser directive's `=` and value: a no-break space
+    /// before the `=` makes no directive, and one after the value an escape Docker refuses (#762).
+    #[test]
+    fn a_no_break_space_in_a_parser_directive_is_no_blank() {
+        assert_eq!(ok("# escape\u{a0}=`\nCOPY a /x/\n"), ["a"]);
+        assert_eq!(
+            unread("# escape=\\\u{a0}\nCOPY a /x/\n"),
+            "an escape directive"
+        );
     }
 
     #[test]
