@@ -19,6 +19,8 @@ CHANGELOG_ITEM_LINES = 10  # one Unreleased item per change: a longer one is sev
 # Harness tooling, self-tested by `static`, never product.
 HARNESS_SCRIPTS = (".claude/skills/verify-blackbox/scripts/", ".claude/skills/meada-feedback/scripts/")
 DEPLOY_WORKFLOWS = {f".github/workflows/{name}.yml" for name in ("compose", "helm", "container", "release")}
+# A machine that leaves the push gate to CI (a small one, where the full gate gets OOM-killed).
+CI_GATE = Path.home() / ".config/meada/ci-gate"
 
 
 def run(*args, capture=False, input=None):
@@ -292,7 +294,12 @@ def static(args, paths, tree):
         if Path(script).exists() and "--selftest" in Path(script).read_text():
             run(sys.executable, script, "--selftest")
     if any(p.startswith("deploy/helm/") or p == "scripts/helm-check" for p in paths):
+        if not shutil.which("helm"):
+            raise RuntimeError("helm is not on PATH: install CI's pin (v3.19.0, .github/workflows/helm.yml) "
+                               "or leave the chart's check to CI")
         bounded(sys.executable, "scripts/helm-check")
+    if any(p.startswith("docs/reference/") for p in paths):
+        print("docs/reference changed: tests/it/grammar.rs reads it; `--scope grammar` or `--scope auto` runs it.", flush=True)
     skill_names = {Path(p).parts[2] for p in paths if p.startswith(".agents/skills/") and len(Path(p).parts) > 2}
     lock = Path(".agents/skills-lock.json")
     if lock.exists() and (skill_names or str(lock) in paths):
@@ -347,6 +354,27 @@ def cloud_features(paths):
     return sorted(features)
 
 
+def auto_scopes(paths):
+    """`--scope auto`: each changed Rust module as its path in the crate (`src/lang/go/mod.rs`
+    gives `lang::go::`, so a short name such as `ts` does not match every `tests` module),
+    `grammar` when `docs/reference` changes (tests/it/grammar.rs reads it), and `stored_format`,
+    the index schema golden a change to any module may move. A `meada-core` module selects meada's
+    tests of the same path; meada-core's own tests, and tests elsewhere that use a module, are CI's
+    to find."""
+    names = {"stored_format"}
+    for path in paths:
+        if path.startswith("docs/reference/"):
+            names.add("grammar")
+        root = next((r for r in ("src/", "meada-core/src/", "tests/it/") if path.startswith(r)), None)
+        if root and path.endswith(".rs"):
+            parts = path[len(root):-3].split("/")
+            if parts[-1] == "mod":
+                parts.pop()
+            if parts not in ([], ["lib"], ["main"]):
+                names.add("::".join(parts) + "::")
+    return sorted(names)
+
+
 def scoped_commands(scopes):
     """A commit's product checks between pushes: fmt, clippy and the unit and `tests/it` tests
     whose path holds one of `scopes` (a module name such as `iac`)."""
@@ -393,6 +421,12 @@ def selftest():
         found = scopes(paths)
         assert (found["product"], found["cli"], found["console"]) == (product, cli, console), (paths, found)
     assert scopes(["tests/golden/query.txt"])["goldens"]
+    assert auto_scopes(["src/lang/kotlin.rs", "src/iac/mod.rs", "src/lib.rs", "tests/it/test_routes.rs",
+                        "meada-core/src/export.rs", "docs/agents/map.md", "src/lang/kotlin.rs",
+                        "src/http/ts.rs", "src/lang/go/mod.rs", "tests/it/main.rs"]) == [
+        "export::", "http::ts::", "iac::", "lang::go::", "lang::kotlin::", "stored_format", "test_routes::"]
+    assert auto_scopes(["README.md"]) == ["stored_format"]
+    assert auto_scopes(["docs/reference/output-grammar.md"]) == ["grammar", "stored_format"]
     assert all(scopes([".claude/skills/prove-meada/scripts/prove.py"])[key] for key in ("goldens", "deploy"))
     assert scopes(["ui/src/local.ts"])["accounts"]
     assert scopes(["deploy/compose/console.yml"])["deploy"]
@@ -588,7 +622,8 @@ def main():
     parser.add_argument("--unpushed", action="store_true",
                         help="check every commit not yet on the branch's upstream, or on origin/main without one (the push gate)")
     parser.add_argument("--scope", action="append", metavar="NAME",
-                        help="run only the product tests whose path holds NAME (repeatable)")
+                        help="run only the product tests whose path holds NAME (repeatable); "
+                             "`auto` adds each changed module's path, grammar for docs/reference, and stored_format")
     options = parser.parse_args()
     if options.selftest:
         selftest()
@@ -614,10 +649,19 @@ def main():
         print("\n".join(lines))
         return
     static(args, paths, tree)
-    if not options.static and selected["product"] and options.scope:
-        for command in scoped_commands(options.scope):
+    # Tests read docs/reference (the output grammar), so a named scope runs there too.
+    if not options.static and options.scope and (
+            selected["product"] or any(p.startswith("docs/reference/") for p in paths)):
+        names = [s for s in options.scope if s != "auto"]
+        if "auto" in options.scope:
+            names = sorted(set(names) | set(auto_scopes(paths)))
+            print(f"--scope auto: {' '.join(names)}", flush=True)
+        for command in scoped_commands(names):
             bounded(*command)
     elif not options.static and selected["product"]:
+        if CI_GATE.exists():
+            raise RuntimeError(f"{CI_GATE} exists: this machine's push gate is CI. "
+                               "Check the change with `--scope <name>` (or `--scope auto`) and push")
         product_gate(paths)
     elif not options.static:
         print("Documentation/harness candidate: product builds and E2E are not selected.")
