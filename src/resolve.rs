@@ -4813,6 +4813,9 @@ pub struct Expanded<'a, R> {
     pub found: R,
 }
 
+/// Positional and keyword arguments, folded (`Code::folded`).
+type Folded = (Vec<Value>, Vec<(String, Value)>);
+
 /// Arguments as written in `path` within `scope`, read on behalf of the call `at`.
 struct Written<'a, 'i> {
     path: &'a str,
@@ -6522,7 +6525,7 @@ impl<'a> Code<'a> {
     /// unknown.
     pub fn value(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Value {
         let folded = self.eval(path, scope, value, &[], 0, &mut Fold::default(), &mut None);
-        unbind(folded, false)
+        unbind(folded, false, &[])
     }
 
     /// The constant `name` refers to from `scope` in `path`: its file and qualified name, and
@@ -6898,8 +6901,11 @@ impl<'a> Code<'a> {
     /// depend on its parameters. `read` answers `None` when what it needs holds a `Ref`: a
     /// parameter of the enclosing function, which makes that function a client wrapper. Each
     /// call site of the wrapper is then read with its own arguments substituted, through any
-    /// number of wrapper levels. A wrapper reached again through its own callers (a cycle) adds
-    /// nothing; a wrapper nobody calls is read where it stands, its parameters unknown.
+    /// number of wrapper levels. A wrapper reached again through its own callers closes a cycle.
+    /// Where the cycle's calls hand on, in each parameter `read` needs, that parameter itself,
+    /// another turn reads what the first did and adds nothing; where they hand on anything else,
+    /// the call that closes the cycle is read where it stands, the wrapper's parameters unknown
+    /// (#886). A wrapper nobody calls is read where it stands too.
     // ponytail: every simple path up the wrappers' callers is walked; memoize per (wrapper,
     // call site) if a dense call graph makes this slow.
     pub fn expand<R>(
@@ -7018,49 +7024,12 @@ impl<'a> Code<'a> {
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
         out: &mut Vec<Expanded<'a, R>>,
     ) {
-        let &Written {
-            path,
-            scope,
-            args,
-            kwargs,
-            ..
-        } = written;
         let (site, at) = frames.last().map_or(written.at, |f| (f.path, f.index));
         if !self.charge(site, 1) {
             return;
         }
-        let mut wants = None;
         let chain = written.chain.is_some();
-        let mut eval = |v: &'a Value| {
-            let fold = &mut Fold {
-                chain,
-                inject: written.inject,
-                selected: (written.writes).map(|writes| mutations::Selection {
-                    site: Some(written.at),
-                    writes,
-                }),
-                ..Fold::default()
-            };
-            self.eval(path, scope, v, frames, 0, fold, &mut wants)
-        };
-        let (values, kwargs): (Vec<Value>, Vec<(String, Value)>) = match written.chain {
-            Some(call) => {
-                let receiver = call.receiver.as_ref().map(|r| Box::new(eval(r)));
-                let invocation = Invocation {
-                    callee: call.callee.clone(),
-                    receiver,
-                    args: call.args.iter().map(&mut eval).collect(),
-                    kwargs: Vec::new(),
-                    range: call.range.clone(),
-                };
-                let kwargs = (call.kwargs.iter()).map(|(k, v)| (k.clone(), eval(v)));
-                (vec![Value::Call(invocation)], kwargs.collect())
-            }
-            None => (
-                args.iter().map(&mut eval).collect(),
-                (kwargs.iter()).map(|(k, v)| (k.clone(), eval(v))).collect(),
-            ),
-        };
+        let ((values, kwargs), wants) = self.folded(written, frames);
         if let Some(found) = read(&values, &kwargs) {
             out.push(Expanded {
                 site: (site, at),
@@ -7072,7 +7041,11 @@ impl<'a> Code<'a> {
         let Some(wrapper) = wants else {
             return;
         };
-        if frames.iter().any(|f| f.def == wrapper) {
+        // A wrapper reached again closes a cycle: another turn of it is climbed no further.
+        let cycle = frames.iter().position(|f| f.def == wrapper);
+        if let Some(first) = cycle
+            && !self.cycle_changes(written, frames, first, wrapper, read)
+        {
             return;
         }
         // A call that only matches the wrapper's name may be on any object, or reach another
@@ -7083,11 +7056,12 @@ impl<'a> Code<'a> {
         let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
             .copied()
             .collect();
-        // A wrapper `WRAPPER_DEPTH` calls up is read where it stands too.
-        if callers.is_empty() || frames.len() >= WRAPPER_DEPTH {
-            let values: Vec<Value> = values.into_iter().map(|v| unbind(v, chain)).collect();
+        // A wrapper `WRAPPER_DEPTH` calls up is read where it stands too, and so is the call
+        // that closes a cycle and sends what the first turn did not.
+        if cycle.is_some() || callers.is_empty() || frames.len() >= WRAPPER_DEPTH {
+            let values: Vec<Value> = values.into_iter().map(|v| unbind(v, chain, &[])).collect();
             let kwargs: Vec<(String, Value)> = (kwargs.into_iter())
-                .map(|(k, v)| (k, unbind(v, chain)))
+                .map(|(k, v)| (k, unbind(v, chain, &[])))
                 .collect();
             out.extend(read(&values, &kwargs).map(|found| Expanded {
                 site: (site, at),
@@ -7105,6 +7079,99 @@ impl<'a> Code<'a> {
             self.walk(written, frames, read, out);
             frames.pop();
         }
+    }
+
+    /// The arguments of `written` folded under `frames`, and the function whose parameter one
+    /// of them still names (`eval`).
+    fn folded(
+        &self,
+        written: &Written<'a, '_>,
+        frames: &[Frame<'a>],
+    ) -> (Folded, Option<Target<'a>>) {
+        let &Written {
+            path,
+            scope,
+            args,
+            kwargs,
+            ..
+        } = written;
+        let mut wants = None;
+        let chain = written.chain.is_some();
+        let mut eval = |v: &'a Value| {
+            let fold = &mut Fold {
+                chain,
+                inject: written.inject,
+                selected: (written.writes).map(|writes| mutations::Selection {
+                    site: Some(written.at),
+                    writes,
+                }),
+                ..Fold::default()
+            };
+            self.eval(path, scope, v, frames, 0, fold, &mut wants)
+        };
+        let folded = match written.chain {
+            Some(call) => {
+                let receiver = call.receiver.as_ref().map(|r| Box::new(eval(r)));
+                let invocation = Invocation {
+                    callee: call.callee.clone(),
+                    receiver,
+                    args: call.args.iter().map(&mut eval).collect(),
+                    kwargs: Vec::new(),
+                    range: call.range.clone(),
+                };
+                let kwargs = (call.kwargs.iter()).map(|(k, v)| (k.clone(), eval(v)));
+                (vec![Value::Call(invocation)], kwargs.collect())
+            }
+            None => (
+                args.iter().map(&mut eval).collect(),
+                (kwargs.iter()).map(|(k, v)| (k.clone(), eval(v))).collect(),
+            ),
+        };
+        (folded, wants)
+    }
+
+    /// Whether a turn of the cycle `frames[first..]` closes on `wrapper` sends what the first
+    /// did not: its calls hand on, in a parameter `read` needs, anything but that parameter
+    /// (another parameter, a value made from one, a value of the caller's). A retry that passes
+    /// its parameters on and counts down does not (#886).
+    fn cycle_changes<R>(
+        &self,
+        written: &Written<'a, '_>,
+        frames: &[Frame<'a>],
+        first: usize,
+        wrapper: Target<'a>,
+        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
+    ) -> bool {
+        let chain = written.chain.is_some();
+        let def = self.resolver.defs[wrapper.path][wrapper.name];
+        let names = (def.params.iter())
+            .flat_map(|p| std::iter::once(&p.name).chain(p.fields.iter().map(|f| &f.name)));
+        // The parameters a turn gives another value: each is read as the cycle's calls bind it.
+        let changed: Vec<&str> = names
+            .map(String::as_str)
+            .filter(|&name| {
+                let fold = &mut Fold {
+                    chain,
+                    ..Fold::default()
+                };
+                let (path, scope) = (wrapper.path, wrapper.name);
+                let handed = self.name(path, scope, name, frames, first, fold, &mut None);
+                !matches!(&handed, Value::Ref(same) if same == name)
+            })
+            .collect();
+        if changed.is_empty() {
+            return false;
+        }
+        // What the first turn read, with those parameters alone left as names: `read` answers
+        // `None` when it needs one of them.
+        let ((values, kwargs), _) = self.folded(written, &frames[..first]);
+        let values: Vec<Value> = (values.into_iter())
+            .map(|v| unbind(v, chain, &changed))
+            .collect();
+        let kwargs: Vec<(String, Value)> = (kwargs.into_iter())
+            .map(|(k, v)| (k, unbind(v, chain, &changed)))
+            .collect();
+        read(&values, &kwargs).is_none()
     }
 
     /// Whether a call that is no exact caller may reach `function`: a name match (`Inferred`,
@@ -7699,16 +7766,19 @@ fn object_value(value: &Value) -> Option<usize> {
     }
 }
 
-fn unbind(value: Value, chain: bool) -> Value {
-    let unbind = |v| unbind(v, chain);
+/// `value` with the parameters it still names unknown, but the ones of `keep`.
+fn unbind(value: Value, chain: bool, keep: &[&str]) -> Value {
+    let unbind = |v| unbind(v, chain, keep);
     match value {
-        Value::Ref(_) => Value::Unknown,
+        Value::Ref(name) if !keep.contains(&name.as_str()) => Value::Unknown,
         Value::Str(parts) => Value::Str(
             parts
                 .into_iter()
                 .map(|p| match p {
                     // What remains a name is a parameter no call site binds (#801).
-                    Part::Ref(name) => Part::Limit(crate::lang::Limit::Parameter(name)),
+                    Part::Ref(name) if !keep.contains(&name.as_str()) => {
+                        Part::Limit(crate::lang::Limit::Parameter(name))
+                    }
                     p => p,
                 })
                 .collect(),

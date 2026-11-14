@@ -126,6 +126,13 @@ All notable changes to Meada are recorded here. The format follows
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
 
+- A wrapper that calls itself, or two that call each other, with another value in the parameter
+  a read needs (`send(ctx, n-1, b, "")` under `send(ctx, n, a, b string)`) no longer drops what
+  that call sends: the call is an unresolved side or contract of its own, beside the names each
+  caller's first pass gives. A retry that passes the same parameter on reads as before. This
+  holds for every reader that follows a wrapper to its callers: HTTP clients, message producers
+  and consumers, and the AWS SDK sides, a Go transaction's list, request or entry included
+  (#886).
 - The Dockerfile reader counts every directory entry a wildcard source examines, matched or not,
   and a long wildcard segment as many entries: 255 sources that match none of 4,000 files no
   longer take 47 seconds to index, and fall back to the whole build context as other Dockerfiles
