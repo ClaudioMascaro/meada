@@ -1257,6 +1257,12 @@ mod tests {
                 "{case}: {took:?}"
             );
         }
+        // A segment past `PATTERN_STEP` counts each entry twice, and the 4,000 still fit.
+        let one = format!("COPY {}*3999 /x/\n", "a".repeat(40));
+        let codes = executions(&root, &node(".", Some((&one, true))), usize::MAX);
+        let name = format!("{}3999", "a".repeat(250));
+        assert_eq!(paths(&codes), [name.as_str()]);
+        assert!(!codes[0].inferred, "{}", codes[0].reason);
         let _ = std::fs::remove_dir_all(root);
     }
 
