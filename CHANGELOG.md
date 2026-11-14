@@ -114,6 +114,14 @@ All notable changes to Meada are recorded here. The format follows
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
 
+- The Dockerfile reader counts every directory entry a wildcard source examines, matched or not,
+  and a long wildcard segment as many entries: 255 sources that match none of 4,000 files no
+  longer take 47 seconds to index, and fall back to the whole build context as other Dockerfiles
+  past the reader's work do (#761).
+- The Dockerfile reader splits an instruction and its sources at ASCII blanks only, as Docker
+  does: a source whose name holds a no-break space or another Unicode blank is one path, not two,
+  and a flag past ASCII, which Docker reads one byte as one character, leaves the Dockerfile
+  unread (#762).
 - Terraform evaluation sizes a variable once per expression however many times the expression
   reads it, and a name every instance of a `count` or `for_each` shares (one that reads neither
   `each` nor `count`) is evaluated once when it is known: a name reading a 21,000-element

@@ -22,6 +22,23 @@ const PATHS_MAX: usize = 256;
 // Dockerfile is not read.
 const WORK_MAX: usize = 16_384;
 
+/// The blanks Docker's parser splits an instruction and its arguments at (buildkit's
+/// `[\t\v\f\r ]`): ASCII only, so a no-break space stays inside a word (#762).
+const BLANKS: [char; 5] = ['\t', '\x0b', '\x0c', '\r', ' '];
+
+/// Go's `\s` (`[\t\n\f\r ]`), the blanks Docker's regular expressions allow around a parser
+/// directive's `=` and value and after a heredoc's `<<`.
+const SPACES: [char; 5] = ['\t', '\n', '\x0c', '\r', ' '];
+
+/// The bytes of a wildcard segment one directory entry is examined against for one unit of
+/// `WORK_MAX`: `fits` compares the segment with each entry's name, so a longer segment counts
+/// each entry one unit more per `PATTERN_STEP` bytes, and once more at each listing, where
+/// `compile` reads it (#761).
+// ponytail: a segment of up to 32 bytes (`requirements-*.txt`) counts an entry once and its
+// listing nothing, as before #761; past it the reader's matching costs at most 255 bytes of a
+// name times 32 per unit, about 134 million comparisons for `WORK_MAX`.
+const PATTERN_STEP: usize = 32;
+
 /// The sources a Dockerfile's `COPY`, `ADD` and `RUN --mount=type=bind` take from the build
 /// context, each normalized from the context root (`.` for the whole of it) with a wildcard still
 /// in it. `COPY --from`, `ADD` of a URL or a git repository, a heredoc and every other mount read
@@ -31,19 +48,21 @@ const WORK_MAX: usize = 16_384;
 pub(super) fn sources(text: &str) -> Result<Vec<String>, Unread> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     for line in text.lines() {
-        // A parser directive is a comment of the form `# name=value` before anything else.
+        // A parser directive is a comment of the form `# name=value` before anything else:
+        // Docker trims any blank before the `#` and the name, and only `SPACES` around the `=`
+        // and the value (#762).
         let Some((name, value)) = line
-            .trim()
+            .trim_start()
             .strip_prefix('#')
             .and_then(|c| c.split_once('='))
         else {
             break;
         };
-        let name = name.trim();
+        let name = name.trim_start().trim_end_matches(SPACES);
         if name.is_empty() || !name.bytes().all(|b| b.is_ascii_alphanumeric()) {
             break;
         }
-        if name.eq_ignore_ascii_case("escape") && value.trim() != "\\" {
+        if name.eq_ignore_ascii_case("escape") && value.trim_matches(SPACES) != "\\" {
             return Err("an escape directive");
         }
     }
@@ -90,8 +109,10 @@ fn instruction(
     lines: &mut std::str::Lines<'_>,
     found: &mut Vec<String>,
 ) -> Result<(), Unread> {
-    let (word, args) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
-    let (word, args) = (word.to_ascii_uppercase(), args.trim());
+    // Docker splits the instruction from its arguments at `BLANKS`; the flags come before any
+    // other trim (`flags`).
+    let (word, args) = line.split_once(BLANKS).unwrap_or((line, ""));
+    let (word, args) = (word.to_ascii_uppercase(), args.trim_start_matches(BLANKS));
     match word.as_str() {
         "COPY" | "ADD" => copy(word == "ADD", args, found)?,
         "RUN" => run(args, found)?,
@@ -123,8 +144,9 @@ fn instruction(
 fn takes_heredocs(word: &str, args: &str) -> Result<bool, Unread> {
     let (word, args) = match word {
         "ONBUILD" => {
-            let (word, args) = args.split_once(char::is_whitespace).unwrap_or((args, ""));
-            (word.to_ascii_uppercase(), args.trim())
+            let args = args.trim();
+            let (word, args) = args.split_once(BLANKS).unwrap_or((args, ""));
+            (word.to_ascii_uppercase(), args.trim_start_matches(BLANKS))
         }
         _ => (word.to_string(), args),
     };
@@ -145,7 +167,7 @@ fn heredoc(word: &str) -> Option<(String, bool)> {
     let rest = word.trim_start_matches(|c: char| c.is_ascii_digit());
     let rest = rest.strip_prefix("<<")?;
     let (tabs, rest) = rest.strip_prefix('-').map_or((false, rest), |r| (true, r));
-    let rest = rest.trim_start_matches(['\t', '\n', '\x0c', '\r', ' ']);
+    let rest = rest.trim_start_matches(SPACES);
     if rest.contains('<') {
         return None;
     }
@@ -169,7 +191,8 @@ fn heredoc(word: &str) -> Option<(String, bool)> {
 
 /// The words Docker's shell lexer splits a line into to find its heredocs, keeping quotes, escapes
 /// and unset variables as written: a blank ends a word unless it is quoted, escaped or right after
-/// `<<`. `None` when the lexer fails on the line, which then opens no heredoc.
+/// `<<`. The lexer's blanks are Unicode white space, unlike the parser's `BLANKS` (#762). `None`
+/// when the lexer fails on the line, which then opens no heredoc.
 fn words(line: &str) -> Result<Option<Vec<String>>, Unread> {
     let (mut out, mut word, mut chars) = (Vec::new(), String::new(), line.chars().peekable());
     while let Some(c) = chars.next() {
@@ -232,19 +255,25 @@ fn variable(
 /// The `--name=value` flags of an instruction, as (lowercase name, value) pairs.
 type Flags = Vec<(String, String)>;
 
-/// The leading flags of an instruction and what follows them.
+/// The leading flags of an instruction and what follows them, trimmed. Docker reads the flags
+/// first, one byte as one character: a flag ends at a byte Go's `unicode.IsSpace` takes for a
+/// blank, which `0x85` and `0xA0` are inside a UTF-8 character too, and any other byte past
+/// ASCII becomes another character, so a flag past ASCII is not read (#762).
 fn flags(mut args: &str) -> Result<(Flags, &str), Unread> {
     let mut out = Vec::new();
     while let Some(rest) = args.strip_prefix("--") {
-        let (flag, tail) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
+        let (flag, tail) = rest.split_once(BLANKS).unwrap_or((rest, ""));
         if flag.contains(['"', '\'']) {
             return Err("a quoted flag");
         }
+        if !flag.is_ascii() {
+            return Err("a flag past ASCII");
+        }
         let (name, value) = flag.split_once('=').unwrap_or((flag, ""));
         out.push((name.to_ascii_lowercase(), value.to_string()));
-        args = tail.trim_start();
+        args = tail.trim_start_matches(BLANKS);
     }
-    Ok((out, args))
+    Ok((out, args.trim()))
 }
 
 fn copy(add: bool, args: &str, found: &mut Vec<String>) -> Result<(), Unread> {
@@ -259,9 +288,12 @@ fn copy(add: bool, args: &str, found: &mut Vec<String>) -> Result<(), Unread> {
             _ => return Err("a COPY or ADD flag this reader does not know"),
         }
     }
-    // A JSON list is read as one; anything else is split at blanks, as Docker's parser does.
-    let words = serde_json::from_str::<Vec<String>>(args)
-        .unwrap_or_else(|_| args.split_whitespace().map(str::to_string).collect());
+    // A JSON list is read as one; anything else is split at `BLANKS`, as Docker's parser does.
+    let words = serde_json::from_str::<Vec<String>>(args).unwrap_or_else(|_| {
+        (args.split(BLANKS).filter(|w| !w.is_empty()))
+            .map(str::to_string)
+            .collect()
+    });
     let Some((_, sources)) = words.split_last().filter(|(_, s)| !s.is_empty()) else {
         return Err("a COPY or ADD with no destination");
     };
@@ -457,18 +489,27 @@ impl Walk<'_> {
         }
         let tokens = compile(head).ok_or("a malformed wildcard")?;
         let entries = contract::list(self.root, dir).ok_or("a directory too large to list")?;
-        self.work += entries.len();
+        // Every entry listed is examined, matched or not, and a segment past `PATTERN_STEP` was
+        // compiled, which a long one over many empty directories would repeat for free (#761).
+        let weight = head.len().div_ceil(PATTERN_STEP);
+        let compiled = usize::from(weight > 1);
+        self.spend((entries.len().saturating_add(compiled)).saturating_mul(weight))?;
         for (name, kind) in entries.into_iter().filter(|(name, _)| fits(&tokens, name)) {
             self.take(join(dir, &name), kind, rest)?;
         }
         Ok(())
     }
 
-    fn take(&mut self, path: String, kind: Probe, rest: &[&str]) -> Result<(), Unread> {
-        self.work += 1;
-        if self.work > WORK_MAX {
-            return Err("more files than the reader examines");
+    fn spend(&mut self, work: usize) -> Result<(), Unread> {
+        self.work = self.work.saturating_add(work);
+        match self.work > WORK_MAX {
+            true => Err("more files than the reader examines"),
+            false => Ok(()),
         }
+    }
+
+    fn take(&mut self, path: String, kind: Probe, rest: &[&str]) -> Result<(), Unread> {
+        self.spend(1)?;
         match (kind, rest.is_empty()) {
             (Probe::Link, _) => Err("a symbolic link"),
             (Probe::Dir | Probe::File, true) => {
@@ -1210,6 +1251,147 @@ mod tests {
         );
         assert!(start.elapsed() < std::time::Duration::from_secs(10));
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// Every entry a wildcard lists is examined, matched or not, and a long segment costs each
+    /// entry as much as many short ones (#761). 4,000 names of 250 bytes: 255 sources of 32
+    /// bytes that match none of them, then one source whose class lists 50,000 characters, each
+    /// past `WORK_MAX` before it compares every entry with every source.
+    #[test]
+    fn a_wildcard_spends_every_entry_it_lists_and_its_length() {
+        let names: Vec<String> = (0..4000)
+            .map(|i| format!("{}{i}", "a".repeat(250)))
+            .collect();
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        let root = repo("nomatch", &names);
+        let short: String = (0..255)
+            .map(|i| format!("COPY *{}b{i} /x/\n", "a".repeat(27)))
+            .collect();
+        let class = "bcdefghijklmnopqrstuvwxyz".repeat(2000);
+        let long = format!("COPY *[{class}] /x/\n");
+        // A long segment is compiled at each listing, of an empty directory too.
+        let empty = repo("empty", &[]);
+        for i in 0..4000 {
+            std::fs::create_dir_all(empty.join(format!("d{i}"))).unwrap();
+        }
+        let deep = format!("COPY */[{class}] /x/\n");
+        for (case, dir, text) in [
+            ("short", &root, short),
+            ("long", &root, long),
+            ("empty", &empty, deep),
+        ] {
+            let start = std::time::Instant::now();
+            let codes = executions(dir, &node(".", Some((&text, true))), usize::MAX);
+            let took = start.elapsed();
+            let reason = codes.first().map(|c| c.reason.as_str());
+            assert!(
+                reason
+                    .is_some_and(|r| r.ends_with("not read: more files than the reader examines")),
+                "{case}: {reason:?} after {took:?}"
+            );
+            assert!(
+                took < std::time::Duration::from_secs(10),
+                "{case}: {took:?}"
+            );
+        }
+        // A segment past `PATTERN_STEP` counts each entry twice, and the 4,000 still fit.
+        let one = format!("COPY {}*3999 /x/\n", "a".repeat(40));
+        let codes = executions(&root, &node(".", Some((&one, true))), usize::MAX);
+        let name = format!("{}3999", "a".repeat(250));
+        assert_eq!(paths(&codes), [name.as_str()]);
+        assert!(!codes[0].inferred, "{}", codes[0].reason);
+        let _ = std::fs::remove_dir_all(root);
+        let _ = std::fs::remove_dir_all(empty);
+    }
+
+    /// A segment of up to `PATTERN_STEP` bytes spends what it spent before #761: one unit an entry
+    /// listed and one a path taken, so four sources over 4,000 entries that take 96 each spend
+    /// `WORK_MAX` exactly and are read, and 97 each go past it.
+    #[test]
+    fn a_short_wildcard_spends_one_unit_an_entry_up_to_the_cap() {
+        for (matched, read) in [(96, true), (97, false)] {
+            let names: Vec<String> = (0..4000)
+                .map(|i| format!("{}{i}", if i < matched { "f" } else { "g" }))
+                .collect();
+            let names: Vec<&str> = names.iter().map(String::as_str).collect();
+            let root = repo("short", &names);
+            let text = "COPY f* /x/\n".repeat(4);
+            let codes = executions(&root, &node(".", Some((&text, true))), usize::MAX);
+            assert_eq!(
+                codes.len() == matched && !codes[0].inferred,
+                read,
+                "{matched}"
+            );
+            let _ = std::fs::remove_dir_all(root);
+        }
+    }
+
+    /// Docker splits a `COPY` into words at ASCII blanks only (#762): a no-break space stays
+    /// inside a source's name, which `docker build` copies whole.
+    #[test]
+    fn a_no_break_space_stays_inside_a_source() {
+        assert_eq!(
+            ok("COPY backend\u{a0}frontend /out/"),
+            ["backend\u{a0}frontend"]
+        );
+        let files = ["backend\u{a0}frontend", "backend/a.py", "frontend/b.ts"];
+        let root = repo("nbsp", &files);
+        let text = "FROM scratch\nCOPY backend\u{a0}frontend /out/\n";
+        let codes = executions(&root, &node(".", Some((text, true))), usize::MAX);
+        assert_eq!(paths(&codes), ["backend\u{a0}frontend"]);
+        assert!(!codes[0].inferred);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// An instruction ends at an ASCII blank: `COPY` and a no-break space make one word, an
+    /// instruction Docker does not know (#762).
+    #[test]
+    fn a_no_break_space_does_not_end_an_instruction() {
+        assert_eq!(
+            unread("COPY\u{a0}a /x/"),
+            "an instruction this reader does not know"
+        );
+    }
+
+    /// Docker reads the flags before it trims the arguments: a no-break space before a `--`,
+    /// after the instruction or after a flag, makes it no flag, so Docker copies it as a source
+    /// (#762).
+    #[test]
+    fn a_no_break_space_before_a_dash_dash_makes_no_flag() {
+        assert_eq!(ok("COPY \u{a0}--from=x a /x/"), ["--from=x", "a"]);
+        assert_eq!(ok("COPY --chown=1 \u{a0}--from=x a /x/"), ["--from=x", "a"]);
+    }
+
+    /// Docker reads a flag one byte as one character: a no-break space splits it inside the
+    /// character, `à` becomes two characters, and an ideographic space, no blank to the parser,
+    /// stays inside the flag and changes too. The Dockerfile is not read (#762).
+    #[test]
+    fn a_flag_past_ascii_leaves_the_dockerfile_unread() {
+        for text in [
+            "COPY --chown=1\u{a0}a /x/",
+            "COPY --chown=jos\u{e0} a /x/",
+            "COPY --chown=1\u{3000}a b /x/",
+        ] {
+            assert_eq!(unread(text), "a flag past ASCII", "{text:?}");
+        }
+    }
+
+    /// The instruction of an `ONBUILD` ends at an ASCII blank too: `RUN` and a no-break space open
+    /// no heredoc, so the next line is an instruction (#762).
+    #[test]
+    fn a_no_break_space_after_onbuild_run_opens_no_heredoc() {
+        assert_eq!(ok("ONBUILD RUN\u{a0}<<EOF\nCOPY a /x/\n"), ["a"]);
+    }
+
+    /// Docker trims only Go's `\s` around a parser directive's `=` and value: a no-break space
+    /// before the `=` makes no directive, and one after the value an escape Docker refuses (#762).
+    #[test]
+    fn a_no_break_space_in_a_parser_directive_is_no_blank() {
+        assert_eq!(ok("# escape\u{a0}=`\nCOPY a /x/\n"), ["a"]);
+        assert_eq!(
+            unread("# escape=\\\u{a0}\nCOPY a /x/\n"),
+            "an escape directive"
+        );
     }
 
     #[test]
