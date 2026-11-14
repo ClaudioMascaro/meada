@@ -28,4 +28,4 @@ whole export. Server-mode answers must equal the restored stdio answers byte for
 A script pass is evidence for the checker, not its independent verdict. Inspect each failing
 capture before changing a driver: a broken driver is BLOCKED, and missing required behavior
 is BROKEN. Do not reduce the expected sets or filter away unexpected rows. Shared-code base
-parity, corpus, console and performance checks still follow the main skill's Scope table.
+parity, corpus, console and performance checks still follow the Scope table ([scope.md](scope.md)).

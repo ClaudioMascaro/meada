@@ -71,7 +71,7 @@ write tools; one index per repository; determinism) live in
   it names when changing a seam. The limits of the code are in `docs/agents/ceilings.md`: follow
   it to the relevant limit topic when a limit is touched. A
   `docs/agents` file past its size budget (`tests/it/docs.rs` names it) is split in the same PR
-  with `cargo run --example split_agents -- <file>`, never trimmed by dropping entries.
+  with `scripts/split-agents <file>`, never trimmed by dropping entries.
 - Coding standards in `CODING_STANDARDS.md`: read them before writing or reviewing resolution, a
   contract kind or a language pack.
 
@@ -81,14 +81,9 @@ Meada indexes this repository too: `.mcp.json` serves it as the `meada` MCP serv
 `context`, `trace`). Reach for it first to find where a symbol lives, who calls it and what a
 change touches, then read the files it names.
 
-- Install the binary once per machine with `cargo install --path . --locked`, and again after a
-  change to a language pack or a contract kind: the server runs the installed binary, while the
-  index follows the working tree on every query. After a kind change, also delete `.meada/`: a
-  refresh keeps the rows of the language groups no file changed in while Meada's version holds.
-- The server answers about the first MCP root the client sends (Claude Code sends the session's
-  directory first), so a session in a worktree under `.claude/worktrees/` gets its own tree even
-  though the desktop app starts the server in the main checkout. A client without roots gets the
-  directory the server started in. Subagents share their parent's server and its roots (#192).
+- The index follows the working tree on every query, but the server runs the installed binary:
+  read `docs/agents/code-graph.md` on a new machine, after a change to a language pack or a
+  contract kind, and in a worktree or subagent session (which tree it answers about).
 - Read its answers as Meada's own levels say: `exact` is certain, `inferred` and `ambiguous` are
   name matches, and a missing caller is unproven, since calls inside macros (`assert!`,
   `format!`, `vec!`) are not indexed.
@@ -118,9 +113,7 @@ Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents
 ### Vendored skills
 
 The `mattpocock/skills` set and the prove-it trio of `ray-amjad/skills` live in `.agents/skills/`
-(linked from `.claude/skills/`), pinned by `.agents/skills-lock.json`. Per skill the lock records
-`path` in the upstream repository, `upstreamTree` and `tree`; the upstream is the skill's own
-`upstream` (`repo`, `commit`) or, without one, the top-level `upstream`. A skill whose `tree`
-differs from `upstreamTree` carries a local adjustment. After staging an edit to a skill, set its
-`tree` to `git rev-parse $(git write-tree):.agents/skills/<name>`. The plugins that ship the same
-skills stay disabled in `.claude/settings.json`, so a session lists each skill once.
+(linked from `.claude/skills/`), pinned by `.agents/skills-lock.json`: a skill whose `tree` differs
+from its `upstreamTree` carries a local adjustment. An edit to a skill updates its `tree` in the
+lock, and `scripts/check` names the value. The plugins that ship the same skills stay disabled in
+`.claude/settings.json`, so a session lists each skill once.

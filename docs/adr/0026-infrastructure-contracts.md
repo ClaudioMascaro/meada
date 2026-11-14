@@ -654,7 +654,10 @@ configuration. Each follows from a rule above, so this amendment decides which s
 orphan scope and be named by an orphan line, one rule per cause. It amends "Config values as use
 sides" (Use sides), "Workloads and the image kind", "Orphans" and "Export". #797, #798, #799 and
 #800 implement it, one cause each; #795 measures the result against an answer key a person
-writes over real mixed repositories, since an ADR cannot be its own answer key.
+writes over real mixed repositories, since an ADR cannot be its own answer key. (Amended
+2026-11-13; ADR 0029: a model outside indexing writes the verdicts and the maintainer calibrates
+them on a sample, so the key is still never written by whoever built the rules; #795 also judges
+the links that remove an orphan line.)
 
 1. **Level.** A use side read from a config value at `inferred` (a plain name under a key that
    names the type) does not count when the orphan scope of its group is decided and is never an

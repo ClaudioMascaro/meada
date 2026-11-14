@@ -6,6 +6,8 @@
   domain decision (roles, eligibility, the Y/A/B rule, discovery, revocation); ADR 0021 holds the
   persistence, publication, query and configuration contracts, ADR 0022 the proposal interface.
   The direction below is unchanged; "direction only" no longer describes it.
+- Amended 2026-11-13: an answer stays bounded by the workspace it is asked in. See "The bound of
+  an answer".
 
 ## Context
 
@@ -214,3 +216,19 @@ graph failure keeps its own freshness and revocation.
   workspace) keeps every behavior it has, and named workspaces are added beside it.
 - ADR 0002 keeps its letter. Invariant 4 is read in ADR 0022: the proposal server's tools write
   nothing, and the node query server gains no tool.
+
+## The bound of an answer (2026-11-13)
+
+A workspace that provides for repositories outside it asks who consumes what it provides, and
+those consumers are not in it. The answer stays bounded by the workspace:
+
+- An answer holds only what the workspace selects. A consumer outside it enters through a wider
+  named workspace that selects its repository, whole. A repository is never indexed in part (the
+  files that hold a consumer side alone): that would break one index per repository (ADR 0002,
+  invariant 5), and shared indexing already charges no second index for a second workspace.
+- No count comes from outside the workspace. An orphan line and a `no use` mark state an absence
+  in the workspace asked, not in the deployment. A count of uses elsewhere in the deployment
+  returns only by its own ADR, on a trigger whose number is written before the measurement that
+  reads it.
+- Discovery by a partial reader stays hidden, as above: a wider workspace is visible to whoever
+  reads every repository it selects, and to nobody else.

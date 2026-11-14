@@ -59,7 +59,8 @@ def light(path):
     return (path.startswith(("docs/", "scripts/docs/", ".github/", ".claude/hooks/"))
             or (len(p.parts) == 1 and (p.suffix == ".md" or p.name.startswith("LICENSE")))
             or path in {".agents/skills-lock.json", ".claude/settings.json", ".mcp.json",
-                        "scripts/check", "scripts/gate", "scripts/prove-ci"}
+                        "scripts/check", "scripts/gate", "scripts/prove-ci",
+                        "scripts/split-agents"}
             or (path.startswith((".agents/skills/", ".claude/skills/"))
                 and p.suffix in {".md", ".json", ".yaml", ".yml", ".toml"})
             or path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/",
@@ -67,7 +68,8 @@ def light(path):
 
 
 def proof_driver(path):
-    return (path == "scripts/prove-ci"
+    # The Proof workflow builds and starts every surface, so a change to it selects them all.
+    return (path in {"scripts/prove-ci", ".github/workflows/proof.yml"}
             or (path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/"))
                 and Path(path).suffix != ".md"
                 and (len(Path(path).parts) > 5 or Path(path).suffix not in {".json", ".yaml", ".yml", ".toml"})))
@@ -314,7 +316,8 @@ def static(args, paths, tree):
             if name in entries:
                 actual = git("rev-parse", f"{tree}:.agents/skills/{name}")
                 if actual != entries[name]["tree"]:
-                    raise RuntimeError(f"{name}: skills-lock.json tree differs from the candidate tree ({actual})")
+                    raise RuntimeError(f"{name}: skills-lock.json tree differs from the candidate tree; "
+                                       f"after staging the edit, set skills.{name}.tree to {actual}")
     with tempfile.TemporaryDirectory(prefix="meada-check-") as tmp:
         tmp = Path(tmp)
         if any(p.startswith(("docs/", "src/", "meada-core/src/")) or p == "tests/it/docs.rs" for p in paths):
@@ -385,6 +388,7 @@ def product_gate(paths):
 def selftest():
     cases = [
         (["README.md", "docs/agents/architecture.md", ".claude/settings.json", ".github/workflows/ci.yml"], False, False, False),
+        (["scripts/split-agents"], False, False, False),
         (["src/lang/rust.rs"], True, True, True),
         (["README.md", "src/main.rs"], True, True, True),
         (["new-unknown-config"], True, True, True),
@@ -398,6 +402,7 @@ def selftest():
         ([".claude/skills/prove-meada/scripts/console.py"], False, True, True),
         ([".claude/skills/prove-meada/scripts/prove.py"], False, True, True),
         ([".claude/skills/prove-meada/scripts/corpus.tsv"], False, True, False),
+        ([".github/workflows/proof.yml"], False, True, True),
         ([".claude/skills/prove-meada/SKILL.md", ".agents/skills-lock.json"], False, False, False),
         ([script + "x.py" for script in HARNESS_SCRIPTS], False, False, False),
     ]
@@ -506,6 +511,12 @@ def selftest():
             payload["pull_request"]["head"]["sha"] = driver
             chosen = select("synchronize", before=workflow)
             assert chosen["e2e"] and chosen["cli"] and chosen["console"] and not chosen["product"]
+            proof = save(".github/workflows/proof.yml", "name: fixture\n")
+            payload["pull_request"]["head"]["sha"] = proof
+            chosen = select("synchronize", before=driver)
+            assert chosen["e2e"] and chosen["console"] and chosen["container"] and not chosen["product"]
+            payload["pull_request"]["head"]["sha"] = save(".github/workflows/ci.yml", "name: fixture\n")
+            assert not select("synchronize", before=proof)["e2e"]
             git("checkout", "-q", "integration")
             Path("docs").mkdir()
             git("mv", "src/main.rs", "docs/renamed.rs")

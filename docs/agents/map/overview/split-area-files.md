@@ -6,7 +6,7 @@ it): `MAP_BUDGET` is 8 KiB for `architecture.md`, `map/contracts.md` and
 under `map/overview/`, `map/contracts/` and `ceilings/resolution-the-index-and-shape-readers/`.
 `AREA_BUDGET` stays 64 KiB for the other files while those areas await their own split.
 Read an index to choose the relevant topics, not every part. A file past its budget is split by
-its `## ` headings with `cargo run --example split_agents -- <file>` in the same change, never
+its `## ` headings with `scripts/split-agents <file>` in the same change, never
 trimmed by dropping entries: the file keeps its introduction and one line per part, and each part
 is a file of its own in a directory named after it. Prepare meaningful headings first when a
 single section would still exceed its budget. The split families include:
