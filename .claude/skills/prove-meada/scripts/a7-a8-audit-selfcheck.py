@@ -31,6 +31,9 @@ def main():
         source.write_bytes(original)
         (root / '.gitignore').write_text('.prove-it/\n')
         (skill / 'frozen-key.txt').write_text('independent dummy answer\n')
+        feature = root / '.claude/skills/prove-meada-dummy/SKILL.md'
+        feature.parent.mkdir()
+        feature.write_text('answer-key row of a feature skill\n')
         for name in ('frozen-inputs-a', 'frozen-inputs-b'):
             (skill / name).mkdir()
             (skill / name / 'value.txt').write_text(name + '\n')
@@ -86,6 +89,9 @@ def main():
         key.write_text('rewritten key\n')
         refused('changed verifier key invalidates baseline', lambda: audit.read_manifest(baseline))
         key.write_text('independent dummy answer\n')
+        feature.write_text('rewritten feature skill key\n')
+        refused('changed feature skill key invalidates baseline', lambda: audit.read_manifest(baseline))
+        feature.write_text('answer-key row of a feature skill\n')
         source_link.unlink()
         source_link.symlink_to('frozen-inputs-b', target_is_directory=True)
         refused('changed directory symlink invalidates frozen source input keys', lambda: audit.read_manifest(baseline))

@@ -31,7 +31,7 @@ its merge-base with the associated open PR's actual base SHA and the three exist
 historical bases below. The workflow resolves exactly one open PR for the repository owner
 and dispatched branch, validates its base SHA and computes that merge-base. Missing or
 ambiguous PRs block the baseline. It copies each binary before releasing the compiler lock,
-pins every byte of this skill's folder (the feature skills are held by the source commit and the clean-tree check) and drives the fixed source-derived checks. `baseline.json` records the
+pins every byte of this skill's folder and of each feature skill beside it (`prove-meada-*`) and drives the fixed source-derived checks. `baseline.json` records the
 source commit/tree, actual build commits, binary SHA256s, keys, flows and raw check results.
 At the baseline the PR merge-base binary is the key of the existing flows, so the clean head is
 checked against the base; later phases take existing A7 annotation/whole-export bytes from the
