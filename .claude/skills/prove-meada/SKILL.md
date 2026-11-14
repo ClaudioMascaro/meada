@@ -49,6 +49,7 @@ Each family of flows has a sibling skill with what a judge needs for it: its ans
 | [prove-meada-a9-ci](../prove-meada-a9-ci/SKILL.md) | CI nodes, the CI contract, `run` scripts and declared permissions | `ci`, `ci-corpus`, `ci-run`, `ci-permissions` |
 | [prove-meada-a8-peers](../prove-meada-a8-peers/SKILL.md) | base URLs resolved across peer workspaces | `a8-peers`, `a8-mcp` |
 | [prove-meada-a7-config](../prove-meada-a7-config/SKILL.md) | config values, IaC nodes and their evaluated names, Terraform JSON, custom IaC, provisioners, orphans, `via`, config uses | `values`, `native-hcl-values`, `iac`, `serverless-values`, `terraform-json`, `custom-iac`, `provisions`, `orphans`, `resource-via`, `config-uses` |
+| [prove-meada-a7-http](../prove-meada-a7-http/SKILL.md) | HTTP through Service DNS, Compose names and Ingress prefixes; IaC-declared routes | `http-iac`, `iac-http-routes` |
 
 For #676/#684's bounded CI audit and receipt maintenance, use
 [references/a7-a8-audit.md](references/a7-a8-audit.md). Freeze the exact source/keys, obtain an
@@ -127,8 +128,6 @@ Ladder, best first: 1 an old system that does the same job, 2 a snapshot, 3 an i
 | A7 Azure SDK forms in JS/TS, Python, Java, Go and C#, exact named receivers, canonical selectors and scoped subscription companions | new | #670/#642, ADR0026 and official SDK inventory; generated neutral sources and source-derived whole side sets | 4 | `azure-sdk.py`, [references/azure-sdk.md](references/azure-sdk.md); HTTP additionally copies stdio (1) | maintainer spec, official SDK research and fresh checker |
 | A7 GCP SDK forms in JS/TS, Python, Java, Go and C#, constructor and named-handle evidence, subscription subtype and scoped environments | new | #668/#642, base ADR 0026, official SDK samples and coordinating inventory; generated source predates product answers | 4 | `gcp-sdk.py`, [references/gcp-sdk.md](references/gcp-sdk.md); HTTP additionally copies stdio (1), existing flows answer to exact base | maintainer spec, official SDK research and independent checker |
 | A7 JavaScript v3/TypeScript and boto3 SDK sides, origins and hidden names | new, plus existing SQS controls | #659/#642 and base ADR 0025/0026; exact base on identical SQS input; HTTP/console copy stdio/CLI | 4 + 1 | `aws-sdk.py`, [references/aws-sdk.md](references/aws-sdk.md), neutral pre-answer oracle and complete exported side/link sets | maintainer spec; independent checker; base binary |
-| A7 HTTP through Service DNS, Compose names and Ingress prefixes | new, plus existing direct-host/gateway/A8 controls | #665/#642, base ADR 0026 and independently named source; existing bytes against base; MCP HTTP copies stdio | 4 + 1 | `http-iac.py`, [references/http-iac.md](references/http-iac.md), complete link/process sets and source-deleted parity | maintainer spec; fresh checker required |
-| A7 IaC-declared HTTP routes, exact handlers and repository fallback | new, plus existing code HTTP control | #666/#642, ADR 0005/0025/0026 and complete source-derived provider/link sets; baseline code HTTP bytes and transport parity | 4 + 1 | `iac-http-routes.py`, [references/iac-http-routes.md](references/iac-http-routes.md), neutral pre-answer oracle, alias/fallback and source-deleted checks | maintainer spec; fresh independent checker required |
 | A new flow that copies nothing | new | the issue | 4 | Find the spec, at run time | the maintainer |
 
 - **Never edit an answer key to make a check pass.** If the app and the answer key disagree, the verdict is BROKEN; only the user changes an answer key.
@@ -209,8 +208,6 @@ One section per surface. `/create-prove-it` adds a section when the app gains a 
 **Could fool you**: a page can render from cached state; the playground check is the one that crosses the API. A green API with an old `ui/dist` proves the API only: build the front end from this tree.
 
 For #675's console graph, run `python3 $S/console-graph.py --head-bin "$RUN/bin/meada-head-ui" --ui-dir ui/dist --run "$RUN/console-graph"`. Inspect the screenshots, whole role/link tables, roots, reasons, native keyboard focus, unpaired sides and `value`/`iac`/`alert` playground answers; retain the receipt and CI artifact. [references/console-graph.md](references/console-graph.md) defines inputs, answer keys, budgets, controls and cleanup. `scripts/prove-ci` runs this flow in the Proof workflow's `prove-meada` job and `proof-a7-a8-ui` runs it in the manual audit, both against a real UI binary; unavailable browser tooling leaves it BLOCKED.
-
-For #665 HTTP routing, run `python3 $S/http-iac.py --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/http-iac"`. Inspect the complete source-derived link set, namespace/path/rewrite controls, raw transport replies and source-deleted read-only parity ([references/http-iac.md](references/http-iac.md)). Existing gateway and A8 controls remain required for shared HTTP changes.
 
 For #667 GCP resources and Cloud Run, run `python3 $S/gcp.py --head-bin "$RUN/bin/meada-head" --run "$RUN/gcp"` and inspect complete identities, subscription filters, workload scopes and transport answers ([references/gcp.md](references/gcp.md)).
 
