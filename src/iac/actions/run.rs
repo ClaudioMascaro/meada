@@ -83,6 +83,35 @@ pub(crate) fn rebound(script: &str) -> HashSet<&str> {
     names
 }
 
+/// Whether `script` names the environment file (`GITHUB_ENV`, `github.env`, `github[...]`), and
+/// then whether each line that does is an `echo` of `NAME=...`, so that `rebound` holds every
+/// name it writes. Any other line (a file appended to it, a name an expansion gives, another
+/// command's output, a backslash) may write a name the script does not show.
+pub(crate) fn environment_file(script: &str) -> Option<bool> {
+    // How many times a line names the file: a second write on a line is not read.
+    let named = |line: &str| {
+        let lower = line.to_ascii_lowercase();
+        let times = |word: &&str| lower.matches(*word).count();
+        ["github_env", "github.env", "github["]
+            .iter()
+            .map(times)
+            .sum::<usize>()
+    };
+    let shown = |line: &str| {
+        let text = line.trim_start().strip_prefix("echo ").unwrap_or("");
+        let text = text.trim_start().trim_start_matches(['"', '\'']);
+        let name = text
+            .bytes()
+            .take_while(|&b| b.is_ascii_alphanumeric() || b == b'_');
+        // `sh` prints an escape of `echo` as a new line, which may hold a second name.
+        text[name.count()..].starts_with('=') && !text.starts_with('=') && !line.contains('\\')
+    };
+    let lines = script.lines().map(|line| (line, named(line)));
+    let mut lines = lines.filter(|(_, times)| *times > 0).peekable();
+    lines.peek()?;
+    Some(lines.all(|(line, times)| times == 1 && shown(line)))
+}
+
 /// The offset past the bracket that closes the one at `at`, over quotes and nested ones of its
 /// kind. Between parentheses the shell reads words, so a comment runs to the end of its line
 /// and a `${...}` is passed whole, whatever they hold. `None` when it is left open or holds a
@@ -862,5 +891,38 @@ mod tests {
         let read = read(&"$PKG ".repeat(400)).unwrap();
         assert!(read[0].starts_with("acme-lib acme-lib") && read[0].ends_with("<$PKG> <$PKG>"));
         assert!(read[0].len() <= 2 * 2000 + VALUE_MAX, "{}", read[0].len());
+    }
+
+    #[test]
+    fn a_line_for_the_environment_file_shows_its_name_or_opens_every_name() {
+        for (script, expected) in [
+            ("pip install acme-lib", None),
+            ("echo \"PKG=b\" >> $GITHUB_ENV", Some(true)),
+            (
+                "  echo PKG=b >> \"${{ github.env }}\"\necho 'A=1' | tee -a $GITHUB_ENV",
+                Some(true),
+            ),
+            (
+                "echo \"SHA=${GITHUB_SHA::7}\" >> ${{ GitHub['env'] }}",
+                Some(true),
+            ),
+            // A file, a name an expansion gives, another command, a second write on the line,
+            // an escape `sh` prints as a new line.
+            ("cat ci/vars.env >> \"$GITHUB_ENV\"", Some(false)),
+            ("echo \"$NAME=b\" >> $GITHUB_ENV", Some(false)),
+            ("echo \"=b\" >> $GITHUB_ENV", Some(false)),
+            ("printf 'PKG=%s\\n' b >> $GITHUB_ENV", Some(false)),
+            ("echo \"A=1\\nPKG=b\" >> $GITHUB_ENV", Some(false)),
+            (
+                "echo \"A=1\" >> $GITHUB_ENV; cat f >> $GITHUB_ENV",
+                Some(false),
+            ),
+            (
+                "echo \"A=1\" >> $GITHUB_ENV\n./vars.sh >> $GITHUB_ENV",
+                Some(false),
+            ),
+        ] {
+            assert_eq!(environment_file(script), expected, "{script}");
+        }
     }
 }

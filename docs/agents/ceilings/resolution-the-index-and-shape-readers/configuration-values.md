@@ -95,7 +95,10 @@
   no `env` at its root, so a composite action reads only the `env` of its CI steps). That
   `env` gives a literal only as a string with no expression and no `*`, not cut: a number, a
   boolean, a list, a map and an `env` written as one expression define the name with no
-  literal, so the part is unresolved and never read from an `env` farther up. A null entry, and a
+  literal, so the part is unresolved and never read from an `env` farther up. A name a `run`
+  script of the file may write to the environment file holds no literal either (#836, the rule
+  of the command table in [CI](compose-cloudformation-serverless-and-images/ci-github-actions.md)),
+  whatever the order of the CI steps. A null entry, and a
   list or a map that holds no value, keep no config value and define the name all the same: the
   CI job or the CI step records such names (`Facts::hollow`), so the part is unresolved, where
   GitHub gives a null the empty string. A scalar the YAML reader keeps as a string is a literal

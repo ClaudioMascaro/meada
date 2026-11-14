@@ -1365,11 +1365,9 @@ impl Engine {
                                 kind.context_at(&partial.exports, repos, &links, &identity, root)
                             })
                             .collect();
-                        // A CI node shows its sides above its values, the last block of
-                        // `lines`: who calls a pipeline is what its reader asks, and the values
-                        // of a long file would spend the budget first.
+                        // The values are the last block of `lines`.
                         let values = |l: &String| l == "values:" || l == "values: none";
-                        let at = (iac::actions::owns(node))
+                        let at = (node.sides_first())
                             .then(|| lines.iter().rposition(values))
                             .flatten()
                             .unwrap_or(lines.len());

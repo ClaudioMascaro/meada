@@ -353,6 +353,13 @@ impl Node {
         format!("{repository}::{}::{}", self.path, self.address)
     }
 
+    /// Whether `context` lists the node's sides above its values: a CI node, since who calls a
+    /// pipeline is what its reader asks and the values of a long file would spend the budget
+    /// first.
+    pub(crate) fn sides_first(&self) -> bool {
+        actions::owns(self)
+    }
+
     /// The node's stored line range as the code-span shape used by open items.
     pub(crate) fn span(&self, source: Option<&[u8]>) -> crate::index::Span {
         let mut span = crate::index::Span::default();

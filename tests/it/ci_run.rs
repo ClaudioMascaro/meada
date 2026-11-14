@@ -513,6 +513,37 @@ fn the_environment_file_named_by_an_expression_rebinds_a_name_too() {
     );
 }
 
+/// A line that names the environment file and is no `echo` of `NAME=` may write a name the
+/// script does not show: no literal `env` of the file gives one then.
+#[test]
+fn a_write_to_the_environment_file_that_shows_no_name_opens_every_literal() {
+    let (_, web) = pair("ci_run_unseen");
+    let head = "env:\n  PKG: shared-lib\n";
+    let open = [(
+        "jobs.build.steps[1]".to_string(),
+        None,
+        Some("$PKG".to_string()),
+    )];
+    for line in [
+        "cat ci/vars.env >> \"$GITHUB_ENV\"",
+        "echo \"$NAME=shared-tools\" >> $GITHUB_ENV",
+        "./ci/vars.sh | tee -a ${{ github.env }}",
+    ] {
+        let steps = format!("- run: {line}\n- run: pip install $PKG\n");
+        write(&web, FILE, &pipeline(head, &steps));
+        assert_eq!(sides(&exported(&web)), open, "{line}");
+    }
+    // A line that shows its name leaves the other names their literal.
+    let steps = "- run: echo \"OTHER=x\" >> $GITHUB_ENV\n- run: pip install $PKG\n";
+    write(&web, FILE, &pipeline(head, steps));
+    let named = [(
+        "jobs.build.steps[1]".to_string(),
+        Some(SHARED.to_string()),
+        None,
+    )];
+    assert_eq!(sides(&exported(&web)), named);
+}
+
 #[test]
 fn a_literal_name_is_the_package_whatever_its_range_or_extra_holds() {
     let head = "env:\n  A: shared-lib\n  B: shared-tools\n";

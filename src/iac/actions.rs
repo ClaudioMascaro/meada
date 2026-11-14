@@ -419,6 +419,9 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     };
     let address =
         |id: &str| config_values::key_path(&[Step::Key("jobs".into()), Step::Key(id.to_string())]);
+    // The block that governs a CI job is its own, else its pipeline's when that one is read:
+    // a block that is not read is declared by no CI job, and is copied to none.
+    let inherited = (doc.get("permissions")).filter(|block| permissions(Some(*block)).is_some());
     for (id, job) in jobs {
         let Value::Object(job) = job else {
             continue;
@@ -429,8 +432,7 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
         // A CI job is found by its id, which its address may quote.
         let mut body = job.clone();
         body.insert("id".into(), Value::String(id.clone()));
-        // The block that governs a CI job is its own, else its pipeline's.
-        if let (false, Some(block)) = (job.contains_key("permissions"), doc.get("permissions")) {
+        if let (false, Some(block)) = (job.contains_key("permissions"), inherited) {
             body.insert("permissions".into(), block.clone());
         }
         if !unit.node(&at, JOB, &body, lines) {
@@ -459,16 +461,12 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
 }
 
 /// Replaces the stored nodes and references of the file at `path` with those of `src`, `None`
-/// for a file that left. `shadowed` says an `action.yml` sits beside this `action.yaml`: the
-/// action of the folder is that one, the file the runner loads, and this file gives none.
-pub(crate) fn refresh(
-    tx: &Transaction,
-    path: &str,
-    src: Option<&[u8]>,
-    shadowed: bool,
-) -> Result<()> {
+/// for a file that left. `twin` says the other action file name sits in the folder: beside an
+/// `action.yml`, the file the runner loads, an `action.yaml` gives no action.
+pub(crate) fn refresh(tx: &Transaction, path: &str, src: Option<&[u8]>, twin: bool) -> Result<()> {
     super::forget(tx, Some(path), Owner::Actions)?;
     let (nodes, references) = src.map_or_else(Default::default, |src| evaluate(path, src));
+    let shadowed = twin && path.ends_with(".yaml");
     if shadowed && nodes.first().is_some_and(|n| n.ty == ACTION) {
         return Ok(());
     }

@@ -1844,6 +1844,15 @@ resource "aws_apigatewayv2_route" "wide" {{
             let jobs = fill(1, |i| format!("  j{i}:\n    needs: [{needs}]\n"));
             pipeline(format!("jobs:\n{jobs}"))
         }),
+        (
+            "pipeline: an unread permissions block above every job",
+            || {
+                // #834: a CI job takes its pipeline's block only when that block is read.
+                let block = fill(2, |i| format!("  - p{i}\n"));
+                let jobs = fill(2, |i| format!("  j{i}: {{}}\n"));
+                pipeline(format!("permissions:\n{block}jobs:\n{jobs}"))
+            },
+        ),
         ("pipeline: an alias per step and per job", || {
             let steps = fill(4, |_| "      - *s\n".into());
             let jobs = fill(4, |i| format!("  j{i}: *j\n"));

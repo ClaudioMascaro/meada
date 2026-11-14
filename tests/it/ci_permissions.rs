@@ -58,6 +58,11 @@ fn a_reusable_pipeline_shows_each_callers_declared_permissions_and_flags_the_one
         )],
         "{release}"
     );
+    // Declared, never granted: no answer says what a token holds at run time.
+    let export = exported(&Engine::open(&app_b).unwrap()).to_string();
+    for text in [&answer, &release, &export] {
+        assert!(!text.to_lowercase().contains("grant"), "{text}");
+    }
     // The export: the block on the consumer row, left out where none is declared.
     let rows = |repo: &std::path::Path| {
         let export = exported(&Engine::open(repo).unwrap());

@@ -1165,7 +1165,7 @@ Las listas vacías se omiten, salvo `files`, `symbols`, `calls`, `providers`, `c
 | `symbols` | Los símbolos: `id`, `span` (`path`, `start`, `end`, desplazamientos en bytes) y `hash` (BLAKE3 en hexadecimal de los bytes del span) |
 | `calls` | Los call sites: `id`, `caller`, `target` y `level` (vacíos mientras no resuelve), `candidates` (si es ambigua), `span`, `narrowed` y `decorates` |
 | `providers` | El lado proveedor de cada contrato: `contract`, `site`, y si los hay `gateway` y `shape` |
-| `consumers` | El lado consumidor: `contract` (nulo si la URL no se evaluó), `site`, `via` (cómo nombra al repositorio del proveedor, como `host:api.example.com` o `env:API_URL`) y `shape`. En el consumidor de un contrato de CI, `via` es el `uses` como está escrito, con los campos opcionales `ref` (el ref Git después del `@`), `with` (las claves pasadas, ordenadas) y `secrets` (las claves, o la palabra `inherit`) |
+| `consumers` | El lado consumidor: `contract` (nulo si la URL no se evaluó), `site`, `via` (cómo nombra al repositorio del proveedor, como `host:api.example.com` o `env:API_URL`) y `shape`. En el consumidor de un contrato de CI, `via` es el `uses` como está escrito, con los campos opcionales `ref` (el ref Git después del `@`), `with` (las claves pasadas, ordenadas) `secrets` (las claves, o la palabra `inherit`), `absent` (`true` cuando ningún repositorio del workspace provee el contrato en su commit indexado) y, en el consumidor en un job de CI, `permissions` (el bloque declarado que rige el job) |
 | `links` | Los enlaces: `consumer`, `provider`, `contract`, `level`, `reason`, y si los hay `by`, `p` y `drift` |
 | `bindings`, `publishes` | Los bindings (`contract`, `exchange`, `pattern`, `site`) y las publicaciones (`exchange`, `key`, `site`) de RabbitMQ que el repositorio declara |
 | `documents` | Los documentos OpenAPI y AsyncAPI leídos: `path`, `format`, `version` y `contracts` |
@@ -1607,7 +1607,9 @@ encaja; un nombre entero así (`pip install $PKG`) es, donde el workspace provee
 consumidor no resuelto, un ítem abierto que dice su causa y no tiene candidato. Un nombre literal
 con una parte así en el rango (`shared-lib==${{ matrix.v }}`) es el propio paquete, con el rango
 como está escrito. Meada no sigue una variable que el script asigna, `cd`, una función ni un script
-llamado.
+llamado. Un nombre que un script del archivo escribe en el archivo de entorno (`GITHUB_ENV`) tampoco
+recibe literal, y cuando una línea escribe ese archivo sin mostrar el nombre (`cat vars.env >>
+"$GITHUB_ENV"`) ningún `env` del archivo da uno.
 
 **Programas.** Un paso de CI cuyo comando es un script de consola de un paquete PyPI del workspace
 (un nombre bajo `[project.scripts]` o `[tool.poetry.scripts]`) inicia ese programa: el paso de CI

@@ -239,6 +239,32 @@ fn a_file_no_ci_reader_owns_keeps_the_key_name_rule() {
     assert_eq!(levels, [(APP, "inferred"); 3], "{export:#}");
 }
 
+/// A `gs://` address is a structured identifier as `s3://` is: an `exact` use on its CI step.
+#[test]
+fn a_gcs_address_in_a_pipeline_is_an_exact_use_on_its_ci_step() {
+    let (_, app) = workspace("ci_owned_gcs");
+    write(
+        &app,
+        DEPLOY,
+        "on: push\njobs:\n  deploy:\n    steps:\n      - uses: other-org/upload@v1\n        with:\n          target: gs://acme-backups/releases\n",
+    );
+    let export = exported(&app);
+    let step = format!("{APP}::{DEPLOY}::jobs.deploy.steps[0]");
+    assert_eq!(
+        uses(&export, DEPLOY),
+        [row(
+            "resource::gcs::acme-backups",
+            &step,
+            "jobs.deploy.steps[0].with.target"
+        )]
+    );
+    let levels: Vec<&str> = (export["uses"].as_array().unwrap().iter())
+        .filter(|row| row["site"] == step.as_str())
+        .map(|row| row["level"].as_str().unwrap())
+        .collect();
+    assert_eq!(levels, ["exact"]);
+}
+
 #[test]
 fn every_scalar_of_a_pipeline_stays_a_config_value() {
     let (_, app) = workspace("ci_owned_values");
@@ -412,6 +438,39 @@ jobs:
             ),
         ]
     );
+}
+
+/// An expression reads the environment of its CI step at run time: a name a script of the file
+/// may write to the environment file holds no literal, and neither does any name once a script
+/// writes that file in a line that shows none.
+#[test]
+fn a_name_written_to_the_environment_file_gives_an_expression_no_literal() {
+    let (_, app) = workspace("ci_owned_rebound");
+    let pipeline = |line: &str| {
+        format!(
+            "on: push\nenv:\n  BUCKET: archive\n  OTHER: archive\njobs:\n  deploy:\n    steps:\n      - run: {line}\n      - uses: other-org/upload@v1\n        with:\n          target: s3://${{{{ env.BUCKET }}}}/releases\n          other: s3://${{{{ env.OTHER }}}}/releases\n"
+        )
+    };
+    write(
+        &app,
+        DEPLOY,
+        &pipeline("echo \"BUCKET=backups\" >> \"$GITHUB_ENV\""),
+    );
+    assert_eq!(
+        uses(&exported(&app), DEPLOY),
+        [row(
+            "resource::s3::archive",
+            &format!("{APP}::{DEPLOY}::jobs.deploy.steps[1]"),
+            "jobs.deploy.steps[1].with.other"
+        )]
+    );
+    write(
+        &app,
+        DEPLOY,
+        &pipeline("cat ci/vars.env >> \"$GITHUB_ENV\""),
+    );
+    let none = uses(&exported(&app), DEPLOY);
+    assert!(none.is_empty(), "{none:?}");
 }
 
 /// The nearest `env` that defines the name decides, whatever it holds. A number, a boolean, a

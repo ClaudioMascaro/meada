@@ -8,6 +8,7 @@
 //! and never resolved. A CI step's `./<folder>` is read in the CI runner's workspace, so it is
 //! unresolved wherever that is not known to be the file's repository (`workspace_causes`).
 
+use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use meada_core::export as written;
@@ -248,13 +249,20 @@ fn block(permissions: &Permissions) -> String {
     }
 }
 
-/// What the CI jobs of the pipeline `file` of `export` declare together: the highest level one
-/// of them gives every permission none names, and each permission one names. None when no CI
-/// job there holds a block: nothing is declared, and Meada guesses no default.
-fn asked<'e>(export: &'e Export, file: &str) -> Option<(Access, BTreeMap<&'e str, Access>)> {
-    let blocks = (export.iac.iter())
-        .filter(|n| actions::owns(n) && n.ty == actions::JOB && n.path == file)
-        .filter_map(|n| n.actions.as_ref()?.permissions.as_ref());
+/// What the CI jobs of one pipeline declare together: the level of every permission none of
+/// them names, and each permission one names.
+type Asked<'e> = (Access, BTreeMap<&'e str, Access>);
+
+/// Each CI job of `export` a `permissions` block governs, with that block.
+fn governed(export: &Export) -> impl Iterator<Item = (&Node, &Permissions)> {
+    let jobs = (export.iac.iter()).filter(|n| actions::owns(n) && n.ty == actions::JOB);
+    jobs.filter_map(|n| Some((n, n.actions.as_ref()?.permissions.as_ref()?)))
+}
+
+/// What the CI jobs of one pipeline declare together, given their `blocks`: the highest level
+/// one of them gives every permission none names, and each permission one names. None when no
+/// CI job there holds a block: nothing is declared, and Meada guesses no default.
+fn asked<'e>(blocks: impl Iterator<Item = &'e Permissions>) -> Option<Asked<'e>> {
     // One pass over the blocks: a block gives a permission it does not name its `rest`, which
     // is `none` for a block of names.
     let mut rest = None;
@@ -277,7 +285,8 @@ fn asked<'e>(export: &'e Export, file: &str) -> Option<(Access, BTreeMap<&'e str
 
 /// The line of a reusable pipeline's `context` that says what its CI jobs declare together.
 fn asked_line(export: &Export, file: &str) -> String {
-    let Some((rest, named)) = asked(export, file) else {
+    let blocks = governed(export).filter(|(job, _)| job.path == file);
+    let Some((rest, named)) = asked(blocks.map(|(_, block)| block)) else {
         return "  permissions: not declared".into();
     };
     let word = match rest {
@@ -295,24 +304,10 @@ fn asked_line(export: &Export, file: &str) -> String {
     }
 }
 
-/// The permissions a CI job of the provider at the site `provider` declares above what the
-/// block of the CI job at `consumer` holds, each with both levels. None when either side
-/// declares nothing, and for a CI step, which calls an action: only a CI job is compared.
-fn mismatch(exports: &[Export], consumer: &str, provider: &str) -> Vec<String> {
-    let held = node_at(exports, consumer)
-        .filter(|(_, node)| node.ty == actions::JOB)
-        .and_then(|(_, node)| node.actions.as_ref()?.permissions.as_ref());
-    // A caller that declares nothing reads no block of the pipeline it calls.
-    let Some(held) = held else {
-        return Vec::new();
-    };
-    let pipeline = node_at(exports, provider).and_then(|(repository, file)| {
-        let export = exports.iter().find(|e| e.repository == repository)?;
-        asked(export, &file.path)
-    });
-    let Some((rest, named)) = pipeline else {
-        return Vec::new();
-    };
+/// The permissions the CI jobs of a called pipeline declare together (`asked`) above what the
+/// block `held` of the calling CI job holds, each with both levels.
+fn mismatch(held: &Permissions, asked: &Asked<'_>) -> Vec<String> {
+    let (rest, named) = (asked.0, &asked.1);
     let own: Vec<&str> = match held {
         Permissions::Named(own) => own.keys().map(String::as_str).collect(),
         Permissions::All(_) => Vec::new(),
@@ -358,17 +353,100 @@ fn passed(node: &Node) -> String {
     format!(" {}", parts.join("; "))
 }
 
-/// The node of the workspace at the side `site`, with its repository.
-fn node_at<'e>(exports: &'e [Export], site: &str) -> Option<(&'e str, &'e Node)> {
-    exports.iter().find_map(|export| {
-        let rest = site.strip_prefix(export.repository.as_str())?;
-        let rest = rest.strip_prefix("::")?;
-        // `Node::identity` without writing it for every node: `<path>::<address>`.
-        let at = |n: &Node| rest.strip_prefix(n.path.as_str())?.strip_prefix("::");
-        let node =
-            (export.iac.iter()).find(|n| actions::owns(n) && at(n) == Some(n.address.as_str()))?;
-        Some((export.repository.as_str(), node))
-    })
+/// The CI nodes of the workspace by site, each with its repository's export: built once for a
+/// pass over the links or the lines of an answer, which then scans no repository per link.
+fn sites(exports: &[Export]) -> HashMap<String, (&Export, &Node)> {
+    let mut sites = HashMap::new();
+    for export in exports {
+        for node in export.iac.iter().filter(|n| actions::owns(n)) {
+            // The first node at a site is the one read, as a scan in order finds it.
+            let site = node.identity(&export.repository);
+            sites.entry(site).or_insert((export, node));
+        }
+    }
+    sites
+}
+
+/// The links of `consumers` to the providers of their contracts, each with its reason. A node
+/// is looked up by its site and a pipeline's blocks are folded once, so the pass costs what
+/// the workspace holds, never its callers times its nodes.
+fn links<'a>(
+    exports: &'a [Export],
+    providers: &[(&'a Repository, &'a Provider)],
+    consumers: impl Iterator<Item = &'a Consumer>,
+) -> Vec<Link> {
+    let mut serving: HashMap<&str, Vec<(&Repository, &Provider)>> = HashMap::new();
+    for &(repository, provider) in providers {
+        if provider.contract.starts_with(PREFIX) {
+            let serving = serving.entry(provider.contract.as_str()).or_default();
+            serving.push((repository, provider));
+        }
+    }
+    // The first export of an identity is the one read, as a lookup in order finds it.
+    let commits: HashMap<&str, Option<&str>> = (exports.iter().rev())
+        .map(|e| (e.repository.as_str(), e.commit.as_deref()))
+        .collect();
+    let nodes = OnceCell::new();
+    let node = |site: &str| nodes.get_or_init(|| sites(exports)).get(site).copied();
+    // The blocks of every pipeline's CI jobs, by repository and file, read on the first link
+    // that compares; then what each called pipeline declares, by its site.
+    let declared = OnceCell::new();
+    let blocks = || {
+        let mut blocks: HashMap<(&str, &str), Vec<&Permissions>> = HashMap::new();
+        for export in exports {
+            for (job, block) in governed(export) {
+                let file = (export.repository.as_str(), job.path.as_str());
+                blocks.entry(file).or_default().push(block);
+            }
+        }
+        blocks
+    };
+    let mut asked_at: HashMap<&str, Option<Asked<'_>>> = HashMap::new();
+    let mut links = Vec::new();
+    for consumer in consumers {
+        let Some(contract) = consumer.contract.as_deref() else {
+            continue;
+        };
+        let (Some(serving), Some(uses)) = (
+            serving.get(contract),
+            consumer.via.as_deref().and_then(Uses::read),
+        ) else {
+            continue;
+        };
+        // Only a CI job is compared (a CI step calls an action), and a caller that declares
+        // nothing reads no block of the pipeline it calls.
+        let held = node(&consumer.site)
+            .filter(|(_, node)| node.ty == actions::JOB)
+            .and_then(|(_, node)| node.actions.as_ref()?.permissions.as_ref());
+        for &(repository, provider) in serving {
+            let indexed = commits.get(repository.identity.as_str()).copied().flatten();
+            let mut reason = reason(uses.git_ref(), indexed);
+            let above = held.map_or(Vec::new(), |held| {
+                let asked = asked_at.entry(provider.site.as_str()).or_insert_with(|| {
+                    let (export, file) = node(&provider.site)?;
+                    let file = (export.repository.as_str(), file.path.as_str());
+                    asked(declared.get_or_init(blocks).get(&file)?.iter().copied())
+                });
+                asked
+                    .as_ref()
+                    .map_or(Vec::new(), |asked| mismatch(held, asked))
+            });
+            if !above.is_empty() {
+                reason.push_str(&format!(", permissions mismatch: {}", above.join(", ")));
+            }
+            links.push(Link::new(
+                consumer.site.clone(),
+                provider.site.clone(),
+                contract.into(),
+                Level::Exact,
+                reason,
+                None,
+                None,
+                None,
+            ));
+        }
+    }
+    links
 }
 
 impl ContractKind for Ci {
@@ -536,35 +614,16 @@ impl ContractKind for Ci {
         providers: &[(&Repository, &Provider)],
         exports: &[Export],
     ) -> Vec<Link> {
-        let (Some(contract), Some(uses)) = (
-            consumer.contract.as_deref(),
-            consumer.via.as_deref().and_then(Uses::read),
-        ) else {
-            return Vec::new();
-        };
-        let serving = providers.iter().filter(|(_, p)| p.contract == contract);
-        serving
-            .map(|(repository, provider)| {
-                let indexed = (exports.iter())
-                    .find(|e| e.repository == repository.identity)
-                    .and_then(|e| e.commit.as_deref());
-                let mut reason = reason(uses.git_ref(), indexed);
-                let above = mismatch(exports, &consumer.site, &provider.site);
-                if !above.is_empty() {
-                    reason.push_str(&format!(", permissions mismatch: {}", above.join(", ")));
-                }
-                Link::new(
-                    consumer.site.clone(),
-                    provider.site.clone(),
-                    contract.into(),
-                    Level::Exact,
-                    reason,
-                    None,
-                    None,
-                    None,
-                )
-            })
-            .collect()
+        links(exports, providers, std::iter::once(consumer))
+    }
+    /// Every link in one pass: a workspace of many callers reads each of its nodes once.
+    fn workspace_links(
+        &self,
+        exports: &[Export],
+        providers: &[(&Repository, &Provider)],
+    ) -> Option<Vec<Link>> {
+        let consumers = exports.iter().flat_map(|e| &e.consumers);
+        Some(links(exports, providers, consumers))
     }
     fn context_at(
         &self,
@@ -575,8 +634,10 @@ impl ContractKind for Ci {
         _: Option<&str>,
     ) -> Vec<String> {
         let ours = |contract: &str| contract.starts_with(PREFIX);
+        let nodes = OnceCell::new();
+        let node = |site: &str| nodes.get_or_init(|| sites(exports)).get(site).copied();
         let side = |word: &str, other: &str, link: &Link| {
-            let (repository, node) = node_at(exports, other)?;
+            let (export, node) = node(other)?;
             let keys = if word == "consumer" {
                 passed(node)
             } else {
@@ -584,7 +645,7 @@ impl ContractKind for Ci {
             };
             Some(format!(
                 "  {word}: {} [{}: {}]{keys}",
-                crate::iac::at(repository, node),
+                crate::iac::at(&export.repository, node),
                 link.level.name(),
                 link.reason
             ))
@@ -596,7 +657,7 @@ impl ContractKind for Ci {
             for provider in provided {
                 lines.push(format!("provides {}", provider.contract));
                 // What its CI jobs declare together, which each consumer's block is held against.
-                let file = node_at(exports, site).filter(|(_, n)| n.ty != actions::ACTION);
+                let file = node(site).filter(|(_, n)| n.ty != actions::ACTION);
                 lines.extend(file.map(|(_, file)| asked_line(export, &file.path)));
                 let calling = (links.iter())
                     .filter(|l| l.provider == site && l.contract == provider.contract);
@@ -616,7 +677,7 @@ impl ContractKind for Ci {
                 }
                 let git_ref = uses.and_then(Uses::read).and_then(|u| u.git_ref());
                 let git_ref = git_ref.map_or(String::new(), |r| format!(" @{r}"));
-                let keys = node_at(exports, site).map_or(String::new(), |(_, n)| passed(n));
+                let keys = node(site).map_or(String::new(), |(_, n)| passed(n));
                 let mark = absent(exports, contract).unwrap_or_default();
                 lines.push(format!("consumes {contract}{git_ref}{keys}{mark}"));
                 let called =

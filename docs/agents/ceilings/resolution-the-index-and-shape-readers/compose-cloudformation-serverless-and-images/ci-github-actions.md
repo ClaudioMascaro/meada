@@ -50,12 +50,18 @@
   when it holds only letters, digits, `.`, `_`, `=`, `-`, `/`, `:` and `@` (the last three
   since #833, for an image name), and when neither the script nor
   another script of the file that names the environment file (`GITHUB_ENV`, `github.env`,
-  `github[`) mentions the name other than by reading it. A write to it by an action, a called
-  script or a script past the length ceiling is not seen, and neither is the environment file
-  named through another variable (`ENV_FILE: ${{ github.env }}`), a name written through a
-  variable (`echo "$NAME=x" >> $GITHUB_ENV`) or a file appended to it (`cat vars.env >>
-  $GITHUB_ENV`): the literal `env` of that name still resolves, and can link `exact` to a
-  package the CI step does not install. The literals read add at most the
+  `github[`) mentions the name other than by reading it. A line that names the environment
+  file and is no `echo` of `NAME=` (#836: a file appended to it, `cat vars.env >> $GITHUB_ENV`;
+  a name written through a variable, `echo "$NAME=x" >> $GITHUB_ENV`; `printf`; a backslash,
+  which `sh` prints as a new line; a `{ }` group
+  or a continued line redirected to it; two writes on one line) may write a name the script
+  does not show, so every literal `env` of that file stays open, whatever the order of the CI
+  steps: such a file gives its `pip install $PKG` no side where a narrower reading would. A
+  write to it by an action, a called script or a script past the length ceiling is not seen,
+  and neither is the environment file named through another variable (`ENV_FILE: ${{
+  github.env }}`) or a second name the expansion of a value carries on a new line: the literal
+  `env` of that name still resolves, and can link `exact` to a package the CI step does not
+  install. The literals read add at most the
   script's own length and `VALUE_MAX`; past it a variable stays open.
 - `ci.rs` (#824, ADR 0028): a CI contract links what is written, and Meada resolves no Git ref.
   Only a ref of 40 or 64 hexadecimal digits is a commit id: an abbreviated one reads as a name
@@ -164,9 +170,11 @@
   A block's named keys count in the stored size of the CI job's node, so a block of thousands
   of names over many CI jobs drops the jobs past `ROOT_STORED_MAX`, and `status` says nothing.
   A name or a `permissions` key written twice reads as the YAML reader gives it (the last
-  one), where GitHub refuses the file; `1` and `true` read as names. Each link of a CI job that
-  declares a block reads the blocks of the called pipeline once, on every query: the cost is
-  callers times the CI jobs of the pipeline (600 by 600 took 0.3 s in a debug build). A `with`
+  one), where GitHub refuses the file; `1` and `true` read as names. The links are derived in
+  one pass over the workspace on every query (#836, `workspace_links`): the CI nodes are looked
+  up by site and the blocks of a called pipeline are folded once, so the cost is the CI nodes
+  and the callers, never their product. That pass writes the site of every CI node of the
+  workspace once it meets a call to a provider the workspace holds. A `with`
   key is shown as written, so one may hold the text `permissions:`; the true block is the last
   `permissions:` of the line, before the absent mark, and the export holds it apart. A `uses`
   whose Git ref holds a space names nothing.

@@ -76,8 +76,10 @@ reads none.
 Declared permissions (#834): `iac::actions::Facts::permissions` holds the block that governs a
 CI job (its own, else its pipeline's, copied into the job's body by `evaluate`; `None` is `not
 declared`), as `meada_core::export::Permissions` (a word or a map of `Access`). `asked` folds
-the CI jobs of a provider's file into the highest level per permission, `mismatch` compares it
-with the consumer CI job's block at the link, and `link` appends `permissions mismatch: ...`
-after the ref text. `passed` writes the block on the `consumer:` line, `context_at` the
+the blocks of the CI jobs of a provider's file into the highest level per permission, `mismatch`
+compares it with the consumer CI job's block, and `links` appends `permissions mismatch: ...`
+after the ref text. `links` is the one pass behind `workspace_links` (and `link`, for one
+consumer): the providers by contract, the CI nodes by site (`sites`) and the blocks by file are
+each read once, so no link scans a repository. `passed` writes the block on the `consumer:` line, `context_at` the
 provider's `permissions:` line under `provides`, and `written` the `permissions` field of the
 consumer row of `meada export`.

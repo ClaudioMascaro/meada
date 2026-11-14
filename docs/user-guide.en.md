@@ -1148,7 +1148,7 @@ which always appear (like `repository`, which is text).
 | `symbols` | The symbols: `id`, `span` (`path`, `start`, `end`, byte offsets) and `hash` (hexadecimal BLAKE3 of the span's bytes) |
 | `calls` | The call sites: `id`, `caller`, `target` and `level` (empty until resolved), `candidates` (if ambiguous), `span`, `narrowed` and `decorates` |
 | `providers` | The provider side of each contract: `contract`, `site`, and if present `gateway` and `shape` |
-| `consumers` | The consumer side: `contract` (null if the URL was not evaluated), `site`, `via` (how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`) and `shape`. On a consumer of a CI contract, `via` is the `uses` as written, with the optional fields `ref` (the Git ref after the `@`), `with` (the keys passed, sorted) and `secrets` (the keys, or the word `inherit`) |
+| `consumers` | The consumer side: `contract` (null if the URL was not evaluated), `site`, `via` (how it names the provider's repository, such as `host:api.example.com` or `env:API_URL`) and `shape`. On a consumer of a CI contract, `via` is the `uses` as written, with the optional fields `ref` (the Git ref after the `@`), `with` (the keys passed, sorted) `secrets` (the keys, or the word `inherit`), `absent` (`true` when no repository of the workspace provides the contract at its indexed commit) and, on a consumer at a CI job, `permissions` (the declared block that governs the job) |
 | `links` | The links: `consumer`, `provider`, `contract`, `level`, `reason`, and if present `by`, `p` and `drift` |
 | `bindings`, `publishes` | The bindings (`contract`, `exchange`, `pattern`, `site`) and the publications (`exchange`, `key`, `site`) of RabbitMQ that the repository declares |
 | `documents` | The OpenAPI and AsyncAPI documents read: `path`, `format`, `version` and `contracts` |
@@ -1572,7 +1572,10 @@ vars.X }}`) is a pattern, linked `inferred` to the one package it fits; a whole 
 install $PKG`) is an unresolved consumer where the workspace provides a PyPI package, an open item
 that says its cause and has no candidate. A literal name with such a part in its range
 (`shared-lib==${{ matrix.v }}`) is the package itself, the range as written. Meada follows no
-variable the script assigns, no `cd`, no function and no called script.
+variable the script assigns, no `cd`, no function and no called script. A name a script of the
+file writes to the environment file (`GITHUB_ENV`) takes no literal either, and when a line writes
+that file without showing the name (`cat vars.env >> "$GITHUB_ENV"`) no `env` of the file gives
+one.
 
 **Programs.** A CI step whose command is a console script of a PyPI package of the workspace (a
 name under `[project.scripts]` or `[tool.poetry.scripts]`) starts that program: the CI step

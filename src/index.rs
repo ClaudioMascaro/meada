@@ -980,18 +980,18 @@ fn refresh_attempt(
     let kubernetes = std::cell::Cell::new(false);
     // A pipeline or an action is its own unit (#823). With both action file names in a folder
     // the action is `action.yml`, so the one that changed or left has the other read again.
+    let located: HashMap<&str, &PathBuf> = configs.iter().map(|(p, abs)| (&**p, abs)).collect();
     let actions = |path: &str, src: Option<&[u8]>| -> Result<()> {
         if !iac::actions::is_file(path) {
             return Ok(());
         }
         let twin = iac::actions::twin(path).and_then(|twin| {
-            let (_, abs) = configs.iter().find(|(p, _)| *p == twin)?;
+            let abs = located.get(twin.as_str())?;
             Some((twin, read_up_to(abs, lang::MAX_BYTES).ok()?))
         });
-        let shadowed = |path: &str, other: bool| other && path.ends_with(".yaml");
-        iac::actions::refresh(&tx, path, src, shadowed(path, twin.is_some()))?;
+        iac::actions::refresh(&tx, path, src, twin.is_some())?;
         if let Some((twin, bytes)) = &twin {
-            iac::actions::refresh(&tx, twin, Some(bytes), shadowed(twin, src.is_some()))?;
+            iac::actions::refresh(&tx, twin, Some(bytes), src.is_some())?;
         }
         Ok(())
     };

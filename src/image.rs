@@ -7,6 +7,7 @@ use crate::index::{Consumer, Export, Indexed, Provider};
 use crate::resolve::Code;
 use crate::workspace::Repository;
 use serde_json::Value;
+use std::collections::HashSet;
 
 pub(crate) mod code;
 mod config;
@@ -86,16 +87,28 @@ impl ContractKind for Image {
         true
     }
     fn declare(&self, repo: &Repository, export: &mut Export) {
-        for (path, summary) in summaries(export) {
-            for side in summary.builders {
+        let mut read = summaries(export);
+        // The CI steps of the repository by file and address: a builder is sited on the one
+        // that holds its form, found without a scan of the nodes for each. The builders come
+        // first, since a runner adds a node.
+        let builds = read.iter().any(|(_, s)| !s.builders.is_empty());
+        let steps: HashSet<(&str, &str)> = (export.iac.iter())
+            .filter(|n| builds && n.ty == crate::iac::actions::STEP)
+            .map(|n| (n.path.as_str(), n.address.as_str()))
+            .collect();
+        for (_, summary) in &mut read {
+            for side in summary.builders.drain(..) {
                 export.providers.push(Provider {
                     contract: format!("image::{}", side.image),
-                    site: step(export, &side.at).unwrap_or_else(|| repo.identity.clone()),
+                    site: step(&steps, &export.repository, &side.at)
+                        .unwrap_or_else(|| repo.identity.clone()),
                     at: Some(side.at.clone()),
                     evidence: side.inferred.then_some(side.at),
                     ..Provider::default()
                 });
             }
+        }
+        for (path, summary) in read {
             for side in summary.runners {
                 export.consumers.push(runner(
                     &repo.identity,
@@ -585,13 +598,12 @@ fn repository(site: &str) -> &str {
 }
 
 /// The CI step that holds the builder form at `at` (`<file>#<key path>`), when the CI reader
-/// gives the file its nodes.
-fn step(export: &Export, at: &str) -> Option<String> {
+/// gives the file its nodes: the step's address is the key path up to one of its `.`.
+fn step(steps: &HashSet<(&str, &str)>, repository: &str, at: &str) -> Option<String> {
     let (path, key) = at.split_once('#')?;
-    (export.iac.iter())
-        .filter(|n| n.ty == crate::iac::actions::STEP && n.path == path)
-        .find(|n| (key.strip_prefix(n.address.as_str())).is_some_and(|rest| rest.starts_with('.')))
-        .map(|n| n.identity(&export.repository))
+    let mut cuts = key.match_indices('.').map(|(end, _)| &key[..end]);
+    let address = cuts.find(|cut| steps.contains(&(path, *cut)))?;
+    Some(format!("{repository}::{path}::{address}"))
 }
 
 /// The options of `docker push` that take no value. The word after any other option is its

@@ -495,8 +495,9 @@
   pipeline or an action written inline: no use by key name, a structured identifier on its CI
   step or CI job in `uses`, `provisions` and `iac_nodes` (`ci-owned.app.export.json`), the
   controls that keep the key-name rule, every scalar still a config value, `vars.X` never matched
-  across repositories, a pattern that fits two names as an open item, and the `env` lookup: the
-  nearest that defines the name, literal or not, and none at an action's root.
+  across repositories, a pattern that fits two names as an open item, a `gs://` address, and the
+  `env` lookup: the nearest that defines the name, literal or not, none at an action's root and
+  none for a name a script may write to the environment file (#836).
 - `ci_run.rs` (#831): the command table over the PyPI pair (`pkg-pylib`, `pkg-pyweb`) with a
   pipeline written inline: each install command, the arguments that give no side, the gate's
   lines and shells, a name as a literal, a pattern or left open, the environment file and

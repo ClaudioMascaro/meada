@@ -243,7 +243,7 @@ pub(crate) fn read(
     // key-name rule reads none of them. Here, the pipelines and actions of the CI reader
     // (ADR 0028), each with the addresses of its CI jobs and CI steps and whether it is a
     // pipeline.
-    let mut ci_files = HashMap::<String, (Vec<String>, bool)>::new();
+    let mut ci_files = HashMap::<String, (HashSet<String>, bool)>::new();
     // The `env` keys of a CI job or a CI step that hold no config value and define their name.
     let mut others = Vec::new();
     for node in super::nodes(db)? {
@@ -255,7 +255,7 @@ pub(crate) fn read(
             if node.address == "." {
                 *pipeline = node.ty != super::actions::ACTION;
             } else {
-                nodes.push(node.address);
+                nodes.insert(node.address);
             }
         } else if let Some(mapped) = node.provisioned.as_ref().filter(|p| !p.defining.is_empty()) {
             definitions.extend(
@@ -300,17 +300,18 @@ pub(crate) fn read(
     }
     // The names the `run` scripts of each owned file may write to the environment file
     // (`GITHUB_ENV`, `github.env`): one of them reaches the CI steps after it, so no literal
-    // `env` gives it.
-    let mut written = HashMap::<&str, HashSet<&str>>::new();
+    // `env` gives it. `None` for a file where a script writes names it does not show: there
+    // no literal `env` gives any name.
+    let mut written = HashMap::<&str, Option<HashSet<&str>>>::new();
     for (path, key, value, _) in rows.iter().filter(|row| ci_files.contains_key(&row.0)) {
-        let lower = value.to_ascii_lowercase();
-        let writes = || {
-            ["github_env", "github.env", "github["]
-                .iter()
-                .any(|w| lower.contains(w))
+        let Some(shown) = (key.ends_with(".run").then(|| run::environment_file(value))).flatten()
+        else {
+            continue;
         };
-        if key.ends_with(".run") && writes() {
-            written.entry(path).or_default().extend(run::rebound(value));
+        let names = written.entry(path).or_insert_with(|| Some(HashSet::new()));
+        match (shown, names.as_mut()) {
+            (true, Some(names)) => names.extend(run::rebound(value)),
+            _ => *names = None,
         }
     }
     let schemas = schemas(db)?;
@@ -329,14 +330,18 @@ pub(crate) fn read(
             documents.contains(&None) || documents.contains(&Some(document))
         };
         // The CI nodes that hold the key, the nearest first: a CI step, then its CI job.
+        // An address is the key up to a `.` or a `[`: each such cut is looked up, never each node.
         let holders = ci_files.get(path).map(|(nodes, _)| {
-            let holds = |node: &&String| {
-                (key.strip_prefix(node.as_str())).is_some_and(|rest| rest.starts_with(['.', '[']))
-            };
-            let mut holders: Vec<&str> = nodes.iter().filter(holds).map(|n| &**n).collect();
-            holders.sort_by_key(|node| std::cmp::Reverse(node.len()));
+            let cuts = key.match_indices(['.', '[']).map(|(at, _)| &key[..at]);
+            let mut holders: Vec<&str> = cuts.filter(|cut| nodes.contains(*cut)).collect();
+            holders.reverse();
             holders
         });
+        // A name a script of the file may write to the environment file holds no literal.
+        let rebound = |name: &str| match written.get(path.as_str()) {
+            Some(names) => names.as_ref().is_none_or(|names| names.contains(name)),
+            None => false,
+        };
         // The `env` of the CI step, of its CI job, then of the pipeline (an action's file holds
         // none at its root).
         let scopes = |holders: &[&str], key: &str| -> Vec<String> {
@@ -358,8 +363,7 @@ pub(crate) fn read(
             let envs = scopes(holders, "env.");
             let env = |name: &str| {
                 let mut found = envs.iter().filter_map(|scope| given(file, scope, name));
-                let written = written.get(path.as_str());
-                (found.next().flatten()).filter(|_| written.is_none_or(|w| !w.contains(name)))
+                found.next().flatten().filter(|_| !rebound(name))
             };
             let commands = (shell.is_none_or(|shell| matches!(shell, Some("bash" | "sh"))))
                 .then(|| run::commands(value, env))
@@ -381,7 +385,7 @@ pub(crate) fn read(
                     let file = entries.get(path.as_str())?;
                     // The nearest `env` that defines the name decides, literal or not.
                     let mut found = outer.filter_map(|scope| given(file, scope, name));
-                    found.next().flatten()
+                    found.next().flatten().filter(|_| !rebound(name))
                 })
             }
             _ => value.clone(),

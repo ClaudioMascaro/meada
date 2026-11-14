@@ -326,10 +326,13 @@ Each enters `docs/agents/ceilings` with its slice:
 - Only PyPI console scripts are programs with a command name.
 - Declared permissions are not effective permissions.
 
-### Amendments to ADRs 0005, 0025 and 0026
+### Amendments to ADRs 0002, 0005, 0025 and 0026
 
-This ADR amends three ADRs, each carrying its dated amendments (2026-11-12):
+This ADR amends four ADRs, each carrying its dated amendments (2026-11-12, and 2026-11-14 for
+ADR 0002):
 
+- ADR 0002: the provider's indexed commit joins the inputs of the answers on CI links
+  (invariant 6), since the reason of a link names it and the `ref mismatch` flag reads it.
 - ADR 0005: its contract kinds gain `ci`, and `secrets.X` and `vars.X` fall under its rule on
   environment variables.
 - ADR 0025: its IaC formats, node addresses, references, evaluation units, static evaluation and
@@ -362,8 +365,13 @@ This ADR amends three ADRs, each carrying its dated amendments (2026-11-12):
 
 - What GitHub does when a called pipeline declares more than its consumer grants. The
   documentation says the permissions "can be only downgraded"; that the run is refused at start is
-  from memory.
+  from memory. Read again on 2026-11-14: the documentation states a refusal at start (a
+  validation error) only for `cache-mode`, a key the reader does not read.
 - Whether GitHub still accepts an abbreviated commit id in `uses`. If it does, it reads as a name.
+  Settled on 2026-11-14: the documentation on custom actions says "The full SHA must be used, not
+  an abbreviated value", so an abbreviated id pins no commit and reads as a name.
 - The spelling `template: <file>@<alias>` of Azure Pipelines; its schema confirms the alias and
-  the fields of a repository resource.
+  the fields of a repository resource. Settled on 2026-11-14: Microsoft's documentation on
+  templates writes `template: common.yml@templates`, the alias being the `repository` name under
+  `resources.repositories`.
 - The address `.` for a file node: it follows the key path rule and was not put to the maintainer.
