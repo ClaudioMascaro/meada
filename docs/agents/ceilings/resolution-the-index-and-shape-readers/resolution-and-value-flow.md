@@ -122,7 +122,8 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   caller's argument at its position, by the same rule, when the wrapper mentions it nowhere that
   runs first and reads it where it runs; a wrapper of a wrapper passes it on the same way, up to
   the expansion's depth. A varargs parameter, a call with another argument count, an alias of the
-  parameter or a read inside a lambda has no table. Two entries passed as two arguments, and a
+  parameter, a read inside a lambda, or a caller that hands the list in another argument too
+  (`w(l, l)`) has no table. Two entries passed as two arguments, and a
   table name in a parameter, keep their tables. A path with no list of entries (a list of names:
   SSM `Names[]`, Secrets Manager `SecretIdList[]`) keeps the rule it had.
   `EVAL_DEPTH` (256): a value

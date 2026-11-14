@@ -48,6 +48,36 @@ class Wrappers {
         send(items);
     }
 
+    void outerChanged(List<TransactWriteItem> items) {
+        items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("outer-new").build()).build());
+        send(items);
+    }
+
+    // The second parameter is the first list too when a caller passes it twice.
+    void sendWith(List<TransactWriteItem> items, List<TransactWriteItem> other) {
+        var db = DynamoDbClient.create();
+        other.set(0, TransactWriteItem.builder().put(Put.builder().tableName("twice-new").build()).build());
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+
+    void sendVarargs(TransactWriteItem... items) {
+        var db = DynamoDbClient.create();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+
+    void sendAliasOnly(List<TransactWriteItem> items) {
+        var db = DynamoDbClient.create();
+        var same = items;
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(same).build());
+    }
+
+    // Read when the lambda runs, which may be after the caller changed the list.
+    void sendLater(List<TransactWriteItem> items) {
+        var db = DynamoDbClient.create();
+        Runnable later = () -> db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+        later.run();
+    }
+
     void write(String table, Map<String, AttributeValue> item) {
         var db = DynamoDbClient.create();
         db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(
@@ -125,6 +155,27 @@ class Wrappers {
         var items = Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("handed-old").build()).build());
         reorder(items);
         send(items);
+    }
+
+    void outerSet() {
+        outerChanged(List.of(TransactWriteItem.builder().put(Put.builder().tableName("outer-old").build()).build()));
+    }
+
+    void twice() {
+        var items = Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("twice-old").build()).build());
+        sendWith(items, items);
+    }
+
+    void varargs() {
+        sendVarargs(TransactWriteItem.builder().put(Put.builder().tableName("varargs").build()).build());
+    }
+
+    void aliasOnly() {
+        sendAliasOnly(List.of(TransactWriteItem.builder().put(Put.builder().tableName("alias-only").build()).build()));
+    }
+
+    void lambdaRead() {
+        sendLater(List.of(TransactWriteItem.builder().put(Put.builder().tableName("lambda-read").build()).build()));
     }
 
     void reorder(List<TransactWriteItem> items) {
