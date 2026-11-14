@@ -1914,8 +1914,9 @@ fn steps(expr: &Expression, roots: &Map<String, Value>) -> usize {
 /// An upper bound of the bytes evaluating `expr` makes, its variables bound to `roots` and the
 /// iterator variables of the `for` around it to `iters` (a name and the most one element holds);
 /// `overhead` grows by the steps that make no bytes each time they run in a `for`: evaluating
-/// a template's parts (`TEMPLATE_PART_COST` each) and copying the root object a traversal reads (`hcl-rs` clones `var`, `local`, ... whole to evaluate `var.x[0]`), kept
-/// apart so an element count estimated from the bytes does not multiply it. A product (a `for`,
+/// a template's parts (`TEMPLATE_PART_COST` each) and copying the root object a traversal reads
+/// (`hcl-rs` clones `var`, `local`, ... whole to evaluate `var.x[0]`), kept apart so an element
+/// count estimated from the bytes does not multiply it. A product (a `for`,
 /// `formatlist`, `join`, `replace`) multiplies, a function that may grow its input (a `format`
 /// width, `jsonencode`'s escapes, `split`'s quotes, a case change) grows it, and anything else
 /// adds up.
@@ -5630,8 +5631,8 @@ mod tests {
     /// before): its steps are charged too, so at `m = 8000, k = 40` (9.6 s in a debug build
     /// before #714) it is unresolved before it runs, alone or 64 times in a root, with no
     /// resource left out; over 100 elements it still resolves. Measured on 2026-11-09 in a debug
-    /// build: 0.35 s for the whole test. (The literal `q-` of each stays: a refusal spends what
-    /// it went through, not 1 MiB.)
+    /// build, before #763: 0.35 s for the whole test. (The literal `q-` of each stays: a refusal
+    /// spends what it went through, not 1 MiB.)
     #[test]
     fn a_template_in_a_wide_for_is_bounded_by_its_steps() {
         let body = "${a}".repeat(40);
@@ -5662,6 +5663,24 @@ mod tests {
             assert!(got.iter().all(|s| s.ends_with(" ~ \"q-*\"")), "{got:?}");
             assert!(took < std::time::Duration::from_secs(secs), "{n}: {took:?}");
         }
+    }
+
+    /// The cheapest template a `for` repeats is a `%{ for }` of no part, charged no part: it still
+    /// evaluates its collection once per element of the directive around it, and each evaluation
+    /// is charged the elements it lists, so two directives over 1,000 literal elements, one inside
+    /// the other with nothing between them (a million calls of an empty body), are refused before
+    /// they run; one alone still evaluates (#763).
+    #[test]
+    fn a_nested_template_for_of_no_part_is_refused() {
+        let ones = vec!["1"; 1000].join(", ");
+        let nested = format!(
+            "\"%{{ for a in [{ones}] }}%{{ for b in [{ones}] }}%{{ endfor }}%{{ endfor }}\""
+        );
+        let expr = parser::parse_expr(&nested).unwrap();
+        assert!(steps(&expr, &Map::new()) > EVAL_COST_MAX);
+        let alone = format!("\"%{{ for a in [{ones}] }}%{{ endfor }}\"");
+        let expr = parser::parse_expr(&alone).unwrap();
+        assert!(steps(&expr, &Map::new()) <= EVAL_COST_MAX);
     }
 
     /// No template reaches `hcl-rs` as text, so none is parsed again at an evaluation, whatever
