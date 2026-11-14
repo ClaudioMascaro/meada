@@ -13,8 +13,9 @@ All notable changes to Meada are recorded here. The format follows
   before the request reads it; a list that is sorted, or changed after a named request's
   `build()` or after the call, keeps its tables too. A wrapper that changes the list after its
   read keeps them only for a list the caller makes in the call, and one that another method of
-  its name and number of parameters, or an anonymous class's, may stand for names none. An
-  existing index is rebuilt on its first open by this version (#772).
+  its name and number of parameters, or an anonymous class's, may stand for names none, and so
+  does every wrapper while a Java or Kotlin file is past its budget. An existing index is rebuilt
+  on its first open by this version (#772).
 - Pipelines, actions, CI jobs and CI steps of GitHub Actions are IaC nodes (ADR 0028). A file
   directly under `.github/workflows/` that holds `jobs` is a pipeline, and an `action.yml` or
   `action.yaml` that holds `runs` is an action; each CI job (`jobs.build`) and CI step
