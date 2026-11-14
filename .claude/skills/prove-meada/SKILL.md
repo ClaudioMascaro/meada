@@ -39,6 +39,14 @@ Every check has three parts: the surface you drive, the answer key that says wha
 
 `S=.claude/skills/prove-meada/scripts` below. Every command runs from the repository root.
 
+## Feature skills
+
+Each family of flows has a sibling skill with what a judge needs for it: its answer keys, what CI drove, what done looks like and how a check there could fool you. Read the skill of every flow Scope reached before Sort, by its path: these skills are not listed for the model.
+
+| Skill | Covers | Flows and receipt steps |
+|---|---|---|
+| [prove-meada-deploy](../prove-meada-deploy/SKILL.md) | `deploy/`, `Dockerfile` and the compose, helm and container checks | steps `deploy-diff`, `compose-contract`, `helm-contract`, `container-build`, `container-smoke` |
+
 For #676/#684's bounded CI audit and receipt maintenance, use
 [references/a7-a8-audit.md](references/a7-a8-audit.md). Freeze the exact source/keys, obtain an
 untouched PROVED baseline before planting, and distinguish script catches from fresh blind
@@ -109,7 +117,6 @@ Ladder, best first: 1 an old system that does the same job, 2 a snapshot, 3 an i
 | Console pages | existing | the budgets below, and the playground answer equal to stdio | budget + 1 | `console-pages.mjs` | the maintainer, 2026-11-02 |
 | A7 console infrastructure roles, roots, image/alert directions, same-repository links, unpaired sides and keyboard/search controls | new | #675/#642 and ADR 0026; complete same-mode CLI/API and playground/query parity | 4 + 1 | `console-graph.py`, [references/console-graph.md](references/console-graph.md) | maintainer specs; fresh independent checker |
 | Index time, peak RSS, export size | existing | head at most x1.25, x1.25 and x1.5 of the base (time only when the base takes 2 s or more) | budget | `prove.py run` | the maintainer, 2026-11-02 |
-| Compose and Helm renders | existing | the renders at the base | 1 | `prove.py deploy` | the deploy files before the change |
 | A7 Datadog monitor tags, OpsGenie criteria and explicit Alertmanager receiver transforms to incident fields | new | #673/#642/#638, provider-native condition semantics and explicit Alertmanager notifier mapping; existing alert answers use the base binary | 4 + 1 | `incident-routing.py`, [references/incident-routing.md](references/incident-routing.md) | maintainer spec and provider documentation; fresh checker required |
 | A7 config values (`search` kind `value`, the status config line) | new | spec #642's user stories 1 to 17, through `prove.py values`'s own reading of the files | 4 | `prove.py values` | the maintainer; the oracle reads the files, never Meada |
 | A7 IaC nodes, Terraform (`search` kind `iac`, `context` and `trace` on an address) | new | ticket #649's criteria and Terraform's address rules, through `tf_oracle.py`'s own reading of the files (python-hcl2) | 4 | `prove.py iac` | the maintainer; the oracle reads the files, never Meada |
@@ -212,18 +219,6 @@ One section per surface. `/create-prove-it` adds a section when the app gains a 
 **Done looks like**: every successful query text and same-mode export byte-equal, each expected tool error with exact status/code/message; every page with its `h1`, CLS at most 0.1, load at most 2 s, zero console errors, zero axe violations of impact serious or critical; the playground answer equal to stdio; with accounts, a wrong password refused, no `Origin` refused, a token issued.
 
 **Could fool you**: a page can render from cached state; the playground check is the one that crosses the API. A green API with an old `ui/dist` proves the API only: build the front end from this tree.
-
-### Deploy
-
-**CI drive**: `python3 $S/prove.py deploy --base "$BASE" --run "$RUN"`, then `python3 scripts/compose-check` and, with `helm` installed, `python3 scripts/helm-check`. Detail: [references/deploy.md](references/deploy.md).
-
-**Copies**: nothing. The renders at the base are the answer key; each difference must be one the issue names.
-
-**Done looks like**: every render identical or its difference predicted, both check scripts exit 0.
-
-**Could fool you**:
-- A render proves the configuration, not that the containers start; `scripts/container-smoke` does that, and needs Docker and an image build.
-- A render shows a mounted file's path, never its text: `prove.py deploy` copies the Caddyfiles, workspace manifests, shell scripts and env examples the stack mounts into the render folder (`mounted-*`) so the base/head diff covers them. `compose-check` asserts only a few strings of those files (a Caddyfile upstream on the wrong port passed it, audit 2026-11-03, D3); read the `mounted-*` diff as you read a render's.
 
 ### A7: config values and IaC (spec #642)
 
