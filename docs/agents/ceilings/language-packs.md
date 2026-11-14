@@ -203,7 +203,9 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   `//go:build` lines, not UTF-8) is. Build constraints hold for one target (`linux`, `amd64`,
   `unix`, `gc`, every `go1.N`; `cgo` and any other tag are false, and a file that imports `"C"`
   is left out); a legacy `// +build` line
-  alone is not read. A plain import binds the name the Go tools assume for its path
+  alone is not read. A file name's system or architecture suffix is read off the name cut at its
+  first dot, as the Go tools read it (#876): `disk.gen_windows.go` is built, `disk_windows.gen.go`
+  is not. A plain import binds the name the Go tools assume for its path
   (`assumed_name`: the last element, the one before a `vN`, without `go-`, up to the first
   character no identifier holds), not the package clause of the directory it names, so a
   package whose clause differs from its directory is reached by its alias alone, and a name two

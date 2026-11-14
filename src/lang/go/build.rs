@@ -1,7 +1,7 @@
 //! Build constraints, evaluated for one fixed target so that the index never depends on the
 //! machine: `linux/amd64`, the `gc` compiler, every `go1.N` release and no cgo. A file is left
-//! out when its name ends in another system or architecture (`_windows.go`, `_arm64.go`), when it
-//! starts with `_` or `.`, or when its `//go:build` line is false. Any other tag (`cgo`, a custom
+//! out when its name, up to its first dot, ends in another system or architecture (`_windows.go`,
+//! `_arm64.go`), when it starts with `_` or `.`, or when its `//go:build` line is false. Any other tag (`cgo`, a custom
 //! tag such as `integration`) is false, and a file that imports `"C"` is left out too (the pack
 //! sees its imports).
 
@@ -86,7 +86,10 @@ fn named(path: &str) -> bool {
     if file.starts_with('_') || file.starts_with('.') {
         return false;
     }
-    let stem = file.strip_suffix(".go").unwrap_or(file);
+    // As the Go tools do (`go/build`'s `goodOSArchFile`), the suffix is read off the name cut at
+    // its first dot: `disk.gen_windows.go` is `disk`, with no suffix, and `disk_windows.gen.go`
+    // is `disk_windows`.
+    let stem = file.split('.').next().unwrap_or(file);
     // What precedes the first `_` is the name itself.
     let Some((_, tail)) = stem.split_once('_') else {
         return true;
