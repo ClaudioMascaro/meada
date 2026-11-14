@@ -735,12 +735,15 @@ pub(crate) fn outermost(root: Node, kinds: &[&str]) -> Vec<Range<usize>> {
 /// how many identifiers written inside the functions named `scope` spell `name`, nested
 /// functions included, in one walk of the file. A name of no function (a field, a package
 /// variable) gets no count: code outside the file may write it. No name gets one in a file that
-/// spells an identifier with an escape (C#'s `\u0061`), which no count compares.
+/// spells an identifier with an escape (C#'s `\u0061`), which no count compares. An identifier
+/// `read` takes is no mention: a use that reads the value and cannot change it (Go's `len(x)`,
+/// C#'s `x.Count`, #774).
 pub(crate) fn mentioned<'l>(
     root: Node,
     src: &[u8],
     defs: &[Def],
     locals: impl Iterator<Item = (&'l str, &'l str)>,
+    read: impl Fn(Node) -> bool,
 ) -> Vec<Mentioned> {
     let locals: BTreeSet<(&str, &str)> = locals.collect();
     let mut written: HashMap<&str, Vec<usize>> =
@@ -755,7 +758,9 @@ pub(crate) fn mentioned<'l>(
                 return Vec::new();
             };
             // C# spells a name that is also a keyword `@name`.
-            if let Some(at) = written.get_mut(text.trim_start_matches('@')) {
+            if let Some(at) = written.get_mut(text.trim_start_matches('@'))
+                && !read(node)
+            {
                 at.push(node.start_byte());
             }
             continue;

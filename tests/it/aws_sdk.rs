@@ -937,7 +937,10 @@ fn dynamodb_transactions_keep_every_entry_table_and_direction_in_java_go_and_dot
 /// method of the list, a helper. A name on the path to an entry's table is followed only when
 /// its function writes it twice, where it is declared and where the path reads it, and every
 /// other mention leaves the transaction's entries unresolved. The same values left alone keep
-/// their tables.
+/// their tables, and so do values a use reads without changing (#774): Go's `len` and `cap`
+/// (unless the package hides the builtin) and C#'s `Count`, and another call sending the same
+/// request (or, in C#, an inline request holding the same list). Their twins changed in place
+/// stay unresolved.
 #[test]
 fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
     let repo = fixture_repo(
@@ -974,13 +977,20 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
             "elementreplaced writer resource::dynamodb",
             "entryreplaced writer resource::dynamodb",
             "getreplaced reader resource::dynamodb",
+            "handedaftersend writer resource::dynamodb",
+            "handedaftersend writer resource::dynamodb",
             "heldentry writer resource::dynamodb",
+            "hiddenlen writer resource::dynamodb",
             "itemcopied writer resource::dynamodb",
             "itemwritten writer resource::dynamodb",
+            "lengthread writer resource::dynamodb::length-read",
+            "lengththenset writer resource::dynamodb",
             "loopwritten writer resource::dynamodb",
             "plainget reader resource::dynamodb::plain-get",
             "plainparts writer resource::dynamodb::plain-parts",
             "plainrequest writer resource::dynamodb::plain-request",
+            "requesttwice writer resource::dynamodb::request-twice",
+            "requesttwice writer resource::dynamodb::request-twice",
             "slicehanded writer resource::dynamodb",
             "slicereplaced writer resource::dynamodb",
             "slicewritten writer resource::dynamodb",
@@ -991,10 +1001,15 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
     assert_eq!(
         sides("cs"),
         [
+            "countcalled writer resource::dynamodb",
             "elementreplaced writer resource::dynamodb",
             "getreplaced reader resource::dynamodb",
+            "handedaftersend writer resource::dynamodb",
+            "handedaftersend writer resource::dynamodb",
             "heldentry writer resource::dynamodb",
             "itemwritten writer resource::dynamodb",
+            "lengthread writer resource::dynamodb::length-read",
+            "lengththenset writer resource::dynamodb",
             "listhanded writer resource::dynamodb",
             "listremoved writer resource::dynamodb",
             "listreplaced writer resource::dynamodb",
@@ -1003,6 +1018,12 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
             "plainparts writer resource::dynamodb::plain-parts",
             "plainrequest writer resource::dynamodb::plain-request",
             "requestcleared writer resource::dynamodb",
+            "requesttwice writer resource::dynamodb::request-twice",
+            "requesttwice writer resource::dynamodb::request-twice",
+            "sentthenset writer resource::dynamodb",
+            "sentthenset writer resource::dynamodb",
+            "senttwice writer resource::dynamodb::sent-twice",
+            "senttwice writer resource::dynamodb::sent-twice",
             "shareditem writer resource::dynamodb",
             "shareditem writer resource::dynamodb",
             "throughrequest writer resource::dynamodb",

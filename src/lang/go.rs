@@ -303,6 +303,14 @@ impl Walk<'_> {
         false
     }
 
+    /// Whether a binding of the file hides the builtin `name` (`len`).
+    // ponytail: a package-level one another file of the package declares is not seen.
+    fn hides(&self, name: &str) -> bool {
+        (self.bound.keys()).any(|(_, n)| n == name)
+            || (self.facts.defs.iter()).any(|d| d.name == name)
+            || (self.facts.consts.iter()).any(|c| c.name == name)
+    }
+
     /// Makes the names held by one binding constants, and gives each definition what it
     /// returns. A name bound again anywhere in its function, or assigned in it or in a literal
     /// inside it, holds no one value.
@@ -352,10 +360,7 @@ impl Walk<'_> {
         }
         // A guard holds when no binding of the file hides `len`, and when `ok` is the second
         // result of the `os.LookupEnv` that bound the read, bound once and never assigned.
-        // ponytail: a package-level `len` another file of the package declares is not seen.
-        let hides_len = (self.bound.keys()).any(|(_, n)| n == "len")
-            || (self.facts.defs.iter()).any(|d| d.name == "len")
-            || (self.facts.consts.iter()).any(|c| c.name == "len");
+        let hides_len = self.hides("len");
         let guarded = |found: &str, name: &str, scope: &str, guard: &values::Guard| {
             let Some(ok) = &guard.ok else {
                 return !(guard.len && hides_len);
@@ -1396,6 +1401,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
     // The values read `bound`, which `finish` takes.
     walk.finish_values();
     walk.finish();
+    let builtin = ["len", "cap"].map(|name| !walk.hides(name));
     let mut facts = walk.facts;
     unbind_clashes(&mut facts.imports);
     facts.exports = (top.into_iter().filter(|n| exported(n)))
@@ -1407,7 +1413,20 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
     facts.loops = super::outermost(tree.root_node(), &["for_statement"]);
     // A local kept as a constant is named `function.name`.
     let held = (facts.consts.iter()).filter_map(|c| c.name.rsplit_once('.'));
-    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, held);
+    // `len(x)` and `cap(x)` read the value and change nothing (#774), where no binding hides them.
+    let read = |name: Node| {
+        let args = name.parent().filter(|a| a.kind() == "argument_list");
+        let call = (args.filter(|a| a.named_child_count() == 1)).and_then(|a| a.parent());
+        let function = (call.filter(|c| c.kind() == "call_expression"))
+            .and_then(|c| c.child_by_field_name("function"))
+            .filter(|f| f.kind() == "identifier");
+        match function.map(|f| text(f, src)) {
+            Some("len") => builtin[0],
+            Some("cap") => builtin[1],
+            _ => false,
+        }
+    };
+    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, held, read);
     Ok(facts)
 }
 

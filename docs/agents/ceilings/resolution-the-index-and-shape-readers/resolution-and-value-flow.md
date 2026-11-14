@@ -101,9 +101,14 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   variable says otherwise: one of the same package in another source root is not seen (#719).
   A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB
   transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that
-  declares the name mentions it twice. In Go and C#, one mentioned a third time (logged, read by two
-  requests), one held in a parameter, a field or a package variable, the first name the path meets
-  when any file of the repository assigns the field read through it (`q.TableName = ..` on any
+  declares the name mentions it twice. In Go and C#, a use that reads it and changes nothing is
+  no mention (#774): Go's `len(x)` and `cap(x)` (unless the file binds or declares `len` or `cap`;
+  a package-level one another file of the package declares is not seen), C#'s `x.Count` (not
+  called, assigned or stepped), and another transaction call of the same function that sends the
+  name as its request or as an inline request's list. One mentioned a third time for any other
+  reason (logged, `x.Count()`, held by a second request in a name), one held in a parameter, a
+  field or a package variable, the first name the path meets when any file of the repository
+  assigns the field read through it (`q.TableName = ..` on any
   variable of any type, in any package or class; a write of another field does not count), and a C#
   request filled by property assignments have no table or bus; nor have Go locals declared together (`p, q
   := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.

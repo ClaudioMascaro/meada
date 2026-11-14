@@ -112,4 +112,71 @@ class Named {
         request.TransactItems[0] = new TransactGetItem { Get = new Get { TableName = "get-new" } };
         await db.TransactGetItemsAsync(request);
     }
+
+    // A use that reads the value and changes nothing is no mention (#774): its size, another
+    // request that sends it.
+    async Task LengthRead() {
+        var db = new AmazonDynamoDBClient();
+        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "length-read" } } };
+        System.Console.WriteLine(items.Count);
+        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
+    }
+
+    async Task LengthThenSet() {
+        var db = new AmazonDynamoDBClient();
+        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "length-old" } } };
+        if (items.Count > 0) {
+            items[0] = new TransactWriteItem { Put = new Put { TableName = "length-new" } };
+        }
+        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
+    }
+
+    // `Count()` is a call, here the repository's own extension that changes the list.
+    async Task CountCalled() {
+        var db = new AmazonDynamoDBClient();
+        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "count-called-old" } } };
+        System.Console.WriteLine(items.Count());
+        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
+    }
+
+    async Task SentTwice() {
+        var db = new AmazonDynamoDBClient();
+        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "sent-twice" } } };
+        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
+        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
+    }
+
+    async Task SentThenSet() {
+        var db = new AmazonDynamoDBClient();
+        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "sent-old" } } };
+        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
+        items[0] = new TransactWriteItem { Put = new Put { TableName = "sent-new" } };
+        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
+    }
+
+    async Task RequestTwice() {
+        var db = new AmazonDynamoDBClient();
+        var request = new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "request-twice" } } } };
+        await db.TransactWriteItemsAsync(request);
+        await db.TransactWriteItemsAsync(request);
+    }
+
+    async Task HandedAfterSend() {
+        var db = new AmazonDynamoDBClient();
+        var request = new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "handed-after-old" } } } };
+        await db.TransactWriteItemsAsync(request);
+        Change(request);
+        await db.TransactWriteItemsAsync(request);
+    }
+
+    void Change(TransactWriteItemsRequest request) {
+        request.TransactItems[0] = new TransactWriteItem { Put = new Put { TableName = "handed-after-new" } };
+    }
+}
+
+static class Lists {
+    public static int Count(this List<TransactWriteItem> items) {
+        items[0] = new TransactWriteItem { Put = new Put { TableName = "count-called-new" } };
+        return 1;
+    }
 }
