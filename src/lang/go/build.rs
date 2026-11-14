@@ -246,6 +246,16 @@ mod tests {
             ("store/windows.go", true),
             ("store/_draft.go", false),
             ("store/.hidden.go", false),
+            // The Go tools cut the name at its first dot before they read the suffix (#876):
+            // what follows the dot names no system, and a suffix before it does.
+            ("store/disk.gen_windows.go", true),
+            ("store/disk.x_arm64.go", true),
+            ("store/a_b.c_windows.go", true),
+            ("store/a.b_linux_arm64.go", true),
+            ("store/disk.gen_windows_test.go", true),
+            ("store/disk_windows.gen.go", false),
+            ("store/disk_linux.gen.go", true),
+            ("store/linux.go", true),
         ];
         for (path, built) in cases {
             assert_eq!(named(path), built, "{path}");
