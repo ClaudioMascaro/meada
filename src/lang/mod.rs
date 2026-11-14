@@ -696,7 +696,7 @@ pub struct Mentioned {
     pub scope: String,
     pub name: String,
     pub count: u32,
-    /// The mentions left out of `count` as reads that change nothing (`len(x)`, `x.Count`), for
+    /// The mentions left out of `count` as reads that change nothing (Go's `len(x)`), for
     /// a reader that finds the platform's name hidden by the repository's own code (#774).
     #[serde(default)]
     pub read: u32,
@@ -741,7 +741,7 @@ pub(crate) fn outermost(root: Node, kinds: &[&str]) -> Vec<Range<usize>> {
 /// variable) gets no count: code outside the file may write it. No name gets one in a file that
 /// spells an identifier with an escape (C#'s `\u0061`), which no count compares. An identifier
 /// `read` takes is no mention but a read (`Mentioned::read`): a use that reads the value and
-/// cannot change it (Go's `len(x)`, C#'s `x.Count`, #774).
+/// cannot change it (Go's `len(x)`, #774).
 pub(crate) fn mentioned<'l>(
     root: Node,
     src: &[u8],

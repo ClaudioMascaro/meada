@@ -113,39 +113,13 @@ class Named {
         await db.TransactGetItemsAsync(request);
     }
 
-    // A use that reads the value and changes nothing is no mention (#774): its size, another
-    // request that sends it.
+    // Another request that sends it changes nothing (#774). `x.Count` stays a mention: `List`
+    // may name a type of the repository whose `Count` runs code.
     async Task LengthRead() {
         var db = new AmazonDynamoDBClient();
         var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "length-read" } } };
         System.Console.WriteLine(items.Count);
         await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
-    }
-
-    async Task LengthThenSet() {
-        var db = new AmazonDynamoDBClient();
-        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "length-old" } } };
-        if (items.Count > 0) {
-            items[0] = new TransactWriteItem { Put = new Put { TableName = "length-new" } };
-        }
-        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
-    }
-
-    // `Count()` is a call, here the repository's own extension that changes the list.
-    async Task CountCalled() {
-        var db = new AmazonDynamoDBClient();
-        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "count-called-old" } } };
-        System.Console.WriteLine(items.Count());
-        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
-    }
-
-    // `Count` on a value that is no `List<T>` is no property of its own: an extension property
-    // (C# 14) is the repository's code.
-    async Task RequestCount() {
-        var db = new AmazonDynamoDBClient();
-        var request = new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "request-count" } } } };
-        System.Console.WriteLine(request.Count);
-        await db.TransactWriteItemsAsync(request);
     }
 
     async Task SentTwice() {
@@ -180,12 +154,5 @@ class Named {
 
     void Change(TransactWriteItemsRequest request) {
         request.TransactItems[0] = new TransactWriteItem { Put = new Put { TableName = "handed-after-new" } };
-    }
-}
-
-static class Lists {
-    public static int Count(this List<TransactWriteItem> items) {
-        items[0] = new TransactWriteItem { Put = new Put { TableName = "count-called-new" } };
-        return 1;
     }
 }

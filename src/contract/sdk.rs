@@ -161,7 +161,7 @@ pub(crate) fn extract<'a>(
         return Vec::new();
     };
     let mut found = Vec::new();
-    let (written, hidden) = (std::cell::OnceCell::new(), std::cell::OnceCell::new());
+    let (written, declared) = (std::cell::OnceCell::new(), std::cell::OnceCell::new());
     let builders = java::Builders::default();
     let configs = std::cell::OnceCell::new();
     let inject = |code: &Code<'a>, path: &'a str, on: crate::resolve::Injected<'a>| {
@@ -227,9 +227,9 @@ pub(crate) fn extract<'a>(
                             operation.field,
                             language,
                             counts.get_or_init(|| {
-                                let hides = hidden
-                                    .get_or_init(|| Hidden::read(code))
-                                    .hides(path, language);
+                                let hides = (declared.get_or_init(|| Declared::read(code)))
+                                    .packages
+                                    .contains(directory(path));
                                 (code.mentioned(path).iter())
                                     .map(|m| {
                                         let reads = if hides { m.read } else { 0 };
@@ -241,7 +241,17 @@ pub(crate) fn extract<'a>(
                                     .collect()
                             }),
                             sent.get_or_init(|| {
-                                sends(code, path, &facts.calls, services, language, origins)
+                                let methods =
+                                    &declared.get_or_init(|| Declared::read(code)).methods;
+                                sends(
+                                    code,
+                                    path,
+                                    &facts.calls,
+                                    services,
+                                    language,
+                                    methods,
+                                    origins,
+                                )
                             }),
                         ));
                     let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
@@ -441,40 +451,35 @@ fn changed_request<'a>(
     false
 }
 
-/// What the repository declares that the language packs' mention counts take for the
-/// platform's own (#774): the Go packages (directories) a file of which declares `len` or `cap`,
-/// and whether a C# file declares a type `List` or names one so with a using alias
-/// (`using List = Mine;`, which a `global using` or a project file may give every file).
-struct Hidden<'a> {
+/// What the repository declares in place of the platform's (#774): the Go packages
+/// (directories) a file of which declares `len` or `cap`, whose `len(x)` the Go pack's counts
+/// leave out (`Mentioned::read`) is then the repository's code, a mention again; and the names of
+/// its C# methods, one of which a C# call that looks like an SDK call may reach (an extension
+/// method), so that it is no send that changes nothing (`sends`).
+struct Declared<'a> {
     packages: BTreeSet<&'a str>,
-    list: bool,
+    methods: BTreeSet<&'a str>,
 }
 
-impl<'a> Hidden<'a> {
+impl<'a> Declared<'a> {
     fn read(code: &Code<'a>) -> Self {
-        let (mut packages, mut list) = (BTreeSet::new(), false);
+        let (mut packages, mut methods) = (BTreeSet::new(), BTreeSet::new());
         for (&path, facts) in code.files() {
             let names = (facts.defs.iter().map(|d| d.name.as_str()))
                 .chain(facts.consts.iter().map(|c| c.name.as_str()));
             if names.clone().any(|n| n == "len" || n == "cap") {
                 packages.insert(directory(path));
             }
-            list |= (facts.defs.iter()).any(|d| {
-                let name = d.name.split('<').next().unwrap_or_default();
-                d.kind == crate::lang::Kind::Class && (name == "List" || name.ends_with(".List"))
-            }) || path.ends_with(".cs")
-                && (facts.imports.iter()).any(|i| i.local == "List");
+            if path.ends_with(".cs") {
+                // `Ns.Type<T>.Method<U>(Ns.Arg)`: the name between its parent and `(` or `<`.
+                let simple = |d: &'a crate::lang::Def| {
+                    let own = d.name[crate::parent(&d.name).len()..].trim_start_matches('.');
+                    own.split(['(', '<']).next().unwrap_or(own)
+                };
+                methods.extend(facts.defs.iter().map(simple));
+            }
         }
-        Self { packages, list }
-    }
-
-    /// Whether the reads the counts of `path` left out (`Mentioned::read`) may change a value: its
-    /// `len(x)` or `x.Count` is then the repository's own code, a mention again.
-    fn hides(&self, path: &str, language: Language) -> bool {
-        match language {
-            Language::Go => self.packages.contains(directory(path)),
-            _ => self.list,
-        }
+        Self { packages, methods }
     }
 }
 
@@ -484,18 +489,24 @@ fn directory(path: &str) -> &str {
 
 /// The names each transaction call of the file sends (Go and C#), by call: its request when a
 /// name holds it, or the list of entries an inline request holds. An SDK call reads its request
-/// and changes nothing, so another one that sends the name is no change to it (#774).
+/// and changes nothing, so another one that sends the name is no change to it (#774). A C# call
+/// of a name some C# method of the repository has (`methods`) may reach that method instead (an
+/// extension method), so it sends nothing here.
 fn sends<'c, 'a>(
     code: &'c Code<'a>,
     path: &'a str,
     calls: &[crate::lang::Call],
     services: &'c [Service],
     language: Language,
+    methods: &BTreeSet<&str>,
     origins: &mut origins::Origins<'c, 'a>,
 ) -> BTreeSet<(usize, &'a str, &'a str)> {
     let mut sent = BTreeSet::new();
     for (index, stored) in calls.iter().enumerate() {
         let method = crate::resolve::method(&stored.callee);
+        if language == Language::Csharp && methods.contains(method) {
+            continue;
+        }
         let operations = (services.iter())
             .flat_map(|service| service.operations.iter().map(move |o| (service, o)))
             .filter(|(_, o)| language.method(method, o.method) && reads_entries(o.field));

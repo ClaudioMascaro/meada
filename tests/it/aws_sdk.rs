@@ -1003,15 +1003,13 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
     assert_eq!(
         sides("cs"),
         [
-            "countcalled writer resource::dynamodb",
             "elementreplaced writer resource::dynamodb",
             "getreplaced reader resource::dynamodb",
             "handedaftersend writer resource::dynamodb",
             "handedaftersend writer resource::dynamodb",
             "heldentry writer resource::dynamodb",
             "itemwritten writer resource::dynamodb",
-            "lengthread writer resource::dynamodb::length-read",
-            "lengththenset writer resource::dynamodb",
+            "lengthread writer resource::dynamodb",
             "listhanded writer resource::dynamodb",
             "listremoved writer resource::dynamodb",
             "listreplaced writer resource::dynamodb",
@@ -1020,7 +1018,6 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
             "plainparts writer resource::dynamodb::plain-parts",
             "plainrequest writer resource::dynamodb::plain-request",
             "requestcleared writer resource::dynamodb",
-            "requestcount writer resource::dynamodb",
             "requesttwice writer resource::dynamodb::request-twice",
             "requesttwice writer resource::dynamodb::request-twice",
             "sentthenset writer resource::dynamodb",
@@ -1425,28 +1422,19 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     );
 }
 
-/// The #774 forms that need a repository of their own. One that declares its own `List`, or
-/// names a type so with a using alias, makes `x.Count` its code: the read that changes nothing is
-/// a mention again, and a list read so names no table; one never read so keeps it. A Go list two
-/// inline requests send keeps its table unless it changes between the sends (the named fixture
-/// writes `.Put` elsewhere, which unnames any list held in a name).
+/// The #774 forms that need a repository of their own. A Go list two inline requests send keeps
+/// its table unless it changes between the sends (the named fixture writes `.Put` elsewhere, which
+/// unnames any list held in a name). A C# repository that declares a method of a transaction
+/// operation's name (an extension method a call may reach) makes no second send a read.
 #[test]
 fn transaction_reads_in_a_repository_of_their_own() {
-    let cases: [(&str, &str, &[&str]); 3] = [
+    let cases: [(&str, &str, &[&str]); 2] = [
         (
-            "aws_sdk_transactions_list_type",
-            "aws-sdk-transactions-list-type",
+            "aws_sdk_transactions_extension",
+            "aws-sdk-transactions-extension",
             &[
-                "ListType.OwnList() resource::dynamodb",
-                "ListType.OwnListPlain() resource::dynamodb::own-list-plain",
-            ],
-        ),
-        (
-            "aws_sdk_transactions_list_alias",
-            "aws-sdk-transactions-list-alias",
-            &[
-                "Alias.AliasCount() resource::dynamodb",
-                "Alias.AliasPlain() resource::dynamodb::alias-plain",
+                "Extension.SentThroughExtension() resource::dynamodb",
+                "Extension.SentThroughExtension() resource::dynamodb",
             ],
         ),
         (

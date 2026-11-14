@@ -9,8 +9,8 @@ All notable changes to Meada are recorded here. The format follows
 ### Added
 
 - Go and C#: a DynamoDB transaction's request or list held in a name keeps its tables when the
-  only other uses read it without changing it: `len(x)` and `cap(x)` in Go, `x.Count` in C#, or
-  another transaction call that sends the same name (#774).
+  only other uses read it without changing it: `len(x)` and `cap(x)` in Go, or another
+  transaction call that sends the same name (#774).
 
 ## [1.4.0] - 2026-11-13
 

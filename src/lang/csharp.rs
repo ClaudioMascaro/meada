@@ -1423,35 +1423,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
     }
     facts.consts.extend(given);
     let locals = bound.iter().map(|b| (b.scope.as_str(), b.name.as_str()));
-    // `x.Count` reads a list's size and changes nothing (#774): not called (`x.Count()`),
-    // assigned or stepped (`x.Count++`), and only where every binding of `x` is a `List<T>`, whose
-    // own property no extension property stands for (the SDK reader checks that no file declares
-    // a type `List` or names one so with a using alias, `sdk::Hidden`).
-    let mut lists: HashMap<&str, bool> = HashMap::new();
-    for b in &bound {
-        let list = matches!(&b.value, Value::New(ty, _) if ty == "List" || ty.ends_with(".List"));
-        *lists.entry(b.name.as_str()).or_insert(true) &= list;
-    }
-    let read = |name: Node| {
-        let Some(access) = name
-            .parent()
-            .filter(|a| a.kind() == "member_access_expression")
-        else {
-            return false;
-        };
-        let size = access.child_by_field_name("name");
-        access.child_by_field_name("expression") == Some(name)
-            && lists.get(text(name, src)) == Some(&true)
-            && size.is_some_and(|n| text(n, src) == "Count")
-            && access.parent().is_none_or(|p| match p.kind() {
-                "invocation_expression"
-                | "postfix_unary_expression"
-                | "prefix_unary_expression" => false,
-                "assignment_expression" => p.child_by_field_name("left") != Some(access),
-                _ => true,
-            })
-    };
-    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, locals, read);
+    // Every mention counts, `x.Count` too (#774): `List` in the source may name a type whose
+    // `Count` runs code (a type parameter, an alias in a file or a project file, an escaped name).
+    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, locals, |_| false);
     facts.bound = bound;
     facts.bound.extend(through);
     facts.externs = outside.into_iter().collect();

@@ -103,11 +103,13 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that
   declares the name mentions it twice. In Go and C#, a use that reads it and changes nothing is
   no mention (#774): Go's `len(x)` and `cap(x)` (unless a file of the package binds or declares
-  `len` or `cap`), C#'s `x.Count` where every binding of `x` is a `List<T>` (not called, assigned
-  or stepped, and unless a file declares a type `List` or a using alias names one so: a `List`
-  of a library the code imports is taken for the platform's), and another transaction call of the
-  same function that sends the name as its request or as an inline request's list. One mentioned a third time for any other
-  reason (logged, `x.Count()`, held by a second request in a name), one held in a parameter, a
+  `len` or `cap`; a file the repository ignores is not read), and another transaction call of the
+  same function that sends the name as its request or as an inline request's list (in C#, unless
+  a file of the repository declares a method of the call's name, such as an extension method the
+  call may reach; an SDK call is taken to change nothing, middleware an option adds unread). C#'s
+  `x.Count` is a mention: `List` in the source may name a type of the repository (a type
+  parameter, an alias in a file or a project file, an escaped name). One mentioned a third time
+  for any other reason (logged, `x.Count`, held by a second request in a name), one held in a parameter, a
   field or a package variable, the first name the path meets when any file of the repository
   assigns the field read through it (`q.TableName = ..` on any
   variable of any type, in any package or class; a write of another field does not count), and a C#
