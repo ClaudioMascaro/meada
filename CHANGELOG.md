@@ -112,6 +112,20 @@ All notable changes to Meada are recorded here. The format follows
   on the package lists the CI step. A name with an unresolved part is a pattern, and a name left
   open whole an unresolved consumer with its cause where the workspace provides a PyPI package. The
   index stores nothing new. Release level: minor, meada (#831).
+### Fixed
+
+- Terraform evaluation sizes a variable once per expression however many times the expression
+  reads it, and a name every instance of a `count` or `for_each` shares (one that reads neither
+  `each` nor `count`) is evaluated once when it is known: a name reading a 21,000-element
+  variable 20,000 times indexes as fast at `count = 10` as at `count = 1`, where each instance
+  paid the estimate again. A refused expression spends the evaluation budget for each root by
+  its own reads, so reading `count.index` no longer counts as copying every variable: forty
+  refused instances no longer leave the names after them unresolved (#765).
+- Terraform evaluation no longer parses a template's text again each time it evaluates it: a
+  template is evaluated as its parts, each charged a few steps in a `for` instead of 32 steps a
+  byte of its text, so a 17 KB template in a `for` over two elements, a `%{ if }` template in a
+  `for` over 2,000 elements and 40 interpolations in a `for` over 198 elements are named
+  exactly again, as before 1.3.0 (#763).
 
 ## [1.4.0] - 2026-11-13
 

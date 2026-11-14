@@ -3,16 +3,19 @@
 - `iac.rs` static evaluation (#650, ADR 0025): `EVAL_VALUE_MAX` (64 KiB of one evaluated value,
   as `iac::size` counts it; past it, the value is unresolved, and a template past it is `*`
   whole), `EVAL_COST_MAX` (1 MiB of evaluation steps one expression could take, `iac::cost`'s
-  upper bound, #714: a step is a byte made or, each time it runs in a `for`, one of the steps
-  that make none: `TEMPLATE_PARSE_COST` (32) per byte of a template's text, whatever the text
-  holds (`hcl-rs` parses a template again at each evaluation, so a long literal template
-  repeated a few times is refused), and a byte of the root object a traversal reads (`hcl-rs`
-  clones `var`, `local`, `each` or `module` whole to read `var.x[0]`); a template outside every
-  `for` is not charged its parse; a `for` collection counts its own elements through any root,
-  a literal list or object as many as it lists at its costliest element's cost, and its
-  elements once, read or not (#716), a conditional its larger branch; `join`, `replace` and
-  `formatlist` are charged their arguments and the output they can make (#764), never more
-  than the square of their arguments they were charged before, a string argument at what it
+  upper bound, #714: a step is a byte made or, each time it runs in a `for`, one of the steps that
+  make none: `TEMPLATE_PART_COST` (8) per part of a template (a literal, an interpolation or a
+  directive), whatever bytes it makes (`iac::Exact` makes a template the call of its parts, so
+  `hcl-rs` never parses one again, #763), and a byte of the root object a traversal reads (`hcl-rs`
+  clones `var`, `local`, `each` or `module` whole to read `var.x[0]`); a part is charged in a `for`
+  expression and in the body of a `%{ for }` directive, so a `%{ for }` of one interpolation over
+  140,000 literal elements, exact before, is refused (a body of no part is bounded by its
+  collection, whose elements each evaluation charges); outside both, a part is charged nothing; a
+  `for` collection counts its own elements through any root, a literal list or object as many as it
+  lists at its costliest element's cost, and its elements once, read or not (#716), a conditional
+  its larger branch; `join`, `replace` and `formatlist` are charged their arguments and the output
+  they can make (#764), never
+  more than the square of their arguments they were charged before, a string argument at what it
   shows (a literal its length, anything else three times its cost: a
   number shown takes up to 24 bytes, where 8 are counted): `join` its lists times the separator
   plus three, `replace` its string times the replacement plus one, `formatlist` a row per
@@ -28,23 +31,30 @@
   (15abf1c0, debug)) and `EVAL_WORK_MAX` (64 MiB of cost per root module; past it every value left is
   unresolved, but for a literal name that fits `EVAL_VALUE_MAX`. A refusal spends an upper
   bound of the bytes it went through to decide, never more than `EVAL_COST_MAX`: its own text,
-  and the size of all the roots times two plus twice its reads of a root (`var`, `local`,
-  `module`, `each`, `count`; a resource it names is none, and a read of `count.index` counts
-  all the roots as a read of `var` does), so 9,999 refusals over a 21,000-element variable stop
+  and the size of each root (`var`, `local`, `module`, `each`, `count`) times two plus twice
+  its reads of that root (a resource it names is none, and a read of `count.index` counts the
+  `count` root alone, #765), so 9,999 refusals over a 21,000-element variable stop
   evaluating after 89 and take 2.3 s in process (1bdcc75d; a cold index of that root took
   4.30 s at b045c759 against 4.17 s on main 05585ce4, then 4.46 s at ae8139de against 4.40 s
   at b045c759, all debug), and a long expression refused in each instance of a `count` stops
   once its text has spent the work. The steps it charges bound a root of expressions near the
   ceiling: 80 resources took 16.6 s (the implementer's, 1bdcc75d, debug). It does not charge
-  what no step counts: a template outside every `for` is parsed again once per `count` or
-  `for_each` instance (10,000 interpolations: 0.72 s at `count = 1`, 4.41 s at 10, 48.4 s at
-  100, the implementer's, 1bdcc75d, debug), one 1 MiB template of 130,000 interpolations took
-  8.8 s, the work is per root, not per repository (20 roots of 80 resources near the ceiling
-  took 234.75 s; both measured by a black-box verifier on a debug build), and the estimate
-  itself is charged nothing: by a reading of `cost`, it sizes a bound value at each read of it,
-  so an expression it then accepts pays that again per instance (ae8139de, debug, one run each:
-  20,000 reads of a 21,000-element variable in a `for` over an empty collection took 2.6 s at
-  `count = 1` and 17.3 s at 10, and 1.7 s and 4.8 s when each read is `var.big[0]`);
+  what no step counts: a template outside every `for` that reads `each` or `count` is evaluated
+  again in each instance, its parts with no parse since #763, and a template past `EVAL_VALUE_MAX`
+  is evaluated whole before that ceiling refuses it (10,000 interpolations and `count.index`: 0.60 s
+  at `count = 1`, 1.25 s at 10 and 8.45 s at 100 at ca6794c8, where the parse took 0.89 s, 3.75 s
+  and 33.0 s at 60db9e4d; one 1 MiB template of 130,000 interpolations, `*`, 6.4 s at ca6794c8 and
+  9.4 s at 60db9e4d; the implementer's, debug); the work is per root, not per repository (20 roots
+  of 80 resources near the ceiling took 234.75 s, measured by a black-box verifier on a debug
+  build); and the estimate itself is charged nothing, though it sizes each bound value it reads once
+  per expression (#765), and a known name that reads neither `each` nor `count` is evaluated once
+  for every instance of its block (20,000 reads of a 21,000-element variable in a `for` over an
+  empty collection: 1.31 s at `count = 1` and 1.50 s at 10 at 7f413fdb, where each instance paid the
+  estimate again: 2.74 s and 16.59 s at b8778732, debug, one run each); a name that is not known
+  (a pattern or unresolved), or that reads `each` or `count`, and any other attribute read per
+  instance, is evaluated again in each instance, at a cost linear in its text that only a
+  refusal charges (about 0.33 s an instance for that name at b8778732, measured with each read
+  `var.big[0]`, whose estimate was already cheap: 1.75 s at `count = 1`, 4.72 s at 10);
   converting an object literal for `hcl-rs` also spends the square of its keys, so a wide local
   evaluated in many module instances stops there; their nodes stay, named `*`). A var file's
   values are bounded the same way, each file with an `EVAL_WORK_MAX` of its own: a value past
