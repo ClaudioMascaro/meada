@@ -1,0 +1,10 @@
+name: Setup
+description: A composite action in a folder, which calls another action.
+runs:
+  using: composite
+  steps:
+    - uses: acme/workflows/tools/login@v1
+      with:
+        registry: internal
+    - run: echo setup
+      shell: bash

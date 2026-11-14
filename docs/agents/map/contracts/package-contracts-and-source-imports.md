@@ -132,9 +132,22 @@
   source roots share: `[project] name`, else `[tool.poetry] name`, `version`, `[project]
   dependencies` as PEP 508 strings, `[tool.poetry.dependencies]` but `python`, the declared
   `roots` and the console `scripts`, `[project.scripts]` else `[tool.poetry.scripts]`, as
-  `(module, function)`) and a `requirements*.txt` (line by line, comments, option lines, URLs and paths
+  `(name, module, function)`) and a `requirements*.txt` (line by line, comments, option lines, URLs and paths
   skipped), each name normalized as PEP 503 does (`normalize`) and each specifier kept as
-  written, extras and markers dropped (`requirement`). A PyPI range is checked by
+  written, extras and markers dropped (`requirement`). A CI step that installs by name is a
+  consumer too (#831, ADR 0028): `consume` asks `Ecosystem::installs` for each command of
+  `Export::scripts`, and PyPI's row (`INSTALLS`, `FLAGS`, `installed`) gives a name, a pattern
+  (`via` `pattern`, fitted by `iac::pattern` and linked `inferred` through
+  `Ecosystem::uncertainty`, which now carries the level) or a name left open, an unresolved
+  consumer whose cause `Packages::unresolved_causes` gives; `Packages::context_at` shows them
+  on the CI step. A CI step that runs a console script starts its program (#832): `consume`
+  asks `Ecosystem::runs` for the name a command runs (and the package, for `uvx <package>` and
+  `pipx run <package>`), looks it up in `console_scripts` (the `Program`s of
+  `Ecosystem::programs` that are program entry points, by ecosystem and name) and adds a
+  consumer of the package whose `via` is `run <command as written>` and whose `hops` name the
+  program's symbol with the level of the evidence (`installed`, the literal installs of the CI
+  job so far, in the order `step_of` gives); `Packages::link` turns each hop into a link at
+  the weaker level, as it does for an import. A PyPI range is checked by
   `package/pep440.rs` (`Pypi::flag`, a hand-written subset: a comma-separated set of `==`, `!=`,
   `<`, `<=`, `>`, `>=`, `~=`, `==X.*` and `===`, over PEP 440 versions with epoch, pre-, post-,
   dev-releases and local labels, no crate: the subset is small, and the evaluator stays inside the clean-room rules and the

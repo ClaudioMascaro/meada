@@ -1,0 +1,12 @@
+name: Release
+on:
+  workflow_call:
+jobs:
+  release:
+    permissions:
+      id-token: write
+      contents: read
+    uses: acme/workflows/.github/workflows/publish.yml@main
+    with:
+      package: wrapped
+    secrets: inherit

@@ -1,0 +1,223 @@
+{
+  "format": 1,
+  "repository": "example.com/config-use/app",
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [],
+  "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy",
+      "address": "jobs.deploy",
+      "type": "job",
+      "root": ".github/workflows/deploy.yml",
+      "path": ".github/workflows/deploy.yml",
+      "line": 7,
+      "end_line": 36
+    },
+    {
+      "identity": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy.steps[1]",
+      "address": "jobs.deploy.steps[1]",
+      "type": "step",
+      "root": ".github/workflows/deploy.yml",
+      "path": ".github/workflows/deploy.yml",
+      "line": 21,
+      "end_line": 23
+    },
+    {
+      "identity": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy.steps[3]",
+      "address": "jobs.deploy.steps[3]",
+      "type": "step",
+      "root": ".github/workflows/deploy.yml",
+      "path": ".github/workflows/deploy.yml",
+      "line": 27,
+      "end_line": 36
+    }
+  ],
+  "uses": [
+    {
+      "contract": "channel::sns::events",
+      "site": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy.steps[3]",
+      "at": ".github/workflows/deploy.yml#jobs.deploy.steps[3].with.notify",
+      "level": "exact"
+    },
+    {
+      "contract": "channel::sns::events",
+      "site": "example.com/config-use/app",
+      "at": "application.yml#spring.messaging.destination",
+      "level": "exact"
+    },
+    {
+      "contract": "channel::sns::events",
+      "site": "example.com/config-use/app",
+      "at": "values.yaml#worker.topic",
+      "level": "inferred"
+    },
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy",
+      "at": ".github/workflows/deploy.yml#jobs.deploy.env.QUEUE_URL",
+      "level": "exact"
+    },
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/config-use/app",
+      "at": "application.yml#spring.messaging.endpoint",
+      "level": "exact"
+    },
+    {
+      "contract": "channel::sqs::orders",
+      "site": "example.com/config-use/app",
+      "at": "values.yaml#worker.queue",
+      "level": "inferred"
+    },
+    {
+      "contract": "resource::dynamodb::orders",
+      "site": "example.com/config-use/app",
+      "at": "values.yaml#worker.table",
+      "level": "inferred"
+    },
+    {
+      "contract": "resource::s3::acme-*-releases",
+      "site": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy.steps[3]",
+      "at": ".github/workflows/deploy.yml#jobs.deploy.steps[3].with.staged",
+      "level": "exact"
+    },
+    {
+      "contract": "resource::s3::archive",
+      "site": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy.steps[1]",
+      "at": ".github/workflows/deploy.yml#jobs.deploy.steps[1].with.target",
+      "level": "exact"
+    },
+    {
+      "contract": "resource::s3::archive",
+      "site": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy.steps[3]",
+      "at": ".github/workflows/deploy.yml#jobs.deploy.steps[3].with.target",
+      "level": "exact"
+    },
+    {
+      "contract": "resource::s3::archive",
+      "site": "example.com/config-use/app",
+      "at": "application.yml#spring.storage.location",
+      "level": "exact"
+    },
+    {
+      "contract": "resource::s3::archive",
+      "site": "example.com/config-use/app",
+      "at": "values.yaml#worker.bucket",
+      "level": "inferred"
+    }
+  ],
+  "links": [],
+  "provisions": [
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_dynamodb_table.orders",
+      "root": ".",
+      "contract": "resource::dynamodb::orders",
+      "level": "inferred",
+      "reason": "resource::dynamodb::orders; config values.yaml#worker.table",
+      "at": "values.yaml#worker.table"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_s3_bucket.archive",
+      "root": ".",
+      "contract": "resource::s3::archive",
+      "level": "exact",
+      "reason": "resource::s3::archive; config application.yml#spring.storage.location",
+      "at": "application.yml#spring.storage.location"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_s3_bucket.archive",
+      "root": ".",
+      "contract": "resource::s3::archive",
+      "level": "inferred",
+      "reason": "resource::s3::archive; config values.yaml#worker.bucket",
+      "at": "values.yaml#worker.bucket"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_sns_topic.events",
+      "root": ".",
+      "contract": "channel::sns::events",
+      "level": "exact",
+      "reason": "channel::sns::events; config application.yml#spring.messaging.destination",
+      "at": "application.yml#spring.messaging.destination"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_sns_topic.events",
+      "root": ".",
+      "contract": "channel::sns::events",
+      "level": "inferred",
+      "reason": "channel::sns::events; config values.yaml#worker.topic",
+      "at": "values.yaml#worker.topic"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_sqs_queue.orders",
+      "root": ".",
+      "contract": "channel::sqs::orders",
+      "level": "exact",
+      "reason": "channel::sqs::orders; config application.yml#spring.messaging.endpoint",
+      "at": "application.yml#spring.messaging.endpoint"
+    },
+    {
+      "side": "example.com/config-use/app",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_sqs_queue.orders",
+      "root": ".",
+      "contract": "channel::sqs::orders",
+      "level": "inferred",
+      "reason": "channel::sqs::orders; config values.yaml#worker.queue",
+      "at": "values.yaml#worker.queue"
+    },
+    {
+      "side": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_sqs_queue.orders",
+      "root": ".",
+      "contract": "channel::sqs::orders",
+      "level": "exact",
+      "reason": "channel::sqs::orders; config .github/workflows/deploy.yml#jobs.deploy.env.QUEUE_URL",
+      "at": ".github/workflows/deploy.yml#jobs.deploy.env.QUEUE_URL"
+    },
+    {
+      "side": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy.steps[1]",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_s3_bucket.archive",
+      "root": ".",
+      "contract": "resource::s3::archive",
+      "level": "exact",
+      "reason": "resource::s3::archive; config .github/workflows/deploy.yml#jobs.deploy.steps[1].with.target",
+      "at": ".github/workflows/deploy.yml#jobs.deploy.steps[1].with.target"
+    },
+    {
+      "side": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy.steps[3]",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_s3_bucket.archive",
+      "root": ".",
+      "contract": "resource::s3::archive",
+      "level": "exact",
+      "reason": "resource::s3::archive; config .github/workflows/deploy.yml#jobs.deploy.steps[3].with.target",
+      "at": ".github/workflows/deploy.yml#jobs.deploy.steps[3].with.target"
+    },
+    {
+      "side": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy.steps[3]",
+      "provisioner": "example.com/config-use/infra::main.tf::aws_sns_topic.events",
+      "root": ".",
+      "contract": "channel::sns::events",
+      "level": "exact",
+      "reason": "channel::sns::events; config .github/workflows/deploy.yml#jobs.deploy.steps[3].with.notify",
+      "at": ".github/workflows/deploy.yml#jobs.deploy.steps[3].with.notify"
+    },
+    {
+      "side": "example.com/config-use/app::.github/workflows/deploy.yml::jobs.deploy.steps[3]",
+      "provisioner": "example.com/config-use/infra::releases.tf::aws_s3_bucket.releases",
+      "root": ".",
+      "contract": "resource::s3::acme-*-releases",
+      "level": "inferred",
+      "reason": "resource::s3::acme-prod-releases; config .github/workflows/deploy.yml#jobs.deploy.steps[3].with.staged; pattern resource::s3::acme-*-releases",
+      "at": ".github/workflows/deploy.yml#jobs.deploy.steps[3].with.staged"
+    }
+  ]
+}

@@ -1,0 +1,301 @@
+{
+  "format": 1,
+  "repository": "github.com/acme/workflows",
+  "commit": "2344e453a4b32c717ca8ed1283df41e7b3357727",
+  "dirty": false,
+  "files": [],
+  "symbols": [],
+  "calls": [],
+  "providers": [
+    {
+      "contract": "ci::github.com/acme/workflows",
+      "site": "github.com/acme/workflows::action.yml::."
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/.github/workflows/forms.yml",
+      "site": "github.com/acme/workflows::.github/workflows/forms.yml::."
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/.github/workflows/lint.yml",
+      "site": "github.com/acme/workflows::.github/workflows/lint.yml::."
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "site": "github.com/acme/workflows::.github/workflows/publish.yml::."
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/.github/workflows/scan.yml",
+      "site": "github.com/acme/workflows::.github/workflows/scan.yml::."
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/tools/login",
+      "site": "github.com/acme/workflows::tools/login/action.yml::."
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/tools/setup",
+      "site": "github.com/acme/workflows::tools/setup/action.yml::."
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "ci::github.com/acme/workflows/.github/workflows/lint.yml",
+      "site": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.local",
+      "via": "./.github/workflows/lint.yml"
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/.github/workflows/scan.yml",
+      "site": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.rooted",
+      "via": "$/.github/workflows/scan.yml"
+    },
+    {
+      "contract": null,
+      "site": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.steps.steps[1]",
+      "via": "./tools/setup"
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/tools/setup",
+      "site": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.steps.steps[2]",
+      "via": "$/tools/setup"
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/tools/setup",
+      "site": "github.com/acme/workflows::action.yml::runs.steps[0]",
+      "via": "$/tools/setup"
+    },
+    {
+      "contract": null,
+      "site": "github.com/acme/workflows::action.yml::runs.steps[1]",
+      "via": "./tools/setup"
+    },
+    {
+      "contract": "ci::github.com/acme/workflows/tools/login",
+      "site": "github.com/acme/workflows::tools/setup/action.yml::runs.steps[0]",
+      "via": "acme/workflows/tools/login@v1",
+      "ref": "v1",
+      "with": [
+        "registry"
+      ]
+    }
+  ],
+  "iac_nodes": [
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/forms.yml::.",
+      "address": ".",
+      "type": "workflow",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 1,
+      "end_line": 15
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.local",
+      "address": "jobs.local",
+      "type": "job",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 6,
+      "end_line": 7
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.rooted",
+      "address": "jobs.rooted",
+      "type": "job",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 8,
+      "end_line": 9
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.steps.steps[1]",
+      "address": "jobs.steps.steps[1]",
+      "type": "step",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 14,
+      "end_line": 14
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.steps.steps[2]",
+      "address": "jobs.steps.steps[2]",
+      "type": "step",
+      "root": ".github/workflows/forms.yml",
+      "path": ".github/workflows/forms.yml",
+      "line": 15,
+      "end_line": 15
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/lint.yml::.",
+      "address": ".",
+      "type": "workflow",
+      "root": ".github/workflows/lint.yml",
+      "path": ".github/workflows/lint.yml",
+      "line": 1,
+      "end_line": 7
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "address": ".",
+      "type": "workflow",
+      "root": ".github/workflows/publish.yml",
+      "path": ".github/workflows/publish.yml",
+      "line": 1,
+      "end_line": 19
+    },
+    {
+      "identity": "github.com/acme/workflows::.github/workflows/scan.yml::.",
+      "address": ".",
+      "type": "workflow",
+      "root": ".github/workflows/scan.yml",
+      "path": ".github/workflows/scan.yml",
+      "line": 1,
+      "end_line": 7
+    },
+    {
+      "identity": "github.com/acme/workflows::action.yml::.",
+      "address": ".",
+      "type": "action",
+      "root": "action.yml",
+      "path": "action.yml",
+      "line": 1,
+      "end_line": 7
+    },
+    {
+      "identity": "github.com/acme/workflows::action.yml::runs.steps[0]",
+      "address": "runs.steps[0]",
+      "type": "step",
+      "root": "action.yml",
+      "path": "action.yml",
+      "line": 6,
+      "end_line": 6
+    },
+    {
+      "identity": "github.com/acme/workflows::action.yml::runs.steps[1]",
+      "address": "runs.steps[1]",
+      "type": "step",
+      "root": "action.yml",
+      "path": "action.yml",
+      "line": 7,
+      "end_line": 7
+    },
+    {
+      "identity": "github.com/acme/workflows::tools/login/action.yml::.",
+      "address": ".",
+      "type": "action",
+      "root": "tools/login/action.yml",
+      "path": "tools/login/action.yml",
+      "line": 1,
+      "end_line": 5
+    },
+    {
+      "identity": "github.com/acme/workflows::tools/setup/action.yml::.",
+      "address": ".",
+      "type": "action",
+      "root": "tools/setup/action.yml",
+      "path": "tools/setup/action.yml",
+      "line": 1,
+      "end_line": 10
+    },
+    {
+      "identity": "github.com/acme/workflows::tools/setup/action.yml::runs.steps[0]",
+      "address": "runs.steps[0]",
+      "type": "step",
+      "root": "tools/setup/action.yml",
+      "path": "tools/setup/action.yml",
+      "line": 6,
+      "end_line": 8
+    }
+  ],
+  "links": [
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/ci.yml::jobs.lint",
+      "provider": "github.com/acme/workflows::.github/workflows/lint.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/lint.yml",
+      "level": "exact",
+      "reason": "@main (indexed 2344e45)"
+    },
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/ci.yml::jobs.publish",
+      "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "level": "exact",
+      "reason": "@main (indexed 2344e45)"
+    },
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/ci.yml::jobs.scan",
+      "provider": "github.com/acme/workflows::.github/workflows/scan.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/scan.yml",
+      "level": "exact",
+      "reason": "@v2 (indexed 2344e45)"
+    },
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[1]",
+      "provider": "github.com/acme/workflows::action.yml::.",
+      "contract": "ci::github.com/acme/workflows",
+      "level": "exact",
+      "reason": "@v1 (indexed 2344e45)"
+    },
+    {
+      "consumer": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[2]",
+      "provider": "github.com/acme/workflows::tools/setup/action.yml::.",
+      "contract": "ci::github.com/acme/workflows/tools/setup",
+      "level": "exact",
+      "reason": "@v2 (indexed 2344e45)"
+    },
+    {
+      "consumer": "github.com/acme/app-b::.github/workflows/ci.yml::jobs[\"publish-prd\"]",
+      "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "level": "exact",
+      "reason": "@v1 (indexed 2344e45), permissions mismatch: id-token write against none"
+    },
+    {
+      "consumer": "github.com/acme/app-b::.github/workflows/ci.yml::jobs[\"publish-stg\"]",
+      "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "level": "exact",
+      "reason": "@main (indexed 2344e45)"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.local",
+      "provider": "github.com/acme/workflows::.github/workflows/lint.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/lint.yml",
+      "level": "exact",
+      "reason": "own repository"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.rooted",
+      "provider": "github.com/acme/workflows::.github/workflows/scan.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/scan.yml",
+      "level": "exact",
+      "reason": "own repository"
+    },
+    {
+      "consumer": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.steps.steps[2]",
+      "provider": "github.com/acme/workflows::tools/setup/action.yml::.",
+      "contract": "ci::github.com/acme/workflows/tools/setup",
+      "level": "exact",
+      "reason": "own repository"
+    },
+    {
+      "consumer": "github.com/acme/workflows::action.yml::runs.steps[0]",
+      "provider": "github.com/acme/workflows::tools/setup/action.yml::.",
+      "contract": "ci::github.com/acme/workflows/tools/setup",
+      "level": "exact",
+      "reason": "own repository"
+    },
+    {
+      "consumer": "github.com/acme/workflows::tools/setup/action.yml::runs.steps[0]",
+      "provider": "github.com/acme/workflows::tools/login/action.yml::.",
+      "contract": "ci::github.com/acme/workflows/tools/login",
+      "level": "exact",
+      "reason": "@v1 (indexed 2344e45)"
+    },
+    {
+      "consumer": "github.com/acme/wrapper::.github/workflows/release.yml::jobs.release",
+      "provider": "github.com/acme/workflows::.github/workflows/publish.yml::.",
+      "contract": "ci::github.com/acme/workflows/.github/workflows/publish.yml",
+      "level": "exact",
+      "reason": "@main (indexed 2344e45)"
+    }
+  ]
+}

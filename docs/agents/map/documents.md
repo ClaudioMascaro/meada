@@ -180,6 +180,13 @@ this file, and a change to these modules updates it.
   A document the reader of a contract kind recognizes as its own (`owned`: the first document of
   a file the document reader read, each document `alert::documents` names) gives no key-name use
   (`key_name`, #800).
+  In a file a kind's reader recognizes whole (#828, the shape #800 asks for), here the
+  pipelines and actions of `iac/actions.rs` (`owned`, by their CI nodes), `typed` is not read:
+  only a structured identifier is a use, after `evaluated` gave each `${{ env.X }}` its
+  literal (`given`: the nearest `env` that defines the name decides, literal or not) and every
+  other expression a `*`. `Side::holder` is the CI node that holds the key,
+  which `Engine::export` writes as the `site` of the use and the `side` of its provisioning
+  link.
 - `iac/provision.rs`, `iac/pattern.rs` (#656): `crate::iac::provision::read` derives provisioner
   sides from stored
   IaC names using the embedded `iac/types.toml` table; `crate::iac::provision::links` joins them
@@ -303,6 +310,35 @@ this file, and a change to these modules updates it.
   and `iac::Owner` keeps each refresh to its own rows: CloudFormation by a type with `::`,
   regardless of filename; among the other types, Terraform and Compose by file name,
   Kubernetes by any other file name.
+- `iac/actions.rs` (#823, ADR 0028): GitHub Actions as IaC nodes, one unit per file (root: its
+  path). `is_file` names a pipeline (a `.yml` or `.yaml` directly under `.github/workflows/`) and
+  an action (`action.yml`, `action.yaml`) by place and name; `evaluate(path, bytes)` reads the
+  first document with `document::events::read_located` (`Spans` keeps the lines of each CI job and
+  CI step as its mapping closes, `iac::compose::KeyLines::end_of` gives the last) and gives the
+  file node `.` (type `workflow` with `jobs`, `action` with `runs`), a node `jobs.<id>` of type
+  `job` and a node `<parent>.steps[<n>]` of type `step`, with the references pipeline to CI job,
+  CI job or composite action to CI step, and CI job to the CI jobs of its `needs`. A CI job's id
+  and a CI job's or CI step's `uses` are `iac::Node::actions` (`Facts`), a `name` the node's
+  own; `Facts` also holds what the CI kind (`ci.rs`, #824) reads: `reusable` on the file node of
+  a pipeline whose `on` holds `workflow_call`, and the keys of `with` and `secrets` beside a
+  `uses`. The index calls `refresh(tx, path, src, shadowed)` from the closure that reads a config
+  file and when one leaves; with both action file names in a folder the one that changed has its
+  twin (`twin`) read again, and `shadowed` keeps an `action.yaml` beside an `action.yml` from
+  being the action. `iac::Owner::Actions` (`ROWS`: root equal to path and one of the four types)
+  keeps the Terraform and Kubernetes refreshes off these rows. `hits` renders `search` kind `ci`
+  (address, type, name, `id`, `uses`) over the nodes of an export, for `ci.rs`, `iac::hits` leaves these rows out of kind `iac`, and
+  `names` lets `iac::named` take a file path for a file node and a selector
+  (`jobs.build.steps[id=login]`) for a CI step.
+- `iac/actions/run.rs` (#831, ADR 0028): the gate of the command table, a pure seam: `commands`
+  takes the `run` script of a CI step and gives its commands, each a list of `Word`s whose
+  `Part`s are text or open (as written). `iac::config_uses::read` calls it at export load for
+  each stored `<step>.run` value, under the shell gate (`<step>.shell`, else
+  `defaults.run.shell` of the CI job, then of the pipeline), with the literal `env` of the CI
+  step, its CI job and its pipeline (`given`), and gives `Export::scripts` (`Script`: the CI
+  step's identity and its commands). Nothing is stored. The rows that give a command its side
+  live in the kinds: `package/pypi.rs` (`Ecosystem::installs`) is the first, and
+  `Ecosystem::runs` (#832) reads the console script a command runs (`written` gives a
+  command back as text).
 - `iac/serverless.rs` (#654, ADR 0025): Serverless Framework services as IaC nodes, one unit per
   `serverless.{yml,yaml,json}` (root: its path). `wanted`, `is_file` and `is_service` decide,
   `evaluate(path, bytes)` reads it with `document::events::read_keyed`, expands the file's

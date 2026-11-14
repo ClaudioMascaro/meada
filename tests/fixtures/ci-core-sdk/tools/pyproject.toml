@@ -1,0 +1,8 @@
+[project]
+name = "core-tools"
+version = "0.2.0"
+
+[project.scripts]
+core-lint = "core_tools.cli:lint_main"
+# A second package of the workspace with a console script of this name.
+core-health = "core_tools.cli:health_main"

@@ -446,7 +446,9 @@
   trace in both directions, scope-aware orphans, segment-bounded patterns, ambiguous image
   open items, safe-path and symlink refresh, plus export/context/trace goldens. The
   `image-evaluation-roots` fixture preserves identical-image runners in two overlays and
-  collapses repeated evidence in one root after refresh.
+  collapses repeated evidence in one root after refresh. A builder of a pipeline on its CI
+  step, `docker push` and `docker buildx build --push` in a `run` script with their silent
+  controls, and two CI steps of one repository as one builder (#833).
 
 - `gcp.rs` (#667): sibling GCP infrastructure/app fixtures cover complete provisioners and
   config uses, disjoint Pub/Sub subscriptions and filtered delivery, instance-qualified SQL
@@ -467,6 +469,54 @@
 - `alerts.rs` (#672): alert labels and Alertmanager routes over sibling `alert-monitoring` and
   `alert-app` fixtures, equality and regex levels, conjunctions, receiver context, bidirectional
   traces, Helm negatives and scope-aware orphan refresh, with complete export goldens.
+
+- `ci.rs` (#823): the `ci-nodes` fixture covers pipelines, actions, CI jobs and CI steps as IaC
+  nodes: `search` kind `ci`, `context` by address, path and selector, the kind `iac` and the
+  default search unchanged, and refresh equal to a cold index.
+
+- `ci_calls.rs` (#824): the reproduction of #816 as sibling `ci-workflows`, `ci-wrapper` and
+  `ci-app-{a,b,c}` fixtures covers the CI contract: the consumers of a reusable pipeline, the
+  shapes of `on`, the identifier's case and host, Git ref reasons, external `uses`, a caller
+  alone and with its peer, a hand declaration beside it, refresh equal to a cold index, and
+  export, context, search and status goldens. `trace` over CI calls (#825): up from the
+  reusable pipeline through the intermediate one, down from a caller, the three starts, a cycle,
+  a caller outside the workspace and the `ci-calls.trace.txt` golden.
+- `ci_uses.rs` (#826): the other forms of `uses` on the same fixtures (`forms.yml` of
+  `ci-app-a` and of `ci-workflows`, the actions under `ci-workflows`): a CI step's action by
+  owner and name, a local call, `$/`, the five positions of a CI step's `./<folder>`, the open
+  items with no candidate beside an HTTP route, a repository without `origin`, `trace` through
+  composite actions and the `ci-uses.*` goldens.
+- `ci_orphans.rs` (#827): orphan providers and the absent mark on the reproduction of #816 plus
+  an action nothing calls, a `Dockerfile`-only folder and calls to paths that provide nothing:
+  the orphan lines of `meada status` and the scope rule on `ci-nodes` alone, the mark in
+  `context`, `search` and `meada export`, refresh equal to a cold index and the `ci-orphans.*`
+  goldens.
+- `ci_owned.rs` (#828): the files the CI reader owns, over the config use fixtures plus a
+  pipeline or an action written inline: no use by key name, a structured identifier on its CI
+  step or CI job in `uses`, `provisions` and `iac_nodes` (`ci-owned.app.export.json`), the
+  controls that keep the key-name rule, every scalar still a config value, `vars.X` never matched
+  across repositories, a pattern that fits two names as an open item, a `gs://` address, and the
+  `env` lookup: the nearest that defines the name, literal or not, none at an action's root and
+  none for a name a script may write to the environment file (#836).
+- `ci_run.rs` (#831): the command table over the PyPI pair (`pkg-pylib`, `pkg-pyweb`) with a
+  pipeline written inline: each install command, the arguments that give no side, the gate's
+  lines and shells, a name as a literal, a pattern or left open, the environment file and
+  `context` from both ends.
+- `ci_program.rs` (#832): console scripts over the chain of F2 as siblings (`ci-core-api`,
+  `ci-core-sdk`, `ci-core-workflows` with the callers of #816's reproduction): one CI job of
+  `programs.yml` per row of the level table, the command as text on the consumer row
+  (`ci-programs.workflows.export.json`), the limit of declaring packages, a program of the CI
+  step's own repository, `context` from both ends and `trace` both ways (`ci-programs.trace.txt`).
+- `ci_permissions.rs` (#834): declared permissions on the reproduction of #816 (the table of
+  the ticket, `not declared`, the export rows), the closed block and the shorthands over pairs
+  of pipelines written inline, the fixed order of both flags (`ci-permissions.context.txt`) and
+  an edited block on either side against a cold index.
+- `ci_served.rs` (#829): the CI kind in server mode over the reproduction of #816: MCP over HTTP
+  equal to stdio for every flow of the kind, and a manifest without the provider's repository
+  giving no link to it and no consumer of it. Its helpers (`listed`, `about_the_call`,
+  `no_provider`) carry the same questions to the grants of `oidc.rs` (a node, a hand-made
+  generation and its named workspaces), to the console in `ui/playground.rs` and `ui/oidc.rs`,
+  and `partial.rs` runs the reproduction and the kind `ci` through the partial export.
 
 - `patterns.rs` (#674): sibling `pattern-infra`/`pattern-app` fixtures cover channel and
   resource anchors, ambiguous literal names, short/interior and pattern-to-pattern negatives,

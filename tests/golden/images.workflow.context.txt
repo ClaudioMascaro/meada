@@ -18,4 +18,4 @@ example.com/acme/deploy deployment.yaml:11 spec.template.spec.containers[0].imag
 example.com/acme/deploy deployment.yaml:13 spec.template.spec.initContainers[0].name = "migration"
 example.com/acme/deploy deployment.yaml:14 spec.template.spec.initContainers[0].image = "ghcr.io/acme/orders@sha256:abc"
 image: image::ghcr.io/acme/orders
-  builder: example.com/acme/app [exact: image::ghcr.io/acme/orders]
+  builder: example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0] [exact: image::ghcr.io/acme/orders]

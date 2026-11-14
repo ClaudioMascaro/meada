@@ -81,12 +81,12 @@
     "handoff": {
       "path": "skills/productivity/handoff",
       "upstreamTree": "ce24892bd2d4b9e7fd5ac9b95c03175e18bef388",
-      "tree": "ce24892bd2d4b9e7fd5ac9b95c03175e18bef388"
+      "tree": "a4e53f1c91bad317d929a47e5856369785a76ed3"
     },
     "implement": {
       "path": "skills/engineering/implement",
       "upstreamTree": "4804b466ab26c9b9d8d42917547db133d1f20a9f",
-      "tree": "ffffdefb3c3c9d709e81db2bb458ba6fe1a1489e"
+      "tree": "56cc828eb9e2d8e7d27d3e2246b6b738fe1f545c"
     },
     "implement-spec": {
       "path": "skills/engineering/implement-spec",

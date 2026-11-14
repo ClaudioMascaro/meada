@@ -189,6 +189,28 @@ fn cloudformation_long(name: &str, reference: &str, between: &str) -> usize {
     ))
 }
 
+/// The bytes of the addresses, names, selectors, passed and hollow keys and references the CI
+/// nodes of `text`, a lone pipeline (#823), store.
+fn pipeline(text: String) -> usize {
+    let (nodes, references) =
+        crate::iac::actions::evaluate(".github/workflows/ci.yml", &file(text));
+    let nodes = nodes.iter().map(|n| {
+        let facts = n.actions.as_ref().map_or(0, |f| {
+            let secrets = match &f.secrets {
+                Some(meada_core::export::Secrets::Keys(keys)) => keys.as_slice(),
+                _ => &[],
+            };
+            let keys = f.with.iter().chain(secrets).chain(&f.hollow);
+            let keys = keys.map(String::len).sum::<usize>();
+            f.id.as_ref().map_or(0, String::len) + f.uses.as_ref().map_or(0, String::len) + keys
+        });
+        n.address.len() + n.name.as_ref().map_or(0, String::len) + facts
+    });
+    let references = (references.iter())
+        .map(|r| r.source.len() + r.target.len() + r.via.as_ref().map_or(0, String::len));
+    nodes.chain(references).sum()
+}
+
 /// The bytes of the addresses, names, handlers, events and references the IaC nodes of `text`, a
 /// lone `serverless.yml` (#654), store.
 fn service(text: String) -> usize {
@@ -1755,6 +1777,88 @@ resource "aws_apigatewayv2_route" "wide" {{
             });
             service(format!(
                 "functions:\n{functions}resources:\n  Resources:\n{resources}"
+            ))
+        }),
+        // GitHub Actions (#823): what one pipeline file's evaluation stores
+        ("pipeline: thousands of steps under long job ids", || {
+            // Each step's address repeats its job's id: a hundred times the bytes written.
+            let steps = "      - run: x\n".repeat(500);
+            let id = "j".repeat(2000);
+            let jobs = fill(1, |i| format!("  {id}{i}:\n    steps:\n{steps}"));
+            pipeline(format!("jobs:\n{jobs}"))
+        }),
+        ("pipeline: flat steps of one job", || {
+            let steps = fill(1, |i| format!("      - id: s{i}\n        uses: a/b@v{i}\n"));
+            pipeline(format!("jobs:\n  build:\n    steps:\n{steps}"))
+        }),
+        ("pipeline: one huge run script beside deep nesting", || {
+            let script = fill(2, |i| format!("          echo line {i}\n"));
+            let deep = (0..100)
+                .map(|i| format!("{}k{i}:\n", " ".repeat(10 + 2 * i)))
+                .collect::<String>();
+            let nested = fill(4, |i| {
+                format!(
+                    "      - id: n{i}\n        with:\n{deep}{}v: 1\n",
+                    " ".repeat(210)
+                )
+            });
+            pipeline(format!(
+                "jobs:\n  build:\n    steps:\n      - run: |\n{script}{nested}"
+            ))
+        }),
+        (
+            "pipeline: run scripts of a variable a long literal gives",
+            || {
+                // #831: the gate of the command table reads each stored script, a value within
+                // `VALUE_MAX`, and the literals it reads add at most the script's own length and
+                // one value's.
+                use crate::iac::actions::run::{Part, commands};
+                let script = "pip install $A$A ".repeat(crate::config_values::VALUE_MAX / 17);
+                let literal = "a".repeat(100);
+                let read = commands(&script, |_| Some(&literal)).unwrap();
+                let parts = read.iter().flatten().flatten();
+                let bytes: usize = parts.map(|(Part::Text(t) | Part::Open(t))| t.len()).sum();
+                let most = 2 * script.len() + crate::config_values::VALUE_MAX;
+                assert!(bytes <= most, "{bytes}");
+                // As many such CI steps as one file holds.
+                bytes * (MAX_BYTES / script.len())
+            },
+        ),
+        ("pipeline: calls that pass long keys", || {
+            // #824: a call keeps the keys of `with` and of `secrets`, never their values.
+            let keys = |section: &str| {
+                let keys = (0..20).map(|i| format!("      key-{i:060}: v\n"));
+                format!("    {section}:\n{}", keys.collect::<String>())
+            };
+            let jobs = fill(1, |i| {
+                let (with, secrets) = (keys("with"), keys("secrets"));
+                format!("  j{i}:\n    uses: a/b/.github/workflows/c.yml@v1\n{with}{secrets}")
+            });
+            pipeline(format!("jobs:\n{jobs}"))
+        }),
+        ("pipeline: every job needs every other", || {
+            let needs = (0..300)
+                .map(|i| format!("j{i}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let jobs = fill(1, |i| format!("  j{i}:\n    needs: [{needs}]\n"));
+            pipeline(format!("jobs:\n{jobs}"))
+        }),
+        (
+            "pipeline: an unread permissions block above every job",
+            || {
+                // #834: a CI job takes its pipeline's block only when that block is read.
+                let block = fill(2, |i| format!("  - p{i}\n"));
+                let jobs = fill(2, |i| format!("  j{i}: {{}}\n"));
+                pipeline(format!("permissions:\n{block}jobs:\n{jobs}"))
+            },
+        ),
+        ("pipeline: an alias per step and per job", || {
+            let steps = fill(4, |_| "      - *s\n".into());
+            let jobs = fill(4, |i| format!("  j{i}: *j\n"));
+            pipeline(format!(
+                "x-step: &s\n  id: {}\n  run: x\njobs:\n  first: &j\n    steps:\n{steps}{jobs}",
+                "i".repeat(1000)
             ))
         }),
         // Kubernetes and Kustomize (#651): what one repository's evaluation stores

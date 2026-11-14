@@ -1,0 +1,5 @@
+github.com/acme/app-a .github/workflows/forms.yml:30 (unresolved) candidates: 0; a checkout before the CI step names `repository` or `path` (`github.com/acme/app-a::.github/workflows/forms.yml::jobs.elsewhere.steps[1]`)
+github.com/acme/app-a .github/workflows/forms.yml:38 (unresolved) candidates: 0; a checkout before the CI step names `repository` or `path` (`github.com/acme/app-a::.github/workflows/forms.yml::jobs["at-a-path"].steps[2]`)
+github.com/acme/app-a .github/workflows/forms.yml:22 (unresolved) candidates: 0; no checkout before the CI step (`github.com/acme/app-a::.github/workflows/forms.yml::jobs["no-checkout"].steps[0]`)
+github.com/acme/workflows .github/workflows/forms.yml:14 (unresolved) candidates: 0; a checkout in a reusable pipeline is of its caller's repository (`github.com/acme/workflows::.github/workflows/forms.yml::jobs.steps.steps[1]`)
+github.com/acme/workflows action.yml:7 (unresolved) candidates: 0; a composite action runs in the workspace of its caller (`github.com/acme/workflows::action.yml::runs.steps[1]`)

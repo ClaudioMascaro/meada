@@ -7,15 +7,24 @@ import { graphModel } from './graph';
 import type { GraphModel } from './graph';
 import './graph.css';
 
-const views = ['communities', 'contracts', 'links', 'provisions', 'images', 'alerts', 'executions', 'drift', 'decisions'] as const;
+const views = ['communities', 'contracts', 'links', 'provisions', 'images', 'alerts', 'ci', 'executions', 'drift', 'decisions'] as const;
 type View = typeof views[number];
+
+/** The views of one contract kind: its prefix and the copy keys of its sides table and of its
+ * roles, the provider's first. */
+const kinds = {
+  images: { prefix: 'image::', sides: 'imageSides', one: ['builder', 'runner'], many: ['builders', 'runners'] },
+  alerts: { prefix: 'alert::', sides: 'alertSides', one: ['emitter', 'matcher'], many: ['emitters', 'matchers'] },
+  ci: { prefix: 'ci::', sides: 'ciSides', one: ['called', 'caller'], many: ['calledFiles', 'callers'] },
+} as const;
+type KindView = keyof typeof kinds;
+const isKind = (name: View): name is KindView => name in kinds;
 
 function hasView(graph: GraphModel, name: View) {
   if (name === 'provisions') return graph.provisions.length > 0;
   if (name === 'executions') return graph.executions.length > 0;
-  if (name === 'images' || name === 'alerts') {
-    const prefix = name === 'images' ? 'image::' : 'alert::';
-    return graph[name].length > 0 || graph.contracts.some(row => row.contract.startsWith(prefix));
+  if (isKind(name)) {
+    return graph[name].length > 0 || graph.contracts.some(row => row.contract.startsWith(kinds[name].prefix));
   }
   return true;
 }
@@ -84,6 +93,7 @@ export function GraphPage({ api, locale }: { api: Api; locale: Language }) {
           <dt>{t.side} → {t.provisioner}</dt><dd>{t.provisionLegend}</dd>
           <dt>{t.builder} → {t.runner}</dt><dd>{t.imageLegend}</dd>
           <dt>{t.emitter} → {t.matcher}</dt><dd>{t.alertLegend}</dd>
+          <dt>{t.called} → {t.caller}</dt><dd>{t.ciLegend}</dd>
         </dl>
         <p>{t.keyboardHelp}</p>
       </section>
@@ -105,13 +115,13 @@ export function GraphPage({ api, locale }: { api: Api; locale: Language }) {
           <code>{row.provisioner} (root {row.root})</code>, row.level, row.reason,
         ]))}
       {view === 'links' && table(t.links, [t.contract, t.consumer, t.provider, t.level], graph.links.map(row => [<code>{row.contract}</code>, <code>{row.consumer}</code>, <code>{row.provider}</code>, row.level]))}
-      {(view === 'images' || view === 'alerts') && <>
-        {table(view === 'images' ? t.imageSides : t.alertSides,
-          [t.contract, view === 'images' ? t.builders : t.emitters, view === 'images' ? t.runners : t.matchers],
-          graph.contracts.filter(row => row.contract.startsWith(view === 'images' ? 'image::' : 'alert::')).map(row => [
+      {isKind(view) && <>
+        {table(t[kinds[view].sides],
+          [t.contract, t[kinds[view].many[0]], t[kinds[view].many[1]]],
+          graph.contracts.filter(row => row.contract.startsWith(kinds[view].prefix)).map(row => [
             <code>{row.contract}</code>, <List values={row.providers} />, <List values={row.consumers} />,
           ]))}
-        {table(t[view], [t.contract, view === 'images' ? t.builder : t.emitter, view === 'images' ? t.runner : t.matcher, t.level, t.reason],
+        {table(t[view], [t.contract, t[kinds[view].one[0]], t[kinds[view].one[1]], t.level, t.reason],
           graph[view].map(row => [<code>{row.contract}</code>, <code>{row.provider}</code>,
             <code>{row.consumer}{row.root ? ` (root ${row.root})` : ''}</code>, row.level, row.reason]))}
       </>}

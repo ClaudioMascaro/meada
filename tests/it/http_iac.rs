@@ -278,7 +278,7 @@ fn a_valid_runner_decision_selects_the_repository_used_by_http() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|l| l["level"] == "decided" && l["provider"] == "example.com/http-iac/server")
+            .any(|l| l["level"] == "decided" && l["provider"] == "example.com/http-iac/server::.github/workflows/build.yml::jobs.image.steps[0]")
     );
     let after = links(&client);
     assert_eq!(after.len(), 3, "{after:#?}");

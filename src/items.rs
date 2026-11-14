@@ -93,6 +93,9 @@ pub struct OpenItem {
     pub enclosing: Option<Enclosing>,
     /// Sorted by repository identity, then label (method and path of a route), then site.
     pub candidates: Vec<Candidate>,
+    /// Why no provider can be a candidate, for an unresolved consumer whose kind says so
+    /// (`ContractKind::unresolved_causes`): `meada decide` has nothing to offer for it.
+    pub cause: Option<&'static str>,
     /// For a consumer whose URL starts with a part Meada could not read, why (#801).
     pub limit: Option<Limit>,
 }
@@ -144,6 +147,9 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
     fn candidate<'a>(&(repository, p): &(&'a str, &'a Provider)) -> (&'a str, &'a str, &'a str) {
         (repository, p.contract.as_str(), p.site.as_str())
     }
+    let causes: HashMap<String, &'static str> = (contract::KINDS.iter())
+        .flat_map(|kind| kind.unresolved_causes(exports))
+        .collect();
     let mut items = Vec::new();
     for (export, repo) in exports.iter().zip(repos) {
         let calls: HashMap<&str, _> = export.calls.iter().map(|c| (c.id.as_str(), c)).collect();
@@ -151,14 +157,17 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
             .map(|s| (s.id.as_str(), s))
             .collect();
         let mut files = Files::new(&repo.root);
+        // The IaC nodes by identity, written out only for an export with an item on one.
+        let mut nodes: Option<HashMap<String, &crate::iac::Node>> = None;
         for consumer in &export.consumers {
             let (kind, candidates) = match (
                 &consumer.contract,
                 ambiguous.get(consumer.item_site().as_ref()),
             ) {
                 (None, _) => {
+                    let open = !causes.contains_key(consumer.site.as_str());
                     let fitting = providers.iter().filter(|(_, p)| {
-                        kind_of(&p.contract).is_some_and(|k| k.candidate(consumer, p))
+                        open && kind_of(&p.contract).is_some_and(|k| k.candidate(consumer, p))
                     });
                     (
                         ItemKind::Unresolved,
@@ -186,11 +195,12 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                 None => match symbols.get(consumer.site.as_str()) {
                     Some(def) => (&def.span, Some(def)),
                     None => {
-                        let Some(node) = export
-                            .iac
-                            .iter()
-                            .find(|n| n.identity(&export.repository) == consumer.site)
-                        else {
+                        // The first node of an identity, as a scan of them finds it.
+                        let nodes = nodes.get_or_insert_with(|| {
+                            let nodes = export.iac.iter().rev();
+                            nodes.map(|n| (n.identity(&export.repository), n)).collect()
+                        });
+                        let Some(node) = nodes.get(&consumer.site) else {
                             continue;
                         };
                         infrastructure = node.span(files.get(&node.path));
@@ -219,9 +229,10 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
             // The label of a route orders as its method then path: the space sorts before
             // every method letter and before the slash.
             candidates.sort_by_cached_key(|c| (c.repository.clone(), c.label(), c.site.clone()));
-            candidates.dedup_by(|a, b| {
-                a.repository == b.repository && a.contract == b.contract && a.site == b.site
-            });
+            // A decision names a repository and a contract (no site): the sites of one
+            // repository that serve one contract are one candidate.
+            let mut listed = HashSet::new();
+            candidates.retain(|c| listed.insert((c.repository.clone(), c.contract.clone())));
             items.push(OpenItem {
                 id: consumer.item_site().into_owned(),
                 kind,
@@ -234,6 +245,9 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                     span: range(s.span.start, s.span.end),
                 }),
                 candidates,
+                cause: (consumer.contract.is_none())
+                    .then(|| causes.get(consumer.site.as_str()).copied())
+                    .flatten(),
                 limit: (consumer.contract.is_none())
                     .then(|| consumer.lead.as_ref().map(|l| l.limit.clone()))
                     .flatten(),

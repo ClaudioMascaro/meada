@@ -35,7 +35,6 @@
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::ops::Range;
 
 use hcl::eval::{Context, Evaluate};
 use hcl::{Map, Value};
@@ -43,7 +42,7 @@ use hcl_edit::Span;
 use hcl_edit::expr::{Expression, ObjectKey, Traversal, TraversalOperator};
 use hcl_edit::parser;
 use hcl_edit::structure::{Body, Structure};
-use hcl_edit::template::{Directive, Element, Template};
+use hcl_edit::template::{Directive, Element, Strip, Template};
 use hcl_edit::visit::{self, Visit};
 
 use self::functions::Elem;
@@ -58,9 +57,10 @@ use crate::document::events::{self, Step, Syntax};
 use crate::lang::MAX_BYTES;
 use crate::render::{rank, section};
 use crate::trace::Direction;
-use meada_core::export::Level;
-use meada_core::trace::{Chain, Row};
+use meada_core::export::{Level, Link};
+use meada_core::trace::{Chain, Row, arrow};
 
+pub(crate) mod actions;
 mod attribute;
 mod azure;
 pub(crate) mod cloudformation;
@@ -105,20 +105,22 @@ const OVERRIDABLE_MAX: usize = 32;
 const EVAL_VALUE_MAX: usize = 64 << 10;
 
 /// The cost one expression may have at most (`cost`, an upper bound of its evaluation steps: a
-/// byte made or `TEMPLATE_PARSE_COST` of a template's text parsed again in a `for`) for `hcl-rs`
-/// to evaluate it; past it the expression is unresolved, but for its template parts, and spends
+/// byte made or `TEMPLATE_PART_COST` of a template's part evaluated in a `for`) for `hcl-rs` to
+/// evaluate it; past it the expression is unresolved, but for its template parts, and spends
 /// only the bytes it went through to decide.
 // ponytail: a `for` over a map of a few hundred entries costs a few hundred KiB; 1 MiB stops a
 // `for` inside a `for` over wide lists, and a template in a `for` before it takes a second.
 const EVAL_COST_MAX: usize = 1 << 20;
 
-/// The cost of one byte of a template's source text at each evaluation in a `for`, whatever the
-/// text holds: `hcl-rs` keeps a template as text and parses it again every time it evaluates it,
-/// so a template in a `for` is parsed once per element.
-// ponytail: measured end to end on 2026-11-09 in a debug build (the text `hcl-rs` parses is the
-// `Exact` rewrite, longer than the source), a template takes 3 to 7 µs a byte of its source, where
-// the other steps take about 0.3 µs a unit of cost; 32 covers the slowest form.
-const TEMPLATE_PARSE_COST: usize = 32;
+/// The cost of one part of a template (a literal, an interpolation or a directive) at each
+/// evaluation in a `for`, whatever bytes it makes: `Exact` makes a template a call of its parts
+/// (`template_call`), which `hcl-rs` evaluates one by one, so a template in a `for` evaluates
+/// each part once per element (#763).
+// ponytail: measured on 2026-11-14 in a debug build (CPU time of 20 resources near the ceiling,
+// against one part per element), a part takes about 1 µs (a literal, an `if` directive) to 1.7 µs
+// (an interpolation, a call of `meada_exact`), where the other steps take about 0.3 µs a unit of
+// cost; 8 covers the slowest form.
+const TEMPLATE_PART_COST: usize = 8;
 
 /// The cost (`cost`) the evaluations of one root module may spend together; past it every value
 /// left is unresolved.
@@ -324,6 +326,9 @@ pub(crate) struct Node {
     pub images: Vec<WorkloadImage>,
     pub provisioned: Option<Projection>,
     pub ingress: Vec<Ingress>,
+    /// What the GitHub Actions reader keeps of a pipeline, a CI job or a CI step: its selectors
+    /// (#823) and what the CI contract reads of it (#824).
+    pub actions: Option<actions::Facts>,
 }
 
 impl Node {
@@ -347,6 +352,13 @@ impl Node {
     }
     pub(crate) fn identity(&self, repository: &str) -> String {
         format!("{repository}::{}::{}", self.path, self.address)
+    }
+
+    /// Whether `context` lists the node's sides above its values: a CI node, since who calls a
+    /// pipeline is what its reader asks and the values of a long file would spend the budget
+    /// first.
+    pub(crate) fn sides_first(&self) -> bool {
+        actions::owns(self)
     }
 
     /// The node's stored line range as the code-span shape used by open items.
@@ -1160,6 +1172,16 @@ impl VisitMut for Exact<'_, '_> {
                 *expr = undefined();
                 return;
             }
+            // Its parts visited, a template becomes the call that makes its text, so `hcl-rs`
+            // never parses it again at an evaluation (#763).
+            Expression::StringTemplate(t) => {
+                *expr = template_expr(Template::from(std::mem::take(t)));
+                return;
+            }
+            Expression::HeredocTemplate(h) => {
+                *expr = template_expr(std::mem::take(&mut h.template));
+                return;
+            }
             Expression::Number(n) => {
                 if !(n.as_repr()).is_some_and(|written| printed_as_written(n.value(), written)) {
                     self.inexact = true;
@@ -1189,15 +1211,6 @@ impl VisitMut for Exact<'_, '_> {
                         let mut keyed: Vec<_> = keys.into_iter().zip(entries).collect();
                         keyed.sort_by(|a, b| a.0.cmp(&b.0));
                         entries = keyed.into_iter().map(|(_, e)| e).collect();
-                        // `hcl-rs` keeps a template as its text: the entry that ended the object
-                        // takes a comma, so the reordered object still parses there. A newline
-                        // stays, since it also ends a line comment the entry may carry.
-                        use hcl_edit::expr::ObjectValueTerminator::{Comma, None as Last};
-                        for (_, value) in &mut entries {
-                            if value.terminator() == Last {
-                                value.set_terminator(Comma);
-                            }
-                        }
                     }
                     None => self.unordered += 1,
                 }
@@ -1289,10 +1302,99 @@ fn arithmetic(
         .ok()
 }
 
+/// The expression `hcl-rs` evaluates for the template `t`, its parts visited by `Exact`: one
+/// that is a single interpolation is that interpolation's expression, whose value keeps its
+/// type as `hcl-rs` unwraps it; any other is `template_call` (#763).
+fn template_expr(t: Template) -> Expression {
+    let mut elements: Vec<Element> = t.into_iter().collect();
+    if let [Element::Interpolation(_)] = elements.as_slice()
+        && let Some(Element::Interpolation(sole)) = elements.pop()
+    {
+        return sole.expr;
+    }
+    template_call(elements, Strip::None, Strip::None)
+}
+
+/// The call `meada_exact("template", ...)` that makes the text of a template of `elements`, as
+/// `hcl-rs` makes it when it parses the template's text again: each literal stripped as the `~`
+/// of the elements around it ask (`prev` and `next` stand for those around the template), an
+/// `if` directive a conditional and a `for` directive a `for` whose texts the call joins.
+fn template_call(elements: Vec<Element>, prev: Strip, next: Strip) -> Expression {
+    use hcl_edit::expr::{Conditional, ForExpr, ForIntro, FuncCall, FuncName};
+    let strips: Vec<Strip> = elements.iter().map(element_strip).collect();
+    let last = elements.len().saturating_sub(1);
+    let mut args = vec![Expression::from("template")];
+    for (i, element) in elements.into_iter().enumerate() {
+        let before = if i == 0 { prev } else { strips[i - 1] };
+        let after = if i == last { next } else { strips[i + 1] };
+        args.push(match element {
+            Element::Literal(s) => Expression::from(stripped(s.value(), before, after)),
+            Element::Interpolation(interpolation) => interpolation.expr,
+            Element::Directive(d) => match *d {
+                Directive::If(d) => {
+                    let (yes, no, endif) = (d.if_expr, d.else_expr, d.endif_expr.strip);
+                    let yes_next = no.as_ref().map_or(endif, |no| no.strip);
+                    let yes_text =
+                        template_call(yes.template.into_iter().collect(), yes.strip, yes_next);
+                    let no_text = match no {
+                        Some(no) => {
+                            template_call(no.template.into_iter().collect(), no.strip, endif)
+                        }
+                        None => Expression::from(""),
+                    };
+                    Expression::from(Conditional::new(yes.cond_expr, yes_text, no_text))
+                }
+                Directive::For(d) => {
+                    let (f, endfor) = (d.for_expr, d.endfor_expr.strip);
+                    let body = template_call(f.template.into_iter().collect(), f.strip, endfor);
+                    let mut intro = ForIntro::new(f.value_var, f.collection_expr);
+                    intro.key_var = f.key_var;
+                    Expression::from(ForExpr::new(intro, body))
+                }
+            },
+        });
+    }
+    let name = FuncName::new(hcl_edit::Ident::new("meada_exact"));
+    Expression::from(FuncCall::new(name, args.into()))
+}
+
+/// The `~` the template element `e` asks of the literals around it, as `hcl-rs` reads it.
+fn element_strip(e: &Element) -> Strip {
+    match e {
+        Element::Literal(_) => Strip::None,
+        Element::Interpolation(i) => i.strip,
+        Element::Directive(d) => {
+            let (start, end) = match d.as_ref() {
+                Directive::If(d) => (d.if_expr.strip, d.endif_expr.strip),
+                Directive::For(d) => (d.for_expr.strip, d.endfor_expr.strip),
+            };
+            Strip::from((start.strip_start(), end.strip_end()))
+        }
+    }
+}
+
+/// `literal` as `hcl-rs` strips it: its leading spaces and first line break cut when the
+/// element before it ends in `~`, and its trailing ones when the element after it starts so.
+fn stripped(literal: &str, before: Strip, after: Strip) -> String {
+    let space = |c: char| c.is_whitespace() && c != '\r' && c != '\n';
+    let mut s = literal;
+    if before.strip_end() {
+        s = s.trim_start_matches(space);
+        s = (s.strip_prefix("\r\n").or_else(|| s.strip_prefix('\n'))).unwrap_or(s);
+    }
+    if after.strip_start() {
+        s = s.trim_end_matches(space);
+        s = (s.strip_suffix("\r\n").or_else(|| s.strip_suffix('\n'))).unwrap_or(s);
+    }
+    s.to_string()
+}
+
 /// `meada_exact(operator, operands...)`: the operation `Exact` could not do before evaluating
 /// (`"neg"` for negation), done as exactly, an error where `Exact` writes the undefined name.
 /// `meada_exact("text", value)` is an interpolated value, an error for a null or a collection,
-/// which Terraform cannot show as text where `hcl-rs` prints them.
+/// which Terraform cannot show as text where `hcl-rs` prints them. `meada_exact("template",
+/// parts...)` is a template's text (`template_call`): its parts shown and joined, a list the
+/// texts a `for` directive made.
 fn exact_call(args: hcl::eval::FuncArgs) -> std::result::Result<Value, String> {
     let operator = match args[0].as_str() {
         Some("text") => {
@@ -1300,6 +1402,20 @@ fn exact_call(args: hcl::eval::FuncArgs) -> std::result::Result<Value, String> {
                 Value::Null | Value::Array(_) | Value::Object(_) => Err("no text".into()),
                 v => Ok(v.clone()),
             };
+        }
+        Some("template") => {
+            let mut text = String::new();
+            for part in args.iter().skip(1) {
+                match part {
+                    Value::Array(texts) => {
+                        for t in texts {
+                            text.push_str(t.as_str().ok_or("no text")?);
+                        }
+                    }
+                    v => text.push_str(&functions::shown(v).ok_or("no text")?),
+                }
+            }
+            return Ok(Value::String(text));
         }
         Some("neg") => None,
         Some(o) => Some(o.parse().map_err(|_| "no operator")?),
@@ -1700,14 +1816,45 @@ fn size(v: &Value) -> usize {
 
 /// The values bound to the root names (`var`, `local`, ...) and the bytes each holds (`size`),
 /// worked out once per expression: `cost` reads a root's size at every traversal in a `for`.
+/// A value read inside them is sized once too, by its address, however many times the
+/// expression reads it (#765).
 struct Roots<'v> {
     values: &'v Map<String, Value>,
     sizes: BTreeMap<&'v str, usize>,
+    read_sizes: RefCell<HashMap<*const Value, usize>>,
+    read_elements: RefCell<HashMap<*const Value, (usize, usize)>>,
 }
 
 impl Roots<'_> {
     fn size(&self, name: &str) -> Option<usize> {
         self.sizes.get(name).copied()
+    }
+
+    /// `size(v)` of a value read inside the roots.
+    fn read_size(&self, v: &Value) -> usize {
+        *(self.read_sizes.borrow_mut())
+            .entry(std::ptr::from_ref(v))
+            .or_insert_with(|| size(v))
+    }
+
+    /// How many elements the value `v` read inside the roots gives a `for`, and the bytes one
+    /// of them (or its key, with its quotes) holds at most.
+    fn read_elements(&self, v: &Value) -> (usize, usize) {
+        let key = std::ptr::from_ref(v);
+        if let Some(&found) = self.read_elements.borrow().get(&key) {
+            return found;
+        }
+        let most = |sizes: &mut dyn Iterator<Item = usize>| sizes.max().unwrap_or(0);
+        let found = match v {
+            Value::Array(items) => (items.len(), most(&mut items.iter().map(size))),
+            Value::Object(map) => (
+                map.len(),
+                most(&mut map.iter().map(|(k, v)| (k.len() + 2).max(size(v)))),
+            ),
+            v => (1, self.read_size(v)),
+        };
+        self.read_elements.borrow_mut().insert(key, found);
+        found
     }
 }
 
@@ -1761,12 +1908,14 @@ fn copied(t: &Traversal, roots: &Roots<'_>, iters: &[(String, usize)]) -> usize 
 }
 
 /// The steps evaluating `expr` takes at most (`cost`), its variables bound to `roots`: the bytes
-/// it makes and the steps that make none (template text parsed again, root objects copied).
+/// it makes and the steps that make none (template parts evaluated, root objects copied).
 fn steps(expr: &Expression, roots: &Map<String, Value>) -> usize {
     let sizes = roots.iter().map(|(k, v)| (k.as_str(), size(v))).collect();
     let roots = Roots {
         values: roots,
         sizes,
+        read_sizes: RefCell::default(),
+        read_elements: RefCell::default(),
     };
     let mut overhead = 0;
     let made = cost(expr, &roots, &mut Vec::new(), &mut overhead);
@@ -1775,10 +1924,10 @@ fn steps(expr: &Expression, roots: &Map<String, Value>) -> usize {
 
 /// An upper bound of the bytes evaluating `expr` makes, its variables bound to `roots` and the
 /// iterator variables of the `for` around it to `iters` (a name and the most one element holds);
-/// `overhead` grows by the steps that make no bytes each time they run in a `for`: parsing a
-/// template again (`TEMPLATE_PARSE_COST` a byte of its text) and copying the root object a
-/// traversal reads (`hcl-rs` clones `var`, `local`, ... whole to evaluate `var.x[0]`), kept
-/// apart so an element count estimated from the bytes does not multiply it. A product (a `for`,
+/// `overhead` grows by the steps that make no bytes each time they run in a `for`: evaluating
+/// a template's parts (`TEMPLATE_PART_COST` each) and copying the root object a traversal reads
+/// (`hcl-rs` clones `var`, `local`, ... whole to evaluate `var.x[0]`), kept apart so an element
+/// count estimated from the bytes does not multiply it. A product (a `for`,
 /// `formatlist`, `join`, `replace`) multiplies, a function that may grow its input (a `format`
 /// width, `jsonencode`'s escapes, `split`'s quotes, a case change) grows it, and anything else
 /// adds up.
@@ -1806,14 +1955,8 @@ fn cost(
                 add(key, cost(v.expr(), roots, iters, overhead))
             })
             .fold(2, add),
-        Expression::StringTemplate(t) => {
-            *overhead = add(*overhead, parse_cost(t.span(), t, iters));
-            template_cost(t, roots, iters, overhead)
-        }
-        Expression::HeredocTemplate(h) => {
-            *overhead = add(*overhead, parse_cost(h.span(), &h.template, iters));
-            template_cost(&h.template, roots, iters, overhead)
-        }
+        Expression::StringTemplate(t) => template_cost(t, roots, iters, overhead),
+        Expression::HeredocTemplate(h) => template_cost(&h.template, roots, iters, overhead),
         Expression::Parenthesis(p) => cost(p.inner(), roots, iters, overhead),
         Expression::Variable(v) => match iters.iter().rev().find(|(n, _)| n == v.as_str()) {
             Some((_, n)) => *n,
@@ -1828,7 +1971,7 @@ fn cost(
             let base = match unshadowed(t, roots, iters) {
                 Some(v) => {
                     *overhead = add(*overhead, copied(t, roots, iters));
-                    size(v)
+                    roots.read_size(v)
                 }
                 None => cost(&t.expr, roots, iters, overhead),
             };
@@ -1965,17 +2108,9 @@ fn shown_len(e: Option<&Expression>, cost: usize) -> usize {
     }
 }
 
-/// What parsing the template `t` again costs at one evaluation in a `for` (`iters`), its text
-/// spanning `span` (a template built rather than read has none, so its text is written out).
-/// Outside every `for` it is overhead once, in time its file's size already bounds: nothing.
-fn parse_cost(span: Option<Range<usize>>, t: &Template, iters: &[(String, usize)]) -> usize {
-    if iters.is_empty() {
-        return 0;
-    }
-    let len = span.map_or_else(|| t.to_string().len(), |s| s.len());
-    len.saturating_mul(TEMPLATE_PARSE_COST)
-}
-
+/// The bytes the template `t` makes, as `cost`; each of its parts evaluated in a `for` (`iters`)
+/// adds `TEMPLATE_PART_COST` to `overhead`. Outside every `for` a part runs once per evaluation,
+/// in time the template's text bounds.
 fn template_cost(
     t: &Template,
     roots: &Roots<'_>,
@@ -1984,6 +2119,9 @@ fn template_cost(
 ) -> usize {
     let mut total = 0usize;
     for e in t.iter() {
+        if !iters.is_empty() {
+            *overhead = overhead.saturating_add(TEMPLATE_PART_COST);
+        }
         let part = match e {
             Element::Literal(s) => s.value().len(),
             Element::Interpolation(i) => cost(&i.expr, roots, iters, overhead),
@@ -2087,14 +2225,8 @@ fn elements(
         }
         _ => None,
     };
-    let most = |sizes: &mut dyn Iterator<Item = usize>| sizes.max().unwrap_or(0);
     match found {
-        Some(Value::Array(items)) => (items.len(), most(&mut items.iter().map(size))),
-        Some(Value::Object(map)) => (
-            map.len(),
-            most(&mut map.iter().map(|(k, v)| (k.len() + 2).max(size(v)))),
-        ),
-        Some(v) => (1, size(v)),
+        Some(v) => roots.read_elements(v),
         None => {
             let c = cost(expr, roots, iters, overhead);
             (c, c)
@@ -2102,20 +2234,33 @@ fn elements(
     }
 }
 
-/// Collects the variables an expression names (`each` and `count` say whether it reads the
-/// instance it is evaluated in) and counts its reads of a root object.
+/// How many times an expression reads each variable it names: `each` and `count` say whether
+/// it reads the instance it is evaluated in, a root object's (`var`, `local`, ...) what a
+/// refusal spends on that root.
 #[derive(Default)]
-struct Variables {
-    names: BTreeSet<String>,
-    roots: usize,
+struct Variables(BTreeMap<String, usize>);
+
+impl Variables {
+    fn of(expr: &Expression) -> Variables {
+        let mut variables = Variables::default();
+        variables.visit_expr(expr);
+        variables
+    }
+
+    fn reads(&self, name: &str) -> usize {
+        self.0.get(name).copied().unwrap_or(0)
+    }
+
+    /// Whether the expression reads the instance it is evaluated in.
+    fn reads_instance(&self) -> bool {
+        self.0.contains_key("each") || self.0.contains_key("count")
+    }
 }
 
 impl Visit for Variables {
     fn visit_expr(&mut self, node: &Expression) {
         if let Expression::Variable(v) = node {
-            let root = matches!(v.as_str(), "var" | "local" | "module" | "each" | "count");
-            self.roots += usize::from(root);
-            self.names.insert(v.as_str().to_string());
+            *self.0.entry(v.as_str().to_string()).or_default() += 1;
         }
         visit::visit_expr(self, node);
     }
@@ -2284,9 +2429,26 @@ impl<'m> Eval<'m> {
                 self.nodes[node].provisioned = Some(Projection::default());
             }
         }
+        // A known name that reads neither `each` nor `count` is the same in every instance of
+        // its block: it is evaluated once (#765). One that is not known (a pattern or
+        // unresolved) is evaluated again, and spends again, in each instance.
+        let mut shared: HashMap<(usize, *const Block), Evaluated> = HashMap::new();
         for &(node, instance, block, ref each) in &pending {
             let Some(named) = &block.named else { continue };
-            let found = self.value(instance, each.as_ref(), named, 0);
+            let key = (instance, std::ptr::from_ref(block));
+            let found = match shared.get(&key) {
+                Some(found) => found.clone(),
+                None => {
+                    let found = self.value(instance, each.as_ref(), named, 0);
+                    if each.is_some()
+                        && matches!(found.val, Val::Known(_))
+                        && !Variables::of(named).reads_instance()
+                    {
+                        shared.insert(key, found.clone());
+                    }
+                    found
+                }
+            };
             // A null or a collection is no name; anything else is its text, `*` when unresolved.
             let (name, pattern) = match &found.val {
                 Val::Known(Value::Null | Value::Array(_) | Value::Object(_)) => (None, false),
@@ -2457,6 +2619,7 @@ impl<'m> Eval<'m> {
                     images: Vec::new(),
                     provisioned: None,
                     ingress: Vec::new(),
+                    actions: None,
                 });
                 let local = (block.source.as_deref())
                     .and_then(|s| local_source(dir, s))
@@ -2872,14 +3035,9 @@ impl<'m> Eval<'m> {
                 mods.insert(name, v);
             }
         }
-        let mut variables = Variables::default();
-        variables.visit_expr(expr);
+        let variables = Variables::of(expr);
         let (mut each_v, mut count_v) = (Map::new(), Map::new());
-        if let Some(e) = each.filter(|_| {
-            ["each", "count"]
-                .iter()
-                .any(|v| variables.names.contains(*v))
-        }) {
+        if let Some(e) = each.filter(|_| variables.reads_instance()) {
             through.extend(e.through.iter().cloned());
             each_v.insert("value".to_string(), e.value.clone());
             match &e.key {
@@ -2923,15 +3081,19 @@ impl<'m> Eval<'m> {
             }
         } else {
             // Refused, it spends the bytes it went through to decide, not what it would have
-            // made: its own text, and an upper bound for its roots, once copied, once ordered
-            // (`lexical`) and twice at each read of one (`cost` reads the value read; a
-            // resource it names is no root). Never more than the `EVAL_COST_MAX` every
-            // refusal spent before. The parts `partial` evaluates pass this gate themselves.
-            let roots = (roots.values().map(size)).fold(0, usize::saturating_add);
-            let reads = variables.roots.saturating_add(1).saturating_mul(2);
+            // made: its own text, and an upper bound for each root, once copied, once ordered
+            // (`lexical`) and twice at each read of that root (`cost` reads the value read; a
+            // resource it names is no root; `count.index` reads only `count`, #765). Never
+            // more than the `EVAL_COST_MAX` every refusal spent before. The parts `partial`
+            // evaluates pass this gate themselves.
             // An expression built rather than read has no span: its text is written out.
             let text = (expr.span()).map_or_else(|| expr.to_string().len(), |s| s.len());
-            let spent = roots.saturating_mul(reads).saturating_add(text);
+            let spent = (roots.iter())
+                .map(|(name, v)| {
+                    let reads = variables.reads(name).saturating_add(1).saturating_mul(2);
+                    size(v).saturating_mul(reads)
+                })
+                .fold(text, usize::saturating_add);
             self.work = self.work.saturating_sub(spent.min(EVAL_COST_MAX));
         }
         self.partial(at, each, expr, depth)
@@ -3311,8 +3473,8 @@ fn terraform_path(column: &str) -> String {
 }
 
 /// Who writes a stored node. The Terraform and Compose nodes (#649, #652), the Kubernetes nodes
-/// (#651) and the CloudFormation nodes (#653) share the tables, and each is rewritten by its own
-/// refresh, so each touches the rows it owns only.
+/// (#651), the CloudFormation nodes (#653) and the GitHub Actions nodes (#823) share the tables,
+/// and each is rewritten by its own refresh, so each touches the rows it owns only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Owner {
     /// A node without `::` in its type, in a Terraform, OpenTofu or Compose file.
@@ -3321,6 +3483,8 @@ pub(crate) enum Owner {
     Kubernetes,
     /// A node whose type has a `::`, regardless of filename: `AWS::SQS::Queue`, `Custom::Name`.
     CloudFormation,
+    /// A pipeline, an action, a CI job or a CI step (`actions::ROWS`), whatever its file's name.
+    Actions,
 }
 
 impl Owner {
@@ -3328,10 +3492,12 @@ impl Owner {
     pub(crate) fn sql(self) -> String {
         let own = terraform_path("path");
         let typed = "type LIKE '%::%'";
+        let ci = actions::ROWS;
         match self {
-            Owner::Terraform => format!("({own} AND NOT {typed})"),
-            Owner::Kubernetes => format!("(NOT {own} AND NOT {typed})"),
+            Owner::Terraform => format!("({own} AND NOT {typed} AND NOT {ci})"),
+            Owner::Kubernetes => format!("(NOT {own} AND NOT {typed} AND NOT {ci})"),
             Owner::CloudFormation => typed.to_string(),
+            Owner::Actions => ci.to_string(),
         }
     }
 }
@@ -3407,7 +3573,7 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
@@ -3449,6 +3615,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
                 .as_ref()
                 .map(serde_json::to_string)
                 .transpose()?,
+            n.actions.as_ref().map(serde_json::to_string).transpose()?,
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -3461,7 +3628,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
                        block, image, image_overridable, build, build_overridable, role, \
-                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes, dockerfile";
+                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes, dockerfile, actions";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -3505,6 +3672,9 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         subscription: r
             .get::<_, Option<String>>(19)?
             .and_then(|s| serde_json::from_str(&s).ok()),
+        actions: r
+            .get::<_, Option<String>>(26)?
+            .and_then(|s| serde_json::from_str(&s).ok()),
     })
 }
 
@@ -3526,14 +3696,15 @@ pub(crate) fn all_references(db: &Connection) -> Result<Vec<Reference>> {
 }
 
 /// `<identity> <path>:<line> <address>`.
-fn at(identity: &str, n: &Node) -> String {
+pub(crate) fn at(identity: &str, n: &Node) -> String {
     format!("{identity} {}:{} {}", n.path, n.line, n.address)
 }
 
 /// The IaC nodes of `db` (repository `identity`) whose address, type or physical name matches
 /// `needle`, lowercased, as `search` hits: `<identity> <path>:<line> <address> (<type>[, name
 /// "<name>"], root <root>)`, `pattern` in place of `name` for a pattern, ordered by rank, then
-/// repository, path, line, address and root.
+/// repository, path, line, address and root. The nodes of a pipeline or an action answer to the
+/// kind `ci` (`actions::hits`), never here.
 pub(crate) fn hits(
     identity: &str,
     db: &Connection,
@@ -3542,7 +3713,10 @@ pub(crate) fn hits(
 ) -> Result<Vec<Hit>> {
     // ponytail: scans every node of every repository; an indexed lookup waits for a workspace
     // that makes it slow.
-    let mut statement = db.prepare(&format!("SELECT {COLUMNS} FROM iac_nodes"))?;
+    let mut statement = db.prepare(&format!(
+        "SELECT {COLUMNS} FROM iac_nodes WHERE NOT {}",
+        actions::ROWS
+    ))?;
     let mut hits = Vec::new();
     for n in statement.query_map([], row)? {
         let n = n?;
@@ -3574,7 +3748,9 @@ pub(crate) fn hits(
 }
 
 /// The nodes `text` names in `db` (repository `identity`): `<address>`, `<path>::<address>` or
-/// `<identity>::<path>::<address>`, any of them followed by ` (root <root>)` to pick a root.
+/// `<identity>::<path>::<address>`, any of them followed by ` (root <root>)` to pick a root. A
+/// pipeline or an action is also named by its file path, and a CI step by a selector
+/// (`actions::names`).
 pub(crate) fn named(identity: &str, nodes: &[Node], text: &str) -> Vec<Node> {
     let (text, root) = match text
         .strip_suffix(')')
@@ -3587,7 +3763,10 @@ pub(crate) fn named(identity: &str, nodes: &[Node], text: &str) -> Vec<Node> {
         .iter()
         .filter(|n| {
             let path = format!("{}::{}", n.path, n.address);
-            (text == n.address || text == path || text == n.identity(identity))
+            (text == n.address
+                || text == path
+                || text == n.identity(identity)
+                || actions::names(identity, n, text))
                 && root.is_none_or(|r| r == n.root)
         })
         .cloned()
@@ -3751,47 +3930,66 @@ pub(crate) fn context(
 /// it references (`Down`) or that reference it (`Up`), depth first, each indented under the one
 /// it hangs from, a node met again on its own branch marked ` (cycle)` and one already followed
 /// ` (see above)`; then the chain footer. A text that fits several nodes lists them.
-pub(crate) fn trace(
+///
+/// `calls` gives the nodes a link joins to a node in the walk's direction, in any repository
+/// (`trace::Graph::node_calls`, a CI call): the walk follows them with the references, before
+/// them, so a chain of calls crosses repositories and goes on through each one's references.
+pub(crate) fn trace<'l>(
     repos: &[(&str, &Connection)],
     exports: &[crate::index::Export],
     text: &str,
     direction: Direction,
     budget: Option<usize>,
     mut attached: impl FnMut(usize, &Node, usize) -> Vec<Row>,
+    mut calls: impl FnMut(usize, &Node) -> Vec<(usize, Node, &'l Link)>,
 ) -> Result<Option<String>> {
     let found = found(exports, text);
     let [(r, start)] = &found[..] else {
         return Ok((!found.is_empty())
             .then(|| crate::render::budgeted(&several(repos, text, &found), budget)));
     };
-    let (identity, db) = repos[*r];
     let mut rows = Vec::new();
-    let mut expanded: HashSet<String> = HashSet::new();
-    let mut path: Vec<String> = Vec::new();
-    // (depth, node, via), popped in walk order.
-    let mut stack: Vec<(usize, Node, Option<String>)> = vec![(0, start.clone(), None)];
-    while let Some((depth, n, via)) = stack.pop() {
+    // A node is itself only within its repository and root: a link leaves both.
+    let mut expanded: HashSet<(usize, String, String)> = HashSet::new();
+    let mut path: Vec<(usize, String, String)> = Vec::new();
+    // (depth, repository, node, the reference's name, the link that reached it), popped in
+    // walk order.
+    let mut stack = vec![(0, *r, start.clone(), None::<String>, None::<&Link>)];
+    while let Some((depth, r, n, via, link)) = stack.pop() {
         path.truncate(depth);
+        let (identity, db) = repos[r];
+        let key = (r, n.root.clone(), n.address.clone());
         let mark = match () {
-            _ if path.contains(&n.address) => " (cycle)",
-            _ if expanded.contains(&n.address) => " (see above)",
+            _ if path.contains(&key) => " (cycle)",
+            _ if expanded.contains(&key) => " (see above)",
             _ => "",
         };
-        let text = format!(
-            "{}{}{mark}",
-            "  ".repeat(depth),
-            reached(identity, &n, &via)
-        );
-        let level = (depth > 0).then_some(Level::Exact);
-        rows.push(Row::call(text, *r, level));
+        let indent = "  ".repeat(depth);
+        rows.push(match link {
+            Some(link) => {
+                let text = format!("{indent}{} {}{mark}", arrow(link), at(identity, &n));
+                let mut row = Row::link(text, r, link);
+                row.text += &std::mem::take(&mut row.end);
+                row
+            }
+            None => {
+                let text = format!("{indent}{}{mark}", reached(identity, &n, &via));
+                Row::call(text, r, (depth > 0).then_some(Level::Exact))
+            }
+        });
         if !mark.is_empty() {
             continue;
         }
-        rows.extend(attached(*r, &n, depth + 1));
-        expanded.insert(n.address.clone());
-        path.push(n.address.clone());
-        let next = references(db, &n, direction)?;
-        stack.extend(next.into_iter().rev().map(|(m, via)| (depth + 1, m, via)));
+        rows.extend(attached(r, &n, depth + 1));
+        expanded.insert(key.clone());
+        path.push(key);
+        let called = calls(r, &n).into_iter();
+        let mut next: Vec<_> = called
+            .map(|(m, node, link)| (depth + 1, m, node, None, Some(link)))
+            .collect();
+        let referenced = references(db, &n, direction)?.into_iter();
+        next.extend(referenced.map(|(node, via)| (depth + 1, r, node, via, None)));
+        stack.extend(next.into_iter().rev());
     }
     let chain = Chain {
         rows,
@@ -5476,12 +5674,13 @@ mod tests {
         assert!(took < std::time::Duration::from_secs(20), "{took:?}");
     }
 
-    /// `hcl-rs` parses a template again at each evaluation, so a template of `k` interpolations
-    /// in a `for` over `m` elements takes time in `m * k` however few bytes it makes: its steps
-    /// are charged too, so at `m = 8000, k = 40` (9.6 s in a debug build before) it is unresolved
-    /// before it runs, alone or 64 times in a root, with no resource left out; over 100 elements
-    /// it still resolves. Measured on 2026-11-09 in a debug build: 0.35 s for the whole test.
-    /// (The literal `q-` of each stays: a refusal spends what it went through, not 1 MiB.)
+    /// A template of `k` interpolations in a `for` over `m` elements takes time in `m * k`
+    /// however few bytes it makes (each part evaluated per element, #763; its text parsed again
+    /// before): its steps are charged too, so at `m = 8000, k = 40` (9.6 s in a debug build
+    /// before #714) it is unresolved before it runs, alone or 64 times in a root, with no
+    /// resource left out; over 100 elements it still resolves. Measured on 2026-11-09 in a debug
+    /// build, before #763: 0.35 s for the whole test. (The literal `q-` of each stays: a refusal
+    /// spends what it went through, not 1 MiB.)
     #[test]
     fn a_template_in_a_wide_for_is_bounded_by_its_steps() {
         let body = "${a}".repeat(40);
@@ -5514,7 +5713,116 @@ mod tests {
         }
     }
 
-    /// The template text a `for` parses counts once per element, and neither as an element of
+    /// The cheapest template a `for` repeats is a `%{ for }` of no part, charged no part: it still
+    /// evaluates its collection once per element of the directive around it, and each evaluation
+    /// is charged the elements it lists, so two directives over 1,000 literal elements, one inside
+    /// the other with nothing between them (a million calls of an empty body), are refused before
+    /// they run; one alone still evaluates (#763).
+    #[test]
+    fn a_nested_template_for_of_no_part_is_refused() {
+        let ones = vec!["1"; 1000].join(", ");
+        let nested = format!(
+            "\"%{{ for a in [{ones}] }}%{{ for b in [{ones}] }}%{{ endfor }}%{{ endfor }}\""
+        );
+        let expr = parser::parse_expr(&nested).unwrap();
+        assert!(steps(&expr, &Map::new()) > EVAL_COST_MAX);
+        let alone = format!("\"%{{ for a in [{ones}] }}%{{ endfor }}\"");
+        let expr = parser::parse_expr(&alone).unwrap();
+        assert!(steps(&expr, &Map::new()) <= EVAL_COST_MAX);
+    }
+
+    /// No template reaches `hcl-rs` as text, so none is parsed again at an evaluation, whatever
+    /// the instances or the elements of a `for` that evaluate it (#763): each is a call of its
+    /// parts, which makes the text `hcl-rs` makes by parsing it, literals stripped as `~` asks,
+    /// escapes, `if` and `for` directives, heredocs indented or not, and a template that is one
+    /// interpolation keeps its value's type.
+    #[test]
+    fn a_template_is_evaluated_without_its_text() {
+        let mut ctx = Context::new();
+        functions::declare(&mut ctx);
+        let var = Map::from_iter([
+            ("x".to_string(), Value::from("ex")),
+            ("y".to_string(), Value::from("why")),
+            ("n".to_string(), Value::from(7)),
+            ("t".to_string(), Value::Bool(true)),
+            ("f".to_string(), Value::Bool(false)),
+            ("l".to_string(), Value::from_iter(["a", "b", "c"])),
+            (
+                "m".to_string(),
+                Value::Object(Map::from_iter([
+                    ("k1".to_string(), Value::from("v1")),
+                    ("k2".to_string(), Value::from("v2")),
+                ])),
+            ),
+        ]);
+        ctx.declare_var("var", Value::Object(var));
+        let templates = [
+            r#""q-${var.x}-${var.y}""#,
+            r#""a\n$${b} %%{c} \"d\" ${var.x}""#,
+            r#""${var.n}""#,
+            r#""n=${var.n}""#,
+            r#""%{ if var.t }yes%{ else }no%{ endif }""#,
+            r#""%{ if var.f }yes%{ endif }-${var.x}""#,
+            r#""x  %{~ if var.t ~}  y  %{~ else ~}  n  %{~ endif ~}  z""#,
+            r#""a ${~ var.x ~} b""#,
+            r#""%{ for k, v in var.m }${k}=${v};%{ endfor }""#,
+            "\"%{ for v in var.l ~}\n  ${v}\n%{~ endfor }\"",
+            r#""%{ for v in var.l }%{ if v == "b" }B%{ else }${v}%{ endif }%{ endfor }""#,
+            "<<-EOT\n    a ${var.x}\n      b\n    EOT",
+            "<<EOT\n%{ for v in var.l }${v}\n%{ endfor }\nEOT",
+        ];
+        for text in templates {
+            let expr = parser::parse_expr(text).unwrap();
+            let mut exact = Exact {
+                ctx: &ctx,
+                sets: &BTreeSet::new(),
+                left: 0,
+                inexact: false,
+                unordered: 0,
+            };
+            let mut called = expr.clone();
+            exact.visit_expr_mut(&mut called);
+            let called = hcl::Expression::from(called);
+            assert!(!format!("{called:?}").contains("TemplateExpr"), "{text}");
+            let parsed = hcl::Expression::from(expr.clone()).evaluate(&ctx).ok();
+            assert!(parsed.is_some(), "{text}");
+            assert_eq!(evaluated(&expr, &ctx, &BTreeSet::new()), parsed, "{text}");
+        }
+    }
+
+    /// The three templates the text charge refused, each fast before it (#763): a 17 KB template
+    /// evaluated twice, an `if` template in a `for` over 2,000 elements and 40 interpolations in
+    /// a `for` over 198 elements, each named as Terraform names it.
+    #[test]
+    fn templates_the_text_charge_refused_resolve() {
+        let list = |n: usize| {
+            (0..n)
+                .map(|i| format!("\"e{i}\""))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let long = "a".repeat(17_000);
+        let forty = "${x}".repeat(40);
+        let main = format!(
+            "variable \"two\" {{ default = [{}] }}\nvariable \"wide\" {{ default = [{}] }}\nvariable \"some\" {{ default = [{}] }}\nresource \"a\" \"long\" {{ name = \"q-${{length([for x in var.two : \"{long}${{x}}\"])}}\" }}\nresource \"a\" \"if\" {{ name = \"q-${{length([for x in var.wide : \"%{{ if x == \"e1\" }}y%{{ else }}n%{{ endif }}\"])}}\" }}\nresource \"a\" \"forty\" {{ name = \"q-${{length([for x in var.some : \"{forty}\"])}}\" }}\n",
+            list(2),
+            list(2000),
+            list(198),
+        );
+        let got = names(&[("main.tf", &main)]);
+        let trimmed: Vec<_> = got.iter().map(|s| s.split(" [").next().unwrap()).collect();
+        assert_eq!(
+            trimmed,
+            [
+                "a.long = \"q-2\"",
+                "a.if = \"q-2000\"",
+                "a.forty = \"q-198\""
+            ],
+            "{got:?}"
+        );
+    }
+
+    /// The template parts a `for` evaluates count once per element, and neither as an element of
     /// the collection it makes nor as one element's size: a `for` over a `for` of templates over
     /// 30 elements still resolves, where counting it in the bytes squared it past `EVAL_COST_MAX`.
     #[test]
@@ -5799,6 +6107,76 @@ mod tests {
         let resources = vec!["a.o.id"; 50].join(", ");
         let named = format!("join(\",\", concat(var.big, [{resources}]))");
         assert_eq!(root(40, &named), resolved);
+    }
+
+    /// A known name that reads neither `each` nor `count` is the same in every instance of its
+    /// block and is evaluated once (#765): a name reading a wide variable thousands of times in
+    /// a `for` over an empty list charges the root's work as much at `count = 10` as at
+    /// `count = 1`, where every instance paid it again, and each instance's name is exact.
+    #[test]
+    fn a_known_name_the_instances_share_is_charged_once() {
+        let big = vec!["\"a\""; 2_000].join(", ");
+        let reads = vec!["var.big"; 2_000].join(", ");
+        let spent = |count: usize| {
+            let main = format!(
+                "variable \"big\" {{}}\nvariable \"e\" {{ default = [] }}\nresource \"a\" \"r\" {{\n  count = {count}\n  name  = \"q-${{length([for a in var.e : [{reads}]])}}\"\n}}\n"
+            );
+            let tfvars = format!("big = [{big}]\n");
+            let repository =
+                Repository::read(&files(&[("main.tf", &main), ("terraform.tfvars", &tfvars)]));
+            let mut eval = Eval::new(&repository.modules, &repository.mappings, STORED_MAX);
+            eval.root("");
+            let named: Vec<_> = (eval.nodes.iter())
+                .map(|n| (n.name.as_deref(), n.pattern))
+                .collect();
+            assert_eq!(named, vec![(Some("q-0"), false); count]);
+            EVAL_WORK_MAX - eval.work
+        };
+        let (one, ten) = (spent(1), spent(10));
+        assert!(one > 0 && ten < 2 * one, "{ten} against {one}");
+    }
+
+    /// The estimate sizes a bound value once per expression however many times it reads it
+    /// (#765): 40,000 reads of a 200,000-element variable are estimated in linear time, where
+    /// sizing the variable at each read walked it 40,000 times (eight billion elements).
+    #[test]
+    fn the_estimate_sizes_a_bound_value_once_in_linear_time() {
+        let var = Map::from_iter([
+            (
+                "big".to_string(),
+                Value::Array(vec![Value::from("a"); 200_000]),
+            ),
+            ("e".to_string(), Value::Array(Vec::new())),
+        ]);
+        let roots = Map::from_iter([("var".to_string(), Value::Object(var))]);
+        let reads = vec!["var.big"; 40_000].join(", ");
+        let expr = parser::parse_expr(&format!("length([for a in var.e : [{reads}]])")).unwrap();
+        let start = std::time::Instant::now();
+        let estimated = steps(&expr, &roots);
+        let took = start.elapsed();
+        assert!(estimated < 100, "{estimated}");
+        assert!(took < std::time::Duration::from_secs(2), "{took:?}");
+    }
+
+    /// A refusal counts each root by its own reads (#765): a refused name that reads a 60 KB
+    /// `var.big` once and `count.index` 50 times spends `var.big` four times and the small
+    /// `count` root at each of its reads, not every root at each read up to `EVAL_COST_MAX`, so
+    /// all 40 instances are `q-*` and the name after them resolves.
+    #[test]
+    fn a_refusal_counts_each_root_by_its_own_reads() {
+        let big = vec!["\"a\""; 20_000].join(", ");
+        let row = vec!["a"; 20].join(", ");
+        let index = vec!["count.index"; 50].join(" + ");
+        let main = format!(
+            "variable \"x\" {{ default = \"x\" }}\nvariable \"big\" {{ default = [{big}] }}\nresource \"a\" \"r\" {{\n  count = 40\n  name  = \"q-${{length([for a in var.big : [{row}]]) + {index}}}\"\n}}\nresource \"a\" \"z\" {{ name = \"q-${{var.x}}\" }}\n"
+        );
+        let got = names(&[("main.tf", &main)]);
+        assert_eq!(got.len(), 41);
+        assert!(
+            got[..40].iter().all(|s| s.ends_with(" ~ \"q-*\"")),
+            "{got:?}"
+        );
+        assert_eq!(got[40], "a.z = \"q-x\" [var.x main.tf:1]");
     }
 
     /// A literal skips the evaluation, not `EVAL_VALUE_MAX`: one past it is unresolved as any

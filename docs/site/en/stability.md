@@ -126,7 +126,7 @@ A repository's export is indented JSON ending in a newline, with every list sort
 | `symbols` | `id`, `span` (`path`, `start`, `end`), `hash`. |
 | `calls` | `id`, `caller`, `target`, `level`, `candidates`, `span`, `narrowed`, `decorates`. |
 | `providers` | `contract`, `site`, `gateway`, `shape`. |
-| `consumers` | `contract`, `site`, `via`, `shape`. |
+| `consumers` | `contract`, `site`, `via`, `shape`; on a consumer of a CI contract, also `ref`, `with` and `secrets`, each left out when empty, and `absent` (`true`, left out otherwise) when no repository of the workspace provides the contract at its indexed commit; on a consumer at a CI job, also `permissions`, the declared block that governs the job (its own, else its pipeline's: a word or a map of levels), left out when none is declared or read. |
 | `bindings` | `contract`, `exchange`, `pattern`, `site`. |
 | `documents` | `path`, `format` (`openapi` or `asyncapi`), `version`, `contracts`. |
 | `publishes` | `exchange`, `key`, `site`. |

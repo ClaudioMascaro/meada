@@ -15,7 +15,9 @@
   apart and names the first `DATA_NAMED` (10) data files in path order, the rest as a count.
   Terraform and OpenTofu files in every form, and a file a reader of a kind takes as its own
   (`config_values::kind_file`: a document, a config file a language pack reads or includes, a
-  Compose file, a GitHub workflow or Skaffold file, a package manifest, a kustomization or a
+  Compose file, a GitHub workflow or Skaffold file, a pipeline or an action by its place and
+  name (`iac::actions::is_file`: also an `action.yml` that holds no `runs`), a package
+  manifest, a kustomization or a
   file the Kubernetes reader takes an object from, a CloudFormation or SAM template or
   Serverless service, a file the alert reader takes a rule, a route or a receiver from), keep
   every value. The kinds are asked only past the ceiling. A file that a `[serve]` listing or a
@@ -74,6 +76,48 @@
   second block renames the key path of the first. A `.tf` file a `.tofu` one shadows is neither
   read nor counted. The old value of a variable made sensitive later stays in SQLite's free
   pages until they are reused (`secure_delete` is off).
+- `iac/config_uses.rs` (#828, ADR 0028): the key-name rule skips the files the CI reader owns
+  (a pipeline, an action), by the reader's own file node and never by name: a file under
+  `.github/workflows/` with no `jobs` and an `action.yml` with no `runs` keep the rule. In an
+  owned file only a structured identifier is a use. Its holder is the nearest CI node whose
+  address starts the key path: a CI step, else its CI job, else the file node. In a file with
+  more than one YAML document every key path starts with the document's index, so the holder
+  is the file node and no `env` resolves. The holder is the `site` of `uses` and the `side` of
+  `provisions` in `meada export` alone: `context`, `search` and `trace` place the use by its
+  key as before, so `trace` from the key does not climb to the callers of its pipeline, and
+  `context` lists a patterned use under its pattern contract at the use's own level, `exact`
+  (the level of its provisioning link is in `meada export`). A `${{ }}` expression is closed
+  at the first `}}` (one that holds `}}` in a string is cut there) and one left open leaves
+  the value as written. Only `env.<name>` alone resolves, the name of letters, digits and `_`
+  in the case written: `env['X']`, another case, a function or an operator are unresolved. The
+  value comes from the nearest `env` above the key that defines the name, never the map the
+  key is written in: the CI step's, its CI job's, then the pipeline's (an action's file holds
+  no `env` at its root, so a composite action reads only the `env` of its CI steps). That
+  `env` gives a literal only as a string with no expression and no `*`, not cut: a number, a
+  boolean, a list, a map and an `env` written as one expression define the name with no
+  literal, so the part is unresolved and never read from an `env` farther up. A name a `run`
+  script of the file may write to the environment file holds no literal either (#836, the rule
+  of the command table in [CI](compose-cloudformation-serverless-and-images/ci-github-actions.md)),
+  whatever the order of the CI steps. A null entry, and a
+  list or a map that holds no value, keep no config value and define the name all the same: the
+  CI job or the CI step records such names (`Facts::hollow`), so the part is unresolved, where
+  GitHub gives a null the empty string. A scalar the YAML reader keeps as a string is a literal
+  as written, though GitHub may read it as a number (`0x1F`, `0o17`, `.inf`: not checked against
+  GitHub). The `with` of a CI job that calls a reusable pipeline resolves `env.X` from the
+  pipeline's `env`, where GitHub gives that key no `env` context and rejects the file. An
+  unresolved part is `*`: in the name of an AWS form (an ARN, a queue URL, `s3://`) it makes a
+  pattern under ADR 0026's limits, and such a use opens the orphan scope as any use does; in a
+  `gs://` name, a Pub/Sub or Secret Manager path (its project included) and an Azure URL,
+  whose readers take whole names, it gives no use. As the whole name it gives no use and no
+  open item (the config value alone names the variable), outside the name (an ARN's account,
+  the object key after a bucket) nothing. A value with a written `*` is not evaluated. A role
+  ARN gives no use because IAM is in no row of the type table, in any file: nothing reads
+  `with` apart. A `[[resource]]` whose `via` names a typed key of an owned file keeps its
+  `declared` side, and its row of `provisions` is the one of a declared key with no use
+  (`<repository>::<file>#<key>` as `side`, no `at`). An identifier among other words of a
+  `run` script is no use, as before. On 200 pipelines of 50 CI steps with an identifier each,
+  the holders add 10,000 rows to `iac_nodes` and double the export (11 to 22 MB, 5.2 to 6.3 s).
+  The image builder forms keep the repository as their site until #831.
 
 - `iac/config_uses.rs` (#661, ADR 0026 "Orphan sides"): a config use comes from a non-secret, uncut
   stored string. The key-name rule (a plain name under `queue`, `topic`, `bucket` or `table`, or a

@@ -1,7 +1,8 @@
 example.com/acme/deploy deployment.yaml:1 Deployment.apps/shop/prod-orders
   runs code example.com/acme/app . [exact: image::ghcr.io/acme/orders]
     example.com/acme/app orders.py:1 orders
-chain: exact · 1 hops · 2 repos · 60 tokens
+  →[exact: image::ghcr.io/acme/orders] example.com/acme/app .github/workflows/build.yml:7 jobs.image.steps[0]
+chain: exact · 2 hops · 2 repos · 88 tokens
 
 example.com/acme/app orders.py:1 orders
   runs code [exact: Compose build compose.yaml#services.orders.build; Dockerfile Dockerfile] example.com/acme/app compose.yaml:2 services.orders (root .)

@@ -200,6 +200,10 @@ with the root, level and reason.
 
 **Image links** shows builder → runner: the repository publishing the image and the workload
 running it. **Alert links** shows emitter → matcher: the label or tag and the condition testing it.
+**CI links** shows pipeline or action → caller: the reusable pipeline or the action and the CI
+job or CI step that calls it, with the Git ref as written and the indexed commit in the reason;
+a call whose path names no provider shows in the contracts table with the mark
+` (absent at the indexed commit)`.
 These views include links within one repository and across repositories, while the general
 cross-repository links view keeps its scope. Each kind's contracts table also shows sides without
 a counterpart; no link is invented for them. The legend explains the roles, and link tables
@@ -209,7 +213,7 @@ Use Tab to reach the view selector and tables; arrow keys choose a view and scro
 table. Each table has an accessible name and headers. Infrastructure views appear when the
 export contains the corresponding sides or links. Reloading retains the selected view, or returns
 to communities if that view is no longer available.
-The playground offers `value`, `iac` and `alert` filters alongside `image` and the existing kinds,
+The playground offers `value`, `iac`, `alert` and `ci` filters alongside `image` and the existing kinds,
 and displays the API answer unchanged.
 
 ## Fleet and diagnostics

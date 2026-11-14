@@ -1,0 +1,25 @@
+name: CI
+on: [push]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test
+  publish-prd:
+    needs: test
+    uses: acme/workflows/.github/workflows/publish.yml@v1
+    with:
+      package: app-b
+    secrets:
+      token: ${{ secrets.PUBLISH_TOKEN }}
+  publish-stg:
+    needs: test
+    permissions:
+      id-token: write
+      contents: read
+    uses: acme/workflows/.github/workflows/publish.yml@main
+    with:
+      package: app-b-stg

@@ -30,6 +30,7 @@ for the area a change touches.
 - `alert.rs`, `alert/`: alert labels as emitters, monitoring readers, bounded Go/RE2 matching, receiver context and two-role orphans. [contracts](../contracts.md)
 - `image.rs`, `image/config.rs`, `image/patterns.rs`: image builders/runners, normalized names, checked-in build configuration, builder-pattern choices, workload execution, scoped environment resolution (`image/environment.rs`, #663), and two-role orphans. [contracts](../contracts.md)
 - `channel.rs`, `channel/`: the channel kind (queues and topics), one module per language for message libraries. [contracts](../contracts.md)
+- `ci.rs`: the CI kind (ADR 0028, #824): reusable pipelines of GitHub Actions and the CI jobs that call them, both sides read from the CI nodes at query time. [contracts](../contracts.md)
 - `package.rs`, `package/`: packages as contracts, one module per ecosystem behind the `Ecosystem` trait. [contracts](../contracts.md)
 - `names.rs`, `names/`: external constructor origins shared by kind-owned language forms (`names/python/arguments.rs` checks complete factory evidence), and the questions the contract kinds ask of a name: what a library outside the repository is. [languages](../languages.md)
 - `jvm/`: what the JVM ecosystems and kinds share: the Maven and Gradle readers, Spring configuration, file readers. [languages](../languages.md), [seams](../seams.md)

@@ -9,15 +9,26 @@
   "providers": [
     {
       "contract": "image::ghcr.io/pattern/orders-*",
-      "site": "example.com/pattern/app",
+      "site": "example.com/pattern/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "at": ".github/workflows/build.yml#jobs.image.steps[0].with.tags"
     }
   ],
   "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/pattern/app::.github/workflows/build.yml::jobs.image.steps[0]",
+      "address": "jobs.image.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/build.yml",
+      "path": ".github/workflows/build.yml",
+      "line": 4,
+      "end_line": 6
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/pattern/infra::compose.yaml::services.east",
-      "provider": "example.com/pattern/app",
+      "provider": "example.com/pattern/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/pattern/orders-east",
       "level": "ambiguous",
       "reason": "image::ghcr.io/pattern/orders-east; .github/workflows/build.yml#jobs.image.steps[0].with.tags; pattern image::ghcr.io/pattern/orders-* on image::ghcr.io/pattern/orders-east; multiple literal runner names",
@@ -25,7 +36,7 @@
     },
     {
       "consumer": "example.com/pattern/infra::compose.yaml::services.west",
-      "provider": "example.com/pattern/app",
+      "provider": "example.com/pattern/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/pattern/orders-west",
       "level": "ambiguous",
       "reason": "image::ghcr.io/pattern/orders-west; .github/workflows/build.yml#jobs.image.steps[0].with.tags; pattern image::ghcr.io/pattern/orders-* on image::ghcr.io/pattern/orders-west; multiple literal runner names",

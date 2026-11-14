@@ -153,6 +153,7 @@ Los valores de `kind`:
 | `duplicate` | símbolos con texto idéntico en dos o más lugares, por el nombre o por la ruta |
 | `value` | un valor de configuración de un archivo YAML o JSON, por el valor o por la ruta de la clave |
 | `iac` | un nodo IaC (un resource, un bloque data o una llamada de módulo de Terraform, o un objeto Kubernetes), por la dirección, el tipo o el nombre físico |
+| `ci` | un pipeline, una action, un job de CI o un paso de CI de GitHub Actions, por la dirección, el tipo, el id, el `name` o el `uses` |
 | `ambiguous`, `unresolved` | los ítems abiertos, con el comando `meada decide` de cada uno |
 
 Cada resultado es una línea: repositorio, `ruta:línea` y nombre.
@@ -469,14 +470,15 @@ Cada servicio es un nodo IaC `services.<nombre>` de tipo `service`.
 El contrato `image::<registry>/<repositorio>` conecta un workload con el repositorio que construye
 su imagen. Se expanden los nombres cortos de Docker Hub, los nombres pasan a minúsculas y se
 quitan tag y digest. Los builders vienen de tags de docker/build-push-action, imágenes de
-docker/metadata-action, Compose con `build` e `image`, artefactos Skaffold, destinos Jib y comandos
-ko simples con `KO_DOCKER_REPO` escrito en la configuración y `--bare`. La sintaxis de shell no
-leída en scripts ko no declara builder. El comando acepta un `--bare`, como máximo un paquete
-literal y ninguna otra opción; un shell explícito debe ser `bash` o `sh`. Los runners vienen de containers e init containers
+docker/metadata-action, Compose con `build` e `image`, artefactos Skaffold, destinos Jib, comandos
+ko con `KO_DOCKER_REPO` escrito en la configuración y `--bare`, y `docker push` y `docker buildx
+build --push` en un script `run` (la sección de CI dice cómo se lee un script). El comando ko
+acepta un `--bare`, como máximo un paquete literal y ninguna otra opción. En un pipeline, el
+sitio del builder es el paso de CI que contiene la forma. Los runners vienen de containers e init containers
 Kubernetes, servicios Compose, `image.repository` de values Helm e imágenes tras overrides Kustomize.
 
 `search` con `kind = "image"` encuentra estos contratos. `context` del workload muestra su imagen
-y el repositorio builder; `trace` baja del workload al código y sube del código a los workloads.
+y sus builders (el paso de CI, en un pipeline); `trace` baja del workload al código y sube del código a los workloads.
 Los nombres literales enlazan en `exact`; patrones y valores reemplazables en `inferred`, con
 su motivo. Varios candidatos quedan `ambiguous`. Un build Compose local seguro conecta el servicio
 directamente con el código que su Dockerfile toma del contexto (`COPY`, `ADD` y
@@ -1163,7 +1165,7 @@ Las listas vacías se omiten, salvo `files`, `symbols`, `calls`, `providers`, `c
 | `symbols` | Los símbolos: `id`, `span` (`path`, `start`, `end`, desplazamientos en bytes) y `hash` (BLAKE3 en hexadecimal de los bytes del span) |
 | `calls` | Los call sites: `id`, `caller`, `target` y `level` (vacíos mientras no resuelve), `candidates` (si es ambigua), `span`, `narrowed` y `decorates` |
 | `providers` | El lado proveedor de cada contrato: `contract`, `site`, y si los hay `gateway` y `shape` |
-| `consumers` | El lado consumidor: `contract` (nulo si la URL no se evaluó), `site`, `via` (cómo nombra al repositorio del proveedor, como `host:api.example.com` o `env:API_URL`) y `shape` |
+| `consumers` | El lado consumidor: `contract` (nulo si la URL no se evaluó), `site`, `via` (cómo nombra al repositorio del proveedor, como `host:api.example.com` o `env:API_URL`) y `shape`. En el consumidor de un contrato de CI, `via` es el `uses` como está escrito, con los campos opcionales `ref` (el ref Git después del `@`), `with` (las claves pasadas, ordenadas) `secrets` (las claves, o la palabra `inherit`), `absent` (`true` cuando ningún repositorio del workspace provee el contrato en su commit indexado) y, en el consumidor en un job de CI, `permissions` (el bloque declarado que rige el job) |
 | `links` | Los enlaces: `consumer`, `provider`, `contract`, `level`, `reason`, y si los hay `by`, `p` y `drift` |
 | `bindings`, `publishes` | Los bindings (`contract`, `exchange`, `pattern`, `site`) y las publicaciones (`exchange`, `key`, `site`) de RabbitMQ que el repositorio declara |
 | `documents` | Los documentos OpenAPI y AsyncAPI leídos: `path`, `format`, `version` y `contracts` |
@@ -1214,7 +1216,7 @@ repositorio.)
 
 ## 8. Tipos de contrato
 
-Un **contrato** es lo que un repositorio expone y otro usa. Meada lee cinco tipos, y cada uno
+Un **contrato** es lo que un repositorio expone y otro usa. Meada lee seis tipos, y cada uno
 tiene su propia regla de enlace. Esta sección dice qué une cada tipo y dónde se detiene, para que
 usted distinga un enlace que falta por un límite conocido de un enlace que falta por un bug.
 
@@ -1227,6 +1229,7 @@ y a `trace`:
 | Canal | `channel::<broker>::<nombre>` | `channel::kafka::orders.created` |
 | Paquete | `package::<ecosistema>::<nombre>` | `package::npm::@example/shared` |
 | Recurso | `resource::<tipo>::<id>` | `resource::postgres::orders` |
+| CI | `ci::<identidad del repositorio>/<ruta del archivo>` para un pipeline, `ci::<identidad del repositorio>[/<carpeta>]` para una action | `ci::github.com/acme/workflows/.github/workflows/publish.yml` |
 
 Los documentos OpenAPI y AsyncAPI no son un tipo aparte: aportan rutas y canales a los tipos de
 arriba (sección 8.3).
@@ -1507,6 +1510,192 @@ Detalles por ecosistema:
 
 Cuando dos proveedores sirven el mismo nombre, el enlace es `ambiguous`, uno por candidato, con el
 motivo iniciado por `<n> providers fit`.
+
+### 8.6 CI: GitHub Actions
+
+Un **contrato de CI** une un archivo de CI que otros reutilizan con quien lo llama. El proveedor
+es un pipeline reutilizable o una action, y el consumidor es cada job de CI o paso de CI del
+workspace cuyo `uses` lo nombra. La identidad es lo que un `uses` escribe después del repositorio,
+sin el ref Git: `ci::<identidad del repositorio>/<ruta del archivo>` para un pipeline y
+`ci::<identidad del repositorio>/<carpeta>` para una action (solo
+`ci::<identidad del repositorio>` cuando la action está en la raíz), nunca la ruta de su
+`action.yml`. Un contrato reúne todas las llamadas a un archivo, sean cuales sean los refs.
+
+**Qué se lee.** Un archivo `.yml` o `.yaml` directamente en `.github/workflows/` que tenga `jobs`
+es un pipeline, y un `action.yml` o `action.yaml` que tenga `runs` es una action, en cualquier
+carpeta. El archivo, cada job de CI y cada paso de CI son nodos que `search` con `kind=ci`
+encuentra y `context` explica. Un pipeline es proveedor cuando su `on` tiene `workflow_call`, y
+una action lo es siempre. Nada se ejecuta y ningún ref se descarga: Meada lee los archivos del
+checkout.
+
+**Las formas de `uses`.**
+
+| `uses` | En | Enlaza con |
+| --- | --- | --- |
+| `<owner>/<repo>/.github/workflows/<archivo>@<ref>` | job de CI | el pipeline reutilizable de ese repositorio del workspace |
+| `<owner>/<repo>[/<carpeta>]@<ref>` | paso de CI | la action de esa carpeta, o de la raíz, de ese repositorio del workspace |
+| `./.github/workflows/<archivo>` | job de CI | el pipeline del propio repositorio, con el motivo `own repository` |
+| `./<carpeta>` | paso de CI | la action del propio repositorio, solo después de un `actions/checkout` por defecto en el mismo job de CI |
+| `docker://<imagen>` | paso de CI | nada: no tiene contrato de CI |
+
+Un `uses` no escribe host, así que el host es el del repositorio que llama. El `./<carpeta>` de
+un paso de CI se lee en el workspace del runner de CI, que solo es el propio repositorio después
+de un checkout sin `repository` ni `path`. En un pipeline reutilizable, en una action compuesta o
+sin ese checkout, el paso queda sin resolver: un ítem abierto sin candidato, que `search` con
+`kind=unresolved` muestra con la causa. Las demás formas y los límites están en
+[Capacidades y límites](site/es/capabilities.md#github-actions).
+
+**Archivos externos.** Un `uses` cuyo repositorio no está en el workspace (`actions/checkout`, un
+pipeline de otra organización) no tiene lado: no es huérfano, ni ítem abierto, ni contrato.
+
+**El ref Git.** El enlace es `exact`, y el motivo muestra el ref tal como está escrito y el
+commit en que Meada leyó el proveedor. `context` en la ruta del pipeline lista quién lo llama:
+
+```text
+provides ci::github.com/acme/workflows/.github/workflows/publish.yml
+  permissions: contents: read, id-token: write
+  consumer: github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish [exact: @main (indexed 1a2b3c4)] with: package, registry; secrets: inherit; permissions: contents: read, id-token: write
+  consumer: github.com/acme/app-b .github/workflows/ci.yml:11 jobs["publish-prd"] [exact: @v1 (indexed 1a2b3c4), permissions mismatch: id-token write against none] with: package; secrets: token; permissions: contents: read
+```
+
+Meada nunca resuelve un ref: `exact` dice que la llamada nombra ese archivo, no que ejecuta la
+versión indexada. Cuando el ref es un id de commit completo distinto del commit indexado, el
+motivo termina en `, ref mismatch`. En el modo servidor el commit indexado es el que
+`meada index --workspace` registró, y no registra ninguno para un checkout que no está limpio
+(`git status` lista un archivo, incluso ignorado): el motivo dice entonces
+`@<ref> (indexed commit unknown)` y nunca lleva `ref mismatch`. `trace` con `direction=up` sigue
+la cadena a través de los pipelines reutilizables intermedios y de las actions compuestas, hasta
+cada job de CI que llama; la ruta del archivo, el nodo del archivo
+(`<repositorio>::<ruta del archivo>::.`) y el contrato inician la misma cadena.
+
+**Permisos declarados.** Cada job de CI que llama muestra el bloque `permissions` que lo
+gobierna: el suyo, si no el del pipeline, si no `not declared`. Un bloque es cerrado: el permiso
+que no nombra es `none`; `read-all`, `write-all` y `{}` valen por los bloques que representan.
+Bajo `provides`, la línea `permissions:` es lo que los jobs de CI del pipeline llamado declaran
+juntos, el nivel más alto de cada permiso. Cuando eso queda por encima de lo que contiene el
+bloque de quien llama, el motivo del enlace termina con `permissions mismatch` y nombra el
+permiso y los dos niveles (`id-token write against none`: el pipeline llamado declara `write`,
+quien llama tiene `none`). Un lado que no declara nada aparece como `not declared` y nunca se
+compara: Meada no lee el valor por defecto de un repositorio ni de una organización. Son los
+permisos que los archivos declaran en el commit indexado, no los efectivos de una ejecución, y un
+paso de CI que llama a una action no lleva ninguno.
+
+**Huérfanos y la marca de ausente.** `meada status` lista como huérfano el pipeline reutilizable
+o la action que nada llama, solo cuando el alcance visible tiene al menos un proveedor y un
+consumidor de un contrato de CI: un repositorio de actions indexado solo no imprime huérfanos.
+Una llamada cuyo repositorio está en el workspace y cuyo archivo o carpeta no está allí lleva la
+marca ` (absent at the indexed commit)` en el lado del consumidor, y `"absent": true` en
+`meada export`. Un archivo de pipeline que está allí sin `on.workflow_call` la lleva con su
+motivo: ` (absent at the indexed commit: the file is no reusable pipeline there)`. Ausente no es
+roto: el archivo puede existir en el ref que la llamada nombra. Una llamada a una carpeta que
+tiene un `Dockerfile` y ningún archivo de action, y un `uses` en ninguna de las formas de arriba
+(un pipeline en una subcarpeta de `.github/workflows/`), no tienen lado y, por tanto, tampoco
+marca.
+
+**El script `run`.** El `run` de un paso de CI se lee con la tabla de comandos, sin evaluar shell:
+bajo `shell: bash`, `sh` o ningún shell declarado (el del paso de CI, si no el `defaults.run.shell`
+del job de CI, si no el del pipeline), cada línea es un comando, y también lo que sigue a `&&` o
+`;`, dentro de `if` y de bucles. Un script con heredoc o de más de 1024 bytes no se lee, y el texto
+en `echo`, en una cadena o en un comentario no da lado. `pip install`, `pip3 install`, `python -m
+pip install`, `uv pip install`, `pipx install` y `uv tool install` hacen del paso de CI un
+consumidor de `package::pypi::<nombre>` cuando un repositorio del workspace provee el paquete, con
+el rango como está escrito: `context` en el paquete lista el paso de CI, y el enlace sigue la regla
+de la sección 8.5 (`exact` para un único proveedor en otro repositorio). Una ruta, una URL, `-e`, el
+archivo de `-r` y el valor de una opción no dan lado. Un nombre con una parte que ningún `env`
+literal da (`shared-${{ vars.X }}`) es un patrón, enlazado como `inferred` al único paquete que
+encaja; un nombre entero así (`pip install $PKG`) es, donde el workspace provee un paquete PyPI, un
+consumidor no resuelto, un ítem abierto que dice su causa y no tiene candidato. Un nombre literal
+con una parte así en el rango (`shared-lib==${{ matrix.v }}`) es el propio paquete, con el rango
+como está escrito. Meada no sigue una variable que el script asigna, `cd`, una función ni un script
+llamado. Un nombre que un script del archivo escribe en el archivo de entorno (`GITHUB_ENV`) tampoco
+recibe literal, y cuando una línea escribe ese archivo sin mostrar el nombre (`cat vars.env >>
+"$GITHUB_ENV"`) ningún `env` del archivo da uno.
+
+**Programas.** Un paso de CI cuyo comando es un script de consola de un paquete PyPI del workspace
+(un nombre bajo `[project.scripts]` o `[tool.poetry.scripts]`) inicia ese programa: el paso de CI
+consume el paquete, y el enlace sigue hasta la función que el script nombra. El nivel dice cuánta
+certeza tiene Meada del paquete que corre:
+
+| Evidencia | Nivel |
+| --- | --- |
+| Una línea o un paso de CI anterior del mismo job de CI instala el paquete | `exact` |
+| El comando nombra el paquete: `uvx <paquete>`, `pipx run <paquete>` | `exact` |
+| Ninguna instalación, y un solo paquete del workspace declara el nombre | `inferred` |
+| Varios paquetes del workspace declaran el nombre | `ambiguous` |
+| Ningún paquete del workspace declara el nombre | ningún lado |
+
+`trace` con `direction=up` desde una ruta llega entonces a quien corre a su llamador en CI, y con
+`direction=down` desde un job de CI entra en el programa:
+
+```text
+github.com/acme/core-api app/main.py:6 register_package
+  →[inferred: base URL from CORE_API_URL, a base_url_env of peer github.com/acme/core-api] github.com/acme/core-sdk core_sdk/cli.py:10 publish_main
+    →[exact: package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
+      github.com/acme/workflows .github/workflows/publish.yml:12 jobs.publish
+        github.com/acme/workflows .github/workflows/publish.yml:1 .
+          →[exact: @main (indexed 1a2b3c4)] github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish
+```
+
+El enlace nunca es más fuerte que el enlace de paquete que continúa (sección 8.5): un paquete del
+propio repositorio del paso de CI da `inferred`. `uvx <paquete>` y `pipx run <paquete>` corren el
+script con el nombre del paquete; cuando el paquete no declara ninguno, el paso de CI solo consume
+el paquete. El nombre se compara como está escrito, así que una ruta hasta el script, `python -m`,
+`uv run` y `poetry run` no se reconocen, y el enlace nombra la función del script, no el handler
+de un subcomando. Una instalación en un paso de CI posterior, en otro job de CI o en un script
+llamado no es evidencia.
+
+**Imágenes.** Un paso de CI que publica una imagen es un builder de esa imagen (sección
+"Imágenes y código de workloads"): `docker/build-push-action` por sus `tags`,
+`docker/metadata-action` por sus `images` y, en un script `run` que lee la tabla de comandos,
+`docker push <imagen>`, `docker buildx build` con `--push` (cada `-t`, `--tag` y `--tag=`) y `ko
+build --bare` o `ko publish --bare` con `KO_DOCKER_REPO` en un `env`. El `context` del workload
+nombra el paso de CI, y `trace` cruza el enlace en ambos sentidos:
+
+```text
+image: image::ghcr.io/acme/orders
+  builder: github.com/acme/app::.github/workflows/publish.yml::jobs.push.steps[1] [exact: image::ghcr.io/acme/orders]
+```
+
+En el paso de CI, `context` muestra `builds image::ghcr.io/acme/orders` y cada runner enlazado
+con él.
+
+Un tag o un digest sin resolver (`$IMAGE:${{ github.sha }}`) se quita con el tag. Una parte del
+nombre que ningún `env` literal da se vuelve patrón, enlazado en `inferred` con el único nombre
+de imagen en el que cabe (`ambiguous`, con un ítem abierto, cuando cabe en varios); un nombre
+entero así es un builder no resuelto, sin enlace. Varios pasos de CI de un mismo repositorio que
+construyen la misma imagen son un solo builder, con un enlace para cada uno. `docker build`, un
+build sin `--push`, `docker image push`, `--output type=registry`, `docker buildx bake`, `docker
+compose push`, Podman, Buildah, Kaniko y crane no se leen, y el valor de cualquier otra opción
+(`--build-arg`, `--label`) no da nada. Un job de CI no es un workload: su `container`, sus
+`services` y su `env` no dan runner.
+
+**Otros sistemas de CI.** Meada lee GitHub Actions. Para un sistema que no lee (GitLab CI,
+Jenkins, Azure Pipelines), declare el vínculo a mano con `[[resource]]` y `via` en la clave que
+hace la llamada (sección 4):
+
+```toml
+# en el repositorio del pipeline compartido
+[[resource]]
+kind = "pipeline"
+id = "acme/ci-templates/publish"
+role = "write"
+via = ["templates/publish.yml#publish.script"]
+```
+
+```toml
+# en cada repositorio que lo llama
+[[resource]]
+kind = "pipeline"
+id = "acme/ci-templates/publish"
+role = "read"
+via = [".gitlab-ci.yml#include[0].file"]
+```
+
+El enlace es `declared`, con un lado por clave, sin ref Git y sin cadena: un `trace` desde el
+pipeline se detiene en sus llamadores directos, y un llamador que nadie declaró queda invisible.
+Donde el archivo no tiene clave que nombrar (un `Jenkinsfile`), omita `via`: el lado es el
+repositorio. La misma declaración sobre una clave de un pipeline de GitHub Actions sigue
+valiendo, junto al contrato de CI.
 
 ## 9. Lenguajes
 

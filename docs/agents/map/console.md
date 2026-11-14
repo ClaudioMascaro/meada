@@ -433,7 +433,10 @@ same-repository links; the general links view still filters to cross-repository 
 without a counterpart remain in their kind's contracts table. The bilingual legend names
 roles, roots and native keyboard controls. Named, focusable table regions and column headers
 keep those views at the existing accessibility seam. Reloading retains the view when available,
-falling back to communities otherwise. The playground also exposes `value`, `iac` and `alert`.
+falling back to communities otherwise. The playground also exposes `value`, `iac`, `alert` and
+`ci`. The CI view (#829) is one more entry of the `kinds` table of `GraphPage.tsx` (prefix,
+sides table, role headings: pipeline or action → caller), and `graph.ts` writes the absent mark
+of a consumer side as the CLI words it.
 `OperationalPage.tsx` reads the fleet, store, repositories, credentials and admission routes;
 `operations.ts` projects their checked DTOs, with bilingual copy in `operations-i18n.ts`.
 Missing modules name their sections, errors remain local to the page, and the pasted token
@@ -527,7 +530,8 @@ seams. The Proof workflow (`prove-meada`, `proof-a7-a8-ui`) also drives the buil
 `console-graph.py`/`console-graph.mjs` in the prove skill: neutral source inputs, complete
 same-mode CLI/API exports, keyboard graph navigation, named tables, orphan sides and search
 filters, with screenshots, load/CLS budgets, axe findings and console-error captures retained.
-`tests/it/ui/playground.rs` serves the provisioner, image and alert fixtures through the real API.
+`tests/it/ui/playground.rs` serves the provisioner, image and alert fixtures through the real API,
+and the CI reproduction with its exports and query answers equal to the `ci-calls.*` goldens (#829).
 
 Config uses (#661) appear in the contracts view's separate optional uses column, as repository
 plus `at`; the graph never puts them in provider or consumer columns. Provisioning rows retain

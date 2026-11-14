@@ -63,15 +63,26 @@
     },
     {
       "contract": "image::ghcr.io/acme/environment-app",
-      "site": "example.com/acme/app",
+      "site": "example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "at": ".github/workflows/build.yml#jobs.image.steps[0].with.tags"
     }
   ],
   "consumers": [],
+  "iac_nodes": [
+    {
+      "identity": "example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0]",
+      "address": "jobs.image.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/build.yml",
+      "path": ".github/workflows/build.yml",
+      "line": 4,
+      "end_line": 6
+    }
+  ],
   "links": [
     {
       "consumer": "example.com/acme/deploy::deployment.yaml::Deployment.apps/shop/sender",
-      "provider": "example.com/acme/app",
+      "provider": "example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/acme/environment-app",
       "level": "exact",
       "reason": "image::ghcr.io/acme/environment-app",

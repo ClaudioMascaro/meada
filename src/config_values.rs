@@ -46,7 +46,8 @@ pub(crate) fn helm_values(path: &str) -> bool {
 /// Whether a reader of a kind takes the YAML or JSON file at `path` (bytes `src`) as its own, so
 /// that it keeps every value past `VALUES_MAX` (#817): one `taken` names (an OpenAPI or AsyncAPI
 /// document, a configuration file a language pack reads or includes), a Compose file, a GitHub
-/// workflow or Skaffold file the image reader reads by name, a package manifest, a kustomization
+/// workflow or Skaffold file the image reader reads by name, a pipeline or an action the CI
+/// reader reads by its place and name, a package manifest, a kustomization
 /// or a file the Kubernetes reader takes an object from, a CloudFormation or SAM template or
 /// Serverless service, and one the alert reader takes a rule, a route or a receiver from. Terraform's own files are
 /// read whole by `read_with`. A Helm values file is none of them: the image reader takes its
@@ -54,6 +55,7 @@ pub(crate) fn helm_values(path: &str) -> bool {
 pub(crate) fn kind_file(path: &str, src: &[u8], taken: impl Fn(&str) -> bool) -> bool {
     taken(path)
         || crate::image::named_file(path)
+        || crate::iac::actions::is_file(path)
         || crate::package::is_manifest(path)
         || crate::kube::takes(path, src)
         || crate::iac::template_wanted(path, src)
@@ -812,7 +814,7 @@ pub(crate) fn key_path(path: &[Step]) -> String {
 }
 
 /// `key`, a key path written without its document, with `[document]` first.
-fn prefixed(document: usize, key: &str) -> String {
+pub(crate) fn prefixed(document: usize, key: &str) -> String {
     match key {
         "." => format!("[{document}]"),
         _ if key.starts_with('[') => format!("[{document}]{key}"),
@@ -1583,6 +1585,8 @@ mod tests {
             // A workflow whose name holds the word of a Helm values file is still a workflow.
             (".github/workflows/release-values.yml", "on: push\n"),
             ("skaffold.yaml", "build: {}\n"),
+            ("tools/setup/action.yml", "runs: {}\n"),
+            ("action.yaml", "runs: {}\n"),
             ("package.json", "{}"),
             ("web/tsconfig.json", "{}"),
             ("deploy/kustomization.yaml", "resources: []\n"),

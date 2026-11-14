@@ -6,7 +6,7 @@ import { queryBody } from './playground';
 import type { QueryAnswer, Tool } from './playground';
 import './graph.css';
 
-const kinds = ['symbol', 'contract', 'route', 'resource', 'channel', 'image', 'alert', 'value', 'iac', 'document', 'package', 'drift', 'community', 'process', 'ambiguous', 'unresolved'];
+const kinds = ['symbol', 'contract', 'route', 'resource', 'channel', 'image', 'alert', 'ci', 'value', 'iac', 'document', 'package', 'drift', 'community', 'process', 'ambiguous', 'unresolved'];
 
 export function PlaygroundPage({ api, locale }: { api: Api; locale: Language }) {
   const t = graphCopy[locale];

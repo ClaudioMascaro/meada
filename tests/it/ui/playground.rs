@@ -32,6 +32,15 @@ pub(super) fn chain_console(case: &str, head: &str, ui: &str) -> PathBuf {
     dir
 }
 
+/// As `chain_console`, over the CI reproduction of #816 (`ci_served::listed`).
+pub(super) fn ci_console(case: &str, head: &str, ui: &str) -> PathBuf {
+    let dir = crate::ci_served::listed(case, &crate::ci_served::LISTED);
+    let _ = fs::remove_dir_all(dir.join("ui"));
+    front_end(&dir, Some(VERSION));
+    append(&dir.join(MANIFEST), &format!("{head}\n[ui]\n{ui}"));
+    dir
+}
+
 fn append(file: &Path, text: &str) {
     let toml = fs::read_to_string(file).unwrap() + text;
     fs::write(file, toml).unwrap();
@@ -212,6 +221,57 @@ fn infrastructure_graph_fixtures_are_served_through_the_console_api() {
             }
         }
     }
+}
+
+/// The CI kind through the console (#829, ADR 0028), over the reproduction of #816: each export
+/// the graph draws is `meada export`'s bytes and the golden of #824, and the query page answers
+/// `context`, `search` and `trace` as the goldens of the stdio answers have them, the kind `ci`
+/// of `search` included.
+#[test]
+fn the_ci_kind_is_served_through_the_console_api() {
+    use crate::ci_served::{APP_A, APP_C, CONTRACT, JOB, PUBLISH, WORKFLOWS};
+    use crate::manifest::run_args;
+
+    let dir = ci_console("ui_graph_ci", "", &ui_section());
+    assert!(run(&dir, "index").2, "index");
+    let console = super::start(&dir, "127.0.0.1:0");
+    for (identity, golden) in [
+        (APP_A, "app-a"),
+        (WORKFLOWS, "workflows"),
+        ("github.com/acme/wrapper", "wrapper"),
+    ] {
+        let reply = get(&console, &format!("/api/v1/repositories/{identity}/export"));
+        assert_eq!(reply.status, 200, "{identity}: {}", reply.body);
+        let (cli, stderr, code) = run_args(
+            &dir,
+            &["export", "--workspace", MANIFEST, "--repo", identity],
+        );
+        assert_eq!(code, Some(0), "{stderr}");
+        assert_eq!(reply.body, cli, "{identity}");
+        assert_golden(&format!("ci-calls.{golden}.export.json"), &reply.body);
+    }
+    let ask = |repository: &str, tool: &str, arguments: Value| {
+        let asked = json!({"repository": repository, "tool": tool, "arguments": arguments});
+        let reply = query(&console, &asked, &[]);
+        assert_eq!(reply.status, 200, "{tool}: {}", reply.body);
+        reply.json()["text"].as_str().unwrap().to_string()
+    };
+    let context = [PUBLISH, JOB, CONTRACT].map(|s| ask(APP_A, "context", json!({"symbol": s})));
+    assert_golden("ci-calls.context.txt", &context.join("\n"));
+    let contracts = json!({"query": "publish", "kind": "contract"});
+    assert_golden("ci-calls.search.txt", &ask(APP_A, "search", contracts));
+    let up = ask(
+        WORKFLOWS,
+        "trace",
+        json!({"from": PUBLISH, "direction": "up"}),
+    );
+    let release = format!("{APP_C}::.github/workflows/release.yml::jobs.release");
+    let down = ask(APP_C, "trace", json!({"from": release}));
+    assert_golden("ci-calls.trace.txt", &format!("{up}\n{down}"));
+    let found = ask(APP_A, "search", json!({"query": "publish", "kind": "ci"}));
+    let job = "github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish (job, id \
+               \"publish\", uses \"acme/workflows/.github/workflows/publish.yml@main\")";
+    assert!(found.lines().any(|line| line == job), "{found}");
 }
 
 /// What every console refuses: `trace` with `changes: uncommitted` with the node's text, an

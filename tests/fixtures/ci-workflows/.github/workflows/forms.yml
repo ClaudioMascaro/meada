@@ -1,0 +1,15 @@
+name: Forms
+on:
+  workflow_call:
+  push:
+jobs:
+  local:
+    uses: ./.github/workflows/lint.yml
+  rooted:
+    uses: $/.github/workflows/scan.yml
+  steps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./tools/setup
+      - uses: $/tools/setup

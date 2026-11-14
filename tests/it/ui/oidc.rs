@@ -607,6 +607,67 @@ fn a_viewer_s_grant_bounds_the_playground_and_the_exports() {
     assert_leaks_nothing(&console.stderr(), &[&web, &all]);
 }
 
+/// The CI kind under a viewer's grant (#829, ADR 0028): a grant that reads the repository of the
+/// pipelines answers the link; one that reads two callers alone answers, in the query page and
+/// in the export the graph draws, no link to that repository and no consumer of it.
+#[test]
+fn a_viewer_s_grant_bounds_the_ci_kind_in_the_playground_and_the_graph() {
+    use super::playground::{ci_console, query};
+    use crate::ci_served::{APP_A, APP_B, PUBLISH, WORKFLOWS, about_the_call, no_provider};
+
+    let (signing, jwk) = key("k1");
+    let issuer = Issuer::new(set(&[&jwk]));
+    let base = issuer.base.clone();
+    let dir = ci_console("ui_oidc_ci", &oidc(&base), &ui_oidc());
+    assert!(crate::manifest::run(&dir, "index").2, "index");
+    let console = start(&dir, "127.0.0.1:0");
+    let grant = |identities: &[&str]| {
+        let claims = claims(&base, identities);
+        bearer(&sign(&signing, "k1", Algorithm::ES256, &claims))
+    };
+    let (whole, callers) = (grant(&["*"]), grant(&[APP_A, APP_B]));
+    let read = |token: &str, (tool, arguments): (&str, Value)| {
+        let asked = json!({"repository": APP_A, "tool": tool, "arguments": arguments});
+        let reply = query(&console, &asked, &[("Authorization", token)]);
+        assert_eq!(reply.status, 200, "{tool}: {}", reply.body);
+        reply.json()["text"].as_str().unwrap().to_string()
+    };
+    let export = |token: &str| {
+        let route = format!("/api/v1/repositories/{APP_A}/export");
+        let reply = send(&console, "GET", &route, &[("Authorization", token)]);
+        assert_eq!(reply.status, 200, "{}", reply.body);
+        reply.json()
+    };
+    let [context, ..] = about_the_call();
+    let linked = read(&whole, context);
+    let provider =
+        format!("  provider: {WORKFLOWS} {PUBLISH}:1 . [exact: @main (indexed 2344e45)]");
+    assert!(linked.lines().any(|line| line == provider), "{linked}");
+    let contract = format!("ci::{WORKFLOWS}/{PUBLISH}");
+    let names = |export: &Value, section: &str| {
+        let rows = export[section].as_array().unwrap().iter();
+        rows.filter_map(|row| row["contract"].as_str().map(String::from))
+            .collect::<Vec<_>>()
+    };
+    let graph = export(&whole);
+    for section in ["consumers", "links"] {
+        assert!(names(&graph, section).contains(&contract), "{section}");
+    }
+
+    for call in about_the_call() {
+        no_provider(&read(&callers, call));
+    }
+    let graph = export(&callers);
+    for section in ["consumers", "links"] {
+        for name in names(&graph, section) {
+            assert!(!name.contains("acme/workflows"), "{section}: {name}");
+        }
+    }
+    // The calls inside the repository keep their links.
+    let local = "ci::github.com/acme/app-a/tools/local".to_string();
+    assert!(names(&graph, "links").contains(&local), "{graph}");
+}
+
 /// The identity provider's `type` (ADR 0016): `admission` names it, `generic` with the key absent
 /// and `entra` when set, and nothing else changes for the same tokens: every read route (the
 /// file `manifest` echoes aside), `session` and `admission/check`, a token in overage
