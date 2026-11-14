@@ -107,17 +107,24 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   variable of any type, in any package or class; a write of another field does not count), and a C#
   request filled by property assignments have no table or bus; nor have Go locals declared together (`p, q
   := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.
-  In Java the rule covers a list or an array: one mentioned a third time or held in a field has no
-  table or bus (a `List.of` list cannot change and keeps them), and neither has a `new T[]{..}` array
-  or a `new ArrayList<>(..)` copy mentioned twice. A method's name is no mention in Java: a list
-  `entries` passed to `.entries(entries)`, a list `transactItems` passed to
-  `.transactItems(transactItems)` and a builder `put` in `.put(put.build())` are each mentioned once
-  there (#773). A Java list, array or
-  single entry that is the one argument of the step that sets the list (`transactItems(..)`,
-  `entries(..)`) and comes in a parameter has no mentions to count and no table, one a wrapper only
-  passes on included (`write(List.of(..))`, #772); two entries passed as two arguments, and a table
-  name in a parameter, keep their tables. A path with no list of entries (a list of names: SSM
-  `Names[]`, Secrets Manager `SecretIdList[]`) keeps the rule it had.
+  In Java the rule covers a list or an array held in a local, by position (#772): one with a
+  mention that may run before the request reads it (a call on it other than `sort`, `size`,
+  `get`, `isEmpty`, `contains`, `stream` or `forEach`, a hand-off to another method or name, a
+  write the syntax model does not show, such as `items[0] = e`) has no table or bus; a mention
+  after the `build()` of a named request (the builder copies the list) or after the call that
+  reads it counts only inside a loop around the read, and anywhere when the read is in a lambda.
+  A list held in a field has none (a `List.of` list cannot change and keeps them), and neither has
+  a `new T[]{..}` array or a `new ArrayList<>(..)` copy mentioned twice. A method's name is no
+  mention in Java: a list `entries` passed to `.entries(entries)`, a list `transactItems` passed
+  to `.transactItems(transactItems)` and a builder `put` in `.put(put.build())` are each mentioned
+  once there (#773). A Java list, array or single entry that is the one argument of the step that
+  sets the list (`transactItems(..)`, `entries(..)`) and comes in a parameter is followed to each
+  caller's argument at its position, by the same rule, when the wrapper mentions it nowhere that
+  runs first and reads it where it runs; a wrapper of a wrapper passes it on the same way, up to
+  the expansion's depth. A varargs parameter, a call with another argument count, an alias of the
+  parameter or a read inside a lambda has no table. Two entries passed as two arguments, and a
+  table name in a parameter, keep their tables. A path with no list of entries (a list of names:
+  SSM `Names[]`, Secrets Manager `SecretIdList[]`) keeps the rule it had.
   `EVAL_DEPTH` (256): a value
   folded deeper than that, through the items of lists and objects, the constants it names and
   the arguments callers pass, is unknown, and a value traced through more constants,

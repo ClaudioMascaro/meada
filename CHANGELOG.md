@@ -6,6 +6,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Java: a list of DynamoDB transaction entries, or one entry, that a wrapper takes in a parameter
+  and passes on names its tables when no mention, in the wrapper or its caller, can change it
+  before the request reads it; a list that is sorted, or changed after a named request's
+  `build()` or after the call, keeps its tables too (#772).
+
 ## [1.4.0] - 2026-11-13
 
 A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md),

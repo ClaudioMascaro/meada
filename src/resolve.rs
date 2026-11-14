@@ -6498,7 +6498,7 @@ impl<'a> Code<'a> {
     }
 
     /// The first full definition `name` of `path`.
-    fn def(&self, path: &'a str, name: &str) -> Option<&'a Def> {
+    pub(crate) fn def(&self, path: &'a str, name: &str) -> Option<&'a Def> {
         self.by_name(path)?.defs.get(name).copied()
     }
 

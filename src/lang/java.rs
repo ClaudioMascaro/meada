@@ -232,7 +232,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
     let mut rebound: Vec<Bound> = Vec::new();
     // The method or constructor of each scope, and the names of the `final` fields: where their
     // mentions are counted (`Facts::mentioned`).
-    let mut bodies: Vec<(String, Node)> = Vec::new();
+    let mut bodies: Vec<(String, Node, Vec<String>)> = Vec::new();
     let mut final_fields: BTreeSet<String> = BTreeSet::new();
     let mut seen = Declared::new(tree.root_node());
     let mut qualification_bytes = QUALIFICATION_BYTES;
@@ -315,7 +315,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
             };
             inner = Rc::new(qualify(&scope, &signature_name));
             if kind == Kind::Method {
-                bodies.push((inner.as_ref().clone(), node));
+                let names = parameters.iter().map(|(n, _, _)| n.clone()).collect();
+                bodies.push((inner.as_ref().clone(), node, names));
             }
             if node.kind() == "constructor_declaration" {
                 let names: Vec<&str> = parameters.iter().map(|(n, _, _)| n.as_str()).collect();
@@ -871,11 +872,15 @@ fn parse(src: &[u8]) -> Result<Facts> {
     for b in &facts.bound {
         named_in.entry(&b.scope).or_default().push(&b.name);
     }
-    for (scope, body) in &bodies {
-        let Some(names) = named_in.get(scope.as_str()) else {
-            continue;
-        };
-        for (name, count) in names.iter().zip(mentions(*body, src, names)) {
+    for (scope, body, parameters) in &bodies {
+        let mut names = named_in.get(scope.as_str()).cloned().unwrap_or_default();
+        // A parameter's too: a reader that follows one passed on counts its mentions (#772).
+        for parameter in parameters {
+            if !parameter.is_empty() && !names.contains(&parameter.as_str()) {
+                names.push(parameter);
+            }
+        }
+        for (name, count) in names.iter().zip(mentions(*body, src, &names)) {
             facts.mentioned.push(Mentioned {
                 scope: scope.clone(),
                 name: name.to_string(),

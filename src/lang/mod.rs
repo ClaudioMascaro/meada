@@ -582,8 +582,9 @@ pub struct Facts {
     /// Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub assigned: Vec<Bound>,
-    /// How many times the file writes the name of each local `bound` keeps, in the body of its
-    /// scope, and of each `final` field, in the whole file (scope `""`): every identifier of that
+    /// How many times the file writes the name of each local `bound` keeps, and in Java of each
+    /// parameter, in the body of its scope, and of each `final` field, in the whole file (scope
+    /// `""`): every identifier of that
     /// spelling, whatever it is part of. A reader that must see every use of a value compares it
     /// with the uses it reads; one more is a use its model of the syntax does not show (a cast, a
     /// ternary, a return). Java, and for the locals of a function Go (those it keeps as
