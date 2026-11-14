@@ -407,6 +407,12 @@ def selftest():
         for name in set(drivers(row)) - corpus:
             assert any(driver[flow[0]] == name and (flow[1] is None or re.match(flow[1], first)) for flow in FLOWS), \
                 f'Scope only: {name} (the row of {first})'
+    # The Feature skills table of the skill sends a judge to each flow: one row per flow, one per sibling skill.
+    skills = [row for row in (SCOPE.parents[1] / 'SKILL.md').read_text().splitlines() if row.startswith('| [prove-meada-')]
+    routed = [name for row in skills for name in re.findall(r'`([^`]+)`', row.split(' | ')[2])]
+    assert sorted(flow[0] for flow in FLOWS if routed.count(flow[0]) != 1) == [], 'Feature skills: flow not in exactly one row'
+    assert sorted(re.match(r'\| \[([^]]+)\]', row).group(1) for row in skills) \
+        == sorted(path.name for path in SCOPE.parents[2].glob('prove-meada-*')), 'Feature skills: rows and folders differ'
     named = {name for row in rows for name in drivers(row)}
     assert set(driver.values()) <= named, f'CI only: {sorted(set(driver.values()) - named)}'
     # Each bug the audit plans to plant selects the flow that catches it (A7-02: shared core).

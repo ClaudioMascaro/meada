@@ -240,7 +240,7 @@ A flow for a new feature lands in one PR:
 
 1. Its driver in `scripts/` here (one flat folder: the drivers import each other), with the input it needs ("An input for a new flow" in [references/scope.md](references/scope.md)).
 2. Its row in [references/scope.md](references/scope.md) and its entry in `FLOWS` (`scripts/prove-ci`): `scripts/prove-ci --selftest` fails when a driver is in one and not in the other.
-3. Its name in the row of its group in the Feature skills table above. Nothing checks that table against `FLOWS`: a flow missing there is one no judge is sent to.
+3. Its name in the row of its group in the Feature skills table above. `scripts/prove-ci --selftest` fails when a `FLOWS` name is in no row or in two, or a sibling skill has no row: a flow missing there is one no judge is sent to.
 4. Its answer-key row and its section in the feature skill of its group, described there once (a group that keeps a Flows table gets a row there too). Detail past a paragraph goes to `references/<flow>.md` here, linked from that skill.
 5. A new group gets a sibling skill, `prove-meada-<group>`, shaped like the others: `disable-model-invocation: true`, no `prove-it:` marker, a first line that sends the reader here, none of this skill's rules repeated (what PROVED, BROKEN, BLOCKED and UNPROVEN mean stays here), and a row in the Feature skills table.
 
