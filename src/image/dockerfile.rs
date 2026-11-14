@@ -191,7 +191,8 @@ fn heredoc(word: &str) -> Option<(String, bool)> {
 
 /// The words Docker's shell lexer splits a line into to find its heredocs, keeping quotes, escapes
 /// and unset variables as written: a blank ends a word unless it is quoted, escaped or right after
-/// `<<`. `None` when the lexer fails on the line, which then opens no heredoc.
+/// `<<`. The lexer's blanks are Unicode white space, unlike the parser's `BLANKS` (#762). `None`
+/// when the lexer fails on the line, which then opens no heredoc.
 fn words(line: &str) -> Result<Option<Vec<String>>, Unread> {
     let (mut out, mut word, mut chars) = (Vec::new(), String::new(), line.chars().peekable());
     while let Some(c) = chars.next() {
@@ -255,8 +256,9 @@ fn variable(
 type Flags = Vec<(String, String)>;
 
 /// The leading flags of an instruction and what follows them, trimmed. Docker reads the flags
-/// first, byte by byte: a flag ends at a byte Go's `unicode.IsSpace` takes for a blank, which
-/// `0x85` and `0xA0` are, inside a no-break space too (#762).
+/// first, one byte as one character: a flag ends at a byte Go's `unicode.IsSpace` takes for a
+/// blank, which `0x85` and `0xA0` are inside a UTF-8 character too, and any other byte past
+/// ASCII becomes another character, so a flag past ASCII is not read (#762).
 fn flags(mut args: &str) -> Result<(Flags, &str), Unread> {
     let mut out = Vec::new();
     while let Some(rest) = args.strip_prefix("--") {
@@ -264,8 +266,8 @@ fn flags(mut args: &str) -> Result<(Flags, &str), Unread> {
         if flag.contains(['"', '\'']) {
             return Err("a quoted flag");
         }
-        if flag.bytes().any(|b| b == 0x85 || b == 0xa0) {
-            return Err("a flag Docker splits inside a character");
+        if !flag.is_ascii() {
+            return Err("a flag past ASCII");
         }
         let (name, value) = flag.split_once('=').unwrap_or((flag, ""));
         out.push((name.to_ascii_lowercase(), value.to_string()));
@@ -1360,14 +1362,18 @@ mod tests {
         assert_eq!(ok("COPY --chown=1 \u{a0}--from=x a /x/"), ["--from=x", "a"]);
     }
 
-    /// Docker splits a flag byte by byte, so a no-break space splits a flag inside the character:
-    /// the Dockerfile is not read (#762).
+    /// Docker reads a flag one byte as one character: a no-break space splits it inside the
+    /// character, `à` becomes two characters, and an ideographic space, no blank to the parser,
+    /// stays inside the flag and changes too. The Dockerfile is not read (#762).
     #[test]
-    fn a_no_break_space_inside_a_flag_leaves_the_dockerfile_unread() {
-        assert_eq!(
-            unread("COPY --chown=1\u{a0}a /x/"),
-            "a flag Docker splits inside a character"
-        );
+    fn a_flag_past_ascii_leaves_the_dockerfile_unread() {
+        for text in [
+            "COPY --chown=1\u{a0}a /x/",
+            "COPY --chown=jos\u{e0} a /x/",
+            "COPY --chown=1\u{3000}a b /x/",
+        ] {
+            assert_eq!(unread(text), "a flag past ASCII", "{text:?}");
+        }
     }
 
     /// The instruction of an `ONBUILD` ends at an ASCII blank too: `RUN` and a no-break space open

@@ -14,7 +14,8 @@ All notable changes to Meada are recorded here. The format follows
   past the reader's work do (#761).
 - The Dockerfile reader splits an instruction and its sources at ASCII blanks only, as Docker
   does: a source whose name holds a no-break space or another Unicode blank is one path, not two,
-  and a flag that Docker splits inside such a character leaves the Dockerfile unread (#762).
+  and a flag past ASCII, which Docker reads one byte as one character, leaves the Dockerfile
+  unread (#762).
 
 ## [1.4.0] - 2026-11-13
 
