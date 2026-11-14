@@ -453,8 +453,16 @@ fn given<'v>(
     scope: &str,
     name: &str,
 ) -> Option<Option<&'v str>> {
-    // An `env` written as one expression may define any name.
-    if file.contains_key(scope.trim_end_matches('.')) {
+    // Whether a key of the file starts with `prefix`.
+    let holds = |prefix: String| {
+        let from = (Bound::Included(prefix.as_str()), Bound::Unbounded);
+        let mut next = file.range::<str, _>(from);
+        next.next().is_some_and(|(k, _)| k.starts_with(&prefix))
+    };
+    // An `env` written as one expression may define any name, and so may one that merges
+    // another map in (`<<`), which the reader does not expand.
+    let map = scope.trim_end_matches('.');
+    if file.contains_key(map) || holds(format!("{map}[\"<<\"]")) {
         return Some(None);
     }
     let key = format!("{scope}{name}");
@@ -462,13 +470,7 @@ fn given<'v>(
         return Some(*value);
     }
     // A list or a map under the name.
-    let under = |open: char| {
-        let prefix = format!("{key}{open}");
-        let from = (Bound::Included(prefix.as_str()), Bound::Unbounded);
-        let mut next = file.range::<str, _>(from);
-        next.next().is_some_and(|(k, _)| k.starts_with(&prefix))
-    };
-    (under('.') || under('[')).then_some(None)
+    (holds(format!("{key}.")) || holds(format!("{key}["))).then_some(None)
 }
 
 /// The sides `of` each export holds (its uses, or its policy grants) at a key: its full

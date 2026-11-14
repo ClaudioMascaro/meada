@@ -544,6 +544,31 @@ fn a_write_to_the_environment_file_that_shows_no_name_opens_every_literal() {
     assert_eq!(sides(&exported(&web)), named);
 }
 
+/// A merge key is not expanded, so an `env` that holds one may define any name: the literal of
+/// an `env` above it is not the value.
+#[test]
+fn an_env_that_merges_another_map_in_gives_no_literal_of_the_ones_above() {
+    let (_, web) = pair("ci_run_merge");
+    let head = "env:\n  PKG: shared-lib\n";
+    let anchor = "- run: echo\n  env: &tools\n    PKG: shared-tools\n";
+    let install = "- run: pip install $PKG\n";
+    let open = [(
+        "jobs.build.steps[1]".to_string(),
+        None,
+        Some("$PKG".to_string()),
+    )];
+    for merge in ["  env:\n    <<: *tools\n", "  env:\n    <<: [*tools]\n"] {
+        let steps = format!("{anchor}{install}{merge}");
+        write(&web, FILE, &pipeline(head, &steps));
+        assert_eq!(sides(&exported(&web)), open, "{merge}");
+    }
+    // An alias is the map itself, and the nearest `env` that defines the name decides.
+    let alias = format!("{anchor}{install}  env: *tools\n");
+    write(&web, FILE, &pipeline(head, &alias));
+    let tools = side("jobs.build.steps[1]", "package::pypi::shared-tools");
+    assert_eq!(sides(&exported(&web)), [tools]);
+}
+
 #[test]
 fn a_literal_name_is_the_package_whatever_its_range_or_extra_holds() {
     let head = "env:\n  A: shared-lib\n  B: shared-tools\n";

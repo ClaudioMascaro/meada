@@ -61,7 +61,10 @@
   and neither is the environment file named through another variable (`ENV_FILE: ${{
   github.env }}`) or a second name the expansion of a value carries on a new line: the literal
   `env` of that name still resolves, and can link `exact` to a package the CI step does not
-  install. The literals read add at most the
+  install. An alias (`env: *vars`) is the map it repeats. A merge key (`<<: *vars`) is not
+  expanded: an `env` that holds one gives no literal for any name and hides the `env` above
+  it, so its `pip install $PKG` has no side where the merged map would name the package.
+  The literals read add at most the
   script's own length and `VALUE_MAX`; past it a variable stays open.
 - `ci.rs` (#824, ADR 0028): a CI contract links what is written, and Meada resolves no Git ref.
   Only a ref of 40 or 64 hexadecimal digits is a commit id: an abbreviated one reads as a name
@@ -120,8 +123,9 @@
   empty segments), which GitHub may refuse in a call by owner and name; one that leaves the
   root, or starts with an empty segment (`.//x`), holds no side. A
   CI step that names a pipeline file and a CI job that names anything else hold no side, so a
-  CI job's `./<file>@<ref>` holds none; a CI step's `./<folder>@<ref>` or `$/<folder>@<ref>`,
-  which GitHub calls invalid, reads as a folder whose name holds the `@`. A `uses` that holds
+  CI job's `./<file>@<ref>` holds none; a CI step's `./<folder>@<ref>`, which GitHub calls
+  invalid, reads as a folder whose name holds the `@`. A `$/<path>` that holds an `@` names
+  nothing: GitHub refuses a Git ref on that form. A `uses` that holds
   `${{` names nothing: GitHub evaluates no expression there. A call by owner and name is cut
   at its first `@` (`<folder>@v1@v2` reads the ref `v1@v2`), and a CI job's ref written
   `refs/heads/<branch>`, which GitHub does not allow, links as any other. An action in a folder named as a pipeline file

@@ -49,8 +49,9 @@ impl<'a> Uses<'a> {
         if !named || uses.starts_with("docker://") {
             return None;
         }
+        // GitHub refuses a Git ref on this form: the call runs the commit of its own file.
         if let Some(path) = uses.strip_prefix("$/") {
-            return Some(Self::Rooted(path));
+            return (!path.contains('@')).then_some(Self::Rooted(path));
         }
         if let Some(path) = uses.strip_prefix("./") {
             return Some(Self::Local(path));
@@ -803,6 +804,7 @@ mod tests {
             ("actions/checkout@v4", None),
             ("acme/workflows", None),
             ("acme/workflows/tools/setup@", None),
+            ("$/tools/local@v1", None),
             ("acme/workflows@v1\n  consumer: forged", None),
             // An expression, which GitHub refuses in a `uses`.
             ("./tools/${{ matrix.dir }}", None),
