@@ -47,6 +47,7 @@ Each family of flows has a sibling skill with what a judge needs for it: its ans
 |---|---|---|
 | [prove-meada-deploy](../prove-meada-deploy/SKILL.md) | `deploy/`, `Dockerfile` and the compose, helm and container checks | steps `deploy-diff`, `compose-contract`, `helm-contract`, `container-build`, `container-smoke` |
 | [prove-meada-a9-ci](../prove-meada-a9-ci/SKILL.md) | CI nodes, the CI contract, `run` scripts and declared permissions | `ci`, `ci-corpus`, `ci-run`, `ci-permissions` |
+| [prove-meada-a8-peers](../prove-meada-a8-peers/SKILL.md) | base URLs resolved across peer workspaces | `a8-peers`, `a8-mcp` |
 
 For #676/#684's bounded CI audit and receipt maintenance, use
 [references/a7-a8-audit.md](references/a7-a8-audit.md). Freeze the exact source/keys, obtain an
@@ -135,8 +136,6 @@ Ladder, best first: 1 an old system that does the same job, 2 a snapshot, 3 an i
 | A7 IaC-declared HTTP routes, exact handlers and repository fallback | new, plus existing code HTTP control | #666/#642, ADR 0005/0025/0026 and complete source-derived provider/link sets; baseline code HTTP bytes and transport parity | 4 + 1 | `iac-http-routes.py`, [references/iac-http-routes.md](references/iac-http-routes.md), neutral pre-answer oracle, alias/fallback and source-deleted checks | maintainer spec; fresh independent checker required |
 | A7 orphan status and side markers, group isolation, visibility and refresh | new | #657 and ADR 0026 at the brief's base; HTTP copies stdio in addition | 4 + 1 | `orphans.py --http`, neutral generated inputs with SHA256 inventory | the maintainer; generated inputs are independent of feature tests |
 | A7 config use sides, typed final keys, directionless provision links, key sites and orphan uses | new | #661/#642 and base ADR 0026; independently generated source-derived whole sets; HTTP/console also copy stdio/CLI | 4 + 1 | `config_uses.py`, [references/config-uses.md](references/config-uses.md) | maintainer spec; fresh independent checker |
-| A8 base URL cases (`a8-cases.tsv`, `landed`) | new | spec #683's expected lines (#684's table) | 4 | `a8-peers.sh check` | the maintainer |
-| The 5 A8 controls and every other field of the peer workspaces' exports | existing | the base binary on the same generated workspaces | 1 | `a8-peers.sh check` | the code before the change |
 | A new flow that copies nothing | new | the issue | 4 | Find the spec, at run time | the maintainer |
 
 - **Never edit an answer key to make a check pass.** If the app and the answer key disagree, the verdict is BROKEN; only the user changes an answer key.
@@ -250,16 +249,6 @@ For #674 anchored names, run `python3 $S/patterns.py --head-bin "$RUN/bin/meada-
 **Done looks like**: `values.md` shows per entry the status config line equal to the oracle (absent on `a7-noconfig`), the other status lines and the export equal to base, every value query equal to the oracle line by line, and "N/N answers byte-equal to stdio" over HTTP; stories 14 and 16 judged by the checker, 15 under Not covered.
 
 **Could fool you**: an export byte-identical base to head over inputs that lack the changed construct is no evidence (#754's run 42931561229: CAPTURED, judged UNPROVEN, since no input declared a set): give the capture one first (`references/scope.md`, "An input for a new flow"); one value per file is sampled; a flow of the A7 table still `pending` has no check (UNPROVEN); the oracle's own conventions are questions for the maintainer, never a fix to the oracle. The full list: the reference's "Could fool you".
-
-### A8: base URLs across peer workspaces (spec #683)
-
-**Drive**: `$S/a8-peers.sh check "$RUN/bin/meada-base" "$RUN/bin/meada-head" "$RUN/peers"`: it generates neutral sibling repositories under `example.com/acme` (two peers serving `GET /orders`, one behind the Backstage proxy, one consumer per case shape), indexes and exports them with both binaries and compares each case of `scripts/a8-cases.tsv`. The workspaces, the case states and what could fool it: [references/peers.md](references/peers.md).
-
-**Copies**: nothing. A `landed` case answers to #683, a control and every other export field to the base binary.
-
-**Done looks like**: `peers.md` with every control and landed case `PASS`, every `pending` case `PENDING (as 1.2.0, not counted)` and named so on the receipt, and every workspace "equal to base".
-
-**Could fool you**: a `pending` case passes on 1.2.0's value, so it proves only that nothing moved it; the script reads the export, not the MCP answers. The full list: the reference's "Could fool you".
 
 ### Varies by and deliberate
 
