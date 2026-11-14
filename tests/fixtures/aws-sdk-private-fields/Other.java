@@ -3,6 +3,13 @@ class Other {
     void set() {
         Fields.open.tableName("open-new");
         Fields.handOut().tableName("leaked-new");
+        Base.shared.tableName("shared-new");
+    }
+
+    // The builder a Lombok getter returns, set here.
+    void generated(Generated from) {
+        var given = from.getGiven();
+        given.tableName("given-new");
     }
 
     // Variables of this method that only share a name with a field of `Fields`.

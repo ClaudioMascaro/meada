@@ -82,3 +82,18 @@ class Twin {
 class Open {
     static final PutItemRequest.Builder twin = PutItemRequest.builder().tableName("twin-open");
 }
+
+// `shared` is private in `Shadow` and, in `Sub`, the field `Base.java` declares: another file
+// can name that one, whatever this file makes private under the same name.
+class Shadow {
+    private static final PutItemRequest.Builder shared = PutItemRequest.builder().tableName("shared-private");
+}
+
+class Sub extends Base {
+    private final DynamoDbClient db = DynamoDbClient.create();
+
+    void sharedField() {
+        var r = shared.build();
+        db.putItem(r);
+    }
+}

@@ -1721,6 +1721,10 @@ mod tests {
             class D { B twin; static B loose; } interface I { B shared = b(); }";
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
         assert_eq!(facts.private_fields, ["kept", "own"]);
+        // Lombok adds members the source does not show: its file lists none.
+        let lombok = format!("import lombok.Getter; {src}");
+        let facts = Java.parse("C.java", lombok.as_bytes()).unwrap();
+        assert_eq!(facts.private_fields, Vec::<String>::new());
     }
 
     /// Code that runs when its caller says: every lambda and local or anonymous class, nested ones
