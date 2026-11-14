@@ -32,11 +32,34 @@ def git(root, *args):
                           text=True).stdout.strip()
 
 
+def newest(binaries):
+    """The most recently built of `binaries` that exist, or None."""
+    found = [b for b in binaries if b.is_file()]
+    return max(found, key=lambda b: b.stat().st_mtime, default=None)
+
+
+def ours(target, root, chosen):
+    """Whether `target` holds a build of the tree at `root`: its own target/, the one
+    CARGO_TARGET_DIR names (`chosen`), or a shared one whose `.bounded-tree` (written by the
+    maintainer's `bounded` runner) names `root` as the tree that built there last."""
+    if target in {root / "target", chosen}:
+        return True
+    try:
+        return (target / ".bounded-tree").read_text().strip() == str(root)
+    except OSError:
+        return False
+
+
 def stage(name):
     root = Path(git(Path.cwd(), "rev-parse", "--show-toplevel"))
-    binary = root / "target/debug/meada"
-    if not binary.is_file():
-        sys.exit("no target/debug/meada: run `cargo build` first")
+    # A worktree's build may land in the main checkout's target/ (`bounded` puts it there).
+    common = Path(git(root, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+    chosen = Path(os.environ["CARGO_TARGET_DIR"]) if os.environ.get("CARGO_TARGET_DIR") else None
+    targets = [t for t in (chosen, root / "target", common.parent / "target") if t]
+    binary = newest([t / "debug/meada" for t in targets if ours(t, root, chosen)])
+    if binary is None:
+        looked = ", ".join(str(t) for t in targets)
+        sys.exit(f"no debug/meada built from this tree in {looked}: run `cargo build` first")
     if git(root, "status", "--porcelain", "--", *SOURCES):
         sys.exit("product sources differ from HEAD: commit them, so COMMIT names what was built")
     newer = stale(binary, [root / s for s in SOURCES])
@@ -65,6 +88,19 @@ def selftest():
         assert stale(binary, [tmp / "src", tmp / "missing.toml"]) is None
         os.utime(source, (3000, 3000))
         assert stale(binary, [tmp / "src"]) == source
+        other = tmp / "other-meada"
+        other.write_text("")
+        os.utime(other, (4000, 4000))
+        assert newest([binary, other, tmp / "missing"]) == other
+        assert newest([tmp / "missing"]) is None
+        own, shared = tmp / "tree", tmp / "main/target"
+        shared.mkdir(parents=True)
+        assert ours(own / "target", own, None) and ours(shared, own, shared)
+        assert not ours(shared, own, None)
+        (shared / ".bounded-tree").write_text(f"{tmp / 'other'}\n")
+        assert not ours(shared, own, None)
+        (shared / ".bounded-tree").write_text(f"{own}\n")
+        assert ours(shared, own, None)
     print("stage.py selftest passed")
 
 

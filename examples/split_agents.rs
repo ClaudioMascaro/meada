@@ -1,7 +1,7 @@
 //! Splits a `docs/agents` Markdown file that is over its size budget, by its second-level headings.
 //!
 //! ```text
-//! cargo run --example split_agents -- docs/agents/map/tests.md
+//! scripts/split-agents docs/agents/map/tests.md
 //! ```
 //!
 //! Each `## ` section of `docs/agents/map/tests.md` becomes a file of its own in
@@ -116,7 +116,7 @@ fn split(stem: &str, text: &str) -> Option<Split> {
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let [file] = args.as_slice() else {
-        eprintln!("usage: cargo run --example split_agents -- docs/agents/<file>.md");
+        eprintln!("usage: scripts/split-agents docs/agents/<file>.md");
         return ExitCode::FAILURE;
     };
     let path = Path::new(file);

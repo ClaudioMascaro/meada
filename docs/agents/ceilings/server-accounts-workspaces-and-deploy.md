@@ -7,7 +7,7 @@
   Markdown files under `docs/agents`) bound a file in bytes, keeping mandatory routing small
   while untouched areas await their own split;
   a file past its budget fails `every_agents_markdown_file_stays_within_its_budget` with its path,
-  its size, its budget and `cargo run --example split_agents -- <file>`, which splits it by its
+  its size, its budget and `scripts/split-agents <file>`, which splits it by its
   `## ` headings (the splitter does not split inside a section: a part still past the budget needs
   `## ` headings of its own first, and the check keeps failing until it has them). The remedy is
   the split, never dropping entries.

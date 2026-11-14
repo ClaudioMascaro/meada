@@ -66,7 +66,7 @@ write tools; one index per repository; determinism) live in
   it names when changing a seam. The limits of the code are in `docs/agents/ceilings.md`: follow
   it to the relevant limit topic when a limit is touched. A
   `docs/agents` file past its size budget (`tests/it/docs.rs` names it) is split in the same PR
-  with `cargo run --example split_agents -- <file>`, never trimmed by dropping entries.
+  with `scripts/split-agents <file>`, never trimmed by dropping entries.
 - Coding standards in `CODING_STANDARDS.md`: read them before writing or reviewing resolution, a
   contract kind or a language pack.
 
