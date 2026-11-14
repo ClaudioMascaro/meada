@@ -112,6 +112,28 @@ All notable changes to Meada are recorded here. The format follows
   on the package lists the CI step. A name with an unresolved part is a pattern, and a name left
   open whole an unresolved consumer with its cause where the workspace provides a PyPI package. The
   index stores nothing new. Release level: minor, meada (#831).
+
+## [1.4.0] - 2026-11-13
+
+A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md),
+made of fixes and a smaller values cache: it is minor because the export gains optional fields
+(`level` on `uses` rows, `policy_grants`) and `context` and `search` gain marks at the end of a
+line. `meada status` reports an orphan only from a side that proves its counterpart missing,
+Terraform evaluation names at `exact` only what Terraform creates, and `meada mcp` takes deep call
+chains without overflowing the stack and pipelined batches without exhausting memory, and traces
+through thousands of functions of one file in linear time. The index schema changes, so existing
+indexes are rebuilt once on first use; export format stays 1. `meada-core` 1.4.0 gives `export::Use`
+a `level` field and `export::Export` a `policy_grants` field, with the new `export::PolicyGrant`.
+There is no Postgres migration. The tree, the `meada-core` pin, the Dockerfile, the compose defaults
+and the Helm chart declare `1.4.0`, and the `v1.4.0` tag goes on the `release/1.4` branch, cut from
+this entry's merge on main. Publication (crates, the staged npm package, the GitHub draft release)
+belongs to the maintainer. Release notes are available in
+[pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.4.0.md),
+[English](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.4.0.en.md) and
+[Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.4.0.es.md).
+
+### Changed
+
 - The values cache (`values.db`, ADR 0027) stores each entry deflated, and gives back the pages
   that replaced or dropped entries free once they are most of the file: on Meada's own repository
   it holds 4.1 MB instead of 30.2 MB. An existing cache shrinks on the first refresh, which
@@ -2234,7 +2256,8 @@ and `trace` from the two longest processes. The spec adds about 0.3 MB and 0.03 
 The rise of the single-file reindex since 2026-10-14 predates it (specs #22 and #23), and at
 692 files it is close to its target.
 
-[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.4.0
 [1.3.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.3.0
 [1.2.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.2.0
 [1.1.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.1.0
