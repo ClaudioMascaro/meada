@@ -947,27 +947,8 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
     );
     let export: Value =
         serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
-    let mut by_language: std::collections::BTreeMap<String, Vec<String>> = Default::default();
-    for (role, sides) in [("writer", "providers"), ("reader", "consumers")] {
-        for side in export[sides].as_array().unwrap() {
-            let mut parts = side["site"].as_str().unwrap().split("::").skip(1);
-            let file = parts.next().unwrap();
-            let method = parts.next().unwrap().trim_end_matches("()");
-            let method = method.rsplit('.').next().unwrap().to_lowercase();
-            by_language
-                .entry(file.rsplit('.').next().unwrap().into())
-                .or_default()
-                .push(format!(
-                    "{method} {role} {}",
-                    side["contract"].as_str().unwrap()
-                ));
-        }
-    }
-    let sides = |language: &str| {
-        let mut sides = by_language[language].clone();
-        sides.sort();
-        sides
-    };
+    let by_language = sides_by_extension(&export);
+    let sides = |language: &str| by_language[language].clone();
     assert_eq!(
         sides("go"),
         [
@@ -1009,6 +990,66 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
         ],
         "{export}"
     );
+}
+
+/// The sides of an export as `method role contract`, sorted, by the extension of their file.
+fn sides_by_extension(export: &Value) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut by_extension: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+    for (role, sides) in [("writer", "providers"), ("reader", "consumers")] {
+        for side in export[sides].as_array().unwrap() {
+            let mut parts = side["site"].as_str().unwrap().split("::").skip(1);
+            let file = parts.next().unwrap();
+            let method = parts.next().unwrap().trim_end_matches("()");
+            let method = method.rsplit('.').next().unwrap().to_lowercase();
+            by_extension
+                .entry(file.rsplit('.').next().unwrap().into())
+                .or_default()
+                .push(format!(
+                    "{method} {role} {}",
+                    side["contract"].as_str().unwrap()
+                ));
+        }
+    }
+    by_extension.values_mut().for_each(|sides| sides.sort());
+    by_extension
+}
+
+/// On a path of entries (a DynamoDB transaction's, EventBridge `PutEvents`' `Entries[]`) each
+/// name is judged by its own mentions in Go and C# (#774): a field written through another name,
+/// in any function, class or package of the repository, reaches no value a local holds alone,
+/// so a request, a list or an entry held in a local mentioned twice keeps its table or bus. Its
+/// twin written through its own name stays unresolved, and so does a named request that is no
+/// list of entries, whose `TableName` some file writes.
+#[test]
+fn a_field_written_through_another_name_leaves_a_held_entry_its_table() {
+    let repo = fixture_repo(
+        "aws_sdk_transactions_fields",
+        "aws-sdk-transactions-fields",
+        None,
+    );
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let by_language = sides_by_extension(&export);
+    for language in ["go", "cs"] {
+        assert_eq!(
+            by_language[language],
+            [
+                "heldbus writer channel::eventbridge::held-bus",
+                "heldentry writer resource::dynamodb::held-entry",
+                "heldget reader resource::dynamodb::held-get",
+                "heldlist writer resource::dynamodb::held-list",
+                "heldrequest writer resource::dynamodb::held-request",
+                "plainput writer resource::dynamodb",
+                "putwritten writer resource::dynamodb",
+                "writtenbus writer channel::eventbridge",
+                "writtenentry writer resource::dynamodb",
+                "writtenget reader resource::dynamodb",
+                "writtenlist writer resource::dynamodb",
+                "writtenrequest writer resource::dynamodb",
+            ],
+            "{language}: {export}"
+        );
+    }
 }
 
 /// A transaction entry held in a named value and changed after it is made names no table, as
