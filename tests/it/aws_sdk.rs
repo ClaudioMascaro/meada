@@ -1389,6 +1389,33 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     );
 }
 
+/// A `private` `final` field builder is named in its own file alone, so a variable of its name
+/// that another file calls a method on is another variable and leaves the field its table
+/// (#775). A field another file can name (package-private, `protected`, `public`) is still
+/// unnamed by such a call, set from there or not; a private one a nested class of its file sets,
+/// one a method hands out, and a name another class of the file declares without `private` have
+/// no table either.
+#[test]
+fn a_private_final_field_builder_keeps_its_table_beside_another_file_s_variable() {
+    let repo = fixture_repo("aws_sdk_private_fields", "aws-sdk-private-fields", None);
+    let (export, sides) = java_sides(&repo);
+    assert_eq!(
+        sides,
+        [
+            "exposedField writer resource::dynamodb",
+            "guardedField writer resource::dynamodb",
+            "keptField writer resource::dynamodb::kept-private",
+            "leakedField writer resource::dynamodb",
+            "nestedField writer resource::dynamodb",
+            "openField writer resource::dynamodb",
+            "ownField writer resource::dynamodb::own-private",
+            "plainField writer resource::dynamodb",
+            "twinField writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
 /// Each Java side of an export, as `method role contract`, sorted.
 fn java_sides(repo: &std::path::Path) -> (Value, Vec<String>) {
     let export: Value =
