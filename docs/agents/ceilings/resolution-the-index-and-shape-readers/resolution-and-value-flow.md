@@ -95,9 +95,13 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   and `ConditionCheck` entries names both (#784). Where the budget ends inside a row, the call's
   later rows are not read, as the calls after it are not: a call whose writer row it cuts has a
   writer, named or unresolved, and no reader, a `ConditionCheck` included. A Java builder held in a `final` field is read in its own
-  file, and a call on its name from another Java file leaves it unresolved; one handed to a call
+  file, and a call on its name from another Java file leaves it unresolved, whatever variable
+  that file calls it on; one handed to a call
   or aliased there, or reached by reflection from there, is not seen, and the field keeps its
-  first name. A request type is the SDK's unless a type of its directory, an import or a
+  first name. A field `private` in every field declaration of its file that spells the name is
+  out of another file's reach, so a call on its name there does not count (#775); a name the
+  file also declares without `private`, in any class and `final` or not, is still judged by
+  every Java file. A request type is the SDK's unless a type of its directory, an import or a
   variable says otherwise: one of the same package in another source root is not seen (#719).
   A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB
   transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that

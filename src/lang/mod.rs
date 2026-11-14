@@ -591,6 +591,11 @@ pub struct Facts {
     /// constants) and C# (`mentioned`). Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub mentioned: Vec<Mentioned>,
+    /// The names of the `final` fields that every field declaration of the file spelling them
+    /// makes `private` (Java): no other file can write a call on one, so a call on that name
+    /// there is on another variable. Not kept in the index (see `Call::args`).
+    #[serde(default, skip_serializing_if = "lean")]
+    pub private_fields: Vec<String>,
     /// The names of the methods the file declares that no definition stands for (Java): an
     /// anonymous class's or an enum constant body's, a class's nested in one, or past the
     /// definition depth. A call through a base type may dispatch to one (#772). Kept in the

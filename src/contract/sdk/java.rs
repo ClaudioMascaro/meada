@@ -982,6 +982,14 @@ impl<'a> Walk<'a, '_> {
                 .is_some()
     }
 
+    /// Whether the field `name` is one this file declares, `private` wherever it declares the
+    /// name (`Facts::private_fields`): an inherited field of another file is not.
+    fn private(&self, name: &'a str) -> bool {
+        (self.code.constant_value(self.path, self.scope, name))
+            .is_some_and(|(declared, ..)| declared == self.path)
+            && (self.code.private_fields(self.path).iter()).any(|field| field == name)
+    }
+
     /// Whether the builder `name` was changed as seen from `at`, or is another name of one, or was
     /// made from a changed value.
     fn builder(&mut self, name: &'a str, at: &At) -> bool {
@@ -1000,8 +1008,12 @@ impl<'a> Walk<'a, '_> {
         if local.is_none() && !field {
             return self.uses.rewritten.contains(&(self.scope, name));
         }
+        // A `private` field of this file is out of another file's reach: a call there on a
+        // variable of its name is on another variable (#775).
         if field
-            && (self.uses.reflective || self.builders.called_elsewhere(self.code, self.path, name))
+            && (self.uses.reflective
+                || !self.private(name)
+                    && self.builders.called_elsewhere(self.code, self.path, name))
         {
             return true;
         }

@@ -234,6 +234,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // mentions are counted (`Facts::mentioned`).
     let mut bodies: Vec<(String, Node, Vec<String>)> = Vec::new();
     let mut final_fields: BTreeSet<String> = BTreeSet::new();
+    // The field names some declaration leaves open to another file (`Facts::private_fields`).
+    let mut open_fields: BTreeSet<String> = BTreeSet::new();
     let mut seen = Declared::new(tree.root_node());
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
@@ -481,6 +483,16 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
             for (name, _, _) in parameters(node, src, &generics) {
                 facts.locals.push(qualify(&scope, &name));
+            }
+        }
+        // An interface's constant is public, whatever it writes.
+        if matches!(node.kind(), "field_declaration" | "constant_declaration")
+            && !modifiers(node).contains(&"private")
+        {
+            for declaration in named(node).filter(|n| n.kind() == "variable_declarator") {
+                if let Some(name) = declaration.child_by_field_name("name") {
+                    open_fields.insert(text(name, src).to_string());
+                }
             }
         }
         match node.kind() {
@@ -905,6 +917,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             count,
         });
     }
+    facts.private_fields = (final_fields.difference(&open_fields).cloned()).collect();
     facts.loops = super::outermost(
         tree.root_node(),
         &[
@@ -1694,6 +1707,20 @@ mod tests {
             class M { void m() {} } }; class L { void l() {} } } }";
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
         assert_eq!(facts.anonymous, ["a", "hold", "k", "m"]);
+    }
+
+    /// A `final` field is private when every field declaration of the file that spells its name
+    /// is (#775): a name another class declares without `private`, final or not, an interface's
+    /// constant and a field that is not `final` are not.
+    #[test]
+    fn final_fields_private_wherever_the_file_declares_them_are_listed() {
+        let src = "class C { private static final B kept = b(); private final B own = b(); \
+            static final B open = b(); protected final B guarded = b(); \
+            public final B shown = b(); private final B twin = b(); \
+            private final B loose = b(); private B plain; } \
+            class D { B twin; static B loose; } interface I { B shared = b(); }";
+        let facts = Java.parse("C.java", src.as_bytes()).unwrap();
+        assert_eq!(facts.private_fields, ["kept", "own"]);
     }
 
     /// Code that runs when its caller says: every lambda and local or anonymous class, nested ones

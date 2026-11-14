@@ -68,7 +68,8 @@
   sees both.
   A chain with `applyMutation` anywhere in it hands its builder to caller code, a file that
   reads a field by name (`getDeclaredField`) or calls a method on a field builder's name from
-  another file may change it, and a chain that starts at a type another type of its file or
+  another file may change it (not a field its file declares `private` wherever it spells the
+  name, `Facts::private_fields`: no other file reaches one, #775), and a chain that starts at a type another type of its file or
   directory, an import outside the SDK or a variable shadows is not the SDK's.
   The question is asked per request call, so one entry the reader cannot follow leaves every
   entry of that request unresolved. Past `EVAL_DEPTH` nested named values the name stays

@@ -5574,6 +5574,12 @@ impl<'a> Code<'a> {
         self.full(path).map_or(&[], |f| f.mentioned.as_slice())
     }
 
+    /// The `final` fields `path` declares `private` wherever it declares them
+    /// (`Facts::private_fields`).
+    pub fn private_fields(&self, path: &'a str) -> &'a [String] {
+        self.full(path).map_or(&[], |f| f.private_fields.as_slice())
+    }
+
     /// Every value `path` assigns to a bare name, and every initializer `bindings` drops
     /// (`Facts::assigned`), in source order: a reader that needs every use of a value reads them.
     pub fn assigned(&self, path: &'a str) -> &'a [Bound] {
