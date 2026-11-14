@@ -28,6 +28,11 @@ pub struct Target<'a> {
     pub name: &'a str,
 }
 
+/// A definition's own name, without the definitions that enclose it (`Type.method` is `method`).
+fn own_name(name: &str) -> &str {
+    name[crate::parent(name).len()..].trim_start_matches('.')
+}
+
 #[derive(Clone)]
 pub enum Resolution<'a> {
     /// Scope and import resolution found one definition.
@@ -7108,8 +7113,13 @@ impl<'a> Code<'a> {
     // ponytail: any other definition of a method's name counts, an interface's or not, since no
     // pack marks interfaces: two types with a constructor method of one name leave it unknown.
     fn name_matched(&self, function: Target<'a>) -> bool {
-        let own = |name: &'a str| name[crate::parent(name).len()..].trim_start_matches('.');
-        let (matched, names) = self.matched.get_or_init(|| {
+        self.matched().0.contains(&function) || self.shares_name(function)
+    }
+
+    /// The functions a call reaches by a name match, and how many definitions spell each own
+    /// name (`Type.method` is `method`).
+    fn matched(&self) -> &(HashSet<Target<'a>>, HashMap<&'a str, usize>) {
+        self.matched.get_or_init(|| {
             let matched = (self.resolver.built.values().flatten())
                 .flat_map(|r| match r {
                     Resolution::Inferred(t) | Resolution::Narrowed(t) => std::slice::from_ref(t),
@@ -7120,12 +7130,28 @@ impl<'a> Code<'a> {
                 .collect();
             let mut names = HashMap::new();
             for name in self.resolver.defs.values().flat_map(|d| d.keys()) {
-                *names.entry(own(name)).or_insert(0) += 1;
+                *names.entry(own_name(name)).or_insert(0) += 1;
             }
             (matched, names)
-        });
+        })
+    }
+
+    /// Whether `function` is a method whose own name another definition spells.
+    fn shares_name(&self, function: Target<'a>) -> bool {
         let method = self.resolver.defs[function.path][function.name].kind == Kind::Method;
-        matched.contains(&function) || (method && names.get(own(function.name)) > Some(&1))
+        method && self.matched().1.get(own_name(function.name)) > Some(&1)
+    }
+
+    /// Whether an exact call of `function` runs it and no other definition: a function, or a
+    /// method whose own name no other definition of the repository spells, so that the
+    /// receiver's type has nothing to choose between. A function literal is held in a name that
+    /// can be set again.
+    pub fn runs_alone(&self, function: Target<'a>) -> bool {
+        match self.resolver.defs[function.path][function.name].kind {
+            Kind::Function => true,
+            Kind::Method => !self.shares_name(function),
+            _ => false,
+        }
     }
 
     /// Whether a call of the repository may reach `function`, at any level: an exact caller, or
@@ -10407,6 +10433,33 @@ mod tests {
         assert_eq!(param(&both), ["a.py Router"]);
         let only = format!("{def}{matched}");
         assert_eq!(param(&only), Vec::<String>::new());
+    }
+
+    /// `Code::runs_alone`: an exact call of a function, or of a method whose own name no other
+    /// definition spells, runs that definition. A method that shares its name with another
+    /// type's method or with an interface's does not, and neither does a function literal.
+    #[test]
+    fn a_function_and_a_method_of_a_name_of_its_own_run_alone() {
+        let src = "package p\n\ntype A struct{}\n\ntype B struct{}\n\n\
+                   type I interface {\n\tshown()\n}\n\nfunc plain() {}\n\nfunc (A) own() {}\n\n\
+                   func (A) both() {}\n\nfunc (B) both() {}\n\nfunc (A) shown() {}\n\n\
+                   func holder() {\n\tf := func() {}\n\tf()\n}\n";
+        let alone = over(go(), &[("a.go", src)], |code| {
+            let (&path, &facts) = code.files().get_key_value("a.go").unwrap();
+            let mut alone: Vec<String> = (facts.defs.iter())
+                .filter(|d| matches!(d.kind, Kind::Function | Kind::Method | Kind::Inline))
+                .filter(|d| {
+                    code.runs_alone(Target {
+                        path,
+                        name: &d.name,
+                    })
+                })
+                .map(|d| d.name.clone())
+                .collect();
+            alone.sort();
+            alone
+        });
+        assert_eq!(alone, ["A.own", "holder", "plain"]);
     }
 
     #[test]

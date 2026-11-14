@@ -1533,7 +1533,7 @@ mod tests {
     /// constant or one of its parameters, a function literal inside it included. A package
     /// variable and a blank parameter get no count.
     #[test]
-    fn the_locals_kept_as_constants_are_counted_where_their_function_writes_them() {
+    fn the_locals_kept_and_the_parameters_are_counted_where_their_function_writes_them() {
         let facts = facts(
             "package p\n\nvar shared = T{}\n\nfunc f() {\n\ta := T{}\n\tb := T{}\n\tg(a)\n\t\
              go func() { g(a) }()\n\tg(b, shared)\n}\n\nfunc h() {\n\ta := T{}\n\tg(a)\n}\n\n\

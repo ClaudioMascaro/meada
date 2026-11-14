@@ -108,9 +108,10 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   A Go function, or a method whose name no other definition of the repository spells, that
   mentions its parameter twice (declared, read by the path) sends what each exact caller passes
   (#774): the argument is followed in the caller by the caller's own mentions, through any number
-  of such wrappers. A function literal, a method that shares its name (an interface's, another
-  type's), a call with more or fewer arguments than parameters (a variadic one) or a spread
-  (`xs...`), and every C# method are not followed.
+  of such wrappers, a spread (`xs...`, the caller's slice itself) and a variadic parameter given
+  one element included. A function literal, a method that shares its name with another
+  definition, a call with more or fewer arguments than parameters (a variadic one given two)
+  and every C# method are not followed.
   In Java the rule covers a list or an array: one mentioned a third time or held in a field has no
   table or bus (a `List.of` list cannot change and keeps them), and neither has a `new T[]{..}` array
   or a `new ArrayList<>(..)` copy mentioned twice. A method's name is no mention in Java: a list

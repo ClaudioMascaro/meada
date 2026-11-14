@@ -2,8 +2,8 @@
 //! fields and call sites. Library names and operations belong to each kind's table.
 
 use super::{Found, Role, Site};
-use crate::lang::{Def, Kind, Part, Value, literal};
-use crate::resolve::{Code, Expand, Frame, Target};
+use crate::lang::{Part, Value, literal};
+use crate::resolve::{Code, Expand, Frame};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 mod csharp;
@@ -215,12 +215,12 @@ pub(crate) fn extract<'a>(
                     // no value a local holds alone (#774). The other paths keep the rule that
                     // counts a write of the field in any file.
                     let entries = language != Language::Java && reads_entries(operation.field);
-                    let held = |params: Params<'_, 'a>| {
+                    let judged = |params: Params<'_, 'a>| {
                         let field = operation.field;
                         held_changed(code, path, index, field, language, &counts, params)
                     };
                     let changed = if entries {
-                        held(Params::Unknown)
+                        judged(Params::Unknown)
                     } else {
                         changed_request(
                             code,
@@ -234,7 +234,7 @@ pub(crate) fn extract<'a>(
                     };
                     // Where only parameters their Go function writes twice stand between the
                     // path and its names, each site is judged by the calls that bind them (#774).
-                    let through = entries && changed && !held(Params::Held);
+                    let per_site = entries && changed && !judged(Params::Held);
                     let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
                         let [Value::Call(call)] = args else {
                             return Some(vec![Name::default()]);
@@ -242,14 +242,14 @@ pub(crate) fn extract<'a>(
                         let values = request(call, keywords, operation.field, language)?;
                         let mut names = Vec::new();
                         for value in &values {
-                            names.push(match (changed && !through, value) {
+                            names.push(match (changed && !per_site, value) {
                                 (true, _) => Name::default(),
                                 // As with a value that changed, a read through a parameter goes
                                 // on where a name is not one.
                                 (false, Some(v)) => {
                                     match name(code, path, Some(v), service.kind, &aliases) {
                                         Some(name) => name,
-                                        None if through => Name::default(),
+                                        None if per_site => Name::default(),
                                         None => return None,
                                     }
                                 }
@@ -273,7 +273,7 @@ pub(crate) fn extract<'a>(
                             Language::Java => {
                                 passed_changed(code, &expanded.frames, operation.field, &builders)
                             }
-                            _ => through && held(Params::Bound(&expanded.frames)),
+                            _ => per_site && judged(Params::Bound(&expanded.frames)),
                         };
                         for mut name in expanded.found {
                             if passed {
@@ -447,50 +447,21 @@ fn changed_request<'a>(
 /// How often a file's functions write their names, by function and name (`Facts::mentioned`).
 type Written<'a> = HashMap<(&'a str, &'a str), u32>;
 
-/// How often each function of a file writes its locals and its parameters, read once per file,
-/// and which methods of the group share their name.
+/// How often each function of a file writes its locals and its parameters, read once per file:
+/// a wrapper's callers are in other files.
 #[derive(Default)]
-struct Counts<'a> {
-    files: std::cell::RefCell<HashMap<&'a str, Written<'a>>>,
-    shared: std::cell::OnceCell<BTreeSet<&'a str>>,
-}
+struct Counts<'a>(std::cell::RefCell<HashMap<&'a str, Written<'a>>>);
 
 impl<'a> Counts<'a> {
     /// Whether the function `scope` of `path` writes `name` twice.
     fn twice(&self, code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> bool {
-        let mut files = self.files.borrow_mut();
+        let mut files = self.0.borrow_mut();
         let counts = files.entry(path).or_insert_with(|| {
             (code.mentioned(path).iter())
                 .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
                 .collect()
         });
         counts.get(&(scope, name)) == Some(&2)
-    }
-
-    /// `function` when a call that reaches it runs it and no other: a function, or a method whose
-    /// name no other definition of the group spells (an interface's, another type's that embeds
-    /// or is embedded). A function literal is held in a name that can be set again.
-    fn wrapper(&self, code: &Code<'a>, function: Target<'a>) -> Option<&'a Def> {
-        let own = |name: &'a str| name.rsplit('.').next().unwrap_or(name);
-        let defs = &code.files().get(function.path)?.defs;
-        let def = defs.iter().find(|d| d.name == function.name)?;
-        let certain = match def.kind {
-            Kind::Function => true,
-            Kind::Method => {
-                let shared = self.shared.get_or_init(|| {
-                    let (mut seen, mut shared) = (BTreeSet::new(), BTreeSet::new());
-                    for def in code.files().values().flat_map(|f| &f.defs) {
-                        if def.kind == Kind::Method && !seen.insert(own(&def.name)) {
-                            shared.insert(own(&def.name));
-                        }
-                    }
-                    shared
-                });
-                !shared.contains(own(function.name))
-            }
-            _ => false,
-        };
-        certain.then_some(def)
     }
 }
 
@@ -502,9 +473,16 @@ enum Params<'f, 'a> {
     Unknown,
     /// Held, whatever the callers pass.
     Held,
-    /// What the call of its frame passes, followed in the caller as any value: the call reaches
-    /// that function alone (`Counts::wrapper`) and passes one argument for each parameter.
+    /// What the call of its frame passes, followed in the caller as any value: the call runs
+    /// that function alone (`Code::runs_alone`) and passes one argument for each parameter.
     Bound(&'f [Frame<'a>]),
+}
+
+/// Where a value on a path is written: its file and the scope inside it.
+#[derive(Clone, Copy)]
+struct Place<'a> {
+    file: &'a str,
+    scope: &'a str,
 }
 
 /// Whether a name on a path of entries (`reads_entries`) may hold a value that changed (Go and
@@ -527,66 +505,76 @@ fn held_changed<'a>(
         return false;
     };
     let go = language == Language::Go;
-    let request = match go {
-        true => call.args.get(1),
-        false => call.keyword("request").or_else(|| call.args.first()),
+    let request = if go {
+        call.args.get(1)
+    } else {
+        call.keyword("request").or_else(|| call.args.first())
     };
-    // What a value on the path is once its names are followed, with the file and the scope it
-    // is written in.
-    let held = |mut value: &'a Value, mut at: &'a str, mut scope: &'a str| {
+    // What a value on the path is once its names are followed, with the place it is written in.
+    let followed = |mut value: &'a Value, mut at: Place<'a>| {
         for _ in 0..crate::resolve::EVAL_DEPTH {
             let Value::Ref(name) = value else {
-                return Some((value, at, scope));
+                return Some((value, at));
             };
-            let local = match go {
-                true => (code.constant_value(at, scope, name))
-                    .map(|(file, within, holds)| (file == at).then_some((within, within, holds))),
-                false => (code.local(at, scope, name))
-                    .map(|b| Some((b.scope.as_str(), b.within.as_str(), &b.value))),
+            let local = if go {
+                (code.constant_value(at.file, at.scope, name)).map(|(file, within, holds)| {
+                    (file == at.file).then_some((within, within, holds))
+                })
+            } else {
+                (code.local(at.file, at.scope, name))
+                    .map(|b| Some((b.scope.as_str(), b.within.as_str(), &b.value)))
             };
             if let Some(local) = local {
                 let (declared, written, holds) = local?;
-                if !counts.twice(code, at, declared, name) {
+                if !counts.twice(code, at.file, declared, name) {
                     return None;
                 }
-                (value, scope) = (holds, written);
+                (value, at.scope) = (holds, written);
                 continue;
             }
-            let (function, n) = code.param_of(at, scope, name).filter(|_| go)?;
+            let (function, n) = code.param_of(at.file, at.scope, name).filter(|_| go)?;
             if !counts.twice(code, function.path, function.name, name) {
                 return None;
             }
             match params {
                 Params::Unknown => return None,
-                Params::Held => return Some((value, at, scope)),
+                Params::Held => return Some((value, at)),
                 Params::Bound(frames) => {
                     let frame = frames.iter().find(|f| f.def == function)?;
                     let passes = code.call(frame.path, frame.index)?;
-                    if counts.wrapper(code, function)?.params.len() != passes.args.len() {
+                    // One argument for each parameter: a variadic one takes any number.
+                    let count = passes.args.len();
+                    if !code.runs_alone(function)
+                        || code.param(function, count).is_some()
+                        || code.param(function, count.wrapping_sub(1)).is_none()
+                    {
                         return None;
                     }
                     let site = Some((frame.path, frame.index));
-                    let &[(file, within, passed)] = &code.param_values(function, n, site)?[..]
+                    let &[(file, scope, passed)] = &code.param_values(function, n, site)?[..]
                     else {
                         return None;
                     };
                     // An argument left out is a default, written in the function.
-                    if file != frame.path || within != passes.scope {
+                    if file != frame.path || scope != passes.scope {
                         return None;
                     }
-                    (value, at, scope) = (passed, file, within);
+                    (value, at) = (passed, Place { file, scope });
                 }
             }
         }
         None
     };
-    let mut values: Vec<(&'a Value, &'a str, &'a str)> =
-        (request.map(|r| (r, path, call.scope.as_str())).into_iter()).collect();
+    let start = Place {
+        file: path,
+        scope: &call.scope,
+    };
+    let mut values: Vec<(&'a Value, Place<'a>)> = request.map(|r| (r, start)).into_iter().collect();
     let members: Vec<&str> = selector.split('.').collect();
     for (depth, member) in members.iter().enumerate() {
         let mut next = Vec::new();
-        for (value, at, scope) in values {
-            let Some((value, at, scope)) = held(value, at, scope) else {
+        for (value, at) in values {
+            let Some((value, at)) = followed(value, at) else {
                 return true;
             };
             // The last member is the name itself, which `name` reads off the entry.
@@ -594,22 +582,23 @@ fn held_changed<'a>(
                 continue;
             }
             for field in member.split('|').map(|f| f.trim_end_matches("[]")) {
-                let inner = match go {
-                    true => go::field_of(value, field),
-                    false => csharp::field_of(value, field),
+                let inner = if go {
+                    go::field_of(value, field)
+                } else {
+                    csharp::field_of(value, field)
                 };
                 let Some(Some(inner)) = inner else {
                     continue;
                 };
                 if !member.ends_with("[]") {
-                    next.push((inner, at, scope));
+                    next.push((inner, at));
                     continue;
                 }
                 // The list is a value of its own, followed before its elements.
-                let Some((list, at, scope)) = held(inner, at, scope) else {
+                let Some((list, at)) = followed(inner, at) else {
                     return true;
                 };
-                next.extend((sequence(list).into_iter().flatten()).map(|item| (item, at, scope)));
+                next.extend((sequence(list).into_iter().flatten()).map(|item| (item, at)));
             }
         }
         values = next;

@@ -3,8 +3,9 @@ using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 
-// C# is not followed (#774): a call may reach an override of the wrapper that the reader does
-// not see, so a list that comes in a parameter names no table.
+// C# is not followed (#774): the pack keeps no fact that tells a method no override can replace
+// (static, private, sealed) from a virtual one, so a list that comes in a parameter names no
+// table, whatever the method.
 class Passed {
     async Task SendList(List<TransactWriteItem> items) {
         var db = new AmazonDynamoDBClient();

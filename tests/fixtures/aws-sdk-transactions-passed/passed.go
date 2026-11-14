@@ -116,15 +116,67 @@ func changedByCaller(ctx context.Context) {
 	sendList(ctx, items)
 }
 
-// More arguments than parameters (a variadic parameter): the list is made at the call.
+func changedRequest(ctx context.Context) {
+	in := &dynamodb.TransactWriteItemsInput{TransactItems: []types.TransactWriteItem{{Put: &types.Put{TableName: aws.String("request-old")}}}}
+	in.TransactItems[0].Put.TableName = aws.String("request-new")
+	sendRequest(ctx, in)
+}
+
+func changedEntry(ctx context.Context) {
+	p := &types.Put{TableName: aws.String("entry-old")}
+	p.TableName = aws.String("entry-new")
+	sendEntry(ctx, p)
+}
+
+func changedGets(ctx context.Context) {
+	items := []types.TransactGetItem{{Get: &types.Get{TableName: aws.String("gets-old")}}}
+	items[0].Get.TableName = aws.String("gets-new")
+	sendGets(ctx, items)
+}
+
+func changedMethod(ctx context.Context) {
+	s := &store{}
+	items := []types.TransactWriteItem{{Put: &types.Put{TableName: aws.String("method-old")}}}
+	items[0].Put.TableName = aws.String("method-new")
+	s.send(ctx, items)
+}
+
+// The wrapper in the middle of two writes its parameter.
+
+func relayChanged(ctx context.Context, items []types.TransactWriteItem) {
+	items[0].Put.TableName = aws.String("relay-new")
+	sendList(ctx, items)
+}
+
+func changedInRelay(ctx context.Context) {
+	relayChanged(ctx, []types.TransactWriteItem{{Put: &types.Put{TableName: aws.String("relay-old")}}})
+}
+
+// A variadic parameter. A spread passes the caller's slice itself, and one element is the whole
+// list: both are followed. Two elements are more arguments than parameters: not followed.
 
 func sendAll(ctx context.Context, items ...types.TransactWriteItem) {
 	client := dynamodb.NewFromConfig(cfg)
 	client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
 }
 
-func passedSpread(ctx context.Context) {
-	sendAll(ctx, types.TransactWriteItem{Put: &types.Put{TableName: aws.String("spread-a")}}, types.TransactWriteItem{Put: &types.Put{TableName: aws.String("spread-b")}})
+func passedSlice(ctx context.Context) {
+	items := []types.TransactWriteItem{{Put: &types.Put{TableName: aws.String("passed-slice")}}}
+	sendAll(ctx, items...)
+}
+
+func passedOne(ctx context.Context) {
+	sendAll(ctx, types.TransactWriteItem{Put: &types.Put{TableName: aws.String("passed-one")}})
+}
+
+func changedOne(ctx context.Context) {
+	p := &types.Put{TableName: aws.String("one-old")}
+	p.TableName = aws.String("one-new")
+	sendAll(ctx, types.TransactWriteItem{Put: p})
+}
+
+func passedTwo(ctx context.Context) {
+	sendAll(ctx, types.TransactWriteItem{Put: &types.Put{TableName: aws.String("two-a")}}, types.TransactWriteItem{Put: &types.Put{TableName: aws.String("two-b")}})
 }
 
 // A method whose name another definition spells is not followed.

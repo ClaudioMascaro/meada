@@ -1057,9 +1057,11 @@ fn a_field_written_through_another_name_leaves_a_held_entry_its_table() {
 /// A Go wrapper that mentions its parameter twice, where it declares it and where a path of
 /// entries reads it, sends what each caller passes (#774): the request, list or entry the caller
 /// writes in the call or holds in a local it mentions twice keeps its table or bus, through a
-/// function, a method and two wrappers. A third mention in the wrapper (a write, a helper, a new
-/// value) or in the caller leaves it unresolved, and so do more arguments than parameters and a
-/// method whose name another type's method spells. C# is not followed.
+/// function, a method and two wrappers, and through a variadic parameter given a spread or one
+/// element; an entry with no bus goes to `default` there too. Each form has its twin: a third
+/// mention in the wrapper (a write, a helper, a new value), in the wrapper between two, or in the
+/// caller leaves it unresolved, and so do more arguments than parameters and a method whose name
+/// another type's method spells. C# is not followed.
 #[test]
 fn a_go_wrapper_s_parameter_is_followed_to_what_its_caller_passes() {
     let repo = fixture_repo(
@@ -1073,20 +1075,30 @@ fn a_go_wrapper_s_parameter_is_followed_to_what_its_caller_passes() {
     assert_eq!(
         by_language["go"],
         [
+            "changedbus writer channel::eventbridge",
             "changedbycaller writer resource::dynamodb",
             "changedbywrapper writer resource::dynamodb",
+            "changedentry writer resource::dynamodb",
+            "changedgets reader resource::dynamodb",
+            "changedinrelay writer resource::dynamodb",
+            "changedmethod writer resource::dynamodb",
+            "changedone writer resource::dynamodb",
+            "changedrequest writer resource::dynamodb",
             "handedbywrapper writer resource::dynamodb",
             "othershared writer resource::dynamodb",
             "passedbus writer channel::eventbridge::passed-bus",
+            "passeddefault writer channel::eventbridge::default",
             "passedentry writer resource::dynamodb::passed-entry",
             "passedgets reader resource::dynamodb::passed-gets",
             "passedinline writer resource::dynamodb::passed-inline",
             "passedlist writer resource::dynamodb::passed-list",
             "passedmethod writer resource::dynamodb::passed-method",
+            "passedone writer resource::dynamodb::passed-one",
             "passedrequest writer resource::dynamodb::passed-request",
             "passedshared writer resource::dynamodb",
-            "passedspread writer resource::dynamodb",
+            "passedslice writer resource::dynamodb::passed-slice",
             "passedtwice writer resource::dynamodb::passed-twice",
+            "passedtwo writer resource::dynamodb",
             "resetbywrapper writer resource::dynamodb",
         ],
         "{export}"

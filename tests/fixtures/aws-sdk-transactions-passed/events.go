@@ -18,3 +18,14 @@ func publish(ctx context.Context, entries []types.PutEventsRequestEntry) {
 func passedBus(ctx context.Context) {
 	publish(ctx, []types.PutEventsRequestEntry{{EventBusName: aws.String("passed-bus")}})
 }
+
+func changedBus(ctx context.Context) {
+	entries := []types.PutEventsRequestEntry{{EventBusName: aws.String("bus-old")}}
+	entries[0].EventBusName = aws.String("bus-new")
+	publish(ctx, entries)
+}
+
+// An entry with no bus goes to `default` (ADR 0026), passed as it would be written in place.
+func passedDefault(ctx context.Context) {
+	publish(ctx, []types.PutEventsRequestEntry{{Source: aws.String("app")}})
+}
