@@ -98,10 +98,16 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   file, and a call on its name from another Java file leaves it unresolved, whatever variable
   that file calls it on; one handed to a call
   or aliased there, or reached by reflection from there, is not seen, and the field keeps its
-  first name. A field `private` in every field declaration of its file that spells the name is
-  out of another file's reach, so a call on its name there does not count (#775); a name the
-  file also declares without `private`, in any class and `final` or not, is still judged by
-  every Java file. A request type is the SDK's unless a type of its directory, an import or a
+  first name. A field its own file declares, `private` in every field declaration of that file
+  that spells the name, is out of another file's reach, so a call on its name there does not
+  count (#775). Still judged by every Java file: a name the file also declares without
+  `private`, in any class and `final` or not; a field of a file that spells `lombok` anywhere
+  (an import, an annotation, a comment: Lombok's accessors are not in the source); a field a
+  class inherits from another file; and every field of a repository where a Java file reads
+  fields by reflection (`getDeclaredField`, `getField` and their plurals, no other API, and no
+  Kotlin file's), since the file that reads one may hand it to any other. A Lombok accessor or
+  a reflective read whose result is set under another name is not seen, as before.
+  A request type is the SDK's unless a type of its directory, an import or a
   variable says otherwise: one of the same package in another source root is not seen (#719).
   A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB
   transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that

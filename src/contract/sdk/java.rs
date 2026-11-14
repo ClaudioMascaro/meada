@@ -79,8 +79,9 @@ type MethodCounts<'a> = std::collections::HashMap<(&'a str, Option<usize>), u32>
 pub(crate) struct Builders<'a> {
     files: std::cell::RefCell<std::collections::HashMap<&'a str, std::rc::Rc<Uses<'a>>>>,
     /// The Java files that call a method on each name (the last name before the method), read
-    /// once: a field builder is changed from another file by such a call.
-    callers: std::cell::OnceCell<std::collections::HashMap<&'a str, Vec<&'a str>>>,
+    /// once: a field builder is changed from another file by such a call. With them, whether a
+    /// Java file of the repository reads fields by reflection (`reflective`).
+    callers: std::cell::OnceCell<(std::collections::HashMap<&'a str, Vec<&'a str>>, bool)>,
     /// The file and the directory of every type the repository's Java files declare, nested ones
     /// included, with its name: a type of the package or the file shadows the one an import names.
     types: std::cell::OnceCell<std::collections::HashSet<(&'a str, &'a str)>>,
@@ -162,14 +163,19 @@ impl<'a> Builders<'a> {
         types.contains(&(path, simple)) || imported.is_none() && types.contains(&(dir, simple))
     }
 
-    /// Whether a file other than `path` calls a method on `name`, a name that may be a field.
-    fn called_elsewhere(&self, code: &Code<'a>, path: &str, name: &str) -> bool {
-        let callers = self.callers.get_or_init(|| {
+    /// Whether a file other than `path` calls a method on `name`, a name that may be a field. A
+    /// `private` field is out of another file's reach but by reflection, which reads it in one
+    /// file and may hand it to any other: for one, such a call counts only where a Java file of
+    /// the repository reads fields that way, and is otherwise on another variable (#775).
+    fn called_elsewhere(&self, code: &Code<'a>, path: &str, name: &str, private: bool) -> bool {
+        let (callers, reflected) = self.callers.get_or_init(|| {
             let mut callers: std::collections::HashMap<&str, Vec<&str>> = Default::default();
+            let mut reflected = false;
             for (&file, facts) in code.files() {
                 if !file.ends_with(".java") {
                     continue;
                 }
+                reflected |= reflective(facts);
                 for call in &facts.calls {
                     let Some((head, method)) = call.callee.rsplit_once('.') else {
                         continue;
@@ -183,9 +189,10 @@ impl<'a> Builders<'a> {
                     }
                 }
             }
-            callers
+            (callers, reflected)
         });
-        (callers.get(name)).is_some_and(|files| files.iter().any(|&f| f != path))
+        (*reflected || !private)
+            && (callers.get(name)).is_some_and(|files| files.iter().any(|&f| f != path))
     }
 
     fn uses(&self, code: &Code<'a>, path: &'a str) -> std::rc::Rc<Uses<'a>> {
@@ -440,12 +447,7 @@ impl<'a> Uses<'a> {
             rewritten: (code.assigned(path).iter())
                 .map(|b| (b.scope.as_str(), b.name.as_str()))
                 .collect(),
-            reflective: (facts.calls.iter()).any(|c| {
-                matches!(
-                    crate::resolve::method(&c.callee),
-                    "getDeclaredField" | "getField" | "getDeclaredFields" | "getFields"
-                )
-            }),
+            reflective: reflective(facts),
             written: (code.mentioned(path).iter())
                 .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
                 .collect(),
@@ -566,6 +568,17 @@ impl<'a> Uses<'a> {
             .get(&(scope, name))
             .is_none_or(|&written| written > 1 + direct)
     }
+}
+
+/// Whether the file reads a field by its name as a string: any field may change there, a
+/// `private` one of another file too.
+fn reflective(facts: &crate::lang::Facts) -> bool {
+    (facts.calls.iter()).any(|c| {
+        matches!(
+            crate::resolve::method(&c.callee),
+            "getDeclaredField" | "getField" | "getDeclaredFields" | "getFields"
+        )
+    })
 }
 
 /// The name a chain of steps is made on: `b` in `b.message(..).build()` as the stored calls spell
@@ -982,14 +995,6 @@ impl<'a> Walk<'a, '_> {
                 .is_some()
     }
 
-    /// Whether the field `name` is one this file declares, `private` wherever it declares the
-    /// name (`Facts::private_fields`): an inherited field of another file is not.
-    fn private(&self, name: &'a str) -> bool {
-        (self.code.constant_value(self.path, self.scope, name))
-            .is_some_and(|(declared, ..)| declared == self.path)
-            && (self.code.private_fields(self.path).iter()).any(|field| field == name)
-    }
-
     /// Whether the builder `name` was changed as seen from `at`, or is another name of one, or was
     /// made from a changed value.
     fn builder(&mut self, name: &'a str, at: &At) -> bool {
@@ -1000,22 +1005,25 @@ impl<'a> Walk<'a, '_> {
             Some(_) => None,
             None => self.code.local(self.path, self.scope, name),
         };
-        let field = local.is_none()
-            && (bare.is_some()
-                || (self.code.constant_value(self.path, self.scope, name)).is_some());
+        let constant = match local {
+            Some(_) => None,
+            None => self.code.constant_value(self.path, self.scope, name),
+        };
+        let field = local.is_none() && (bare.is_some() || constant.is_some());
         // A type or a parameter holds no builder to follow. A name the file assigns again or
         // declares twice holds no one builder: a change the reader cannot follow.
         if local.is_none() && !field {
             return self.uses.rewritten.contains(&(self.scope, name));
         }
-        // A `private` field of this file is out of another file's reach: a call there on a
-        // variable of its name is on another variable (#775).
-        if field
-            && (self.uses.reflective
-                || !self.private(name)
-                    && self.builders.called_elsewhere(self.code, self.path, name))
-        {
-            return true;
+        if field {
+            // A field this file declares, `private` wherever it declares the name
+            // (`Facts::private_fields`): an inherited field of another file is not one (#775).
+            let private = constant.is_some_and(|(declared, ..)| declared == self.path)
+                && (self.code.private_fields(self.path).iter()).any(|f| f == name);
+            let (code, path) = (self.code, self.path);
+            if self.uses.reflective || self.builders.called_elsewhere(code, path, name, private) {
+                return true;
+            }
         }
         let scope = local.map_or(self.scope, |b| b.scope.as_str());
         let declared = match local.map(|b| &b.value) {

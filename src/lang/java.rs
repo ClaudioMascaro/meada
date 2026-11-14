@@ -917,7 +917,11 @@ fn parse(src: &[u8]) -> Result<Facts> {
             count,
         });
     }
-    facts.private_fields = (final_fields.difference(&open_fields).cloned()).collect();
+    // Lombok adds members the source does not show (a `@Getter`'s accessor hands a private field
+    // out), so a file that spells its name anywhere, a comment included, lists none.
+    if !src.windows(6).any(|bytes| bytes == b"lombok") {
+        facts.private_fields = (final_fields.difference(&open_fields).cloned()).collect();
+    }
     facts.loops = super::outermost(
         tree.root_node(),
         &[
@@ -1711,7 +1715,7 @@ mod tests {
 
     /// A `final` field is private when every field declaration of the file that spells its name
     /// is (#775): a name another class declares without `private`, final or not, an interface's
-    /// constant and a field that is not `final` are not.
+    /// constant and a field that is not `final` are not. A file that names Lombok lists none.
     #[test]
     fn final_fields_private_wherever_the_file_declares_them_are_listed() {
         let src = "class C { private static final B kept = b(); private final B own = b(); \

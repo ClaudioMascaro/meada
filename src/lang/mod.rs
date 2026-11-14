@@ -593,7 +593,8 @@ pub struct Facts {
     pub mentioned: Vec<Mentioned>,
     /// The names of the `final` fields that every field declaration of the file spelling them
     /// makes `private` (Java): no other file can write a call on one, so a call on that name
-    /// there is on another variable. Not kept in the index (see `Call::args`).
+    /// there is on another variable. None for a file that names Lombok, whose accessors the
+    /// source does not show. Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub private_fields: Vec<String>,
     /// The names of the methods the file declares that no definition stands for (Java): an

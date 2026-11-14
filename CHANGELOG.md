@@ -17,10 +17,12 @@ All notable changes to Meada are recorded here. The format follows
   does every wrapper while a Java or Kotlin file is past its budget. An existing index is rebuilt
   on its first open by this version (#772).
 - Java: a request builder held in a `private final` field keeps its table when another file calls
-  a method on a variable of the same name. No other file can reach a private field, so that
-  variable is another one; before, any such call in the repository left the field's side
-  unresolved. A name its file also declares without `private` is judged by every Java file, as
-  before (#775).
+  a method on a variable of the same name. The source of another file cannot name a private
+  field, so that variable is another one; before, a call there on that name, other than
+  `build()`, left the field's side unresolved. As before, every Java file judges a name its file
+  also declares without `private`, a field of a file that names Lombok (a `@Getter` hands the
+  field out with no mention in the source), and every field of a repository where a Java file
+  reads fields by reflection (#775).
 - Pipelines, actions, CI jobs and CI steps of GitHub Actions are IaC nodes (ADR 0028). A file
   directly under `.github/workflows/` that holds `jobs` is a pipeline, and an `action.yml` or
   `action.yaml` that holds `runs` is an action; each CI job (`jobs.build`) and CI step
