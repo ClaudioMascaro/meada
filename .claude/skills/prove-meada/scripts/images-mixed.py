@@ -21,10 +21,13 @@ PREFIX = 'example.com/zz-prove-mixed/'
 IMAGE = 'image::ghcr.io/mixed-proof/worker'
 TOPIC = 'channel::sns::parcel'
 QUEUE = 'channel::sqs::parcel'
-EXPECTED_IMAGE_LINKS = {
-    (PREFIX+'infra::compose.yaml::services.parcel', IMAGE, '.', 'exact', PREFIX+'app'),
-    (PREFIX+'infra::compose.yaml::services.registry', 'image::*/mixed-proof/worker', '.', 'inferred', PREFIX+'app'),
-}
+# The app builds the image twice: its Compose `build: .`, whose site is the repository, and the CI
+# step of `publish.yml`, its own site since #860. Each runner links to both.
+BUILDERS = (PREFIX+'app', PREFIX+'app::.github/workflows/publish.yml::jobs.publish.steps[0]')
+EXPECTED_IMAGE_LINKS = {row + (builder,) for builder in BUILDERS for row in [
+    (PREFIX+'infra::compose.yaml::services.parcel', IMAGE, '.', 'exact'),
+    (PREFIX+'infra::compose.yaml::services.registry', 'image::*/mixed-proof/worker', '.', 'inferred'),
+]}
 EXPECTED_SUBSCRIPTION = (TOPIC, QUEUE, PREFIX+'infra::main.tf::aws_sns_topic_subscription.route', '.')
 # ADR 0026 (#755): the app writes no Dockerfile, so the build runs its whole context at `inferred`
 # and the reason says the Dockerfile was not read (#782).
@@ -81,7 +84,7 @@ def main(args):
         'execution_tuple': EXPECTED_EXECUTION,
         # Same-repository Compose follows its direct execution rather than adding
         # a self image link (base ADR 0026 and original image binary's direct flow).
-        'head_expected_image_links': 2, 'head_expected_channel_links': 1,
+        'head_expected_image_links': len(EXPECTED_IMAGE_LINKS), 'head_expected_channel_links': 1,
     }, indent=2))
     seed = OUT / 'input'
     app, infra = seed / 'app', seed / 'infra'
@@ -147,8 +150,8 @@ def main(args):
     infra_images=[r for r in infra_data['links'] if r['contract'].startswith('image::')]
     # Each endpoint's repository export carries its cross-repository links. This
     # is the existing export scope, not two additional links or a self link.
-    check('each endpoint retains exactly both mixed image links and no direct self link',
-          len(app_images)==2 and app_images==infra_images and {
+    check('each endpoint retains exactly the mixed image links of both builders and no direct self link',
+          len(app_images)==len(EXPECTED_IMAGE_LINKS) and app_images==infra_images and {
               (r['consumer'],r['contract'],r.get('root'),r['level'],r['provider'])
               for r in app_images}==EXPECTED_IMAGE_LINKS,app_images)
     check('exact and registry-pattern image levels coexist',
