@@ -2,16 +2,11 @@
 
 `SKILL.md` reaches this file for the mechanics of a run. GitHub Actions executes them through
 `scripts/prove-ci` (the `build-*` and `clean*` steps of a receipt); the manual audit, and a flow run by
-hand on a runner, follow the same commands. `S=.claude/skills/prove-meada/scripts`, and every command
-runs from the repository root.
+hand on a runner, follow the same commands. Preserve the same corpus, answer keys, limits and
+before/after checks when arranging the CI run. `S=.claude/skills/prove-meada/scripts`, and every
+command runs from the repository root.
 
-## CI execution recipes
-
-The following Start, Health, Surfaces, bug-fix and probe commands are for the GitHub Actions
-runner only. Local use prepares their inputs and reads their artifacts. Preserve the same
-corpus, answer keys, limits and before/after checks when arranging the CI run.
-
-## Start (CI only)
+## Start
 
 ```bash
 SLUG=kotlin-extension-calls   # a few words naming the change
@@ -29,7 +24,7 @@ Never drive an instance you didn't start: every repository the scripts index is 
 
 `cat "$RUN"/bin/*.from` and `"$RUN/bin/meada-head" --version`: the build and its source.
 
-## Clean up (CI runner)
+## Clean up
 
 `python3 $S/prove.py clean "$RUN"` (the corpus copies and the HTTP indexes; it stops a leftover HTTP server by its pid file), `python3 $S/console.py stop --run "$RUN"` after a console run, then `git worktree remove --force` on the build worktrees this run made (`$RUN/src-*`), never a bare `git worktree prune`: in a sandbox whose checkout is itself a linked worktree whose host path is missing, prune deletes the checkout's own worktree entry and breaks git (prove round 1 of #653). Evidence in `.prove-it/runs/` stays.
 

@@ -11,8 +11,9 @@ Proof means reviewed evidence shows the running app did the thing against its an
 
 Every check has three parts: the surface you drive, the answer key that says what right looks like, and the comparison between them.
 
-`AGENTS.md` owns activation and validation policy. A source edit, task completion or bug report
-alone does not activate E2E. Product execution recipes below run only inside GitHub Actions.
+`AGENTS.md` (Workflow) owns when E2E is selected, where the product runs and what a docs-only
+change reports. Every command that builds, starts or drives Meada, in the feature skills and the
+references, is one the Proof workflow runs.
 
 `S=.claude/skills/prove-meada/scripts` below. Every command runs from the repository root.
 
@@ -37,28 +38,23 @@ The `build-*` and `clean*` steps of a receipt are the runner's own: [references/
 
 ## Local preparation and evidence review
 
-1. Read `AGENTS.md` and classify the change. Docs, instructions and harness-only changes stop
-   with E2E `N/A` in the ordinary validation summary, no product run and no proof receipt. A
-   proof driver (`proof_driver` in `scripts/check`; the Proof workflow is one) is not
-   harness-only: a labelled PR runs its E2E in CI.
+1. Read `AGENTS.md` and classify the change. A proof driver (`proof_driver` in `scripts/check`;
+   the Proof workflow is one) is not harness-only: a labelled PR runs its E2E in CI.
 2. For selected E2E, prepare Scope, Sort and Find the spec below. Record base/head SHAs,
    corpus entries, queries, probes, surfaces and independent answer keys for the CI runner.
-   A PR must be non-draft and carry `e2e`; external writes still require the user's authorization.
+   Readying or labelling the PR, which starts the run, is an external write: it needs the
+   user's authorization.
 3. Read workflow `Proof` (`.github/workflows/proof.yml`), job `prove-meada`, and artifact
-   `prove-meada-<PR number>-<head SHA>` for the tested SHA (each Scope driver under `flows/<name>`, its exit in `receipt.json`). Confirm its base/head identity,
-   scope, raw captures and checker provenance before interpreting results. A docs-only follow-up
-   does not trigger another E2E run: cite the original artifact SHA, never relabel it as HEAD.
+   `prove-meada-<PR number>-<head SHA>` for the tested SHA (each Scope driver under
+   `flows/<name>`, its exit in `receipt.json`). Confirm its base/head identity, scope, raw
+   captures and checker provenance before interpreting results.
 4. Give the evidence and answer keys to an independent judge using Check in a fresh agent.
-   `CAPTURED` means execution evidence exists, never `PROVED`. Missing or pending judgment
-   stays pending; missing prerequisites are `BLOCKED`, and a disagreement is `BROKEN`.
-5. Report the tested SHA, run/artifact or CI receipt, verdict and limitations. Without CI
-   evidence, report preparation and pending evidence only; do not manufacture a proof receipt.
+   A missing or pending judgment stays pending.
+5. Report the tested SHA, run/artifact or CI receipt, verdict and limitations.
 
-Manual mutation audits use the separate explicit `workflow_dispatch` path, never a routine
-proof invocation or a skill edit. Where the branch includes A7/A8, preserve the audit phases
-in `proof-a7-a8` and its baseline, UI and scope artifacts; generic capture does not replace them.
-
-For #676/#684's bounded CI audit and receipt maintenance, use
+Where the branch includes A7/A8, preserve the audit phases in `proof-a7-a8` and its baseline,
+UI and scope artifacts; generic capture does not replace them. For #676/#684's bounded CI audit
+(the manual `workflow_dispatch` path) and receipt maintenance, use
 [references/a7-a8-audit.md](references/a7-a8-audit.md). Freeze the exact source/keys, obtain an
 untouched PROVED baseline before planting, and distinguish script catches from fresh blind
 judgments. Pending rounds and old BROKEN receipts remain visible until actually rerun.
@@ -90,7 +86,7 @@ Follow each changed file to the surfaces and flows it reaches. Internal code cou
 Prove checks what the change touches. Answer these for each flow Scope reached, top to bottom, and write the answers in the receipt:
 
 1. **New or existing?** New means this change adds it (a route, tool, command, page, field). Existing means it was there before.
-2. **New, and does it copy something that exists?** Yes: answer key is parity with that thing (see its surface section). No: answer key is the spec (see Find the spec).
+2. **New, and does it copy something that exists?** Yes: answer key is parity with that thing (see its feature skill). No: answer key is the spec (see Find the spec).
 3. **New, and did this change also edit the thing it copies?** Then use the spec AND parity. Both sides can be wrong the same way, and parity still passes.
 4. **Existing, and did the change touch its code**, directly or through shared code (schema, auth, nav, a shared component or function)? Answer key is the app before the change.
 5. **Existing, and untouched?** Not something the change touches: skip it. If the selected product implementation is entirely new files, the CI runner also runs the smoke test once: the app starts and `prove.py run --repos meada` passes.
@@ -126,7 +122,7 @@ Each feature skill holds the rows of its flows.
 - **Never edit an answer key to make a check pass.** If the app and the answer key disagree, the verdict is BROKEN; only the user changes an answer key.
 - **Compare against the answer key, not your idea of right.** Where a flow has none, say so on the receipt.
 - **A spec line that says an area is "not changed"** makes that area an existing flow. Run the same input on the base commit and on the change, and compare the two outputs with each other, not with the spec. Any difference is BROKEN until the user approves it, even when the spec seems to allow it. Base `[3, 4, 6]` and change `[]` is BROKEN, not noise.
-- **There is no "PROVED with a flag".** A question for the user is BROKEN until they answer it. A parity difference is BROKEN unless it is listed under Known and deliberate.
+- **There is no "PROVED with a flag".** A question for the user is BROKEN until they answer it. A parity difference is BROKEN unless its feature skill lists it under Known and deliberate.
 - **A snapshot shows "same as before", not "correct".** If the change is meant to alter a snapshot, the step is BROKEN until the user approves a new one.
 
 In the AFK loop the issue approves a golden or export difference, line by line (maintainer, 2026-11-02): a difference the issue predicts passes, any other is BROKEN and goes back with the finding.
@@ -135,15 +131,11 @@ In the AFK loop the issue approves a golden or export difference, line by line (
 
 The agent that made the change knows what it meant to build, so it tends to see what it expects. Do Scope, Sort and Find the spec yourself, then, if you can start a sub-agent (the Agent tool in Claude Code, a subagent in Codex), hand the CI evidence review to a fresh one. Give it only the flows, the surfaces, whether each is new or existing, the answer keys, the CI artifact and tested SHA, and the paths of this skill and of the feature skill of each flow under review. Not your plan, your reasoning or what you think the change does. Ask for PROVED, BROKEN, BLOCKED or UNPROVEN and the receipt path.
 
-If you cannot start a sub-agent, review the CI evidence yourself and record `Checker: same agent (not independent)`. Keep an independent judgment pending when the CI evidence requires it; do not turn a capture into PROVED.
-
-## Surfaces
-
-One section per surface. `/create-prove-it` adds a section when the app gains a surface.
+If you cannot start a sub-agent, review the CI evidence yourself and record `Checker: same agent (not independent)`. Keep an independent judgment pending when the CI evidence requires it.
 
 ## Varies by
 
-- **Varies by**: cargo features (the default build serves the CLI and MCP; `ui`, `accounts` and the other modules change the binary); the message language (`LANG`, pt-BR or English, the same for both binaries in one run); the MCP era (the scripts speak the `initialize` era, 2025-11-25; the 2026-07-28 `server/discover` era is `tests/it/mcp.rs`'s). A flow isn't proved while a variant the change reaches is unproven.
+Cargo features (the default build serves the CLI and MCP; `ui`, `accounts` and the other modules change the binary); the message language (`LANG`, pt-BR or English, the same for both binaries in one run); the MCP era (the scripts speak the `initialize` era, 2025-11-25; the 2026-07-28 `server/discover` era is `tests/it/mcp.rs`'s). A flow isn't proved while a variant the change reaches is unproven.
 
 ## Verifying a bug fix
 
@@ -156,7 +148,7 @@ After the happy path passes, run at least one probe that matches what you change
 ## Evidence and receipt
 
 The CI run saves execution evidence; the judge records its reviewed verdict separately from
-any `CAPTURED` status. A local preparation or docs-only check creates no proof receipt.
+any `CAPTURED` status. A local preparation creates no proof receipt.
 
 Save everything to `.prove-it/runs/<UTC timestamp>-<slug>/`. Write `receipt.md` there:
 
