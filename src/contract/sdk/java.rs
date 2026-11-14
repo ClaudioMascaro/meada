@@ -81,9 +81,40 @@ pub(crate) struct Builders<'a> {
     /// The file and the directory of every type the repository's Java files declare, nested ones
     /// included, with its name: a type of the package or the file shadows the one an import names.
     types: std::cell::OnceCell<std::collections::HashSet<(&'a str, &'a str)>>,
+    /// How many methods of the repository have each simple name and arity, and each name an
+    /// anonymous class or an enum constant declares a method of (`Facts::anonymous`), with no
+    /// arity (`overridden`).
+    methods: std::cell::OnceCell<std::collections::HashMap<(&'a str, Option<usize>), u32>>,
 }
 
 impl<'a> Builders<'a> {
+    /// Whether a call of the method `def` may run another (#772): a method of the repository with
+    /// its simple name and arity, however its parameters are spelled (an override), or one an
+    /// anonymous class or an enum constant declares.
+    fn overridden(&self, code: &Code<'a>, def: &'a crate::lang::Def) -> bool {
+        let simple = |name: &'a str| {
+            let own = name[crate::parent(name).len()..].trim_start_matches('.');
+            own.split('(').next().unwrap_or(own)
+        };
+        let methods = self.methods.get_or_init(|| {
+            let mut methods = std::collections::HashMap::new();
+            for facts in code.files().values() {
+                for d in (facts.defs.iter()).filter(|d| d.kind == crate::lang::Kind::Method) {
+                    *methods
+                        .entry((simple(&d.name), Some(d.params.len())))
+                        .or_insert(0) += 1;
+                }
+                for name in &facts.anonymous {
+                    *methods.entry((name.as_str(), None)).or_insert(0) += 1;
+                }
+            }
+            methods
+        });
+        let name = simple(&def.name);
+        methods.get(&(name, Some(def.params.len()))) > Some(&1)
+            || methods.contains_key(&(name, None))
+    }
+
     /// Whether `name`, the start of a builder chain, may be a type of the repository or of a
     /// package other than the SDK's: its setters are then the repository's, not the SDK's. A type
     /// the file declares beats an import; a type of its directory beats a wildcard import only.
@@ -193,6 +224,14 @@ impl Span {
         };
         other.is_some_and(|&s| s < at.later)
     }
+
+    /// Whether a mention other than the one read at `at.own` starts before `at.later`: a list's
+    /// read is one hand-off there, and the call a receiver hands it in starts there too
+    /// (`prep(l).w(l)`, #772).
+    fn hits_once(&self, at: &At) -> bool {
+        let skip = usize::from(self.starts.first() == Some(&at.own));
+        (self.starts.get(skip)).is_some_and(|&s| s < at.later)
+    }
 }
 
 /// Where a value is made, and how far past that a mention still changes it.
@@ -299,6 +338,16 @@ impl<'a> Mentions<'a> {
     fn changed(&self, setter: &dyn Fn(&str) -> bool, at: &At) -> bool {
         self.other.as_ref().is_some_and(|s| s.hits(at))
             || (self.sets.iter()).any(|(method, span)| setter(method) && span.hits(at))
+    }
+
+    /// Whether a mention of a list read at `at` may change it (`Walk::list_changed`): a call on it
+    /// other than one of `KEEPS`, wherever it starts, or a hand-off but the read's own
+    /// (`Span::hits_once`).
+    fn list_changed(&self, at: &At) -> bool {
+        self.other.as_ref().is_some_and(|s| s.hits_once(at))
+            || (self.sets.iter()).any(|(method, span)| {
+                !KEEPS.contains(method) && (span.starts.first()).is_some_and(|&s| s < at.later)
+            })
     }
 
     fn sorted(&mut self) {
@@ -736,10 +785,9 @@ impl<'a> Walk<'a, '_> {
         at: &At,
     ) -> bool {
         let at = self.widened(at, declared);
-        let changes = |method: &str| !KEEPS.contains(&method);
         self.uses.rewritten.contains(&(scope, name))
             || self.uses.unseen_list(scope, name)
-            || (self.uses.locals.get(&(scope, name))).is_some_and(|m| m.changed(&changes, &at))
+            || (self.uses.locals.get(&(scope, name))).is_some_and(|m| m.list_changed(&at))
     }
 
     /// `at` with what a name declared at `declared` sees later in the source too: a builder or a
@@ -808,9 +856,11 @@ impl<'a> Walk<'a, '_> {
         let mentions = self.uses.locals.get(&(self.scope, name));
         if def.params[index].binds != crate::lang::Binds::Any
             || self.code.name_matched(function)
+            || self.builders.overridden(self.code, def)
             || (self.uses.deferred.outlived(&at.range, declared)).is_some()
             || self.list_changed(self.scope, name, declared, at)
-            || mentions.is_some_and(|m| (m.other.as_ref()).is_some_and(|s| s.hits(&everywhere)))
+            || mentions
+                .is_some_and(|m| (m.other.as_ref()).is_some_and(|s| s.hits_once(&everywhere)))
             || self.parameter.is_some_and(|p| p != index)
         {
             return false;

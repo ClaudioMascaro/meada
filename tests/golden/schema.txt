@@ -1578,14 +1578,14 @@ sample.java
       "kind": "Class",
       "range": {
         "start": 89,
-        "end": 489
+        "end": 572
       },
       "params": [],
       "bases": [
         "Base",
         "Comparable"
       ],
-      "hash": "4eab4589711270096acd26507d0cb69a09ef0fc058d065b1f573f063006d719a"
+      "hash": "d5a815515beb8b268a47790d1b2945d14fdc9c10785a285bbdb058d369eb07ac"
     },
     {
       "name": "example.Store.Store()",
@@ -1656,6 +1656,19 @@ sample.java
       },
       "params": [],
       "hash": "a67f7394772f35463e36211ffe0f29dc75e005f33b894d14e572a20997ea4894"
+    },
+    {
+      "name": "example.Store.later()",
+      "kind": "Method",
+      "range": {
+        "start": 492,
+        "end": 570
+      },
+      "params": [],
+      "result": {
+        "Type": "Runnable"
+      },
+      "hash": "31b464b75251a442e18015986bbf15b2a618c0dfbd91aae35e901d9c10ead841"
     }
   ],
   "overloads": {
@@ -1665,6 +1678,9 @@ sample.java
     ],
     "example.Store.hidden": [
       "example.Store.hidden()"
+    ],
+    "example.Store.later": [
+      "example.Store.later()"
     ],
     "example.Store.reset": [
       "example.Store.reset()"
@@ -1792,6 +1808,26 @@ sample.java
         "start": 435,
         "end": 448
       }
+    },
+    {
+      "scope": "example.Store.later()",
+      "callee": "Runnable",
+      "arity": 0,
+      "constructs": true,
+      "range": {
+        "start": 518,
+        "end": 567
+      },
+      "by_path": true
+    },
+    {
+      "scope": "example.Store.later()",
+      "callee": "(anonymous).reset",
+      "arity": 0,
+      "range": {
+        "start": 555,
+        "end": 562
+      }
     }
   ],
   "consts": [
@@ -1801,6 +1837,9 @@ sample.java
     {
       "name": ".client@example.Store"
     }
+  ],
+  "locals": [
+    "example.Store.later().run"
   ],
   "receivers": [
     {
@@ -1848,15 +1887,26 @@ sample.java
     "Base",
     "Client",
     "Comparable",
+    "Runnable",
     "Store",
     "String",
     "var"
   ],
   "hidden": [
     "example.Store.hidden()",
-    "example.Store.reset()"
+    "example.Store.reset()",
+    "example.Store.later()"
   ],
-  "package": "example"
+  "package": "example",
+  "anonymous": [
+    "run"
+  ],
+  "deferred": [
+    {
+      "start": 533,
+      "end": 567
+    }
+  ]
 }
 
 sample.kt

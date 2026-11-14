@@ -12,8 +12,9 @@ All notable changes to Meada are recorded here. The format follows
   and passes on names its tables when no mention, in the wrapper or its caller, can change it
   before the request reads it; a list that is sorted, or changed after a named request's
   `build()` or after the call, keeps its tables too. A wrapper that changes the list after its
-  read keeps them only for a list the caller makes in the call, and one with an override names
-  none (#772).
+  read keeps them only for a list the caller makes in the call, and one that another method of
+  its name and number of parameters, or an anonymous class's, may stand for names none. An
+  existing index is rebuilt on its first open by this version (#772).
 
 ## [1.4.0] - 2026-11-13
 

@@ -228,6 +228,41 @@ class Wrappers {
         base.store(List.of(TransactWriteItem.builder().put(Put.builder().tableName("dispatched-old").build()).build()));
     }
 
+    // The receiver runs first: `prep` changes the list before `send` reads it.
+    void receiverFirst() {
+        var items = Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("receiver-old").build()).build());
+        prep(items).send(items);
+    }
+
+    void midReceiver(List<TransactWriteItem> items) {
+        prep(items).send(items);
+    }
+
+    void midReceiverCaller() {
+        midReceiver(Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("mid-receiver-old").build()).build()));
+    }
+
+    Wrappers prep(List<TransactWriteItem> items) {
+        items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("receiver-new").build()).build());
+        return this;
+    }
+
+    // An override however its parameter is spelled, or one an anonymous class declares.
+    void spelled(Keeper keeper) {
+        keeper.keep(List.of(TransactWriteItem.builder().put(Put.builder().tableName("spelled-old").build()).build()));
+    }
+
+    void anonymous() {
+        Holder holder = new Holder() {
+            @Override
+            void hold(List<TransactWriteItem> items) {
+                items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("anonymous-new").build()).build());
+                super.hold(items);
+            }
+        };
+        holder.hold(List.of(TransactWriteItem.builder().put(Put.builder().tableName("anonymous-old").build()).build()));
+    }
+
     void reorder(List<TransactWriteItem> items) {
         items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("handed-new").build()).build());
     }
@@ -245,5 +280,27 @@ class Sub extends Base {
     void store(List<TransactWriteItem> items) {
         items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("dispatched-new").build()).build());
         super.store(items);
+    }
+}
+
+class Keeper {
+    void keep(List<TransactWriteItem> items) {
+        var db = DynamoDbClient.create();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+}
+
+class SpelledKeeper extends Keeper {
+    @Override
+    void keep(java.util.List<TransactWriteItem> items) {
+        items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("spelled-new").build()).build());
+        super.keep(items);
+    }
+}
+
+class Holder {
+    void hold(List<TransactWriteItem> items) {
+        var db = DynamoDbClient.create();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
     }
 }
