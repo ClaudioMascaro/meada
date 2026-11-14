@@ -62,6 +62,15 @@ class Fields {
         await db.TransactWriteItemsAsync(request);
     }
 
+    // The entry written through a second local: the alias is a third mention of `put`.
+    async Task AliasedEntry() {
+        var db = new AmazonDynamoDBClient();
+        var put = new Put { TableName = "aliased-entry-old" };
+        var alias = put;
+        alias.TableName = "aliased-entry-new";
+        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { Put = put } } });
+    }
+
     async Task WrittenGet() {
         var db = new AmazonDynamoDBClient();
         var held = new Get { TableName = "written-get-old" };

@@ -948,9 +948,8 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
     let export: Value =
         serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
     let by_language = sides_by_extension(&export);
-    let sides = |language: &str| by_language[language].clone();
     assert_eq!(
-        sides("go"),
+        by_language["go"],
         [
             "elementreplaced writer resource::dynamodb",
             "entryreplaced writer resource::dynamodb",
@@ -970,7 +969,7 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
         "{export}"
     );
     assert_eq!(
-        sides("cs"),
+        by_language["cs"],
         [
             "elementreplaced writer resource::dynamodb",
             "getreplaced reader resource::dynamodb",
@@ -1018,8 +1017,9 @@ fn sides_by_extension(export: &Value) -> std::collections::BTreeMap<String, Vec<
 /// name is judged by its own mentions in Go and C# (#774): a field written through another name,
 /// in any function, class or package of the repository, reaches no value a local holds alone,
 /// so a request, a list or an entry held in a local mentioned twice keeps its table or bus. Its
-/// twin written through its own name stays unresolved, and so does a named request that is no
-/// list of entries, whose `TableName` some file writes.
+/// twin written through its own name or through a second local stays unresolved, and so does a
+/// named request that is no list of entries, whose `TableName` some file writes. Go's two locals
+/// of one name in one function are counted together (C# allows none).
 #[test]
 fn a_field_written_through_another_name_leaves_a_held_entry_its_table() {
     let repo = fixture_repo(
@@ -1031,24 +1031,26 @@ fn a_field_written_through_another_name_leaves_a_held_entry_its_table() {
         serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
     let by_language = sides_by_extension(&export);
     for language in ["go", "cs"] {
-        assert_eq!(
-            by_language[language],
-            [
-                "heldbus writer channel::eventbridge::held-bus",
-                "heldentry writer resource::dynamodb::held-entry",
-                "heldget reader resource::dynamodb::held-get",
-                "heldlist writer resource::dynamodb::held-list",
-                "heldrequest writer resource::dynamodb::held-request",
-                "plainput writer resource::dynamodb",
-                "putwritten writer resource::dynamodb",
-                "writtenbus writer channel::eventbridge",
-                "writtenentry writer resource::dynamodb",
-                "writtenget reader resource::dynamodb",
-                "writtenlist writer resource::dynamodb",
-                "writtenrequest writer resource::dynamodb",
-            ],
-            "{language}: {export}"
-        );
+        let expected = [
+            "aliasedentry writer resource::dynamodb",
+            "heldbus writer channel::eventbridge::held-bus",
+            "heldentry writer resource::dynamodb::held-entry",
+            "heldget reader resource::dynamodb::held-get",
+            "heldlist writer resource::dynamodb::held-list",
+            "heldrequest writer resource::dynamodb::held-request",
+            "plainput writer resource::dynamodb",
+            "putwritten writer resource::dynamodb",
+            "shadowedentry writer resource::dynamodb",
+            "writtenbus writer channel::eventbridge",
+            "writtenentry writer resource::dynamodb",
+            "writtenget reader resource::dynamodb",
+            "writtenlist writer resource::dynamodb",
+            "writtenrequest writer resource::dynamodb",
+        ];
+        let expected: Vec<&str> = (expected.into_iter())
+            .filter(|side| language == "go" || !side.starts_with("shadowed"))
+            .collect();
+        assert_eq!(by_language[language], expected, "{language}: {export}");
     }
 }
 
