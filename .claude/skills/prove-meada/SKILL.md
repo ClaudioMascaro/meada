@@ -53,6 +53,7 @@ Each family of flows has a sibling skill with what a judge needs for it: its ans
 | [prove-meada-a7-alerts](../prove-meada-a7-alerts/SKILL.md) | alert labels and routes, incident fields and their guards | `alerts`, `incident-routing`, `incident-guards` |
 | [prove-meada-a7-workloads](../prove-meada-a7-workloads/SKILL.md) | workload environments, AWS functions and tasks, image contracts, anchored names | `environment`, `aws-workloads`, `images`, `images-mixed`, `image-ko`, `patterns` |
 | [prove-meada-a7-cloud](../prove-meada-a7-cloud/SKILL.md) | AWS, GCP and Azure provisioners, subscriptions and SDK use sides | `aws`, `aws-json-values`, `aws-sdk`, `aws-sdk-jvm-go-dotnet`, `gcp`, `gcp-sdk`, `azure`, `azure-sdk` |
+| [prove-meada-console](../prove-meada-console/SKILL.md) | console pages, the query and export API, accounts, the infrastructure graph | `console-graph`; steps `console-start`, `console-pages`, `console-stop`, `console-<entry>-start`, `console-<entry>-api`, `console-<entry>-stop` |
 
 For #676/#684's bounded CI audit and receipt maintenance, use
 [references/a7-a8-audit.md](references/a7-a8-audit.md). Freeze the exact source/keys, obtain an
@@ -120,9 +121,6 @@ Ladder, best first: 1 an old system that does the same job, 2 a snapshot, 3 an i
 | A new or changed resolution in the export diff | new | the issue, and the call site and target in the indexed source | 4 | "Confirm in the source" in `compare.md` | the maintainer; the corpus authors |
 | The MCP tool list | existing | the base binary's `tools/list` (frozen at 1.0 in `tests/golden/mcp.tools.json`) | 1 | `prove.py run` | the 1.0 surface |
 | MCP over HTTP | copies stdio | the same binary's stdio answers, byte for byte | 1 | `prove.py run --http` | the stdio server |
-| Console query and export API | copies MCP and CLI | the head's stdio answers and `meada export` bytes | 1 | `console.py api` | the MCP server and the CLI |
-| Console pages | existing | the budgets below, and the playground answer equal to stdio | budget + 1 | `console-pages.mjs` | the maintainer, 2026-11-02 |
-| A7 console infrastructure roles, roots, image/alert directions, same-repository links, unpaired sides and keyboard/search controls | new | #675/#642 and ADR 0026; complete same-mode CLI/API and playground/query parity | 4 + 1 | `console-graph.py`, [references/console-graph.md](references/console-graph.md) | maintainer specs; fresh independent checker |
 | Index time, peak RSS, export size | existing | head at most x1.25, x1.25 and x1.5 of the base (time only when the base takes 2 s or more) | budget | `prove.py run` | the maintainer, 2026-11-02 |
 | A new flow that copies nothing | new | the issue | 4 | Find the spec, at run time | the maintainer |
 
@@ -192,18 +190,6 @@ One section per surface. `/create-prove-it` adds a section when the app gains a 
 **Done looks like**: "tools same, N/N answers byte-equal to stdio" for every entry.
 
 **Could fool you**: one manifest of several repositories is one workspace, so `search` spans all of them; the script serves each alone for that reason. Keep it that way.
-
-### Console and its API
-
-**CI drive**: [references/console.md](references/console.md): a `ui` build, the front end, `console.py start`, `console.py api`, `console-pages.mjs`, `console.py stop`. With `--accounts` when Scope reaches sign-in.
-
-**Copies**: the MCP server in the same query scope (successful text byte-equal; tool errors require the existing HTTP 422/code/full-message mapping) and the CLI in the same server mode (`GET /api/v1/repositories/{identity}/export` equals `meada export --workspace <manifest> --repo <identity>` bytes, all fields retained).
-
-**Done looks like**: every successful query text and same-mode export byte-equal, each expected tool error with exact status/code/message; every page with its `h1`, CLS at most 0.1, load at most 2 s, zero console errors, zero axe violations of impact serious or critical; the playground answer equal to stdio; with accounts, a wrong password refused, no `Origin` refused, a token issued.
-
-**Could fool you**: a page can render from cached state; the playground check is the one that crosses the API. A green API with an old `ui/dist` proves the API only: build the front end from this tree.
-
-For #675's console graph, run `python3 $S/console-graph.py --head-bin "$RUN/bin/meada-head-ui" --ui-dir ui/dist --run "$RUN/console-graph"`. Inspect the screenshots, whole role/link tables, roots, reasons, native keyboard focus, unpaired sides and `value`/`iac`/`alert` playground answers; retain the receipt and CI artifact. [references/console-graph.md](references/console-graph.md) defines inputs, answer keys, budgets, controls and cleanup. `scripts/prove-ci` runs this flow in the Proof workflow's `prove-meada` job and `proof-a7-a8-ui` runs it in the manual audit, both against a real UI binary; unavailable browser tooling leaves it BLOCKED.
 
 ### Varies by and deliberate
 
@@ -316,4 +302,3 @@ Send the findings back to the agent that made the change: the failing steps, the
 - `prove.py iac` imports python-hcl2 and PyYAML (`cfn_oracle.py`), which the system Python may lack: `python3 -m venv --system-site-packages "$RUN/venv" && "$RUN/venv/bin/pip" install -q python-hcl2==8.1.4 pyyaml` (a Debian Python with no `ensurepip`: `python3 -m venv --without-pip --system-site-packages "$RUN/venv"`, then `curl -sS https://bootstrap.pypa.io/get-pip.py | "$RUN/venv/bin/python"`), then run `"$RUN/venv/bin/python" $S/prove.py iac ...`. Without it, `iac` cannot run: BLOCKED, never skipped. The Proof job's venv installs both pinned.
 - `examples/golden_diff` panics without `origin/main` (#592); `prove.py rebless --base` takes the base explicitly and needs no build.
 - `meada decide` has no scripted check: its replay is `tests/it/decisions.rs`'s. Put it under Not covered when Scope reaches `src/decide.rs` or `src/decider/`.
-- The cloud modules beyond accounts (snapshot, generations, OIDC, directory, GitHub App, named workspaces) need Valkey, S3 or an identity provider: Not covered here, with the unlock `deploy/compose` or CI's `cloud` job.
