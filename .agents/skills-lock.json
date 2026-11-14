@@ -17,7 +17,7 @@
       },
       "path": "skills/audit-prove-it",
       "upstreamTree": "99d1fe97d3ca3340d03fdd21648877541415b8a1",
-      "tree": "be5922c87b77eb5ebe928baffaa7f696ef3170ab"
+      "tree": "99d1fe97d3ca3340d03fdd21648877541415b8a1"
     },
     "chief-of-staff": {
       "path": "skills/in-progress/chief-of-staff",
@@ -32,7 +32,7 @@
     "code-review": {
       "path": "skills/engineering/code-review",
       "upstreamTree": "a8ef561571acbb611de8ff19ba6da75b197c63a8",
-      "tree": "88475d4470c45f68e510bfa5747c1fda6d5d8b56"
+      "tree": "12f0707f0f2fc2eb0cc88655dbdea9322acc6369"
     },
     "codebase-design": {
       "path": "skills/engineering/codebase-design",
@@ -46,7 +46,7 @@
       },
       "path": "skills/create-prove-it",
       "upstreamTree": "18f1d9f03f3736c2a8652f7485b918664baae727",
-      "tree": "75308b1e83a0ef897ea35543d155af4e58cc43f6"
+      "tree": "18f1d9f03f3736c2a8652f7485b918664baae727"
     },
     "diagnosing-bugs": {
       "path": "skills/engineering/diagnosing-bugs",
@@ -110,7 +110,7 @@
       },
       "path": "skills/maintain-prove-it",
       "upstreamTree": "be43531a1ee4054f9e3c37714851fbba1c0d5de4",
-      "tree": "a47a995b3feb844067c263e65a47455ea2d7ca0c"
+      "tree": "be43531a1ee4054f9e3c37714851fbba1c0d5de4"
     },
     "migrate-to-shoehorn": {
       "path": "skills/misc/migrate-to-shoehorn",
@@ -130,7 +130,7 @@
     "research": {
       "path": "skills/engineering/research",
       "upstreamTree": "2f8f36af48796faed5c687c75bb650071631a984",
-      "tree": "c05e3566872b9d74b04d131d28154a41b5b01740"
+      "tree": "aa7c2026cd189a9058dc93fd8213451590454416"
     },
     "retro": {
       "path": "skills/engineering/retro",
@@ -175,12 +175,12 @@
     "to-spec": {
       "path": "skills/engineering/to-spec",
       "upstreamTree": "136b9651747cfccbfbb7c50a6b0dfb757e7547d2",
-      "tree": "d9a8c093d4b5a58c89cd4afbc11ea86ebcb42acf"
+      "tree": "6653196ca665d1f7bcd4750b66a3c71e17033dbd"
     },
     "to-tickets": {
       "path": "skills/engineering/to-tickets",
       "upstreamTree": "2dee20ad722a31c04ededf9f2d83842473573045",
-      "tree": "312d4a2aa8e108ecd0dfcc15f86e10033cc3c8bf"
+      "tree": "37c8312f1b3600f34e2a00a86e08b3d5ebb11115"
     },
     "triage": {
       "path": "skills/engineering/triage",
