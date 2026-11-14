@@ -1013,6 +1013,35 @@ fn sides_by_extension(export: &Value) -> std::collections::BTreeMap<String, Vec<
     by_extension
 }
 
+/// A chain of wrappers enters a function once (#886). Where the call that closes a cycle hands the
+/// wrapper's parameters on as they are (a retry, two wrappers that call each other), another turn
+/// sends what the first did and the call adds no side. Where it hands on another value in the
+/// parameter the request reads (the second of two names, the second of two lists), what that
+/// turn sends is not followed: the call that closes the cycle is an unresolved side, beside the
+/// names each outside caller gives.
+#[test]
+fn a_recursive_wrapper_that_passes_another_value_on_is_unresolved_at_that_call() {
+    let fixture = "aws-sdk-recursive-wrappers";
+    let repo = fixture_repo("aws_sdk_recursive_wrappers", fixture, None);
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    assert_eq!(
+        sides_by_extension(&export)["go"],
+        [
+            "ping writer resource::dynamodb",
+            "placechanged writer resource::dynamodb::changed-first",
+            "placelist writer resource::dynamodb::list-first",
+            "placeping writer resource::dynamodb::ping-first",
+            "placeretry writer resource::dynamodb::retried",
+            "placetable writer resource::dynamodb::table-first",
+            "placetick writer resource::dynamodb::ticked",
+            "sendlist writer resource::dynamodb",
+            "sendtable writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
 /// On a path of entries (a DynamoDB transaction's, EventBridge `PutEvents`' `Entries[]`) Go judges
 /// each name by its own mentions alone (#774): a field written through another name, in any
 /// function or package of the repository, reaches no value a local holds alone, so a request, a
