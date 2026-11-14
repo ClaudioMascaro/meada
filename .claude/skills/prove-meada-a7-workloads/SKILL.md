@@ -16,6 +16,12 @@ Read `.claude/skills/prove-meada/SKILL.md` first: it owns Scope, Sort, the answe
 
 ## Flows
 
+| Flow | Stories | Surfaces | Entries (`$S/infra.tsv`, `$S/corpus.tsv`) | Check | State |
+|---|---|---|---|---|---|
+| Workloads and image contracts: normalized builders/runners, direct Compose code paths, evaluated names/patterns, scope-aware orphans | #662; 44 to 46, 57 to 60, 63, 64 | CLI export/status, MCP stdio/HTTP, console API and graph | neutral independently generated repositories and pinned `boutique` | `images.py --public --http` with the UI options of [images.md](../prove-meada/references/images.md) | landed (#662) |
+| Anchored unresolved channel/resource/image names and decisions | #674; #642 29, 30, 58 | CLI export/status/decide, MCP stdio/HTTP, console graph | generated neutral repositories | `patterns.py --head-bin BIN --run DIR --http`, plus `images.py` graph ([patterns.md](../prove-meada/references/patterns.md)) | landed (#674) |
+| Workload environment entries | #663; 47 to 49 | CLI export, MCP stdio and HTTP | generated sibling workload/code/queue repositories | `environment.py --head-bin BIN --run DIR` ([environment.md](../prove-meada/references/environment.md)) | #663 |
+
 For #663 workload environment resolution, run `python3 $S/environment.py --head-bin "$RUN/bin/meada-head" --run "$RUN/environment"` and inspect the saved source, resolved side/provision sets and raw transport answers ([references/environment.md](../prove-meada/references/environment.md)).
 
 For #664 AWS functions/tasks, run `python3 "$S/aws-workloads.py" --head-bin "$RUN/bin/meada-head" --run "$RUN/aws-workloads"`. Inspect whole producer/image/execution sets, direct and image traces, environment provenance, orphan scope, path-only refresh and refusal captures. [references/aws-workloads.md](../prove-meada/references/aws-workloads.md) names the independent inputs, controls and limits; the script supplies evidence for an independent verdict.

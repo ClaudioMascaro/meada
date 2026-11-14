@@ -231,7 +231,9 @@ A flow for a new feature lands in one PR:
 
 1. Its driver in `scripts/` here (one flat folder: the drivers import each other), with the input it needs ("An input for a new flow" in [references/scope.md](references/scope.md)).
 2. Its row in [references/scope.md](references/scope.md) and its entry in `FLOWS` (`scripts/prove-ci`): `scripts/prove-ci --selftest` fails when the two disagree.
-3. Its answer-key row and its section in the feature skill of its family, described there once. Detail past a paragraph goes to `references/<flow>.md` here, linked from that skill.
+3. Its answer-key row and its section in the feature skill of its family, described there once (a family that keeps a Flows table gets a row there too). Detail past a paragraph goes to `references/<flow>.md` here, linked from that skill.
 4. A new family gets a sibling skill, `prove-meada-<family>`, shaped like the others: `disable-model-invocation: true`, no `prove-it:` marker, no verdict rule, and a row in the Feature skills table.
+
+A flow whose check does not exist yet is `pending` in its Flows table: a change that reaches it is UNPROVEN on that flow until the ticket that lands it writes the check.
 
 A feature skill that no longer reads in one pass splits by family.

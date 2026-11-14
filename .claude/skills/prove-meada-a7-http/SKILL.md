@@ -17,4 +17,10 @@ Read `.claude/skills/prove-meada/SKILL.md` first: it owns Scope, Sort, the answe
 
 ## Flows
 
+| Flow | Stories | Surfaces | Entries (`$S/infra.tsv`, `$S/corpus.tsv`) | Check | State |
+|---|---|---|---|---|---|
+| HTTP through Services, Compose and Ingress | #665; HTTP stories and ADR 0026 | CLI export, MCP stdio/HTTP and read-only stored queries | neutral source-generated workload/provider/Service workspace, whole-link oracle and source-deleted parity | `http-iac.py --head-bin BIN --base-bin BASE --run DIR` ([http-iac.md](../prove-meada/references/http-iac.md)) | #665 |
+| HTTP routes declared in IaC: exact finite methods/paths, same-repository handlers or repository fallback | #666; #642 HTTP stories; ADR 0005/0025/0026 | CLI export, MCP stdio/HTTP and stored read-only queries | neutral SAM/Serverless/Terraform/code/consumer workspace, complete provider/link oracle and adjacent misses | `iac-http-routes.py --head-bin BIN --base-bin BASE --run DIR` ([iac-http-routes.md](../prove-meada/references/iac-http-routes.md)) | #666 |
+| HTTP providers from IaC-declared API Gateway, SAM and Serverless routes | 52 (Services/Ingress above) | CLI export, MCP | neutral #666 sources, with the public `sam-rust` source subset judged separately | registered `iac-http-routes.py` row above and its independent complete provider/link key | landed (#666); public source capture is not an independent verdict |
+
 For #665 HTTP routing, run `python3 $S/http-iac.py --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/http-iac"`. Inspect the complete source-derived link set, namespace/path/rewrite controls, raw transport replies and source-deleted read-only parity ([references/http-iac.md](../prove-meada/references/http-iac.md)). Existing gateway and A8 controls remain required for shared HTTP changes.
