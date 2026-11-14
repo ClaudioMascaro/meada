@@ -8,8 +8,8 @@ conferido pelo CI do repositório, pelo script indicado na seção.
 Na raiz do repositório:
 
 ```sh
-docker run --rm --network none --user "$(id -u):$(id -g)" -v "${PWD%/*}:${PWD%/*}" -w "$PWD" ghcr.io/claudiomascaro/meada:1.3.0 index
-docker run --rm --network none --user "$(id -u):$(id -g)" -v "${PWD%/*}:${PWD%/*}" -w "$PWD" ghcr.io/claudiomascaro/meada:1.3.0 status
+docker run --rm --network none --user "$(id -u):$(id -g)" -v "${PWD%/*}:${PWD%/*}" -w "$PWD" ghcr.io/claudiomascaro/meada:1.4.0 index
+docker run --rm --network none --user "$(id -u):$(id -g)" -v "${PWD%/*}:${PWD%/*}" -w "$PWD" ghcr.io/claudiomascaro/meada:1.4.0 status
 ```
 
 - `--user` grava o `.meada/` com o seu usuário, não com o da imagem (uid 10001).
@@ -29,7 +29,7 @@ publica `127.0.0.1:8443`. O perfil padrão, `local`, busca e indexa os repositó
 `REPOSITORIES` em volumes próprios; os perfis de gerações e da console são opcionais.
 
 ```sh
-git clone --depth 1 --branch v1.3.0 https://github.com/ClaudioMascaro/meada.git
+git clone --depth 1 --branch v1.4.0 https://github.com/ClaudioMascaro/meada.git
 cd meada/deploy/compose
 cp .env.example .env    # versão, token aleatório e, se quiser, REPOSITORIES
 docker compose up -d
@@ -49,8 +49,8 @@ do Meada. `values-minimal.yaml` sobe um nó, sem módulos cloud, que busca e ind
 público no init container:
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.3.0/deploy/helm/meada/values-minimal.yaml
-helm install meada oci://ghcr.io/claudiomascaro/charts/meada --version 1.3.0 -f values-minimal.yaml
+curl -fsSLO https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.4.0/deploy/helm/meada/values-minimal.yaml
+helm install meada oci://ghcr.io/claudiomascaro/charts/meada --version 1.4.0 -f values-minimal.yaml
 kubectl rollout status deployment/meada-meada
 kubectl port-forward service/meada-meada 7333:7333
 ```
