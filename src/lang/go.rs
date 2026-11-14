@@ -1415,7 +1415,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
     // A local kept as a constant is named `function.name`.
     let held = (facts.consts.iter()).filter_map(|c| c.name.rsplit_once('.'));
     // `len(x)` and `cap(x)` read the value and change nothing (#774), where no binding of the file
-    // hides them (the SDK reader checks the package's other files, `sdk::Hidden`).
+    // hides them (the SDK reader checks the package's other files, `sdk::hiding_builtins`).
     let read = |name: Node| {
         let args = name.parent().filter(|a| a.kind() == "argument_list");
         let call = (args.filter(|a| a.named_child_count() == 1)).and_then(|a| a.parent());

@@ -112,47 +112,4 @@ class Named {
         request.TransactItems[0] = new TransactGetItem { Get = new Get { TableName = "get-new" } };
         await db.TransactGetItemsAsync(request);
     }
-
-    // Another request that sends it changes nothing (#774). `x.Count` stays a mention: `List`
-    // may name a type of the repository whose `Count` runs code.
-    async Task LengthRead() {
-        var db = new AmazonDynamoDBClient();
-        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "length-read" } } };
-        System.Console.WriteLine(items.Count);
-        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
-    }
-
-    async Task SentTwice() {
-        var db = new AmazonDynamoDBClient();
-        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "sent-twice" } } };
-        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
-        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
-    }
-
-    async Task SentThenSet() {
-        var db = new AmazonDynamoDBClient();
-        var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "sent-old" } } };
-        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
-        items[0] = new TransactWriteItem { Put = new Put { TableName = "sent-new" } };
-        await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
-    }
-
-    async Task RequestTwice() {
-        var db = new AmazonDynamoDBClient();
-        var request = new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "request-twice" } } } };
-        await db.TransactWriteItemsAsync(request);
-        await db.TransactWriteItemsAsync(request);
-    }
-
-    async Task HandedAfterSend() {
-        var db = new AmazonDynamoDBClient();
-        var request = new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "handed-after-old" } } } };
-        await db.TransactWriteItemsAsync(request);
-        Change(request);
-        await db.TransactWriteItemsAsync(request);
-    }
-
-    void Change(TransactWriteItemsRequest request) {
-        request.TransactItems[0] = new TransactWriteItem { Put = new Put { TableName = "handed-after-new" } };
-    }
 }

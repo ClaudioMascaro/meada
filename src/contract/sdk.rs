@@ -161,7 +161,7 @@ pub(crate) fn extract<'a>(
         return Vec::new();
     };
     let mut found = Vec::new();
-    let (written, declared) = (std::cell::OnceCell::new(), std::cell::OnceCell::new());
+    let (written, hiding) = (std::cell::OnceCell::new(), std::cell::OnceCell::new());
     let builders = java::Builders::default();
     let configs = std::cell::OnceCell::new();
     let inject = |code: &Code<'a>, path: &'a str, on: crate::resolve::Injected<'a>| {
@@ -178,7 +178,7 @@ pub(crate) fn extract<'a>(
         // A transaction folds a value per entry, and a file of them would spend what its other
         // calls need: its rows have a budget of their own, here and in `Code::apart`.
         let mut apart = origins::Origins::new(code, language);
-        let (counts, sent) = (std::cell::OnceCell::new(), std::cell::OnceCell::new());
+        let counts = std::cell::OnceCell::new();
         let aliases: BTreeMap<_, _> = if language == Language::Csharp {
             facts
                 .imports
@@ -220,40 +220,21 @@ pub(crate) fn extract<'a>(
                         &builders,
                     ) || (language != Language::Java
                         && reads_entries(operation.field)
-                        && held_changed(
-                            code,
-                            path,
-                            index,
-                            operation.field,
-                            language,
+                        && held_changed(code, path, index, operation.field, language, {
                             counts.get_or_init(|| {
-                                let hides = (declared.get_or_init(|| Declared::read(code)))
-                                    .packages
+                                // Where the package may declare `len` or `cap`, `len(x)` may be
+                                // the repository's code: the reads left out count again.
+                                let hides = (hiding.get_or_init(|| hiding_builtins(code)))
                                     .contains(directory(path));
                                 (code.mentioned(path).iter())
                                     .map(|m| {
                                         let reads = if hides { m.read } else { 0 };
-                                        (
-                                            (m.scope.as_str(), m.name.as_str()),
-                                            m.count.saturating_add(reads),
-                                        )
+                                        let count = m.count.saturating_add(reads);
+                                        ((m.scope.as_str(), m.name.as_str()), count)
                                     })
                                     .collect()
-                            }),
-                            sent.get_or_init(|| {
-                                let methods =
-                                    &declared.get_or_init(|| Declared::read(code)).methods;
-                                sends(
-                                    code,
-                                    path,
-                                    &facts.calls,
-                                    services,
-                                    language,
-                                    methods,
-                                    origins,
-                                )
-                            }),
-                        ));
+                            })
+                        }));
                     let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
                         let [Value::Call(call)] = args else {
                             return Some(vec![Name::default()]);
@@ -451,89 +432,24 @@ fn changed_request<'a>(
     false
 }
 
-/// What the repository declares in place of the platform's (#774): the Go packages
-/// (directories) a file of which declares `len` or `cap`, whose `len(x)` the Go pack's counts
-/// leave out (`Mentioned::read`) is then the repository's code, a mention again; and the names of
-/// its C# methods, one of which a C# call that looks like an SDK call may reach (an extension
-/// method), so that it is no send that changes nothing (`sends`).
-struct Declared<'a> {
-    packages: BTreeSet<&'a str>,
-    methods: BTreeSet<&'a str>,
-}
-
-impl<'a> Declared<'a> {
-    fn read(code: &Code<'a>) -> Self {
-        let (mut packages, mut methods) = (BTreeSet::new(), BTreeSet::new());
-        for (&path, facts) in code.files() {
-            let names = (facts.defs.iter().map(|d| d.name.as_str()))
-                .chain(facts.consts.iter().map(|c| c.name.as_str()));
-            if names.clone().any(|n| n == "len" || n == "cap") {
-                packages.insert(directory(path));
-            }
-            if path.ends_with(".cs") {
-                // `Ns.Type<T>.Method<U>(Ns.Arg)`: the name between its parent and `(` or `<`.
-                let simple = |d: &'a crate::lang::Def| {
-                    let own = d.name[crate::parent(&d.name).len()..].trim_start_matches('.');
-                    own.split(['(', '<']).next().unwrap_or(own)
-                };
-                methods.extend(facts.defs.iter().map(simple));
-            }
+/// The Go packages (directories) a file of which declares `len` or `cap` (#774): there `len(x)`
+/// and `cap(x)`, which the Go pack's counts leave out (`Mentioned::read`), may be the
+/// repository's code, so they are mentions again. A file the target does not build is not among
+/// the files, as for every Go name.
+fn hiding_builtins<'a>(code: &Code<'a>) -> BTreeSet<&'a str> {
+    let mut packages = BTreeSet::new();
+    for (&path, facts) in code.files() {
+        let mut names = (facts.defs.iter().map(|d| d.name.as_str()))
+            .chain(facts.consts.iter().map(|c| c.name.as_str()));
+        if names.any(|n| n == "len" || n == "cap") {
+            packages.insert(directory(path));
         }
-        Self { packages, methods }
     }
+    packages
 }
 
 fn directory(path: &str) -> &str {
     path.rsplit_once('/').map_or("", |(directory, _)| directory)
-}
-
-/// The names each transaction call of the file sends (Go and C#), by call: its request when a
-/// name holds it, or the list of entries an inline request holds. An SDK call reads its request
-/// and changes nothing, so another one that sends the name is no change to it (#774). A C# call
-/// of a name some C# method of the repository has (`methods`) may reach that method instead (an
-/// extension method), so it sends nothing here.
-fn sends<'c, 'a>(
-    code: &'c Code<'a>,
-    path: &'a str,
-    calls: &[crate::lang::Call],
-    services: &'c [Service],
-    language: Language,
-    methods: &BTreeSet<&str>,
-    origins: &mut origins::Origins<'c, 'a>,
-) -> BTreeSet<(usize, &'a str, &'a str)> {
-    let mut sent = BTreeSet::new();
-    for (index, stored) in calls.iter().enumerate() {
-        let method = crate::resolve::method(&stored.callee);
-        if language == Language::Csharp && methods.contains(method) {
-            continue;
-        }
-        let operations = (services.iter())
-            .flat_map(|service| service.operations.iter().map(move |o| (service, o)))
-            .filter(|(_, o)| language.method(method, o.method) && reads_entries(o.field));
-        for (service, operation) in operations {
-            let Some(call) = code.call(path, index).filter(|_| {
-                origins.call(path, index, &service.client)
-                    || origins.declared(path, index, service.declared)
-            }) else {
-                continue;
-            };
-            let request = match language {
-                Language::Go => call.args.get(1),
-                _ => call.keyword("request").or_else(|| call.args.first()),
-            };
-            let field = (operation.field.split('.').next()).map(|f| f.trim_end_matches("[]"));
-            let list = request.zip(field).and_then(|(r, f)| match language {
-                Language::Go => go::field_of(r, f).flatten(),
-                _ => csharp::field_of(r, f).flatten(),
-            });
-            for value in request.into_iter().chain(list) {
-                if let Value::Ref(name) = value {
-                    sent.insert((index, call.scope.as_str(), name.as_str()));
-                }
-            }
-        }
-    }
-    sent
 }
 
 /// Whether a name on a path of entries (`reads_entries`) may hold a value that changed (Go and
@@ -550,7 +466,6 @@ fn held_changed<'a>(
     selector: &str,
     language: Language,
     counts: &HashMap<(&'a str, &'a str), u32>,
-    sent: &BTreeSet<(usize, &'a str, &'a str)>,
 ) -> bool {
     let Some(call) = code.call(path, index) else {
         return false;
@@ -575,11 +490,7 @@ fn held_changed<'a>(
                     (bound.scope.as_str(), bound.within.as_str(), &bound.value)
                 }
             };
-            // Another transaction's request reading the name is a mention that changes nothing.
-            let others = (sent.iter())
-                .filter(|&&(i, scope, n)| i != index && scope == declared && n == name.as_str())
-                .count();
-            if counts.get(&(declared, name.as_str())).map(|&c| c as usize) != Some(2 + others) {
+            if counts.get(&(declared, name.as_str())) != Some(&2) {
                 return None;
             }
             (value, scope) = (holds, written);
