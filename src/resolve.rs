@@ -9372,46 +9372,37 @@ mod tests {
 
     #[test]
     fn a_wrapper_cycle_that_hands_another_value_on_is_read_where_it_stands() {
+        // The URL each site reads, sorted; `?` for one not known.
         let urls = |wrappers: &str, call: &str| {
-            let mut found = fetched(&format!("{wrappers}\nfunction place() {{ {call}; }}\n"));
+            let src = format!("{wrappers}\nfunction place() {{ {call}; }}\n");
+            let mut found: Vec<String> = (fetched(&src).into_iter())
+                .map(|url| url.unwrap_or_else(|| "?".into()))
+                .collect();
             found.sort();
             found
         };
-        let (first, cut) = (Some("/first".to_string()), None);
         // The call that closes the cycle sends the other parameter: it is read where it
         // stands, the URL not known, beside what the caller's turn reads (#886).
         let send = "function send(n: number, a: string, b: string) {\n\
                     fetch(a); if (n > 0) send(n - 1, b, ''); }";
-        assert_eq!(
-            urls(send, "send(1, '/first', '/second')"),
-            [cut.clone(), first.clone()]
-        );
+        assert_eq!(urls(send, "send(1, '/first', '/second')"), ["/first", "?"]);
         // So is one that hands the same parameter on in the place of the one the read needs.
         let twice = "function send(n: number, a: string, b: string) {\n\
                      fetch(a); if (n > 0) send(n - 1, b, b); }";
-        assert_eq!(
-            urls(twice, "send(1, '/first', '/second')"),
-            [cut.clone(), first.clone()]
-        );
+        assert_eq!(urls(twice, "send(1, '/first', '/second')"), ["/first", "?"]);
         // Two wrappers that call each other and swap the parameters.
         let ping = "function ping(n: number, a: string, b: string) {\n\
                     fetch(a); if (n > 0) pong(n, a, b); }\n\
                     function pong(n: number, a: string, b: string) { ping(n - 1, b, a); }";
-        assert_eq!(
-            urls(ping, "ping(1, '/first', '/second')"),
-            [cut, first.clone()]
-        );
+        assert_eq!(urls(ping, "ping(1, '/first', '/second')"), ["/first", "?"]);
         // A retry hands the parameter the read needs on as itself, whatever else it changes:
         // another turn reads what the first did, and adds nothing.
         let retry = "function retry(n: number, a: string, b: string) {\n\
                      fetch(a); if (n > 0) retry(n - 1, a, a); }";
-        assert_eq!(
-            urls(retry, "retry(1, '/first', '/second')"),
-            [first.clone()]
-        );
+        assert_eq!(urls(retry, "retry(1, '/first', '/second')"), ["/first"]);
         let tick = "function tick(n: number, a: string) { fetch(a); if (n > 0) tock(n, a); }\n\
                     function tock(n: number, a: string) { tick(n - 1, a); }";
-        assert_eq!(urls(tick, "tick(1, '/first')"), [first]);
+        assert_eq!(urls(tick, "tick(1, '/first')"), ["/first"]);
     }
 
     #[test]
