@@ -12,6 +12,8 @@ short.
   `/home/user/meada/.claude/skills/verify-blackbox/scripts/`: `mcp.py <binary> <repo> <tool>
   [json-args]` for one MCP call (`--list` names the tools), `fixtures.py <prev> <after> <out-dir>
   [substring]` to index every fixture with both binaries. `meada export` prints the whole graph.
+- One process at a time, in the foreground: wait on a command by running it, with no polling
+  loop of your own (a `sleep` loop waiting on a file outlives you).
 - Disk is tight: delete every `.meada/` and scratch copy when done.
 - Your final message is the report.
 
@@ -24,8 +26,10 @@ Name what must stay unchanged.>
 
 Decide each expected value from <the emulated tool or spec: Terraform, Kubernetes, the ADR> before
 running either binary; when you can, check it with a small oracle built on that tool's own
-libraries (say which version). Cases: the claim's list, PREV vs AFTER; <edges the implementer
-suspects: neighbours, combinations, other file formats, scale>. Then run `fixtures.py` over
+libraries (say which version). An oracle's REPL (`terraform console`) gets one expression per
+invocation: several lines on its stdin print one answer. Cases: the claim's list, PREV vs
+AFTER; <edges the implementer suspects: neighbours, combinations, other file formats, scale>.
+Then run `fixtures.py` over
 <every fixture | fixtures matching a substring>: answers identical unless the claim explains the
 difference.
 

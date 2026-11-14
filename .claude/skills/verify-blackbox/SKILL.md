@@ -42,7 +42,9 @@ either binary. Its report is development evidence; E2E evidence stays with `prov
 
 `scripts/check` runs the `--selftest` of each one a change touches.
 
-- `scripts/stage.py <name>`: `/tmp/verify/<name>/{meada,COMMIT,work/}`, binary stripped.
+- `scripts/stage.py <name>`: `/tmp/verify/<name>/{meada,COMMIT,work/}`, binary stripped; it takes
+  the newest build of this tree from its own `target/`, `CARGO_TARGET_DIR`, or the main
+  checkout's `target/` when `bounded` recorded this tree as its last builder there.
 - `scripts/fixtures.py <prev> <after> <out> [substring]`: indexes each `tests/fixtures/` entry
   with both binaries, prints `ok` or the difference (export minus `commit`, `status`, exit).
 - `scripts/mcp.py <binary> <repo> <tool|--list> [json-args]`: one MCP call over stdio.

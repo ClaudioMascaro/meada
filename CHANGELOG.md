@@ -86,6 +86,16 @@ belongs to the maintainer. Release notes are available in
   `.tf` block with the override files Terraform reads, in either order of the two files: `a.tf`
   declaring `["x"]` and `b.tofu` declaring `["b", "a", "a"]` names `0-x`, where Meada gave the
   block of the file it read last at `exact` (#768).
+- A `for` over a literal list or object is costed as one over a variable's value, its element
+  count times its costliest element, plus its elements once, where the literal's whole cost
+  stood for both and squared it: a `for_each` over forty inline objects names its forty
+  instances, where it gave one pattern name. A `for` whose output would pass the estimate's
+  ceiling is still refused before it is evaluated, and so is a literal holding one (#716).
+- `join`, `replace` and `formatlist` are costed by the output they can make (a separator per
+  byte of the lists joined, a replacement per byte of the string, a row per element of the
+  list formatted), where their arguments' cost was squared and squared again when nested:
+  `join("-", [join("-", [join(",", ["a"])])])` names `a`, where it gave `*`. A call whose output
+  would pass the estimate's ceiling is still refused before it is evaluated (#764).
 - Each Terraform root knows which of its variables hold a set, whatever root was evaluated before
   it in the repository: a root's answer could come from another root's variable of the same name.
   Under `type = set(string)` with a default `["b", "a", "a"]`, a `for_each = { for k, v in var.s :

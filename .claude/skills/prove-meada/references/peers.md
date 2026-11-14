@@ -61,7 +61,7 @@ Each A8 ticket that lands a flow turns its rows of `a8-cases.tsv` from `pending`
 adds the cases its spec lines name beyond the repro's (`String(u)`, `` `${u}` ``, the
 `new URL(ref, base)` joins, `$env`, the string endpoint, both proxy shapes, `meada status` on an
 include not followed, a refresh after editing only a partial) to the generator and the table
-through `/create-prove-it`, and adds its paths to SKILL.md's Scope row.
+through `/create-prove-it`, and adds its paths to its Scope row ([scope.md](scope.md)).
 
 | Flow (#683) | Cases | Ticket | State |
 |---|---|---|---|
