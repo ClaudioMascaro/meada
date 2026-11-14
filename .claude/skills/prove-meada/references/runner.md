@@ -1,8 +1,8 @@
 # The runner: builds, health and clean-up
 
 `SKILL.md` reaches this file for the mechanics of a run. GitHub Actions executes them through
-`scripts/prove-ci` (the `build-*` and `clean*` steps of a receipt); the manual audit, and a flow run by
-hand on a runner, follow the same commands. Preserve the same corpus, answer keys, limits and
+`scripts/prove-ci` (the `build-*` and `clean*` steps of a receipt), and the manual audit
+workflow follows the same commands. Preserve the same corpus, answer keys, limits and
 before/after checks when arranging the CI run. `S=.claude/skills/prove-meada/scripts`, and every
 command runs from the repository root.
 

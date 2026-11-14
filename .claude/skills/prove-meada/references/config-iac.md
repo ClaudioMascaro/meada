@@ -1,6 +1,7 @@
 # A7: config values and IaC (spec #642)
 
-The A7 section of prove-meada. Spec #642 ("Config and IaC in the graph") is the answer key of
+The reference of [prove-meada-a7-config](../../prove-meada-a7-config/SKILL.md), with what every A7 flow
+shares. Spec #642 ("Config and IaC in the graph") is the answer key of
 every new A7 flow: its user stories, read at run time from the issue
 (`gh api repos/ClaudioMascaro/meada/issues/642 --jq .body`), never from a PR body or a golden the
 same change wrote. The base binary is the answer key of everything an A7 change leaves as it
@@ -9,13 +10,13 @@ was, a repository with no config included.
 ## Flows
 
 The rows of the A7 flows (stories, surfaces, entries, check, state) are in the feature skill of
-each family, under "Flows": [prove-meada-a7-config](../../prove-meada-a7-config/SKILL.md),
+each group, under "Flows": [prove-meada-a7-config](../../prove-meada-a7-config/SKILL.md),
 [prove-meada-a7-cloud](../../prove-meada-a7-cloud/SKILL.md),
 [prove-meada-a7-workloads](../../prove-meada-a7-workloads/SKILL.md),
 [prove-meada-a7-alerts](../../prove-meada-a7-alerts/SKILL.md) and
 [prove-meada-a7-http](../../prove-meada-a7-http/SKILL.md). The console graph's row is in
 [prove-meada-console](../../prove-meada-console/SKILL.md). `SKILL.md`, "Adding a feature", says
-where a new flow goes. This file keeps the detail of the config and IaC family.
+where a new flow goes. This file keeps the detail of the config and IaC group.
 
 ## `orphans.py`: #657
 
@@ -32,7 +33,7 @@ When the six scenarios were already completed and only the same-token cross-kind
 needs adding, the same command with `--cross-kind-only` drives just that focused addendum in
 its own run directory, with its own input hashes and captures.
 
-Extend this existing A7 section through `/create-prove-it`, never a second prove skill. The
+A new A7 flow goes where `SKILL.md`, "Adding a feature", says, never into a second prove skill. The
 answer key is the maintainer's #657 acceptance criteria and ADR 0026 at the required base,
 read before checking. #642 supplies the parent contract model. Neither feature tests, their
 fixtures, newly written docs nor the implementation are answer keys.

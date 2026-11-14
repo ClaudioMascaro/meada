@@ -18,9 +18,9 @@ Then sketch the end-to-end seams, where the running app proves the feature. Read
 
 - **Flows**: every surface and flow the spec adds or touches, each sorted new or existing.
 - **Answer keys**: what each flow's proof compares with. A new flow that copies an existing one: parity with it. A new flow that copies nothing: this spec, so write down the result that proves it. An existing flow: the app before the change. Name the areas that must stay as they are "not changed".
-- **Prove skill work**: which tickets extend the prove skill through `/create-prove-it` wherever it cannot reach a flow yet (a surface section, Scope map rows, answer keys, fixtures), each followed by `/audit-prove-it` to try to fool the extension, and when `/maintain-prove-it` folds what their receipts learned back into it.
+- **Prove skill work**: which tickets extend the prove skill wherever it cannot reach a flow yet, the way the prove skill itself says to add one (in this repository `prove-meada`, "Adding a feature": the driver, the Scope rows, the answer keys, the fixtures). `/create-prove-it`, `/audit-prove-it` and `/maintain-prove-it` are the maintainer's to invoke: where the spec wants one (a new surface, an audit that tries to fool the extension, receipts folded back in), write it as a step for the maintainer, never as a ticket's.
 
-With no prove skill in the repository, propose `/create-prove-it` as the first ticket.
+With no prove skill in the repository, propose `/create-prove-it` as the first step, for the maintainer to run.
 
 Check with the user that these seams match their expectations.
 

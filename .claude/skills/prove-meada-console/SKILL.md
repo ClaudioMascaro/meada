@@ -32,6 +32,8 @@ Read `.claude/skills/prove-meada/SKILL.md` first: it owns Scope, Sort, the answe
 |---|---|---|---|---|---|
 | Console provisioners/provisioning, image builders/runners and alert emitters/matchers, legend, keyboard navigation and search selectors | #675; 63, 64 | CLI export parity, console graph and query/export API | four neutral repositories with two roots, unpaired image sides and local equality/regex alerts | `console-graph.py --head-bin UI_BIN --ui-dir ui/dist --run DIR` ([console-graph.md](../prove-meada/references/console-graph.md)); existing image/config-use/viewer flows still apply | #675, executable CI flow |
 
+`console-graph` is an A7 flow: it also follows the **Copies** and **Could fool you** paragraphs of [prove-meada-a7-config](../prove-meada-a7-config/SKILL.md).
+
 For #675's console graph, run `python3 $S/console-graph.py --head-bin "$RUN/bin/meada-head-ui" --ui-dir ui/dist --run "$RUN/console-graph"`. Inspect the screenshots, whole role/link tables, roots, reasons, native keyboard focus, unpaired sides and `value`/`iac`/`alert` playground answers; retain the receipt and CI artifact. [references/console-graph.md](../prove-meada/references/console-graph.md) defines inputs, answer keys, budgets, controls and cleanup. `scripts/prove-ci` runs this flow in the Proof workflow's `prove-meada` job and `proof-a7-a8-ui` runs it in the manual audit, both against a real UI binary; unavailable browser tooling leaves it BLOCKED.
 
 ## Gotchas
