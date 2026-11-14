@@ -1,6 +1,6 @@
 # Bounded A7/A8 audit: #676 and #684
 
-Use `/audit-prove-it` and `/maintain-prove-it` with the existing skill. The source/spec keys
+`/audit-prove-it` and `/maintain-prove-it`, which the maintainer invokes, work on the existing skill. The source/spec keys
 remain #642/#676, the child flow issues, #683/#684, and base ADRs 0025/0026. The executable
 plan is [a7-a8-mutations.json](../scripts/a7-a8-mutations.json): eight plausible A7 bugs across
 values, IaC nodes, provisioners, workload environments, Service DNS, alert routing, AWS direct
@@ -31,7 +31,7 @@ its merge-base with the associated open PR's actual base SHA and the three exist
 historical bases below. The workflow resolves exactly one open PR for the repository owner
 and dispatched branch, validates its base SHA and computes that merge-base. Missing or
 ambiguous PRs block the baseline. It copies each binary before releasing the compiler lock,
-pins every skill/answer-key byte and drives the fixed source-derived checks. `baseline.json` records the
+pins every byte of this skill's folder (the feature skills are held by the source commit and the clean-tree check) and drives the fixed source-derived checks. `baseline.json` records the
 source commit/tree, actual build commits, binary SHA256s, keys, flows and raw check results.
 At the baseline the PR merge-base binary is the key of the existing flows, so the clean head is
 checked against the base; later phases take existing A7 annotation/whole-export bytes from the

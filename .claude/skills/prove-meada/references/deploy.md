@@ -1,9 +1,5 @@
 # Deploy
 
-These product execution commands are CI-only recipes under `AGENTS.md`. Locally, prepare
-inputs or read the matching run artifact; do not build or start the product.
-
-
 ## Renders, base against head
 
 ```bash
@@ -45,9 +41,10 @@ python3 scripts/container-smoke meada:zz-prove
 docker image rm meada:zz-prove
 ```
 
-The image build compiles a release binary inside Docker: minutes and gigabytes. Without Docker
-(the cloud sandbox) it is BLOCKED here and CI's `container.yml` runs it on the PR; list it under
-Not covered with that unlock.
+The image build compiles a release binary inside Docker: minutes and gigabytes. The Proof job
+runs both as the steps `container-build` and `container-smoke`. Where a run has no Docker they are
+BLOCKED, and CI's `container.yml` runs the same on the PR: list them under Not covered with that
+unlock.
 
 ## Not covered
 

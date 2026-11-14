@@ -143,7 +143,7 @@ these subscription, config-use and orphan controls.
 ## Shared image storage and trace supplement
 
 When the required baseline already supports this AWS flow, also run `images-mixed.py` as
-documented in [config-iac.md](config-iac.md#combined-imageaws-and-literal-ko-regressions).
+documented in [images.md](images.md#combined-imageaws-and-literal-ko-regressions).
 It places an AWS subscription and image workloads in the same repository, preserves the
 baseline's complete AWS rows, drives both trace relationships together, and edits/restores
 each feature without disturbing the other. Its unresolved-registry case also checks that
