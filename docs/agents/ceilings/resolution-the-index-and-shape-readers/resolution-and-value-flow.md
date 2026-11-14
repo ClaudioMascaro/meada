@@ -102,8 +102,15 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB
   transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that
   declares the name mentions it twice. In Go and C#, one mentioned a third time (logged, read by two
-  requests), one held in a parameter, a field or a package variable, and a C# request filled by
-  property assignments have no table or bus; nor have Go locals declared together (`p, q := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.
+  requests), one held in a field or a package variable, one held in a parameter (a Go wrapper's
+  apart, below), and a C# request filled by property assignments have no table or bus; nor have
+  Go locals declared together (`p, q := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.
+  A Go function, or a method whose name no other definition of the repository spells, that
+  mentions its parameter twice (declared, read by the path) sends what each exact caller passes
+  (#774): the argument is followed in the caller by the caller's own mentions, through any number
+  of such wrappers. A function literal, a method that shares its name (an interface's, another
+  type's), a call with more or fewer arguments than parameters (a variadic one) or a spread
+  (`xs...`), and every C# method are not followed.
   In Java the rule covers a list or an array: one mentioned a third time or held in a field has no
   table or bus (a `List.of` list cannot change and keeps them), and neither has a `new T[]{..}` array
   or a `new ArrayList<>(..)` copy mentioned twice. A method's name is no mention in Java: a list

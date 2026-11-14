@@ -1405,9 +1405,14 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         })
         .collect();
     facts.loops = super::outermost(tree.root_node(), &["for_statement"]);
-    // A local kept as a constant is named `function.name`.
+    // A local kept as a constant is named `function.name`. A parameter is counted in its
+    // function too: a wrapper that writes it twice sends what its caller passes (#774).
     let held = (facts.consts.iter()).filter_map(|c| c.name.rsplit_once('.'));
-    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, held);
+    let params = (facts.defs.iter()).flat_map(|d| {
+        let named = d.params.iter().filter(|p| !p.name.is_empty());
+        named.map(move |p| (d.name.as_str(), p.name.as_str()))
+    });
+    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, held.chain(params));
     Ok(facts)
 }
 
@@ -1525,17 +1530,22 @@ mod tests {
     }
 
     /// `Facts::mentioned`: the identifiers of a function that spell a local it keeps as a
-    /// constant, a function literal inside it included. A package variable gets no count.
+    /// constant or one of its parameters, a function literal inside it included. A package
+    /// variable and a blank parameter get no count.
     #[test]
     fn the_locals_kept_as_constants_are_counted_where_their_function_writes_them() {
         let facts = facts(
             "package p\n\nvar shared = T{}\n\nfunc f() {\n\ta := T{}\n\tb := T{}\n\tg(a)\n\t\
-             go func() { g(a) }()\n\tg(b, shared)\n}\n\nfunc h() {\n\ta := T{}\n\tg(a)\n}\n",
+             go func() { g(a) }()\n\tg(b, shared)\n}\n\nfunc h() {\n\ta := T{}\n\tg(a)\n}\n\n\
+             func k(p T, _ T, q T) {\n\tg(p)\n}\n\nfunc (r R) m(p T) {\n\tp = T{}\n\tg(p)\n}\n",
         );
         let counted: Vec<String> = (facts.mentioned.iter())
             .map(|m| format!("{} {} {}", m.scope, m.name, m.count))
             .collect();
-        assert_eq!(counted, ["f a 3", "f b 2", "h a 2"]);
+        assert_eq!(
+            counted,
+            ["R.m p 3", "f a 3", "f b 2", "h a 2", "k p 2", "k q 1"]
+        );
     }
 
     #[test]

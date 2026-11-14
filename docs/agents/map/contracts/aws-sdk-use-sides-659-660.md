@@ -25,8 +25,12 @@
   item or an entry held in a name is followed only when the function that declares the name
   mentions it twice, where it is declared and where the path reads it (`lang::mentioned` fills
   `Facts::mentioned` for the locals Go keeps as constants and the ones C#'s `bound` keeps); a
-  parameter, a field and a package variable are never followed, and a list holding one entry not
-  followed names nothing for its inline entries either. The rows of a transaction run inside `Code::apart` and trace their clients
+  field and a package variable are never followed, and a list holding one entry not followed names
+  nothing for its inline entries either. A parameter is followed in Go alone, where its function
+  writes it twice: `row` then judges each expanded site (`Params::Bound`, the site's frames),
+  taking the argument of the frame's call (`Code::param_values`) when that call reaches a function
+  or a method of a name no other definition spells (`Counts::wrapper`) with one argument per
+  parameter. The rows of a transaction run inside `Code::apart` and trace their clients
   with an `Origins` of their own, so what they fold is charged to a second per-file budget and
   the other calls of the file keep theirs. Each row of one call starts from what the call found
   spent (`Code::spent_apart`, `set_spent_apart`) and the call is charged the sum of its rows, so

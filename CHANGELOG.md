@@ -87,6 +87,10 @@ All notable changes to Meada are recorded here. The format follows
   `PutEvents` held in a local keeps its table or bus when another function, class or package
   writes the same field through another name (`q.TableName = ..`). The value written through
   its own name, and a named request that is no list of entries, stay unresolved (#774).
+- Go: a request, a list or an entry of a DynamoDB transaction or of EventBridge `PutEvents`
+  that a wrapper takes in a parameter keeps its table or bus at each caller, when the wrapper
+  only declares the parameter and sends it and the caller passes a value nothing else names. A
+  function, and a method whose name no other definition spells, are followed (#774).
 
 ### Changed
 
