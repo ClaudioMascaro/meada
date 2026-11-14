@@ -103,9 +103,9 @@
   more than `PATHS_MAX` (256) sources, or matching more paths than that, is not read; the wildcard
   sources of one Dockerfile examine at most `WORK_MAX` (16,384) directory entries, matched or not,
   each counted once per `PATTERN_STEP` (32) bytes of its wildcard segment, which `fits` compares
-  with the entry's name and `compile` reads at each listing (#761), so past it a `*/*/*/*` source
-  that walks the tree, 255 sources that match nothing in a directory of 4,000 entries, or one long
-  segment leave the Dockerfile unread; a directory past `LIST_MAX` (4,096) entries is not listed,
+  with the entry's name, and a longer segment once more at each listing, where `compile` reads it
+  (#761), so past it a `*/*/*/*` source that walks the tree, 255 sources that match nothing in a
+  directory of 4,000 entries, or one long segment leave the Dockerfile unread; a directory past `LIST_MAX` (4,096) entries is not listed,
   so a wildcard through it leaves the Dockerfile unread. "Not read" is the fallback of ADR 0026:
   the whole context at `inferred`, the reason naming the cause. The fallback is also the
   answer for every form the reader does not parse: a source or mount with a variable, a quote or

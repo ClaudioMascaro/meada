@@ -23,11 +23,12 @@ const PATHS_MAX: usize = 256;
 const WORK_MAX: usize = 16_384;
 
 /// The bytes of a wildcard segment one directory entry is examined against for one unit of
-/// `WORK_MAX`: `compile` reads the segment and `fits` compares it with each entry's name, so a
-/// longer segment counts one unit more per `PATTERN_STEP` bytes, at each listing (#761).
-// ponytail: a segment of up to 32 bytes (`requirements-*.txt`) counts an entry once, as before
-// #761; past it the reader's matching costs at most 255 bytes of a name times 32 per unit, about
-// 134 million comparisons for `WORK_MAX`.
+/// `WORK_MAX`: `fits` compares the segment with each entry's name, so a longer segment counts
+/// each entry one unit more per `PATTERN_STEP` bytes, and once more at each listing, where
+/// `compile` reads it (#761).
+// ponytail: a segment of up to 32 bytes (`requirements-*.txt`) counts an entry once and its
+// listing nothing, as before #761; past it the reader's matching costs at most 255 bytes of a
+// name times 32 per unit, about 134 million comparisons for `WORK_MAX`.
 const PATTERN_STEP: usize = 32;
 
 /// The sources a Dockerfile's `COPY`, `ADD` and `RUN --mount=type=bind` take from the build
@@ -465,9 +466,11 @@ impl Walk<'_> {
         }
         let tokens = compile(head).ok_or("a malformed wildcard")?;
         let entries = contract::list(self.root, dir).ok_or("a directory too large to list")?;
-        // Every entry listed is examined, matched or not, and the segment was compiled (#761).
+        // Every entry listed is examined, matched or not, and a segment past `PATTERN_STEP` was
+        // compiled, which a long one over many empty directories would repeat for free (#761).
         let weight = head.len().div_ceil(PATTERN_STEP);
-        self.spend((entries.len().saturating_add(1)).saturating_mul(weight))?;
+        let compiled = usize::from(weight > 1);
+        self.spend((entries.len().saturating_add(compiled)).saturating_mul(weight))?;
         for (name, kind) in entries.into_iter().filter(|(name, _)| fits(&tokens, name)) {
             self.take(join(dir, &name), kind, rest)?;
         }
@@ -1241,10 +1244,21 @@ mod tests {
         let short: String = (0..255)
             .map(|i| format!("COPY *{}b{i} /x/\n", "a".repeat(27)))
             .collect();
-        let long = format!("COPY *[{}] /x/\n", "bcdefghijklmnopqrstuvwxyz".repeat(2000));
-        for (case, text) in [("short", short), ("long", long)] {
+        let class = "bcdefghijklmnopqrstuvwxyz".repeat(2000);
+        let long = format!("COPY *[{class}] /x/\n");
+        // A long segment is compiled at each listing, of an empty directory too.
+        let empty = repo("empty", &[]);
+        for i in 0..4000 {
+            std::fs::create_dir_all(empty.join(format!("d{i}"))).unwrap();
+        }
+        let deep = format!("COPY */[{class}] /x/\n");
+        for (case, dir, text) in [
+            ("short", &root, short),
+            ("long", &root, long),
+            ("empty", &empty, deep),
+        ] {
             let start = std::time::Instant::now();
-            let codes = executions(&root, &node(".", Some((&text, true))), usize::MAX);
+            let codes = executions(dir, &node(".", Some((&text, true))), usize::MAX);
             let took = start.elapsed();
             let reason = codes.first().map(|c| c.reason.as_str());
             assert!(
@@ -1264,6 +1278,29 @@ mod tests {
         assert_eq!(paths(&codes), [name.as_str()]);
         assert!(!codes[0].inferred, "{}", codes[0].reason);
         let _ = std::fs::remove_dir_all(root);
+        let _ = std::fs::remove_dir_all(empty);
+    }
+
+    /// A segment of up to `PATTERN_STEP` bytes spends what it spent before #761: one unit an entry
+    /// listed and one a path taken, so four sources over 4,000 entries that take 96 each spend
+    /// `WORK_MAX` exactly and are read, and 97 each go past it.
+    #[test]
+    fn a_short_wildcard_spends_one_unit_an_entry_up_to_the_cap() {
+        for (matched, read) in [(96, true), (97, false)] {
+            let names: Vec<String> = (0..4000)
+                .map(|i| format!("{}{i}", if i < matched { "f" } else { "g" }))
+                .collect();
+            let names: Vec<&str> = names.iter().map(String::as_str).collect();
+            let root = repo("short", &names);
+            let text = "COPY f* /x/\n".repeat(4);
+            let codes = executions(&root, &node(".", Some((&text, true))), usize::MAX);
+            assert_eq!(
+                codes.len() == matched && !codes[0].inferred,
+                read,
+                "{matched}"
+            );
+            let _ = std::fs::remove_dir_all(root);
+        }
     }
 
     #[test]
