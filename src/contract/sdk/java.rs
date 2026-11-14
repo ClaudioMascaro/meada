@@ -65,6 +65,9 @@ pub(crate) fn root(value: &Value) -> Option<&str> {
     }
 }
 
+/// Methods by simple name and arity, or by name alone (`None`): `Builders::overridden`.
+type MethodCounts<'a> = std::collections::HashMap<(&'a str, Option<usize>), u32>;
+
 /// What a Java file does with the builders it names, read once for the whole run. A builder
 /// changes in place, so a name is `exact` only when every mention of its builder is a form the
 /// reader follows: a setter called on it (a member of the name's path changes it, any other does
@@ -82,14 +85,17 @@ pub(crate) struct Builders<'a> {
     /// included, with its name: a type of the package or the file shadows the one an import names.
     types: std::cell::OnceCell<std::collections::HashSet<(&'a str, &'a str)>>,
     /// How many methods of the repository have each simple name and arity, and each name of a
-    /// method no definition stands for (`Facts::anonymous`), with no arity (`overridden`).
-    methods: std::cell::OnceCell<std::collections::HashMap<(&'a str, Option<usize>), u32>>,
+    /// method no definition stands for (`Facts::anonymous`), with no arity (`overridden`). None
+    /// when a Java file is past its budget (`Facts::budget`): it keeps no facts, so it may declare
+    /// a method of any name.
+    methods: std::cell::OnceCell<Option<MethodCounts<'a>>>,
 }
 
 impl<'a> Builders<'a> {
     /// Whether a call of the method `def` may run another (#772): a method of the repository with
     /// its simple name and arity, however its parameters are spelled (an override), or one of its
-    /// name that no definition stands for (an anonymous class's, or a class's nested in one).
+    /// name that no definition stands for (an anonymous class's, or a class's nested in one), or
+    /// any method at all where a Java file is past its budget.
     fn overridden(&self, code: &Code<'a>, def: &'a crate::lang::Def) -> bool {
         let simple = |name: &'a str| {
             let own = name[crate::parent(name).len()..].trim_start_matches('.');
@@ -98,6 +104,9 @@ impl<'a> Builders<'a> {
         let methods = self.methods.get_or_init(|| {
             let mut methods = std::collections::HashMap::new();
             for facts in code.files().values() {
+                if facts.budget.is_some() {
+                    return None;
+                }
                 for d in (facts.defs.iter()).filter(|d| d.kind == crate::lang::Kind::Method) {
                     *methods
                         .entry((simple(&d.name), Some(d.params.len())))
@@ -107,8 +116,11 @@ impl<'a> Builders<'a> {
                     *methods.entry((name.as_str(), None)).or_insert(0) += 1;
                 }
             }
-            methods
+            Some(methods)
         });
+        let Some(methods) = methods else {
+            return true;
+        };
         let name = simple(&def.name);
         methods.get(&(name, Some(def.params.len()))) > Some(&1)
             || methods.contains_key(&(name, None))

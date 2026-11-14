@@ -1465,6 +1465,30 @@ fn java_lists_a_wrapper_passes_on_unchanged_name_their_tables() {
     );
 }
 
+/// A Java file past its qualification budget keeps no facts, so it may declare an override of
+/// any wrapper: no wrapper keeps its caller's tables (#772).
+#[test]
+fn a_java_file_past_its_budget_leaves_every_wrapper_unnamed() {
+    let repo = fixture_repo("aws_sdk_wrappers_budget", "aws-sdk-wrappers", None);
+    // The Java pack's `QUALIFICATION_BYTES` (4 MiB): each node under the class repeats its name.
+    let name = "N".repeat(64 * 1024);
+    let methods = "void m() { f(); }\n".repeat(4 * 1024 * 1024 / name.len() + 1);
+    let big = format!("class {name} {{\n{methods}}}\n");
+    std::fs::write(repo.join("Big.java"), big).unwrap();
+    let (export, sides) = java_sides(&repo);
+    for side in [
+        "listOf writer",
+        "asList writer",
+        "entry writer",
+        "twoLevels writer",
+    ] {
+        assert!(
+            sides.contains(&format!("{side} resource::dynamodb")),
+            "{side}: {export}"
+        );
+    }
+}
+
 #[test]
 fn hidden_aws_client_and_command_names_never_feed_contracts() {
     let typescript = [
