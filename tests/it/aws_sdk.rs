@@ -974,6 +974,7 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
     assert_eq!(
         sides("go"),
         [
+            "capbound writer resource::dynamodb",
             "elementreplaced writer resource::dynamodb",
             "entryreplaced writer resource::dynamodb",
             "getreplaced reader resource::dynamodb",
@@ -994,6 +995,7 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
             "slicehanded writer resource::dynamodb",
             "slicereplaced writer resource::dynamodb",
             "slicewritten writer resource::dynamodb",
+            "splitlen writer resource::dynamodb",
             "throughrequest writer resource::dynamodb",
         ],
         "{export}"
@@ -1018,6 +1020,7 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
             "plainparts writer resource::dynamodb::plain-parts",
             "plainrequest writer resource::dynamodb::plain-request",
             "requestcleared writer resource::dynamodb",
+            "requestcount writer resource::dynamodb",
             "requesttwice writer resource::dynamodb::request-twice",
             "requesttwice writer resource::dynamodb::request-twice",
             "sentthenset writer resource::dynamodb",
@@ -1417,6 +1420,36 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
             "wrappedCallerSet writer resource::dynamodb",
             "wrappedPlain writer resource::dynamodb",
             "wrappedSet writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
+/// A repository that declares its own `List` makes `x.Count` its code (#774): the read that
+/// changes nothing is a mention again, and a list read so names no table; one never read so keeps
+/// it.
+#[test]
+fn csharp_count_of_a_repository_list_type_is_a_mention() {
+    let repo = fixture_repo(
+        "aws_sdk_transactions_list_type",
+        "aws-sdk-transactions-list-type",
+        None,
+    );
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let mut sides: Vec<String> = (export["providers"].as_array().unwrap().iter())
+        .map(|s| {
+            let site = s["site"].as_str().unwrap();
+            let method = site.rsplit("::").nth(1).unwrap_or(site);
+            format!("{method} {}", s["contract"].as_str().unwrap())
+        })
+        .collect();
+    sides.sort();
+    assert_eq!(
+        sides,
+        [
+            "ListType.OwnList() resource::dynamodb",
+            "ListType.OwnListPlain() resource::dynamodb::own-list-plain",
         ],
         "{export}"
     );

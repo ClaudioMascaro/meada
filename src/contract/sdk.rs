@@ -161,7 +161,7 @@ pub(crate) fn extract<'a>(
         return Vec::new();
     };
     let mut found = Vec::new();
-    let written = std::cell::OnceCell::new();
+    let (written, hidden) = (std::cell::OnceCell::new(), std::cell::OnceCell::new());
     let builders = java::Builders::default();
     let configs = std::cell::OnceCell::new();
     let inject = |code: &Code<'a>, path: &'a str, on: crate::resolve::Injected<'a>| {
@@ -227,8 +227,17 @@ pub(crate) fn extract<'a>(
                             operation.field,
                             language,
                             counts.get_or_init(|| {
+                                let hides = hidden
+                                    .get_or_init(|| Hidden::read(code))
+                                    .hides(path, language);
                                 (code.mentioned(path).iter())
-                                    .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
+                                    .map(|m| {
+                                        let reads = if hides { m.read } else { 0 };
+                                        (
+                                            (m.scope.as_str(), m.name.as_str()),
+                                            m.count.saturating_add(reads),
+                                        )
+                                    })
                                     .collect()
                             }),
                             sent.get_or_init(|| {
@@ -430,6 +439,45 @@ fn changed_request<'a>(
         values = next;
     }
     false
+}
+
+/// What the repository declares that the language packs' mention counts take for the
+/// platform's own (#774): the Go packages (directories) a file of which declares `len` or `cap`,
+/// and whether a C# file declares a type `List`.
+struct Hidden<'a> {
+    packages: BTreeSet<&'a str>,
+    list: bool,
+}
+
+impl<'a> Hidden<'a> {
+    fn read(code: &Code<'a>) -> Self {
+        let (mut packages, mut list) = (BTreeSet::new(), false);
+        for (&path, facts) in code.files() {
+            let names = (facts.defs.iter().map(|d| d.name.as_str()))
+                .chain(facts.consts.iter().map(|c| c.name.as_str()));
+            if names.clone().any(|n| n == "len" || n == "cap") {
+                packages.insert(directory(path));
+            }
+            list |= (facts.defs.iter()).any(|d| {
+                let name = d.name.split('<').next().unwrap_or_default();
+                d.kind == crate::lang::Kind::Class && (name == "List" || name.ends_with(".List"))
+            });
+        }
+        Self { packages, list }
+    }
+
+    /// Whether the reads the counts of `path` left out (`Mentioned::read`) may change a value: its
+    /// `len(x)` or `x.Count` is then the repository's own code, a mention again.
+    fn hides(&self, path: &str, language: Language) -> bool {
+        match language {
+            Language::Go => self.packages.contains(directory(path)),
+            _ => self.list,
+        }
+    }
+}
+
+fn directory(path: &str) -> &str {
+    path.rsplit_once('/').map_or("", |(directory, _)| directory)
 }
 
 /// The names each transaction call of the file sends (Go and C#), by call: its request when a

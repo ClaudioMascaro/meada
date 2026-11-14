@@ -139,6 +139,15 @@ class Named {
         await db.TransactWriteItemsAsync(new TransactWriteItemsRequest { TransactItems = items });
     }
 
+    // `Count` on a value that is no `List<T>` is no property of its own: an extension property
+    // (C# 14) is the repository's code.
+    async Task RequestCount() {
+        var db = new AmazonDynamoDBClient();
+        var request = new TransactWriteItemsRequest { TransactItems = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "request-count" } } } };
+        System.Console.WriteLine(request.Count);
+        await db.TransactWriteItemsAsync(request);
+    }
+
     async Task SentTwice() {
         var db = new AmazonDynamoDBClient();
         var items = new List<TransactWriteItem> { new TransactWriteItem { Put = new Put { TableName = "sent-twice" } } };

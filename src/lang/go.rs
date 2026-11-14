@@ -304,7 +304,7 @@ impl Walk<'_> {
     }
 
     /// Whether a binding of the file hides the builtin `name` (`len`).
-    // ponytail: a package-level one another file of the package declares is not seen.
+    // ponytail: a package-level one another file of the package declares is not seen here.
     fn hides(&self, name: &str) -> bool {
         (self.bound.keys()).any(|(_, n)| n == name)
             || (self.facts.defs.iter()).any(|d| d.name == name)
@@ -1400,8 +1400,9 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
     }
     // The values read `bound`, which `finish` takes.
     walk.finish_values();
+    // Before `finish`, which takes the bindings `hides` reads.
+    let [free_len, free_cap] = ["len", "cap"].map(|name| !walk.hides(name));
     walk.finish();
-    let builtin = ["len", "cap"].map(|name| !walk.hides(name));
     let mut facts = walk.facts;
     unbind_clashes(&mut facts.imports);
     facts.exports = (top.into_iter().filter(|n| exported(n)))
@@ -1413,7 +1414,8 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
     facts.loops = super::outermost(tree.root_node(), &["for_statement"]);
     // A local kept as a constant is named `function.name`.
     let held = (facts.consts.iter()).filter_map(|c| c.name.rsplit_once('.'));
-    // `len(x)` and `cap(x)` read the value and change nothing (#774), where no binding hides them.
+    // `len(x)` and `cap(x)` read the value and change nothing (#774), where no binding of the file
+    // hides them (the SDK reader checks the package's other files, `sdk::Hidden`).
     let read = |name: Node| {
         let args = name.parent().filter(|a| a.kind() == "argument_list");
         let call = (args.filter(|a| a.named_child_count() == 1)).and_then(|a| a.parent());
@@ -1421,8 +1423,8 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
             .and_then(|c| c.child_by_field_name("function"))
             .filter(|f| f.kind() == "identifier");
         match function.map(|f| text(f, src)) {
-            Some("len") => builtin[0],
-            Some("cap") => builtin[1],
+            Some("len") => free_len,
+            Some("cap") => free_cap,
             _ => false,
         }
     };

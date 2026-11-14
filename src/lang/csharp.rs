@@ -1424,7 +1424,14 @@ fn parse(src: &[u8]) -> Result<Facts> {
     facts.consts.extend(given);
     let locals = bound.iter().map(|b| (b.scope.as_str(), b.name.as_str()));
     // `x.Count` reads a list's size and changes nothing (#774): not called (`x.Count()`),
-    // assigned or stepped (`x.Count++`).
+    // assigned or stepped (`x.Count++`), and only where every binding of `x` is a `List<T>`, whose
+    // own property no extension property stands for (the SDK reader checks that no file declares
+    // a type `List`, `sdk::Hidden`).
+    let mut lists: HashMap<&str, bool> = HashMap::new();
+    for b in &bound {
+        let list = matches!(&b.value, Value::New(ty, _) if ty == "List" || ty.ends_with(".List"));
+        *lists.entry(b.name.as_str()).or_insert(true) &= list;
+    }
     let read = |name: Node| {
         let Some(access) = name
             .parent()
@@ -1434,6 +1441,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
         };
         let size = access.child_by_field_name("name");
         access.child_by_field_name("expression") == Some(name)
+            && lists.get(text(name, src)) == Some(&true)
             && size.is_some_and(|n| text(n, src) == "Count")
             && access.parent().is_none_or(|p| match p.kind() {
                 "invocation_expression"

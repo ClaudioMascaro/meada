@@ -102,10 +102,11 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB
   transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that
   declares the name mentions it twice. In Go and C#, a use that reads it and changes nothing is
-  no mention (#774): Go's `len(x)` and `cap(x)` (unless the file binds or declares `len` or `cap`;
-  a package-level one another file of the package declares is not seen), C#'s `x.Count` (not
-  called, assigned or stepped), and another transaction call of the same function that sends the
-  name as its request or as an inline request's list. One mentioned a third time for any other
+  no mention (#774): Go's `len(x)` and `cap(x)` (unless a file of the package binds or declares
+  `len` or `cap`), C#'s `x.Count` where every binding of `x` is a `List<T>` (not called, assigned
+  or stepped, and unless a file declares a type `List`), and another transaction call of the same
+  function that sends the name as its request or as an inline request's list (a C# form: Go names
+  no table for an inline request holding a named list). One mentioned a third time for any other
   reason (logged, `x.Count()`, held by a second request in a name), one held in a parameter, a
   field or a package variable, the first name the path meets when any file of the repository
   assigns the field read through it (`q.TableName = ..` on any
