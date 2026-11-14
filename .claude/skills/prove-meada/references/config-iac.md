@@ -8,7 +8,7 @@ was, a repository with no config included.
 
 ## Flows
 
-Each A7 ticket that adds a flow adds its row here, its row in SKILL.md's Scope table, and its
+Each A7 ticket that adds a flow adds its row here, its row in the Scope table ([scope.md](scope.md)), and its
 check (a `prove.py` subcommand or `--queries` file) in the same PR. A flow whose check does not
 exist yet is `pending`: a change that reaches it is UNPROVEN on that flow until the ticket that
 lands it writes the check.

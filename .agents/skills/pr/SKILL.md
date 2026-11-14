@@ -36,6 +36,9 @@ Use this template for writing the PR body:
 
 Skip all preambles and keep prose brief. Use the user's domain language from `GLOSSARY.md`.
 
+Keep the body in a file: send it from there and check what GitHub holds against it
+(`docs/agents/issue-tracker.md`, **Check a PR body**), never by reading the whole PR back.
+
 ### Summary
 
 Pick the smallest view that makes the key point clear.
@@ -162,6 +165,8 @@ Concrete evidence that the change works. Show a before and after.
 Screenshots are S-tier - when the environment is set up for it and the change is visual.
 
 Execution-based evidence is A-tier. Test results, console output. Show the exact test that now fails and passes, using pseudocode.
+
+Give each check its final verdict once: earlier rounds stay in the commits and PR comments.
 
 Each statement says what it is. A measurement names its run: the commit, the build (debug or release), the case, the numbers. A cause or a cost that no run or test isolates is a reading of the code, and is written as one.
 
