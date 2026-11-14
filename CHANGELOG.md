@@ -11,7 +11,9 @@ All notable changes to Meada are recorded here. The format follows
 - Java: a list of DynamoDB transaction entries, or one entry, that a wrapper takes in a parameter
   and passes on names its tables when no mention, in the wrapper or its caller, can change it
   before the request reads it; a list that is sorted, or changed after a named request's
-  `build()` or after the call, keeps its tables too (#772).
+  `build()` or after the call, keeps its tables too. A wrapper that changes the list after its
+  read keeps them only for a list the caller makes in the call, and one with an override names
+  none (#772).
 
 ## [1.4.0] - 2026-11-13
 

@@ -210,7 +210,7 @@ pub(crate) fn extract<'a>(
                     {
                         return;
                     }
-                    let (changed, parameter) = changed_request(
+                    let judged = changed_request(
                         code,
                         path,
                         index,
@@ -219,7 +219,7 @@ pub(crate) fn extract<'a>(
                         &written,
                         &builders,
                     );
-                    let changed = changed
+                    let changed = judged.changed
                         || (language != Language::Java
                             && reads_entries(operation.field)
                             && held_changed(code, path, index, operation.field, language, {
@@ -263,7 +263,7 @@ pub(crate) fn extract<'a>(
                                 &expanded.frames,
                                 operation.field,
                                 &builders,
-                                parameter,
+                                &judged,
                             );
                         for mut name in expanded.found {
                             if caller_changed {
@@ -354,15 +354,18 @@ fn reads_entries(selector: &str) -> bool {
 /// Whether a wrapper's caller passes the request on as a value that changed (Java): the request
 /// the wrapper reads is what its callers hand it, and a call judged where it is made sees only
 /// the parameter. Each argument of each call climbed is judged in the scope of that call; the
-/// one at `parameter`, the one the path's list comes in, by the rule of a list the call reads
-/// (#772), and when it is a parameter of that scope in turn, the next call's argument there.
+/// one at the parameter the path's list comes in (`request`), by the rule of a list the call
+/// reads (#772), and when it is a parameter of that scope in turn, the next call's argument there.
+/// A parameter changed after the read takes only a list the call makes for it (`Judged::fresh`):
+/// a caller's own list may be read again, by a loop, a lambda or recursion further up.
 fn passed_changed<'a>(
     code: &Code<'a>,
     frames: &[crate::resolve::Frame<'a>],
     selector: &str,
     builders: &java::Builders<'a>,
-    mut parameter: Option<usize>,
+    request: &java::Judged,
 ) -> bool {
+    let (mut parameter, mut fresh) = (request.parameter, request.fresh);
     for frame in frames {
         let Some(call) = code.call(frame.path, frame.index) else {
             parameter = None;
@@ -377,6 +380,12 @@ fn passed_changed<'a>(
             return true;
         }
         let position = parameter.take();
+        if let Some(p) = position
+            && fresh
+            && !call.args.get(p).is_some_and(java::made_here)
+        {
+            return true;
+        }
         // The list handed on twice is another name of it in the wrapper, which the read does not
         // see: `w(l, l)` and a wrapper that sets its second parameter.
         if let Some(Value::Ref(list)) = position.and_then(|p| call.args.get(p))
@@ -401,7 +410,7 @@ fn passed_changed<'a>(
                 return true;
             }
             if read {
-                parameter = judged.parameter;
+                (parameter, fresh) = (judged.parameter, judged.fresh);
             }
         }
     }
@@ -410,7 +419,7 @@ fn passed_changed<'a>(
 
 /// A named request can change after construction, and so can a named value an inline request
 /// holds on the name's path (an EventBridge entry); inline literals cannot change before the call.
-/// In Java, also the parameter the path's list comes in unchanged (`java::Judged::parameter`).
+/// In Java, also the parameter the path's list comes in unchanged (`java::Judged`).
 fn changed_request<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -419,18 +428,23 @@ fn changed_request<'a>(
     language: Language,
     written: &std::cell::OnceCell<BTreeSet<&'a str>>,
     builders: &java::Builders<'a>,
-) -> (bool, Option<usize>) {
+) -> java::Judged {
+    let judged = |changed| java::Judged {
+        changed,
+        parameter: None,
+        fresh: false,
+    };
     let Some(call) = code.call(path, index) else {
-        return (false, None);
+        return judged(false);
     };
     let request = match language {
         Language::Go => call.args.get(1),
         Language::Csharp => call.keyword("request").or_else(|| call.args.first()),
         Language::Java => {
             let Some(r) = call.args.first() else {
-                return (false, None);
+                return judged(false);
             };
-            let judged = java::changed(
+            return java::changed(
                 code,
                 path,
                 &call.scope,
@@ -440,7 +454,6 @@ fn changed_request<'a>(
                 builders,
                 false,
             );
-            return (judged.changed, judged.parameter);
         }
     };
     // Follow the name's path through the request as written: a named value met on it changes
@@ -453,7 +466,7 @@ fn changed_request<'a>(
             for field in member.split('|').map(|f| f.trim_end_matches("[]")) {
                 if let Value::Ref(_) = value {
                     if opaque(code, field, language, written) {
-                        return (true, None);
+                        return judged(true);
                     }
                     continue;
                 }
@@ -472,7 +485,7 @@ fn changed_request<'a>(
         }
         values = next;
     }
-    (false, None)
+    judged(false)
 }
 
 /// Whether a name on a path of entries (`reads_entries`) may hold a value that changed (Go and

@@ -78,6 +78,31 @@ class Wrappers {
         later.run();
     }
 
+    // Set after its send: a later call reads the change, so only a list each call makes keeps
+    // the tables (a loop or recursion above may call it again with the same list).
+    void mid(List<TransactWriteItem> items) {
+        send(items);
+        items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("mid-new").build()).build());
+    }
+
+    void recursive(int n, List<TransactWriteItem> items) {
+        send(items);
+        items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("recursive-new").build()).build());
+        if (n > 0) {
+            recursive(n - 1, items);
+        }
+    }
+
+    private final List<TransactWriteItem> held = Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("held-old").build()).build());
+
+    List<TransactWriteItem> held() {
+        return held;
+    }
+
+    void heldSet() {
+        held.set(0, TransactWriteItem.builder().put(Put.builder().tableName("held-new").build()).build());
+    }
+
     void write(String table, Map<String, AttributeValue> item) {
         var db = DynamoDbClient.create();
         db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(
@@ -178,7 +203,47 @@ class Wrappers {
         sendLater(List.of(TransactWriteItem.builder().put(Put.builder().tableName("lambda-read").build()).build()));
     }
 
+    void midFresh() {
+        mid(Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("mid-fresh").build()).build()));
+    }
+
+    void loopAbove() {
+        var items = Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("loop-above-old").build()).build());
+        for (int i = 0; i < 2; i++) {
+            mid(items);
+        }
+    }
+
+    void recursion() {
+        recursive(1, Arrays.asList(TransactWriteItem.builder().put(Put.builder().tableName("recursive-old").build()).build()));
+    }
+
+    // A getter's list may be another name's, changed anywhere.
+    void fromGetter() {
+        send(held());
+    }
+
+    // The call may dispatch to an override that changes the list first.
+    void dispatched(Base base) {
+        base.store(List.of(TransactWriteItem.builder().put(Put.builder().tableName("dispatched-old").build()).build()));
+    }
+
     void reorder(List<TransactWriteItem> items) {
         items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("handed-new").build()).build());
+    }
+}
+
+class Base {
+    void store(List<TransactWriteItem> items) {
+        var db = DynamoDbClient.create();
+        db.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(items).build());
+    }
+}
+
+class Sub extends Base {
+    @Override
+    void store(List<TransactWriteItem> items) {
+        items.set(0, TransactWriteItem.builder().put(Put.builder().tableName("dispatched-new").build()).build());
+        super.store(items);
     }
 }

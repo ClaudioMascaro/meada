@@ -7107,7 +7107,7 @@ impl<'a> Code<'a> {
     /// another definition of its name (an interface's method, whose calls dispatch to it).
     // ponytail: any other definition of a method's name counts, an interface's or not, since no
     // pack marks interfaces: two types with a constructor method of one name leave it unknown.
-    fn name_matched(&self, function: Target<'a>) -> bool {
+    pub(crate) fn name_matched(&self, function: Target<'a>) -> bool {
         let own = |name: &'a str| name[crate::parent(name).len()..].trim_start_matches('.');
         let (matched, names) = self.matched.get_or_init(|| {
             let matched = (self.resolver.built.values().flatten())

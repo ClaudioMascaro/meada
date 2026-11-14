@@ -1414,8 +1414,10 @@ fn java_sides(repo: &std::path::Path) -> (Value, Vec<String>) {
 /// the read, in the caller, the wrapper or the wrapper's wrapper, in a loop around the call, a
 /// method the list is handed to first, or another parameter it is passed in too names no table,
 /// and so do an alias of the parameter and a read in a lambda; a varargs wrapper is read where it
-/// stands, a writer and a reader with no table. A
-/// `write(table, item)` wrapper keeps its name.
+/// stands, a writer and a reader with no table. A wrapper that changes the list after its read
+/// keeps the tables only for a list the caller makes in the call (not one a loop above hands in
+/// again); a recursive wrapper, a getter's list and a method an override may stand for name none.
+/// A `write(table, item)` wrapper keeps its name.
 #[test]
 fn java_lists_a_wrapper_passes_on_unchanged_name_their_tables() {
     let repo = fixture_repo("aws_sdk_wrappers", "aws-sdk-wrappers", None);
@@ -1428,18 +1430,26 @@ fn java_lists_a_wrapper_passes_on_unchanged_name_their_tables() {
             "aliasOnly writer resource::dynamodb",
             "asList writer resource::dynamodb::as-list",
             "callerSet writer resource::dynamodb",
+            "dispatched writer resource::dynamodb",
             "entry writer resource::dynamodb::entry",
             "filled writer resource::dynamodb::filled",
+            "fromGetter reader resource::dynamodb",
+            "fromGetter writer resource::dynamodb",
             "gets reader resource::dynamodb::gets",
             "handedFirst writer resource::dynamodb",
             "lambdaRead writer resource::dynamodb",
             "listOf writer resource::dynamodb::list-of",
+            "loopAbove writer resource::dynamodb",
             "loopAfterCall writer resource::dynamodb",
+            "midFresh writer resource::dynamodb::mid-fresh",
             "outerSet writer resource::dynamodb",
+            "recursion writer resource::dynamodb",
             "sendVarargs reader resource::dynamodb",
             "sendVarargs writer resource::dynamodb",
             "sorted writer resource::dynamodb::sorted-a",
             "sorted writer resource::dynamodb::sorted-b",
+            "store reader resource::dynamodb",
+            "store writer resource::dynamodb",
             "twice writer resource::dynamodb",
             "twoLevels writer resource::dynamodb::two-levels",
             "wrapperSet writer resource::dynamodb",

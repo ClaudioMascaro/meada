@@ -548,6 +548,27 @@ pub(super) struct Judged {
     /// The parameter of the function the value is in, by position, that the list of the path's
     /// entries comes in unchanged: each caller's argument there is judged in turn (#772).
     pub(super) parameter: Option<usize>,
+    /// Whether that parameter is set after the read: a later call of the function reads the
+    /// change, so only a list each call makes for it (`made_here`) keeps the read's tables.
+    pub(super) fresh: bool,
+}
+
+/// Whether `value` makes, where it is written, the list or the entry it is: a list or an array
+/// literal, `new`, `List.of`, `Arrays.asList`, or a builder chain (`T.builder()..build()`).
+pub(super) fn made_here(value: &Value) -> bool {
+    match value {
+        Value::List(_) | Value::New(..) => true,
+        Value::Call(c) => {
+            matches!(crate::resolve::method(&c.callee), "of" | "asList")
+                || std::iter::successors(Some(c), |c| match c.receiver.as_deref() {
+                    Some(Value::Call(next)) => Some(next),
+                    _ => None,
+                })
+                .last()
+                .is_some_and(|c| crate::resolve::method(&c.callee) == "builder")
+        }
+        _ => false,
+    }
 }
 
 /// Whether the request `value`, made by the call at `range`, reads a builder changed by a mention
@@ -583,6 +604,7 @@ pub(super) fn changed<'a>(
         on: read,
         shared: false,
         parameter: None,
+        fresh: false,
     };
     let at = match read {
         true => At::made(range),
@@ -596,6 +618,7 @@ pub(super) fn changed<'a>(
     Judged {
         changed,
         parameter: walk.parameter,
+        fresh: walk.fresh,
     }
 }
 
@@ -630,6 +653,8 @@ struct Walk<'a, 'c> {
     shared: bool,
     /// The parameter the path's list comes in unchanged (`Judged::parameter`).
     parameter: Option<usize>,
+    /// Whether it is set after the read (`Judged::fresh`).
+    fresh: bool,
 }
 
 /// The methods of a list that leave its entries as they are: sorting changes their order only.
@@ -758,9 +783,10 @@ impl<'a> Walk<'a, '_> {
     /// Whether `name` is a parameter of this function that no mention changes before the read at
     /// `at`, read where it runs (not in a lambda its caller may run after changing the list),
     /// recording it by position. A second one on the path is not kept.
-    // ponytail: a varargs parameter, an alias of the parameter and a read in a lambda name no
-    // table; following them needs the caller's arguments as one list, the alias's own mentions
-    // and where the lambda runs.
+    // ponytail: a varargs parameter, an alias of the parameter, a read in a lambda and a function
+    // another definition may stand for (an override) name no table; following them needs the
+    // caller's arguments as one list, the alias's own mentions, where the lambda runs and which
+    // override a call dispatches to.
     fn kept(&mut self, name: &'a str, at: &At) -> bool {
         let Some(def) = self.code.def(self.path, self.scope) else {
             return false;
@@ -769,13 +795,27 @@ impl<'a> Walk<'a, '_> {
             return false;
         };
         let declared = Some(def.range.start);
+        let function = crate::resolve::Target {
+            path: self.path,
+            name: self.scope,
+        };
+        // A hand-off after the read may reach a read again (a recursive call); a call on it
+        // after the read is seen by a later call of this function (`Judged::fresh`).
+        let everywhere = At {
+            later: usize::MAX,
+            ..at.clone()
+        };
+        let mentions = self.uses.locals.get(&(self.scope, name));
         if def.params[index].binds != crate::lang::Binds::Any
+            || self.code.name_matched(function)
             || (self.uses.deferred.outlived(&at.range, declared)).is_some()
             || self.list_changed(self.scope, name, declared, at)
+            || mentions.is_some_and(|m| (m.other.as_ref()).is_some_and(|s| s.hits(&everywhere)))
             || self.parameter.is_some_and(|p| p != index)
         {
             return false;
         }
+        self.fresh |= self.list_changed(self.scope, name, declared, &everywhere);
         self.parameter = Some(index);
         true
     }
