@@ -7,7 +7,7 @@ use rusqlite::Connection;
 
 use crate::contract::{self, ContractKind, Hit, KINDS, Level, Link, Role, Search, View};
 pub use crate::decisions::{Cause, Evaluation, Stale, Waiting};
-use crate::index::{CallSite, Dropped, Export, State, Symbol};
+use crate::index::{CallSite, Consumer, Dropped, Export, State, Symbol};
 pub use crate::items::{Candidate, Enclosing, ItemKind, OpenItem};
 use crate::msg::{Fix, Msg};
 use crate::partial::{self, Partial};
@@ -45,9 +45,10 @@ enum CommitSource {
     Checkout,
     /// Server mode: the commit `meada index --workspace` recorded beside the index.
     Recorded,
-    /// At a generation: the `head` its document records for the repository.
+    /// At a generation: the `head` its document records for each repository, in workspace
+    /// order.
     #[cfg(feature = "snapshot")]
-    Generation(Option<String>),
+    Generation(Vec<Option<String>>),
 }
 
 impl Engine {
@@ -129,7 +130,8 @@ impl Engine {
     /// The engine with its indexed commit the one the generation `held` records.
     #[cfg(feature = "snapshot")]
     fn at_generation(mut self, held: &crate::snapshot::serve::Held) -> Self {
-        self.commit_source = CommitSource::Generation(held.head(&self.identity));
+        let heads = self.workspace.repos.iter().map(|r| held.head(&r.identity));
+        self.commit_source = CommitSource::Generation(heads.collect());
         self
     }
 
@@ -214,7 +216,9 @@ impl Engine {
                     .map(|commit| (commit, false))
             }
             #[cfg(feature = "snapshot")]
-            CommitSource::Generation(head) => head.clone().map(|commit| (commit, false)),
+            CommitSource::Generation(heads) => {
+                (heads.first().cloned().flatten()).map(|commit| (commit, false))
+            }
         };
         let mut exports = self.exports()?;
         let here = format!("{}::", self.identity);
@@ -226,12 +230,22 @@ impl Engine {
             .collect();
         let links = all.into_iter();
         let links = links.filter(|l| contract::link_in_repository(l, &self.identity));
+        // A use read from a pipeline or an action sits on the CI node that holds its key.
+        let holders: HashMap<&str, &str> = (exports.iter().flat_map(|e| &e.config_uses))
+            .filter_map(|u| Some((u.site.as_str(), u.holder.as_deref()?)))
+            .collect();
         let provisions = iac::provision::links(&exports)
             .into_iter()
             .filter(|l| {
                 l.side == self.identity
                     || l.side.starts_with(&here)
                     || l.provisioner.starts_with(&here)
+            })
+            .map(|mut link| {
+                if let Some(holder) = holders.get(link.side.as_str()) {
+                    link.side = holder.to_string();
+                }
+                link
             })
             .collect();
         let mut export = exports.swap_remove(0);
@@ -280,6 +294,7 @@ impl Engine {
             .collect::<Result<Vec<_>>>()?;
         // Each kind's step over the whole workspace, once every repository has declared.
         contract::workspace_steps(&mut exports, &self.workspace.repos);
+        self.commits(&mut exports);
         Ok(exports)
     }
 
@@ -309,7 +324,32 @@ impl Engine {
             }
         }
         contract::workspace_steps(&mut partial.exports, &self.workspace.repos);
+        self.commits(&mut partial.exports);
         Ok(partial)
+    }
+
+    /// Sets the indexed commit of each repository that holds a provider of a kind that reads
+    /// it (`ContractKind::reads_commit`), from where this engine learns commits: the checkout,
+    /// the commit recorded beside the index, or the generation's document.
+    fn commits(&self, exports: &mut [Export]) {
+        let read: Vec<_> = (KINDS.iter().filter(|k| k.reads_commit()))
+            .map(|k| format!("{}::", k.prefix()))
+            .collect();
+        for (n, export) in exports.iter_mut().enumerate() {
+            let providers = &export.providers;
+            if !(providers.iter()).any(|p| read.iter().any(|r| p.contract.starts_with(r))) {
+                continue;
+            }
+            let repo = &self.workspace.repos[n];
+            export.commit = match &self.commit_source {
+                // ponytail: one `git` call per such repository on each query; keep the head by
+                // the mtime of `.git/HEAD` and its ref when a workspace makes it slow.
+                CommitSource::Checkout => repo::head(&repo.root).ok(),
+                CommitSource::Recorded => index::indexed_commit(&self.dbs[n], &repo.index),
+                #[cfg(feature = "snapshot")]
+                CommitSource::Generation(heads) => heads.get(n).cloned().flatten(),
+            };
+        }
     }
 
     /// Every link of the workspace, sorted.
@@ -549,6 +589,12 @@ impl Engine {
         self.refresh()?;
         let mut partial = self.partial()?;
         let links = self.links(&partial.exports);
+        // A CI contract starts at the pipeline that provides it, as the pipeline's name does.
+        let node = match start {
+            Start::From(from) => trace::provider_node(&partial.exports, from),
+            Start::Uncommitted => None,
+        };
+        let start = node.as_deref().map_or(start, Start::From);
         let changes = match start {
             Start::Uncommitted => Some(repo::uncommitted(&self.root)?),
             Start::From(_) => None,
@@ -600,6 +646,7 @@ impl Engine {
                 direction,
                 budget,
                 |r, n, depth| graph.attached_rows(r, n, depth, direction),
+                |r, n| graph.node_calls(r, n, direction),
             )?
         {
             return Ok(iac);
@@ -622,8 +669,8 @@ impl Engine {
     /// when no symbol and no contract does; `iac` lists the IaC nodes whose address, type or
     /// physical name matches (`iac::hits`), never part of the answer with no `kind`; `ambiguous`
     /// and `unresolved` list the open items whose enclosing symbol or call expression matches,
-    /// each with the `meada decide` command that resolves it. The answer is cut at `budget`
-    /// tokens.
+    /// each with the `meada decide` command that resolves it, or with its cause when its kind
+    /// leaves it no candidate. The answer is cut at `budget` tokens.
     pub fn search(&self, query: &str, kind: Option<&str>, budget: Option<usize>) -> Result<String> {
         if let Some(item_kind) = kind.and_then(ItemKind::parse) {
             return self.search_items(query, item_kind, budget);
@@ -686,6 +733,10 @@ impl Engine {
         // (rank, identity to break ties, line)
         let mut hits: Vec<Hit> = Vec::new();
         let orphans = iac::orphans::Scope::new(&exports);
+        // An unresolved consumer a kind owns is an open item, and no contract to list.
+        let owned: HashSet<String> = (KINDS.iter())
+            .flat_map(|kind| kind.unresolved_causes(&exports).into_keys())
+            .collect();
         for ((export, repo), db) in exports.iter().zip(&self.workspace.repos).zip(&self.dbs) {
             let mut files = Files::new(&repo.root);
             if symbols {
@@ -712,7 +763,8 @@ impl Engine {
                 .iter()
                 .map(|p| (p.contract.clone(), &p.site, Some(Role::Provider), false));
             // An unresolved consumer has no contract: it shows as `(unresolved) <callee>`.
-            let consumed = export.consumers.iter().map(|c| {
+            let listed = |c: &&Consumer| c.contract.is_some() || !owned.contains(&c.site);
+            let consumed = export.consumers.iter().filter(listed).map(|c| {
                 let contract = c.contract.clone();
                 (
                     contract.unwrap_or_else(|| unresolved(&c.site)),
@@ -727,6 +779,11 @@ impl Engine {
                 .map(|(u, grant)| (u.contract.clone(), &u.site, None, grant));
             for (contract, site, role, grant) in provided.chain(consumed).chain(configured) {
                 if !contract.starts_with(prefix) {
+                    continue;
+                }
+                if kind.is_none()
+                    && contract::kind_of(&contract).is_some_and(|k| !k.in_default_search())
+                {
                     continue;
                 }
                 let Some(r) = contract_rank(&contract, &needle) else {
@@ -1014,15 +1071,19 @@ impl Engine {
             .min() else {
                 continue;
             };
+            // An item no decision closes says why, where another names the command.
+            let close = match item.cause {
+                Some(cause) => format!("{cause} (`{}`)", item.id),
+                None => format!("run `meada decide --item {}`", item.id),
+            };
             let limit = (item.limit.as_ref())
                 .map_or(String::new(), |l| format!(" limit: {};", l.describe()));
             let line = format!(
-                "{} {} ({}) candidates: {};{limit} run `meada decide --item {}`",
+                "{} {} ({}) candidates: {};{limit} {close}",
                 item.repository,
                 item.location(),
                 kind.name(),
                 item.candidates.len(),
-                item.id
             );
             hits.push((r, item.id, line));
         }
@@ -1061,6 +1122,16 @@ impl Engine {
         for (n, (export, repo)) in exports.iter().zip(&self.workspace.repos).enumerate() {
             let mut files = Files::new(&repo.root);
             let related = prepared.as_mut().map(|rows| std::mem::take(&mut rows[n]));
+            // The IaC nodes by identity, the first of an identity kept: written out for an
+            // export with a side on one.
+            let nodes = std::cell::OnceCell::new();
+            let nodes = || {
+                nodes.get_or_init(|| {
+                    let nodes = export.iac.iter().rev();
+                    let nodes = nodes.map(|n| (n.identity(&repo.identity), n));
+                    nodes.collect::<HashMap<_, _>>()
+                })
+            };
             for (site, order, role, tag, shape) in
                 sides_of(exports, export, contract, view, kind, related)
             {
@@ -1073,11 +1144,7 @@ impl Engine {
                     format!("{at} {}", name.map_or("(top level)", |s| label(&s.id)))
                 } else if let Some(s) = export.config_sites.iter().find(|s| s.id == site) {
                     s.place()
-                } else if let Some(node) = export
-                    .iac
-                    .iter()
-                    .find(|n| n.identity(&repo.identity) == site)
-                {
+                } else if let Some(node) = nodes().get(site) {
                     format!("{}:{} {}", node.path, node.line, node.address)
                 } else if site == repo.identity {
                     REPOSITORY_LEVEL.into()
@@ -1292,15 +1359,19 @@ impl Engine {
                     if let [(n, node)] = &nodes[..] {
                         let identity = node.identity(&repos[*n].identity);
                         let links = self.links(&partial.exports);
-                        for kind in KINDS {
-                            lines.extend(kind.context_at(
-                                &partial.exports,
-                                repos,
-                                &links,
-                                &identity,
-                                Some(&node.root),
-                            ));
-                        }
+                        let sides: Vec<String> = (KINDS.iter())
+                            .flat_map(|kind| {
+                                let root = Some(&*node.root);
+                                kind.context_at(&partial.exports, repos, &links, &identity, root)
+                            })
+                            .collect();
+                        // The values are the last block of `lines`.
+                        let values = |l: &String| l == "values:" || l == "values: none";
+                        let at = (node.sides_first())
+                            .then(|| lines.iter().rposition(values))
+                            .flatten()
+                            .unwrap_or(lines.len());
+                        lines.splice(at..at, sides);
                         let provisions = iac::provision::links(&partial.exports);
                         lines.extend(iac::provision::decision_context(
                             &provisions,
@@ -1495,9 +1566,13 @@ fn sides_of<'e>(
 ) -> Vec<(&'e str, u8, String, String, Option<&'e crate::shape::Shape>)> {
     let provided = export.providers.iter().filter(|p| p.contract == contract);
     let provided = provided.map(|p| (p.site.as_str(), 0, provider.into(), p.shape.as_ref()));
-    let consumed = export.consumers.iter().filter_map(|c| {
+    // A site is listed once: a CI step that installs a package and runs its console script
+    // holds two rows of one contract.
+    let mut listed = HashSet::new();
+    let consumed = export.consumers.iter().filter_map(move |c| {
         let words = consumer.filter(|_| c.contract.as_deref() == Some(contract))?;
-        Some((c.site.as_str(), 1, words.into(), c.shape.as_ref()))
+        (c.shape.is_some() || listed.insert(c.site.as_str()))
+            .then(|| (c.site.as_str(), 1, words.into(), c.shape.as_ref()))
     });
     let own = provided
         .chain(consumed)

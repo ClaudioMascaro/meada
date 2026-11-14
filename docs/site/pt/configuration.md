@@ -130,6 +130,23 @@ role = "write"
 via = ["values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support"]
 ```
 
+O mesmo `via` em uma chave declara a chamada entre pipelines de um sistema de CI que o Meada não
+lê (GitLab CI, Jenkins, Azure Pipelines). O repositório do pipeline compartilhado declara o
+recurso com `role = "write"`, e cada repositório que o chama o declara com `role = "read"` e
+`via` na chave que faz a chamada. A ligação é `declared`, sem ref Git e sem cadeia. As chamadas
+do GitHub Actions o Meada lê sozinho ([GitHub Actions](capabilities.md#github-actions)), e uma
+declaração dessas sobre uma chave de um pipeline do GitHub continua valendo, ao lado do contrato
+de CI.
+
+```toml
+# em cada repositório que chama o pipeline compartilhado
+[[resource]]
+kind = "pipeline"
+id = "acme/ci-templates/publish"
+role = "read"
+via = [".gitlab-ci.yml#include[0].file"]
+```
+
 
 ## Mapeamentos privados de IaC
 

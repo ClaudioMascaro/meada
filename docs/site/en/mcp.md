@@ -53,7 +53,8 @@ There are three tools, always in English, and none of them writes:
   with the kind `duplicate`, groups of symbols whose text is identical in two or more places;
   with the kind `value`, configuration values whose value or key path equals, starts with or
   holds the query; with the kind `iac`, IaC nodes by address, type or physical name (see
-  Capabilities and limits);
+  Capabilities and limits); with the kind `ci`, GitHub Actions pipelines, actions, CI jobs and
+  CI steps by address, type, id, `name` or `uses`;
   with the kind `ambiguous` or `unresolved`, it lists the open items (see
   Decisions);
 - `context` describes one symbol: its code read from disk, its callers, its callees and the

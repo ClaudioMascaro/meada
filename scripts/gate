@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# The push gate on a commit, detached from the caller: a session's command timeout or a closed
+# terminal does not stop it. It runs `scripts/check --unpushed` in a worktree of its own, so the
+# working tree stays free for the next change, and its log ends with `exit <code> at <sha>`.
+#
+#   scripts/gate [<commit>]   start the gate on <commit> (default HEAD) and return
+#   scripts/gate --wait       wait for the gate to end, show its last lines, exit with its code
+#
+# MEADA_GATE_DIR (default ${TMPDIR:-/tmp}/meada-gate) holds the worktree (`wt`), its build
+# (`target`) and the log (`gate.log`). One gate runs at a time, and its heavy commands take the
+# machine's lock of `scripts/check`, so a scoped check in the working tree waits its turn.
+set -euo pipefail
+
+dir=${MEADA_GATE_DIR:-${TMPDIR:-/tmp}/meada-gate}
+mkdir -p "$dir"
+dir=$(cd "$dir" && pwd)
+log=$dir/gate.log
+
+case ${1:-} in
+--wait)
+    [ -f "$log" ] || { echo "scripts/gate: no gate has run in $dir" >&2; exit 1; }
+    until grep -aq '^exit [0-9]* at ' "$log"; do
+        # A gate that died with its machine holds no lock and wrote no result.
+        if (exec 9> "$dir/lock" && flock -n 9) && ! grep -aq '^exit [0-9]* at ' "$log"; then
+            echo "scripts/gate: the gate ended without a result: start it again" >&2
+            exit 1
+        fi
+        sleep 15
+    done
+    tr -d '\0' < "$log" | tail -n 15
+    exit "$(tr -d '\0' < "$log" | sed -n 's/^exit \([0-9]*\) at .*/\1/p' | tail -n 1)"
+    ;;
+--run)
+    # The detached half: $2 is the commit, $3 the ref its unpushed commits are counted from.
+    # No debug info and no incremental state: the gate's build is read by nobody.
+    export CARGO_TARGET_DIR=$dir/target CARGO_INCREMENTAL=0
+    export CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
+    check() {
+        cd "$dir/wt" && git checkout -q -B gate "$1" || return 1
+        # Without an upstream the check counts from origin/main, which is no less.
+        git branch -q --set-upstream-to="$2" gate || true
+        scripts/check --unpushed
+    }
+    code=0
+    check "$2" "$3" > "$log" 2>&1 || code=$?
+    # The tests' scratch repositories.
+    rm -rf "$dir/target/tmp"
+    echo "exit $code at $2" >> "$log"
+    exit "$code"
+    ;;
+esac
+
+sha=$(git rev-parse --verify "${1:-HEAD}^{commit}")
+upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || echo origin/main)
+[ -d "$dir/wt" ] || git worktree add -q --detach "$dir/wt" "$sha"
+# The lock is held by the detached half until it ends.
+exec 9> "$dir/lock"
+flock -n 9 || { echo "scripts/gate: a gate is already running in $dir" >&2; exit 1; }
+: > "$log"
+setsid nohup "$0" --run "$sha" "$upstream" > /dev/null 2>&1 < /dev/null &
+echo "gate started on $sha against $upstream: $log"

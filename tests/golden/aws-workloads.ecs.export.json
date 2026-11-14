@@ -57,7 +57,7 @@
   "links": [
     {
       "consumer": "example.com/acme/tasks::main.tf::aws_ecs_task_definition.worker",
-      "provider": "example.com/acme/app",
+      "provider": "example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/acme/aws-worker",
       "level": "exact",
       "reason": "image::ghcr.io/acme/aws-worker",

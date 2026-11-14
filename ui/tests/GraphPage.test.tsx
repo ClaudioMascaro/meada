@@ -146,6 +146,7 @@ test.each(['en', 'pt-BR'] as const)('new kind views keep orphan sides visible an
   await waitFor(() => expect(getByRole(host, 'table', { name: t.communities })).toBeDefined());
   expect((getByRole(host, 'combobox', { name: t.view }) as HTMLSelectElement).value).toBe('communities');
   expect(queryByRole(host, 'option', { name: t.images })).toBeNull();
+  expect(queryByRole(host, 'option', { name: t.ci })).toBeNull();
   await act(() => {
     fireEvent.change(getByRole(host, 'combobox', { name: t.view }), { target: { value: 'contracts' } });
     fireEvent.submit(getByRole(host, 'form', { name: t.graph }));
@@ -156,7 +157,7 @@ test.each(['en', 'pt-BR'] as const)('new kind views keep orphan sides visible an
 
 test.each([
   { view: 'images', golden: 'images.workflow', title: 'Image links', from: 'Builder', to: 'Runner',
-    contract: 'image::ghcr.io/acme/orders', provider: 'example.com/acme/app',
+    contract: 'image::ghcr.io/acme/orders', provider: 'example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0]',
     consumer: 'example.com/acme/deploy::deployment.yaml::Deployment.apps/shop/orders (root .)' },
   { view: 'alerts', golden: 'alerts.equality', title: 'Alert links', from: 'Emitter', to: 'Matcher',
     contract: 'alert::support::team-b', provider: 'example.com/acme/monitoring::rules.yaml::groups[0].rules[0]',
@@ -190,5 +191,53 @@ test.each([
   expect(Array.from(table.querySelectorAll('tbody tr')).map(row =>
     Array.from(row.querySelectorAll('td')).map(cell => cell.textContent))).toEqual([
     [example.contract, example.provider, example.consumer, 'exact', JSON.parse(text).links[0].reason],
+  ]);
+});
+
+test.each(['en', 'pt-BR'] as const)('CI links are a group of their own, with its legend and the absent mark, in %s', async locale => {
+  const t = graphCopy[locale];
+  const text = readFileSync('../tests/golden/ci-calls.app-a.export.json', 'utf8');
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(text)));
+  await act(() => root.render(<GraphPage api={new Api(new Auth(config))} locale={locale} />));
+  await act(() => {
+    fireEvent.change(getByRole(host, 'textbox', { name: t.repository }), { target: { value: 'github.com/acme/app-a' } });
+    fireEvent.submit(getByRole(host, 'form', { name: t.graph }));
+  });
+  await waitFor(() => expect(getByRole(host, 'table', { name: t.communities })).toBeDefined());
+  expect(getByRole(host, 'region', { name: t.legend }).textContent).toContain(`${t.called} → ${t.caller}`);
+  await act(() => {
+    fireEvent.change(getByRole(host, 'combobox', { name: t.view }), { target: { value: 'ci' } });
+  });
+  const links = getByRole(host, 'table', { name: t.ci });
+  expect(Array.from(links.querySelectorAll('thead th')).map(th => th.textContent)).toEqual([
+    t.contract, t.called, t.caller, t.level, t.reason,
+  ]);
+  const rows = Array.from(links.querySelectorAll('tbody tr')).map(row =>
+    Array.from(row.querySelectorAll('td')).map(cell => cell.textContent));
+  // A call to another repository, with the Git ref as written and the indexed commit.
+  expect(rows[0]).toEqual([
+    'ci::github.com/acme/workflows/.github/workflows/lint.yml',
+    'github.com/acme/workflows::.github/workflows/lint.yml::.',
+    'github.com/acme/app-a::.github/workflows/ci.yml::jobs.lint',
+    'exact', '@main (indexed 2344e45)',
+  ]);
+  // A call inside the repository is in the group too.
+  expect(rows[6]).toEqual([
+    'ci::github.com/acme/app-a/tools/local',
+    'github.com/acme/app-a::tools/local/action.yml::.',
+    'github.com/acme/app-a::.github/workflows/forms.yml::jobs.actions.steps[4]',
+    'exact', 'own repository',
+  ]);
+  expect(rows).toHaveLength(7);
+  const sides = getByRole(host, 'table', { name: t.ciSides });
+  expect(Array.from(sides.querySelectorAll('thead th')).map(th => th.textContent)).toEqual([
+    t.contract, t.calledFiles, t.callers,
+  ]);
+  const internal = Array.from(sides.querySelectorAll('tbody tr')).map(row =>
+    Array.from(row.querySelectorAll('td')).map(cell => cell.textContent))
+    .find(row => row[0] === 'ci::github.com/acme/workflows/.github/workflows/internal.yml');
+  expect(internal).toEqual([
+    'ci::github.com/acme/workflows/.github/workflows/internal.yml', '',
+    'github.com/acme/app-a::.github/workflows/ci.yml::jobs.internal (absent at the indexed commit)',
   ]);
 });

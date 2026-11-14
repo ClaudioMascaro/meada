@@ -100,7 +100,7 @@
   "providers": [
     {
       "contract": "image::ghcr.io/probe/azure-sdk-worker",
-      "site": "local/azure-sdk-same-handler",
+      "site": "local/azure-sdk-same-handler::.github/workflows/build.yml::jobs.publish.steps[0]",
       "at": ".github/workflows/build.yml#jobs.publish.steps[0].with.tags"
     }
   ],
@@ -124,6 +124,15 @@
   ],
   "iac_nodes": [
     {
+      "identity": "local/azure-sdk-same-handler::.github/workflows/build.yml::jobs.publish.steps[0]",
+      "address": "jobs.publish.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/build.yml",
+      "path": ".github/workflows/build.yml",
+      "line": 4,
+      "end_line": 6
+    },
+    {
       "identity": "local/azure-sdk-same-handler::pods.yaml::Pod/same-handler",
       "address": "Pod/same-handler",
       "type": "Pod",
@@ -136,7 +145,7 @@
   "links": [
     {
       "consumer": "local/azure-sdk-same-handler::pods.yaml::Pod/same-handler",
-      "provider": "local/azure-sdk-same-handler",
+      "provider": "local/azure-sdk-same-handler::.github/workflows/build.yml::jobs.publish.steps[0]",
       "contract": "image::ghcr.io/probe/azure-sdk-worker",
       "level": "exact",
       "reason": "image::ghcr.io/probe/azure-sdk-worker",

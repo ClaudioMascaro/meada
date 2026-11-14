@@ -3,15 +3,28 @@
 `image.rs` owns builders, runners, matching and workload execution; `image/config.rs` reads
 GitHub Actions tags/images, Skaffold artifacts, literal Maven/Gradle Jib destinations and ko
 commands with checked-in `KO_DOCKER_REPO` and `--bare`. A ko base image is an input, never a
-builder. Only one simple literal ko command is read; multiline and compound shell scripts
-stay absent. The recognized command has one `--bare`, at most one literal target and no other
-flags; an explicit shell is `bash` or `sh`. No process environment is read. Configuration
+builder. A ko command is read where the gate of the command table (`iac/actions/run.rs`) reads
+a command, every word literal (#833). The recognized command has one `--bare`, at most one
+literal target and no other flags; an explicit shell is `bash` or `sh`. No process environment
+is read. Configuration
 facts enter the stamped `contract_configs` table through `ContractKind::config_file` and
 `config_summary`; each row keeps what its summary read beside the bytes (`inputs`: the IaC nodes'
 digest and every path `contract::probe` looked at), and a refresh summarizes it again only when
 one of them moved.
 
-The kind declares repository-level providers with `at`, workload consumers from stored Compose
+A builder read in a pipeline has its CI step as its site (#833, ADR 0028): `image::step` finds
+the CI step node from the `at` a stored builder was read at, and `Image::declare` reads `docker
+push` and `docker buildx build --push` from `Export::scripts` (`image::pushed`, the image rows
+of the command table), with the script's CI step as the site. `image::repository` gives the
+repository of a site: link candidates, the literal-over-pattern rule, a builder's name choice
+(`patterns::builder`) and executions are per builder repository, a workload links to each CI
+step that builds its image, and its `runs code` execution is one per repository and image.
+Of the sites of one repository that build one image, `Image::link` keeps those on the best
+evidence. `Image::context_at` writes `builds <image>` and its runners on the CI step, and
+`trace::Graph::node_calls` joins a link that holds an evaluation root to the workload of that
+root only.
+
+The kind declares the other providers repository-level with `at`, workload consumers from stored Compose
 and Kubernetes images, and Helm `image.repository` consumers from a YAML file with a `values`
 word in its name (`config_values::helm_values`, the rule alert files use). `iac/types.toml` marks workload
 types. Image normalization expands Docker Hub names, removes tags/digests and lowercases names.
@@ -19,7 +32,7 @@ Unknown interpolations remain patterns; the IaC pattern matcher enforces the exi
 and segment ceilings. A literal name is exact, defaults and Helm values inferred (a Helm
 `image.registry` prefixes `image.repository` unless it already starts with it, a templated
 registry a `*`), and distinct matching image candidates ambiguous, including two images built by
-the same repository. Duplicate build evidence for one repository and image is collapsed
+the same repository. Duplicate build evidence for one site and image is collapsed
 to its strongest evidence, and a repository's literal name covers its own pattern matching the
 same runner.
 

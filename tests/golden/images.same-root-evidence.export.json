@@ -9,7 +9,7 @@
   "providers": [
     {
       "contract": "image::ghcr.io/independent/root-review",
-      "site": "independent.invalid/azure/roots",
+      "site": "independent.invalid/azure/roots::.github/workflows/image.yml::jobs.build.steps[0]",
       "at": ".github/workflows/image.yml#jobs.build.steps[0].with.tags"
     }
   ],
@@ -23,6 +23,15 @@
   ],
   "iac_nodes": [
     {
+      "identity": "independent.invalid/azure/roots::.github/workflows/image.yml::jobs.build.steps[0]",
+      "address": "jobs.build.steps[0]",
+      "type": "step",
+      "root": ".github/workflows/image.yml",
+      "path": ".github/workflows/image.yml",
+      "line": 7,
+      "end_line": 8
+    },
+    {
       "identity": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
       "address": "Pod/common",
       "type": "Pod",
@@ -35,7 +44,7 @@
   "links": [
     {
       "consumer": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
-      "provider": "independent.invalid/azure/roots",
+      "provider": "independent.invalid/azure/roots::.github/workflows/image.yml::jobs.build.steps[0]",
       "contract": "image::ghcr.io/independent/root-review",
       "level": "exact",
       "reason": "image::ghcr.io/independent/root-review",

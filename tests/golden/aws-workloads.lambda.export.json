@@ -45,7 +45,7 @@
   "links": [
     {
       "consumer": "example.com/acme/deploy::main.tf::aws_lambda_function.worker",
-      "provider": "example.com/acme/app",
+      "provider": "example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0]",
       "contract": "image::ghcr.io/acme/aws-worker",
       "level": "exact",
       "reason": "image::ghcr.io/acme/aws-worker",

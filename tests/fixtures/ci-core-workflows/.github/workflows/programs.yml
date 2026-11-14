@@ -1,0 +1,60 @@
+# One CI job per row of the level table of a program link (#832).
+name: Programs
+on: push
+jobs:
+  # exact: an earlier CI step of the job installs the package that declares the script.
+  earlier_step:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pip install core-tools
+      - run: core-lint --strict
+  # exact: an earlier line of the same script does.
+  earlier_line:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          pip install "core-sdk>=1.0"
+          core-health --wait 5
+  # exact: the command names the package, whose script of that name it starts.
+  by_package:
+    runs-on: ubuntu-latest
+    steps:
+      - run: uvx core-sdk status
+      - run: pipx run core-sdk status
+  # The package declares no script of its own name: a consumer of the package, no program.
+  no_script:
+    runs-on: ubuntu-latest
+    steps:
+      - run: uvx core-tools
+  # inferred: no install, one package of the workspace declares the script.
+  no_install:
+    runs-on: ubuntu-latest
+    steps:
+      - run: core-lint
+  # ambiguous: no install, core-sdk and core-tools both declare the script.
+  declared_twice:
+    runs-on: ubuntu-latest
+    steps:
+      - run: core-health
+  # exact: of the two that declare it, the job installs one.
+  picked:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pip install core-tools && core-health
+  # inferred: an install in a later CI step is no evidence.
+  later:
+    runs-on: ubuntu-latest
+    steps:
+      - run: core-publish early
+      - run: pip install core-sdk
+  # inferred: nor is one in another CI job (`earlier_step`) or in a called script.
+  elsewhere:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./scripts/install.sh
+      - run: core-lint
+  # No side: no package of the workspace declares the command.
+  outside:
+    runs-on: ubuntu-latest
+    steps:
+      - run: twine upload dist/*

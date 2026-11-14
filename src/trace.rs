@@ -196,6 +196,7 @@ impl<'a> Graph<'a> {
             ancestors: Vec::new(),
             expanded: HashSet::new(),
             executed: HashSet::new(),
+            held: HashSet::new(),
             limit: WALK_DEPTH,
         };
         match start {
@@ -253,6 +254,7 @@ impl<'a> Graph<'a> {
             ancestors: Vec::new(),
             expanded: HashSet::new(),
             executed: HashSet::new(),
+            held: HashSet::new(),
             // The walk starts at the IaC node, one level above `depth`.
             limit: depth + WALK_DEPTH - 1,
         };
@@ -357,6 +359,40 @@ impl<'a> Graph<'a> {
             }
         }
         walk.rows
+    }
+
+    /// The IaC nodes a link whose consumer calls its provider (`calls_on_link`, a CI call)
+    /// joins to `node`: the consumers that call it going up, the providers it calls going
+    /// down, each with its repository and the link, in the links' order (#825).
+    pub(crate) fn node_calls(
+        &self,
+        repository: usize,
+        node: &crate::iac::Node,
+        direction: Direction,
+    ) -> Vec<(usize, crate::iac::Node, &'a Link)> {
+        let identity = node.identity(&self.exports[repository].repository);
+        let (links, other): (_, fn(&Link) -> &str) = match direction {
+            Direction::Up => (self.into.get(identity.as_str()), |l| &l.consumer),
+            Direction::Down => (self.out.get(identity.as_str()), |l| &l.provider),
+        };
+        (links.into_iter().flatten())
+            .filter(|link| calls_on_link(link))
+            .filter_map(|&link| {
+                let &(n, reached) = self.iac.get(other(link))?;
+                // A link of one evaluation root joins the workload of that root only (an
+                // image, #833): one identity may sit in several roots.
+                let reached = match (link.root.as_deref(), direction) {
+                    (Some(root), Direction::Down) if root != node.root => return None,
+                    (Some(root), Direction::Up) => (self.exports[n].iac.iter())
+                        .find(|x| {
+                            x.root == root && x.path == reached.path && x.address == reached.address
+                        })
+                        .unwrap_or(reached),
+                    _ => reached,
+                };
+                Some((n, reached.clone(), link))
+            })
+            .collect()
     }
 
     /// The starts `from` names: the providers of a route, else one symbol, else one call site.
@@ -563,6 +599,28 @@ pub(crate) fn read_executions(partial: &mut Partial, links: &[Link]) -> Result<(
     }
     read(partial, links, starts, Direction::Down, true)?;
     Ok(())
+}
+
+/// The IaC node that provides the contract `from` names, when its kind starts a trace there
+/// (`ContractKind::starts_at_provider`) and no kind starts a trace from it by itself: a CI
+/// contract starts at its pipeline, as the node's own name does (#825). An image, which several
+/// CI steps may build, stays listed by its sides.
+pub(crate) fn provider_node(exports: &[Export], from: &str) -> Option<String> {
+    if !contract::kind_of(from).is_some_and(|kind| kind.starts_at_provider()) {
+        return None;
+    }
+    let providers: Vec<(&str, &str)> = (exports.iter())
+        .flat_map(|e| &e.providers)
+        .map(|p| (p.contract.as_str(), p.site.as_str()))
+        .collect();
+    if (contract::KINDS.iter()).any(|kind| !kind.starts(from, &providers).is_empty()) {
+        return None;
+    }
+    exports.iter().find_map(|e| {
+        let site = &e.providers.iter().find(|p| p.contract == from)?.site;
+        let node = |n: &crate::iac::Node| n.identity(&e.repository) == *site;
+        e.iac.iter().any(node).then(|| site.clone())
+    })
 }
 
 /// The nodes `start` names, as `Graph::find` and `Graph::changed` find them, read into
@@ -779,6 +837,8 @@ struct Walk<'g, 'a> {
     /// The workloads and roots whose `runs code` line the answer wrote (#744): a workload that
     /// runs several of the nodes reached, or several paths of one, is written once.
     executed: HashSet<(String, String)>,
+    /// The IaC nodes already followed upward from a CI step that runs a program (#832).
+    held: HashSet<String>,
     /// The depth where a branch stops, `WALK_DEPTH` below where the walk starts.
     limit: usize,
 }
@@ -846,6 +906,16 @@ impl<'a> Walk<'_, 'a> {
                     let (n, place) = (graph.repo(id), self.place(id));
                     self.consumers_down(id, n, &place, depth + 1, true, &mut shown);
                 }
+                // A CI step that runs a console script starts its program (#832).
+                if graph.iac.contains_key(id) {
+                    for link in (graph.out.get(id).into_iter().flatten())
+                        .filter(|l| calls_on_link(l) && graph.symbols.contains_key(&*l.provider))
+                    {
+                        if shown.insert((&link.provider, true)) {
+                            self.reach(&link.provider, depth + 1, link);
+                        }
+                    }
+                }
                 // A writer goes on to the readers of what it writes; a repository-level reader
                 // ends the branch.
                 for link in (graph.into.get(id).into_iter().flatten()).filter(|l| !calls_on_link(l))
@@ -898,6 +968,23 @@ impl<'a> Walk<'_, 'a> {
                         {
                             self.reach(method, depth + 1, link);
                         }
+                        // A CI step runs the program (#832). The walk from an IaC node
+                        // follows that node's own callers (`iac::trace`).
+                        if let Some(&(n, node)) = graph.iac.get(method)
+                            && graph.symbols.contains_key(id)
+                            && calls_on_link(link)
+                            && shown.insert((method, true))
+                        {
+                            let text = format!("{} {}", arrow(link), self.node(method).1);
+                            let mut path = Vec::new();
+                            self.holders_up(
+                                n,
+                                node,
+                                depth + 1,
+                                Row::link(text, n, link),
+                                &mut path,
+                            );
+                        }
                         continue;
                     };
                     if !shown.insert((c.caller.as_str(), true)) {
@@ -916,6 +1003,56 @@ impl<'a> Walk<'_, 'a> {
             }
         }
         self.ancestors.pop();
+    }
+
+    /// Upstream of a CI step that runs a program (#832): the step, then the nodes that hold it
+    /// (its CI job, its pipeline) and the CI jobs that call that pipeline, as the walk from an
+    /// IaC node writes them going up (`iac::trace`), calls before references. `path` holds
+    /// the nodes from the step to the one being followed.
+    fn holders_up(
+        &mut self,
+        n: usize,
+        node: &crate::iac::Node,
+        depth: usize,
+        mut row: Row,
+        path: &mut Vec<String>,
+    ) {
+        let graph = self.graph;
+        let export = &graph.exports[n];
+        let identity = node.identity(&export.repository);
+        let seen = match () {
+            _ if path.contains(&identity) => " (cycle)",
+            _ if self.held.contains(&identity) => " (see above)",
+            _ if depth >= self.limit => " (depth limit)",
+            _ => "",
+        };
+        row.text += seen;
+        self.push(depth, row);
+        if !seen.is_empty() {
+            return;
+        }
+        self.held.insert(identity.clone());
+        path.push(identity);
+        for (m, caller, link) in graph.node_calls(n, node, Direction::Up) {
+            let at = crate::iac::at(&graph.exports[m].repository, &caller);
+            let row = Row::link(format!("{} {at}", arrow(link)), m, link);
+            self.holders_up(m, &caller, depth + 1, row, path);
+        }
+        let mut holders: Vec<_> = (export.iac_references.iter())
+            .filter(|r| r.root == node.root && r.target == node.address)
+            .filter_map(|r| {
+                let holds = |h: &&crate::iac::Node| h.root == r.root && h.address == r.source;
+                Some((export.iac.iter().find(holds)?, &r.via))
+            })
+            .collect();
+        holders.sort_by_key(|(h, via)| (&h.path, h.line, &h.address, *via));
+        for (holder, via) in holders {
+            let via = via.as_ref().map_or(String::new(), |v| format!(" via {v}"));
+            let text = format!("{}{via}", crate::iac::at(&export.repository, holder));
+            let row = Row::call(text, n, Some(Level::Exact));
+            self.holders_up(n, holder, depth + 1, row, path);
+        }
+        path.pop();
     }
 
     fn writer_up(&mut self, link: &'a Link, depth: usize, shown: &mut HashSet<(&'a str, bool)>) {

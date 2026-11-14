@@ -1,0 +1,10 @@
+[project]
+name = "core-sdk"
+version = "1.0.0"
+dependencies = ["requests"]
+
+[project.scripts]
+core-publish = "core_sdk.cli:publish_main"
+core-health = "core_sdk.cli:health_main"
+# Named like the package: what `uvx core-sdk` and `pipx run core-sdk` start.
+core-sdk = "core_sdk.cli:main"

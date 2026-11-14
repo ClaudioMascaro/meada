@@ -84,6 +84,8 @@ file whose path holds a space reads as more fields than it has.
 | `<orphan-note>` | ` (no runner in the workspace)` | The visible scope has no runner of an image in this registry and namespace. |
 | `<orphan-note>` | ` (no matcher in the workspace)` | The visible alert scope has emitters but no matcher. |
 | `<orphan-note>` | ` (no emitter in the workspace)` | The visible alert scope has matchers but no emitter. |
+| `<orphan-note>` | ` (absent at the indexed commit)` | No repository of the workspace provides the CI contract this consumer names: at the indexed commit of the repository its path holds no reusable pipeline and no action. The file may exist at the Git ref, so the mark never says broken. |
+| `<orphan-note>` | ` (absent at the indexed commit: the file is no reusable pipeline there)` | The same, where the pipeline file is there and holds no `on.workflow_call`. |
 
 ## Levels
 
@@ -119,7 +121,12 @@ repository serving it is <repository>`, `2 providers fit; host unresolved; serve
 resource, a channel), `<channel> wildcard <pattern>`, `<queue> binding <exchange> <pattern>`,
 and for a package `<contract> <range> (local <version>)`, followed by `, range unchecked` or
 `, range mismatch` when the range does not plainly accept the version, and `; import <how>` for
-an import hop. A link to a provider that serves every method ends with `; any method`.
+an import hop. A link to a provider that serves every method ends with `; any method`. A link
+of a CI contract reads `@<ref> (indexed <short commit>)`: the Git ref the call wrote and the
+commit the provider's index was read at, followed by `, ref mismatch` when the ref is a full
+commit id (40 or 64 hexadecimal digits) other than that commit, or `@<ref> (indexed commit
+unknown)` when the provider's repository records none. A call inside its repository (a local
+call, `$/`, a CI step's `./<folder>`) writes no ref and reads `own repository`.
 
 The reason of a call's mark is how many definitions have its name: `one method named render`,
 `2 functions or classes named render`, `one of several methods named run` (a match narrowed to
@@ -137,6 +144,7 @@ A contract identifier starts with its contract kind and `::`:
 | `<contract>` | `package::<ecosystem>::<package>` | A package: `package::npm::@example/kit`. |
 | `<contract>` | `image::<word>` | A normalized image name or an unresolved image pattern. |
 | `<contract>` | `alert::<text>::<text>` | A label key and value (or matcher pattern) on an alert rule or Alertmanager route. |
+| `<contract>` | `ci::<repository>/<path>` | A reusable pipeline of GitHub Actions, by its repository and its file: `ci::github.com/acme/workflows/.github/workflows/publish.yml`. The Git ref a call names is no part of it. |
 | `<contract>` | `resource::<resource-kind>::<resource-id>` | A resource declared in `meada.toml` or used through an SDK: `resource::postgres::orders`, `resource::s3::orders-bucket`. |
 | `<method>` | `<word>` | An HTTP method in upper case, such as `GET` or `POST`. |
 | `<route>` | `<word>` | A route path; each parameter is `{}`. |
@@ -168,6 +176,7 @@ substrings), and an optional `kind`:
 | `alert` | Alert rule emitters and Alertmanager route matchers of `alert::` contracts. |
 | `document` | OpenAPI and AsyncAPI documents, by path or title. |
 | `package` | Packages, by name. |
+| `ci` | Pipelines, actions, CI jobs and CI steps of GitHub Actions, by address, type, id, `name` or `uses`. |
 | `drift` | Fields a consumer reads that its provider lacks, by route or field path. |
 | `community` | Communities, by name. |
 | `process` | Processes, by their entry point's label. |
@@ -192,8 +201,10 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | process | `<repository> <label> process::<entry-identity> (<entry-kind>)` | A process: `process::<entry-identity>` is what `trace` starts from. |
 | value | `<repository> <place> <key-path> = <shown-value>` | A config value, at its file and line. |
 | iac node | `<repository> <place> <address> (<iac-type><iac-name?>, root <iac-root>)<orphan-note?>` | An IaC node, at its block's first line, with its type, its physical name and its root module. |
+| ci node | `<repository> <place> <address> (<ci-type><ci-id?><ci-name?><ci-uses?>)` | A pipeline, an action, a CI job or a CI step, at its block's first line, with its type and what else names it. |
 | copies | `<n> copies` | A group of duplicates; one symbol line per copy follows. |
 | open item | `` <repository> <place> (<item-kind>) candidates: <n>;<item-limit?> run `meada decide --item <call-site>` `` | An open item and the command that closes it. |
+| open item cause | `` <repository> <place> (<item-kind>) candidates: 0; <reason> (`<identity>`) `` | An open item its kind leaves no candidate for: why the consumer is unresolved, then its identity, which `context` takes. A CI step whose `./<folder>` is read in a workspace Meada does not know is one. |
 | no matches | `` no matches for `<query?>` `` | Nothing matched. |
 
 | Field | Form | Meaning |
@@ -229,11 +240,26 @@ matches; it never lists standalone IaC nodes. Provisioner sides are contracts an
 | `<item-limit>` | ` limit: <text>;` | Why Meada could not read the start of a dynamic URL, whose path it appends to an unknown base: `base from the return value of <callee>`, `base from the parameter <name>`, `base of a client Meada did not read` or `base Meada could not read` (#801). |
 | `<key-path>` | `<text>` | Where the value sits in its file, jq style: `spec.containers[0].image`, `metadata.labels["app.kubernetes.io/name"]`, `[2].spec.replicas` in a file of several documents. |
 | `<shown-value>` | `<text> (cut)` | A string past 1 KiB, quoted as JSON and cut. |
-| `<address>` | `<word>` | An IaC node's address: `aws_sqs_queue.orders`, `data.aws_iam_policy_document.p`, `module.orders.aws_sqs_queue.this`, `aws_sqs_queue.dlq[0]`, and for a Kubernetes object `<Kind>[.<group>]/<namespace>/<name>`: `Deployment.apps/shop/api`, `Service/shop/api`, `ClusterRole.rbac.authorization.k8s.io/reader`. |
+| `<address>` | `<word>` | An IaC node's address: `aws_sqs_queue.orders`, `data.aws_iam_policy_document.p`, `module.orders.aws_sqs_queue.this`, `aws_sqs_queue.dlq[0]`, and for a Kubernetes object `<Kind>[.<group>]/<namespace>/<name>`: `Deployment.apps/shop/api`, `Service/shop/api`, `ClusterRole.rbac.authorization.k8s.io/reader`. In a pipeline or an action the address is the key path of the block: `.` for the file, `jobs.build`, `jobs["publish-prd"]`, `jobs.build.steps[2]`, `runs.steps[0]`. |
 | `<iac-type>` | `<word>` | The resource or data type of an IaC node, `module` for a module call, or the kind of a Kubernetes object. |
 | `<iac-name>` | `, name <text>` | The node's physical name, its `name` argument as static evaluation resolves it or a Kubernetes object's `metadata.name` once its overlay's prefix and suffix are applied, quoted as JSON. |
 | `<iac-name>` | `, pattern <text>` | The node's physical name when a part of it is unresolved (a data source, `terraform.workspace`, a resource's attribute), each such part a `*`, quoted as JSON. |
 | `<iac-root>` | `<word>` | The root module or overlay its evaluation starts from: its directory, `.` for the repository's root. |
+| `<ci-type>` | `workflow` | A pipeline: its address is `.`. |
+| `<ci-type>` | `action` | An action: its address is `.`. |
+| `<ci-type>` | `job` | A CI job, at `jobs.<id>`. |
+| `<ci-type>` | `step` | A CI step, at `<parent>.steps[<n>]`. |
+| `<ci-id>` | `, id <text>` | A CI job's id or a CI step's `id`, quoted as JSON. |
+| `<ci-name>` | `, name <text>` | The node's `name`, quoted as JSON. |
+| `<ci-uses>` | `, uses <text>` | What a CI job or a CI step calls, as written, quoted as JSON. |
+| `<git-ref>` | `<word>` | The Git ref of a call, as written after `@`: a branch, a tag or a commit id. Meada never resolves it. |
+| `<ci-ref>` | ` @<git-ref>` | The Git ref the call wrote. A call inside its repository writes none. |
+| `<ci-passed>` | ` with: <ci-keys>` | The keys of the call's `with`, never their values. |
+| `<ci-passed>` | ` secrets: <ci-keys>` | The keys of the call's `secrets`, or the word `inherit`. |
+| `<ci-passed>` | ` with: <ci-keys>; secrets: <ci-keys>` | Both. |
+| `<ci-passed>` | ` permissions: <ci-block>` | For a CI job, the `permissions` block that governs it. It closes the parts, after `; ` when `with` or `secrets` come before it. |
+| `<ci-block>` | `<text>` | A `permissions` block as declared, never as granted: `read-all`, `write-all`, `{}`, or its permissions as `<name>: <level>`, sorted and joined by `, `. `not declared` when neither the CI job nor its pipeline declares one that Meada reads. |
+| `<ci-keys>` | `<text>` | Keys as written, sorted, joined by `, `. |
 | `<shown-value>` | `<text>` | A string quoted as JSON (`"team-b"`), a number or a boolean as written, an HCL `expression` or `template` as written, a line break as `\n` (`var.env`, `"${var.env}-orders"`), or `redacted` for a value a format marks secret. |
 
 ## `context`
@@ -330,10 +356,15 @@ words:
 | config use | `<repository> use <config-place> [<level>] <contract><orphan-note?>` | A directionless config use named by its key locator. |
 | config policy grant | `<repository> policy grant <config-place> <contract>` | A policy grant named by its key locator. |
 | config key | `<repository> <config-place>` | A declared resource key's canonical location. |
-| located provides | `provides <contract>` | The selected key or IaC node writes the declared resource. |
+| located provides | `provides <contract>` | The selected key or IaC node writes the declared resource, or the selected pipeline or action is the provider of the CI contract. |
 | located consumes | `consumes <contract>` | The selected key or IaC node reads the declared resource. |
 | linked reader | `  reader: <identity><mark>` | A reader linked to the selected resource writer. |
 | linked writer | `  writer: <identity><mark>` | A writer linked to the selected resource reader. |
+| ci consumer | `  consumer: <repository> <place> <address> [<level>: <reason>]<ci-passed?>` | Under a pipeline's or an action's `provides`: a CI job or a CI step that calls it, with the link's level and reason and the keys the call passes. |
+| ci permissions | `  permissions: <ci-block>` | Under a reusable pipeline's `provides`: what its CI jobs declare together, the highest level of each permission, which each consumer's block is held against. |
+| ci consumes | `consumes <contract><ci-ref?><ci-passed?><orphan-note?>` | The selected CI job calls the reusable pipeline of the contract, or the selected CI step its action, at the Git ref and with the keys it wrote. With the absent mark no `ci provider` line follows: no repository of the workspace provides the contract. |
+| ci unresolved | `consumes (unresolved) <text>: <reason>` | The selected CI step names `./<folder>`, read in a workspace Meada does not know: its `uses` as written, then why. It is an open item with no candidate. |
+| ci provider | `  provider: <repository> <place> <address> [<level>: <reason>]` | Under a CI job's or a CI step's `consumes`: the pipeline or the action that provides the contract, with the link's level and reason. |
 | contract head | `<shown-contract>` | The contract the sides below belong to. |
 | side | `  <repository> <role> <side><mark?><orphan-note?>` | A side of the contract; a side linked through another name carries its mark. |
 | drift | `    drift: missing <missing>` | Under a consumer: the field paths it reads that the provider lacks, each with its level. |
@@ -341,8 +372,8 @@ words:
 | no contract | `` no <contract-kind> matches `<query>` `` | No side of the contract is in the workspace. |
 | provisioner | `<repository> <place> <address> (root <iac-root>)<mark?>` | A provisioner with its level and reason. |
 | iac type | `type: <iac-type>` | The IaC node's type. |
-| iac name | `name: <physical-name>` | The IaC node's physical name. |
-| iac root | `root: <iac-root>` | The IaC node's root module. |
+| iac name | `name: <physical-name>` | The IaC node's physical name; for a pipeline, an action, a CI job or a CI step, its `name`. |
+| iac root | `root: <iac-root>` | The IaC node's root module; for a pipeline or an action and the nodes under it, the file's path. |
 | iac role | `role: <text>` | What a Kubernetes object is to Crossplane: `crossplane composite resource definition`, `crossplane composition`, `crossplane claim`, `crossplane composite resource`, `crossplane managed resource` or `crossplane composed resource`. |
 | iac image | `image: <text><iac-mark?>` | A Compose service's image quoted as JSON, or a workload's image contract with its optional missing-builder note. |
 | image builder | `  builder: <repository> [<level>: <reason>]` | A workload's image builder, with its evaluated evidence. |
@@ -503,13 +534,13 @@ carries its level with no reason.
 | no overlap | `no symbol overlaps the uncommitted changes` | `changes: uncommitted` found no symbol to start from. |
 | process up | `a process is what its entry point sets in motion: trace it down` | A process traces `down` only. |
 | no process | `` no process `<query>`: pass `process::<entry point identity>` `` | No entry point has that identity. |
-| not a start | ``` `<query>` is a <sided-kind>, and a trace starts from a symbol, a route or a call site: run `context` on it for its <sides>, then trace from one ``` | A contract listed by its sides is no start. |
+| not a start | ``` `<query>` is a <sided-kind>, and a trace starts from a symbol, a route or a call site: run `context` on it for its <sides>, then trace from one ``` | A contract listed by its sides is no start. A CI contract a pipeline of the workspace provides is one: the trace starts at that pipeline's file node. |
 | fits symbols | ``` `<query>` fits <n> symbols; pass one of: ``` | The name fits several symbols, listed after it. |
 | fit symbol | `<node> <identity>` | One of the symbols the name fits, and its identity. |
 | fits call sites | ``` `<query>` fits <n> call sites; pass one of: ``` | The name fits several call sites, listed after it. |
 | fit call site | `<repository> <place> <call-site>` | One of the call sites the name fits. |
 | no start | `` no symbol, route or call site matches `<query>` `` | Nothing to start from. |
-| iac reference | `<indent><repository> <place> <address><via?><repeat?>` | From an IaC node: a node it references (`down`) or that references it (`up`), at its block, within its root module. |
+| iac reference | `<indent><repository> <place> <address><via?><repeat?>` | From an IaC node: a node it references (`down`) or that references it (`up`), at its block, within its root module. A CI call leaves the root module and the repository as a `link` line: `up` from a pipeline to the CI jobs that call it, `down` from a CI job to the pipeline it calls, and the walk goes on through that node's references. |
 | fits iac | ``` `<query>` fits <n> IaC nodes; pass one of: ``` | The address fits several IaC nodes, listed after it. |
 | fit iac | `<repository> <place> <iac-pass>` | One of the IaC nodes the address fits, and what to pass for it. |
 

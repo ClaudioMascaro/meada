@@ -126,7 +126,7 @@ O export de um repositório é JSON indentado e terminado por uma quebra de linh
 | `symbols` | `id`, `span` (`path`, `start`, `end`), `hash`. |
 | `calls` | `id`, `caller`, `target`, `level`, `candidates`, `span`, `narrowed`, `decorates`. |
 | `providers` | `contract`, `site`, `gateway`, `shape`. |
-| `consumers` | `contract`, `site`, `via`, `shape`. |
+| `consumers` | `contract`, `site`, `via`, `shape`; no consumidor de um contrato de CI, também `ref`, `with` e `secrets`, cada um omitido quando vazio, e `absent` (`true`, omitido nos demais casos) quando nenhum repositório do workspace provê o contrato no commit indexado; no consumidor em um job de CI, também `permissions`, o bloco declarado que rege o job (o dele, senão o do pipeline: uma palavra ou um mapa de níveis), omitido quando nenhum é declarado ou lido. |
 | `bindings` | `contract`, `exchange`, `pattern`, `site`. |
 | `documents` | `path`, `format` (`openapi` ou `asyncapi`), `version`, `contracts`. |
 | `publishes` | `exchange`, `key`, `site`. |

@@ -1,0 +1,5 @@
+name: Login
+description: An action no other action calls into.
+runs:
+  using: node20
+  main: index.js

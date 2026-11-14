@@ -27,7 +27,7 @@ example.com/gcp/infra run.tf:42 resource.google_cloud_run_service.v1.template.sp
 example.com/gcp/infra run.tf:43 resource.google_cloud_run_service.v1.template.spec.containers[1].env.value = "other-container"
 image: image::ghcr.io/acme/gcp-sidecar
 image: image::ghcr.io/acme/gcp-worker
-  builder: example.com/gcp/app [exact: image::ghcr.io/acme/gcp-worker]
+  builder: example.com/gcp/app::.github/workflows/build.yml::jobs.image.steps[0] [exact: image::ghcr.io/acme/gcp-worker]
 env worker BUCKET_AS_QUEUE -> Terraform google_storage_bucket assets: resource::gcs::assets
 env worker DUP_QUEUE -> duplicate environment entry: unresolved
 env worker QUEUE_URL -> Terraform environment: tasks-v1
@@ -52,7 +52,7 @@ example.com/gcp/infra run.tf:61 resource.google_cloud_run_v2_service.v2.template
 example.com/gcp/infra run.tf:64 resource.google_cloud_run_v2_service.v2.template.containers.env[1].value_source.secret_key_ref.secret = google_secret_manager_secret.token.id
 example.com/gcp/infra run.tf:65 resource.google_cloud_run_v2_service.v2.template.containers.env[1].value_source.secret_key_ref.version = "latest"
 image: image::ghcr.io/acme/gcp-worker
-  builder: example.com/gcp/app [inferred: image::ghcr.io/acme/gcp-worker; image: run.tf#resource.google_cloud_run_v2_service.v2 (var.image run.tf:1)]
+  builder: example.com/gcp/app::.github/workflows/build.yml::jobs.image.steps[0] [inferred: image::ghcr.io/acme/gcp-worker; image: run.tf#resource.google_cloud_run_v2_service.v2 (var.image run.tf:1)]
 env worker V2_QUEUE -> Terraform default var.queue: tasks-v2
 env worker V2_SECRET -> secret resource::gcpsecretmanager::api-key: unresolved
 
@@ -72,6 +72,6 @@ example.com/gcp/infra run.tf:82 resource.google_cloud_run_v2_job.batch.template.
 example.com/gcp/infra run.tf:85 resource.google_cloud_run_v2_job.batch.template.template.containers.env[1].name = "UNKNOWN_QUEUE"
 example.com/gcp/infra run.tf:86 resource.google_cloud_run_v2_job.batch.template.template.containers.env[1].value = var.unknown
 image: image::ghcr.io/acme/gcp-worker
-  builder: example.com/gcp/app [exact: image::ghcr.io/acme/gcp-worker]
+  builder: example.com/gcp/app::.github/workflows/build.yml::jobs.image.steps[0] [exact: image::ghcr.io/acme/gcp-worker]
 env worker JOB_QUEUE -> Terraform environment: tasks-job
 env worker UNKNOWN_QUEUE -> Terraform environment (unresolved): unresolved

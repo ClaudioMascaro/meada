@@ -19,5 +19,5 @@ example.com/acme/deploy deployment.yaml:21 [1].spec.template.spec.containers[0].
 example.com/acme/deploy deployment.yaml:24 [1].spec.template.spec.containers[0].env[0].valueFrom.configMapKeyRef.name = "queues"
 example.com/acme/deploy deployment.yaml:25 [1].spec.template.spec.containers[0].env[0].valueFrom.configMapKeyRef.key = "queue"
 image: image::ghcr.io/acme/environment-app
-  builder: example.com/acme/app [exact: image::ghcr.io/acme/environment-app]
+  builder: example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0] [exact: image::ghcr.io/acme/environment-app]
 env sender QUEUE_URL -> ConfigMap/shop/queues key queue: https://sqs.us-east-1.amazonaws.com/123456789012/orders

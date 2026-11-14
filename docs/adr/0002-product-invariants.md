@@ -61,7 +61,10 @@ amended for it (2 and 4) and one was added (6).
    indexed commit, so the commit `HEAD` names and whether the checkout differs from it join the
    inputs of the export, not of the answers. The same tree at another commit gives an export
    that differs in `commit` and `dirty` alone. Both are read from local git state, with no
-   network and no clock.)
+   network and no clock.) (Amended 2026-11-14; ADR 0028: the reason of a CI link names the
+   provider's indexed commit, so that commit joins the inputs of the answers on CI links, and of
+   them alone. The same tree at another commit gives the same links at the same levels, with
+   another `(indexed <commit>)` in the reason and a `ref mismatch` flag that follows it.)
 
 ## Consequences
 

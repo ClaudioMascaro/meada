@@ -1,0 +1,8 @@
+name: Sample action
+runs:
+  using: composite
+  steps:
+    - id: prepare
+      run: echo prepare
+      shell: bash
+    - uses: ./nested

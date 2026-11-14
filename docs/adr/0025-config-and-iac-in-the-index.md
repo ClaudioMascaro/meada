@@ -31,9 +31,10 @@ model, and the same inputs give the same answers.
   (`VALUES_MAX`, 1,000, all its documents together, redacted values counted; #817,
   2026-11-12): it keeps none, and `meada status` counts it apart and names it. Terraform and
   OpenTofu files in every form, and a file a reader of a kind takes as its own (a document, a
-  config file a language pack reads, Compose, a GitHub workflow or Skaffold file, a package
-  manifest, a Kubernetes object, a CloudFormation or SAM template, a Serverless service, an
-  alert rule, route or receiver), keep every value, since the config use rule reads their rows.
+  config file a language pack reads, Compose, a GitHub workflow or Skaffold file, an action
+  file (ADR 0028), a package manifest, a Kubernetes object, a CloudFormation or SAM template, a
+  Serverless service, an alert rule, route or receiver), keep every value, since the config use
+  rule reads their rows.
   A Helm chart's values file is a generic file here: past the ceiling it keeps none.
 - **Reader.** One event reader for YAML and JSON yields each scalar with its line and reads
   every document of a stream. Alias expansion keeps today's budget (a node built is charged to a
@@ -98,6 +99,10 @@ checkout does not, and the docs point at `.meadaignore` for files that must stay
 - **Helm charts**, through their values files only: templates are not rendered and stay skipped.
 
 IaC written in general-purpose code (CDK, Pulumi) is out.
+
+(Amended 2026-11-12; ADR 0028.) **GitHub Actions** joins these formats: a file under
+`.github/workflows/` that holds `jobs` (a pipeline) and an `action.yml` or `action.yaml` that
+holds `runs` (an action). The files of other CI systems stay config values only.
 
 ### HCL reader
 
@@ -464,6 +469,11 @@ Its address:
 - CloudFormation and SAM: the logical id within its template.
 - Compose: `services.<name>`.
 - Serverless: `functions.<name>`, and its resources by logical id.
+- (Amended 2026-11-12; ADR 0028.) GitHub Actions: the key path of the block in the grammar of
+  "Key path" above. A CI job is `jobs.build`, and `jobs["publish-prd"]` when its id is not a
+  plain identifier; a CI step is `jobs.build.steps[2]` or `runs.steps[0]`; the pipeline or the
+  action itself is `.`. A CI step's address is positional: its `id`, `name` and `uses` are
+  selectors, never identity. Only the first YAML document of such a file is read.
 
 Each node records the label of the root module or overlay that roots its evaluation (ADR 0026
 labels a provisioner by it). Its identity is `<repo remote>::<file>::<address>`, the form of a
@@ -479,7 +489,9 @@ A static reference from one IaC node to another is stored like a call and walked
   namespace and evaluation unit, ConfigMap, Secret and service account references, and Ingress
   backends;
 - Compose: `depends_on`, `links` and shared networks;
-- Crossplane: claims to composite resources to composed resources.
+- Crossplane: claims to composite resources to composed resources;
+- (Amended 2026-11-12; ADR 0028.) GitHub Actions: a pipeline to its CI jobs, a CI job
+  or a composite action to its CI steps, and a CI job to the CI jobs its `needs` names.
 
 References per node are a named ceiling.
 
@@ -489,6 +501,8 @@ An evaluation unit is the set of files evaluated together: a Terraform module di
 local module instantiated once per call), a Kustomize tree per overlay, a CloudFormation or SAM
 template, a Compose project, a Serverless service file. A change to any file of a unit
 re-evaluates the whole unit. Links across repositories resolve at link time, as today.
+(Amended 2026-11-12; ADR 0028.) A pipeline file and an action's manifest are each one
+evaluation unit.
 
 ### Static evaluation
 
@@ -503,6 +517,9 @@ re-evaluates the whole unit. Links across repositories resolve at link time, as 
 - **Never resolved**: data sources, remote state, registry modules (beyond what the type table
   says of their inputs), Terraform workspaces, `-var` and `TF_VAR_`, Helm template rendering,
   composition patches and functions, and anything read from a process environment.
+- (Amended 2026-11-12; ADR 0028.) **GitHub Actions.** A `${{ }}` expression resolves
+  only where a literal `env` of the CI step, the CI job or the pipeline gives its value. Anything else
+  is an unresolved part, and `secrets.X` and `vars.X` have no value in a repository.
 - **Unresolved parts.** An unresolved part of a name becomes a wildcard, and the name becomes a
   pattern (ADR 0026 fixes how a pattern links).
 - **Level of an evaluated name.** A name written as one literal, or assembled from literals,
@@ -572,6 +589,10 @@ re-evaluates the whole unit. Links across repositories resolve at link time, as 
   keeps its answer byte for byte, and one that found nothing changes only by finding a config
   value.
 - The MCP `search` tool's kind list gains `value` and `iac`.
+- (Amended 2026-11-12; ADR 0028.) `search` gains the kind `ci` for the nodes of the
+  GitHub Actions format, matched by address, type and a CI step's `id`, `name` and `uses`. The
+  kind `iac` keeps its answers, the default search still includes no IaC node, and the MCP tool's
+  kind list gains `ci`.
 
 ## Considered options
 
