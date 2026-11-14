@@ -22,6 +22,14 @@ const PATHS_MAX: usize = 256;
 // Dockerfile is not read.
 const WORK_MAX: usize = 16_384;
 
+/// The bytes of a wildcard segment one directory entry is examined against for one unit of
+/// `WORK_MAX`: `compile` reads the segment and `fits` compares it with each entry's name, so a
+/// longer segment counts one unit more per `PATTERN_STEP` bytes, at each listing (#761).
+// ponytail: a segment of up to 32 bytes (`requirements-*.txt`) counts an entry once, as before
+// #761; past it the reader's matching costs at most 255 bytes of a name times 32 per unit, about
+// 134 million comparisons for `WORK_MAX`.
+const PATTERN_STEP: usize = 32;
+
 /// The sources a Dockerfile's `COPY`, `ADD` and `RUN --mount=type=bind` take from the build
 /// context, each normalized from the context root (`.` for the whole of it) with a wildcard still
 /// in it. `COPY --from`, `ADD` of a URL or a git repository, a heredoc and every other mount read
@@ -457,18 +465,25 @@ impl Walk<'_> {
         }
         let tokens = compile(head).ok_or("a malformed wildcard")?;
         let entries = contract::list(self.root, dir).ok_or("a directory too large to list")?;
-        self.work += entries.len();
+        // Every entry listed is examined, matched or not, and the segment was compiled (#761).
+        let weight = head.len().div_ceil(PATTERN_STEP);
+        self.spend((entries.len().saturating_add(1)).saturating_mul(weight))?;
         for (name, kind) in entries.into_iter().filter(|(name, _)| fits(&tokens, name)) {
             self.take(join(dir, &name), kind, rest)?;
         }
         Ok(())
     }
 
-    fn take(&mut self, path: String, kind: Probe, rest: &[&str]) -> Result<(), Unread> {
-        self.work += 1;
-        if self.work > WORK_MAX {
-            return Err("more files than the reader examines");
+    fn spend(&mut self, work: usize) -> Result<(), Unread> {
+        self.work = self.work.saturating_add(work);
+        match self.work > WORK_MAX {
+            true => Err("more files than the reader examines"),
+            false => Ok(()),
         }
+    }
+
+    fn take(&mut self, path: String, kind: Probe, rest: &[&str]) -> Result<(), Unread> {
+        self.spend(1)?;
         match (kind, rest.is_empty()) {
             (Probe::Link, _) => Err("a symbolic link"),
             (Probe::Dir | Probe::File, true) => {
@@ -1209,6 +1224,39 @@ mod tests {
             codes[0].reason
         );
         assert!(start.elapsed() < std::time::Duration::from_secs(10));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// Every entry a wildcard lists is examined, matched or not, and a long segment costs each
+    /// entry as much as many short ones (#761). 4,000 names of 250 bytes: 255 sources of 32
+    /// bytes that match none of them, then one source whose class lists 50,000 characters, each
+    /// past `WORK_MAX` before it compares every entry with every source.
+    #[test]
+    fn a_wildcard_spends_every_entry_it_lists_and_its_length() {
+        let names: Vec<String> = (0..4000)
+            .map(|i| format!("{}{i}", "a".repeat(250)))
+            .collect();
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        let root = repo("nomatch", &names);
+        let short: String = (0..255)
+            .map(|i| format!("COPY *{}b{i} /x/\n", "a".repeat(27)))
+            .collect();
+        let long = format!("COPY *[{}] /x/\n", "bcdefghijklmnopqrstuvwxyz".repeat(2000));
+        for (case, text) in [("short", short), ("long", long)] {
+            let start = std::time::Instant::now();
+            let codes = executions(&root, &node(".", Some((&text, true))), usize::MAX);
+            let took = start.elapsed();
+            let reason = codes.first().map(|c| c.reason.as_str());
+            assert!(
+                reason
+                    .is_some_and(|r| r.ends_with("not read: more files than the reader examines")),
+                "{case}: {reason:?} after {took:?}"
+            );
+            assert!(
+                took < std::time::Duration::from_secs(10),
+                "{case}: {took:?}"
+            );
+        }
         let _ = std::fs::remove_dir_all(root);
     }
 

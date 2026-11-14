@@ -6,6 +6,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The Dockerfile reader counts every directory entry a wildcard source examines, matched or not,
+  and a long wildcard segment as many entries: 255 sources that match none of 4,000 files no
+  longer take 47 seconds to index, and fall back to the whole build context as other Dockerfiles
+  past the reader's work do (#761).
+
 ## [1.4.0] - 2026-11-13
 
 A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md),
