@@ -108,12 +108,17 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   through it (`q.TableName = ..` on any variable of any type, in any class; a write of another
   property does not count), since a class derived from an SDK type can keep `this` (Go judges a
   name by its own mentions alone, #774); nor have
-  Go locals declared together (`p, q := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.
+  Go locals declared together (`p, q := ..`), a Go name declared in a block, an `if`, a `switch` or
+  `select` case or a loop body (the Go pack binds a constant only in a statement of the function
+  body, `language-packs.md`; #888) and a Go request held by value and passed by address.
   A Go function, or a method whose name no other definition of the repository spells, that
   mentions its parameter twice (declared, read by the path) sends what each exact caller passes
   (#774): the argument is followed in the caller by the caller's own mentions, through any number
   of such wrappers, a spread (`xs...`, the caller's slice itself) and a variadic parameter given
-  one element included. A function literal, a method that shares its name with another
+  one element included. A chain enters a function once: a wrapper that passes its parameter on
+  to itself gives the caller's site the names of the first pass alone, and what the recursive
+  call sends has no site and no unresolved side, a table name in a string parameter included
+  (#886). A function literal, a method that shares its name with another
   definition, a call with more or fewer arguments than parameters (a variadic one given two)
   and every C# method are not followed.
   In Java the rule covers a list or an array: one mentioned a third time or held in a field has no
