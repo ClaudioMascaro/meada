@@ -444,11 +444,14 @@ fn changed_request<'a>(
     false
 }
 
-/// How often each function of a file writes its locals and its parameters (`Facts::mentioned`),
-/// read once per file, and which methods of the group share their name.
+/// How often a file's functions write their names, by function and name (`Facts::mentioned`).
+type Written<'a> = HashMap<(&'a str, &'a str), u32>;
+
+/// How often each function of a file writes its locals and its parameters, read once per file,
+/// and which methods of the group share their name.
 #[derive(Default)]
 struct Counts<'a> {
-    files: std::cell::RefCell<HashMap<&'a str, HashMap<(&'a str, &'a str), u32>>>,
+    files: std::cell::RefCell<HashMap<&'a str, Written<'a>>>,
     shared: std::cell::OnceCell<BTreeSet<&'a str>>,
 }
 
