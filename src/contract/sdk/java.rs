@@ -80,7 +80,7 @@ pub(crate) struct Builders<'a> {
     files: std::cell::RefCell<std::collections::HashMap<&'a str, std::rc::Rc<Uses<'a>>>>,
     /// The Java files that call a method on each name (the last name before the method), read
     /// once: a field builder is changed from another file by such a call. With them, whether a
-    /// Java file of the repository reads fields by reflection (`reflective`).
+    /// Java file of the repository reads fields by reflection (`Facts::reflects`).
     callers: std::cell::OnceCell<(std::collections::HashMap<&'a str, Vec<&'a str>>, bool)>,
     /// The file and the directory of every type the repository's Java files declare, nested ones
     /// included, with its name: a type of the package or the file shadows the one an import names.
@@ -175,7 +175,7 @@ impl<'a> Builders<'a> {
                 if !file.ends_with(".java") {
                     continue;
                 }
-                reflected |= reflective(facts);
+                reflected |= facts.reflects;
                 for call in &facts.calls {
                     let Some((head, method)) = call.callee.rsplit_once('.') else {
                         continue;
@@ -447,7 +447,7 @@ impl<'a> Uses<'a> {
             rewritten: (code.assigned(path).iter())
                 .map(|b| (b.scope.as_str(), b.name.as_str()))
                 .collect(),
-            reflective: reflective(facts),
+            reflective: facts.reflects,
             written: (code.mentioned(path).iter())
                 .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
                 .collect(),
@@ -568,17 +568,6 @@ impl<'a> Uses<'a> {
             .get(&(scope, name))
             .is_none_or(|&written| written > 1 + direct)
     }
-}
-
-/// Whether the file reads a field by its name as a string: any field may change there, a
-/// `private` one of another file too.
-fn reflective(facts: &crate::lang::Facts) -> bool {
-    (facts.calls.iter()).any(|c| {
-        matches!(
-            crate::resolve::method(&c.callee),
-            "getDeclaredField" | "getField" | "getDeclaredFields" | "getFields"
-        )
-    })
 }
 
 /// The name a chain of steps is made on: `b` in `b.message(..).build()` as the stored calls spell

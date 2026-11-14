@@ -102,11 +102,14 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   that spells the name, is out of another file's reach, so a call on its name there does not
   count (#775). Still judged by every Java file: a name the file also declares without
   `private`, in any class and `final` or not; a field of a file that spells `lombok` anywhere
-  (an import, an annotation, a comment: Lombok's accessors are not in the source); a field a
-  class inherits from another file; and every field of a repository where a Java file reads
-  fields by reflection (`getDeclaredField`, `getField` and their plurals, no other API, and no
-  Kotlin file's), since the file that reads one may hand it to any other. A Lombok accessor or
-  a reflective read whose result is set under another name is not seen, as before.
+  (an import, an annotation, a comment: Lombok's accessors are not in the source) or holds a
+  Unicode escape (`\u..`, which may spell that name or a step on the field); a field a
+  class inherits from another file; and every field of a repository where a Java file spells
+  `getDeclaredField`, `getField` or their plurals as a whole name (`Facts::reflects`: a call, a
+  method reference, a comment, a Unicode escape read as its character; no other reflection
+  API, and no Kotlin, Groovy or Scala file's), since the file that reads one may hand it to
+  any other. A Lombok accessor or a reflective read whose result is set under another name is
+  not seen, as before, and neither is a step on a field written with a Unicode escape.
   A request type is the SDK's unless a type of its directory, an import or a
   variable says otherwise: one of the same package in another source root is not seen (#719).
   A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB

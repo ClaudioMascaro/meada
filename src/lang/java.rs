@@ -918,10 +918,15 @@ fn parse(src: &[u8]) -> Result<Facts> {
         });
     }
     // Lombok adds members the source does not show (a `@Getter`'s accessor hands a private field
-    // out), so a file that spells its name anywhere, a comment included, lists none.
-    if !src.windows(6).any(|bytes| bytes == b"lombok") {
+    // out), so a file that spells its name anywhere, a comment included, lists none. Nor does a
+    // file that holds a Unicode escape (JLS 3.3): one may spell that name, or a step on a field,
+    // where this pack reads other text.
+    let holds = |needle: &[u8]| src.windows(needle.len()).any(|bytes| bytes == needle);
+    let escaped = holds(b"\\u");
+    if !holds(b"lombok") && !escaped {
         facts.private_fields = (final_fields.difference(&open_fields).cloned()).collect();
     }
+    facts.reflects = (holds(b"Field") || escaped) && spells(src, &REFLECTIVE);
     facts.loops = super::outermost(
         tree.root_node(),
         &[
@@ -1680,6 +1685,47 @@ fn encloses(class: &str, scope: &str) -> bool {
             .is_some_and(|rest| rest.starts_with('.'))
 }
 
+/// The methods of `Class` that read a field by its name (`Facts::reflects`).
+const REFLECTIVE: [&str; 4] = [
+    "getDeclaredField",
+    "getField",
+    "getDeclaredFields",
+    "getFields",
+];
+
+/// Whether `src` spells one of `names` as a whole identifier, anywhere: a call, a method
+/// reference, a comment, a string. A Unicode escape (`\u0046`, JLS 3.3) is read as the character
+/// it stands for, as the compiler reads it before anything else; one after an escaped backslash
+/// is read so too, which can only find a name the file does not spell.
+fn spells(src: &[u8], names: &[&str]) -> bool {
+    let mut token: Vec<u8> = Vec::new();
+    let mut at = 0;
+    while at <= src.len() {
+        // One character: `\uXXXX`, with any number of `u`, or a byte.
+        let escape = src[at..].strip_prefix(b"\\u").and_then(|rest| {
+            let hex = &rest[rest.iter().take_while(|&&b| b == b'u').count()..];
+            let digits = hex
+                .get(..4)
+                .filter(|d| d.iter().all(u8::is_ascii_hexdigit))?;
+            let code = u32::from_str_radix(std::str::from_utf8(digits).ok()?, 16).ok()?;
+            Some((u8::try_from(code).ok(), src.len() - at - hex.len() + 4))
+        });
+        let (character, length) = escape.unwrap_or((src.get(at).copied(), 1));
+        match character {
+            Some(c) if c.is_ascii_alphanumeric() || c == b'_' || c == b'$' => token.push(c),
+            // Any other character, and the end of the file, end a name.
+            _ => {
+                if names.iter().any(|name| name.as_bytes() == token) {
+                    return true;
+                }
+                token.clear();
+            }
+        }
+        at += length;
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1729,6 +1775,34 @@ mod tests {
         let lombok = format!("import lombok.Getter; {src}");
         let facts = Java.parse("C.java", lombok.as_bytes()).unwrap();
         assert_eq!(facts.private_fields, Vec::<String>::new());
+        // A Unicode escape may spell Lombok's name, or a step on a field: its file lists none.
+        let escaped = format!("{src} class E {{ String e = \"\\u00e9\"; }}");
+        let facts = Java.parse("C.java", escaped.as_bytes()).unwrap();
+        assert_eq!(facts.private_fields, Vec::<String>::new());
+    }
+
+    /// A file reads fields by reflection where it spells one of the four methods of `Class` as a
+    /// whole name (#775): in a call, a method reference, a name written with a Unicode escape, a
+    /// comment. A longer name is another method.
+    #[test]
+    fn a_file_that_spells_a_reflective_field_read_says_so() {
+        let reflects = |body: &str| {
+            let src = format!("class C {{ void f() throws Exception {{ {body} }} }}");
+            Java.parse("C.java", src.as_bytes()).unwrap().reflects
+        };
+        assert!(reflects("Holder.class.getDeclaredField(\"b\");"));
+        assert!(reflects("o.getClass().getFields();"));
+        assert!(reflects("Lookup l = Holder.class::getDeclaredField;"));
+        assert!(reflects("Holder.class.getDeclared\\u0046ield(\"b\");"));
+        assert!(reflects("Holder.class.\\uu0067etField(\"b\");"));
+        assert!(reflects("/* through getField */ lookup.find(\"b\");"));
+        assert!(!reflects(
+            "errors.getFieldErrors(); form.getFieldName(); my_getField();"
+        ));
+        assert!(!reflects("holder.build(); String e = \"\\u00e9\";"));
+        // The name ends the file.
+        assert!(spells(b"x::getFields", &REFLECTIVE));
+        assert!(!spells(b"x::getFieldsOf", &REFLECTIVE));
     }
 
     /// Code that runs when its caller says: every lambda and local or anonymous class, nested ones

@@ -13,3 +13,4 @@ public class Store extends Base implements Comparable<Store> {
     void reset() { client = null; }
     Runnable later() { return new Runnable() { public void run() { reset(); } }; }
 }
+// No field is read by reflection here, but the name getDeclaredField is spelled: `reflects`.

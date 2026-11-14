@@ -21,8 +21,8 @@ All notable changes to Meada are recorded here. The format follows
   field, so that variable is another one; before, a call there on that name, other than
   `build()`, left the field's side unresolved. As before, every Java file judges a name its file
   also declares without `private`, a field of a file that names Lombok (a `@Getter` hands the
-  field out with no mention in the source), and every field of a repository where a Java file
-  reads fields by reflection (#775).
+  field out with no mention in the source) or holds a Unicode escape, and every field of a
+  repository where a Java file reads fields by reflection (#775).
 - Pipelines, actions, CI jobs and CI steps of GitHub Actions are IaC nodes (ADR 0028). A file
   directly under `.github/workflows/` that holds `jobs` is a pipeline, and an `action.yml` or
   `action.yaml` that holds `runs` is an action; each CI job (`jobs.build`) and CI step
@@ -129,6 +129,12 @@ All notable changes to Meada are recorded here. The format follows
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
 
+- Java: a file that reads a field by reflection through a method reference
+  (`Holder.class::getDeclaredField`) or a name written with a Unicode escape no longer leaves
+  a field builder it may change with its first table. A file reads fields where it spells
+  `getDeclaredField`, `getField` or their plurals as a whole name, a comment included. The
+  index stores that per file, and an existing index is rebuilt on its first open by this
+  version (#775).
 - The Dockerfile reader counts every directory entry a wildcard source examines, matched or not,
   and a long wildcard segment as many entries: 255 sources that match none of 4,000 files no
   longer take 47 seconds to index, and fall back to the whole build context as other Dockerfiles
