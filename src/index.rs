@@ -119,7 +119,10 @@ pub(crate) fn schema_version() -> i32 {
 /// `id`), which serves substring search for a query of three characters or more. None of the
 /// three reaches the export. `taken` lists the documents and the config files a pack reads or
 /// includes as of the last refresh: those keep every value past `config_values::VALUES_MAX`
-/// (#817), so a config file one starts or stops taking is read again.
+/// (#817), so a config file one starts or stops taking is read again. `dockerfiles` lists the
+/// folders (no `/` at the end, empty for the root) that hold a file named `Dockerfile` or
+/// `dockerfile`, the two the runner builds an action from, as of the last refresh (#827): the CI
+/// kind tells by it a container action, which no reader takes, from a folder that holds no action.
 /// `iac_nodes` holds each IaC node (#649, `iac::Node`: its address, the
 /// label of its root module, its type, physical name as static evaluation resolves it (#650),
 /// whether that is a `pattern`, the `overridable` values it went through as JSON, file, first and
@@ -184,6 +187,7 @@ CREATE TABLE config_files (
     summary TEXT NOT NULL
 );
 CREATE TABLE taken (path TEXT PRIMARY KEY);
+CREATE TABLE dockerfiles (folder TEXT PRIMARY KEY);
 CREATE TABLE contract_configs (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT ''
@@ -206,7 +210,7 @@ CREATE TABLE iac_nodes (
     image TEXT, image_overridable INTEGER, build TEXT, build_overridable INTEGER, role TEXT,
     handler TEXT, handler_overridable INTEGER, events TEXT NOT NULL, build_image INTEGER NOT NULL,
     subscription TEXT, environment TEXT NOT NULL, images TEXT NOT NULL, provisioned TEXT,
-    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT
+    ingress TEXT NOT NULL, routes TEXT NOT NULL, dockerfile TEXT, actions TEXT
 );
 CREATE INDEX iac_nodes_address ON iac_nodes (address);
 CREATE INDEX iac_nodes_path ON iac_nodes (path);
@@ -904,7 +908,7 @@ fn refresh_attempt(
                  DELETE FROM calls; DELETE FROM candidates; DELETE FROM contracts; \
                  DELETE FROM documents; DELETE FROM manifests; DELETE FROM exports; \
                  DELETE FROM families; DELETE FROM flexible; DELETE FROM entry_points; DELETE FROM communities; \
-                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM taken; DELETE FROM contract_configs; DELETE FROM config_values; \
+                 DELETE FROM valued; DELETE FROM config_files; DELETE FROM taken; DELETE FROM dockerfiles; DELETE FROM contract_configs; DELETE FROM config_values; \
                  INSERT INTO config_search (config_search) VALUES ('delete-all'); \
                  DELETE FROM iac_nodes; DELETE FROM iac_references; DELETE FROM iac_images; \
                  DELETE FROM iac_unresolved;",
@@ -974,6 +978,23 @@ fn refresh_attempt(
     let terraform = std::cell::RefCell::new(BTreeSet::new());
     // Whether a Kubernetes file changed, appeared or left: its objects are evaluated again.
     let kubernetes = std::cell::Cell::new(false);
+    // A pipeline or an action is its own unit (#823). With both action file names in a folder
+    // the action is `action.yml`, so the one that changed or left has the other read again.
+    let located: HashMap<&str, &PathBuf> = configs.iter().map(|(p, abs)| (&**p, abs)).collect();
+    let actions = |path: &str, src: Option<&[u8]>| -> Result<()> {
+        if !iac::actions::is_file(path) {
+            return Ok(());
+        }
+        let twin = iac::actions::twin(path).and_then(|twin| {
+            let abs = located.get(twin.as_str())?;
+            Some((twin, read_up_to(abs, lang::MAX_BYTES).ok()?))
+        });
+        iac::actions::refresh(&tx, path, src, twin.is_some())?;
+        if let Some((twin, bytes)) = &twin {
+            iac::actions::refresh(&tx, twin, Some(bytes), src.is_some())?;
+        }
+        Ok(())
+    };
     let gone = refresh_stamped(
         &tx,
         "config_files",
@@ -994,6 +1015,7 @@ fn refresh_attempt(
             if iac::template_changed(&tx, path, Some(src))? {
                 iac::refresh_template(&tx, path, Some(src))?;
             }
+            actions(path, Some(src))?;
             let whole = || kind_file(path, src);
             let (outcome, rows) = config_values::read_with(path, src, &sensitive.of(path)?, whole);
             config_values::store(&tx, path, &rows)?;
@@ -1006,12 +1028,35 @@ fn refresh_attempt(
         if iac::template_changed(&tx, path, None)? {
             iac::refresh_template(&tx, path, None)?;
         }
+        actions(path, None)?;
         config_values::forget(&tx, path)?;
     }
     if !before.iter().map(String::as_str).eq(taken.iter().copied()) {
         tx.execute("DELETE FROM taken", [])?;
         for path in &taken {
             tx.execute("INSERT INTO taken VALUES (?1)", [path])?;
+        }
+    }
+    // The folders with a `Dockerfile`, hidden CI ones too, for the CI kind (#827): no file of
+    // theirs is stamped, so the walk's set is compared with the stored one.
+    let dockerfiles: BTreeSet<&str> = (all.iter().chain(&hidden))
+        .filter_map(|(path, _)| {
+            let folder =
+                (path.strip_suffix("Dockerfile")).or_else(|| path.strip_suffix("dockerfile"))?;
+            if folder.is_empty() {
+                Some("")
+            } else {
+                folder.strip_suffix('/')
+            }
+        })
+        .collect();
+    if stored_dockerfiles(&tx)?
+        .iter()
+        .ne(dockerfiles.iter().copied())
+    {
+        tx.execute("DELETE FROM dockerfiles", [])?;
+        for folder in &dockerfiles {
+            tx.execute("INSERT INTO dockerfiles VALUES (?1)", [folder])?;
         }
     }
     // A Terraform file of a directory holding an override file is read above with every default
@@ -2335,6 +2380,13 @@ fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
         .collect()
 }
 
+/// The folders the index holds a `Dockerfile` in (`dockerfiles`), sorted.
+fn stored_dockerfiles(db: &Connection) -> Result<Vec<String>> {
+    let mut rows = db.prepare("SELECT folder FROM dockerfiles ORDER BY folder")?;
+    let folders = rows.query_map([], |r| r.get(0))?;
+    Ok(folders.collect::<rusqlite::Result<_>>()?)
+}
+
 /// The config files of a repository (path and absolute path): the YAML and JSON files `walk`
 /// found and those under the hidden CI paths (`hidden`, from `hidden_ci`), in path order; and the
 /// Terraform files left out, as a `.tofu` one shadows them.
@@ -2801,6 +2853,9 @@ pub(crate) struct Export {
     pub(crate) repository: String,
     /// Where the repository stands in the workspace; set by the engine, never stored or shown.
     pub(crate) root: PathBuf,
+    /// The indexed commit, when a kind reads it (`ContractKind::reads_commit`) and it is known;
+    /// set by the engine, never stored.
+    pub(crate) commit: Option<String>,
     /// Query-time decisions, supplied by the workspace, never stored in the index.
     pub(crate) decisions: crate::decisions::Decisions,
     pub(crate) name_candidates: std::collections::BTreeMap<String, crate::items::NameCandidates>,
@@ -2856,6 +2911,9 @@ pub(crate) struct Export {
     pub(crate) links: Vec<Link>,
     pub(crate) provisioners: Vec<iac::provision::Side>,
     pub(crate) config_uses: Vec<iac::config_uses::Side>,
+    /// The `run` scripts of the CI steps, as the gate of the command table reads them (ADR
+    /// 0028), by CI step. Not exported: the kinds read their sides from the commands.
+    pub(crate) scripts: Vec<iac::actions::run::Script>,
     /// Policy grants (ADR 0026, "Orphan sides"): config sides that name a resource without
     /// using it, apart from `config_uses`.
     pub(crate) policy_grants: Vec<iac::config_uses::Side>,
@@ -2864,6 +2922,9 @@ pub(crate) struct Export {
     pub(crate) configurations: Vec<(String, serde_json::Value)>,
     pub(crate) iac: Vec<iac::Node>,
     pub(crate) iac_references: Vec<iac::Reference>,
+    /// The folders that hold a `Dockerfile` (`dockerfiles`), sorted. Not exported: the CI kind
+    /// reads a call to one with no action file as a container action, which holds no side.
+    pub(crate) dockerfiles: Vec<String>,
     /// HTTP's prepared workspace routing, never stored or written to the graph export.
     pub(crate) http: Option<crate::http::Prepared>,
     pub(crate) workload_images: Vec<(String, String, String)>,
@@ -2970,6 +3031,7 @@ impl Export {
                 || out.providers.iter().any(|p| p.site == identity)
                 || out.bindings.iter().any(|b| b.site == identity)
                 || self.executions.iter().any(|x| x.workload == identity)
+                || (self.config_uses.iter()).any(|u| u.holder.as_deref() == Some(&identity))
             {
                 let mut written = written::IacNode::default();
                 written.identity = identity;
@@ -2991,9 +3053,12 @@ impl Export {
             .map(|mut link| {
                 // Internal key identities let trace start at one key. The wire format uses
                 // the repository as the side, with the locator kept separately (ADR 0026).
-                if link.at.is_some()
-                    && let Some((repository, _)) = link.side.split_once("::")
-                {
+                // A use the engine placed on its CI node keeps it (ADR 0028).
+                let key = link
+                    .at
+                    .as_ref()
+                    .and_then(|at| link.side.strip_suffix(at.as_str()));
+                if let Some(repository) = key.and_then(|side| side.strip_suffix("::")) {
                     link.side = repository.to_string();
                 }
                 link
@@ -3028,6 +3093,9 @@ impl Export {
         out.subscriptions.dedup();
         out.processes = self.processes;
         out.stale_decisions = self.stale_decisions;
+        for kind in crate::contract::KINDS {
+            kind.written(&self.iac, &mut out);
+        }
         out
     }
 
@@ -3410,10 +3478,11 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
             })
         })
         .collect();
-    let (config_uses, policy_grants) = iac::config_uses::read(db, identity)?;
+    let (config_uses, policy_grants, scripts) = iac::config_uses::read(db, identity)?;
     Ok(Export {
         repository: identity.to_string(),
         root: PathBuf::new(),
+        commit: None,
         files,
         dropped,
         symbols: Vec::new(),
@@ -3437,6 +3506,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         links: Vec::new(),
         provisioners: iac::provision::read(db, identity)?,
         config_uses,
+        scripts,
         policy_grants,
         config_sites: Vec::new(),
         configurations: db
@@ -3449,6 +3519,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
             .collect::<Result<_>>()?,
         iac: iac::nodes(db)?,
         iac_references: iac::all_references(db)?,
+        dockerfiles: stored_dockerfiles(db)?,
         http: None,
         workload_images: db
             .prepare(
@@ -4850,6 +4921,17 @@ mod tests {
         ))
         .unwrap();
         actual += "\n";
+
+        // The CI nodes and references of a pipeline and of a composite action (#823), with the
+        // facts a pipeline, a CI job and a CI step store.
+        for (name, path) in [
+            ("sample.workflow.yml", ".github/workflows/sample.yml"),
+            ("sample.action.yml", "tools/setup/action.yml"),
+        ] {
+            let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
+            let evaluated = crate::iac::actions::evaluate(path, &src);
+            actual += &format!("\n{name}\n{evaluated:#?}\n");
+        }
 
         // Alert rule and route summaries (#672) invalidate indexes from earlier extractors.
         let src = fs::read(tests.join("fixtures/schema/sample.alert.yaml")).unwrap();

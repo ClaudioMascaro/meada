@@ -160,7 +160,8 @@ fn builders(export: &Export) -> Vec<Builder<'_>> {
 }
 
 pub(super) fn builder<'a>(exports: &'a [Export], provider: &'a Provider) -> Option<Builder<'a>> {
-    let export = exports.iter().find(|e| e.repository == provider.site)?;
+    let repository = super::repository(&provider.site);
+    let export = exports.iter().find(|e| e.repository == repository)?;
     let builder = Builder { export, provider };
     builder.ambiguous().then_some(builder)
 }
@@ -175,7 +176,7 @@ pub(super) fn consumer_item(link: &Link, exports: &[Export]) -> bool {
         .iter()
         .flat_map(|e| &e.providers)
         .filter(|p| active_match(exports, p, &link.contract))
-        .map(|p| (&p.site, &p.contract))
+        .map(|p| (super::repository(&p.site), &p.contract))
         .collect::<BTreeSet<_>>();
     candidates.len() > 1
         || !exports.iter().flat_map(|e| &e.providers).any(|p| {
@@ -202,6 +203,7 @@ pub(super) fn items(exports: &[Export]) -> Vec<(OpenItem, bool)> {
                     expression: format!("{} at {at}", builder.provider.contract),
                     enclosing: None,
                     candidates: builder.candidates().to_vec(),
+                    cause: None,
                     limit: None,
                 },
                 selected,

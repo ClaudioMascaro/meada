@@ -1,0 +1,5 @@
+github.com/acme/app-a .github/workflows/ci.yml::jobs.publish ci::github.com/acme/workflows/.github/workflows/publish.yml
+github.com/acme/app-b .github/workflows/ci.yml::jobs["publish-prd"] ci::github.com/acme/workflows/.github/workflows/publish.yml
+github.com/acme/app-b .github/workflows/ci.yml::jobs["publish-stg"] ci::github.com/acme/workflows/.github/workflows/publish.yml
+github.com/acme/workflows .github/workflows/publish.yml ci::github.com/acme/workflows/.github/workflows/publish.yml
+github.com/acme/wrapper .github/workflows/release.yml::jobs.release ci::github.com/acme/workflows/.github/workflows/publish.yml

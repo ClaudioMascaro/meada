@@ -38,7 +38,12 @@ write tools; one index per repository; determinism) live in
   the full applicable gate: fmt, clippy and tests, plus the relevant cloud feature checks (ADR
   0012). Before each commit in between, `scripts/check --scope <name>` (repeatable) runs fmt,
   clippy and only the unit and `tests/it` tests whose path holds a name, such as a module
-  (`iac`, `alert`). Heavy commands run through `bounded` when it is on PATH.
+  (`iac`, `alert`), plus the stored-format golden and the docs tests. Heavy commands run
+  through `bounded` when it is on PATH, else one at a time under a lock. `scripts/gate` runs
+  the push gate detached in its own worktree (`scripts/gate --wait` gives its result): reach
+  for it where a command's time limit would cut the gate, as in a cloud session.
+- Keep implementing while a gate, a check or a verifier runs: draft the next ticket in a
+  worktree outside the tree, and bring it in once the current one is committed.
 - Product E2E runs only in GitHub Actions, for a relevant large implementation marked with the
   `e2e` label on a non-draft PR. Locally, `/prove-meada` prepares the scope and answer keys or
   reads CI evidence; it does not build or start the product. Docs-only follow-up commits also

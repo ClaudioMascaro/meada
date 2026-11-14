@@ -3,6 +3,7 @@
 # skips them: most hold no code, so their exports have no symbol. `values` reads them, and each
 # later A7 ticket names the flows it adds in the second column (for people: no script reads it). Change a pin only with the
 # maintainer's OK.
+# The `ci-*` rows are A9's (spec #820): `ci.py --corpus` reads them, and references/ci.md says why each.
 a7-probe	values	probe:a7-probe	-	Apache-2.0 (this repository)
 a7-noconfig	values	probe:a7-noconfig	-	Apache-2.0 (this repository)
 a7-iac	values,terraform	probe:a7-iac	-	Apache-2.0 (this repository)
@@ -15,3 +16,6 @@ kube-prometheus	values,alert,kubernetes	https://github.com/prometheus-operator/k
 a7-names	values,terraform	probe:a7-names	-	Apache-2.0 (this repository)
 a7-sls	values,serverless	probe:a7-sls	-	Apache-2.0 (this repository)
 a7-tf-set	terraform	probe:a7-tf-set	-	Apache-2.0 (this repository)
+ci-slsa	ci	https://github.com/slsa-framework/slsa-github-generator	bb91a05077afa6601a3d7538c4cbbdbf0abe7ed9	Apache-2.0
+ci-osv-scanner	ci	https://github.com/google/osv-scanner	80fe50567a5d6e0ec408353e2ceacca1561b91be	Apache-2.0
+ci-osv-action	ci	https://github.com/google/osv-scanner-action	d3c1414ded37de590f207572e37a7d180f1d0ef7	Apache-2.0

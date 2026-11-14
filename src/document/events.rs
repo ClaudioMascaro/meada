@@ -129,6 +129,8 @@ pub fn read_keyed(
 /// A collection's source location. `path` is borrowed from the reader, and a mapping value
 /// starts at its key, including when the opening bracket is on a later line.
 pub(crate) struct Collection<'a> {
+    /// The 0-based index of its document in the stream.
+    pub document: usize,
     pub path: &'a [Step],
     pub line: usize,
     pub end_line: usize,
@@ -543,6 +545,7 @@ impl Builder<'_> {
         {
             each(
                 Collection {
+                    document: self.document,
                     path: &self.path,
                     line: open.line,
                     end_line: line,

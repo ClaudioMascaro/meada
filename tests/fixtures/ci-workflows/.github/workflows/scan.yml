@@ -1,0 +1,7 @@
+name: Scan
+on: workflow_call
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo scan

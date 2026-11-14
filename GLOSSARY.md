@@ -78,20 +78,55 @@ _Avoid_: JSON path, selector, pointer
 A resource-like block of an IaC file (Terraform or OpenTofu, Kubernetes, Compose, Crossplane,
 CloudFormation and SAM, Serverless), with an address (`aws_sqs_queue.orders`,
 `Deployment.apps/shop/api`, `services.web`), a type, a file and a span, and the label of the
-root module or overlay its evaluation starts from. `search` finds it with kind `iac`.
+root module or overlay its evaluation starts from. `search` finds it with kind `iac`. A pipeline,
+an action, a CI job and a CI step are IaC nodes of the GitHub Actions format (`jobs.build`,
+`jobs.build.steps[2]`), which `search` finds with kind `ci` instead.
 _Avoid_: resource (a contract), block, node (a server-mode process), manifest
 
 **Reference**:
 A static pointer from one IaC node to another, such as a Terraform attribute naming another
-resource, a CloudFormation `Ref` or a Kubernetes Service selecting pods. It is stored like a call
-and walked by `trace`; it is not a link.
+resource, a CloudFormation `Ref`, a Kubernetes Service selecting pods, a pipeline holding its CI
+jobs or a CI job naming another in `needs`. It is stored like a call and walked by `trace`; it is
+not a link.
 _Avoid_: edge, dependency, link
 
 **Evaluation unit**:
 The IaC files evaluated together: a Terraform module directory (a local module once per call), a
-Kustomize tree per overlay, a CloudFormation or SAM template, a Compose project or a Serverless
-service file. A change to one of its files re-evaluates all of it.
+Kustomize tree per overlay, a CloudFormation or SAM template, a Compose project, a Serverless
+service file, a pipeline file or an action's manifest. A change to one of its files re-evaluates
+all of it.
 _Avoid_: stack, project, workspace
+
+**Pipeline**:
+A CI configuration file that defines CI jobs: in GitHub Actions, a workflow file under
+`.github/workflows/`. A **reusable pipeline** is one that other pipelines can call
+(`on: workflow_call`). `workflow` names only the node type of the GitHub Actions format.
+_Avoid_: workflow (also a word to avoid for a process), build, CI file
+
+**CI job**:
+A job of a pipeline, addressed by its id (`jobs.build`). It runs on a CI runner.
+_Avoid_: job (alone: a Cloud Run job is a workload), task
+
+**CI step**:
+One item of the step list of a CI job or of a composite action, addressed by its position
+(`jobs.build.steps[2]`, `runs.steps[0]`). Its `id`, `name` and `uses` find it without being its
+identity.
+_Avoid_: step (alone: never a hop), task
+
+**Action**:
+A packaged CI step of GitHub Actions: a folder holding `action.yml` or `action.yaml` (composite,
+JavaScript or Docker), which a CI step calls with `uses`.
+_Avoid_: plugin, task, GitHub action (for a pipeline)
+
+**CI runner**:
+The machine a CI job runs on (`runs-on`).
+_Avoid_: runner (alone: the consumer of an image contract), agent
+
+**Command table**:
+The curated list of command shapes Meada reads from the `run` script of a CI step, each giving one
+contract side: an install of a package, a push of an image, a command that starts a program of the
+workspace. A command outside the table gives no side.
+_Avoid_: shell reader, script parser
 
 **Overlay**:
 A directory with a Kustomize `kustomization.yaml` that no other kustomization names as a base: the
@@ -715,6 +750,26 @@ a routing condition that tests it (OpsGenie, PagerDuty, Alertmanager). Equality 
 a regular expression, prefix or containment `inferred`.
 _Avoid_: alert route; router (HTTP vocabulary), source and sink (for emitter and matcher)
 
+**CI contract**:
+The contract `ci::<repository identity>/<path>` between a reusable pipeline or an action and what
+calls it, the path being the one the call names (the pipeline's file, the action's folder). Its
+provider is the node of that file; its consumer is the CI job that calls a reusable pipeline, or
+the CI step that calls an action, with the Git ref and the keys of `with` and `secrets` it wrote.
+A pipeline or an action from outside the workspace is external: it holds no side, so it is never
+an orphan nor an open item.
+_Avoid_: CI resource, workflow contract; incidence, usage (for a consumer); wrapper (for a reusable pipeline that calls another: a hop of a chain)
+
+**Git ref**:
+The branch, tag or commit a consumer of a CI contract writes after `@`. It is recorded as written
+and never resolved; only a full commit id is compared, with the provider's indexed commit.
+_Avoid_: ref (alone), reference (a pointer between IaC nodes), version, revision
+
+**Declared permissions**:
+The `permissions` block that governs a CI job: its own, else its pipeline's, else `not declared`.
+A link of a CI contract compares what the provider's CI jobs declare with what the consumer
+declares, and reports only a mismatch.
+_Avoid_: effective permissions (they depend on settings outside the repository), grants
+
 **Link**:
 A connection Meada makes between a consumer and a provider through a contract. It carries a
 level and a reason. A **provisioning link** is a link of its own kind, between any other side of
@@ -753,7 +808,7 @@ _Avoid_: confidence, score, weight
 
 **Chain**:
 A sequence of links followed across repositories, such as A → B → C. It is as strong as its
-weakest link.
+weakest link. A reusable pipeline that calls another is a hop of a chain, not a client wrapper.
 _Avoid_: path, flow
 
 **Hop**:

@@ -23,7 +23,7 @@ fn workloads_link_to_the_repository_whose_workflow_builds_their_image() {
     assert_eq!(export["consumers"].as_array().unwrap().len(), 1, "{export}");
     assert_eq!(export["links"].as_array().unwrap().len(), 1, "{export}");
     assert_eq!(export["links"][0]["contract"], "image::ghcr.io/acme/orders");
-    assert_eq!(export["links"][0]["provider"], "example.com/acme/app");
+    assert_eq!(export["links"][0]["provider"], BUILD_STEP);
     assert_eq!(export["links"][0]["level"], "exact");
     let built: serde_json::Value =
         serde_json::from_str(&Engine::open(&app).unwrap().export().unwrap()).unwrap();
@@ -124,6 +124,23 @@ fn trace_crosses_images_and_same_repository_code_paths_both_ways() {
     assert!(up.contains("Deployment.apps/shop/prod-orders"), "{up}");
     assert!(up.contains("services.orders"), "{up}");
     assert_golden("images.trace.txt", &format!("{down}\n{up}"));
+    // The repository builds the image in a CI step and, on weaker evidence, in its Compose
+    // file: the workload links once, to the site at the best level.
+    let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let links: Vec<_> = (export["links"].as_array().unwrap().iter())
+        .map(|l| {
+            (
+                l["provider"].as_str().unwrap(),
+                l["level"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    // The Deployment, then the Helm value, whose own evidence leaves its link `inferred`.
+    assert_eq!(
+        links,
+        [(BUILD_STEP, "exact"), (BUILD_STEP, "inferred")],
+        "{export}"
+    );
 }
 
 #[test]
@@ -438,7 +455,7 @@ fn unresolved_registry_segments_match_literal_images_in_both_directions() {
     let links = export["links"].as_array().unwrap();
     assert_eq!(links.len(), 1, "{export}");
     assert_eq!(links[0]["level"], "inferred");
-    assert_eq!(links[0]["provider"], "example.com/acme/app");
+    assert_eq!(links[0]["provider"], BUILD_STEP);
     assert!(
         links[0]["reason"]
             .as_str()
@@ -455,7 +472,7 @@ fn unresolved_registry_segments_match_literal_images_in_both_directions() {
     assert_eq!(links.len(), 1, "{export}");
     assert_eq!(links[0]["contract"], "image::*/acme/orders");
     assert_eq!(links[0]["level"], "inferred");
-    assert_eq!(links[0]["provider"], "example.com/acme/app");
+    assert_eq!(links[0]["provider"], BUILD_STEP);
 }
 
 #[test]
@@ -482,18 +499,58 @@ fn ko_script_text_is_not_a_builder_and_plain_commands_refresh() {
             false,
         ),
         ("ko build --bare ./cmd/orders", None, true),
+        // The gate of the command table reads each command (#833): one inside `if`, one before
+        // `;` and one on a line of several count, and text in `echo` or a string does not.
         (
             "if false; then\nko publish --bare ./cmd/orders\nfi\n",
             None,
-            false,
+            true,
         ),
         ("ko publish --bare ./cmd/orders", None, true),
-        ("ko build --bare ./cmd/orders; echo done", None, false),
+        ("ko build --bare ./cmd/orders; echo done", None, true),
+        ("set -e\nko build --bare ./cmd/orders\n", None, true),
+        ("echo ko build --bare ./cmd/orders", None, false),
+        ("NOTE='ko build --bare ./cmd/orders'", None, false),
+        ("ko build --bare ./cmd/$APP", None, false),
         ("ko build --bare --help ./cmd/orders", None, false),
         ("ko publish --bare -h ./cmd/orders", None, false),
         ("ko build --bare --unknown ./cmd/orders", None, false),
         ("ko build --bare ./cmd/orders", Some("python"), false),
         ("ko build --bare ./cmd/orders", Some("bash"), true),
+        // The script gives ko another destination than the `env` of the document (found by
+        // the verifier of #833): the image it pushes is not the one the `env` names.
+        (
+            "export KO_DOCKER_REPO=ghcr.io/acme/other\nko build --bare ./cmd/orders\n",
+            None,
+            false,
+        ),
+        (
+            "KO_DOCKER_REPO=ghcr.io/acme/other\nko build --bare ./cmd/orders\n",
+            None,
+            false,
+        ),
+        (
+            "unset KO_DOCKER_REPO\nko build --bare ./cmd/orders\n",
+            None,
+            false,
+        ),
+        (
+            "echo KO_DOCKER_REPO=ghcr.io/acme/other >> \"$GITHUB_ENV\"\nko build --bare ./cmd/orders\n",
+            None,
+            false,
+        ),
+        // Reading the name binds nothing.
+        (
+            "echo \"$KO_DOCKER_REPO\"\nko build --bare ./cmd/orders\n",
+            None,
+            true,
+        ),
+        // Two ko commands of one step build one image: one side.
+        (
+            "ko build --bare ./cmd/orders\nko publish --bare ./cmd/orders\n",
+            None,
+            true,
+        ),
     ] {
         let mut step = serde_json::json!({
             "run": command,
@@ -525,6 +582,195 @@ fn ko_script_text_is_not_a_builder_and_plain_commands_refresh() {
             assert_eq!(export["links"][0]["level"], "exact");
         }
     }
+}
+
+/// The builder sides of an export as (contract, CI step, `at` inside the pipeline file).
+fn built(export: &serde_json::Value, file: &str) -> Vec<(String, String, String)> {
+    let text = |p: &serde_json::Value, key: &str| p[key].as_str().unwrap().to_string();
+    (export["providers"].as_array().unwrap().iter())
+        .map(|p| {
+            let site = text(p, "site");
+            let site = site.strip_prefix(&format!("example.com/acme/app::{file}::"));
+            let at = text(p, "at");
+            let at = at.strip_prefix(&format!("{file}#")).unwrap().to_string();
+            (text(p, "contract"), site.unwrap().to_string(), at)
+        })
+        .collect()
+}
+
+#[test]
+fn a_run_script_that_pushes_an_image_makes_its_ci_step_the_builder() {
+    let file = ".github/workflows/publish.yml";
+    let app = repo(
+        "images_run_push",
+        &[(
+            file,
+            r#"name: publish
+on: push
+env:
+  IMAGE: ghcr.io/acme/orders
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          docker push ghcr.io/acme/pushed:v1
+          docker push ghcr.io/acme/pushed:v2
+      - run: |
+          docker build -t "$IMAGE:${{ github.sha }}" .
+          docker push "$IMAGE:${{ github.sha }}"
+      - run: >-
+          docker buildx build --push -t ghcr.io/acme/built:v1 --tag=ghcr.io/acme/built-too
+          --build-arg BASE=ghcr.io/acme/base --label source=$UNKNOWN .
+      - run: docker push ghcr.io/${{ github.repository_owner }}/part:latest
+      - run: docker push ${{ inputs.image }}
+  silent:
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker build -t ghcr.io/acme/silent-build .
+      - run: docker buildx build -t ghcr.io/acme/silent-buildx .
+      - run: echo docker push ghcr.io/acme/silent-echo
+      - run: |
+          MESSAGE="docker push ghcr.io/acme/silent-string"
+          # docker push ghcr.io/acme/silent-comment
+      - run: |
+          docker push ghcr.io/acme/silent-heredoc
+          cat <<EOF
+          docker push ghcr.io/acme/silent-heredoc-text
+          EOF
+      - run: docker push ghcr.io/acme/silent-shell
+        shell: pwsh
+      - run: docker push --unknown ghcr.io/acme/silent-option
+  boxed:
+    runs-on: ubuntu-latest
+    container: ghcr.io/acme/job-container:v1
+    services:
+      db:
+        image: ghcr.io/acme/job-service:v1
+    env:
+      IMAGE: ghcr.io/acme/job-env:v1
+    steps:
+      - run: echo boxed
+"#,
+        )],
+    );
+    // A CI job is no workload: its container, its services and its `env` run no image.
+    let read = export(&app);
+    let runners = read["consumers"].as_array();
+    assert!(runners.is_none_or(|sides| sides.is_empty()), "{read}");
+    let side = |contract: &str, step: usize| {
+        let step = format!("jobs.push.steps[{step}]");
+        (
+            format!("image::{contract}"),
+            step.clone(),
+            format!("{step}.run"),
+        )
+    };
+    assert_eq!(
+        built(&export(&app), file),
+        [
+            side("*", 4),
+            side("ghcr.io/*/part", 3),
+            side("ghcr.io/acme/built", 2),
+            side("ghcr.io/acme/built-too", 2),
+            side("ghcr.io/acme/orders", 1),
+            side("ghcr.io/acme/pushed", 0),
+        ]
+    );
+}
+
+#[test]
+fn a_workload_links_to_each_ci_step_of_the_repository_that_builds_its_image() {
+    use meada::engine::{Direction, Start};
+    let file = ".github/workflows/publish.yml";
+    let app = repo(
+        "images_run_link",
+        &[
+            (
+                file,
+                "name: publish\non: push\njobs:\n  push:\n    runs-on: ubuntu-latest\n    steps:\n      \
+                 - uses: docker/metadata-action@v5\n        with:\n          images: ghcr.io/acme/orders\n      \
+                 - run: docker push ghcr.io/acme/orders:v1\n",
+            ),
+            ("orders.py", "def orders():\n    pass\n"),
+        ],
+    );
+    let deploy = fixture_repo(
+        "images_run_link",
+        "image-deploy",
+        Some("https://example.com/acme/deploy.git"),
+    );
+    std::fs::remove_file(deploy.join("values.yaml")).unwrap();
+    std::fs::remove_file(deploy.join("overlays/prod/kustomization.yaml")).unwrap();
+    let engine = Engine::open(&deploy).unwrap();
+    let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    // Two CI steps of one repository are one builder repository: both links stay `exact`.
+    let step = |n: usize| format!("example.com/acme/app::{file}::jobs.push.steps[{n}]");
+    let links: Vec<_> = (export["links"].as_array().unwrap().iter())
+        .map(|l| {
+            (
+                l["provider"].as_str().unwrap(),
+                l["level"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        links,
+        [(&*step(0), "exact"), (&*step(1), "exact")],
+        "{export}"
+    );
+    assert_eq!(
+        built(&self::export(&app), file),
+        [
+            (
+                "image::ghcr.io/acme/orders".into(),
+                "jobs.push.steps[0]".into(),
+                "jobs.push.steps[0].with.images".into()
+            ),
+            (
+                "image::ghcr.io/acme/orders".into(),
+                "jobs.push.steps[1]".into(),
+                "jobs.push.steps[1].run".into()
+            ),
+        ] as [(String, String, String); 2]
+    );
+    let context = engine.context("Deployment.apps/shop/orders", None).unwrap();
+    for n in 0..2 {
+        let line = format!("  builder: {} [exact: image::ghcr.io/acme/orders]", step(n));
+        assert!(context.contains(&line), "{context}");
+    }
+    // The workload runs the code of the builder's repository, once.
+    let down = engine
+        .trace(
+            Start::From("Deployment.apps/shop/orders"),
+            Direction::Down,
+            None,
+        )
+        .unwrap();
+    let runs = "runs code example.com/acme/app . [exact: image::ghcr.io/acme/orders]";
+    assert_eq!(down.matches(runs).count(), 1, "{down}");
+    assert!(down.contains("orders.py"), "{down}");
+    // Upward from the CI step, the workload that runs what it builds.
+    let up = engine
+        .trace(Start::From("jobs.push.steps[1]"), Direction::Up, None)
+        .unwrap();
+    assert!(up.contains("Deployment.apps/shop/orders"), "{up}");
+    // The image itself is listed by its sides: several steps may build it, so it is no start.
+    for direction in [Direction::Up, Direction::Down] {
+        let refused = engine
+            .trace(Start::From("image::ghcr.io/acme/orders"), direction, None)
+            .unwrap();
+        assert!(
+            refused.contains("is a image, and a trace starts from"),
+            "{refused}"
+        );
+    }
+    // On the CI step, the image it builds and the workload that runs it.
+    let context = engine.context(&step(1), None).unwrap();
+    let side = "builds image::ghcr.io/acme/orders\n  runner: \
+                example.com/acme/deploy::deployment.yaml::Deployment.apps/shop/orders (root .) \
+                [exact: image::ghcr.io/acme/orders]\n";
+    assert!(context.contains(side), "{context}");
 }
 
 #[test]
@@ -734,7 +980,7 @@ fn overlays_of_one_workload_keep_both_runners_of_the_same_image() {
         export["providers"],
         serde_json::json!([{
             "contract": "image::ghcr.io/independent/root-review",
-            "site": "independent.invalid/azure/roots",
+            "site": "independent.invalid/azure/roots::.github/workflows/image.yml::jobs.build.steps[0]",
             "at": ".github/workflows/image.yml#jobs.build.steps[0].with.tags"
         }]),
         "{raw}"
@@ -762,7 +1008,7 @@ fn overlays_of_one_workload_keep_both_runners_of_the_same_image() {
         serde_json::json!([
             {
                 "consumer": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
-                "provider": "independent.invalid/azure/roots",
+                "provider": "independent.invalid/azure/roots::.github/workflows/image.yml::jobs.build.steps[0]",
                 "contract": "image::ghcr.io/independent/root-review",
                 "level": "exact",
                 "reason": "image::ghcr.io/independent/root-review",
@@ -770,7 +1016,7 @@ fn overlays_of_one_workload_keep_both_runners_of_the_same_image() {
             },
             {
                 "consumer": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
-                "provider": "independent.invalid/azure/roots",
+                "provider": "independent.invalid/azure/roots::.github/workflows/image.yml::jobs.build.steps[0]",
                 "contract": "image::ghcr.io/independent/root-review",
                 "level": "exact",
                 "reason": "image::ghcr.io/independent/root-review",
@@ -804,7 +1050,7 @@ fn overlays_of_one_workload_keep_both_runners_of_the_same_image() {
         control["links"],
         serde_json::json!([{
             "consumer": "independent.invalid/azure/roots::base/pod.yaml::Pod/common",
-            "provider": "independent.invalid/azure/roots",
+            "provider": "independent.invalid/azure/roots::.github/workflows/image.yml::jobs.build.steps[0]",
             "contract": "image::ghcr.io/independent/root-review",
             "level": "exact",
             "reason": "image::ghcr.io/independent/root-review",
@@ -925,6 +1171,62 @@ fn two_image_ambiguities_can_be_decided_independently() {
         1,
         "{export}"
     );
+}
+
+/// Several CI steps of one repository that build one image are one builder, and a decision
+/// names a repository: an open item lists that repository once (found by the verifier of #833).
+#[test]
+fn a_repository_that_builds_an_image_in_two_ci_steps_is_one_candidate() {
+    let case = "images_two_steps_one_candidate";
+    let job = |id: &str| {
+        format!("  {id}:\n    steps:\n      - run: docker push ghcr.io/acme/orders:v2\n")
+    };
+    let file = ".github/workflows/build.yml";
+    repo(
+        case,
+        &[(
+            file,
+            &format!("on: push\njobs:\n{}{}", job("one"), job("two")),
+        )],
+    );
+    let second = fixture_repo(
+        case,
+        "image-dockerfile",
+        Some("https://example.com/acme/second.git"),
+    );
+    write(&second, file, &format!("on: push\njobs:\n{}", job("only")));
+    let deploy = fixture_repo(
+        case,
+        "image-deploy",
+        Some("https://example.com/acme/deploy.git"),
+    );
+    std::fs::remove_file(deploy.join("values.yaml")).unwrap();
+    std::fs::remove_file(deploy.join("overlays/prod/kustomization.yaml")).unwrap();
+    let peers =
+        "[[peer]]\nrepo = \"example.com/acme/app\"\n[[peer]]\nrepo = \"example.com/acme/second\"\n";
+    write(&deploy, "meada.toml", peers);
+    let engine = Engine::open(&deploy).unwrap();
+    let items = engine.open_items().unwrap();
+    assert!(!items.is_empty());
+    for item in &items {
+        let listed: Vec<&str> = (item.candidates.iter())
+            .map(|c| c.repository.as_str())
+            .collect();
+        assert_eq!(
+            listed,
+            ["example.com/acme/app", "example.com/acme/second"],
+            "{}",
+            item.id
+        );
+    }
+    // Each CI step is still a side of its own, and the workload links to each.
+    let export = export(&deploy);
+    let links = export["links"].as_array().unwrap();
+    let steps: std::collections::BTreeSet<&str> = (links.iter())
+        .map(|l| l["provider"].as_str().unwrap())
+        .collect();
+    assert_eq!(steps.len(), 3, "{export}");
+    assert!(links.iter().all(|l| l["level"] == "ambiguous"), "{export}");
 }
 
 #[test]
@@ -1064,7 +1366,7 @@ fn image_levels_and_names_follow_defaults_registries_and_unresolved_names() {
     let links = export["links"].as_array().unwrap();
     assert_eq!(links.len(), 2, "{export}");
     for link in links {
-        assert_eq!(link["provider"], "example.com/acme/app", "{export}");
+        assert_eq!(link["provider"], BUILD_STEP, "{export}");
         let helm = link["consumer"].as_str().unwrap().contains("values.yaml");
         assert_eq!(
             link["level"],
@@ -1117,6 +1419,8 @@ fn a_helm_values_file_is_a_yaml_file_named_with_the_word_values() {
 // A Compose build runs what its Dockerfile takes from the context (#744, ADR 0026).
 
 const APP: Option<&str> = Some("https://example.com/acme/app.git");
+/// The CI step of the fixture pipeline that builds the image: the builder's site (#833).
+const BUILD_STEP: &str = "example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0]";
 
 /// A repository of `image-app` with its Compose file, Dockerfile, workflow and code removed,
 /// holding `files` (path, text) instead.

@@ -1,0 +1,3 @@
+# The reusable pipeline installs the SDK and runs its console script.
+[[peer]]
+repo = "github.com/acme/core-sdk"

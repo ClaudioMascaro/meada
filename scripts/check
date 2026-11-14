@@ -18,6 +18,11 @@ DEPLOY_SCRIPTS = {"scripts/compose-check", "scripts/helm-check", "scripts/contai
 CHANGELOG_ITEM_LINES = 10  # one Unreleased item per change: a longer one is several changes
 # Harness tooling, self-tested by `static`, never product.
 HARNESS_SCRIPTS = (".claude/skills/verify-blackbox/scripts/", ".claude/skills/meada-feedback/scripts/")
+# What a scoped check always runs besides its scopes: the stored-format golden and the docs
+# tests fail on changes whose module name no scope holds.
+ALWAYS_SCOPED = ("stored_format", "docs::")
+# One lock per machine for the heavy commands, and the mark of a process that holds it.
+LOCK, HELD = "MEADA_CHECK_LOCK", "MEADA_CHECK_LOCK_HELD"
 DEPLOY_WORKFLOWS = {f".github/workflows/{name}.yml" for name in ("compose", "helm", "container", "release")}
 # A machine that leaves the push gate to CI (a small one, where the full gate gets OOM-killed).
 CI_GATE = Path.home() / ".config/meada/ci-gate"
@@ -56,7 +61,8 @@ def light(path):
     return (path.startswith(("docs/", "scripts/docs/", ".github/", ".claude/hooks/"))
             or (len(p.parts) == 1 and (p.suffix == ".md" or p.name.startswith("LICENSE")))
             or path in {".agents/skills-lock.json", ".claude/settings.json", ".mcp.json",
-                        "scripts/check", "scripts/prove-ci", "scripts/split-agents"}
+                        "scripts/check", "scripts/gate", "scripts/prove-ci",
+                        "scripts/split-agents"}
             or (path.startswith((".agents/skills/", ".claude/skills/"))
                 and p.suffix in {".md", ".json", ".yaml", ".yml", ".toml"})
             or path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/",
@@ -210,11 +216,18 @@ def local_selection(unpushed=False):
 
 def bounded(*args):
     """Runs a heavy command through the maintainer's low-priority `bounded` runner when it is on
-    PATH, directly otherwise (CI, a fresh cloud session)."""
-    if os.environ.get("GITHUB_ACTIONS") == "true" or not shutil.which("bounded"):
+    PATH. Without it (a fresh cloud session) the command runs at low priority under one lock per
+    machine, so a detached gate (`scripts/gate`) and a scoped check never build at once. In CI,
+    and inside a command that already holds the lock, it runs directly."""
+    if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get(HELD):
         run(*args)
-    else:
+    elif shutil.which("bounded"):
         run("bounded", *args)
+    elif shutil.which("flock") and shutil.which("nice"):
+        lock = os.environ.get(LOCK) or os.path.join(tempfile.gettempdir(), "meada-check.lock")
+        run("env", f"{HELD}=1", "flock", lock, "nice", *args)
+    else:
+        run(*args)
 
 
 def rust_tests(source, destination):
@@ -290,7 +303,9 @@ def static(args, paths, tree):
             run("node", "--check", name)
         elif suffix in {".sh", ".bash"} or (not suffix and path.read_bytes()[:100].startswith((b"#!/bin/sh", b"#!/bin/bash", b"#!/usr/bin/env bash"))):
             run("bash" if suffix == ".bash" or b"bash" in path.read_bytes().splitlines()[0] else "sh", "-n", name)
-    for script in sorted({p for p in paths if p.startswith(HARNESS_SCRIPTS) and p.endswith(".py")}):
+    # A prove-meada driver with a self-test (`ci.py`) runs it here too: it needs no Meada.
+    selftested = (*HARNESS_SCRIPTS, ".claude/skills/prove-meada/scripts/")
+    for script in sorted({p for p in paths if p.startswith(selftested) and p.endswith(".py")}):
         if Path(script).exists() and "--selftest" in Path(script).read_text():
             run(sys.executable, script, "--selftest")
     if any(p.startswith("deploy/helm/") or p == "scripts/helm-check" for p in paths):
@@ -377,10 +392,11 @@ def auto_scopes(paths):
 
 def scoped_commands(scopes):
     """A commit's product checks between pushes: fmt, clippy and the unit and `tests/it` tests
-    whose path holds one of `scopes` (a module name such as `iac`)."""
+    whose path holds one of `scopes` (a module name such as `iac`) or of `ALWAYS_SCOPED`."""
+    filters = [*scopes, *(name for name in ALWAYS_SCOPED if name not in scopes)]
     return [("cargo", "fmt", "--check"),
             ("cargo", "clippy", "--locked", "--all-targets", "--", "-D", "warnings"),
-            ("cargo", "test", "--locked", "-p", "meada", "--lib", "--test", "it", "--", *scopes)]
+            ("cargo", "test", "--locked", "-p", "meada", "--lib", "--test", "it", "--", *filters)]
 
 
 def product_gate(paths):
@@ -405,6 +421,7 @@ def selftest():
         (["README.md", "src/main.rs"], True, True, True),
         (["new-unknown-config"], True, True, True),
         (["ui/src/AccountPages.tsx"], True, True, True),
+        (["scripts/gate"], False, False, False),
         (["tests/it/query.rs"], True, False, False),
         # Rust the static path compiles only in part still builds with the product.
         (["tests/it/docs.rs"], True, False, False),
@@ -436,13 +453,31 @@ def selftest():
     item = "- one change\n" + "  more\n" * CHANGELOG_ITEM_LINES
     assert long_changelog_items("## [Unreleased]\n### Fixed\n" + item + "- short\n## [1.0.0]\n" + item * 2) == ["- one change"]
     assert long_changelog_items("## [Unreleased]\n- short\n  wrapped\n") == []
-    path = os.environ.get("PATH", "")
+    saved = {key: os.environ.get(key) for key in ("PATH", LOCK, HELD, "GITHUB_ACTIONS")}
     with tempfile.TemporaryDirectory(prefix="meada-check-path-") as empty:
         os.environ["PATH"] = os.pathsep.join([empty, os.path.dirname(shutil.which("true"))])
+        os.environ[LOCK] = os.path.join(empty, "lock")
+        os.environ.pop(HELD, None)
         try:
-            bounded("true")  # no `bounded` on PATH: the command runs directly
+            # CI runs the command directly: its runner holds one job.
+            os.environ["GITHUB_ACTIONS"] = "true"
+            bounded("true")
+            assert not os.path.exists(os.environ[LOCK])
+            del os.environ["GITHUB_ACTIONS"]
+            # No `bounded` on PATH: the command runs, under the lock where `flock` and `nice` exist.
+            bounded("true")
+            assert os.path.exists(os.environ[LOCK]) == bool(shutil.which("flock") and shutil.which("nice"))
+            # A command that holds the lock runs its own heavy commands without asking for it again.
+            os.environ[HELD] = "1"
+            Path(os.environ[LOCK]).unlink(missing_ok=True)
+            bounded("true")
+            assert not os.path.exists(os.environ[LOCK])
         finally:
-            os.environ["PATH"] = path
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
     old = Path.cwd()
     with tempfile.TemporaryDirectory(prefix="meada-check-selftest-") as tmp:
         os.chdir(tmp)
@@ -576,7 +611,8 @@ def selftest():
             assert "Selected checks" in Path("summary").read_text()
         finally:
             os.chdir(old)
-    assert scoped_commands(["iac", "alert"])[-1][-3:] == ("--", "iac", "alert")
+    assert scoped_commands(["iac", "alert"])[-1][-5:] == ("--", "iac", "alert", *ALWAYS_SCOPED)
+    assert scoped_commands(["docs::"])[-1][-3:] == ("--", "docs::", "stored_format")
     with tempfile.TemporaryDirectory(prefix="meada-check-unpushed-") as tmp:
         os.chdir(tmp)
         try:
@@ -622,8 +658,9 @@ def main():
     parser.add_argument("--unpushed", action="store_true",
                         help="check every commit not yet on the branch's upstream, or on origin/main without one (the push gate)")
     parser.add_argument("--scope", action="append", metavar="NAME",
-                        help="run only the product tests whose path holds NAME (repeatable); "
-                             "`auto` adds each changed module's path, grammar for docs/reference, and stored_format")
+                        help="run only the product tests whose path holds NAME (repeatable), "
+                             "with the stored-format golden and the docs tests; "
+                             "`auto` adds each changed module's path and grammar for docs/reference")
     options = parser.parse_args()
     if options.selftest:
         selftest()

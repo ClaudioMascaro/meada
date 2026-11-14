@@ -129,6 +129,11 @@ Ladder, best first: 1 an old system that does the same job, 2 a snapshot, 3 an i
 | A7 config use sides, typed final keys, directionless provision links, key sites and orphan uses | new | #661/#642 and base ADR 0026; independently generated source-derived whole sets; HTTP/console also copy stdio/CLI | 4 + 1 | `config_uses.py`, [references/config-uses.md](references/config-uses.md) | maintainer spec; fresh independent checker |
 | A8 base URL cases (`a8-cases.tsv`, `landed`) | new | spec #683's expected lines (#684's table) | 4 | `a8-peers.sh check` | the maintainer |
 | The 5 A8 controls and every other field of the peer workspaces' exports | existing | the base binary on the same generated workspaces | 1 | `a8-peers.sh check` | the code before the change |
+| A9 CI nodes, the CI contract with its Git ref and keys, `trace` through an intermediate pipeline, external files, orphans, the absent mark and `ref mismatch` | new | #820 and ADR 0028, through `ci.py`'s own reading of the workspaces it generates, a control per case; HTTP also copies stdio | 4 + 1 | `ci.py`, [references/ci.md](references/ci.md) | the maintainer; the driver reads the files, never Meada |
+| A9: the files the CI reader owns, `uses` lines as config values, `[[resource]] via`, every other row of the A9 workspaces and the pinned CI corpus | existing | the base binary on the same input; allowed: the differences #820 predicts | 1 | `ci.py`, `ci.py --corpus` | the code before the change |
+| A9 F2: the command table and the gate of a `run` script, the unresolved parts, programs of the workspace with their level, `trace` across the three contracts of the chain | new | #820's tables, through `ci.py`'s own reading of the scripts and manifests it generates, a control per case; HTTP also copies stdio | 4 + 1 | `ci.py --slice f2`, [references/ci.md](references/ci.md) | the maintainer; the driver reads the files, never Meada |
+| A9 F2: the image builder forms of today and the SDK's HTTP link, every other row of the `run` and `chain` workspaces | existing | the base binary on the same input; allowed: a builder's site becomes its CI step, and the rows #820 adds on CI nodes | 1 | `ci.py --slice f2` | the code before the change |
+| A9 F3: declared permissions on a consumer and `permissions mismatch` on a link | new | #820's rules, through `ci.py`'s own reading of the `permissions` blocks it generates, a control per case; HTTP also copies stdio | 4 + 1 | `ci.py --slice f3`, [references/ci.md](references/ci.md) | the maintainer; the driver reads the files, never Meada |
 | A new flow that copies nothing | new | the issue | 4 | Find the spec, at run time | the maintainer |
 
 - **Never edit an answer key to make a check pass.** If the app and the answer key disagree, the verdict is BROKEN; only the user changes an answer key.
@@ -264,6 +269,16 @@ For #674 anchored names, run `python3 $S/patterns.py --head-bin "$RUN/bin/meada-
 **Done looks like**: `peers.md` with every control and landed case `PASS`, every `pending` case `PENDING (as 1.2.0, not counted)` and named so on the receipt, and every workspace "equal to base".
 
 **Could fool you**: a `pending` case passes on 1.2.0's value, so it proves only that nothing moved it; the script reads the export, not the MCP answers. The full list: the reference's "Could fool you".
+
+### A9: CI in the graph (spec #820)
+
+**Drive**: `$S/ci.py --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/ci" --http`: it generates the neutral workspaces of one slice under `github.com/acme`, indexes and exports them with both binaries and checks each case of its `CASES` table. The default slice is F1 (the reproduction of #816, one case per form of `uses`, Git refs, orphans, a repository without `origin`); `--slice f2 --run "$RUN/ci-run"` drives the `run` scripts and the chain of three contracts, `--slice f3 --run "$RUN/ci-permissions"` the declared permissions. `ci.py --corpus` drives the three pinned repositories of flow `ci` in `scripts/infra.tsv`, alone and as one workspace. The cases, the keys and what could fool it: [references/ci.md](references/ci.md).
+
+**Copies**: nothing for the CI rows, which answer to #820. Every other row answers to the base binary, MCP over HTTP to stdio.
+
+**Done looks like**: for each command, `checks.json` with every check passed and `receipt.md` saying so; from `--corpus`, also `workspace/ci-links.json`.
+
+**Could fool you**: a case proves something only beside its control, so read a failure as the pair; `meada status` is saved as a diff against the base and read by hand. The full list: the reference's "Could fool you".
 
 ### Varies by and deliberate
 

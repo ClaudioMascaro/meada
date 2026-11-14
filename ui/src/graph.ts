@@ -1,7 +1,7 @@
 import { parseExport } from './core';
 
 interface Community { name: string; members: string[] }
-interface Side { contract: string | null; site: string; at?: string; root?: string }
+interface Side { contract: string | null; site: string; at?: string; root?: string; absent?: boolean }
 interface Execution { workload: string; root: string; repository: string; path: string; level: string; reason: string }
 interface Link {
   consumer: string; provider: string; contract: string; level: string; reason: string;
@@ -30,7 +30,9 @@ export function graphModel(text: string) {
         contracts.set(entry.contract, row);
       }
       const location = entry.at ? `${entry.site} (${entry.at})` : entry.site;
-      row[side].push(entry.root ? `${location} (root ${entry.root})` : location);
+      // The mark of a CI call whose path names no provider, worded as the CLI words it.
+      const mark = entry.absent ? ' (absent at the indexed commit)' : '';
+      row[side].push((entry.root ? `${location} (root ${entry.root})` : location) + mark);
     }
   }
   for (const entry of data.uses ?? []) {
@@ -67,6 +69,7 @@ export function graphModel(text: string) {
   return {
     images: data.links.filter(link => link.contract.startsWith('image::')),
     alerts: data.links.filter(link => link.contract.startsWith('alert::')),
+    ci: data.links.filter(link => link.contract.startsWith('ci::')),
     executions: data.executions ?? [],
     provisions: data.provisions ?? [],
     repository: data.repository,

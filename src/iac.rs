@@ -57,9 +57,10 @@ use crate::document::events::{self, Step, Syntax};
 use crate::lang::MAX_BYTES;
 use crate::render::{rank, section};
 use crate::trace::Direction;
-use meada_core::export::Level;
-use meada_core::trace::{Chain, Row};
+use meada_core::export::{Level, Link};
+use meada_core::trace::{Chain, Row, arrow};
 
+pub(crate) mod actions;
 mod attribute;
 mod azure;
 pub(crate) mod cloudformation;
@@ -325,6 +326,9 @@ pub(crate) struct Node {
     pub images: Vec<WorkloadImage>,
     pub provisioned: Option<Projection>,
     pub ingress: Vec<Ingress>,
+    /// What the GitHub Actions reader keeps of a pipeline, a CI job or a CI step: its selectors
+    /// (#823) and what the CI contract reads of it (#824).
+    pub actions: Option<actions::Facts>,
 }
 
 impl Node {
@@ -348,6 +352,13 @@ impl Node {
     }
     pub(crate) fn identity(&self, repository: &str) -> String {
         format!("{repository}::{}::{}", self.path, self.address)
+    }
+
+    /// Whether `context` lists the node's sides above its values: a CI node, since who calls a
+    /// pipeline is what its reader asks and the values of a long file would spend the budget
+    /// first.
+    pub(crate) fn sides_first(&self) -> bool {
+        actions::owns(self)
     }
 
     /// The node's stored line range as the code-span shape used by open items.
@@ -2608,6 +2619,7 @@ impl<'m> Eval<'m> {
                     images: Vec::new(),
                     provisioned: None,
                     ingress: Vec::new(),
+                    actions: None,
                 });
                 let local = (block.source.as_deref())
                     .and_then(|s| local_source(dir, s))
@@ -3461,8 +3473,8 @@ fn terraform_path(column: &str) -> String {
 }
 
 /// Who writes a stored node. The Terraform and Compose nodes (#649, #652), the Kubernetes nodes
-/// (#651) and the CloudFormation nodes (#653) share the tables, and each is rewritten by its own
-/// refresh, so each touches the rows it owns only.
+/// (#651), the CloudFormation nodes (#653) and the GitHub Actions nodes (#823) share the tables,
+/// and each is rewritten by its own refresh, so each touches the rows it owns only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Owner {
     /// A node without `::` in its type, in a Terraform, OpenTofu or Compose file.
@@ -3471,6 +3483,8 @@ pub(crate) enum Owner {
     Kubernetes,
     /// A node whose type has a `::`, regardless of filename: `AWS::SQS::Queue`, `Custom::Name`.
     CloudFormation,
+    /// A pipeline, an action, a CI job or a CI step (`actions::ROWS`), whatever its file's name.
+    Actions,
 }
 
 impl Owner {
@@ -3478,10 +3492,12 @@ impl Owner {
     pub(crate) fn sql(self) -> String {
         let own = terraform_path("path");
         let typed = "type LIKE '%::%'";
+        let ci = actions::ROWS;
         match self {
-            Owner::Terraform => format!("({own} AND NOT {typed})"),
-            Owner::Kubernetes => format!("(NOT {own} AND NOT {typed})"),
+            Owner::Terraform => format!("({own} AND NOT {typed} AND NOT {ci})"),
+            Owner::Kubernetes => format!("(NOT {own} AND NOT {typed} AND NOT {ci})"),
             Owner::CloudFormation => typed.to_string(),
+            Owner::Actions => ci.to_string(),
         }
     }
 }
@@ -3557,7 +3573,7 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
 /// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
-        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)")?;
+        .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)")?;
     for n in nodes {
         let (line, end) = (n.line as i64, n.end_line as i64);
         let overridable = serde_json::to_string(&n.overridable)?;
@@ -3599,6 +3615,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
                 .as_ref()
                 .map(serde_json::to_string)
                 .transpose()?,
+            n.actions.as_ref().map(serde_json::to_string).transpose()?,
         ])?;
     }
     let mut insert = tx.prepare_cached("INSERT INTO iac_references VALUES (?1, ?2, ?3, ?4)")?;
@@ -3611,7 +3628,7 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
 /// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
                        block, image, image_overridable, build, build_overridable, role, \
-                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes, dockerfile";
+                       handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes, dockerfile, actions";
 
 /// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
@@ -3655,6 +3672,9 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
         subscription: r
             .get::<_, Option<String>>(19)?
             .and_then(|s| serde_json::from_str(&s).ok()),
+        actions: r
+            .get::<_, Option<String>>(26)?
+            .and_then(|s| serde_json::from_str(&s).ok()),
     })
 }
 
@@ -3676,14 +3696,15 @@ pub(crate) fn all_references(db: &Connection) -> Result<Vec<Reference>> {
 }
 
 /// `<identity> <path>:<line> <address>`.
-fn at(identity: &str, n: &Node) -> String {
+pub(crate) fn at(identity: &str, n: &Node) -> String {
     format!("{identity} {}:{} {}", n.path, n.line, n.address)
 }
 
 /// The IaC nodes of `db` (repository `identity`) whose address, type or physical name matches
 /// `needle`, lowercased, as `search` hits: `<identity> <path>:<line> <address> (<type>[, name
 /// "<name>"], root <root>)`, `pattern` in place of `name` for a pattern, ordered by rank, then
-/// repository, path, line, address and root.
+/// repository, path, line, address and root. The nodes of a pipeline or an action answer to the
+/// kind `ci` (`actions::hits`), never here.
 pub(crate) fn hits(
     identity: &str,
     db: &Connection,
@@ -3692,7 +3713,10 @@ pub(crate) fn hits(
 ) -> Result<Vec<Hit>> {
     // ponytail: scans every node of every repository; an indexed lookup waits for a workspace
     // that makes it slow.
-    let mut statement = db.prepare(&format!("SELECT {COLUMNS} FROM iac_nodes"))?;
+    let mut statement = db.prepare(&format!(
+        "SELECT {COLUMNS} FROM iac_nodes WHERE NOT {}",
+        actions::ROWS
+    ))?;
     let mut hits = Vec::new();
     for n in statement.query_map([], row)? {
         let n = n?;
@@ -3724,7 +3748,9 @@ pub(crate) fn hits(
 }
 
 /// The nodes `text` names in `db` (repository `identity`): `<address>`, `<path>::<address>` or
-/// `<identity>::<path>::<address>`, any of them followed by ` (root <root>)` to pick a root.
+/// `<identity>::<path>::<address>`, any of them followed by ` (root <root>)` to pick a root. A
+/// pipeline or an action is also named by its file path, and a CI step by a selector
+/// (`actions::names`).
 pub(crate) fn named(identity: &str, nodes: &[Node], text: &str) -> Vec<Node> {
     let (text, root) = match text
         .strip_suffix(')')
@@ -3737,7 +3763,10 @@ pub(crate) fn named(identity: &str, nodes: &[Node], text: &str) -> Vec<Node> {
         .iter()
         .filter(|n| {
             let path = format!("{}::{}", n.path, n.address);
-            (text == n.address || text == path || text == n.identity(identity))
+            (text == n.address
+                || text == path
+                || text == n.identity(identity)
+                || actions::names(identity, n, text))
                 && root.is_none_or(|r| r == n.root)
         })
         .cloned()
@@ -3901,47 +3930,66 @@ pub(crate) fn context(
 /// it references (`Down`) or that reference it (`Up`), depth first, each indented under the one
 /// it hangs from, a node met again on its own branch marked ` (cycle)` and one already followed
 /// ` (see above)`; then the chain footer. A text that fits several nodes lists them.
-pub(crate) fn trace(
+///
+/// `calls` gives the nodes a link joins to a node in the walk's direction, in any repository
+/// (`trace::Graph::node_calls`, a CI call): the walk follows them with the references, before
+/// them, so a chain of calls crosses repositories and goes on through each one's references.
+pub(crate) fn trace<'l>(
     repos: &[(&str, &Connection)],
     exports: &[crate::index::Export],
     text: &str,
     direction: Direction,
     budget: Option<usize>,
     mut attached: impl FnMut(usize, &Node, usize) -> Vec<Row>,
+    mut calls: impl FnMut(usize, &Node) -> Vec<(usize, Node, &'l Link)>,
 ) -> Result<Option<String>> {
     let found = found(exports, text);
     let [(r, start)] = &found[..] else {
         return Ok((!found.is_empty())
             .then(|| crate::render::budgeted(&several(repos, text, &found), budget)));
     };
-    let (identity, db) = repos[*r];
     let mut rows = Vec::new();
-    let mut expanded: HashSet<String> = HashSet::new();
-    let mut path: Vec<String> = Vec::new();
-    // (depth, node, via), popped in walk order.
-    let mut stack: Vec<(usize, Node, Option<String>)> = vec![(0, start.clone(), None)];
-    while let Some((depth, n, via)) = stack.pop() {
+    // A node is itself only within its repository and root: a link leaves both.
+    let mut expanded: HashSet<(usize, String, String)> = HashSet::new();
+    let mut path: Vec<(usize, String, String)> = Vec::new();
+    // (depth, repository, node, the reference's name, the link that reached it), popped in
+    // walk order.
+    let mut stack = vec![(0, *r, start.clone(), None::<String>, None::<&Link>)];
+    while let Some((depth, r, n, via, link)) = stack.pop() {
         path.truncate(depth);
+        let (identity, db) = repos[r];
+        let key = (r, n.root.clone(), n.address.clone());
         let mark = match () {
-            _ if path.contains(&n.address) => " (cycle)",
-            _ if expanded.contains(&n.address) => " (see above)",
+            _ if path.contains(&key) => " (cycle)",
+            _ if expanded.contains(&key) => " (see above)",
             _ => "",
         };
-        let text = format!(
-            "{}{}{mark}",
-            "  ".repeat(depth),
-            reached(identity, &n, &via)
-        );
-        let level = (depth > 0).then_some(Level::Exact);
-        rows.push(Row::call(text, *r, level));
+        let indent = "  ".repeat(depth);
+        rows.push(match link {
+            Some(link) => {
+                let text = format!("{indent}{} {}{mark}", arrow(link), at(identity, &n));
+                let mut row = Row::link(text, r, link);
+                row.text += &std::mem::take(&mut row.end);
+                row
+            }
+            None => {
+                let text = format!("{indent}{}{mark}", reached(identity, &n, &via));
+                Row::call(text, r, (depth > 0).then_some(Level::Exact))
+            }
+        });
         if !mark.is_empty() {
             continue;
         }
-        rows.extend(attached(*r, &n, depth + 1));
-        expanded.insert(n.address.clone());
-        path.push(n.address.clone());
-        let next = references(db, &n, direction)?;
-        stack.extend(next.into_iter().rev().map(|(m, via)| (depth + 1, m, via)));
+        rows.extend(attached(r, &n, depth + 1));
+        expanded.insert(key.clone());
+        path.push(key);
+        let called = calls(r, &n).into_iter();
+        let mut next: Vec<_> = called
+            .map(|(m, node, link)| (depth + 1, m, node, None, Some(link)))
+            .collect();
+        let referenced = references(db, &n, direction)?.into_iter();
+        next.extend(referenced.map(|(node, via)| (depth + 1, r, node, via, None)));
+        stack.extend(next.into_iter().rev());
     }
     let chain = Chain {
         rows,

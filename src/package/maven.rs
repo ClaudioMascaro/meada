@@ -540,8 +540,8 @@ impl Ecosystem for Maven {
     fn fits(&self, wanted: &str, provided: &str) -> bool {
         pattern_fits(wanted, provided)
     }
-    fn uncertainty(&self, via: Option<&str>) -> Option<&'static str> {
-        (via == Some("computed")).then_some("computed coordinate")
+    fn uncertainty(&self, via: Option<&str>) -> Option<(&'static str, Level)> {
+        (via == Some("computed")).then_some(("computed coordinate", Level::Ambiguous))
     }
     /// A constructor or a method of the class itself, by its id: the class's id, a dot, then a
     /// signature (`example.models.Order.total()`, a companion's `Money.Companion.of(Int)`); a

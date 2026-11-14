@@ -1,0 +1,7 @@
+name: Root action
+description: The action at the root of its repository.
+runs:
+  using: composite
+  steps:
+    - uses: $/tools/setup
+    - uses: ./tools/setup

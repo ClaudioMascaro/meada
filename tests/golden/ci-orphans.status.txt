@@ -1,0 +1,12 @@
+github.com/acme/app-a (.) indexed, 0 files
+  config files: 4 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 55, redacted: 0
+github.com/acme/workflows (../ci-workflows) indexed, 0 files
+  orphan ci::github.com/acme/workflows/.github/workflows/forms.yml: no consumer; .github/workflows/forms.yml
+  orphan ci::github.com/acme/workflows/tools/unused: no consumer; tools/unused/action.yml
+  config files: 10 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 52, redacted: 0
+github.com/acme/app-b (../ci-app-b) indexed, 0 files
+  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 15, redacted: 0
+github.com/acme/wrapper (../ci-wrapper) indexed, 0 files
+  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 6, redacted: 0
+github.com/acme/app-c (../ci-app-c) indexed, 0 files
+  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 3, redacted: 0

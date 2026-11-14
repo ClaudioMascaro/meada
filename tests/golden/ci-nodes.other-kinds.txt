@@ -1,0 +1,8 @@
+# default build
+example.com/acme/app src/build.ts:2 build
+
+# value docker/login-action@v3
+example.com/acme/app .github/workflows/ci.yml:17 jobs.build.steps[1].uses = "docker/login-action@v3"
+
+# value make test
+example.com/acme/app .github/workflows/ci.yml:32 jobs.test.steps[0].run = "make test"

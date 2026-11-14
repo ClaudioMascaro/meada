@@ -11,5 +11,5 @@ example.com/acme/deploy main.tf:6 resource.aws_lambda_function.worker.package_ty
 example.com/acme/deploy main.tf:7 resource.aws_lambda_function.worker.image_uri = "ghcr.io/acme/aws-worker:v1"
 example.com/acme/deploy main.tf:9 resource.aws_lambda_function.worker.environment.variables.QUEUE_NAME = "orders"
 image: image::ghcr.io/acme/aws-worker
-  builder: example.com/acme/app [exact: image::ghcr.io/acme/aws-worker]
+  builder: example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0] [exact: image::ghcr.io/acme/aws-worker]
 env worker QUEUE_NAME -> Terraform environment: orders

@@ -465,9 +465,9 @@ impl Ecosystem for Swiftpm {
         wanted.contains('*') || wanted == provided
     }
 
-    fn uncertainty(&self, via: Option<&str>) -> Option<&'static str> {
+    fn uncertainty(&self, via: Option<&str>) -> Option<(&'static str, Level)> {
         via.is_some_and(|v| v.starts_with("computed "))
-            .then_some("computed dependency")
+            .then_some(("computed dependency", Level::Ambiguous))
     }
 
     fn reaches(
