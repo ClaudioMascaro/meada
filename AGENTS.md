@@ -82,9 +82,9 @@ write tools; one index per repository; determinism) live in
 
 Meada indexes this repository too: `.mcp.json` serves it as the `meada` MCP server (`search`,
 `context`, `trace`). The trigger: a question shaped "who calls X", "what does X call or hold" or
-"what does a change to X reach" goes to `context` or `trace` on X (`search` when only part of
-the name is known) before a grep or the read of a file to answer it; then read the files it
-names.
+"what does a change to X reach" goes to `context` or `trace` on X before a grep or the read of
+a file to answer it; `search` first gives X's full name when only part is known (a method is
+`Type.method`). Then read the files it names.
 
 - The index follows the working tree on every query, but the server runs the installed binary:
   read `docs/agents/code-graph.md` on a new machine, after a change to a language pack or a
