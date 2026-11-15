@@ -344,7 +344,6 @@ links_of() { # <export> <fn>
 
 expected_export() { # <base export> <workspace> <run>
   jq -S --arg workspace "$2" --rawfile cases "$3/cases.tsv" \
-    --slurpfile template "$3/base/g8/export.json" \
     --slurpfile environment "$3/base/g9/export.json" \
     --slurpfile proxy "$3/base/g10d/export.json" \
     -f "$HERE/a8-expected.jq" "$1"

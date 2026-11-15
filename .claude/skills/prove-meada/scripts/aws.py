@@ -123,8 +123,9 @@ def seed(run):
                 contract = 'resource::s3::' + value.removeprefix('arn:aws:s3:::').split('/', 1)[0]
             else:
                 raise ValueError('Unkeyed neutral ARN fixture: ' + value)
+            # A literal ARN is a structured identifier: an `exact` use, the level `meada export` writes since #844.
             config_uses.append({'contract': contract, 'site': REMOTE + 'infra',
-                                'at': f'main.tofu#resource.{typ}.{label}.{key}'})
+                                'at': f'main.tofu#resource.{typ}.{label}.{key}', 'level': 'exact'})
         return block(typ, label, body)
     channel_names = {kind: [] for kind in ['sns', 'eventbridge', 'kinesis']}
     # Two provisioners per identity exercise ARN extraction independently of name matching.

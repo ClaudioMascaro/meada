@@ -21,6 +21,8 @@ from console import http, query_equal
 from prove import Http, Stdio, answer, free_port, git, fetch, infra
 
 PREFIX = 'example.com/image-proof/'
+# The CI step of `decision-app` that builds every candidate, the builder's site since #860.
+DECISION_BUILDER = PREFIX+'decision-app::.github/workflows/publish.yml::jobs.publish.steps[0]'
 
 
 def boutique_non_image_key(source, base):
@@ -28,7 +30,9 @@ def boutique_non_image_key(source, base):
 
     Keep every old consumer and process field. #668 adds two unresolved Secret
     Manager reads; #667 adds one literal GCS provisioner; #661/ADR 0026 retain
-    the AWS meaning of the generic final key `bucket`, even in a GCS backend.
+    the AWS meaning of the generic final key `bucket`, even in a GCS backend,
+    an `inferred` use whose level `meada export` writes since #844. #845 makes
+    the one URL built on a base Meada does not read an unresolved consumer.
     """
     repository = 'github.com/googlecloudplatform/microservices-demo'
     calls = [
@@ -52,6 +56,18 @@ def boutique_non_image_key(source, base):
         consumers.append({'contract': 'resource::gcpsecretmanager',
                           'site': f'{repository}::{file}::{symbol}::client.AccessSecretVersion#0',
                           'via': None})
+    # `httpGetPackagingInfo` appends the product id to a package variable that `init` fills from the
+    # environment: a path appended to an unread base, an open item and no longer a consumer of `GET /{}`.
+    packaging = (source/'src/frontend/packaging_info.go').read_text()
+    handlers = (source/'src/frontend/handlers.go').read_text()
+    if not all(packaging.count(witness) == 1 for witness in [
+            'packagingServiceUrl = os.Getenv("PACKAGING_SERVICE_URL")', 'url := packagingServiceUrl + "/" + productId',
+            'resp, err := http.Get(url)']) or handlers.count('packagingInfo, err = httpGetPackagingInfo(id)') != 1:
+        raise ValueError('pinned Boutique packaging source changed')
+    unread = f'{repository}::src/frontend/handlers.go::frontendServer.productHandler::httpGetPackagingInfo#0'
+    if [row['contract'] for row in base['consumers'] if row['site'] == unread] != ['http::GET::/{}']:
+        raise ValueError('the pre-image binary no longer reads the packaging call as `GET /{}`')
+    kept = [dict(row, contract=None) if row['site'] == unread else row for row in base['consumers']]
     processes = copy.deepcopy(base['processes'])
     by_parent = {row['site'].rsplit('::', 1)[0]: row for row in consumers}
     for process in processes:
@@ -69,13 +85,13 @@ def boutique_non_image_key(source, base):
             or not re.search(r'resource\s+"google_storage_bucket"\s+"terraform_state_storage_bucket"\s*\{\s*name\s*=\s*"cicd-terraform-state"', terraform):
         raise ValueError('pinned Boutique Terraform source changed')
     return {
-        'consumers': sorted(base['consumers']+consumers, key=lambda row: row['site']),
+        'consumers': sorted(kept+consumers, key=lambda row: row['site']),
         'processes': processes,
         'provisioners': [{'contract': 'resource::gcs::cicd-terraform-state',
                           'node': repository+'::.github/terraform/main.tf::google_storage_bucket.terraform_state_storage_bucket',
                           'root': '.github/terraform'}],
         'uses': [{'contract': 'resource::s3::cicd-terraform-state', 'site': repository,
-                  'at': '.github/terraform/main.tf#terraform.backend.gcs.bucket'}],
+                  'at': '.github/terraform/main.tf#terraform.backend.gcs.bucket', 'level': 'inferred'}],
     }
 
 
@@ -402,7 +418,14 @@ class Probe:
         got = {p['contract'].removeprefix('image::') for p in app['providers'] if p['contract'].startswith('image::')}
         self.check('all named builders, normalization and no base-image false builder', got == expected, repr(sorted(got)))
         links = [l for l in deploy['links'] if l['contract'].startswith('image::')]
-        self.check('literal image links identify repository builder', bool(links) and all(l['provider'] == PREFIX+'app' for l in links))
+        # A builder read in a pipeline is its CI step, in the order `publish.yml` lists them (#860); Skaffold
+        # and both Jib forms keep the repository.
+        step = lambda n: f'{PREFIX}app::.github/workflows/publish.yml::jobs.publish.steps[{n}]'
+        builder = {'image::ghcr.io/parcel/'+n: PREFIX+'app' for n in ['skaffold', 'jib-maven', 'jib-gradle']}
+        builder |= {'image::ghcr.io/parcel/meta': step(1), 'image::ghcr.io/parcel/ko': step(2)}
+        self.check('literal image links identify the builder of each form, a CI step or the repository',
+                   bool(links) and all(l['provider'] == builder.get(l['contract'], step(0)) for l in links),
+                   repr(sorted({(l['contract'], l['provider']) for l in links})))
         for image in expected - {'ghcr.io/parcel/idle'}:
             self.check('runner links '+image, any(l['contract'] == 'image::'+image for l in links))
         helm = [l for l in links if 'values.yaml' in l['consumer']]
@@ -534,7 +557,7 @@ class Probe:
             self.check('deciding app leaves independent init-container candidates unchanged',len(initial_init)==2 and current_init==initial_init,repr(current_init))
             # Base decision semantics retain the contract the consumer uses, even when
             # the manual target names a literal candidate of its pattern.
-            self.check('selected app candidate alone becomes decided',len(chosen)==1 and chosen[0]['level']=='decided' and chosen[0]['contract']=='image::ghcr.io/decision-probe/app-*' and chosen[0]['provider']==PREFIX+'decision-app' and chosen[0].get('by')=='human' and not after.get('stale_decisions'),repr(chosen))
+            self.check('selected app candidate alone becomes decided',len(chosen)==1 and chosen[0]['level']=='decided' and chosen[0]['contract']=='image::ghcr.io/decision-probe/app-*' and chosen[0]['provider']==DECISION_BUILDER and chosen[0].get('by')=='human' and not after.get('stale_decisions'),repr(chosen))
             original_roots=[l for l in before['links'] if 'shared/pod.yaml' in l['consumer']]
             retained_roots=[l for l in after['links'] if 'shared/pod.yaml' in l['consumer']]
             self.check('container decision preserves both overlay candidate sets',len(original_roots)==4 and retained_roots==original_roots)
@@ -552,7 +575,7 @@ class Probe:
             west=lambda data:[l for l in data['links'] if 'shared/pod.yaml' in l['consumer'] and l.get('root')=='overlays/west']
             east_links=[l for l in roots_after['links'] if 'shared/pod.yaml' in l['consumer'] and l.get('root')=='overlays/east']
             self.check('deciding one overlay preserves other root complete candidates',len(west(before))==2 and west(roots_after)==west(before),repr(west(roots_after)))
-            self.check('selected overlay root retained on decided link',len(east_links)==1 and east_links[0]['level']=='decided' and east_links[0]['contract']=='image::ghcr.io/decision-probe/app-*' and east_links[0]['provider']==PREFIX+'decision-app' and east_links[0].get('by')=='human' and not roots_after.get('stale_decisions'),repr(east_links))
+            self.check('selected overlay root retained on decided link',len(east_links)==1 and east_links[0]['level']=='decided' and east_links[0]['contract']=='image::ghcr.io/decision-probe/app-*' and east_links[0]['provider']==DECISION_BUILDER and east_links[0].get('by')=='human' and not roots_after.get('stale_decisions'),repr(east_links))
             self.check('overlay decision also preserves independent init candidates',[l for l in dual(roots_after) if '/init-' in l['contract']]==initial_init)
             _,final=self.stdio(repo,qs,'decisions/after-overlay-stdio')
             final_ids=re.findall(r'run `meada decide --item (.*?)`',final[6])
