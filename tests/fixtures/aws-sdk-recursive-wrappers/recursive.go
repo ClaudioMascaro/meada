@@ -9,8 +9,8 @@ import (
 )
 
 // A chain of wrappers enters a function once. A wrapper that calls itself with another value in
-// the parameter the request reads sends what the first pass does not: that send is unresolved,
-// at the call that makes it (#886).
+// the parameter the request reads sends what the first pass does not: each caller's site gets an
+// unresolved side for it, beside the name its own pass gives (#886).
 
 // A table name: the recursive call passes `b` where the request reads `a`.
 func sendTable(ctx context.Context, n int, a, b string) {
@@ -25,6 +25,19 @@ func placeTable(ctx context.Context) {
 	sendTable(ctx, 1, "table-first", "table-second")
 }
 
+// A value made from the parameter the request reads.
+func sendNext(ctx context.Context, n int, a string) {
+	client := dynamodb.NewFromConfig(cfg)
+	client.PutItem(ctx, &dynamodb.PutItemInput{TableName: aws.String(a)})
+	if n > 0 {
+		sendNext(ctx, n-1, a+"-next")
+	}
+}
+
+func placeNext(ctx context.Context) {
+	sendNext(ctx, 1, "next-first")
+}
+
 // A list nobody passes: read where it stands, it is a write and, as a `ConditionCheck` is an
 // entry too, a read of no table.
 func aloneList(ctx context.Context, items []types.TransactWriteItem) {
@@ -32,7 +45,7 @@ func aloneList(ctx context.Context, items []types.TransactWriteItem) {
 	client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
 }
 
-// A list of entries, the same way: the call that closes the cycle reads as `aloneList` does.
+// A list of entries, the same way: what the next turn sends reads as `aloneList` does.
 func sendList(ctx context.Context, n int, a, b []types.TransactWriteItem) {
 	client := dynamodb.NewFromConfig(cfg)
 	client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: a})
@@ -101,4 +114,13 @@ func tock(ctx context.Context, n int, table string) {
 
 func placeTick(ctx context.Context) {
 	tick(ctx, 1, "ticked")
+}
+
+// Nothing but its own cycle calls it: the wrapper is read where it stands.
+func spin(ctx context.Context, n int, a, b string) {
+	client := dynamodb.NewFromConfig(cfg)
+	client.PutItem(ctx, &dynamodb.PutItemInput{TableName: aws.String(a)})
+	if n > 0 {
+		spin(ctx, n-1, b, a)
+	}
 }

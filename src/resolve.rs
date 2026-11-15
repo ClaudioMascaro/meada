@@ -6904,8 +6904,9 @@ impl<'a> Code<'a> {
     /// number of wrapper levels. A wrapper reached again through its own callers closes a cycle.
     /// Where the cycle's calls hand on, in each parameter `read` needs, that parameter itself,
     /// another turn reads what the first did and adds nothing; where they hand on anything else,
-    /// the call that closes the cycle is read where it stands, the wrapper's parameters unknown
-    /// (#886). A wrapper nobody calls is read where it stands too.
+    /// each site the wrapper's first turn gives also gets what the wrapper reads where it
+    /// stands, its parameters unknown, and with no such site the wrapper's own does (#886). A
+    /// wrapper nobody calls is read where it stands too.
     // ponytail: every simple path up the wrappers' callers is walked; memoize per (wrapper,
     // call site) if a dense call graph makes this slow.
     pub fn expand<R>(
@@ -6948,7 +6949,7 @@ impl<'a> Code<'a> {
                     inject,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out);
+                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
             }
             Expand::Chain(path, index) => {
                 let Some(call) = self.call(path, index) else {
@@ -6964,7 +6965,7 @@ impl<'a> Code<'a> {
                     inject,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out);
+                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
             }
             Expand::Constructed {
                 held: (file, constant),
@@ -6983,7 +6984,7 @@ impl<'a> Code<'a> {
                     inject,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out);
+                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
             }
         }
         out
@@ -7013,16 +7014,19 @@ impl<'a> Code<'a> {
             inject: None,
             writes: Some(writes),
         };
-        self.walk(&written, &mut Vec::new(), read, &mut out);
+        self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
         out
     }
 
+    /// `cuts` holds, for each cycle met whose turn sends what its first did not, how many frames
+    /// were under the wrapper it closes on when the walk first climbed from it.
     fn walk<R>(
         &self,
         written: &Written<'a, '_>,
         frames: &mut Vec<Frame<'a>>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
         out: &mut Vec<Expanded<'a, R>>,
+        cuts: &mut Vec<usize>,
     ) {
         let (site, at) = frames.last().map_or(written.at, |f| (f.path, f.index));
         if !self.charge(site, 1) {
@@ -7042,10 +7046,10 @@ impl<'a> Code<'a> {
             return;
         };
         // A wrapper reached again closes a cycle: another turn of it is climbed no further.
-        let cycle = frames.iter().position(|f| f.def == wrapper);
-        if let Some(first) = cycle
-            && !self.cycle_changes(written, frames, first, wrapper, read)
-        {
+        if let Some(first) = frames.iter().position(|f| f.def == wrapper) {
+            if self.cycle_sends_more(written, frames, first, wrapper, read) {
+                cuts.push(first);
+            }
             return;
         }
         // A call that only matches the wrapper's name may be on any object, or reach another
@@ -7056,13 +7060,9 @@ impl<'a> Code<'a> {
         let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
             .copied()
             .collect();
-        // A wrapper `WRAPPER_DEPTH` calls up is read where it stands too, and so is the call
-        // that closes a cycle and sends what the first turn did not.
-        if cycle.is_some() || callers.is_empty() || frames.len() >= WRAPPER_DEPTH {
-            let values: Vec<Value> = values.into_iter().map(|v| unbind(v, chain, &[])).collect();
-            let kwargs: Vec<(String, Value)> = (kwargs.into_iter())
-                .map(|(k, v)| (k, unbind(v, chain, &[])))
-                .collect();
+        // A wrapper `WRAPPER_DEPTH` calls up is read where it stands too.
+        if callers.is_empty() || frames.len() >= WRAPPER_DEPTH {
+            let (values, kwargs) = unbound((values, kwargs), chain, &[]);
             out.extend(read(&values, &kwargs).map(|found| Expanded {
                 site: (site, at),
                 frames: frames.clone(),
@@ -7070,14 +7070,39 @@ impl<'a> Code<'a> {
             }));
             return;
         }
+        let (under, climbed) = (frames.len(), out.len());
         for caller in callers {
             frames.push(Frame {
                 def: wrapper,
                 path: caller.path,
                 index: caller.index,
             });
-            self.walk(written, frames, read, out);
+            self.walk(written, frames, read, out, cuts);
             frames.pop();
+        }
+        if !cuts.contains(&under) {
+            return;
+        }
+        cuts.retain(|&cut| cut != under);
+        // A cycle through this wrapper sends more than its first turn, which nothing follows:
+        // each site that turn reached also sends what the wrapper reads where it stands, and
+        // with no such site (nothing but the cycle calls the wrapper) the wrapper itself does.
+        let mut reached: Vec<((&'a str, usize), Vec<Frame<'a>>)> = Vec::new();
+        for expanded in &out[climbed..] {
+            if reached.iter().all(|(site, _)| *site != expanded.site) {
+                reached.push((expanded.site, expanded.frames.clone()));
+            }
+        }
+        if reached.is_empty() {
+            reached.push(((site, at), frames.clone()));
+        }
+        let (values, kwargs) = unbound((values, kwargs), chain, &[]);
+        for (site, frames) in reached {
+            out.extend(read(&values, &kwargs).map(|found| Expanded {
+                site,
+                frames,
+                found,
+            }));
         }
     }
 
@@ -7132,9 +7157,9 @@ impl<'a> Code<'a> {
 
     /// Whether a turn of the cycle `frames[first..]` closes on `wrapper` sends what the first
     /// did not: its calls hand on, in a parameter `read` needs, anything but that parameter
-    /// (another parameter, a value made from one, a value of the caller's). A retry that passes
-    /// its parameters on and counts down does not (#886).
-    fn cycle_changes<R>(
+    /// (another parameter, a value made from one). A retry that passes its parameters on and
+    /// counts down does not (#886).
+    fn cycle_sends_more<R>(
         &self,
         written: &Written<'a, '_>,
         frames: &[Frame<'a>],
@@ -7164,13 +7189,8 @@ impl<'a> Code<'a> {
         }
         // What the first turn read, with those parameters alone left as names: `read` answers
         // `None` when it needs one of them.
-        let ((values, kwargs), _) = self.folded(written, &frames[..first]);
-        let values: Vec<Value> = (values.into_iter())
-            .map(|v| unbind(v, chain, &changed))
-            .collect();
-        let kwargs: Vec<(String, Value)> = (kwargs.into_iter())
-            .map(|(k, v)| (k, unbind(v, chain, &changed)))
-            .collect();
+        let (first_turn, _) = self.folded(written, &frames[..first]);
+        let (values, kwargs) = unbound(first_turn, chain, &changed);
         read(&values, &kwargs).is_none()
     }
 
@@ -7764,6 +7784,13 @@ fn object_value(value: &Value) -> Option<usize> {
         Value::New(_, args) if args.len() == 1 => object_value(&args[0]),
         _ => None,
     }
+}
+
+/// Folded arguments with the parameters they still name unknown, but the ones of `keep`.
+fn unbound((values, kwargs): Folded, chain: bool, keep: &[&str]) -> Folded {
+    let values = values.into_iter().map(|v| unbind(v, chain, keep));
+    let kwargs = (kwargs.into_iter()).map(|(k, v)| (k, unbind(v, chain, keep)));
+    (values.collect(), kwargs.collect())
 }
 
 /// `value` with the parameters it still names unknown, but the ones of `keep`.
@@ -9381,11 +9408,13 @@ mod tests {
             found.sort();
             found
         };
-        // The call that closes the cycle sends the other parameter: it is read where it
-        // stands, the URL not known, beside what the caller's turn reads (#886).
+        // The cycle's call sends the other parameter: beside what the caller's turn reads,
+        // its site gets the wrapper read where it stands, the URL not known (#886).
         let send = "function send(n: number, a: string, b: string) {\n\
                     fetch(a); if (n > 0) send(n - 1, b, ''); }";
         assert_eq!(urls(send, "send(1, '/first', '/second')"), ["/first", "?"]);
+        // Nothing but its own cycle calls the wrapper: it is read where it stands.
+        assert_eq!(urls(send, "0"), ["?"]);
         // So is one that hands the same parameter on in the place of the one the read needs.
         let twice = "function send(n: number, a: string, b: string) {\n\
                      fetch(a); if (n > 0) send(n - 1, b, b); }";

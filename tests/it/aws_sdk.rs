@@ -1013,15 +1013,16 @@ fn sides_by_extension(export: &Value) -> std::collections::BTreeMap<String, Vec<
     by_extension
 }
 
-/// A chain of wrappers enters a function once (#886). Where the call that closes a cycle hands the
+/// A chain of wrappers enters a function once (#886). Where the calls of a cycle hand the
 /// wrapper's parameters on as they are (a retry, two wrappers that call each other), another turn
-/// sends what the first did and the call adds no side. Where it hands on another value in the
-/// parameter the request reads (the second of two names, the second of two lists), what that
-/// turn sends is not followed: the call that closes the cycle is an unresolved side, beside the
-/// names each outside caller gives. It reads as a wrapper nobody calls does: a list of entries no
-/// caller gives is a write and a read (`aloneList`).
+/// sends what the first did and adds no side. Where they hand on another value in the parameter
+/// the request reads (the second of two names, a name made from the first, the second of two
+/// lists, two wrappers that swap theirs), what that turn sends is not followed: each caller's
+/// site gets an unresolved side beside the name its own pass gives, and a wrapper nothing but its
+/// cycle calls gets it where it stands (`spin`). A list of entries no caller gives is a write and
+/// a read, as for a wrapper nobody calls (`aloneList`).
 #[test]
-fn a_recursive_wrapper_that_passes_another_value_on_is_unresolved_at_that_call() {
+fn a_recursive_wrapper_that_passes_another_value_on_is_unresolved_at_each_caller() {
     let fixture = "aws-sdk-recursive-wrappers";
     let repo = fixture_repo("aws_sdk_recursive_wrappers", fixture, None);
     let export: Value =
@@ -1031,16 +1032,21 @@ fn a_recursive_wrapper_that_passes_another_value_on_is_unresolved_at_that_call()
         [
             "alonelist reader resource::dynamodb",
             "alonelist writer resource::dynamodb",
-            "ping writer resource::dynamodb",
+            "placechanged reader resource::dynamodb",
+            "placechanged writer resource::dynamodb",
             "placechanged writer resource::dynamodb::changed-first",
+            "placelist reader resource::dynamodb",
+            "placelist writer resource::dynamodb",
             "placelist writer resource::dynamodb::list-first",
+            "placenext writer resource::dynamodb",
+            "placenext writer resource::dynamodb::next-first",
+            "placeping writer resource::dynamodb",
             "placeping writer resource::dynamodb::ping-first",
             "placeretry writer resource::dynamodb::retried",
+            "placetable writer resource::dynamodb",
             "placetable writer resource::dynamodb::table-first",
             "placetick writer resource::dynamodb::ticked",
-            "sendlist reader resource::dynamodb",
-            "sendlist writer resource::dynamodb",
-            "sendtable writer resource::dynamodb",
+            "spin writer resource::dynamodb",
         ],
         "{export}"
     );

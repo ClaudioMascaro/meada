@@ -69,8 +69,9 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
 - `resolve.rs`: wrapper expansion (HTTP clients, message producers and consumers) walks every
   simple path up the callers, cut where it reaches a wrapper again (nothing more where the
   cycle's calls pass each parameter the read needs on as itself; where they pass anything else,
-  the closing call is read where it stands, the wrapper's parameters unknown, #886), and does
-  not climb a call found only by a name match, so a wrapper
+  each site the wrapper's first turn gives also gets what the wrapper reads where it stands,
+  its parameters unknown, #886), and does not climb a call found only by a name match, so a
+  wrapper
   method called on a receiver whose class Meada cannot tell (in TypeScript any receiver but
   `this`, a `const api = new Api()` included), or a function called by a bare name no import
   binds, is read where it stands; value flow (`Code::origins`, for a parameter's arguments) does
@@ -120,9 +121,10 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   of such wrappers, a spread (`xs...`, the caller's slice itself) and a variadic parameter given
   one element included. A chain enters a function once: a wrapper that calls itself, or two that
   call each other, give the caller's site the names of the first pass alone. A retry that passes
-  the same parameter on adds nothing; a call that passes another value on (the next parameter, a
-  value made from one) is an unresolved side at that call, never the name it sends, a table name
-  in a string parameter included (#886). A function literal, a method that shares its name with another
+  the same parameter on adds nothing; where a call of the cycle passes another value on (the
+  next parameter, a value made from one), the caller's site gets an unresolved side beside
+  those names, never the name the next turn sends, a table name in a string parameter included
+  (#886). A function literal, a method that shares its name with another
   definition, a call with more or fewer arguments than parameters (a variadic one given two)
   and every C# method are not followed.
   In Java the rule covers a list or an array: one mentioned a third time or held in a field has no
