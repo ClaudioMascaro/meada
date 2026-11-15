@@ -260,16 +260,15 @@ def notice(text):
 
 
 def golden_notice(paths):
-    """What a change to a golden owes before its pull request is ready. The E2E judge holds a
-    re-blessed golden BROKEN until the maintainer approves it in words, unless the issue predicts
-    each changed line (`prove-meada`, "Answer keys"): PR 863 learned it from the judge, a day
-    after it opened."""
+    """What a change to a golden owes before its pull request is ready. `prove-meada`'s "Answer
+    keys" holds the rule, and the notice only points at it: PR 863 learned it from the E2E judge,
+    a day after it opened."""
     goldens = sorted(p for p in paths if p.startswith("tests/golden/"))
     if not goldens:
         return None
     text = (f"{', '.join(goldens)} changed: E2E holds a re-blessed golden BROKEN until the maintainer approves "
-            "it in words, unless the issue predicts each changed line. Ask for that approval before the "
-            "pull request is ready.")
+            "it in words (\"Answer keys\" in .claude/skills/prove-meada/SKILL.md). Ask for that approval "
+            "before the pull request is ready.")
     if "tests/golden/schema.txt" in goldens:
         text += (" schema.txt is the stored format: its change moves the format version and every existing "
                  "index is rebuilt on its first open. Say what it gains under \"Stored format\" in the "

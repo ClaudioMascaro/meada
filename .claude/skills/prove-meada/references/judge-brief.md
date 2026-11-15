@@ -57,8 +57,8 @@ Sort:
 - Never edit an answer key, a skill or the artifact. An answer key that disagrees with the app
   is BROKEN and is reported, never reconciled.
 - The pull request body, the CHANGELOG and goldens written by this change are not a spec: use
-  them only to find the issue. A difference from the base that the issue does not predict is
-  BROKEN until the maintainer approves it.
+  them only to find the issue. A difference from the base is judged by the skill's "Answer
+  keys", which says whose approval it needs.
 - Write one file only: the receipt, at `<W>/.prove-it/runs/<UTC timestamp>-pr<pr>-e2e/receipt.md`,
   in the skill's receipt format, with `Checker: fresh sub-agent`.
 
