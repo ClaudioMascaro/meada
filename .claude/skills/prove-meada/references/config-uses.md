@@ -10,7 +10,7 @@ python3 $S/config_uses.py --base-bin "$RUN/bin/meada-pre-config" \
 The base is a build from before #661 (`6a5eca5853193d205bcf756983b41e9cb16ffa9d`, the manual
 audit's `pre-config`, which `scripts/prove-ci` builds when the flow is selected): the driver
 compares config uses with a base that has none, and its tool catalog with one before #672's
-`alert` kind, so the merge-base cannot serve.
+`alert` kind and #860's `ci` kind, so the merge-base cannot serve.
 The binary needs the `ui` feature for the final console checks. `--ui-dir` is optional for an
 intermediate CLI/MCP run, but omitting it leaves the console unproven. Reuse the build and
 browser environment from [console.md](console.md); the script never builds, downloads, or
@@ -67,8 +67,10 @@ the defining attribute, not references in the rest of an IaC file.
 Complete use and provisioning set equality, exact/inferred levels, precise `<file>#<key path>`
 sites and all roots pass. Existing provider/consumer/link arrays and all other export fields
 match base on identical generated inputs; no-config exports match completely. Config values
-remain outside exports. Orphan sets have every idle provisioner and the one missing use,
-without extra rows. Existing value-search answers match base completely. HTTP and console
+remain outside exports. Orphan sets have every idle provisioner and the one missing use that is
+`exact` (`lost`, a queue URL), without extra rows: the missing use a key name only infers
+(`absent`) is never an orphan line since #844. Each use row carries the level of its rule. The
+warm refresh edits one letter of that URL's host and requires the use and its orphan line gone. Existing value-search answers match base completely. HTTP and console
 retain every successful byte or exact error status/message. The browser visibly lists config
 uses and provisioning keys and saves screenshots. Same-size removal changes live answers,
 removes exactly one use; removing a provisioned key also removes exactly its two root links.
