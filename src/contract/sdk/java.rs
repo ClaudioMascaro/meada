@@ -587,7 +587,7 @@ impl<'a> Uses<'a> {
         // So the own step of a chain is not known to set a field last: a method an argument of
         // the chain calls sets it too, and so does another thread. Nor a local beside a set in a
         // lambda or a class body, which an argument of the chain may call.
-        let later = |m: &&str| setter(*m) && self.set_later.contains(&(scope, name, *m));
+        let later = |m: &&str| setter(m) && self.set_later.contains(&(scope, name, *m));
         let own: &[&str] = match field || own.iter().any(later) {
             true => &[],
             false => own,
