@@ -72,8 +72,10 @@ command/transport exits 2 with its error retained. An existing run is never over
 
 `images-mixed.py` always drives CLI, persistent MCP stdio and MCP HTTP. One infrastructure
 repository contains Compose image workloads and an SNS-to-SQS subscription; its peer both
-builds the image and receives the queue, with a direct Compose build context. It requires two
-distinct image links, mirrored whole-row in both endpoints' exports, plus the separate AWS
+builds the image and receives the queue, with a direct Compose build context. The peer builds
+it twice, in its Compose file (the repository is the site) and in a CI step of its pipeline (the
+step is the site since #860), so the driver requires four distinct image links, each runner to
+both builders, mirrored whole-row in both endpoints' exports, plus the separate AWS
 route and direct execution. The direct Compose workload has no self image link. Every AWS
 provisioner/provision/subscription array and non-image contract row equals the supplied
 AWS-capable baseline. Reopening preserves bytes. Same-size image and subscription edits each
@@ -86,13 +88,14 @@ The unresolved registry runner `${REGISTRY}/mixed-proof/worker` must remain
 Docker Hub expansion must add no registry evidence. A contradictory synthetic process
 `REGISTRY` must have no effect.
 
-`image-ko.py` requires the exact set of eight literal publications: simple bare build/publish,
-explicit bash/sh, an omitted package target, and step/job shell overrides of a Python workflow
-default. Heredoc text, compound/multiline commands, semicolons, substitutions, quoted command
+`image-ko.py` requires the exact set of eleven literal publications: simple bare build/publish,
+explicit bash/sh, an omitted package target, step/job shell overrides of a Python workflow
+default and, since #860 reads ko through ADR 0028's command table with no shell evaluated, a
+command after `&&`, on a later line and before `;`. Heredoc text, substitutions, quoted command
 text, non-bare mode, help flags, unknown flags, repeated `--bare`, multiple targets and
-Python/custom shells create no guessed publication. It checks each complete repository-level
-contract context separately from its exact exported `at` key; contract context does not print
-the builder location. Only the checked-in shell/configuration is read; no shell or ko runs.
+Python/custom shells create no guessed publication. It checks each complete contract context,
+which names the builder's CI step by file, line and address, separately from its exact exported
+`at` key. Only the checked-in shell/configuration is read; no shell or ko runs.
 
 For a fix, add `--before-bin "$RUN/bin/meada-before"` with an immutable image binary predating
 the shell/help fixes. This retains its complete export and requires the original heredoc,

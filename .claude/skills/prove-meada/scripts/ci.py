@@ -700,7 +700,6 @@ PROBES = {
                               file='levels.yml'),
     'level_pipx_install': probe('level_none', 'pipx install acme-fmt\nacme-fmt --check .', consumer('acme-fmt'), program('exact', 'fmt'), file='levels.yml'),
 }
-NEW_BUILDERS = ('docker_push', 'docker_push_sha', 'buildx_push')  # the forms the base does not read
 # Each unresolved form, with the variable its side names when it names one, in the three places of the gate:
 # in part of a name (a pattern one package of the workspace fits), as the whole name, inside an option's value.
 FORMS = {'secrets': ('${{ secrets.SECRET_FLAVOR }}', 'SECRET_FLAVOR'), 'vars': ('${{ vars.FLAVOR }}', 'FLAVOR'), 'github': ('${{ github.ref_name }}', None),
@@ -1446,9 +1445,13 @@ def f1(run, heads, exports, statuses):
     hub_queries = [('context', {'symbol': PUBLISH[0], **big}), ('context', {'symbol': W + 'publish.yml', **big}),
                    ('trace', {'from': PUBLISH[0], 'direction': 'up', **big}), ('trace', {'from': pipeline('workflows', 'on-string.yml')[0], 'direction': 'up', **big})]
     hub = run.ask('head', calls('head', 'hub'), 'hub', hub_queries)
-    for reply, label in zip(hub[:2], ('its contract', 'its file path')):
-        listed = [row for row in PUBLISH_CONSUMERS if any(all(part in line for part in (*row, 'package')) for line in reply.splitlines())]
-        run.check(f'`context` on `publish.yml` by {label} lists the four consumers, each on one line with its Git ref and keys',
+    # #820 gives the Git ref and the keys to `context` on the provider, the pipeline: its contract identifier
+    # answers with the contract's sides, the same four consumers and no more.
+    for reply, label, words in zip(hub[:2], ('the contract of `publish.yml` lists the four consumers as its sides, each on one line',
+                                             '`publish.yml` by its file path lists the four consumers, each on one line with its Git ref and keys'),
+                                   (lambda row: (*row[:3], ' consumer '), lambda row: (*row, 'package'))):
+        listed = [row for row in PUBLISH_CONSUMERS if any(all(part in line for part in words(row)) for line in reply.splitlines())]
+        run.check(f'`context` on {label}',
                   listed == PUBLISH_CONSUMERS and f'{HOST}/app-c' not in reply and f'{HOST}/forms' not in reply, reply)
     reaches = lambda reply, repo, address: any(f'{HOST}/{repo}' in line and address in line for line in reply.splitlines())
     run.check('`trace` up from `publish.yml` reaches `app-c` through `wrapper`',
@@ -1465,10 +1468,14 @@ def f1(run, heads, exports, statuses):
 
     # CI nodes and references, in `app-a` and `actions`.
     step_site = lambda case: located(case)[0]
+    # `app-b` and `app-c` hold a `ci.yml` too, and `app-b` a `jobs.build`: a path that several repositories
+    # of the workspace hold is ambiguous, so those three nodes are asked with their repository. The two
+    # addresses only `app-a` holds are asked by path.
+    own = f'{HOST}/app-a::{W}ci.yml::'
     node_queries = [('search', {'query': 'publish', 'kind': 'ci'}), ('search', {'query': 'a_image', 'kind': 'ci'}),
-                    ('search', {'query': 'docker/build-push-action', 'kind': 'ci'}), ('context', {'symbol': W + 'ci.yml', **big}),
-                    ('context', {'symbol': W + 'ci.yml::jobs.publish', **big}), ('context', {'symbol': W + 'ci.yml::jobs.build', **big}),
-                    ('context', {'symbol': W + 'ci.yml::jobs.build.steps[1]', **big}), ('context', {'symbol': W + 'ci.yml::jobs.build.steps[id=a_image]', **big})]
+                    ('search', {'query': 'docker/build-push-action', 'kind': 'ci'}), ('context', {'symbol': own + '.', **big}),
+                    ('context', {'symbol': W + 'ci.yml::jobs.publish', **big}), ('context', {'symbol': own + 'jobs.build', **big}),
+                    ('context', {'symbol': own + 'jobs.build.steps[1]', **big}), ('context', {'symbol': W + 'ci.yml::jobs.build.steps[id=a_image]', **big})]
     wanted = [['jobs.publish', 'ci.yml'], ['jobs.build.steps[1]'], ['jobs.build.steps[1]'], ['jobs.build', 'jobs.publish'], ['jobs.build'],
               ['jobs.publish', 'jobs.build.steps[0]', 'jobs.build.steps[1]'], ['neutral-zz'], ['jobs.build.steps[1]', 'neutral-zz']]
     replies = run.ask('head', calls('head', 'app-a'), 'nodes', node_queries)
@@ -1483,7 +1490,7 @@ def f1(run, heads, exports, statuses):
     reply = run.ask('head', calls('head', 'actions'), 'composite', [('context', {'symbol': 'action.yml', **big})])[0]
     run.check('`context` on a composite action shows its own CI steps', 'runs.steps[0]' in reply, reply)
     named, callers = run.ask('head', calls('head', 'app-a'), 'step-name', [('search', {'query': 'Build neutral image', 'kind': 'ci'}),
-                                                                           ('context', {'symbol': W + 'ci.yml::jobs.build.steps[1]', **big})])
+                                                                           ('context', {'symbol': own + 'jobs.build.steps[1]', **big})])
     run.check('`search` kind `ci` finds a CI step by its `name`', 'jobs.build.steps[1]' in named, named)
     run.check('`context` on a CI step shows the values of its `env`', 'neutral-env' in callers, callers)
     setup = step_site('step_remote_folder').split('::')
@@ -1500,13 +1507,11 @@ def f1(run, heads, exports, statuses):
     run.check('use_structured: the use is on its CI step', [row['site'] for row in at('head', '.with.target')] == [step_site('use_structured')], at('head', '.with.target'))
     run.check('use_other_file: another file of `.github/` keeps its use', len(at('head', 'storage.bucket')) == 1, at('head', 'storage.bucket'))
 
-    run.check('control: the base gives the typed key a use', len(at('base', '.with.bucket')) == 1, at('base', '.with.bucket'))
-    # IAM is in no row of the type table: the role ARN is no use on the base either (#828 recorded it).
-    run.check('control: the base gives the role ARN no use either', not at('base', 'role-to-assume"]'), at('base', 'role-to-assume"]'))
-    structured = [{key: value for key, value in row.items() if key != 'site'} for side in ('base', 'head') for row in at(side, '.with.target')]
-    run.check('control: the base has the structured use on the repository, the same row but for its site',
-              [row['site'] for row in at('base', '.with.target')] == [f'{HOST}/forms'] and structured[:1] == structured[1:], at('base', '.with.target'))
-    run.check('use_other_file: equal to the base', at('head', 'storage.bucket') == at('base', 'storage.bucket'), at('base', 'storage.bucket'))
+    # The base holds #828 since #860 merged: these rows are the base's now. `use_other_file` is the control
+    # that the key-name rule still gives a use outside a pipeline.
+    for case, suffix in (('use_typed_key', '.with.bucket'), ('use_role_arn', 'role-to-assume"]'), ('use_structured', '.with.target'),
+                         ('use_other_file', 'storage.bucket')):
+        run.check(f'{case}: equal to the base', at('head', suffix) == at('base', suffix), at('base', suffix))
     # Existing answers: the `uses` lines as config values, the hand declaration, kind `iac` and the default search.
     same = [('search', {'query': 'publish.yml', 'kind': 'value', **big}), ('search', {'query': 'publish', 'kind': 'iac'}), ('search', {'query': 'publish'}),
             ('context', {'symbol': 'resource::gha-workflow::acme/workflows/.github/workflows/publish.yml', **big})]
@@ -1619,8 +1624,8 @@ def f2(run, heads, exports, statuses):
         others = [case for case, row in CASES.items() if row[0] == 'run' and package(name) not in want[located(case)[0]][1]]
         run.check(f'`context` on `{package(name)}` lists each of the {len(installs)} CI steps that install it and none of the {len(others)} others',
                   all(map(listed, installs)) and not any(map(listed, others)), reply)
-    # The image builder forms. The base reads the forms of today with the repository as their site, and
-    # the only difference #820 allows is that site; `docker push` and `docker buildx build --push` are new.
+    # The image builder forms: each builder row has its CI step as its site and is read at a key of that
+    # step. The base holds #833 since #860 merged, so the row is the base's too.
     built = lambda side, contracts: sorted((row for row in exports[side, 'run', 'steps'].get('providers', []) if row['contract'] in contracts),
                                            key=lambda row: json.dumps(row, sort_keys=True))
     for case, row in CASES.items():
@@ -1628,13 +1633,10 @@ def f2(run, heads, exports, statuses):
         if not contracts:
             continue
         before, after = built('base', contracts), built('head', contracts)
-        if case in NEW_BUILDERS:
-            run.check(f'control: the base reads no builder from {case}', not before, before)
-            continue
-        run.check(f'control: the base reads {case} with the repository as its site',
-                  len(before) == len(contracts) and all(found['site'] == STEPS and found.get('at', '').startswith(f'{row[2]}#{address(case)}.') for found in before), before)
-        run.check(f'{case}: the head row is the base row but for its site',
-                  bool(before) and [{**found, 'site': located(case)[0]} for found in before] == after, after)
+        run.check(f'{case}: each builder row is on its CI step, read at a key of that step',
+                  len(after) == len(contracts) and all(found['site'] == located(case)[0] and found.get('at', '').startswith(f'{row[2]}#{address(case)}.')
+                                                       for found in after), after)
+        run.check(f'{case}: equal to the base', before == after, before)
     # The chain: the HTTP link is read from the SDK's code and equals the base, and `trace` crosses the
     # three contracts both ways.
     links = lambda side: sorted(json.dumps(row, sort_keys=True) for row in gathered(exports, 'chain', 'links', side) if row['contract'].startswith('http::'))
@@ -1677,16 +1679,20 @@ def f3(run, heads, exports, statuses):
             text = json.dumps(found[0].get(PERMISSIONS)) if len(found) == 1 else ''
             run.check(f'{case}: its consumer row carries the block that governs it, under `{PERMISSIONS}`',
                       all(name in text and level in text for name, level in block.items()), found)
-        if contract not in contexts:
-            contexts[contract] = run.ask('head', run.folder / 'head' / 'work' / workspace / 'hub', f'permissions-context-{len(contexts)}',
-                                         [('context', {'symbol': contract, **big})])[0]
-        lines = [line for line in contexts[contract].splitlines()
+        # The provider is the pipeline's node, named with its repository: the contract identifier answers with
+        # the contract's sides, which carry no permissions.
+        owner, name, path = body['uses'].split('@')[0].split('/', 2)
+        provider = f'github.com/{owner}/{name}::{path}::.'
+        if provider not in contexts:
+            contexts[provider] = run.ask('head', run.folder / 'head' / 'work' / workspace / 'hub', f'permissions-context-{len(contexts)}',
+                                         [('context', {'symbol': provider, **big})])[0]
+        lines = [line for line in contexts[provider].splitlines()
                  if f'{HOST}/{repo}' in line and re.search(re.escape(site.split('::')[2]) + r'(?![\w.\[])', line)]
         # A provider that declares nothing may be shown so on the line: only the consumer's own words are keyed.
         shown = (len(lines) == 1 and (PMISMATCH in lines[0]) == bool(flags)
                  and (NOT_DECLARED in lines[0] if block == NOT_DECLARED else case == 'perm_provider_not_declared' or NOT_DECLARED not in lines[0])
                  and (not isinstance(block, dict) or all(name in lines[0] and level in lines[0] for name, level in block.items())))
-        run.check(f'{case}: `context` on its provider shows its declared permissions and {"the flag" if flags else "no flag"}', shown, lines or contexts[contract])
+        run.check(f'{case}: `context` on its provider shows its declared permissions and {"the flag" if flags else "no flag"}', shown, lines or contexts[provider])
     # Only a link whose consumer is a CI job compares permissions: an action declares none.
     site = located('perm_action_step')[0]
     rows = lambda section: gathered(exports, 'permissions', section)
@@ -1701,7 +1707,9 @@ def f3(run, heads, exports, statuses):
 def corpus(run):
     """The pinned public corpus: each repository alone against the base, then the three as one workspace."""
     roots = {}
-    for side in run.bins:
+    # `clean`: a third copy no index is written in. `meada index --workspace` records a commit only for a
+    # clean checkout, and an export alone leaves its `.meada/` in the checkout it read.
+    for side in (*run.bins, 'clean'):
         for name, repository in CORPUS.items():
             roots[side, name] = run.folder / side / 'work' / name
             if side == 'head':
@@ -1723,7 +1731,7 @@ def corpus(run):
                   all(row['provider'].startswith(repository + '::') for row in local) and (local or name != 'ci-slsa'), len(local))
     folder = run.folder / 'workspace'
     write(folder / 'workspace.toml', 'index_dir = "indexes"\n' + ''.join(
-        f'\n[[repository]]\nrepo = "{repository}"\npath = {json.dumps(str(roots["head", name]))}\n' for name, repository in CORPUS.items()))
+        f'\n[[repository]]\nrepo = "{repository}"\npath = {json.dumps(str(roots["clean", name]))}\n' for name, repository in CORPUS.items()))
     run.command('head', folder, 'workspace-index', 'index', '--workspace', 'workspace.toml')
     links = []
     for name, repository in CORPUS.items():

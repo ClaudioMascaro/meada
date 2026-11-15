@@ -18,6 +18,9 @@ import time
 import traceback
 from prove import Http, Stdio, answer, free_port, git
 
+# A queue no Terraform provisions, named by its URL: an `exact` use, so its orphan line prints.
+LOST = 'https://sqs.eu-west-2.amazonaws.com/123456789012/lost'
+UNPROVISIONED = ('channel::sqs::absent', 'channel::sqs::lost')
 PREFIX = 'example.com/config-use-proof/'
 # Curated AWS kinds in base ADR 0026, with standard structured AWS syntax.
 # type, attribute, identity, literal, structured identifier
@@ -56,12 +59,14 @@ def file_sha256(path):
 
 
 def expected_tools(base):
-    """#672 adds only the alert search description to the pre-config catalog."""
+    """#672 adds the alert kind and #860 the CI kind to the search description of the pre-config catalog, and
+    nothing else. The CI sentence is the doc comment of `Search::kind` in `src/mcp.rs` at #860, line break included."""
     expected = copy.deepcopy(base)
     search = next(tool for tool in expected if tool['name'] == 'search')
     kind = search['inputSchema']['properties']['kind']
     before = '`image` (an image builder or runner), or `ambiguous`'
-    after = '`image` (an image builder or runner), `alert` (an alert emitter or matcher), or `ambiguous`'
+    after = ('`ci` (a pipeline, an action, a CI job or a CI step, by address, id, name or\n`uses`), '
+             '`image` (an image builder or runner), `alert` (an alert emitter or matcher), or `ambiguous`')
     if kind['description'].count(before) != 1:
         raise ValueError('pre-config search description differs from the pinned catalog')
     kind['description'] = kind['description'].replace(before, after, 1)
@@ -122,13 +127,17 @@ def seed(root):
     yaml = ('worker:\n  queue: parcel\n  topic: notice\n  bucket: vault\n  table: ledger\n'
             '  service:\n    queue:\n      name: parcel\n  queue_url: parcel\n  label: parcel\n'
             '  missing:\n    queue: absent\n  numeric:\n    queue: 17\n  flag:\n    bucket: false\n'
-            '  unsupported: "arn:aws:ec2:eu-west-2:123456789012:instance/i-0123456789abcdef0"\n')
+            '  unsupported: "arn:aws:ec2:eu-west-2:123456789012:instance/i-0123456789abcdef0"\n'
+            f'  lost:\n    queue: "{LOST}"\n')
     write(repos['app'], 'helm/values.yaml', yaml)
     for key, prefix, name, line in [('queue','channel::sqs','parcel',2), ('topic','channel::sns','notice',3),
                                    ('bucket','resource::s3','vault',4), ('table','resource::dynamodb','ledger',5)]:
         use(prefix+'::'+name, f'helm/values.yaml#worker.{key}', 'inferred', name, line)
+    # Two queues no Terraform provisions. `absent` is a plain name under a typed key: a use the key-name rule
+    # only infers is never an orphan line (#844). `lost` is a queue URL, an `exact` use: its orphan line stays.
     use('channel::sqs::absent', 'helm/values.yaml#worker.missing.queue', 'inferred', 'absent', 12)
-    oracle['orphans']['channel::sqs::absent'] = 'no provisioner'
+    use('channel::sqs::lost', 'helm/values.yaml#worker.lost.queue', 'exact', LOST, 19)
+    oracle['orphans']['channel::sqs::lost'] = 'no provisioner'
     # JSON, list paths and quoted keys are independent config reader branches.
     obj = {'services': [{'queue':'parcel'}, {'bucket':'vault'}], 'special.key': {'topic':'notice'},
            'bare':'ledger', 'queueName':'parcel'}
@@ -312,8 +321,12 @@ class Probe:
         expected=sorted((u['contract'],u['site'],u['at']) for u in oracle['uses']) if name=='app' else []
         self.check(name+' complete use set/count/sites',sorted(use_set(h))==expected,
                    {'expected':expected,'got':sorted(use_set(h))})
-        self.check(name+' use objects contain exactly graph identity fields',
-                   all(set(row)=={'contract','site','at'} for row in h.get('uses',[])),h.get('uses',[]))
+        # `meada export` writes the level of each use since #844: `exact` for a structured identifier,
+        # `inferred` for a plain value under a typed key.
+        levels={(u['contract'],u['at']):u['level'] for u in oracle['uses']}
+        self.check(name+' use objects contain exactly the graph identity fields and the level of their rule',
+                   all(set(row)=={'contract','site','at','level'} and row['level']==levels.get((row['contract'],row['at']))
+                       for row in h.get('uses',[])),h.get('uses',[]))
         self.check(name+' format remains 1',h.get('format')==1)
         # Existing public export order is side, provisioner, root, contract. The
         # optional at locator has no predating promised ordering among equal tuples.
@@ -401,7 +414,7 @@ class Probe:
                 expected=expected_orphan_rows(oracle)
                 self.check(name+' complete orphan set/count',orphan_set(h[name]['status'])==(expected,len(expected)),h[name]['status'])
                 self.check(name+' existing status lines base parity',strip_orphans(h[name]['status'])==strip_orphans(b[name]['status']))
-        self.check('whole tool catalog preserves base plus #672 alert description',expected_tools(b['tools'])==h['tools'])
+        self.check('whole tool catalog preserves base plus the alert (#672) and CI (#860) kinds of search',expected_tools(b['tools'])==h['tools'])
         self.check('plain all query tools base parity',b['plain_texts']==h['plain_texts'])
         for i,(q,text) in enumerate(zip(queries,h['texts'])):
             args=q['arguments']
@@ -420,7 +433,7 @@ class Probe:
             if args.get('kind')=='value':
                 # Search remains an existing flow: exact whole base answer on same input.
                 self.check(f'existing value query {i} base parity',text==b['texts'][i],text)
-            if q['tool']=='trace' and rows and contract!='channel::sqs::absent':
+            if q['tool']=='trace' and rows and contract not in UNPROVISIONED:
                 self.check(f'existing contract trace advisory {args["direction"]} {contract} base parity',
                            text==b['texts'][i],text)
             key_rows=[u for u in oracle['uses'] if contract in [u['at'],u['site']+'::'+u['at']]]
@@ -430,7 +443,7 @@ class Probe:
                            (row['at']+' (line '+str(row['line'])+')') in text and row['contract'] in text and row['level'] in text,text)
             if q['tool']=='trace' and key_rows:
                 row=key_rows[0]
-                if args['direction']=='up' and row['contract']!='channel::sqs::absent':
+                if args['direction']=='up' and row['contract'] not in UNPROVISIONED:
                     self.check('direct key up trace provisions '+row['at'],
                                'provisions ' in text and 'east/main.tf' in text and 'west/main.tf' in text,text)
                 if args['direction']=='down':
@@ -438,7 +451,7 @@ class Probe:
                                '::emit' not in text and '::receive' not in text,text)
             if q['tool']=='trace' and contract==PREFIX+'app' and args['direction']=='up':
                 self.check('repository aggregate trace includes provisioned config keys',
-                           all(u['at'] in text for u in oracle['uses'] if u['contract']!='channel::sqs::absent'),text)
+                           all(u['at'] in text for u in oracle['uses'] if u['contract'] not in UNPROVISIONED),text)
             if q['tool']=='trace' and contract.startswith('aws_sqs_queue.case_0'):
                 queue_rows=[u for u in oracle['uses'] if u['contract']=='channel::sqs::parcel']
                 self.check('IaC trace all config keys '+contract,all(u['at'] in text for u in queue_rows),text)
@@ -466,18 +479,20 @@ class Probe:
         path=repos['app']/'helm/values.yaml'
         original=path.read_text()
         client=Stdio(self.head,repos['app'],self.run/'refresh.err')
-        q={'name':'context','arguments':{'symbol':'channel::sqs::absent','budget':200000}}
+        q={'name':'context','arguments':{'symbol':'channel::sqs::lost','budget':200000}}
         try:
             before=answer(client.call('tools/call',q))
-            path.write_text(original.replace('queue: absent','label: absent'))
+            # One letter of the host: no longer a queue URL, and a URL under a typed key is no plain name.
+            assert original.count(LOST)==1
+            path.write_text(original.replace(LOST,LOST.replace('//sqs.','//sqx.')))
             after=answer(client.call('tools/call',q))
             changed=json.loads(self.command(self.head,repos['app'],'refresh/export','export'))
-            self.check('warm same-size typed key removal changes live context',before!=after and 'worker.missing.queue' not in after,
+            self.check('warm same-size edit of a queue URL changes live context',before!=after and 'worker.lost.queue' not in after,
                        {'before':before,'after':after})
-            expected=[u for u in use_set(exported) if u[2]!='helm/values.yaml#worker.missing.queue']
+            expected=[u for u in use_set(exported) if u[2]!='helm/values.yaml#worker.lost.queue']
             self.check('warm refresh removes exactly one use',sorted(use_set(changed))==sorted(expected))
             changed_status=self.command(self.head,repos['app'],'refresh/status','status')
-            expected_orphans=[row for row in expected_orphan_rows(oracle) if row[0]!='channel::sqs::absent']
+            expected_orphans=[row for row in expected_orphan_rows(oracle) if row[0]!='channel::sqs::lost']
             self.check('warm refresh removes missing-use orphan',
                        orphan_set(changed_status)==(expected_orphans,len(expected_orphans)),changed_status)
             path.write_text(original)
