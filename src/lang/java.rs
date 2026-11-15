@@ -1868,6 +1868,38 @@ mod tests {
         assert!(!spells(b"x::getFieldsOf", &REFLECTIVE));
     }
 
+    /// A file the scan cannot read counts as reading fields by reflection (#775). The scan takes
+    /// each ASCII byte for the character it is in UTF-8, which UTF-16 (a zero byte beside every
+    /// letter), EBCDIC (no letter is ASCII) and a multi-byte encoding (GB18030 writes a soft
+    /// hyphen with two ASCII digits in it) do not keep. A file that is not UTF-8, or holds a zero
+    /// byte, may be any of them: a Latin-1 file is not told from the others.
+    #[test]
+    fn a_file_that_is_not_utf_8_or_holds_a_zero_byte_counts_as_reflecting() {
+        let reflects = |src: &[u8]| Java.parse("C.java", src).unwrap().reflects;
+        let utf16 = |text: &str, bytes: fn(u16) -> [u8; 2]| -> Vec<u8> {
+            text.encode_utf16().flat_map(bytes).collect()
+        };
+        // An escape in UTF-16 has a zero byte between its backslash and its `u`.
+        let escaped = "class C { void f() { c.getDeclared\\u0046ield(n); } }";
+        assert!(reflects(&utf16(escaped, u16::to_le_bytes)));
+        // A zero-width space in UTF-16 is the bytes 20 0B, a space. Big-endian text with no byte
+        // order mark is valid UTF-8.
+        let spaced = utf16(
+            "class C { void f() { c.getDeclared\u{200b}Field(n); } }",
+            u16::to_be_bytes,
+        );
+        assert!(std::str::from_utf8(&spaced).is_ok() && reflects(&spaced));
+        // GB18030 writes U+00AD as 81 30 85 32.
+        assert!(reflects(
+            b"class C { void f() { c.getDeclared\x81\x30\x85\x32Field(n); } }"
+        ));
+        // `class C { }` in EBCDIC (IBM037).
+        assert!(reflects(b"\x83\x93\x81\xa2\xa2\x40\xc3\x40\xc0\x40\xd0"));
+        assert!(reflects(b"class C { /* caf\xe9 */ }"));
+        // UTF-8 text past ASCII is read as before.
+        assert!(!reflects("class C { /* caf\u{e9} */ }".as_bytes()));
+    }
+
     /// Code that runs when its caller says: every lambda and local or anonymous class, nested ones
     /// too. A member class, a method and a field initializer without one are not.
     #[test]
