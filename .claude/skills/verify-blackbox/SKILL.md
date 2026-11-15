@@ -16,10 +16,12 @@ either binary. Its report is development evidence; E2E evidence stays with `prov
 2. **Stage AFTER.** Commit, `cargo build --locked`, then
    `.claude/skills/verify-blackbox/scripts/stage.py <name>` (a short name for the change). It
    refuses a stale binary or uncommitted product sources. Done when it prints the staged size.
-   A pushed commit needs no build: its green `Diff` run kept the binary (`gh run download <run>
-   -n meada-debug-<full sha> -D /tmp/verify/<name>`, `chmod +x` it, write the sha to `COMMIT`,
-   `mkdir work`). Take PREV the same way, from the run of the commit before the change: a
-   runner's build and a local one are two profiles, never compared.
+   A pushed commit needs no build where its `Diff` run kept the binary: a green product run of
+   the commit itself, on a branch whose `diff.yml` has the step, for seven days (`gh run
+   download <run> -n meada-debug-<full sha> -D /tmp/verify/<name>`, `strip` and `chmod +x` it,
+   write the sha to `COMMIT`, `mkdir work`). A commit with no artifact (the base on `main`, a
+   commit pushed under a later one) is built here as above. Behaviour compares across a runner's
+   build and a local one; a cost compares two binaries of one lane only.
 
 3. **Brief.** Copy [`brief.md`](brief.md) to `/tmp/verify/<name>-brief.md` and fill every `<...>`.
    The claim states each behaviour change as a checkable before/after, with the cases you
