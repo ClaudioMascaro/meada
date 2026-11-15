@@ -254,7 +254,8 @@ Check each claim a diff adds at its source, never against the ticket's wording:
   the proof input that shows it: the flow of `prove-meada`, or the corpus entry, and the file.
   A form with none says so in the PR body's Evidence, beside the tests that stand for it: the
   E2E judge holds a new flow with no input unproven. The judges of PRs 863 and 872 found forms
-  whose one input, this repository's own fixtures, another fixture's names refused.
+  whose one input, this repository's own fixtures, another fixture's names refused (#894 asks
+  for a neutral one).
 - A reference the diff moves or reflows still sits next to the thing it names.
 - A change to a skill or a harness script searches the skill's own texts for the behaviour it
   changes; a ticket premise they contradict is a finding.
