@@ -60,7 +60,8 @@ write tools; one index per repository; determinism) live in
 - GitHub Actions owns the full integration, UI and deployment checks. CI for the exact PR
   head must be green before marking the PR ready for review or merging into main. A branch
   push runs `diff.yml` first (`scripts/check --scope auto` on a runner): a fast answer, never
-  the gate.
+  the gate. A newer push waits for the run in progress (a red run is a test's evidence), and a
+  green product run keeps its debug binary as the artifact `meada-debug-<sha>`.
 - `.githooks/` runs part of the gate locally: `cargo fmt --check` and no em dash in staged
   Markdown on commit; on push, a check against the maintainer's private-term list. Enable it
   once per clone with `git config core.hooksPath .githooks`.

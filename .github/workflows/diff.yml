@@ -8,10 +8,12 @@ on:
   push:
     branches-ignore: [main, 'loop/**']
 
-# A newer push to the branch supersedes its run in progress.
+# A newer push to the branch waits for its run in progress: the red run of a test pushed alone
+# is that test's evidence, and the push of its fix must not cancel it. GitHub keeps one run
+# waiting per branch, so a third push replaces the one that waits, never the one that runs.
 concurrency:
   group: diff-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 # The same as `ci.yml`: the cache below is keyed on them.
 env:
@@ -48,3 +50,19 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/check-venv"
           "$RUNNER_TEMP/check-venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3
           "$RUNNER_TEMP/check-venv/bin/python" scripts/check --scope auto
+      # The binary those tests ran, kept for a reader outside this run: a black-box verifier or
+      # a mutation check downloads it (`gh run download <run> -n meada-debug-<sha>`, then
+      # `chmod +x`) where a local build would hold the build slot for ten minutes. It is this
+      # workflow's dev profile on its runner: compare its cost only with another binary of this
+      # workflow. A red run keeps none.
+      - name: Build the debug binary
+        if: steps.scope.outputs.product == 'true'
+        run: cargo build --locked
+      - name: Retain the debug binary
+        if: steps.scope.outputs.product == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: meada-debug-${{ github.sha }}
+          path: target/debug/meada
+          if-no-files-found: error
+          retention-days: 7
