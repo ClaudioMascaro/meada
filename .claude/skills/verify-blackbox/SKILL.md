@@ -16,6 +16,10 @@ either binary. Its report is development evidence; E2E evidence stays with `prov
 2. **Stage AFTER.** Commit, `cargo build --locked`, then
    `.claude/skills/verify-blackbox/scripts/stage.py <name>` (a short name for the change). It
    refuses a stale binary or uncommitted product sources. Done when it prints the staged size.
+   A pushed commit needs no build: its green `Diff` run kept the binary (`gh run download <run>
+   -n meada-debug-<full sha> -D /tmp/verify/<name>`, `chmod +x` it, write the sha to `COMMIT`,
+   `mkdir work`). Take PREV the same way, from the run of the commit before the change: a
+   runner's build and a local one are two profiles, never compared.
 
 3. **Brief.** Copy [`brief.md`](brief.md) to `/tmp/verify/<name>-brief.md` and fill every `<...>`.
    The claim states each behaviour change as a checkable before/after, with the cases you
@@ -25,8 +29,10 @@ either binary. Its report is development evidence; E2E evidence stays with `prov
    measures AFTER against PREV's number (time, memory) has that number: PREV ran it to its end.
    Under `## Report only` go a declared ceiling, a measurement beside the claim (memory, scale,
    another process), and a behaviour change or a measurement that fails its test. What must
-   stay unchanged stays in the claim. Done when no placeholder remains, every claim names its
-   PREV and AFTER values, and each behaviour change was red on PREV.
+   stay unchanged stays in the claim. A time is no case of the brief unless the claim is one:
+   it needs a quiet machine, and the verifier shares this one with your builds (step 6). Done
+   when no placeholder remains, every claim names its PREV and AFTER values, and each behaviour
+   change was red on PREV.
 
 4. **Launch.** Agent, `general-purpose`, background, prompt
    `Read /tmp/verify/<name>-brief.md and follow it exactly.` Keep working meanwhile.
@@ -37,6 +43,11 @@ either binary. Its report is development evidence; E2E evidence stays with `prov
    `report only` row where AFTER answers wrong gets a ceiling or a follow-up issue. Done when
    every FAIL has a commit or a ceiling, every such row a ceiling or an issue, and the PREV
    directory is deleted (disk is tight; this AFTER becomes the next PREV).
+
+6. **Cost, when the change adds work.** Optional, yours, after the verdict: with nothing else
+   building, index one generated repository cold with PREV and AFTER, alternating, at least
+   twice each, and report the commit, the build, the case and the numbers (`CODING_STANDARDS.md`,
+   "Claims the diff adds"). Done when the PR body has them, or says no time was measured.
 
 ## Scripts
 
