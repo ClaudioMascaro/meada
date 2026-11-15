@@ -1437,6 +1437,58 @@ fn a_private_field_builder_has_no_table_where_a_file_reads_fields_by_reflection(
 }
 
 /// Each Java side of an export, as `method role contract`, sorted.
+/// A chain that sets the path's member itself and builds at once reads its own argument, whatever
+/// set the builder before (#775): one builder set and built twice inside a request names each
+/// entry's table, through named values too, and so does a builder set in earlier statements or
+/// a field two methods set and build. No table where the chain does not set it (a statement did),
+/// where an argument of a later step sets it again before `build()`, where the chain is kept
+/// unbuilt in a name, or where the builder is handed on.
+#[test]
+fn a_java_chain_that_sets_and_builds_at_once_reads_its_own_table() {
+    let repo = fixture_repo("aws_sdk_builder_steps", "aws-sdk-builder-steps", None);
+    let (export, sides) = java_sides(&repo);
+    assert_eq!(
+        sides,
+        [
+            "builtAfterSet writer resource::dynamodb",
+            "builtTwice writer resource::dynamodb::twice-a",
+            "builtTwice writer resource::dynamodb::twice-b",
+            "builtTwiceNamed writer resource::dynamodb::named-a",
+            "builtTwiceNamed writer resource::dynamodb::named-b",
+            "handedBetween writer resource::dynamodb",
+            "keptUnbuilt writer resource::dynamodb",
+            "setAgain writer resource::dynamodb::again-new",
+            "setInArgument writer resource::dynamodb",
+            "sharedFirst writer resource::dynamodb::shared-a",
+            "sharedSecond writer resource::dynamodb::shared-b",
+        ],
+        "{export}"
+    );
+}
+
+/// `this.name` reads the `final` field whatever local or parameter of the file has its name
+/// (#775). The bare name is not told apart by where it stands: beside such a local or parameter
+/// it reads no field (it is the local, or what the caller passes), and a step on it, before the
+/// local is declared or on the local itself, counts as one on the field.
+#[test]
+fn a_java_field_read_through_this_keeps_its_table_beside_a_local_of_its_name() {
+    let repo = fixture_repo("aws_sdk_hidden_fields", "aws-sdk-hidden-fields", None);
+    let (export, sides) = java_sides(&repo);
+    assert_eq!(
+        sides,
+        [
+            "bareBesideLocal writer resource::dynamodb",
+            "bareBesideParameter writer resource::dynamodb",
+            "localStepped writer resource::dynamodb",
+            "setBeforeLocal writer resource::dynamodb",
+            "thisApart writer resource::dynamodb::apart-field",
+            "thisBesideLocal writer resource::dynamodb::beside-field",
+            "thisBesideParameter writer resource::dynamodb::taken-field",
+        ],
+        "{export}"
+    );
+}
+
 fn java_sides(repo: &std::path::Path) -> (Value, Vec<String>) {
     let export: Value =
         serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap();
