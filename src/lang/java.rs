@@ -1268,7 +1268,7 @@ fn repeated(root: Node) -> Vec<Range<usize>> {
 /// there (#773). `declared` counts, of those, the ones that declare a local or a parameter: the
 /// name of a local variable's declarator, and of a parameter of a method, a constructor or a
 /// lambda that writes its type (#775).
-// shortcut: a `catch` or untyped lambda parameter, a loop's variable, a `try` resource, a pattern
+// ponytail: a `catch` or untyped lambda parameter, a loop's variable, a `try` resource, a pattern
 // variable and a varargs parameter are not told from any other mention, so a field of such a
 // name keeps no table beside one; count them when a repository shows the need.
 fn mentions(root: Node, src: &[u8], names: &[&str], mut declared: Option<&mut [u32]>) -> Vec<u32> {
