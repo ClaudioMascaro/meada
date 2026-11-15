@@ -22,7 +22,8 @@ assert.deepEqual(exports.app.providers.map(row => row.contract).sort(), [worker,
 assert.deepEqual(exports.deploy.consumers.map(row => row.contract).sort(), [worker, 'image::ghcr.io/console/missing'].sort());
 assert.equal(exports.deploy.links.length, 1);
 assert.deepEqual(exports.deploy.links.map(row => [row.contract, row.provider, row.consumer, row.level, row.root]), [[
-  worker, prefix + 'app', prefix + 'deploy::compose.yaml::services.worker', 'exact', '.',
+  // The builder is the CI step of `build.yml` that holds the form, no longer the repository (#860).
+  worker, prefix + 'app::.github/workflows/build.yml::jobs.publish.steps[0]', prefix + 'deploy::compose.yaml::services.worker', 'exact', '.',
 ]]);
 assert.deepEqual(exports.infra.provisioners.map(row => [row.contract, row.root]).sort(), [[queue, 'envs/dev'], [queue, 'envs/prod']]);
 assert.deepEqual(exports.app.provisions.map(row => [row.contract, row.root, row.at, row.level]).sort(), [

@@ -158,7 +158,9 @@ def main():
     expected_exec = {('aws_lambda_function.code', 'lambda', '.', 'inferred'), ('aws_lambda_function.zip', 'worker.zip', '.', 'exact'),
                      ('SamWorker', 'sam', 'sam.yaml', 'exact'), ('functions.local', 'functions/send.ts', 'serverless.yml', 'exact')}
     assert executions == expected_exec, executions
-    expected_links = {(f'{PREFIX}infra::main.tf::{node}', PREFIX + 'app', 'image::' + IMAGE, '.', 'exact')
+    # The builder is the CI step of `build.yaml` that holds the form, no longer the repository (#860).
+    expected_links = {(f'{PREFIX}infra::main.tf::{node}', PREFIX + 'app::.github/workflows/build.yaml::jobs.publish.steps[0]',
+                       'image::' + IMAGE, '.', 'exact')
                       for node in ['aws_lambda_function.image', 'aws_ecs_task_definition.task']}
     actual_links = {(l['consumer'], l['provider'], l['contract'], l['root'], l['level']) for l in initial['infra']['links']}
     assert actual_links == expected_links, initial['infra']['links']
