@@ -1810,6 +1810,8 @@ mod tests {
         ("go/build.rs:ARCHITECTURES", "runtime"),
         ("go/build.rs:SYSTEMS", "runtime"),
         ("go/values.rs:METHODS", "exception"),
+        // `java.lang.Class`: the names the pack looks for in the bytes, escapes decoded (#775).
+        ("java.rs:REFLECTIVE", "runtime"),
         ("kotlin.rs:CLOSEABLE", "runtime"),
         ("kotlin.rs:COMPARABLE", "runtime"),
         ("kotlin.rs:DECLARATION_KEYWORDS", "syntax"),
