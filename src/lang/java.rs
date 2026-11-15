@@ -1740,7 +1740,11 @@ mod tests {
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
         assert!(facts.defs.is_empty() && facts.calls.is_empty());
         assert_eq!(facts.budget, Some(QUALIFICATION_BYTES));
-        assert!(!facts.unbuilt);
+        assert!(!facts.unbuilt && !facts.reflects);
+        // Whether it reads fields by reflection is read off its bytes, which no budget bounds.
+        let reflective = src.replacen("f();", "getClass().getDeclaredField(\"b\");", 1);
+        let facts = Java.parse("C.java", reflective.as_bytes()).unwrap();
+        assert!(facts.budget.is_some() && facts.reflects);
         let src = format!("class {name} {{\nvoid m() {{ f(); }}\n}}\n");
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
         assert_eq!(facts.budget, None);
@@ -1779,6 +1783,27 @@ mod tests {
         let escaped = format!("{src} class E {{ String e = \"\\u00e9\"; }}");
         let facts = Java.parse("C.java", escaped.as_bytes()).unwrap();
         assert_eq!(facts.private_fields, Vec::<String>::new());
+        // So may a character the compiler drops from a name (JLS 3.8), which this pack reads as
+        // other text: a file that holds one, or is not UTF-8, lists none.
+        for dropped in [
+            "\u{ad}",
+            "\u{200b}",
+            "\u{7f}",
+            "\u{85}",
+            "\u{feff}",
+            "\u{1f600}",
+        ] {
+            let hidden = format!("{src} class E {{ String e = \"{dropped}\"; }}");
+            let facts = Java.parse("C.java", hidden.as_bytes()).unwrap();
+            assert_eq!(facts.private_fields, Vec::<String>::new(), "{dropped:?}");
+        }
+        let latin = [src.as_bytes(), b" // caf\xe9"].concat();
+        let facts = Java.parse("C.java", &latin).unwrap();
+        assert_eq!(facts.private_fields, Vec::<String>::new());
+        // Other text past ASCII is no such character.
+        let accented = format!("{src} // \u{e9} \u{201c}ok\u{201d} \u{e7}\u{e3}o \u{d7}");
+        let facts = Java.parse("C.java", accented.as_bytes()).unwrap();
+        assert_eq!(facts.private_fields, ["kept", "own"]);
     }
 
     /// A file reads fields by reflection where it spells one of the four methods of `Class` as a
@@ -1800,6 +1825,17 @@ mod tests {
             "errors.getFieldErrors(); form.getFieldName(); my_getField();"
         ));
         assert!(!reflects("holder.build(); String e = \"\\u00e9\";"));
+        // A character the compiler drops from a name (JLS 3.8) is read as not there: a soft
+        // hyphen, raw or escaped, a control, a zero-width space, in any encoding.
+        assert!(reflects("Holder.class.getDeclared\u{ad}Field(\"b\");"));
+        assert!(reflects("Holder.class.getDeclared\\u00adField(\"b\");"));
+        assert!(reflects("Holder.class.getDeclared\u{7f}Field(\"b\");"));
+        assert!(reflects("Holder.class.getF\\u200bield(\"b\");"));
+        assert!(spells(b"x.getDeclared\xadField()", &REFLECTIVE));
+        // White space and punctuation end a name, escaped or not.
+        assert!(!reflects(
+            "get Field(); getDeclared.Field(); getDeclared\\u000aField();"
+        ));
         // The name ends the file.
         assert!(spells(b"x::getFields", &REFLECTIVE));
         assert!(!spells(b"x::getFieldsOf", &REFLECTIVE));
