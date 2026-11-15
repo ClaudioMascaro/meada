@@ -114,12 +114,16 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   reflection API, and no Kotlin, Groovy or Scala file's), since the file that reads one may hand it to
   any other. A Lombok accessor or a reflective read whose result is set under another name is
   not seen, as before, and neither is a step on a field written with a Unicode escape.
-  A chain that sets a member of the path itself and ends in `build()`
-  (`pb.tableName("t").build()`) reads its own argument, whatever set the builder before or
-  elsewhere, so one builder set and built twice in a request names each entry's table (#775).
+  A chain that sets a member of the path on a local builder itself and ends in `build()`
+  (`pb.tableName("t").build()`) reads its own argument, whatever statement set the builder
+  before, so one builder set and built twice in a request names each entry's table (#775).
   Unresolved still: a builder its chain does not set (a statement did, and statement order is
   not followed), one a mention inside the chain sets again (an argument of a step runs between
-  two steps), a chain kept unbuilt in a name, and a builder handed on or aliased. `this.name`
+  two steps), one whose member a lambda or a local or anonymous class written after the builder
+  was made also sets (an argument of the chain may call that code), a chain kept unbuilt in a
+  name, a builder handed on or aliased, and a field any other chain or statement of the file
+  also sets (a method an argument calls, or another thread, sets a field between the chain's
+  step and its `build()`). `this.name`
   reads the field in a file where a local variable, or a typed parameter of a method, a
   constructor or a lambda, has its name (`Mentioned::hidden`); the bare name there reads no
   field, and a step on it counts as one on the field wherever it stands. Beside a `catch` or

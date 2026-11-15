@@ -247,7 +247,7 @@ impl Span {
     /// one of its steps, which runs between two of them.
     fn inside(&self, at: &At) -> bool {
         let next = self.starts.partition_point(|&s| s <= at.own);
-        self.starts.get(next).is_some_and(|&s| s < at.built)
+        (at.built).is_some_and(|end| self.starts.get(next).is_some_and(|&s| s < end))
     }
 
     /// Whether a mention other than the one read at `at.own` starts before `at.later`: a list's
@@ -268,9 +268,10 @@ struct At {
     later: usize,
     /// Where the chain now followed starts.
     own: usize,
-    /// Where it ends when its last step is `build()` (`b.set(..).build()`), else 0: a member
-    /// such a chain sets is set last by its own step, but for a mention inside the chain.
-    built: usize,
+    /// Where it ends when its last step is `build()` (`b.set(..).build()`): a member such a
+    /// chain sets on a local builder is set last by its own step, but for a mention inside the
+    /// chain or in code that runs when it is called (`Uses::set_later`).
+    built: Option<usize>,
 }
 
 impl At {
@@ -280,7 +281,7 @@ impl At {
             range: range.clone(),
             later: range.end,
             own: range.start,
-            built: 0,
+            built: None,
         }
     }
 }
@@ -364,8 +365,9 @@ impl<'a> Mentions<'a> {
         }
     }
 
-    /// `own` holds the steps of the chain now followed when it builds at once: a member one of
-    /// them sets is what the request reads, unless a mention inside the chain sets it again.
+    /// `own` holds the steps of the chain now followed when it builds a local at once: a member
+    /// one of them sets is what the request reads, unless a mention inside the chain sets it
+    /// again.
     fn changed(&self, setter: &dyn Fn(&str) -> bool, own: &[&str], at: &At) -> bool {
         self.other.as_ref().is_some_and(|s| s.hits(at))
             || (self.sets.iter()).any(|(method, span)| {
@@ -424,6 +426,10 @@ struct Uses<'a> {
     /// How many of a field's are the declaration of a local or a parameter of its name
     /// (`Mentioned::hidden`).
     hidden: std::collections::HashMap<&'a str, u32>,
+    /// The members of a local builder that a lambda or a local or anonymous class made after it
+    /// sets (`deferred`), by declaring scope, name and setter: code that runs when it is called,
+    /// which its place in the file does not tell.
+    set_later: std::collections::HashSet<(&'a str, &'a str, &'a str)>,
 }
 
 /// One mention of the name of a builder, made in `scope`.
@@ -446,8 +452,17 @@ impl<'a> Uses<'a> {
             (mention.kind, mention.range, mention.direct, mention.bare);
         // `this.name` is the field, whatever local hides the bare name.
         if name.len() == mention.name.len() {
-            let declared =
-                (code.local(path, mention.scope, name)).map_or(mention.scope, |b| b.scope.as_str());
+            let local = code.local(path, mention.scope, name);
+            let declared = local.map_or(mention.scope, |b| b.scope.as_str());
+            let made = match local.map(|b| &b.value) {
+                Some(Value::Call(c)) => Some(c.range.start),
+                _ => None,
+            };
+            if let Kind::Set(method) = kind
+                && self.deferred.outlived(range, made).is_some()
+            {
+                self.set_later.insert((declared, name, method));
+            }
             self.locals
                 .entry((declared, name))
                 .or_default()
@@ -477,6 +492,7 @@ impl<'a> Uses<'a> {
                 .filter(|m| m.scope.is_empty() && m.hidden > 0)
                 .map(|m| (m.name.as_str(), m.hidden))
                 .collect(),
+            set_later: Default::default(),
         };
         for index in 0..facts.calls.len() {
             let Some(call) = code.call(path, index) else {
@@ -567,6 +583,14 @@ impl<'a> Uses<'a> {
         let anywhere = At {
             later: usize::MAX,
             ..at.clone()
+        };
+        // So the own step of a chain is not known to set a field last: a method an argument of
+        // the chain calls sets it too, and so does another thread. Nor a local beside a set in a
+        // lambda or a class body, which an argument of the chain may call.
+        let later = |m: &&str| setter(*m) && self.set_later.contains(&(scope, name, *m));
+        let own: &[&str] = match field || own.iter().any(later) {
+            true => &[],
+            false => own,
         };
         self.locals
             .get(&(scope, name))
@@ -707,7 +731,7 @@ pub(super) fn changed<'a>(
             range: range.clone(),
             later: usize::MAX,
             own: usize::MAX,
-            built: 0,
+            built: None,
         },
     };
     let changed = read && walk.passed(value, &at) || walk.value(value, &at);
@@ -765,8 +789,8 @@ impl<'a> Walk<'a, '_> {
             Value::Ref(name) => self.named(name, at),
             Value::Call(top) => {
                 let built = match crate::resolve::method(&top.callee) {
-                    "build" => top.range.end,
-                    _ => 0,
+                    "build" => Some(top.range.end),
+                    _ => None,
                 };
                 let at = &At {
                     own: top.range.start,
@@ -788,8 +812,9 @@ impl<'a> Walk<'a, '_> {
                         && root(value)
                             .is_some_and(|t| self.builders.shadowed(self.code, self.path, t))
                     || root(value).is_some_and(|b| {
-                        // A chain that builds at once reads what its own steps set (#775).
-                        let own: Vec<&str> = (steps().filter(|_| built > 0))
+                        // A chain that builds a local at once reads what its own steps set
+                        // (#775, `Uses::changed`).
+                        let own: Vec<&str> = (steps().filter(|_| built.is_some()))
                             .map(|c| crate::resolve::method(&c.callee))
                             .collect();
                         self.builder(b, at, &own)

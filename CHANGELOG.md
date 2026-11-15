@@ -23,11 +23,12 @@ All notable changes to Meada are recorded here. The format follows
   also declares without `private`, a field of a file that names Lombok (a `@Getter` hands the
   field out with no mention in the source) or holds a Unicode escape, and every field of a
   repository where a Java file reads fields by reflection (#775).
-- Java: a builder chain that sets the table itself and builds at once
-  (`pb.tableName("t").build()`) names it whatever set the builder before, so one builder set
-  and built twice inside a request names each entry's table; and a `final` field read through
-  `this.name` keeps its table in a file where a local or a parameter has its name. A builder
-  its chain does not set, one set again inside the chain, a chain kept unbuilt in a name and
+- Java: a chain that sets the table of a local builder itself and builds at once
+  (`pb.tableName("t").build()`) names it whatever statement set the builder before, so one
+  builder set and built twice inside a request names each entry's table; and a `final` field
+  read through `this.name` keeps its table in a file where a local or a parameter has its
+  name. A builder its chain does not set, one set again inside the chain or in a lambda or a
+  class body, a field another chain or statement also sets, a chain kept unbuilt in a name and
   the bare name beside such a local stay unresolved (#775).
 - Pipelines, actions, CI jobs and CI steps of GitHub Actions are IaC nodes (ADR 0028). A file
   directly under `.github/workflows/` that holds `jobs` is a pipeline, and an `action.yml` or
