@@ -1298,19 +1298,7 @@ fn java_named_builds_chained_past_the_evaluation_depth_stay_unresolved() {
 #[test]
 fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     let repo = fixture_repo("aws_sdk_builder_forms", "aws-sdk-builders", None);
-    let export: Value =
-        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
-    let mut sides: Vec<_> = [("writer", "providers"), ("reader", "consumers")]
-        .iter()
-        .flat_map(|(role, sides)| {
-            export[sides].as_array().unwrap().iter().map(move |s| {
-                let scope = s["site"].as_str().unwrap().split("::").nth(2).unwrap();
-                let method = scope.split('(').next().unwrap().rsplit('.').next().unwrap();
-                format!("{method} {role} {}", s["contract"].as_str().unwrap())
-            })
-        })
-        .collect();
-    sides.sort();
+    let (export, sides) = java_sides(&repo);
     assert_eq!(
         sides,
         [
@@ -1394,11 +1382,111 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
             "wrappedBoth writer resource::dynamodb::wrapped-first",
             "wrappedBoth writer resource::dynamodb::wrapped-second",
             "wrappedCallerSet writer resource::dynamodb",
-            "wrappedPlain writer resource::dynamodb",
+            "wrappedPlain writer resource::dynamodb::wrapped-plain",
             "wrappedSet writer resource::dynamodb",
         ],
         "{export}"
     );
+}
+
+/// Each Java side of an export, as `method role contract`, sorted.
+fn java_sides(repo: &std::path::Path) -> (Value, Vec<String>) {
+    let export: Value =
+        serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap();
+    let mut sides: Vec<_> = [("writer", "providers"), ("reader", "consumers")]
+        .iter()
+        .flat_map(|(role, sides)| {
+            export[sides].as_array().unwrap().iter().map(move |s| {
+                let scope = s["site"].as_str().unwrap().split("::").nth(2).unwrap();
+                let method = scope.split('(').next().unwrap().rsplit('.').next().unwrap();
+                format!("{method} {role} {}", s["contract"].as_str().unwrap())
+            })
+        })
+        .collect();
+    sides.sort();
+    (export, sides)
+}
+
+/// A list of transaction entries, or one entry, that a wrapper takes in a parameter and passes on
+/// (#772): its tables are named when no mention can change it before the request reads it. The
+/// builder copies the list, so a change after `build()` is not in the request, nor is one after
+/// the call; sorting keeps the tables; a wrapper of a wrapper passes it on too. A change before
+/// the read, in the caller, the wrapper or the wrapper's wrapper, in a loop around the call, a
+/// method the list is handed to first, or another parameter it is passed in too names no table,
+/// and so do an alias of the parameter and a read in a lambda; a varargs wrapper is read where it
+/// stands, a writer and a reader with no table. A wrapper that changes the list after its read
+/// keeps the tables only for a list the caller makes in the call (not one a loop above hands in
+/// again); a recursive wrapper, a getter's list and a method an override may stand for name none.
+/// A `write(table, item)` wrapper keeps its name.
+#[test]
+fn java_lists_a_wrapper_passes_on_unchanged_name_their_tables() {
+    let repo = fixture_repo("aws_sdk_wrappers", "aws-sdk-wrappers", None);
+    let (export, sides) = java_sides(&repo);
+    assert_eq!(
+        sides,
+        [
+            "afterBuild writer resource::dynamodb::after-build",
+            "afterCall writer resource::dynamodb::after-call",
+            "aliasOnly writer resource::dynamodb",
+            "anonymous writer resource::dynamodb",
+            "asList writer resource::dynamodb::as-list",
+            "callerSet writer resource::dynamodb",
+            "dispatched writer resource::dynamodb",
+            "entry writer resource::dynamodb::entry",
+            "filled writer resource::dynamodb::filled",
+            "fromGetter reader resource::dynamodb",
+            "fromGetter writer resource::dynamodb",
+            "gets reader resource::dynamodb::gets",
+            "handedFirst writer resource::dynamodb",
+            "keep reader resource::dynamodb",
+            "keep writer resource::dynamodb",
+            "lambdaRead writer resource::dynamodb",
+            "listOf writer resource::dynamodb::list-of",
+            "loopAbove writer resource::dynamodb",
+            "loopAfterCall writer resource::dynamodb",
+            "midFresh writer resource::dynamodb::mid-fresh",
+            "midReceiverCaller writer resource::dynamodb",
+            "nested writer resource::dynamodb",
+            "outerSet writer resource::dynamodb",
+            "receiverFirst writer resource::dynamodb",
+            "recursion writer resource::dynamodb",
+            "sendVarargs reader resource::dynamodb",
+            "sendVarargs writer resource::dynamodb",
+            "sorted writer resource::dynamodb::sorted-a",
+            "sorted writer resource::dynamodb::sorted-b",
+            "spelled writer resource::dynamodb",
+            "store reader resource::dynamodb",
+            "store writer resource::dynamodb",
+            "twice writer resource::dynamodb",
+            "twoLevels writer resource::dynamodb::two-levels",
+            "wrapperSet writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
+/// A Java file past its qualification budget keeps no facts, so it may declare an override of
+/// any wrapper: no wrapper keeps its caller's tables (#772).
+#[test]
+fn a_java_file_past_its_budget_leaves_every_wrapper_unnamed() {
+    let repo = fixture_repo("aws_sdk_wrappers_budget", "aws-sdk-wrappers", None);
+    // The Java pack's `QUALIFICATION_BYTES` (4 MiB): each node under the class repeats its name.
+    let name = "N".repeat(64 * 1024);
+    let methods = "void m() { f(); }\n".repeat(4 * 1024 * 1024 / name.len() + 1);
+    let big = format!("class {name} {{\n{methods}}}\n");
+    std::fs::write(repo.join("Big.java"), big).unwrap();
+    let (export, sides) = java_sides(&repo);
+    for side in [
+        "listOf writer",
+        "asList writer",
+        "entry writer",
+        "twoLevels writer",
+    ] {
+        assert!(
+            sides.contains(&format!("{side} resource::dynamodb")),
+            "{side}: {export}"
+        );
+    }
 }
 
 #[test]

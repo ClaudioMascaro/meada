@@ -582,14 +582,21 @@ pub struct Facts {
     /// Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub assigned: Vec<Bound>,
-    /// How many times the file writes the name of each local `bound` keeps, in the body of its
-    /// scope, and of each `final` field, in the whole file (scope `""`): every identifier of that
+    /// How many times the file writes the name of each local `bound` keeps, and in Java of each
+    /// parameter, in the body of its scope, and of each `final` field, in the whole file (scope
+    /// `""`): every identifier of that
     /// spelling, whatever it is part of. A reader that must see every use of a value compares it
     /// with the uses it reads; one more is a use its model of the syntax does not show (a cast, a
     /// ternary, a return). Java, and for the locals of a function Go (those it keeps as
     /// constants) and C# (`mentioned`). Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub mentioned: Vec<Mentioned>,
+    /// The names of the methods the file declares that no definition stands for (Java): an
+    /// anonymous class's or an enum constant body's, a class's nested in one, or past the
+    /// definition depth. A call through a base type may dispatch to one (#772). Kept in the
+    /// index: the SDK reader reads it from every file.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub anonymous: Vec<String>,
     /// A stable first binding of a multiple-result call (Go). This is a result projection,
     /// not a scalar constant: only a reader proving that call's result may follow it.
     /// Not kept in the lean index, like the bound values above.

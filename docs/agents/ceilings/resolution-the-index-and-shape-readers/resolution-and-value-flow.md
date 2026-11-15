@@ -107,17 +107,34 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   variable of any type, in any package or class; a write of another field does not count), and a C#
   request filled by property assignments have no table or bus; nor have Go locals declared together (`p, q
   := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.
-  In Java the rule covers a list or an array: one mentioned a third time or held in a field has no
-  table or bus (a `List.of` list cannot change and keeps them), and neither has a `new T[]{..}` array
-  or a `new ArrayList<>(..)` copy mentioned twice. A method's name is no mention in Java: a list
-  `entries` passed to `.entries(entries)`, a list `transactItems` passed to
-  `.transactItems(transactItems)` and a builder `put` in `.put(put.build())` are each mentioned once
-  there (#773). A Java list, array or
-  single entry that is the one argument of the step that sets the list (`transactItems(..)`,
-  `entries(..)`) and comes in a parameter has no mentions to count and no table, one a wrapper only
-  passes on included (`write(List.of(..))`, #772); two entries passed as two arguments, and a table
-  name in a parameter, keep their tables. A path with no list of entries (a list of names: SSM
-  `Names[]`, Secrets Manager `SecretIdList[]`) keeps the rule it had.
+  In Java the rule covers a list or an array held in a local, by position (#772): one with a
+  mention that may run before the request reads it (a call on it other than `sort`, `size`,
+  `get`, `isEmpty`, `contains`, `stream` or `forEach`, a hand-off to another method or name, the
+  receiver of the reading call's own among them (`prep(l).w(l)`), a write the syntax model does
+  not show, such as `items[0] = e`) has no table or bus. In the
+  request's own function a mention after the call counts too, but not one after the `build()` of
+  a named request (the builder copies the list); in a caller of a wrapper a mention after the call
+  counts only inside a loop around it, and anywhere when the read is in a lambda.
+  A list held in a field has none (a `List.of` list cannot change and keeps them), and neither has
+  a `new T[]{..}` array or a `new ArrayList<>(..)` copy mentioned twice. A method's name is no
+  mention in Java: a list `entries` passed to `.entries(entries)`, a list `transactItems` passed
+  to `.transactItems(transactItems)` and a builder `put` in `.put(put.build())` are each mentioned
+  once there (#773). A Java list, array or single entry that is the one argument of the step that
+  sets the list (`transactItems(..)`, `entries(..)`) and comes in a parameter is followed to each
+  caller's argument at its position, by the same rule, when the wrapper mentions it nowhere that
+  runs first, hands it on nowhere else (a recursive call), reads it where it runs, and no other
+  method of the repository has its simple name and number of parameters, however their types are
+  spelled, nor does a file declare a method of its name that no definition stands for (an
+  anonymous class's, an enum constant body's or a class's nested in one: an override a call may
+  dispatch to, `Facts::anonymous`), and no file of any pack is past its budget (it keeps no
+  facts, and the check does not ask its language); a wrapper of a wrapper passes it on the same way, up to the expansion's depth. A wrapper that changes the parameter after its read
+  takes only a list the caller makes in the call (`List.of`, `Arrays.asList`, `new`, a builder
+  chain): a loop, a lambda or a recursion further up may hand a list it holds in again. A varargs
+  parameter, a call with another argument count, an alias of the parameter, a read inside a
+  lambda, a caller's argument from a getter or another call, or a caller that hands the list in
+  another argument too (`w(l, l)`) has no table. Two entries passed as two arguments, and a
+  table name in a parameter, keep their tables. A path with no list of entries (a list of names:
+  SSM `Names[]`, Secrets Manager `SecretIdList[]`) keeps the rule it had.
   `EVAL_DEPTH` (256): a value
   folded deeper than that, through the items of lists and objects, the constants it names and
   the arguments callers pass, is unknown, and a value traced through more constants,
