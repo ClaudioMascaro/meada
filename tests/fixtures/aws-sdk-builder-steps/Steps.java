@@ -86,6 +86,45 @@ class Steps {
         db.putItem(rb.tableName("deferred-old").conditionExpression(late.get()).build());
     }
 
+    // The lambda is handed to a method that calls it: the request carries `handed-new`.
+    void setInHandedLambda() {
+        var rb = PutItemRequest.builder();
+        Supplier<String> late = () -> {
+            rb.tableName("handed-new");
+            return "attribute_not_exists(pk)";
+        };
+        db.putItem(rb.tableName("handed-old").conditionExpression(ask(late)).build());
+    }
+
+    String ask(Supplier<String> from) {
+        return from.get();
+    }
+
+    // An anonymous class written before the chain sets the table: the request carries
+    // `class-new`.
+    void setInClassBody() {
+        var rb = PutItemRequest.builder();
+        Supplier<String> late = new Supplier<>() {
+            public String get() {
+                rb.tableName("class-new");
+                return "attribute_not_exists(pk)";
+            }
+        };
+        db.putItem(rb.tableName("class-old").conditionExpression(ask(late)).build());
+    }
+
+    // The same from a local class: the request carries `local-new`.
+    void setInLocalClass() {
+        var rb = PutItemRequest.builder();
+        class Late implements Supplier<String> {
+            public String get() {
+                rb.tableName("local-new");
+                return "attribute_not_exists(pk)";
+            }
+        }
+        db.putItem(rb.tableName("local-old").conditionExpression(ask(new Late())).build());
+    }
+
     // A lambda in an argument of the chain itself sets the table: it may run before `build()`.
     void setInOwnLambda() {
         var rb = PutItemRequest.builder();

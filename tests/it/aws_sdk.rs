@@ -1441,8 +1441,9 @@ fn a_private_field_builder_has_no_table_where_a_file_reads_fields_by_reflection(
 /// inside a request names each entry's table, through named values too, and so does a builder
 /// set in earlier statements. No table where the chain does not set it (a statement did), where
 /// the chain is kept unbuilt in a name, or where something may set it again before `build()`:
-/// an argument of a later step, a lambda in one, a lambda written before the chain that an
-/// argument calls, or the method the builder is handed to, inside the chain or before it. No
+/// an argument of a later step, a lambda in one, a lambda or a class body written before the
+/// chain that an argument calls or hands on, or the method the builder is handed to, inside the
+/// chain or before it. No
 /// table for a field either: any method sets one, in an argument of the chain (a method it
 /// calls) or on another thread.
 #[test]
@@ -1463,7 +1464,10 @@ fn a_java_chain_that_sets_and_builds_at_once_reads_its_own_table() {
             "keptUnbuilt writer resource::dynamodb",
             "setAgain writer resource::dynamodb::again-new",
             "setInArgument writer resource::dynamodb",
+            "setInClassBody writer resource::dynamodb",
             "setInDeferredCode writer resource::dynamodb",
+            "setInHandedLambda writer resource::dynamodb",
+            "setInLocalClass writer resource::dynamodb",
             "setInOwnLambda writer resource::dynamodb",
             "sharedFirst writer resource::dynamodb",
             "sharedSecond writer resource::dynamodb",
