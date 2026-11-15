@@ -5002,6 +5002,8 @@ pub struct Code<'a> {
     /// `folded` and `field_reads` for what a cut cycle adds to a walk (`Code::cut_apart`).
     folded_cuts: RefCell<HashMap<&'a str, usize>>,
     field_reads_cuts: RefCell<HashMap<Field<'a>, Value>>,
+    /// Whether a budget refused a charge since this was last cleared.
+    refused: Cell<bool>,
     /// Each file of `full` by name, built the first time a name is looked up in it.
     by_name: HashMap<&'a str, OnceCell<ByName<'a>>>,
     /// The marker constants of the literals that set each field (`field_values`), by field name
@@ -5185,6 +5187,7 @@ impl<'a> Code<'a> {
             field_reads_apart: RefCell::new(HashMap::new()),
             folded_cuts: RefCell::new(HashMap::new()),
             field_reads_cuts: RefCell::new(HashMap::new()),
+            refused: Cell::new(false),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
             literals: OnceCell::new(),
             field_reads: RefCell::new(HashMap::new()),
@@ -5200,7 +5203,9 @@ impl<'a> Code<'a> {
         let mut folded = self.folded.borrow_mut();
         let spent = folded.entry(file).or_default();
         *spent = spent.saturating_add(cost);
-        *spent <= EVAL_BUDGET
+        let within = *spent <= EVAL_BUDGET;
+        self.refused.set(self.refused.get() || !within);
+        within
     }
 
     /// `work` on an `EVAL_BUDGET` of its own for each file, with the field reads it folds kept
@@ -7070,7 +7075,11 @@ impl<'a> Code<'a> {
         };
         // A wrapper reached again closes a cycle: another turn of it is climbed no further.
         if let Some(first) = frames.iter().position(|f| f.def == wrapper) {
-            let more = || self.cycle_sends_more(written, frames, first, wrapper, read);
+            // A value the check could not fold for its budget is not one the cycle changed.
+            let more = || {
+                self.refused.set(false);
+                self.cycle_sends_more(written, frames, first, wrapper, read) && !self.refused.get()
+            };
             if self.cut_apart(more) {
                 cuts.push(first);
             }
@@ -9500,6 +9509,33 @@ mod tests {
         assert_eq!(file, file_wide);
         assert!(file < 1000 && cuts >= 1000, "{file} {cuts}");
         assert!(cuts_wide >= cuts + 30, "{cuts} {cuts_wide}");
+    }
+
+    /// Past the budget of what cut cycles add, a cycle adds nothing, as before the walk told
+    /// such cycles apart: a value the check could not fold is not one the cycle changed.
+    #[test]
+    fn past_its_budget_a_cut_cycle_adds_nothing() {
+        use crate::lang::ts::TsJs;
+        let src = "function send(n, a, b) { fetch(`/x/${a}`); if (n > 0) send(n - 1, b, a); }\n\
+                   function place() { send(1, 'first', 'second'); }\n";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a.ts", &facts)]);
+        let resolver = Resolver::new(&files, TsJs.modules(&[], &files).unwrap(), &TsJs);
+        let n = (facts.calls.iter())
+            .position(|c| c.callee == "fetch")
+            .unwrap();
+        // Like a reader of requests, this one reads no URL off a value it knows nothing of.
+        let url = |args: &[Value], _: &Keywords| match args.first()? {
+            Value::Str(parts) if !parts.iter().any(|p| matches!(p, Part::Ref(_))) => Some(()),
+            _ => None,
+        };
+        // The sites the `fetch` is read at, with `spent` of the cut budget gone beforehand.
+        let sites = |spent: usize| {
+            let code = Code::new(&resolver, &files, crate::lang::pack(0));
+            code.cut_apart(|| code.charge("a.ts", spent));
+            code.expand(Expand::Call("a.ts", n), &url).len()
+        };
+        assert_eq!((sites(0), sites(EVAL_BUDGET)), (2, 1));
     }
 
     #[test]
