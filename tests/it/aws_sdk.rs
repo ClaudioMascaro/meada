@@ -1436,13 +1436,15 @@ fn a_private_field_builder_has_no_table_where_a_file_reads_fields_by_reflection(
     );
 }
 
-/// Each Java side of an export, as `method role contract`, sorted.
-/// A chain that sets the path's member itself and builds at once reads its own argument, whatever
-/// set the builder before (#775): one builder set and built twice inside a request names each
-/// entry's table, through named values too, and so does a builder set in earlier statements or
-/// a field two methods set and build. No table where the chain does not set it (a statement did),
-/// where an argument of a later step sets it again before `build()`, where the chain is kept
-/// unbuilt in a name, or where the builder is handed on.
+/// A chain that sets the path's member of a local builder itself and builds at once reads its own
+/// argument, whatever statement set the builder before (#775): one builder set and built twice
+/// inside a request names each entry's table, through named values too, and so does a builder
+/// set in earlier statements. No table where the chain does not set it (a statement did), where
+/// the chain is kept unbuilt in a name, or where something may set it again before `build()`:
+/// an argument of a later step, a lambda in one, a lambda written before the chain that an
+/// argument calls, or the method the builder is handed to, inside the chain or before it. No
+/// table for a field either: any method sets one, in an argument of the chain (a method it
+/// calls) or on another thread.
 #[test]
 fn a_java_chain_that_sets_and_builds_at_once_reads_its_own_table() {
     let repo = fixture_repo("aws_sdk_builder_steps", "aws-sdk-builder-steps", None);
@@ -1455,22 +1457,30 @@ fn a_java_chain_that_sets_and_builds_at_once_reads_its_own_table() {
             "builtTwice writer resource::dynamodb::twice-b",
             "builtTwiceNamed writer resource::dynamodb::named-a",
             "builtTwiceNamed writer resource::dynamodb::named-b",
+            "fieldSetInArgument writer resource::dynamodb",
             "handedBetween writer resource::dynamodb",
+            "handedInside writer resource::dynamodb",
             "keptUnbuilt writer resource::dynamodb",
             "setAgain writer resource::dynamodb::again-new",
             "setInArgument writer resource::dynamodb",
-            "sharedFirst writer resource::dynamodb::shared-a",
-            "sharedSecond writer resource::dynamodb::shared-b",
+            "setInDeferredCode writer resource::dynamodb",
+            "setInOwnLambda writer resource::dynamodb",
+            "sharedFirst writer resource::dynamodb",
+            "sharedSecond writer resource::dynamodb",
         ],
         "{export}"
     );
 }
 
 /// `this.name` reads the `final` field whatever local or parameter of the file has its name
-/// (#775). The bare name is not told apart by where it stands: beside such a local or parameter
-/// it reads no field (it is the local, or what the caller passes), and a step on it, before the
-/// local is declared or on the local itself, counts as one on the field. A field that is another
-/// name of a builder is judged as it is where no local has its name.
+/// (#775), a lambda's parameter that writes its type included. The bare name is not told apart
+/// by where it stands: beside such a local or parameter it reads no field (it is the local, or
+/// what the caller passes), and a step on it, before the local is declared or on the local
+/// itself, counts as one on the field, as does handing it on, returning it, or the local being
+/// the field itself. A field that is another name of a builder is judged as it is where no local
+/// has its name. No table beside a declaration the count does not tell from a mention: a
+/// `catch` parameter, a loop's variable, a `try` resource, a pattern variable, a lambda's
+/// parameter with no type and a varargs parameter.
 #[test]
 fn a_java_field_read_through_this_keeps_its_table_beside_a_local_of_its_name() {
     let repo = fixture_repo("aws_sdk_hidden_fields", "aws-sdk-hidden-fields", None);
@@ -1480,17 +1490,28 @@ fn a_java_field_read_through_this_keeps_its_table_beside_a_local_of_its_name() {
         [
             "bareBesideLocal writer resource::dynamodb",
             "bareBesideParameter writer resource::dynamodb",
+            "fieldUnderItsOwnName writer resource::dynamodb",
+            "localHandedOn writer resource::dynamodb",
+            "localReturned writer resource::dynamodb",
             "localStepped writer resource::dynamodb",
             "setBeforeLocal writer resource::dynamodb",
             "thisAliasBesideLocal writer resource::dynamodb",
             "thisApart writer resource::dynamodb::apart-field",
+            "thisBesideCatch writer resource::dynamodb",
             "thisBesideLocal writer resource::dynamodb::beside-field",
+            "thisBesideLoop writer resource::dynamodb",
             "thisBesideParameter writer resource::dynamodb::taken-field",
+            "thisBesidePattern writer resource::dynamodb",
+            "thisBesideResource writer resource::dynamodb",
+            "thisBesideTypedLambda writer resource::dynamodb::typed-field",
+            "thisBesideUntypedLambda writer resource::dynamodb",
+            "thisBesideVarargs writer resource::dynamodb",
         ],
         "{export}"
     );
 }
 
+/// Each Java side of an export, as `method role contract`, sorted.
 fn java_sides(repo: &std::path::Path) -> (Value, Vec<String>) {
     let export: Value =
         serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap();

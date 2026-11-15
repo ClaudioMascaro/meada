@@ -1,14 +1,17 @@
+import java.util.function.Supplier;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 
-// A chain that sets the table itself and builds at once (`pb.tableName("t").build()`) reads its
-// own argument, whatever set the builder before: nothing runs between its step and its `build()`.
+// A chain that sets the table of a local builder itself and builds at once
+// (`pb.tableName("t").build()`) reads its own argument, whatever statement set the builder before:
+// between its step and its `build()` only the arguments of its own steps run.
 class Steps {
     private final DynamoDbClient db = DynamoDbClient.create();
     private final PutItemRequest.Builder shared = PutItemRequest.builder();
+    private final PutItemRequest.Builder guarded = PutItemRequest.builder();
 
     // One builder set and built twice inside one request: each entry has its own table.
     void builtTwice() {
@@ -35,7 +38,8 @@ class Steps {
         db.putItem(rb.tableName("again-new").build());
     }
 
-    // A field builder two methods set and build, each in one chain.
+    // A field builder two methods set and build, each in one chain: any method sets a field, and
+    // another thread may run one chain's step between the other's step and its `build()`.
     void sharedFirst() {
         db.putItem(shared.tableName("shared-a").build());
     }
@@ -58,6 +62,46 @@ class Steps {
         db.putItem(rb.tableName("argument-old")
             .conditionExpression(rb.tableName("argument-new").toString())
             .build());
+    }
+
+    // A method called in an argument of a later step sets the field after the chain's own step
+    // did: the request carries `field-new`.
+    void fieldSetInArgument() {
+        db.putItem(guarded.tableName("field-old").conditionExpression(renamed()).build());
+    }
+
+    String renamed() {
+        guarded.tableName("field-new");
+        return "attribute_not_exists(pk)";
+    }
+
+    // A lambda written before the chain sets the table when an argument of a later step calls
+    // it: the request carries `deferred-new`.
+    void setInDeferredCode() {
+        var rb = PutItemRequest.builder();
+        Supplier<String> late = () -> {
+            rb.tableName("deferred-new");
+            return "attribute_not_exists(pk)";
+        };
+        db.putItem(rb.tableName("deferred-old").conditionExpression(late.get()).build());
+    }
+
+    // A lambda in an argument of the chain itself sets the table: it may run before `build()`.
+    void setInOwnLambda() {
+        var rb = PutItemRequest.builder();
+        db.putItem(rb.tableName("lambda-old")
+            .overrideConfiguration(c -> rb.tableName("lambda-new"))
+            .build());
+    }
+
+    // The builder is handed on inside the chain: a mention the reader does not follow.
+    void handedInside() {
+        var rb = PutItemRequest.builder();
+        db.putItem(rb.tableName("inside").conditionExpression(note(rb)).build());
+    }
+
+    String note(PutItemRequest.Builder b) {
+        return "attribute_not_exists(pk)";
     }
 
     // The chain is kept unbuilt in a name, and the builder is set before that name is built.
