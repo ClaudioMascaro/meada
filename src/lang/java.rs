@@ -254,7 +254,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             return Ok(Facts {
                 budget: Some(QUALIFICATION_BYTES),
                 // Read off the bytes: a file with no facts still says so (#775).
-                reflects: spells(src, &REFLECTIVE),
+                reflects: reflects(src),
                 ..Facts::default()
             });
         };
@@ -927,7 +927,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
     if !holds(b"lombok") && !holds(b"\\u") && !ignorable(src) {
         facts.private_fields = (final_fields.difference(&open_fields).cloned()).collect();
     }
-    facts.reflects = spells(src, &REFLECTIVE);
+    facts.reflects = reflects(src);
     facts.loops = super::outermost(
         tree.root_node(),
         &[
@@ -1694,6 +1694,18 @@ const REFLECTIVE: [&str; 4] = [
     "getFields",
 ];
 
+/// Whether a file may read a field by its name (`Facts::reflects`): it spells one of
+/// `REFLECTIVE`, or `spells` cannot read it. UTF-16 puts a zero byte beside each letter and
+/// inside each Unicode escape, EBCDIC writes no letter in ASCII, and a multi-byte encoding
+/// writes a character the compiler drops from a name with bytes the scan keeps (GB18030's soft
+/// hyphen is 81 30 85 32).
+// ponytail: every file that is not UTF-8 counts, a Latin-1 one among them, so its repository
+// names no private field; tell the encodings of one byte a character apart when a repository
+// shows the need.
+fn reflects(src: &[u8]) -> bool {
+    spells(src, &REFLECTIVE) || src.contains(&0) || std::str::from_utf8(src).is_err()
+}
+
 /// Whether `src` may hold a character the compiler drops from a name (JLS 3.8,
 /// `Character.isIdentifierIgnorable`): a control that is no white space, or a format character
 /// (a soft hyphen, a zero-width space, a byte order mark). Text that is not UTF-8 may, and any
@@ -1719,8 +1731,8 @@ fn ignorable(src: &[u8]) -> bool {
 /// is read so too, which can only find a name the file does not spell. A control that is no
 /// white space and every character past ASCII, escaped or not, is read as not there: the
 /// compiler drops some from a name (JLS 3.8), and a letter among them makes a longer name, which
-/// this takes for the listed one, never the reverse. Bytes are read one by one, so the encoding
-/// of the file does not matter.
+/// this takes for the listed one, never the reverse. Each ASCII byte is read as the character it
+/// is in UTF-8: `reflects` answers for a file where it may be another.
 fn spells(src: &[u8], names: &[&str]) -> bool {
     let mut token: Vec<u8> = Vec::new();
     let mut at = 0;

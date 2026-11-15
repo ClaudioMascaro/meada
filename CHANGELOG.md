@@ -22,7 +22,8 @@ All notable changes to Meada are recorded here. The format follows
   `build()`, left the field's side unresolved. As before, every Java file judges a name its file
   also declares without `private`, a field of a file that names Lombok (a `@Getter` hands the
   field out with no mention in the source) or holds a Unicode escape, and every field of a
-  repository where a Java file reads fields by reflection (#775).
+  repository where a Java file reads fields by reflection, is not UTF-8 or holds a zero byte
+  (#775).
 - Pipelines, actions, CI jobs and CI steps of GitHub Actions are IaC nodes (ADR 0028). A file
   directly under `.github/workflows/` that holds `jobs` is a pipeline, and an `action.yml` or
   `action.yaml` that holds `runs` is an action; each CI job (`jobs.build`) and CI step

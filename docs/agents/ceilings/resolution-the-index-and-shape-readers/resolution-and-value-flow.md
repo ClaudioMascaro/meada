@@ -112,8 +112,13 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   method reference, a comment, a Unicode escape read as its character, a control and any
   character past ASCII read as not there, in a file past `QUALIFICATION_BYTES` too; no other
   reflection API, and no Kotlin, Groovy or Scala file's), since the file that reads one may hand it to
-  any other. A Lombok accessor or a reflective read whose result is set under another name is
-  not seen, as before, and neither is a step on a field written with a Unicode escape.
+  any other. A Java file that is not UTF-8, or holds a zero byte, counts as one that does: the
+  scan reads each ASCII byte as UTF-8 does, which UTF-16, EBCDIC and GB18030 do not keep, and a
+  Latin-1 file is not told from them, so its repository names no private field. A Lombok
+  accessor or a reflective read whose result is set under another name is
+  not seen, as before, and neither is a step on a field written with a Unicode escape, nor a
+  reflective read in a Java file the index does not read (under a hidden directory, or one an
+  ignore file lists).
   A request type is the SDK's unless a type of its directory, an import or a
   variable says otherwise: one of the same package in another source root is not seen (#719).
   A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB
