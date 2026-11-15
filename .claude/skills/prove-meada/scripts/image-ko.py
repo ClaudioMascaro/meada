@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-# From the two maintainer specs and shell execution semantics, not feature fixtures.
-"""#662 literal ko publications; refuse heredoc text and compound shell scripts."""
+# From the maintainer specs (#662, then ADR 0028's command table), not feature fixtures.
+"""#662 literal ko publications: refuse heredoc text, substitution and text in a string. Since #860 no
+shell is evaluated and the command table counts a command after `&&`, `;` or on a later line."""
 import argparse
 import hashlib
 import json
@@ -44,6 +45,7 @@ def main(args):
         'custom_shell': 'ko build --bare ./cmd/app',
     }
     positive = {'plain_build','plain_publish','plain_bash','plain_sh','targetless',
+                'compound','multiline','semicolon',
                 'default_job_sh','default_step_bash','default_step_sh'}
     expected = {'image::ghcr.io/ko-shell/'+label for label in positive}
     (out/'oracle.json').write_text(json.dumps({'expected_builders': sorted(expected),
@@ -110,9 +112,12 @@ def main(args):
                     selected=[row for row in providers if row['contract']==contract]
                     checks.append({'check':label+' export retains exact checked-in command location',
                                    'pass':len(selected)==1 and selected[0].get('at')==expected_at})
-                    expected_context=(contract+'\n  example.com/zz-prove-ko-shell/app builder '
-                                      '(repository-level) (no runner in the workspace)\n')
-                    checks.append({'check':label+' full repository-level context is correct',
+                    # The builder is the CI step (#860): its file, the line of the step and its address.
+                    lines=(workflow.parent/file).read_text().splitlines()
+                    line=next(n for n in range(lines.index(f'  {label}:')+1,len(lines)) if lines[n].startswith('    - '))+1
+                    expected_context=(contract+f'\n  example.com/zz-prove-ko-shell/app builder .github/workflows/{file}:{line} '
+                                      f'jobs.{label}.steps[0] (no runner in the workspace)\n')
+                    checks.append({'check':label+' full CI step context is correct',
                                    'pass':answer(raw)==expected_context})
             finally:
                 client.close()
