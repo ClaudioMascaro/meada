@@ -13,6 +13,8 @@ class Hidden {
     private final PutItemRequest.Builder given = PutItemRequest.builder().tableName("given-field");
     private final PutItemRequest.Builder early = PutItemRequest.builder().tableName("early-field");
     private final PutItemRequest.Builder stepped = PutItemRequest.builder().tableName("stepped-field");
+    private final PutItemRequest.Builder source = PutItemRequest.builder().tableName("source-field");
+    private final PutItemRequest.Builder alias = source;
 
     void thisBesideLocal() {
         var beside = PutItemRequest.builder().tableName("beside-local");
@@ -48,6 +50,12 @@ class Hidden {
         early.tableName("early-new");
         var early = PutItemRequest.builder().tableName("early-local");
         db.putItem(this.early.build());
+    }
+
+    // The field is another name of a builder: judged as it is where no local has its name.
+    void thisAliasBesideLocal() {
+        int alias = 1;
+        db.putItem(this.alias.build());
     }
 
     // A step on the local of the field's name counts as one on the field.

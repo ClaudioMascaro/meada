@@ -588,7 +588,9 @@ pub struct Facts {
     /// spelling, whatever it is part of. A reader that must see every use of a value compares it
     /// with the uses it reads; one more is a use its model of the syntax does not show (a cast, a
     /// ternary, a return). Java, and for the locals of a function Go (those it keeps as
-    /// constants) and C# (`mentioned`). Not kept in the index (see `Call::args`).
+    /// constants) and C# (`mentioned`). A Java field's count also tells which of them declare a
+    /// local or a parameter of its name (`Mentioned::hidden`). Not kept in the index (see
+    /// `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub mentioned: Vec<Mentioned>,
     /// The names of the `final` fields that every field declaration of the file spelling them
@@ -720,6 +722,10 @@ pub struct Mentioned {
     pub scope: String,
     pub name: String,
     pub count: u32,
+    /// For a field (Java): how many of them declare a local or a parameter of its name, which
+    /// `this.name` is not (#775).
+    #[serde(default)]
+    pub hidden: u32,
 }
 
 /// The value a name bound in `scope` holds, written in `within` (`Facts::bound`).
@@ -804,6 +810,7 @@ pub(crate) fn mentioned<'l>(
                 scope: scope.into(),
                 name: name.into(),
                 count: count.try_into().unwrap_or(u32::MAX),
+                hidden: 0,
             })
         })
         .collect()

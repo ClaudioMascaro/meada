@@ -243,6 +243,13 @@ impl Span {
         other.is_some_and(|&s| s < at.later)
     }
 
+    /// Whether a mention starts inside the chain now followed, past its start: in an argument of
+    /// one of its steps, which runs between two of them.
+    fn inside(&self, at: &At) -> bool {
+        let next = self.starts.partition_point(|&s| s <= at.own);
+        self.starts.get(next).is_some_and(|&s| s < at.built)
+    }
+
     /// Whether a mention other than the one read at `at.own` starts before `at.later`: a list's
     /// read is one hand-off there, and the call a receiver hands it in starts there too
     /// (`prep(l).w(l)`, #772).
@@ -261,6 +268,9 @@ struct At {
     later: usize,
     /// Where the chain now followed starts.
     own: usize,
+    /// Where it ends when its last step is `build()` (`b.set(..).build()`), else 0: a member
+    /// such a chain sets is set last by its own step, but for a mention inside the chain.
+    built: usize,
 }
 
 impl At {
@@ -270,6 +280,7 @@ impl At {
             range: range.clone(),
             later: range.end,
             own: range.start,
+            built: 0,
         }
     }
 }
@@ -353,9 +364,17 @@ impl<'a> Mentions<'a> {
         }
     }
 
-    fn changed(&self, setter: &dyn Fn(&str) -> bool, at: &At) -> bool {
+    /// `own` holds the steps of the chain now followed when it builds at once: a member one of
+    /// them sets is what the request reads, unless a mention inside the chain sets it again.
+    fn changed(&self, setter: &dyn Fn(&str) -> bool, own: &[&str], at: &At) -> bool {
         self.other.as_ref().is_some_and(|s| s.hits(at))
-            || (self.sets.iter()).any(|(method, span)| setter(method) && span.hits(at))
+            || (self.sets.iter()).any(|(method, span)| {
+                setter(method)
+                    && match own.contains(method) {
+                        true => span.inside(at),
+                        false => span.hits(at),
+                    }
+            })
     }
 
     /// Whether a mention of a list read at `at` may change it (`Walk::list_changed`): a call on it
@@ -402,6 +421,9 @@ struct Uses<'a> {
     reflective: bool,
     /// How many times the file writes the name of each local and `final` field (`Facts::mentioned`).
     written: std::collections::HashMap<(&'a str, &'a str), u32>,
+    /// How many of a field's are the declaration of a local or a parameter of its name
+    /// (`Mentioned::hidden`).
+    hidden: std::collections::HashMap<&'a str, u32>,
 }
 
 /// One mention of the name of a builder, made in `scope`.
@@ -450,6 +472,10 @@ impl<'a> Uses<'a> {
             reflective: facts.reflects,
             written: (code.mentioned(path).iter())
                 .map(|m| ((m.scope.as_str(), m.name.as_str()), m.count))
+                .collect(),
+            hidden: (code.mentioned(path).iter())
+                .filter(|m| m.scope.is_empty() && m.hidden > 0)
+                .map(|m| (m.name.as_str(), m.hidden))
                 .collect(),
         };
         for index in 0..facts.calls.len() {
@@ -534,6 +560,7 @@ impl<'a> Uses<'a> {
         name: &str,
         field: bool,
         setter: &dyn Fn(&str) -> bool,
+        own: &[&str],
         at: &At,
     ) -> bool {
         // Any method sets a field, whatever the order of the file.
@@ -543,8 +570,8 @@ impl<'a> Uses<'a> {
         };
         self.locals
             .get(&(scope, name))
-            .is_some_and(|m| m.changed(setter, at))
-            || field && (self.fields.get(name)).is_some_and(|m| m.changed(setter, &anywhere))
+            .is_some_and(|m| m.changed(setter, own, at))
+            || field && (self.fields.get(name)).is_some_and(|m| m.changed(setter, own, &anywhere))
     }
 
     /// Whether the file writes the list `name`, a local or a parameter of `scope`, more often
@@ -558,15 +585,21 @@ impl<'a> Uses<'a> {
     /// Whether the file writes the builder `name` more often than the calls made on it account
     /// for (its declaration and each call started from it): a use the syntax model does not
     /// show, which could be any change. A name with no count is not known to be seen whole.
-    fn unseen(&self, scope: &str, name: &str, field: bool) -> bool {
+    /// Spelled `this.name` (`this`), a field is not what a local or a parameter of its name
+    /// declares; the bare name beside one may be either, so those declarations stay unseen.
+    fn unseen(&self, scope: &str, name: &str, field: bool, this: bool) -> bool {
         let (scope, mentions) = match field {
             true => ("", self.fields.get(name)),
             false => (scope, self.locals.get(&(scope, name))),
         };
         let direct = mentions.map_or(0, |m| m.direct);
+        let hidden = match this {
+            true => self.hidden.get(name).copied().unwrap_or(0),
+            false => 0,
+        };
         self.written
             .get(&(scope, name))
-            .is_none_or(|&written| written > 1 + direct)
+            .is_none_or(|&written| written > 1 + direct + hidden)
     }
 }
 
@@ -674,6 +707,7 @@ pub(super) fn changed<'a>(
             range: range.clone(),
             later: usize::MAX,
             own: usize::MAX,
+            built: 0,
         },
     };
     let changed = read && walk.passed(value, &at) || walk.value(value, &at);
@@ -730,8 +764,13 @@ impl<'a> Walk<'a, '_> {
         match value {
             Value::Ref(name) => self.named(name, at),
             Value::Call(top) => {
+                let built = match crate::resolve::method(&top.callee) {
+                    "build" => top.range.end,
+                    _ => 0,
+                };
                 let at = &At {
                     own: top.range.start,
+                    built,
                     ..at.clone()
                 };
                 let steps = || {
@@ -748,7 +787,13 @@ impl<'a> Walk<'a, '_> {
                         .is_some_and(|c| crate::resolve::method(&c.callee) == "builder")
                         && root(value)
                             .is_some_and(|t| self.builders.shadowed(self.code, self.path, t))
-                    || root(value).is_some_and(|b| self.builder(b, at))
+                    || root(value).is_some_and(|b| {
+                        // A chain that builds at once reads what its own steps set (#775).
+                        let own: Vec<&str> = (steps().filter(|_| built > 0))
+                            .map(|c| crate::resolve::method(&c.callee))
+                            .collect();
+                        self.builder(b, at, &own)
+                    })
                     || steps().any(|c| {
                         let method = crate::resolve::method(&c.callee);
                         if let [sole] = &c.args[..]
@@ -985,18 +1030,23 @@ impl<'a> Walk<'a, '_> {
     }
 
     /// Whether the builder `name` was changed as seen from `at`, or is another name of one, or was
-    /// made from a changed value.
-    fn builder(&mut self, name: &'a str, at: &At) -> bool {
+    /// made from a changed value. `own` holds the steps of the chain read off it when that chain
+    /// builds at once.
+    fn builder(&mut self, name: &'a str, at: &At, own: &[&str]) -> bool {
         // `this.name` is the field, whatever local or parameter hides the bare name.
+        let spelled = name;
         let bare = name.strip_prefix("this.");
         let name = bare.unwrap_or(name);
         let local = match bare {
             Some(_) => None,
             None => self.code.local(self.path, self.scope, name),
         };
+        // Where a local or a parameter hides the bare name, `this.name` still finds the field.
         let constant = match local {
             Some(_) => None,
-            None => self.code.constant_value(self.path, self.scope, name),
+            None => (self.code.constant_value(self.path, self.scope, name)).or_else(|| {
+                bare.and_then(|_| self.code.constant_value(self.path, self.scope, spelled))
+            }),
         };
         let field = local.is_none() && (bare.is_some() || constant.is_some());
         // A type or a parameter holds no builder to follow. A name the file assigns again or
@@ -1020,8 +1070,8 @@ impl<'a> Walk<'a, '_> {
             _ => None,
         };
         let at = self.widened(at, declared);
-        if self.uses.unseen(scope, name, field)
-            || self.uses.changed(scope, name, field, self.setter, &at)
+        if self.uses.unseen(scope, name, field, bare.is_some())
+            || self.uses.changed(scope, name, field, self.setter, own, &at)
         {
             return true;
         }
@@ -1040,9 +1090,7 @@ impl<'a> Walk<'a, '_> {
             Some(_) => false,
             // A `final` field built from a name, or from another builder.
             None => {
-                let Some((path, scope, value)) =
-                    self.code.constant_value(self.path, self.scope, name)
-                else {
+                let Some((path, scope, value)) = constant else {
                     return false;
                 };
                 match value {

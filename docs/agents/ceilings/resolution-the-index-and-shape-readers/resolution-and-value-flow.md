@@ -114,6 +114,17 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   reflection API, and no Kotlin, Groovy or Scala file's), since the file that reads one may hand it to
   any other. A Lombok accessor or a reflective read whose result is set under another name is
   not seen, as before, and neither is a step on a field written with a Unicode escape.
+  A chain that sets a member of the path itself and ends in `build()`
+  (`pb.tableName("t").build()`) reads its own argument, whatever set the builder before or
+  elsewhere, so one builder set and built twice in a request names each entry's table (#775).
+  Unresolved still: a builder its chain does not set (a statement did, and statement order is
+  not followed), one a mention inside the chain sets again (an argument of a step runs between
+  two steps), a chain kept unbuilt in a name, and a builder handed on or aliased. `this.name`
+  reads the field in a file where a local variable, or a typed parameter of a method, a
+  constructor or a lambda, has its name (`Mentioned::hidden`); the bare name there reads no
+  field, and a step on it counts as one on the field wherever it stands. Beside a `catch` or
+  untyped lambda parameter, a loop's variable, a `try` resource, a pattern variable or a varargs
+  parameter of its name the field has no table.
   A request type is the SDK's unless a type of its directory, an import or a
   variable says otherwise: one of the same package in another source root is not seen (#719).
   A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB

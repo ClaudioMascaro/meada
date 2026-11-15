@@ -903,20 +903,24 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 names.push(parameter);
             }
         }
-        for (name, count) in names.iter().zip(mentions(*body, src, &names)) {
+        for (name, count) in names.iter().zip(mentions(*body, src, &names, None)) {
             facts.mentioned.push(Mentioned {
                 scope: scope.clone(),
                 name: name.to_string(),
                 count,
+                hidden: 0,
             });
         }
     }
     let fields: Vec<&str> = final_fields.iter().map(String::as_str).collect();
-    for (name, count) in fields.iter().zip(mentions(tree.root_node(), src, &fields)) {
+    let mut hidden = vec![0; fields.len()];
+    let counts = mentions(tree.root_node(), src, &fields, Some(&mut hidden[..]));
+    for ((name, count), hidden) in fields.iter().zip(counts).zip(hidden) {
         facts.mentioned.push(Mentioned {
             scope: String::new(),
             name: name.to_string(),
             count,
+            hidden,
         });
     }
     // Lombok adds members the source does not show (a `@Getter`'s accessor hands a private field
@@ -1261,8 +1265,13 @@ fn repeated(root: Node) -> Vec<Range<usize>> {
 
 /// How often each of `names` is written as an identifier under `root`, in the order given. A
 /// method's name is no mention: a local `entries` passed to `.entries(entries)` is written once
-/// there (#773).
-fn mentions(root: Node, src: &[u8], names: &[&str]) -> Vec<u32> {
+/// there (#773). `declared` counts, of those, the ones that declare a local or a parameter: the
+/// name of a local variable's declarator, and of a parameter of a method, a constructor or a
+/// lambda that writes its type (#775).
+// shortcut: a `catch` or untyped lambda parameter, a loop's variable, a `try` resource, a pattern
+// variable and a varargs parameter are not told from any other mention, so a field of such a
+// name keeps no table beside one; count them when a repository shows the need.
+fn mentions(root: Node, src: &[u8], names: &[&str], mut declared: Option<&mut [u32]>) -> Vec<u32> {
     let index: BTreeMap<&str, usize> = names.iter().enumerate().map(|(n, s)| (*s, n)).collect();
     let mut counts = vec![0; names.len()];
     let mut stack = vec![root];
@@ -1272,6 +1281,27 @@ fn mentions(root: Node, src: &[u8], names: &[&str]) -> Vec<u32> {
                 counts[n] += 1;
             }
             continue;
+        }
+        if let Some(declared) = declared.as_deref_mut() {
+            let declarators: Vec<Node> = match node.kind() {
+                "local_variable_declaration" => named(node)
+                    .filter(|n| n.kind() == "variable_declarator")
+                    .collect(),
+                "formal_parameter" => vec![node],
+                _ => Vec::new(),
+            };
+            for name in (declarators.iter()).filter_map(|d| d.child_by_field_name("name")) {
+                // A record's component is a field of the record, no parameter of a method.
+                let component = || {
+                    (node.parent().and_then(|p| p.parent()))
+                        .is_some_and(|owner| owner.kind() == "record_declaration")
+                };
+                if let Some(&n) = index.get(text(name, src))
+                    && !component()
+                {
+                    declared[n] += 1;
+                }
+            }
         }
         let method = (node.kind() == "method_invocation")
             .then(|| node.child_by_field_name("name"))
@@ -1788,6 +1818,34 @@ mod tests {
             class M { void m() {} } }; class L { void l() {} } } }";
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
         assert_eq!(facts.anonymous, ["a", "hold", "k", "m"]);
+    }
+
+    /// A field's count tells apart the mentions that declare a local or a parameter of its name
+    /// (#775): a local variable's declarator, and a typed parameter of a method, a constructor
+    /// or a lambda. A record's component, a `catch` parameter, a loop's variable, a `try`
+    /// resource, a lambda's untyped parameter and a varargs parameter stay plain mentions.
+    #[test]
+    fn a_field_s_count_tells_the_declarations_of_a_local_or_a_parameter_of_its_name() {
+        let counted = |body: &str| {
+            let src = format!("class C {{ private final B b = make(); {body} }}");
+            let facts = Java.parse("C.java", src.as_bytes()).unwrap();
+            let field = (facts.mentioned.iter()).find(|m| m.scope.is_empty() && m.name == "b");
+            field.map(|m| (m.count, m.hidden))
+        };
+        assert_eq!(counted("void m() { this.b.x(); }"), Some((2, 0)));
+        assert_eq!(counted("void m() { int b = 1, c = 2; }"), Some((2, 1)));
+        assert_eq!(counted("void m(String b) {} C(int b) {}"), Some((3, 2)));
+        assert_eq!(counted("void m() { f((String b) -> b); }"), Some((3, 1)));
+        for plain in [
+            "record R(String b) {}",
+            "void m() { try { f(); } catch (E b) {} }",
+            "void m() { for (String b : xs) {} }",
+            "void m() { try (R b = open()) {} }",
+            "void m() { f(b -> 1); }",
+            "void m(String... b) {}",
+        ] {
+            assert_eq!(counted(plain), Some((2, 0)), "{plain}");
+        }
     }
 
     /// A `final` field is private when every field declaration of the file that spells its name

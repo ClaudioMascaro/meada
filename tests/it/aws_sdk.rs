@@ -1469,7 +1469,8 @@ fn a_java_chain_that_sets_and_builds_at_once_reads_its_own_table() {
 /// `this.name` reads the `final` field whatever local or parameter of the file has its name
 /// (#775). The bare name is not told apart by where it stands: beside such a local or parameter
 /// it reads no field (it is the local, or what the caller passes), and a step on it, before the
-/// local is declared or on the local itself, counts as one on the field.
+/// local is declared or on the local itself, counts as one on the field. A field that is another
+/// name of a builder is judged as it is where no local has its name.
 #[test]
 fn a_java_field_read_through_this_keeps_its_table_beside_a_local_of_its_name() {
     let repo = fixture_repo("aws_sdk_hidden_fields", "aws-sdk-hidden-fields", None);
@@ -1481,6 +1482,7 @@ fn a_java_field_read_through_this_keeps_its_table_beside_a_local_of_its_name() {
             "bareBesideParameter writer resource::dynamodb",
             "localStepped writer resource::dynamodb",
             "setBeforeLocal writer resource::dynamodb",
+            "thisAliasBesideLocal writer resource::dynamodb",
             "thisApart writer resource::dynamodb::apart-field",
             "thisBesideLocal writer resource::dynamodb::beside-field",
             "thisBesideParameter writer resource::dynamodb::taken-field",
