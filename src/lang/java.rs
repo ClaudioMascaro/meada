@@ -253,6 +253,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
             // A partial overload family could turn an ambiguous call into a false exact one.
             return Ok(Facts {
                 budget: Some(QUALIFICATION_BYTES),
+                // Read off the bytes: a file with no facts still says so (#775).
+                reflects: spells(src, &REFLECTIVE),
                 ..Facts::default()
             });
         };
@@ -919,14 +921,13 @@ fn parse(src: &[u8]) -> Result<Facts> {
     }
     // Lombok adds members the source does not show (a `@Getter`'s accessor hands a private field
     // out), so a file that spells its name anywhere, a comment included, lists none. Nor does a
-    // file that holds a Unicode escape (JLS 3.3): one may spell that name, or a step on a field,
-    // where this pack reads other text.
+    // file that holds a Unicode escape (JLS 3.3) or a character the compiler drops from a name
+    // (JLS 3.8): one may spell that name, or a step on a field, where this pack reads other text.
     let holds = |needle: &[u8]| src.windows(needle.len()).any(|bytes| bytes == needle);
-    let escaped = holds(b"\\u");
-    if !holds(b"lombok") && !escaped {
+    if !holds(b"lombok") && !holds(b"\\u") && !dropped(src) {
         facts.private_fields = (final_fields.difference(&open_fields).cloned()).collect();
     }
-    facts.reflects = (holds(b"Field") || escaped) && spells(src, &REFLECTIVE);
+    facts.reflects = spells(src, &REFLECTIVE);
     facts.loops = super::outermost(
         tree.root_node(),
         &[
@@ -1693,10 +1694,33 @@ const REFLECTIVE: [&str; 4] = [
     "getFields",
 ];
 
+/// Whether `src` may hold a character the compiler drops from a name (JLS 3.8,
+/// `Character.isIdentifierIgnorable`): a control that is no white space, or a format character
+/// (a soft hyphen, a zero-width space, a byte order mark). Text that is not UTF-8 may, and any
+/// character past the Basic Multilingual Plane counts, as do the unassigned ones beside the
+/// format characters of today's Unicode: a later version may make one of them.
+fn dropped(src: &[u8]) -> bool {
+    let Ok(text) = std::str::from_utf8(src) else {
+        return true;
+    };
+    text.chars().any(|c| {
+        matches!(
+            u32::from(c),
+            0x00..=0x08 | 0x0e..=0x1b | 0x7f..=0x9f | 0xad | 0x600..=0x605 | 0x61c | 0x6dd
+                | 0x70f | 0x890..=0x89f | 0x8e2 | 0x180e | 0x200b..=0x200f | 0x202a..=0x202e
+                | 0x2060..=0x206f | 0xfeff | 0xfff0..=0xfffb | 0x1_0000..
+        )
+    })
+}
+
 /// Whether `src` spells one of `names` as a whole identifier, anywhere: a call, a method
 /// reference, a comment, a string. A Unicode escape (`\u0046`, JLS 3.3) is read as the character
 /// it stands for, as the compiler reads it before anything else; one after an escaped backslash
-/// is read so too, which can only find a name the file does not spell.
+/// is read so too, which can only find a name the file does not spell. A control that is no
+/// white space and every character past ASCII, escaped or not, is read as not there: the
+/// compiler drops some from a name (JLS 3.8), and a letter among them makes a longer name, which
+/// this takes for the listed one, never the reverse. Bytes are read one by one, so the encoding
+/// of the file does not matter.
 fn spells(src: &[u8], names: &[&str]) -> bool {
     let mut token: Vec<u8> = Vec::new();
     let mut at = 0;
@@ -1708,11 +1732,14 @@ fn spells(src: &[u8], names: &[&str]) -> bool {
                 .get(..4)
                 .filter(|d| d.iter().all(u8::is_ascii_hexdigit))?;
             let code = u32::from_str_radix(std::str::from_utf8(digits).ok()?, 16).ok()?;
-            Some((u8::try_from(code).ok(), src.len() - at - hex.len() + 4))
+            Some((Some(code), src.len() - at - hex.len() + 4))
         });
-        let (character, length) = escape.unwrap_or((src.get(at).copied(), 1));
-        match character {
-            Some(c) if c.is_ascii_alphanumeric() || c == b'_' || c == b'$' => token.push(c),
+        let (character, length) = escape.unwrap_or((src.get(at).map(|&b| u32::from(b)), 1));
+        let named = (character.and_then(|c| u8::try_from(c).ok()))
+            .filter(|&c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'$'));
+        match (named, character) {
+            (Some(c), _) => token.push(c),
+            (None, Some(0x00..=0x08 | 0x0e..=0x1b | 0x7f..)) => {}
             // Any other character, and the end of the file, end a name.
             _ => {
                 if names.iter().any(|name| name.as_bytes() == token) {

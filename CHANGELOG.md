@@ -132,7 +132,8 @@ All notable changes to Meada are recorded here. The format follows
 - Java: a file that reads a field by reflection through a method reference
   (`Holder.class::getDeclaredField`) or a name written with a Unicode escape no longer leaves
   a field builder it may change with its first table. A file reads fields where it spells
-  `getDeclaredField`, `getField` or their plurals as a whole name, a comment included. The
+  `getDeclaredField`, `getField` or their plurals as a whole name, a comment included, with a
+  character the compiler drops from a name read as not there, and whatever its size. The
   index stores that per file, and an existing index is rebuilt on its first open by this
   version (#775).
 - The Dockerfile reader counts every directory entry a wildcard source examines, matched or not,

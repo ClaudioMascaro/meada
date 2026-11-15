@@ -103,11 +103,15 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   count (#775). Still judged by every Java file: a name the file also declares without
   `private`, in any class and `final` or not; a field of a file that spells `lombok` anywhere
   (an import, an annotation, a comment: Lombok's accessors are not in the source) or holds a
-  Unicode escape (`\u..`, which may spell that name or a step on the field); a field a
+  Unicode escape (`\u..`) or a character the compiler drops from a name (JLS 3.8: a control
+  that is no white space, a format character such as a soft hyphen or a byte order mark; any
+  character past the Basic Multilingual Plane and any file that is not UTF-8 count), which may
+  spell that name or a step on the field; a field a
   class inherits from another file; and every field of a repository where a Java file spells
   `getDeclaredField`, `getField` or their plurals as a whole name (`Facts::reflects`: a call, a
-  method reference, a comment, a Unicode escape read as its character; no other reflection
-  API, and no Kotlin, Groovy or Scala file's), since the file that reads one may hand it to
+  method reference, a comment, a Unicode escape read as its character, a control and any
+  character past ASCII read as not there, in a file past `QUALIFICATION_BYTES` too; no other
+  reflection API, and no Kotlin, Groovy or Scala file's), since the file that reads one may hand it to
   any other. A Lombok accessor or a reflective read whose result is set under another name is
   not seen, as before, and neither is a step on a field written with a Unicode escape.
   A request type is the SDK's unless a type of its directory, an import or a
