@@ -1,5 +1,5 @@
 # #683/#684: start with the complete trusted base export, then apply only the specified
-# resolutions. The three inline controls supply existing link/reason behavior. Never read
+# resolutions. The inline controls supply existing link/reason behavior. Never read
 # the head export here: unexpected fields, locations and process metadata must survive comparison.
 def function_name: split("::")[2];
 def consumers($doc; $fn): [$doc.consumers[] | select((.site | function_name) == $fn)];
@@ -28,8 +28,13 @@ def expected_consumer($doc; $rows; $fn):
 def expected_links($consumer):
   (if $consumer.via == "env:API_URL" then links($environment[0]; "OrdersInline")
    elif $consumer.via == $proxy[0].consumers[0].via then links($proxy[0]; "listClusters")
+   # A hostless `GET /orders`: both peers serve it (`gen_peers`), so one ambiguous link to each. The
+   # rows are written out: the template control `ordersTpl` that gave them until #845 is an open item
+   # now, and no other hostless call of g8 links.
    elif $consumer.via == null and $consumer.contract == "http::GET::/orders"
-   then links($template[0]; "ordersTpl")
+   then [("api", "other") | ("example.com/acme/" + .) as $peer
+         | {level: "ambiguous", provider: ($peer + "::main.go::orders"),
+            reason: ("2 providers fit; host unresolved; served by " + $peer)}]
    else [] end)
   | map(.consumer = $consumer.site | .contract = $consumer.contract);
 def terminal_steps($doc; $consumer; $links):

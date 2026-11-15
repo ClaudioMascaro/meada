@@ -66,7 +66,7 @@ through `/create-prove-it`, and adds its paths to its Scope row ([scope.md](scop
 | Flow (#683) | Cases | Ticket | State |
 |---|---|---|---|
 | Controls: template string, cleanenv tag inline, `config.getString` inline, `proxy.endpoints` inline | 5 | existing | control |
-| TS URL builders, one argument and lexical String controls | 11 (`g8`) | #685 | landed |
+| TS URL builders, one argument and lexical String controls | 11 (`g8`) | #685 | landed (9 controls) |
 | TS `new URL(ref, base)` join | 19 rows, 15 functions (`g8`) | #686 | landed (4 controls) |
 | Go struct field | 2 (`g9`) | #687 | landed |
 | TS readonly field | 1 (`g9`) | #688 | landed |
@@ -91,7 +91,13 @@ through `/create-prove-it`, and adds its paths to its Scope row ([scope.md](scop
 - The link check takes the head's links of the case's consumer only; a link the change adds to a
   control's consumer fails the control, one added elsewhere shows in "Everything else".
 
-There are currently 44 rows: 30 landed, fourteen controls and none pending. Four String
+There are currently 44 rows: 26 landed, eighteen controls and none pending. Since #845 (issue
+#801) a path appended to a base Meada does not read is an open item, so the template string
+control and the four one-argument builders of `g8` that take `base` as a parameter no call binds
+(`toString()` after `searchParams`, `.href`, `String(u)`, `${u}`) are controls of that rule: `null`
+on the base and on the head. No row proves those four builder forms any more (`ordersUrlEnv` keeps
+`toString()`), and `a8-expected.jq` writes out the two ambiguous links of a hostless `GET /orders`,
+which the template control gave until then. Four String
 shadow controls retain opaque callbacks and non-strict block functions with unknown contract
 and host while independent global String conversions still resolve. They reproduce hidden-name
 defects found during inline review; the uncorrected binaries invent those callbacks' routes. The five original
