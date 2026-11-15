@@ -65,4 +65,6 @@ jobs:
           name: meada-debug-${{ github.sha }}
           path: target/debug/meada
           if-no-files-found: error
+          # A re-run of this run uploads the same name again.
+          overwrite: true
           retention-days: 7
