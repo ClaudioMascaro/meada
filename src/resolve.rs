@@ -9482,8 +9482,11 @@ mod tests {
             let n = (facts.calls.iter())
                 .position(|c| c.callee == "fetch")
                 .unwrap();
+            // A reader folds to read, too: here what it reads of a value not known, which only
+            // the second answer of the caller's site holds, costs a thousand.
             let url = |args: &[Value], _: &Keywords| match args.first()? {
                 Value::Ref(_) => None,
+                Value::Unknown => code.charge("a.ts", 1000).then_some(Value::Unknown),
                 url => Some(url.clone()),
             };
             // The caller's own URL and what the next turn sends, not known.
@@ -9495,7 +9498,8 @@ mod tests {
         };
         let ((file, cuts), (file_wide, cuts_wide)) = (spent(0), spent(30));
         assert_eq!(file, file_wide);
-        assert!(cuts > 0 && cuts_wide >= cuts + 30, "{cuts} {cuts_wide}");
+        assert!(file < 1000 && cuts >= 1000, "{file} {cuts}");
+        assert!(cuts_wide >= cuts + 30, "{cuts} {cuts_wide}");
     }
 
     #[test]
