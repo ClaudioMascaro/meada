@@ -924,7 +924,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // file that holds a Unicode escape (JLS 3.3) or a character the compiler drops from a name
     // (JLS 3.8): one may spell that name, or a step on a field, where this pack reads other text.
     let holds = |needle: &[u8]| src.windows(needle.len()).any(|bytes| bytes == needle);
-    if !holds(b"lombok") && !holds(b"\\u") && !dropped(src) {
+    if !holds(b"lombok") && !holds(b"\\u") && !ignorable(src) {
         facts.private_fields = (final_fields.difference(&open_fields).cloned()).collect();
     }
     facts.reflects = spells(src, &REFLECTIVE);
@@ -1699,7 +1699,7 @@ const REFLECTIVE: [&str; 4] = [
 /// (a soft hyphen, a zero-width space, a byte order mark). Text that is not UTF-8 may, and any
 /// character past the Basic Multilingual Plane counts, as do the unassigned ones beside the
 /// format characters of today's Unicode: a later version may make one of them.
-fn dropped(src: &[u8]) -> bool {
+fn ignorable(src: &[u8]) -> bool {
     let Ok(text) = std::str::from_utf8(src) else {
         return true;
     };
