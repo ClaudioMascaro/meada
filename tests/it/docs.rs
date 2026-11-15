@@ -715,9 +715,7 @@ fn source_comments_use_ponytail_instead_of_shortcut() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
-/// Proof of the diff lane, removed before this branch is reviewed: red on purpose, so that the
-/// run of this commit can be seen to survive the push of the next one.
+/// Proof of the diff lane, removed before this branch is reviewed: green here, so that this
+/// run keeps its debug binary; the commit before made it red on purpose.
 #[test]
-fn retro_proof_a_red_run_survives_the_next_push() {
-    panic!("red on purpose: the next commit turns this green");
-}
+fn retro_proof_a_red_run_survives_the_next_push() {}
