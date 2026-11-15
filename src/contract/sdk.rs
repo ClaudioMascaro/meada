@@ -267,12 +267,19 @@ pub(crate) fn extract<'a>(
                         .then_some(&inject as &crate::resolve::Inject<'a, '_>);
                     for expanded in code.expand_with(Expand::Chain(path, index), injected, &read) {
                         let (at, index) = expanded.site;
-                        let passed = match language {
-                            Language::Java => {
-                                passed_changed(code, &expanded.frames, operation.field, &builders)
-                            }
-                            _ => per_site && judged(Params::Bound(&expanded.frames)),
-                        };
+                        // A site with no name to lose is not judged: a second answer a cut
+                        // cycle gives a site spends nothing more of the file's budget (#886).
+                        let named = |n: &Name| n.literal.is_some() || n.env.is_some();
+                        let passed = expanded.found.iter().any(named)
+                            && match language {
+                                Language::Java => passed_changed(
+                                    code,
+                                    &expanded.frames,
+                                    operation.field,
+                                    &builders,
+                                ),
+                                _ => per_site && judged(Params::Bound(&expanded.frames)),
+                            };
                         for mut name in expanded.found {
                             if passed {
                                 name = Name::default();

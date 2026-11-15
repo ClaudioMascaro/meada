@@ -4999,6 +4999,9 @@ pub struct Code<'a> {
     /// `folded` and `field_reads` for the work `Code::apart` runs.
     folded_apart: RefCell<HashMap<&'a str, usize>>,
     field_reads_apart: RefCell<HashMap<Field<'a>, Value>>,
+    /// `folded` and `field_reads` for what a cut cycle adds to a walk (`Code::cut_apart`).
+    folded_cuts: RefCell<HashMap<&'a str, usize>>,
+    field_reads_cuts: RefCell<HashMap<Field<'a>, Value>>,
     /// Each file of `full` by name, built the first time a name is looked up in it.
     by_name: HashMap<&'a str, OnceCell<ByName<'a>>>,
     /// The marker constants of the literals that set each field (`field_values`), by field name
@@ -5180,6 +5183,8 @@ impl<'a> Code<'a> {
             folded: RefCell::new(HashMap::new()),
             folded_apart: RefCell::new(HashMap::new()),
             field_reads_apart: RefCell::new(HashMap::new()),
+            folded_cuts: RefCell::new(HashMap::new()),
+            field_reads_cuts: RefCell::new(HashMap::new()),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
             literals: OnceCell::new(),
             field_reads: RefCell::new(HashMap::new()),
@@ -5202,9 +5207,27 @@ impl<'a> Code<'a> {
     /// to itself: whatever it spends, every other reader of a file folds what it folds without
     /// it. Not to be nested.
     pub(crate) fn apart<T>(&self, work: impl FnOnce() -> T) -> T {
+        self.aside(&self.folded_apart, &self.field_reads_apart, work)
+    }
+
+    /// `work` on the `EVAL_BUDGET` that what cut cycles add to the walks of a file shares
+    /// (telling whether a cycle sends more, and reading its sites once more, #886): a file's
+    /// readers fold what they folded before the walk told such cycles apart. It may run inside
+    /// `apart`. Past that budget a value is unknown, and a cycle adds nothing.
+    fn cut_apart<T>(&self, work: impl FnOnce() -> T) -> T {
+        self.aside(&self.folded_cuts, &self.field_reads_cuts, work)
+    }
+
+    /// `work` with `folded` and `field_reads` standing in for the budgets and the field reads.
+    fn aside<T>(
+        &self,
+        folded: &RefCell<HashMap<&'a str, usize>>,
+        field_reads: &RefCell<HashMap<Field<'a>, Value>>,
+        work: impl FnOnce() -> T,
+    ) -> T {
         let swap = || {
-            self.folded.swap(&self.folded_apart);
-            self.field_reads.swap(&self.field_reads_apart);
+            self.folded.swap(folded);
+            self.field_reads.swap(field_reads);
         };
         swap();
         let done = work();
@@ -7047,7 +7070,8 @@ impl<'a> Code<'a> {
         };
         // A wrapper reached again closes a cycle: another turn of it is climbed no further.
         if let Some(first) = frames.iter().position(|f| f.def == wrapper) {
-            if self.cycle_sends_more(written, frames, first, wrapper, read) {
+            let more = || self.cycle_sends_more(written, frames, first, wrapper, read);
+            if self.cut_apart(more) {
                 cuts.push(first);
             }
             return;
@@ -7097,13 +7121,15 @@ impl<'a> Code<'a> {
             reached.push(((site, at), frames.clone()));
         }
         let (values, kwargs) = unbound((values, kwargs), chain, &[]);
-        for (site, frames) in reached {
-            out.extend(read(&values, &kwargs).map(|found| Expanded {
-                site,
-                frames,
-                found,
-            }));
-        }
+        self.cut_apart(|| {
+            for (site, frames) in reached {
+                out.extend(read(&values, &kwargs).map(|found| Expanded {
+                    site,
+                    frames,
+                    found,
+                }));
+            }
+        });
     }
 
     /// The arguments of `written` folded under `frames`, and the function whose parameter one
@@ -9432,6 +9458,44 @@ mod tests {
         let tick = "function tick(n: number, a: string) { fetch(a); if (n > 0) tock(n, a); }\n\
                     function tock(n: number, a: string) { tick(n - 1, a); }";
         assert_eq!(urls(tick, "tick(1, '/first')"), ["/first"]);
+    }
+
+    /// What telling a cycle that sends more apart, and reading its sites once more, folds is
+    /// charged to a budget of its own (`Code::cut_apart`): the file's budget is spent as it was
+    /// before the walk told such cycles apart, however much the check folds. A wrapper with
+    /// thirty more parameters, each handed on through the cycle, costs the check thirty more
+    /// values and the file's budget nothing.
+    #[test]
+    fn what_a_cut_cycle_adds_spends_nothing_of_the_file_s_budget() {
+        use crate::lang::ts::TsJs;
+        let spent = |extra: usize| {
+            let more: String = (0..extra).map(|i| format!(", p{i}")).collect();
+            let zeros = ", 0".repeat(extra);
+            let src = format!(
+                "function send(n, a, b{more}) {{ fetch(a); if (n > 0) send(n - 1, b, a{more}); }}\n\
+                 function place() {{ send(1, '/first', '/second'{zeros}); }}\n"
+            );
+            let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+            let files = BTreeMap::from([("a.ts", &facts)]);
+            let resolver = Resolver::new(&files, TsJs.modules(&[], &files).unwrap(), &TsJs);
+            let code = Code::new(&resolver, &files, crate::lang::pack(0));
+            let n = (facts.calls.iter())
+                .position(|c| c.callee == "fetch")
+                .unwrap();
+            let url = |args: &[Value], _: &Keywords| match args.first()? {
+                Value::Ref(_) => None,
+                url => Some(url.clone()),
+            };
+            // The caller's own URL and what the next turn sends, not known.
+            assert_eq!(code.expand(Expand::Call("a.ts", n), &url).len(), 2);
+            let of = |budget: &RefCell<HashMap<&str, usize>>| {
+                budget.borrow().get("a.ts").copied().unwrap_or_default()
+            };
+            (of(&code.folded), of(&code.folded_cuts))
+        };
+        let ((file, cuts), (file_wide, cuts_wide)) = (spent(0), spent(30));
+        assert_eq!(file, file_wide);
+        assert!(cuts > 0 && cuts_wide >= cuts + 30, "{cuts} {cuts_wide}");
     }
 
     #[test]

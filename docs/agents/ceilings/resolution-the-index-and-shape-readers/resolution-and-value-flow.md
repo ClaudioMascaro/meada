@@ -70,8 +70,9 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   simple path up the callers, cut where it reaches a wrapper again (nothing more where the
   cycle's calls pass each parameter the read needs on as itself; where they pass anything else,
   each site the wrapper's first turn gives also gets what the wrapper reads where it stands,
-  its parameters unknown, #886), and does not climb a call found only by a name match, so a
-  wrapper
+  its parameters unknown, #886; what that adds is folded on an `EVAL_BUDGET` of its own per
+  file, past which a cycle adds nothing), and does not climb a call found only by a name
+  match, so a wrapper
   method called on a receiver whose class Meada cannot tell (in TypeScript any receiver but
   `this`, a `const api = new Api()` included), or a function called by a bare name no import
   binds, is read where it stands; value flow (`Code::origins`, for a parameter's arguments) does
