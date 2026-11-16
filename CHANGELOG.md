@@ -122,15 +122,6 @@ All notable changes to Meada are recorded here. The format follows
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
 
-- Go: a parameter list or named results that group ten names or more under one type
-  (`p0, p1, ..., p9 string`) keep their first names. tree-sitter-go parses each name before the
-  last nine as a nameless parameter of that type name, and Go writes the names of a list all or
-  none, so the pack gives them back to the group: a wrapper whose table comes in `p0` is followed
-  to its callers, where the table is named, instead of leaving one unresolved side at its own
-  call, or naming the table of a package constant the parameter hides. The schema version is
-  the same: an index written before the upgrade keeps its reading of such a file until the file
-  next changes, or takes the new rule at once after deleting `.meada/index.db` (found by the
-  verification of #886).
 - Go: the system or architecture suffix of a file name is read off the name cut at its first
   dot, as the Go tools read it. A file such as `store.gen_windows.go`, which Go builds for every
   target, was left out with all its definitions and calls, and `store_windows.gen.go`, which Go
@@ -141,6 +132,15 @@ All notable changes to Meada are recorded here. The format follows
   and a long wildcard segment as many entries: 255 sources that match none of 4,000 files no
   longer take 47 seconds to index, and fall back to the whole build context as other Dockerfiles
   past the reader's work do (#761).
+- Go: a parameter list or named results that group ten names or more under one type
+  (`p0, p1, ..., p9 string`) keep their first names. tree-sitter-go parses each name before the
+  last nine as a nameless parameter of that type name, and Go writes the names of a list all or
+  none, so the pack gives them back to the group: a wrapper whose table comes in `p0` is followed
+  to its callers, where the table is named, instead of leaving one unresolved side at its own
+  call, or naming the table of a package constant the parameter hides. The schema version is
+  the same: an index written before the upgrade keeps its reading of such a file until the file
+  next changes, or takes the new rule at once after deleting `.meada/index.db` (found by the
+  verification of #886).
 - The Dockerfile reader splits an instruction and its sources at ASCII blanks only, as Docker
   does: a source whose name holds a no-break space or another Unicode blank is one path, not two,
   and a flag past ASCII, which Docker reads one byte as one character, leaves the Dockerfile
