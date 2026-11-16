@@ -454,8 +454,9 @@ export async function send() {
             .unwrap()
             .contains("(no use in the workspace)")
     );
+    // No IaC type provisions `postgres` (ADR 0026, amended 2026-11-16).
     assert!(
-        engine
+        !engine
             .context("resource::postgres::archive", None)
             .unwrap()
             .contains("(no provisioner in the workspace)")

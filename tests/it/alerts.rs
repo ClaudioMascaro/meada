@@ -713,7 +713,7 @@ fn alert_places_do_not_change_search_locations_of_other_kinds() {
         .unwrap();
     assert_eq!(
         found.trim(),
-        "example.com/acme/monitoring aws_sqs_queue.q resource::routing::teams (no provisioner in the workspace)"
+        "example.com/acme/monitoring aws_sqs_queue.q resource::routing::teams"
     );
 }
 

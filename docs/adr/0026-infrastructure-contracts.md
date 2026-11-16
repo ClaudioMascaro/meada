@@ -262,6 +262,9 @@ execution, context, trace, orphan and export seams and the shared 1.3.0 minor re
   holds no side, so it is never an orphan. A consumer whose repository is in the workspace and
   whose path names no provider there is marked absent at the indexed commit.
 - Which sides open the scope and which an orphan line may name: see "Orphan sides".
+- (Amended 2026-11-16; #814.) Orphans and the marks of `context` and `search` apply only to a
+  broker or resource kind that an entry of the type table provisions: see "Kinds no IaC type
+  provisions".
 
 ### Export
 
@@ -730,3 +733,27 @@ the links that remove an orphan line.)
    Not taken: no generic use side at all from such a document, structured identifiers included,
    since an ARN in a rule label names its resource exactly; and a skip list by file name,
    extension or path, one more rule to keep for each format.
+
+### Kinds no IaC type provisions (#814, 2026-11-16)
+
+"Orphans" groups the sides of a contract kind by broker or resource kind, and says that where a
+scope lacks a provisioner of a group, `context` and `search` mark each use side `no provisioner in
+the workspace`. It did not say what happens to a kind that no IaC type can provision. Meada read
+it as a group with no provisioner: every side of a declared `[[resource]]` of kind `postgres`, of
+a NATS subject and of a resource declared through `via` (`routing`) carried the mark, and a reader
+went looking for infrastructure that cannot exist.
+
+A broker or resource kind has an orphan group only when an entry of the type table
+(`src/iac/types.toml`) provisions that kind for that contract kind: a `channel` entry of kind
+`sqs` gives `channel::sqs` a group, and no entry gives one to `resource::sqs`. A side of a kind
+with no group carries neither `no provisioner in the workspace` nor `no use in the workspace`,
+opens no orphan scope and is never an orphan line. A kind the table provisions answers as before,
+in a scope with a provisioner of it or without one. The set of grouped kinds is read from the
+table, never written a second time, so a new entry gives its kind a group. `meada status` does not
+change: its orphan lines already needed a provisioner, and only a kind the table provisions has
+one.
+
+Not taken: a mark of its own for such a kind (`no IaC type provisions this kind`), which states
+what Meada cannot read rather than something missing from the workspace; and a list of kinds in
+`meada.toml` that the workspace provisions by other means, one more setting for a note the
+workspace cannot act on.

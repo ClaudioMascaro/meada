@@ -121,6 +121,11 @@ All notable changes to Meada are recorded here. The format follows
   open whole an unresolved consumer with its cause where the workspace provides a PyPI package. The
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
+- `search` and `context` no longer mark a side `(no provisioner in the workspace)` when no IaC
+  type can provision its kind: a declared `[[resource]]` of kind `postgres`, a NATS subject or a
+  resource declared through `via` of a kind the type table does not list carries no mark, and the
+  writer of a declared resource no longer reads as missing infrastructure. A kind the type table
+  provisions is marked as before, and `meada status` is unchanged (ADR 0026, amended) (#814).
 
 - Go: the system or architecture suffix of a file name is read off the name cut at its first
   dot, as the Go tools read it. A file such as `store.gen_windows.go`, which Go builds for every

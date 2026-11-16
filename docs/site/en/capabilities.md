@@ -329,6 +329,10 @@ IaC-only repository produces no such lines; `search` and `context` mark the side
 patterns and independent root modules, determine whether a counterpart exists. Existing
 warnings about declared resources without writers and readers remain separate.
 
+Only a broker or resource kind that the type table provisions has an orphan group. A declared
+`[[resource]]` of kind `postgres` or a NATS subject, which no IaC type creates, carries no mark in
+`search` or `context` and is never an orphan line.
+
 A use Meada only infers from a key name (a plain value under `queue`, `topic`, `bucket`, `table`
 or a typed alias, `inferred`) opens no orphan scope for its group and is never an orphan line: a
 name match proves neither a use nor its absence. It still links to the provisioner of the same

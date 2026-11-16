@@ -553,6 +553,10 @@ código o solo de IaC no genera esas líneas; `search` y `context` marcan el pro
 incluidos patrones y módulos raíz independientes, determinan si hay contraparte. Los avisos
 existentes de recursos declarados sin escritores y lectores siguen separados.
 
+Solo tiene grupo de huérfanos un broker o tipo de recurso que la tabla de tipos aprovisiona. Un
+`[[resource]]` declarado de tipo `postgres` o un subject NATS, que ningún tipo de IaC crea, no
+lleva marca en `search` ni en `context` y nunca es una línea de huérfano.
+
 Un uso que Meada solo infiere por el nombre de una clave (un valor simple bajo `queue`, `topic`,
 `bucket`, `table` o un alias tipado, `inferred`) no abre el ámbito de huérfanos de su grupo y
 nunca es una línea de huérfano: una coincidencia de nombre no prueba ni el uso ni su ausencia.
