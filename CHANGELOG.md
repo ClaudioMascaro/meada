@@ -6,6 +6,8 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-16
+
 ### Added
 
 - Go: a DynamoDB transaction's list held in a name keeps its tables when it is also read by
@@ -139,7 +141,6 @@ All notable changes to Meada are recorded here. The format follows
   resource declared through `via` of a kind the type table does not list carries no mark, and the
   writer of a declared resource no longer reads as missing infrastructure. A kind the type table
   provisions is marked as before, and `meada status` is unchanged (ADR 0026, amended) (#814).
-
 - Java: a unicode escape of a line terminator (`\u000a`, `\u000d`, with any number of `u`, and
   not after an odd run of backslashes) is read as javac reads it, before the file is parsed: in a
   line comment it ends the comment, and the rest of the line is code. A change written there, to
