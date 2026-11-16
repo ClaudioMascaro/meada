@@ -95,6 +95,21 @@ pub(super) fn nfc(s: String) -> String {
     }
 }
 
+/// `v` with each string and object key in NFC: a value read whole rather than evaluated (a JSON
+/// var file's).
+pub(super) fn nfc_value(v: Value) -> Value {
+    match v {
+        Value::String(s) => Value::String(nfc(s)),
+        Value::Array(items) => Value::Array(items.into_iter().map(nfc_value).collect()),
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .map(|(k, v)| (nfc(k), nfc_value(v)))
+                .collect(),
+        ),
+        v => v,
+    }
+}
+
 fn text(args: FuncArgs, f: fn(&str) -> String) -> Out {
     Ok(Value::String(nfc(f(string(&args[0])))))
 }

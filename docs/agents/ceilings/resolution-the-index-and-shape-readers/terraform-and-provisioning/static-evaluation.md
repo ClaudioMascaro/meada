@@ -117,7 +117,9 @@
   of that object inside the collection), and a template `%{ for }` directive is not evaluated (a
   `*`). A file's own call of `meada_exact` is no function.
   Every string is in NFC, as cty holds it (#749): a literal or an object key before `hcl-rs`
-  evaluates, and the text a template or a string function makes (`functions::nfc`).
+  evaluates, a literal `Eval::value` keeps without evaluating, a literal index of a reference,
+  each string and key of a JSON var file (`functions::nfc_value`), and the text a template or a
+  string function makes (`functions::nfc`).
   A function over an unresolved argument is `*` whole, even
   `format` or `join`, which keep no literal part. A literal
   `*` in a name reads as a wildcard. A child module's variable default its call leaves is not

@@ -984,8 +984,9 @@ fn reference(root: &str, ops: &[&TraversalOperator]) -> Option<Ref> {
             Some(TraversalOperator::Index(Expression::Number(n))) => {
                 (n.value().as_u64().map(Key::Int), at + 1)
             }
+            // The key in NFC, as the instance keys are (#749).
             Some(TraversalOperator::Index(Expression::String(s))) => {
-                (Some(Key::Str(s.value().clone())), at + 1)
+                (Some(Key::Str(functions::nfc(s.value().clone()))), at + 1)
             }
             Some(TraversalOperator::LegacyIndex(n)) => (Some(Key::Int(*n.value())), at + 1),
             Some(
@@ -1557,6 +1558,7 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
             let value = (!float(&value))
                 .then(|| serde_json::from_value::<Value>(value).ok())
                 .flatten()
+                .map(functions::nfc_value)
                 .filter(|v| size(v) <= EVAL_VALUE_MAX);
             values.push((name, value, at));
         }
@@ -2988,9 +2990,10 @@ impl<'m> Eval<'m> {
         if let Expression::String(s) = expr
             && s.len() + 2 <= EVAL_VALUE_MAX
         {
-            // Nothing to evaluate: a literal that fits stays known once the work is spent.
+            // Nothing to evaluate: a literal that fits stays known once the work is spent, in NFC
+            // as `Exact` writes the literals it evaluates (#749).
             return Evaluated {
-                val: Val::Known(Value::from(s.value().as_str())),
+                val: Val::Known(Value::String(functions::nfc(s.value().clone()))),
                 through: BTreeSet::new(),
             };
         }
