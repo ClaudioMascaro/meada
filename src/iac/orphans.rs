@@ -136,3 +136,33 @@ impl<'e> Scope<'e> {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::group;
+    use crate::iac::types::ENTRIES;
+
+    /// ADR 0026, amended 2026-11-16 (#814): a kind no entry of the type table provisions has no
+    /// orphan group, so its sides carry no mark.
+    #[test]
+    fn only_a_kind_the_type_table_provisions_has_an_orphan_group() {
+        assert_eq!(group("resource::postgres::orders"), None);
+        assert_eq!(group("resource::routing::team-b"), None);
+        assert_eq!(group("channel::nats::orders.created"), None);
+        assert_eq!(group("channel::sqs::orders"), Some(("channel", "sqs")));
+        assert_eq!(group("resource::s3::archive"), Some(("resource", "s3")));
+    }
+
+    /// The groups come from the type table: every kind it provisions has one.
+    #[test]
+    fn every_kind_of_the_type_table_has_an_orphan_group() {
+        for entry in ENTRIES.iter() {
+            let contract = entry.contract("name");
+            assert_eq!(
+                group(&contract).map(|(_, kind)| kind),
+                Some(entry.kind.as_str()),
+                "{contract}"
+            );
+        }
+    }
+}

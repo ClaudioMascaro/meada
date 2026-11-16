@@ -145,7 +145,7 @@ pub(crate) fn workload_of(node: &super::Node) -> Option<&'static Workload> {
     workload(format_of(&node.path)?, &node.ty)
 }
 
-static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {
+pub(super) static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {
     // The table is the repository's own file, checked by `the_table_parses`.
     toml::from_str::<Table>(TABLE).map_or_else(|_| Vec::new(), |t| t.entry)
 });
