@@ -57,7 +57,8 @@ root), with the path normalised by `iac::joined`. An action's file node provides
 repository` and no ref. A CI step's `./<folder>` is unresolved wherever `workspace_causes` names
 a cause (a composite action, a reusable pipeline, no `actions/checkout` before it in its CI
 job, one that names `repository` or `path`): its consumer then has no contract. The kind hook
-`unresolved_causes` hands those sites to `items::list` (no candidate, `OpenItem::cause`) and to
+`unresolved_causes` hands those sites to `items::causes`, so `items::list` gives no candidate
+(`OpenItem::cause`) and a `dynamic-url` decision for the step is stale `not-candidate`, and to
 `Engine::search` (no line in the default search or under the kind `contract`); `search` with
 the kind `unresolved`, `context` on the CI step and `meada decide --list` show the cause.
 

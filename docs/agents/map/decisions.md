@@ -29,8 +29,13 @@ this file, and a change to these modules updates it.
   that decides a decision's `Fate`, in this order: call gone (`Cause::CallGone`), target
   repository a missing peer (`Waiting`, neither applied nor stale, whatever else holds), item no
   longer open (the core resolves the call on its own, or the item is not of the decision's kind:
-  `ItemNotOpen`), target gone (`TargetGone`), target not among the ambiguous link's candidates
-  (`NotCandidate`); else it applies. A stale or waiting decision changes no link. `Evaluation {
+  `ItemNotOpen`), target gone (`TargetGone`), target not among the item's candidates
+  (`NotCandidate`): the ambiguous link's providers, or, for a dynamic URL, the served routes
+  `items::fits` lets one of the call's unresolved consumers reach, the rule `meada decide --list`
+  uses (a gateway path included, never a consumer `items::causes` names, such as a CI step); else
+  it applies, a dynamic URL to the first fitting site. `replay_repositories` works out
+  `items::causes` once, in a `OnceCell`, on the first decision that needs it. A stale or waiting
+  decision changes no link. `Evaluation {
   repository, stale: Vec<Stale {call, target, cause}>, waiting: Vec<Waiting {call, target, peer}>
   }` is per repository, in file order; `Engine::decision_report()` returns them for the workspace
   (`Engine::local_decisions()` the one of the repository where Meada runs,

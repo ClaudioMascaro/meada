@@ -931,10 +931,13 @@ p = 0.62
 O arquivo tem uma entrada por `call`: repetir uma chamada é um erro que nomeia a linha. A ligação
 decidida ganha o nível `decided`, e o motivo mostra quem decidiu.
 
-Quando o código muda e uma decisão deixa de caber (a chamada sumiu, o item não está mais aberto,
-o provedor sumiu ou não é mais candidato), o `meada status` a mostra como **obsoleta** sob o
-repositório, e `meada decide --prune` a remove. Uma decisão que espera um par ainda não
-encontrado aparece à parte (`decision waiting on missing peer ...`) e é mantida.
+O `target` precisa ser um dos candidatos do item, os que o `meada decide --list` mostra, também
+numa URL dinâmica: uma rota servida que não está entre eles (de outro método, por exemplo) não se
+aplica. Quando uma decisão não cabe, porque o código mudou ou porque o arquivo foi escrito à mão (a
+chamada sumiu, o item não está mais aberto, o provedor sumiu ou não é candidato do item), o
+`meada status` a mostra como **obsoleta** sob o repositório, e `meada decide --prune` a remove. Uma
+decisão que espera um par ainda não encontrado aparece à parte
+(`decision waiting on missing peer ...`) e é mantida.
 
 ### Decisor por modelo
 

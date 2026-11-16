@@ -26,6 +26,12 @@ that. Neither may enter indexing (invariant 1).
   ADR 0004.
 - Indexing replays the file and gives the link the `decided` level. A model's output is an
   input artifact, never a step of the pipeline, so invariants 1 and 6 hold.
+- A decision's target is one of its item's candidates: for an ambiguous link, a provider the link
+  lists; for a dynamic URL, a route that `meada decide` lists for the call (its method and the
+  part of its URL Meada read). A target outside them is a stale decision, never a link. (Amended
+  2026-11-16: a dynamic URL's target was only checked to be served by some repository, so a `GET`
+  call decided to a `POST` route became a `decided` link; Meada offers no way to decide a target
+  outside the candidates, which would replace what it read at the call.)
 - The decidable kinds through v1 are ambiguous links and dynamic URLs. Community names and
   shape drift triage are not decision kinds in v1.
 - Decisions apply as soon as they are written. There is no offline evaluation gate. Safety comes

@@ -23,7 +23,7 @@ revisa. Cada `[[decision]]` trae la llamada (`call`), el proveedor elegido (`tar
 decidió (`by`: `human` o el id del modelo) y, para un modelo, la probabilidad (`p`). La
 indexación solo vuelve a leer el archivo: el enlace decidido recibe el nivel `decided` y su
 motivo dice quién decidió. Cuando el código cambia y una decisión deja de encajar (la llamada
-desapareció, el ítem ya no está abierto, el proveedor desapareció o ya no es candidato),
+desapareció, el ítem ya no está abierto, el proveedor desapareció o no es candidato del ítem),
 `meada status` la muestra como obsoleta, bajo su repositorio, y `meada decide --prune` la quita.
 Una decisión que espera un par aún no encontrado aparece aparte y se conserva.
 

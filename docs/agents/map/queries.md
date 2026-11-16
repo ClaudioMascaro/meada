@@ -211,7 +211,10 @@ this file, and a change to these modules updates it.
   reach come from each provider's kind (`ContractKind::candidate`; for HTTP, `route_fits`: method,
   or a route of every method, and ordered literal fragments, see `Found::method` /
   `fragments`; for a consumer whose base Meada could not read, `tail_fits`: a route whose path has
-  a suffix from a `/` equal to `Lead::path`, #801). `OpenItem::limit` is that lead's `Limit`,
+  a suffix from a `/` equal to `Lead::path`, #801). `fits(consumer, provider, causes)` is that
+  one rule, shared with the replay of a `dynamic-url` decision: never for a consumer that
+  `causes(exports)` (every kind's `unresolved_causes`, by site) names, else the provider kind's
+  `candidate`. `OpenItem::limit` is that lead's `Limit`,
   which `decide --list` prints (`Msg::ItemLimit`) and the `search` line names
   (`Limit::describe`). `Candidate::describe` is the one candidate line (repository identity, method,
   path) shared by the prompt and the excerpt. `Engine::items` pairs each item with whether a

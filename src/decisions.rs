@@ -3,7 +3,8 @@
 //! `decided`; a decision that no longer fits is ignored. The file is an input like the source
 //! tree: indexing and replay read no model and no network.
 
-use std::collections::HashSet;
+use std::cell::OnceCell;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,7 @@ use crate::Result;
 use crate::config;
 use crate::contract::{self, Level, Link};
 use crate::index::Export;
-use crate::items::{Candidate, ItemKind, OpenItem};
+use crate::items::{self, Candidate, ItemKind, OpenItem};
 use crate::msg::Msg;
 use crate::workspace::{Missing, Workspace};
 
@@ -258,14 +259,16 @@ enum Fate {
 /// workspace's links before any decision. The checks run in this order, the first that fails
 /// decides: the call is there, the target's repository is not a missing peer (the decision
 /// waits, whatever else), its item is still open (an ambiguous link, or an unresolved
-/// consumer), the target is still served, and, for an ambiguous link, it is still among the
-/// link's candidates.
+/// consumer), the target is still served, and it is among the item's candidates: the link's,
+/// or the routes `meada decide` lists for the unresolved consumer. `causes` is
+/// `items::causes(exports)`, worked out on the first decision that needs it.
 fn evaluate(
     d: &Decision,
     export: &Export,
     exports: &[Export],
     core: &[Link],
     missing: &[Missing],
+    causes: &OnceCell<HashMap<String, &'static str>>,
 ) -> Fate {
     let at = |l: &&Link| l.item_site() == d.call && contract::consumer_item(l, exports);
     if !(export.calls.iter().any(|c| c.id == d.call)
@@ -280,11 +283,12 @@ fn evaluate(
     {
         return Fate::Waiting(peer.repo.clone());
     }
+    let unresolved: Vec<_> = (export.consumers.iter())
+        .filter(|c| c.contract.is_none() && c.item_site() == d.call)
+        .collect();
     let open = match d.kind {
         Kind::AmbiguousLink => core.iter().any(|l| at(&l)),
-        Kind::DynamicUrl => {
-            (export.consumers.iter()).any(|c| c.item_site() == d.call && c.contract.is_none())
-        }
+        Kind::DynamicUrl => !unresolved.is_empty(),
     };
     if !open {
         return Fate::Stale(Cause::ItemNotOpen);
@@ -293,18 +297,27 @@ fn evaluate(
         return Fate::Stale(Cause::TargetGone);
     };
     // ponytail: a repository serving one contract from several sites links to the first by
-    // site; the target names no site.
+    // site (the first that fits, for a dynamic URL); the target names no site.
     let served: Vec<_> = exports
         .iter()
         .filter(|e| e.repository == identity)
         .flat_map(|e| &e.providers)
         .filter(|p| p.contract == contract)
         .collect();
-    let Some(provider) = served.iter().map(|p| &p.site).min() else {
+    if served.is_empty() {
         return Fate::Stale(Cause::TargetGone);
-    };
+    }
     match d.kind {
-        Kind::DynamicUrl => Fate::Applies(provider.clone(), contract.into()),
+        Kind::DynamicUrl => {
+            let causes = causes.get_or_init(|| items::causes(exports));
+            (served.iter())
+                .filter(|p| unresolved.iter().any(|c| items::fits(c, p, causes)))
+                .map(|p| &p.site)
+                .min()
+                .map_or(Fate::Stale(Cause::NotCandidate), |site| {
+                    Fate::Applies(site.clone(), contract.into())
+                })
+        }
         // The ambiguous link to a provider of the target, by its code path or its gateway
         // path; the decided link keeps the contract the call uses.
         Kind::AmbiguousLink => core
@@ -348,6 +361,7 @@ pub(crate) fn replay_repositories(
 ) -> (Vec<Link>, Vec<Evaluation>) {
     let mut evaluations = Vec::new();
     let mut applied = Vec::new();
+    let causes = OnceCell::new();
     for (repo, export) in repositories.iter().zip(exports) {
         let mut evaluation = Evaluation {
             repository: repo.identity.clone(),
@@ -355,7 +369,7 @@ pub(crate) fn replay_repositories(
             waiting: Vec::new(),
         };
         for d in repo.decisions.items.iter().filter(|d| include(d)) {
-            let fate = evaluate(d, export, exports, &links, missing);
+            let fate = evaluate(d, export, exports, &links, missing, &causes);
             let (call, target) = (d.call.clone(), d.target.clone());
             match fate {
                 Fate::Applies(provider, contract) => applied.push((d, provider, contract)),

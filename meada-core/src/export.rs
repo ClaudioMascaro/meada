@@ -879,7 +879,8 @@ pub enum Cause {
     ItemNotOpen,
     /// No repository of the workspace serves the target's contract.
     TargetGone,
-    /// The target is served, but is not among the candidates of the ambiguous link.
+    /// The target is served, but is not among the candidates of the item: the ambiguous link's,
+    /// or the routes the dynamic URL's method and literal fragments leave.
     NotCandidate,
 }
 

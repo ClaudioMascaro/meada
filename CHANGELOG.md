@@ -120,6 +120,13 @@ All notable changes to Meada are recorded here. The format follows
   on the package lists the CI step. A name with an unresolved part is a pattern, and a name left
   open whole an unresolved consumer with its cause where the workspace provides a PyPI package. The
   index stores nothing new. Release level: minor, meada (#831).
+- A `dynamic-url` decision applies only when its target is one of the item's candidates, the routes
+  `meada decide --list` shows for the call by the rule of #801, one that fits by a gateway path
+  included. A target a repository serves but that the call's method or URL does not fit, which only
+  a file written by hand could name, was a `decided` link and closed the item: it is now a stale
+  decision with the cause `not-candidate`, the item stays open, and `meada decide --prune` removes
+  it, as for an ambiguous link. The stale line reads `target not a candidate` in English, and its
+  Portuguese and Spanish lines drop "mais" and "ya" alike. Release level: minor, meada.
 ### Fixed
 
 - Go: the system or architecture suffix of a file name is read off the name cut at its first

@@ -928,10 +928,13 @@ p = 0.62
 The file has one entry per `call`: repeating a call is an error that names the line. The decided
 link gets level `decided`, and the reason shows who decided.
 
-When the code changes and a decision no longer fits (the call is gone, the item is no longer open,
-the provider is gone or is no longer a candidate), `meada status` shows it as **stale** under the
-repository, and `meada decide --prune` removes it. A decision waiting on a peer not yet found
-appears separately (`decision waiting on missing peer ...`) and is kept.
+The `target` must be one of the item's candidates, those `meada decide --list` shows, for a dynamic
+URL too: a served route that is not among them (of another method, say) does not apply. When a
+decision does not fit, because the code changed or because the file was written by hand (the call
+is gone, the item is no longer open, the provider is gone or is not a candidate of the item),
+`meada status` shows it as **stale** under the repository, and `meada decide --prune` removes it. A
+decision waiting on a peer not yet found appears separately
+(`decision waiting on missing peer ...`) and is kept.
 
 ### Model decider
 

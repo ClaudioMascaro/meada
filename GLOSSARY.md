@@ -855,9 +855,10 @@ Whoever makes a decision: a person or, if the user opts in, a language model rea
 _Avoid_: judge, LLM, oracle
 
 **Stale decision**:
-A decision that no longer applies, for one cause: its call site is gone, its item is no longer
-open (the core now resolves the call on its own), its target is gone, or its target is no longer
-a candidate of the ambiguous link. Indexing ignores it, so the link stays as the core sees it;
+A decision that does not apply, for one cause: its call site is gone, its item is no longer open
+(the core now resolves the call on its own), its target is gone, or its target is not a candidate
+of the item: of the ambiguous link, or, for a dynamic URL, of the routes the call's method and URL
+leave, as `meada decide` lists them. Indexing ignores it, so the link stays as the core sees it;
 `meada status` and `meada export` report it with the cause. A decision whose target repository
 is a missing peer is neither applied nor stale: it waits.
 _Avoid_: outdated decision, invalid decision

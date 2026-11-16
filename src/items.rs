@@ -125,6 +125,27 @@ pub(crate) fn sites(exports: &[Export], links: &[Link]) -> Vec<(usize, String)> 
     items.collect()
 }
 
+/// The consumers with no contract that their kinds own, by site, each with why it is
+/// unresolved (`ContractKind::unresolved_causes`).
+pub(crate) fn causes(exports: &[Export]) -> HashMap<String, &'static str> {
+    (contract::KINDS.iter())
+        .flat_map(|kind| kind.unresolved_causes(exports))
+        .collect()
+}
+
+/// Whether `provider` is a candidate of `consumer`, which has no contract: never when `causes`
+/// names the consumer, else by its kind's `candidate` (HTTP: by method and literal URL
+/// fragments, or by a gateway path). The one rule behind the list of an unresolved consumer's
+/// candidates and the replay of a `dynamic-url` decision.
+pub(crate) fn fits(
+    consumer: &Consumer,
+    provider: &Provider,
+    causes: &HashMap<String, &'static str>,
+) -> bool {
+    !causes.contains_key(consumer.site.as_str())
+        && kind_of(&provider.contract).is_some_and(|k| k.candidate(consumer, provider))
+}
+
 /// The items of every repository as the core sees them, in id order: `links` are the links
 /// before any decision, so a decided call is listed too (the caller drops it to keep the open
 /// ones). The candidates of an ambiguous link are the providers `links` lists for it; those of
@@ -147,9 +168,7 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
     fn candidate<'a>(&(repository, p): &(&'a str, &'a Provider)) -> (&'a str, &'a str, &'a str) {
         (repository, p.contract.as_str(), p.site.as_str())
     }
-    let causes: HashMap<String, &'static str> = (contract::KINDS.iter())
-        .flat_map(|kind| kind.unresolved_causes(exports))
-        .collect();
+    let causes = causes(exports);
     let mut items = Vec::new();
     for (export, repo) in exports.iter().zip(repos) {
         let calls: HashMap<&str, _> = export.calls.iter().map(|c| (c.id.as_str(), c)).collect();
@@ -165,10 +184,7 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                 ambiguous.get(consumer.item_site().as_ref()),
             ) {
                 (None, _) => {
-                    let open = !causes.contains_key(consumer.site.as_str());
-                    let fitting = providers.iter().filter(|(_, p)| {
-                        open && kind_of(&p.contract).is_some_and(|k| k.candidate(consumer, p))
-                    });
+                    let fitting = providers.iter().filter(|(_, p)| fits(consumer, p, &causes));
                     (
                         ItemKind::Unresolved,
                         fitting.map(candidate).collect::<Vec<_>>(),

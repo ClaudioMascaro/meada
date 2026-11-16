@@ -943,10 +943,13 @@ p = 0.62
 El archivo tiene una entrada por `call`: repetir una llamada es un error que nombra la línea. El
 enlace decidido recibe el nivel `decided`, y el motivo muestra quién decidió.
 
-Cuando el código cambia y una decisión deja de encajar (la llamada desapareció, el ítem ya no
-está abierto, el proveedor desapareció o ya no es candidato), `meada status` la muestra como
-**obsoleta** bajo el repositorio, y `meada decide --prune` la quita. Una decisión que espera un
-par aún no encontrado aparece aparte (`decision waiting on missing peer ...`) y se conserva.
+El `target` debe ser uno de los candidatos del ítem, los que muestra `meada decide --list`, también
+en una URL dinámica: una ruta servida que no está entre ellos (de otro método, por ejemplo) no se
+aplica. Cuando una decisión no encaja, porque el código cambió o porque el archivo se escribió a
+mano (la llamada desapareció, el ítem ya no está abierto, el proveedor desapareció o no es
+candidato del ítem), `meada status` la muestra como **obsoleta** bajo el repositorio, y
+`meada decide --prune` la quita. Una decisión que espera un par aún no encontrado aparece aparte
+(`decision waiting on missing peer ...`) y se conserva.
 
 ### Decisor por modelo
 

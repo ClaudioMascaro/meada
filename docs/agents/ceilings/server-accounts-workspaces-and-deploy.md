@@ -262,7 +262,7 @@
   FIFO given as the path is refused by the check. Closing it would take
   `O_NONBLOCK | O_NOFOLLOW` and a direct `libc` dependency, declined in #548.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
-  first by site; the target names no site.
+  first by site (for a dynamic URL, the first the call fits); the target names no site.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
   assumed.
 - `drift_view.rs`: `context`, `search` and `status` find each shown link's consumer call by

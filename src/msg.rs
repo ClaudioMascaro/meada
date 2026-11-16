@@ -1798,9 +1798,9 @@ impl Msg<'_> {
                     ),
                     Cause::TargetGone => ("target gone", "alvo removido", "destino eliminado"),
                     Cause::NotCandidate => (
-                        "target no longer a candidate",
-                        "alvo não é mais candidato",
-                        "el destino ya no es candidato",
+                        "target not a candidate",
+                        "alvo não é candidato",
+                        "el destino no es candidato",
                     ),
                 };
                 pick(

@@ -23,7 +23,7 @@ review. Each `[[decision]]` holds the call (`call`), the chosen provider (`targe
 (`by`: `human` or the model id) and, for a model, the probability (`p`). Indexing only reads
 the file back: the decided link gets the level `decided` and its reason says who decided. When
 the code changes and a decision no longer fits (the call is gone, the item is no longer open,
-the provider is gone or is no longer a candidate), `meada status` reports it as stale, under
+the provider is gone or is not a candidate of the item), `meada status` reports it as stale, under
 its repository, and `meada decide --prune` removes it. A decision waiting for a peer that has
 not been found yet is shown apart and kept.
 
