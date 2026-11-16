@@ -143,6 +143,10 @@ All notable changes to Meada are recorded here. The format follows
   paid the estimate again. A refused expression spends the evaluation budget for each root by
   its own reads, so reading `count.index` no longer counts as copying every variable: forty
   refused instances no longer leave the names after them unresolved (#765).
+- A Backstage backend module (`createBackendModule`) serves its routes under the
+  `/api/<pluginId>` of the plugin it extends, where Backstage mounts them, and no longer at the
+  root, where nothing serves them; a `discovery.getBaseUrl('<pluginId>')` call to such a route
+  links to it (#813).
 - Terraform evaluation no longer parses a template's text again each time it evaluates it: a
   template is evaluated as its parts, each charged a few steps in a `for` instead of 32 steps a
   byte of its text, so a 17 KB template in a `for` over two elements, a `%{ if }` template in a

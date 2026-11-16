@@ -1727,7 +1727,9 @@ In Backstage, the router a backend plugin gives its `httpRouter` (`httpRouter.us
 `httpRouter` taken from `coreServices.httpRouter` in the `deps` of `registerInit`) holds under
 `/api/<pluginId>`, the path where the framework mounts it, when `createBackendPlugin`, imported
 from a `@backstage/` package, writes its `pluginId` as a literal or as a `const` of the same file
-bound to one. A plugin whose `pluginId` cannot be read that way (an environment read, an import)
+bound to one. A backend module (`createBackendModule`) gets the `httpRouter` of the plugin it
+extends: the router it gives holds under that plugin's `/api/<pluginId>`, its `pluginId` read the
+same way. A plugin whose `pluginId` cannot be read that way (an environment read, an import)
 leaves its router at the root, as before, and `meada status` names the plugin. On the
 consumer side, a URL that starts with `discovery.getBaseUrl('<id>')` (held by a constant or
 written in the URL itself) starts at `/api/<id>`, and the link's reason names the plugin and that

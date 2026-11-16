@@ -82,8 +82,9 @@ pub(crate) fn schema_version() -> i32 {
 /// row of `contracts` is a call through a binding imported from a bare specifier (`via`), naming `method` of it. A `shape`
 /// row (issue #175) is the shape of the module-level constant or type `method` a file exports,
 /// read for the view `via` (`shape::Want`), kept only in a repository with a named manifest.
-/// An `unmounted` row (#615) is a Backstage plugin whose `pluginId` cannot be read, at its
-/// `createBackendPlugin` call, no `contract`: `meada status` reports it. An `unfollowed` row
+/// An `unmounted` row (#615) is a Backstage plugin or module whose `pluginId` cannot be read,
+/// at its `createBackendPlugin` or `createBackendModule` call, no `contract`: `meada status`
+/// reports it. An `unfollowed` row
 /// (#689) is a Backstage `$include` not followed, at the first file of the TS and JavaScript
 /// group, no `contract`: the including file in `via`, the reason in `method` and the include as
 /// written in `fragments`; `meada status` reports it. `exports` holds what each file exports

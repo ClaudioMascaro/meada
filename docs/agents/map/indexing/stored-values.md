@@ -48,7 +48,8 @@ links and structured inference explanations are transient query values, never st
   parts, scalar leaves, declared and optional paths and the imports they leave to fill, issue
   #175; what crosses repositories is this shape of an exported name,
   never its source text), the Backstage plugins whose `pluginId` cannot be read (`contracts`
-  rows of role `unmounted`, no contract, at the `createBackendPlugin` call, issue #615), the
+  rows of role `unmounted`, no contract, at the `createBackendPlugin` or `createBackendModule`
+  call, issues #615 and #813), the
   Backstage `$include`s not followed (`contracts` rows of role `unfollowed`, no contract, at the
   TS group's first file: the including config file's path in `via`, the include as written in
   `fragments` and the reason's name in `method`, #689; never a value the include resolves to), the names of the Cargo features a Rust crate enables by default
