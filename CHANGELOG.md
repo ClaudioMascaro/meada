@@ -8,6 +8,26 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [1.5.0] - 2026-11-16
 
+A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md)
+that brings GitHub Actions into the graph (ADR 0028): pipelines, actions, CI jobs and CI steps are
+IaC nodes, the new `ci` contract kind links each call of a reusable pipeline or an action across
+the repositories of a workspace, and a CI step's `run` script links to the packages it installs,
+the programs it starts and the images it publishes. It is minor because `search` gains the kind
+`ci`, contract identifiers gain `ci::`, `context` and `search` gain line kinds and marks, and the
+export gains optional fields. It also reads more of the AWS SDKs in Go and Java and fixes the
+reading of Go, Java, Terraform, Dockerfile, Backstage and decisions. The index schema changes, so
+existing indexes are rebuilt once on first use, and every fix below applies then, those whose
+entry says the schema version is the same included; export format stays 1. `meada-core` 1.5.0
+gives `export::Consumer` the fields `git_ref` (serialized as `ref`), `with`, `secrets`, `absent`
+and `permissions`, with the new `export::Permissions`, `AllPermissions`, `Access`, `Secrets` and
+`Inherit`. There is no Postgres migration. The tree, the `meada-core` pin, the Dockerfile, the
+compose defaults and the Helm chart declare `1.5.0`, and the `v1.5.0` tag goes on the
+`release/1.5` branch, cut from this entry's merge on main. Publication (crates, the staged npm
+package, the GitHub draft release) belongs to the maintainer. Release notes are available in
+[pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.5.0.md),
+[English](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.5.0.en.md) and
+[Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.5.0.es.md).
+
 ### Added
 
 - Go: a DynamoDB transaction's list held in a name keeps its tables when it is also read by

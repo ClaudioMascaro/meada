@@ -382,7 +382,7 @@ words:
 | iac root | `root: <iac-root>` | The IaC node's root module; for a pipeline or an action and the nodes under it, the file's path. |
 | iac role | `role: <text>` | What a Kubernetes object is to Crossplane: `crossplane composite resource definition`, `crossplane composition`, `crossplane claim`, `crossplane composite resource`, `crossplane managed resource` or `crossplane composed resource`. |
 | iac image | `image: <text><iac-mark?>` | A Compose service's image quoted as JSON, or a workload's image contract with its optional missing-builder note. |
-| image builder | `  builder: <repository> [<level>: <reason>]` | A workload's image builder, with its evaluated evidence: the repository, or in a pipeline the identity of the CI step that builds the image. |
+| image builder | `  builder: <builder> [<level>: <reason>]` | A workload's image builder, with its evaluated evidence. |
 | ci builds | `builds <contract>` | The selected CI step builds the image of the contract. |
 | image runner | `  runner: <identity><runner-root?> [<level>: <reason>]` | Under `builds`: a workload that runs the image, with the link's level and reason. |
 | workload code | `code: <repository> <path> [<level>]` | A same-repository path the workload runs directly, at the level of its execution. |
@@ -464,6 +464,8 @@ words:
 | `<role>` | `provisioner` | Creates the resource. |
 | `<role>` | `writer` | Writes the resource. |
 | `<role>` | `reader` | Reads the resource. |
+| `<builder>` | `<repository>` | The repository whose configuration publishes the image. |
+| `<builder>` | `<identity>` | In a pipeline, the CI step that builds the image. |
 | `<role>` | `producer` | Produces to the channel: the symbol around the producing call. |
 | `<role>` | `producer <broker> send <channel>` | A documented producer on a subscription's source channel, shown in the target channel's context. |
 | `<role>` | `consumer` | Consumes the channel (its handler), or calls the route. |
