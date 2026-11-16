@@ -12,6 +12,7 @@ expected answer, so an answer given without reading the case fails one of the tw
 """
 import argparse
 import collections
+import gzip
 import hashlib
 import json
 import os
@@ -1215,7 +1216,53 @@ def selftest():
     pinned = prove.infra()
     for name in CORPUS:
         assert re.fullmatch(r'[0-9a-f]{40}', pinned[name][2]) and pinned[name][1].startswith('https://github.com/'), name
+    corpus_selftest(pinned)
     print(f'ci.py self-test: {len(CASES)} cases, each with a control that can fail')
+
+
+def corpus_selftest(pinned):
+    """#904's sets, their run records and what `measure` counts, without Meada."""
+    sets = corpus_sets()
+    assert {name: len(repos) for name, repos in sets.items()} == {'p': 3, 'a': 6, 'b': 7, 'c': 10, 'f': 41, 'f-distractor': 47}, sets
+    records = json.loads((Path(__file__).resolve().parent / 'ci-records.json').read_text())['records']
+    assert set(records) == {repo for repos in sets.values() for repo in repos}, sorted(records)
+    for name, record in records.items():
+        assert (record['repository'], record['sha']) == (pinned[name][1].removeprefix('https://github.com/'), pinned[name][2]), name
+    for uses, job, want in (('o/hub/.github/workflows/b.yml@v1', True, ('<owner>/<repo>/.github/workflows/<file>@<ref>', 'github.com/o/hub')),
+                            ('o/hub@v1', False, ('<owner>/<repo>@<ref>', 'github.com/o/hub')),
+                            ('o/hub/a/b@0123abc', False, ('<owner>/<repo>/<folder>@<ref>', 'github.com/o/hub')),
+                            ('./.github/workflows/b.yml', True, ('./.github/workflows/<file>', None)),
+                            ('./.github/actions/x', False, ("a CI step's ./<folder>", None)), ('./../x', False, ('./../<directory>', None)),
+                            ('$/a', False, ('$/<path>', None)), ('docker://alpine:3', False, ('docker://<image>', None)),
+                            ('o/${{ matrix.r }}@v1', False, ('expression', None))):
+        assert uses_form(uses, job) == want, uses
+    a, b = 'github.com/o/a', 'github.com/o/b'
+    job, pipe = f'{a}::{W}x.yml::jobs.j', f'ci::{b}/{W}p.yml'
+    linked = {'consumer': job, 'provider': f'{b}::{W}p.yml::.', 'contract': pipe, 'level': 'exact', 'reason': '@v1 (indexed 0123abc), ref mismatch'}
+    install = {'consumer': f'{a}::{W}x.yml::jobs.k.steps[3]', 'provider': f'{b}::pyproject.toml::.', 'contract': 'pkg::b', 'level': 'exact', 'reason': ''}
+    nodes = [{'site': job, 'node': 'job', 'uses': f'o/b/{W}p.yml@v1', 'consumers': [{'site': job, 'contract': pipe}], 'links': [linked], 'providers': []},
+             {'site': f'{a}::{W}x.yml::jobs.k.steps[0]', 'node': 'step', 'uses': './x', 'consumers': [{'contract': None}], 'links': [], 'providers': []},
+             {'site': f'{a}::{W}x.yml::jobs.k.steps[1]', 'node': 'step', 'uses': 'o/b/f@v1', 'consumers': [{'contract': f'ci::{b}/f', 'absent': True}],
+              'links': [], 'providers': []},
+             {'site': f'{a}::{W}x.yml::jobs.k.steps[2]', 'node': 'step', 'uses': 'actions/checkout@v4', 'consumers': [], 'links': [], 'providers': []},
+             {'site': install['consumer'], 'node': 'step', 'run': 'pip install b', 'consumers': [{'contract': 'pkg::b'}, {'contract': None}],
+              'links': [install], 'providers': []}]
+    rows = {'links': [linked, install], 'consumers': [row for node in nodes for row in node['consumers']], 'providers': []}
+    got = counted(nodes, rows, ['orphan ci::x: no use'], [a, b])
+    assert got['forms of uses'] == {
+        '<owner>/<repo>/.github/workflows/<file>@<ref> | in the set': {'link exact': 1, 'ref mismatch': 1, 'uses read': 1},
+        '<owner>/<repo>/<folder>@<ref> | in the set': {'absent mark': 1, 'uses read': 1},
+        '<owner>/<repo>@<ref> | outside the set': {'no row': 1, 'uses read': 1},
+        "a CI step's ./<folder> | own repository": {'unresolved': 1, 'uses read': 1}}, got['forms of uses']
+    assert got['ci links'] == {'per level': {'exact': 1}, 'total': 1, 'across repositories': 1, 'ref mismatch': 1}, got['ci links']
+    assert (got['absent marks'], got['orphan ci:: lines'], got['unresolved consumers on a CI node']) == (1, 1, {'with uses': 1, 'with run': 1}), got
+    assert got['F2 rows on CI nodes (side, kind, level)'] == {'consumer pkg': 1, 'consumer unresolved': 1, 'link pkg exact': 1}, got
+    assert got['F3 links from a CI job'] == {'total': 1, PMISMATCH: 0, NOT_DECLARED: 0}, got
+    named = got['run scripts naming a form (steps, of which with an F2 row)']
+    assert named['pip install'] == [1, 1] and named['python -m pip install'] == [0, 0] and named['uvx'] == [0, 0], named
+    for text, label in (('python3 -m pip install x', 'python -m pip install'), ('uvx --from build pyproject-build', 'uvx --from'),
+                        ('python -m tox -e py', 'python -m tox'), ('uv tool run tox', 'uv tool run'), ('pipx run --spec build x', 'pipx run --spec')):
+        assert re.search(RUN_FORMS[label], text) and not re.search(RUN_FORMS['pip install'], 'pipx run x'), text
 
 
 class Run:
@@ -1704,9 +1751,180 @@ def f3(run, heads, exports, statuses):
     run.check('no answer says a permission is granted', not said, said)
 
 
+def corpus_sets():
+    """#904's sets from `infra.tsv`, each as infra name -> repository identity: P is flow `ci` (`CORPUS`),
+    each other set its `ci-<set>` rows, and the distractor (every `ci-distractor` row, three of set C among
+    them) joins F once as `f-distractor`."""
+    sets = {}
+    for name, (flows, url, _) in prove.infra().items():
+        for flow in flows:
+            if flow == 'ci' or flow.startswith('ci-'):
+                sets.setdefault('p' if flow == 'ci' else flow[3:], {})[name] = 'github.com/' + url.removeprefix('https://github.com/')
+    sets['f-distractor'] = {**sets['f'], **sets.pop('distractor')}
+    return sets
+
+
+def uses_form(uses, job):
+    """A `uses` as (its form in ADR 0028's table, the repository a full name names, else None)."""
+    if '${{' in uses:
+        return 'expression', None
+    if uses.startswith(('docker://', '$/')):
+        return ('docker://<image>' if uses.startswith('docker://') else '$/<path>'), None
+    if uses.startswith('./'):
+        if uses.startswith('./..'):
+            return './../<directory>', None
+        return ('./.github/workflows/<file>' if job else 'a CI step\'s ./<folder>'), None
+    parts = uses.partition('@')[0].split('/')
+    form = ('<owner>/<repo>/.github/workflows/<file>@<ref>' if parts[2:4] == ['.github', 'workflows']
+            else '<owner>/<repo>/<folder>@<ref>' if parts[2:] else '<owner>/<repo>@<ref>')
+    return form, 'github.com/' + '/'.join(parts[:2])
+
+
+def ci_nodes(identity, root):
+    """Every CI job that calls with `uses` and every CI step of a checkout, by this driver's reading
+    (`owned_files`), each with its `uses`, or its `run` and `shell`."""
+    tracked = git('ls-files', '-z', '--', W, '*action.yml', '*action.yaml', cwd=root).split('\0')
+    for file, doc in sorted(owned_files({file: (root / file).read_text(errors='replace') for file in tracked if file}).items()):
+        if 'jobs' in doc:
+            blocks = [('jobs' + key_step(str(job)), body) for job, body in (doc['jobs'] or {}).items() if isinstance(body, dict)]
+        else:
+            blocks = [('runs', doc['runs'])] if isinstance(doc['runs'], dict) else []
+        for address, body in blocks:
+            if address != 'runs' and isinstance(body.get('uses'), str):
+                yield {'site': f'{identity}::{file}::{address}', 'node': 'job', 'uses': body['uses']}
+            for index, step in enumerate(body.get('steps') if isinstance(body.get('steps'), list) else []):
+                if isinstance(step, dict) and any(isinstance(step.get(key), str) for key in ('uses', 'run')):
+                    yield {'site': f'{identity}::{file}::{address}.steps[{index}]', 'node': 'step',
+                           **{key: step[key] for key in ('uses', 'run', 'shell') if isinstance(step.get(key), str)}}
+
+
+# Command forms of a `run` script the yardstick's verifier counts (#904 and its phase 1), found by a text search
+# so each is countable per set beside the F2 rows of its CI step; the reading of each script is the verifier's.
+RUN_FORMS = {'pip install': r'(?<![-\w])pip3? install\b', 'python -m pip install': r'\bpython(3(\.\d+)?)? -m pip install\b',
+             'uv pip install': r'\buv pip install\b', 'uv tool install': r'\buv tool install\b', 'uv tool run': r'\buv tool run\b',
+             'uvx': r'(?<![-\w])uvx\b', 'uvx --from': r'(?<![-\w])uvx --from\b', 'uvx --with': r'(?<![-\w])uvx --with\b',
+             'pipx run': r'\bpipx run\b', 'pipx run --spec': r'\bpipx run --spec\b', 'python -m tox': r'\bpython(3(\.\d+)?)? -m tox\b',
+             'docker build': r'\bdocker (buildx )?build\b'}
+
+
+def counted(nodes, rows, orphans, identities):
+    """What one set's verifier counts, from the rows Meada gave at each node: per form of `uses` (and
+    whether it names this repository, another of the set or one outside it) the outcome at its site;
+    the CI links per level and across repositories; absent marks; unresolved consumers; the orphan
+    lines; the F2 rows on CI nodes; the F3 text of the links from a CI job. It counts, it does not judge."""
+    ci = lambda row: (row.get('contract') or '').startswith('ci::')
+    known = {identity.lower() for identity in identities}
+    forms = collections.defaultdict(collections.Counter)
+    for node in nodes:
+        if 'uses' not in node:
+            continue
+        form, named = uses_form(node['uses'], node['node'] == 'job')
+        here = node['site'].split('::')[0].lower()
+        scope = 'own repository' if named is None or named.lower() == here else 'in the set' if named.lower() in known else 'outside the set'
+        tally = forms[f'{form} | {scope}']
+        tally['uses read'] += 1
+        links = [row for row in node['links'] if ci(row)]
+        consumers = [row for row in node['consumers'] if ci(row) or row.get('contract') is None]
+        for row in links:
+            tally[f"link {row['level']}"] += 1
+            if 'ref mismatch' in (row.get('reason') or ''):
+                tally['ref mismatch'] += 1
+        if not links:
+            tally['absent mark' if any(row.get('absent') for row in consumers) else 'unresolved' if any(row.get('contract') is None for row in consumers)
+                  else 'consumer, no link' if consumers else 'no row'] += 1
+    links = [row for row in rows['links'] if ci(row)]
+    on_node = {node['site']: node for node in nodes}
+    f2 = collections.Counter()
+    for node in nodes:
+        for section, side in (('consumers', 'consumer'), ('providers', 'provider'), ('links', 'link')):
+            for row in node[section]:
+                if not ci(row) and (row.get('contract') is not None or 'run' in node):
+                    kind = (row.get('contract') or 'unresolved').split('::')[0]
+                    f2[f"{side} {kind}" + (f" {row['level']}" if section == 'links' else '')] += 1
+    from_job = [row for row in links if on_node.get(row['consumer'], {}).get('node') == 'job']
+    scripts = [node for node in nodes if 'run' in node]
+    f2_row = lambda node: any(not ci(row) for section in ('consumers', 'providers', 'links') for row in node[section])
+    return {
+        'forms of uses': {key: dict(sorted(tally.items())) for key, tally in sorted(forms.items())},
+        'ci links': {'per level': dict(collections.Counter(row['level'] for row in links)), 'total': len(links),
+                     'across repositories': sum(row['consumer'].split('::')[0] != row['provider'].split('::')[0] for row in links),
+                     'ref mismatch': sum('ref mismatch' in (row.get('reason') or '') for row in links)},
+        'absent marks': sum(bool(row.get('absent')) for row in rows['consumers'] if ci(row)),
+        'unresolved consumers on a CI node': {
+            'with uses': sum(row.get('contract') is None for node in nodes if 'uses' in node for row in node['consumers']),
+            'with run': sum(row.get('contract') is None for node in nodes if 'run' in node for row in node['consumers'])},
+        'orphan ci:: lines': len(orphans),
+        'F2 rows on CI nodes (side, kind, level)': dict(sorted(f2.items())),
+        'F3 links from a CI job': {'total': len(from_job), PMISMATCH: sum(PMISMATCH in (row.get('reason') or '') for row in from_job),
+                                   NOT_DECLARED: sum(NOT_DECLARED in (row.get('reason') or '') for row in from_job)},
+        'run scripts naming a form (steps, of which with an F2 row)': {
+            label: [sum(bool(re.search(form, node['run'])) for node in scripts), sum(bool(re.search(form, node['run'])) and f2_row(node) for node in scripts)]
+            for label, form in RUN_FORMS.items()},
+        'steps with a shell of their own': sum('shell' in node for node in scripts),
+        'CI nodes read': {'jobs with uses': sum(node['node'] == 'job' for node in nodes), 'steps': sum(node['node'] == 'step' for node in nodes),
+                          'steps with run': sum('run' in node for node in nodes)},
+    }
+
+
+def head(run, cwd, label, *words):
+    """The head binary's answer, its stderr kept; the caller says what a failure means."""
+    result = subprocess.run([run.bins['head'], *words], cwd=cwd, env={**os.environ, 'LANG': 'en_US.UTF-8'},
+                            text=True, capture_output=True, timeout=3 * 3600)
+    write(Path(cwd) / 'captures' / (label + '.stderr'), result.stderr)
+    return result
+
+
+def measure(run, name, repos, roots, records):
+    """One set of #904 as its own workspace, in `sets/<name>/`: index it, export each repository, ask
+    `status`, and save what its verifier counts beside the set's run records. It saves; the verdicts are
+    the verifier's. Returns the exports."""
+    folder, clock = run.folder / 'sets' / name, time.monotonic()
+    write(folder / 'workspace.toml', 'index_dir = "indexes"\n' + ''.join(
+        f'\n[[repository]]\nrepo = "{identity}"\npath = {json.dumps(str(roots[repo]))}\n' for repo, identity in repos.items()))
+    indexed = head(run, folder, 'index', 'index', '--workspace', 'workspace.toml')
+    seconds = {'index': round(time.monotonic() - clock)}
+    run.check(f'set {name}: `meada index --workspace` exits 0', indexed.returncode == 0, indexed.stderr[-4000:])
+    exports, failed = {}, []
+    (folder / 'exports').mkdir()
+    for repo, identity in repos.items():
+        out = head(run, folder, f'{repo}-export', 'export', '--workspace', 'workspace.toml', '--repo', identity)
+        with gzip.open(folder / 'exports' / f'{repo}.json.gz', 'wt') as saved:
+            saved.write(out.stdout)
+        exports[repo] = json.loads(out.stdout) if out.returncode == 0 else {}
+        if out.returncode:
+            failed.append(repo)
+    run.check(f'set {name}: every repository exported', not failed, failed)
+    status = head(run, folder, 'status', 'status', '--workspace', 'workspace.toml').stdout
+    seconds['index, export and status'] = round(time.monotonic() - clock)
+    write(folder / 'status.txt', status)
+    orphans = [line for line in status.splitlines() if ORPHAN.match(line)]
+    write(folder / 'orphans.txt', ''.join(line + '\n' for line in orphans))  # as `status` prints them, no case apart
+    rows = {section: list({json.dumps(row, sort_keys=True): row for export in exports.values() for row in export.get(section, [])}.values())
+            for section in ('consumers', 'providers', 'links')}
+    nodes = [node for repo, identity in repos.items() for node in ci_nodes(identity, roots[repo])]
+    at = collections.defaultdict(lambda: collections.defaultdict(list))
+    for section, key in (('consumers', 'site'), ('providers', 'site'), ('links', 'consumer')):
+        for row in rows[section]:
+            at[row[key]][section].append(row)
+    for node in nodes:
+        node.update({section: at[node['site']][section] for section in ('consumers', 'providers', 'links')})
+    write(folder / 'nodes.jsonl', ''.join(json.dumps(node, sort_keys=True, ensure_ascii=False) + '\n' for node in nodes))
+    files = {'::'.join(node['site'].split('::')[:2]) for node in nodes}
+    on_ci = lambda site: '::'.join((site or '').split('::')[:2]) in files
+    dump(folder / 'ci-rows.json', {section: [row for row in found if (row.get('contract') or '').startswith('ci::')
+                                             or any(on_ci(row.get(key)) for key in ('site', 'consumer', 'provider'))]
+                                   for section, found in rows.items()})
+    dump(folder / 'run-records.json', {repo: records[repo] for repo in repos if repo in records})
+    dump(folder / 'counts.json', {'repositories': repos, 'seconds': seconds, **counted(nodes, rows, orphans, repos.values())})
+    shutil.rmtree(folder / 'indexes', ignore_errors=True)  # about four times its sources, and the artifact leaves it out
+    return exports
+
+
 def corpus(run):
-    """The pinned public corpus: each repository alone against the base, then the three as one workspace."""
-    roots = {}
+    """The pinned public corpus. Set P: each repository alone against the base, then the three as one
+    workspace with #835's keys. Then each set of #904 (P, A, B, C, F, and F with the distractor) as its
+    own workspace, on the head binary, saved by `measure`."""
+    clock, roots = time.monotonic(), {}
     # `clean`: a third copy no index is written in. `meada index --workspace` records a commit only for a
     # clean checkout, and an export alone leaves its `.meada/` in the checkout it read.
     for side in (*run.bins, 'clean'):
@@ -1729,16 +1947,15 @@ def corpus(run):
         # `ci-slsa` calls its own pipelines by local path: alone, it holds links.
         run.check(f'corpus {name}: alone, every CI link stays inside the repository',
                   all(row['provider'].startswith(repository + '::') for row in local) and (local or name != 'ci-slsa'), len(local))
-    folder = run.folder / 'workspace'
-    write(folder / 'workspace.toml', 'index_dir = "indexes"\n' + ''.join(
-        f'\n[[repository]]\nrepo = "{repository}"\npath = {json.dumps(str(roots["clean", name]))}\n' for name, repository in CORPUS.items()))
-    run.command('head', folder, 'workspace-index', 'index', '--workspace', 'workspace.toml')
+    sets, records = corpus_sets(), json.loads((Path(__file__).resolve().parent / 'ci-records.json').read_text())
+    shutil.copy(Path(__file__).resolve().parent / 'ci-records.json', run.folder / 'ci-records.json')
+    checkouts = {name: roots['clean', name] for name in CORPUS}
+    seconds = {'set P alone, both binaries': round(time.monotonic() - clock)}
     links = []
-    for name, repository in CORPUS.items():
-        export = json.loads(run.command('head', folder, f'workspace-{name}-export', 'export', '--workspace', 'workspace.toml', '--repo', repository))
+    for name, export in measure(run, 'p', sets['p'], checkouts, records['records']).items():
         links += [row for row in export.get('links', []) if row['contract'].startswith('ci::') and row not in links]
     # Every link goes to the fresh checker of #835, who reads each against the source; these four are read here.
-    dump(folder / 'ci-links.json', {'levels': {level: sum(row['level'] == level for row in links) for level in sorted({row['level'] for row in links})}, 'links': links})
+    dump(run.folder / 'workspace' / 'ci-links.json', {'levels': {level: sum(row['level'] == level for row in links) for level in sorted({row['level'] for row in links})}, 'links': links})
     slsa, scanner, osv = CORPUS.values()
     sha = {name: git('rev-parse', 'HEAD', cwd=roots['head', name]).strip() for name in CORPUS}
     keys = [  # consumer, contract, the Git ref it wrote, the repository whose indexed commit the reason names, `ref mismatch`
@@ -1754,6 +1971,19 @@ def corpus(run):
         shape = flagged(found[0]['reason']) if len(found) == 1 else None
         run.check(f'corpus: {consumer} calls {contract} at @{ref}', bool(shape) and found[0]['level'] == 'exact' and shape[0] == ref
                   and sha[provider].startswith(shape[1]) and ('ref mismatch' in shape[2]) == differs, found)
+    seconds['set P as a workspace'] = round(time.monotonic() - clock) - sum(seconds.values())
+    for name, repos in sets.items():
+        if name == 'p':
+            continue
+        began = time.monotonic()
+        for repo in repos:
+            if repo not in checkouts:  # F's checkouts serve `f-distractor` too: each workspace keeps its index apart
+                checkouts[repo] = run.folder / 'work' / repo
+                fetch(repo, checkouts[repo])
+        measure(run, name, repos, checkouts, records['records'])
+        seconds[f'set {name}, fetch included'] = round(time.monotonic() - began)
+        dump(  # after each set, so a run cut by its time limit still says where it stopped
+            run.folder / 'seconds.json', {**seconds, 'total': round(time.monotonic() - clock)})
 
 
 def main():
