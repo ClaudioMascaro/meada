@@ -2043,11 +2043,6 @@ fn aws_origin_chains_and_inline_factories_stay_bounded_at_the_file_size_ceiling(
     }
 }
 
-/// The transaction calls of a file fold on a budget of their own: however many they are, the
-/// other calls of the file keep the sides they have without them, of every kind (#719). The calls
-/// before the one where that budget ends keep their names, and that call has a writer, named or
-/// unresolved, and no reader for write entries; a reader for a `ConditionCheck` entry, unless the
-/// budget ends inside its writer row (#784).
 /// A Go wrapper whose parameters are one group of nine, ten or twenty names, the first of which
 /// names the table, is followed to its caller: tree-sitter-go parses a group of ten or more apart.
 /// The parameter hides the package constant of its name.
@@ -2082,6 +2077,11 @@ fn a_go_wrapper_with_a_group_of_ten_parameters_or_more_names_its_callers_table()
     assert!(export["consumers"].as_array().unwrap().is_empty(), "{text}");
 }
 
+/// The transaction calls of a file fold on a budget of their own: however many they are, the
+/// other calls of the file keep the sides they have without them, of every kind (#719). The calls
+/// before the one where that budget ends keep their names, and that call has a writer, named or
+/// unresolved, and no reader for write entries; a reader for a `ConditionCheck` entry, unless the
+/// budget ends inside its writer row (#784).
 #[test]
 fn transaction_calls_leave_the_other_sides_of_their_file_named() {
     // `$CHECK` declares a second entry (a `ConditionCheck` of table `c$K`, or a `Put` of table
