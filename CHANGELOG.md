@@ -236,6 +236,14 @@ package, the GitHub draft release) belongs to the maintainer. Release notes are 
   character the compiler drops from a name read as not there, and whatever its size. The
   index stores that per file, and an existing index is rebuilt on its first open by this
   version (#775).
+- Terraform evaluation holds every string in Unicode NFC, as Terraform and OpenTofu do: a string
+  literal (a name, a local, a variable default, a module argument), an object key, a literal
+  index, a `.tfvars.json` value and key, and the text a template or a string function makes. A
+  set holding two spellings of one string (`e` and a combining acute accent, and `é`) is one
+  element, a key, an index or a comparison matches either spelling, and the names are the ones
+  Terraform gives, where Meada named each spelling apart, all `exact` (#749). The schema version is the same: an index written
+  before the upgrade keeps its names until a Terraform or var file of their root module next
+  changes, or takes the new rule at once after deleting `.meada/index.db`.
 - Terraform evaluation no longer parses a template's text again each time it evaluates it: a
   template is evaluated as its parts, each charged a few steps in a `for` instead of 32 steps a
   byte of its text, so a 17 KB template in a `for` over two elements, a `%{ if }` template in a

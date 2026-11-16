@@ -371,8 +371,9 @@ O JSON Terraform usa as mesmas regras de avaliação e referência. Strings comu
   `each`, `count.index`, templates e as funções puras `format`, `formatlist`, `join`, `split`,
   `lower`, `upper`, `title`, `trim`, `trimprefix`, `trimsuffix`, `trimspace`, `chomp`, `replace`
   (uma substring literal), `substr`, `concat`, `coalesce`, `element`, `keys`, `values`, `lookup`,
-  `merge`, `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` e `jsonencode`. Data
-  sources, atributos de resources, módulos do registro, `terraform.workspace`, `-var`, `-var-file`,
+  `merge`, `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` e `jsonencode`. Cada
+  string fica em Unicode NFC, como o Terraform a guarda, então duas grafias de uma string são um
+  valor só. Data sources, atributos de resources, módulos do registro, `terraform.workspace`, `-var`, `-var-file`,
   `TF_VAR_`, variáveis sensíveis e qualquer outra função nunca são avaliados: essa parte do nome
   vira um `*` e o nome um **padrão** (`"orders-${terraform.workspace}"` é `orders-*`), que liga
   nomes literais pelas regras de padrões abaixo. Um nome que passou por uma variável do módulo raiz a lista em

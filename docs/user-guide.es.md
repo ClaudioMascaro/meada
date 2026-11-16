@@ -378,7 +378,8 @@ El JSON Terraform usa las mismas reglas de evaluación y referencia. Las cadenas
   `join`, `split`, `lower`, `upper`, `title`, `trim`, `trimprefix`, `trimsuffix`, `trimspace`,
   `chomp`, `replace` (una subcadena literal), `substr`, `concat`, `coalesce`, `element`, `keys`,
   `values`, `lookup`, `merge`, `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` y
-  `jsonencode`. Data sources, atributos de resources, módulos del registro, `terraform.workspace`,
+  `jsonencode`. Cada cadena queda en Unicode NFC, como Terraform la guarda, así que dos grafías de
+  una cadena son un solo valor. Data sources, atributos de resources, módulos del registro, `terraform.workspace`,
   `-var`, `-var-file`, `TF_VAR_`, variables sensibles y cualquier otra función nunca se evalúan: esa
   parte del nombre es un `*` y el nombre un **patrón** (`"orders-${terraform.workspace}"` es
   `orders-*`), que enlaza nombres literales según las reglas de patrones de abajo. Un nombre que pasó por una variable del módulo raíz la

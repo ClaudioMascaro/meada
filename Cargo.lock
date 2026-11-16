@@ -1590,6 +1590,7 @@ dependencies = [
  "tree-sitter-rust",
  "tree-sitter-swift",
  "tree-sitter-typescript",
+ "unicode-normalization",
  "ureq",
  "yaml-rust2",
 ]

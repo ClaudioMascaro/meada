@@ -984,8 +984,9 @@ fn reference(root: &str, ops: &[&TraversalOperator]) -> Option<Ref> {
             Some(TraversalOperator::Index(Expression::Number(n))) => {
                 (n.value().as_u64().map(Key::Int), at + 1)
             }
+            // The key in NFC, as the instance keys are (#749).
             Some(TraversalOperator::Index(Expression::String(s))) => {
-                (Some(Key::Str(s.value().clone())), at + 1)
+                (Some(Key::Str(functions::nfc(s.value().clone()))), at + 1)
             }
             Some(TraversalOperator::LegacyIndex(n)) => (Some(Key::Int(*n.value())), at + 1),
             Some(
@@ -1182,6 +1183,12 @@ impl VisitMut for Exact<'_, '_> {
                 *expr = template_expr(std::mem::take(&mut h.template));
                 return;
             }
+            Expression::String(s) => {
+                if !s.is_ascii() {
+                    *expr = Expression::from(functions::nfc(s.value().clone()));
+                }
+                return;
+            }
             Expression::Number(n) => {
                 if !(n.as_repr()).is_some_and(|written| printed_as_written(n.value(), written)) {
                     self.inexact = true;
@@ -1191,10 +1198,16 @@ impl VisitMut for Exact<'_, '_> {
             }
             Expression::Object(object) => {
                 let mut entries: Vec<_> = std::mem::take(object).into_iter().collect();
-                // `hcl-edit` visits no key: a computed one is evaluated as any other expression.
+                // `hcl-edit` visits no key: a computed one is evaluated as any other expression,
+                // and a name is the string Terraform makes of it, in NFC.
                 for (key, _) in &mut entries {
-                    if let ObjectKey::Expression(key) = key {
-                        self.visit_expr_mut(key);
+                    match key {
+                        ObjectKey::Expression(key) => self.visit_expr_mut(key),
+                        ObjectKey::Ident(i) if !i.is_ascii() => {
+                            let name = functions::nfc(i.as_str().to_string());
+                            *key = ObjectKey::Expression(Expression::from(name));
+                        }
+                        ObjectKey::Ident(_) => {}
                     }
                 }
                 let keys: Option<Vec<String>> = (entries.iter())
@@ -1415,7 +1428,7 @@ fn exact_call(args: hcl::eval::FuncArgs) -> std::result::Result<Value, String> {
                     v => text.push_str(&functions::shown(v).ok_or("no text")?),
                 }
             }
-            return Ok(Value::String(text));
+            return Ok(Value::String(functions::nfc(text)));
         }
         Some("neg") => None,
         Some(o) => Some(o.parse().map_err(|_| "no operator")?),
@@ -1545,6 +1558,7 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
             let value = (!float(&value))
                 .then(|| serde_json::from_value::<Value>(value).ok())
                 .flatten()
+                .map(functions::nfc_value)
                 .filter(|v| size(v) <= EVAL_VALUE_MAX);
             values.push((name, value, at));
         }
@@ -2976,9 +2990,10 @@ impl<'m> Eval<'m> {
         if let Expression::String(s) = expr
             && s.len() + 2 <= EVAL_VALUE_MAX
         {
-            // Nothing to evaluate: a literal that fits stays known once the work is spent.
+            // Nothing to evaluate: a literal that fits stays known once the work is spent, in NFC
+            // as `Exact` writes the literals it evaluates (#749).
             return Evaluated {
-                val: Val::Known(Value::from(s.value().as_str())),
+                val: Val::Known(Value::String(functions::nfc(s.value().clone()))),
                 through: BTreeSet::new(),
             };
         }
@@ -3172,9 +3187,9 @@ impl<'m> Eval<'m> {
                 while text.contains("**") {
                     text = text.replace("**", "*");
                 }
-                Val::Pattern(text)
+                Val::Pattern(functions::nfc(text))
             }
-            false => Val::Known(Value::String(text)),
+            false => Val::Known(Value::String(functions::nfc(text))),
         };
         Evaluated { val, through }
     }
@@ -4218,6 +4233,24 @@ mod tests {
                 "b.missing -> a.q[\"eu\"]",
                 "b.missing -> a.q[\"us\"]",
             ]
+        );
+    }
+
+    /// A literal index is the key Terraform reads, in NFC as the instance keys are (#749): either
+    /// spelling picks the one instance.
+    #[test]
+    fn a_literal_index_in_either_spelling_picks_its_instance() {
+        let (_, references) = evaluate(&files(&[(
+            "main.tf",
+            concat!(
+                "resource \"a\" \"q\" { for_each = toset([\"e\\u0301\", \"z\"]) }\n",
+                "resource \"b\" \"nfd\" { x = a.q[\"e\\u0301\"].arn }\n",
+                "resource \"b\" \"nfc\" { x = a.q[\"\\u00e9\"].arn }\n",
+            ),
+        )]));
+        assert_eq!(
+            shown(&references),
+            ["b.nfd -> a.q[\"\u{e9}\"]", "b.nfc -> a.q[\"\u{e9}\"]"]
         );
     }
 

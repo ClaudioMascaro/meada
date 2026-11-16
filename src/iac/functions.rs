@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use hcl::eval::{Context, FuncArgs, FuncDef, ParamType};
 use hcl::{Map, Number, Value};
+use unicode_normalization::UnicodeNormalization;
 
 type Out = Result<Value, String>;
 
@@ -84,8 +85,33 @@ fn string(v: &Value) -> &str {
     v.as_str().unwrap_or_default()
 }
 
+/// `s` in Unicode NFC, the form Terraform and OpenTofu give every string they read or make, so
+/// that two spellings of one string are one value (#749). Every string literal is normalized
+/// before evaluation, and every call that makes a string normalizes it.
+pub(super) fn nfc(s: String) -> String {
+    match s.is_ascii() || unicode_normalization::is_nfc(&s) {
+        true => s,
+        false => s.nfc().collect(),
+    }
+}
+
+/// `v` with each string and object key in NFC: a value read whole rather than evaluated (a JSON
+/// var file's).
+pub(super) fn nfc_value(v: Value) -> Value {
+    match v {
+        Value::String(s) => Value::String(nfc(s)),
+        Value::Array(items) => Value::Array(items.into_iter().map(nfc_value).collect()),
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .map(|(k, v)| (nfc(k), nfc_value(v)))
+                .collect(),
+        ),
+        v => v,
+    }
+}
+
 fn text(args: FuncArgs, f: fn(&str) -> String) -> Out {
-    Ok(Value::String(f(string(&args[0]))))
+    Ok(Value::String(nfc(f(string(&args[0])))))
 }
 
 /// A scalar as a template shows it; `None` for a null, a list or an object.
@@ -155,7 +181,7 @@ fn formatted(spec: &str, args: &[Value]) -> Result<String, String> {
 }
 
 fn format(args: FuncArgs) -> Out {
-    Ok(Value::String(formatted(string(&args[0]), &args[1..])?))
+    Ok(Value::String(nfc(formatted(string(&args[0]), &args[1..])?)))
 }
 
 /// Terraform's `formatlist`: every list argument has the same length, a scalar repeats.
@@ -174,7 +200,7 @@ fn formatlist(args: FuncArgs) -> Out {
             let row: Vec<Value> = (rest.iter())
                 .map(|a| a.as_array().map_or(a, |l| &l[i]).clone())
                 .collect();
-            formatted(string(&args[0]), &row).map(Value::String)
+            formatted(string(&args[0]), &row).map(|s| Value::String(nfc(s)))
         })
         .collect::<Result<Vec<_>, _>>()
         .map(Value::Array)
@@ -187,7 +213,7 @@ fn join(args: FuncArgs) -> Out {
             parts.push(shown(item).ok_or("join of a collection or null")?);
         }
     }
-    Ok(Value::String(parts.join(string(&args[0]))))
+    Ok(Value::String(nfc(parts.join(string(&args[0])))))
 }
 
 fn split(args: FuncArgs) -> Out {
@@ -195,7 +221,8 @@ fn split(args: FuncArgs) -> Out {
     if sep.is_empty() {
         return Err("an empty separator".into());
     }
-    Ok(Value::Array(s.split(sep).map(Value::from).collect()))
+    let parts = s.split(sep).map(|s| Value::String(nfc(s.into())));
+    Ok(Value::Array(parts.collect()))
 }
 
 /// Go's `strings.Title`, as Terraform's `title`: a letter after a separator is upper case.
@@ -217,19 +244,20 @@ fn title(s: &str) -> String {
 
 fn trim(args: FuncArgs) -> Out {
     let cut: HashSet<char> = string(&args[1]).chars().collect();
-    Ok(Value::from(
-        string(&args[0]).trim_matches(|c| cut.contains(&c)),
-    ))
+    let s = string(&args[0]).trim_matches(|c| cut.contains(&c));
+    Ok(Value::String(nfc(s.into())))
 }
 
 fn trimprefix(args: FuncArgs) -> Out {
     let s = string(&args[0]);
-    Ok(Value::from(s.strip_prefix(string(&args[1])).unwrap_or(s)))
+    let cut = s.strip_prefix(string(&args[1])).unwrap_or(s);
+    Ok(Value::String(nfc(cut.into())))
 }
 
 fn trimsuffix(args: FuncArgs) -> Out {
     let s = string(&args[0]);
-    Ok(Value::from(s.strip_suffix(string(&args[1])).unwrap_or(s)))
+    let cut = s.strip_suffix(string(&args[1])).unwrap_or(s);
+    Ok(Value::String(nfc(cut.into())))
 }
 
 fn chomp(s: &str) -> String {
@@ -242,7 +270,7 @@ fn replace(args: FuncArgs) -> Out {
     if from.is_empty() || (from.len() > 1 && from.starts_with('/') && from.ends_with('/')) {
         return Err("a pattern or an empty substring".into());
     }
-    Ok(Value::String(s.replace(from, to)))
+    Ok(Value::String(nfc(s.replace(from, to))))
 }
 
 /// Characters from `offset` (from the end when negative), `length` of them or, at -1, the rest.
@@ -260,9 +288,8 @@ fn substr(args: FuncArgs) -> Out {
         l if l < 0 => return Err("a negative length".into()),
         l => start + l.min(len - start),
     };
-    Ok(Value::String(
-        chars[start as usize..end as usize].iter().collect(),
-    ))
+    let cut = chars[start as usize..end as usize].iter().collect();
+    Ok(Value::String(nfc(cut)))
 }
 
 fn concat(args: FuncArgs) -> Out {
