@@ -1578,8 +1578,9 @@ dentro de `if` e de laços. Um script com heredoc ou com mais de 1024 bytes não
 `echo`, em uma string ou em um comentário não dá lado. `pip install`, `pip3 install`, `python -m pip
 install`, `uv pip install`, `pipx install` e `uv tool install` fazem do passo de CI um consumidor de
 `package::pypi::<nome>` quando um repositório do workspace fornece o pacote, com a faixa como
-escrita: `context` no pacote lista o passo de CI, e a ligação segue a regra da seção 8.5 (`exact`
-para um único provedor em outro repositório). Um caminho, uma URL, `-e`, o arquivo de `-r` e o valor
+escrita: `context` no pacote lista o passo de CI, e um único provedor liga em `inferred`, com o
+motivo começando por `the name alone matched`: a instalação não nomeia origem, e um fork ou uma
+cópia de um pacote público pode ter o nome (ADR 0029). Um caminho, uma URL, `-e`, o arquivo de `-r` e o valor
 de uma opção não dão lado. Um nome com uma parte que nenhum `env` literal dá (`shared-${{ vars.X
 }}`) é um padrão, ligado como `inferred` ao único pacote que cabe nele; um nome inteiro assim (`pip
 install $PKG`) é, onde o workspace fornece um pacote PyPI, um consumidor não resolvido, um item
@@ -1592,13 +1593,14 @@ dá um.
 
 **Programas.** Um passo de CI cujo comando é um script de console de um pacote PyPI do workspace
 (um nome sob `[project.scripts]` ou `[tool.poetry.scripts]`) inicia esse programa: o passo de CI
-consome o pacote, e a ligação segue até a função que o script nomeia. O nível diz quanta certeza o
-Meada tem do pacote que roda:
+consome o pacote, e a ligação segue até a função que o script nomeia. O pacote casa só pelo nome,
+então a ligação é no máximo `inferred` (ADR 0029); o nível e o motivo dizem quanta certeza o Meada
+tem do pacote que roda:
 
 | Evidência | Nível |
 | --- | --- |
-| Uma linha ou um passo de CI anterior do mesmo job de CI instala o pacote | `exact` |
-| O comando nomeia o pacote: `uvx <pacote>`, `pipx run <pacote>` | `exact` |
+| Uma linha ou um passo de CI anterior do mesmo job de CI instala o pacote | `inferred` |
+| O comando nomeia o pacote: `uvx <pacote>`, `pipx run <pacote>` | `inferred` |
 | Nenhuma instalação, e um só pacote do workspace declara o nome | `inferred` |
 | Vários pacotes do workspace declaram o nome | `ambiguous` |
 | Nenhum pacote do workspace declara o nome | nenhum lado |
@@ -1609,7 +1611,7 @@ e com `direction=down` a partir de um job de CI ele entra no programa:
 ```text
 github.com/acme/core-api app/main.py:6 register_package
   →[inferred: base URL from CORE_API_URL, a base_url_env of peer github.com/acme/core-api] github.com/acme/core-sdk core_sdk/cli.py:10 publish_main
-    →[exact: package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
+    →[inferred: the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
       github.com/acme/workflows .github/workflows/publish.yml:12 jobs.publish
         github.com/acme/workflows .github/workflows/publish.yml:1 .
           →[exact: @main (indexed 1a2b3c4)] github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish

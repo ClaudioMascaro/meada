@@ -1836,6 +1836,8 @@ const MAX_DECLARING: usize = 8;
 const INSTALLED: &str = "its package installed earlier in the CI job";
 const NOT_INSTALLED: &str = "no install of its package earlier in the CI job";
 const BY_PACKAGE: &str = "run by its package's name";
+/// Why a CI step's one fitting provider is `inferred` (ADR 0029): no origin is named.
+const BY_NAME: &str = "the name alone matched";
 
 /// What a command of a CI step's `run` script installs by name (`Ecosystem::installs`).
 enum Install {
@@ -2252,7 +2254,8 @@ impl ContractKind for Packages {
 
     /// The dependency entry links to the providers of its package: one candidate is `exact`
     /// (`inferred` when it shares the consumer's repository and `Ecosystem::unsourced` says no
-    /// source names it), several are each `ambiguous`. A `workspace:` range keeps the providers
+    /// source names it, or when a CI step names the package by its name alone, ADR 0029),
+    /// several are each `ambiguous`. A `workspace:` range keeps the providers
     /// of its own repository. The reason is `reason()`'s, flag included. A call through a package import
     /// and a CI step that runs a console script (`Consumer::hops`) link instead to the symbol
     /// they reach in each provider, at the weaker of that level and the hop's, the reason
@@ -2262,7 +2265,7 @@ impl ContractKind for Packages {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        _exports: &[Export],
+        exports: &[Export],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
@@ -2298,16 +2301,25 @@ impl ContractKind for Packages {
             }
             _ => None,
         };
+        // A CI step installs or runs a package by its name alone: a fork or a copy of a public
+        // package of that name may be what the workspace provides (ADR 0029).
+        let by_name = match fits.len() {
+            1 if uncertain.is_none() && unsourced.is_none() => (exports.iter())
+                .filter(|e| e.repository == from.identity)
+                .any(|e| e.scripts.iter().any(|s| s.site == consumer.site))
+                .then_some(BY_NAME),
+            _ => None,
+        };
         let (level, n) = match fits.len() {
             0 => return Vec::new(),
-            1 if unsourced.is_some() => (Level::Inferred, None),
+            1 if unsourced.is_some() || by_name.is_some() => (Level::Inferred, None),
             1 => (uncertain_level.unwrap_or(Level::Exact), None),
             n => (Level::Ambiguous, Some(n)),
         };
         fits.into_iter()
             .flat_map(|(_, p)| {
                 let said = reason(contract, range, p.version.as_deref());
-                let said = match uncertain.or(unsourced) {
+                let said = match uncertain.or(unsourced).or(by_name) {
                     Some(why) => format!("{why}; {said}"),
                     None => said,
                 };

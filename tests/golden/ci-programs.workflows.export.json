@@ -248,120 +248,120 @@
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.by_package.steps[0]",
       "provider": "github.com/acme/core-sdk::core_sdk/cli.py::main",
       "contract": "package::pypi::core-sdk",
-      "level": "exact",
-      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-sdk, run by its package's name"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-sdk, run by its package's name"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.by_package.steps[1]",
       "provider": "github.com/acme/core-sdk::core_sdk/cli.py::main",
       "contract": "package::pypi::core-sdk",
-      "level": "exact",
-      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-sdk, run by its package's name"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-sdk, run by its package's name"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.declared_twice.steps[0]",
       "provider": "github.com/acme/core-sdk::core_sdk/cli.py::health_main",
       "contract": "package::pypi::core-sdk",
       "level": "ambiguous",
-      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-health, 2 packages declare it"
+      "reason": "the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-health, 2 packages declare it"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.declared_twice.steps[0]",
       "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::health_main",
       "contract": "package::pypi::core-tools",
       "level": "ambiguous",
-      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-health, 2 packages declare it"
+      "reason": "the name alone matched; package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-health, 2 packages declare it"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_line.steps[0]",
       "provider": "github.com/acme/core-sdk::core_sdk/cli.py::health_main",
       "contract": "package::pypi::core-sdk",
-      "level": "exact",
-      "reason": "package::pypi::core-sdk >=1.0 (local 1.0.0); console script core-health, its package installed earlier in the CI job"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-sdk >=1.0 (local 1.0.0); console script core-health, its package installed earlier in the CI job"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_line.steps[0]",
       "provider": "github.com/acme/core-sdk::pyproject.toml",
       "contract": "package::pypi::core-sdk",
-      "level": "exact",
-      "reason": "package::pypi::core-sdk >=1.0 (local 1.0.0)"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-sdk >=1.0 (local 1.0.0)"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_step.steps[0]",
       "provider": "github.com/acme/core-sdk::tools/pyproject.toml",
       "contract": "package::pypi::core-tools",
-      "level": "exact",
-      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-tools none (local 0.2.0), range unchecked"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_step.steps[1]",
       "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::lint_main",
       "contract": "package::pypi::core-tools",
-      "level": "exact",
-      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, its package installed earlier in the CI job"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, its package installed earlier in the CI job"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.elsewhere.steps[1]",
       "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::lint_main",
       "contract": "package::pypi::core-tools",
       "level": "inferred",
-      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, no install of its package earlier in the CI job"
+      "reason": "the name alone matched; package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, no install of its package earlier in the CI job"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.later.steps[0]",
       "provider": "github.com/acme/core-sdk::core_sdk/cli.py::publish_main",
       "contract": "package::pypi::core-sdk",
       "level": "inferred",
-      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, no install of its package earlier in the CI job"
+      "reason": "the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, no install of its package earlier in the CI job"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.later.steps[1]",
       "provider": "github.com/acme/core-sdk::pyproject.toml",
       "contract": "package::pypi::core-sdk",
-      "level": "exact",
-      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.no_install.steps[0]",
       "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::lint_main",
       "contract": "package::pypi::core-tools",
       "level": "inferred",
-      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, no install of its package earlier in the CI job"
+      "reason": "the name alone matched; package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, no install of its package earlier in the CI job"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.no_script.steps[0]",
       "provider": "github.com/acme/core-sdk::tools/pyproject.toml",
       "contract": "package::pypi::core-tools",
-      "level": "exact",
-      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-tools none (local 0.2.0), range unchecked"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.picked.steps[0]",
       "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::health_main",
       "contract": "package::pypi::core-tools",
-      "level": "exact",
-      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-health, its package installed earlier in the CI job"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-health, its package installed earlier in the CI job"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.picked.steps[0]",
       "provider": "github.com/acme/core-sdk::tools/pyproject.toml",
       "contract": "package::pypi::core-tools",
-      "level": "exact",
-      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-tools none (local 0.2.0), range unchecked"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/publish.yml::jobs.publish.steps[1]",
       "provider": "github.com/acme/core-sdk::pyproject.toml",
       "contract": "package::pypi::core-sdk",
-      "level": "exact",
-      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/publish.yml::jobs.publish.steps[2]",
       "provider": "github.com/acme/core-sdk::core_sdk/cli.py::publish_main",
       "contract": "package::pypi::core-sdk",
-      "level": "exact",
-      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job"
+      "level": "inferred",
+      "reason": "the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job"
     },
     {
       "consumer": "github.com/acme/wrapper::.github/workflows/release.yml::jobs.release",

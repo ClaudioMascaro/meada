@@ -1568,8 +1568,9 @@ follows `&&` or `;`, inside `if` and loops too. A script with a heredoc or past 
 read, and text in `echo`, in a string or in a comment gives no side. `pip install`, `pip3 install`,
 `python -m pip install`, `uv pip install`, `pipx install` and `uv tool install` make the CI step a
 consumer of `package::pypi::<name>` when a repository of the workspace provides the package, with
-the range as written: `context` on the package lists the CI step, and the link follows the rule of
-section 8.5 (`exact` for a single provider in another repository). A path, a URL, `-e`, the file of
+the range as written: `context` on the package lists the CI step, and a single provider links
+`inferred`, its reason starting with `the name alone matched`: the install names no origin, and a
+fork or a copy of a public package may hold the name (ADR 0029). A path, a URL, `-e`, the file of
 `-r` and the value of an option give no side. A name with a part no literal `env` gives (`shared-${{
 vars.X }}`) is a pattern, linked `inferred` to the one package it fits; a whole name like that (`pip
 install $PKG`) is an unresolved consumer where the workspace provides a PyPI package, an open item
@@ -1582,13 +1583,14 @@ one.
 
 **Programs.** A CI step whose command is a console script of a PyPI package of the workspace (a
 name under `[project.scripts]` or `[tool.poetry.scripts]`) starts that program: the CI step
-consumes the package, and its link goes on to the function the script names. The level says how
-sure Meada is of the package that runs:
+consumes the package, and its link goes on to the function the script names. The package is
+matched by its name alone, so the link is `inferred` at best (ADR 0029); the level and the reason
+say how sure Meada is of the package that runs:
 
 | Evidence | Level |
 | --- | --- |
-| An earlier line or CI step of the same CI job installs the package | `exact` |
-| The command names the package: `uvx <package>`, `pipx run <package>` | `exact` |
+| An earlier line or CI step of the same CI job installs the package | `inferred` |
+| The command names the package: `uvx <package>`, `pipx run <package>` | `inferred` |
 | No install, and one package of the workspace declares the name | `inferred` |
 | Several packages of the workspace declare the name | `ambiguous` |
 | No package of the workspace declares the name | no side |
@@ -1599,7 +1601,7 @@ sure Meada is of the package that runs:
 ```text
 github.com/acme/core-api app/main.py:6 register_package
   →[inferred: base URL from CORE_API_URL, a base_url_env of peer github.com/acme/core-api] github.com/acme/core-sdk core_sdk/cli.py:10 publish_main
-    →[exact: package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
+    →[inferred: the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
       github.com/acme/workflows .github/workflows/publish.yml:12 jobs.publish
         github.com/acme/workflows .github/workflows/publish.yml:1 .
           →[exact: @main (indexed 1a2b3c4)] github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish
