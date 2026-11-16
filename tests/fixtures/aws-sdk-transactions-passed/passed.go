@@ -205,3 +205,18 @@ func otherShared(ctx context.Context) {
 	s := &second{}
 	s.push(ctx, []types.TransactWriteItem{{Put: &types.Put{TableName: aws.String("second-old")}}})
 }
+
+// `len(items)` reads the list and changes nothing: the wrapper still mentions its parameter twice
+// (#774, the reads of #869 in a wrapper of #879).
+func sendCounted(ctx context.Context, items []types.TransactWriteItem) {
+	if len(items) == 0 {
+		return
+	}
+	client := dynamodb.NewFromConfig(cfg)
+	client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
+}
+
+func passedCounted(ctx context.Context) {
+	items := []types.TransactWriteItem{{Put: &types.Put{TableName: aws.String("passed-counted")}}}
+	sendCounted(ctx, items)
+}
