@@ -263,14 +263,14 @@
       "provider": "github.com/acme/core-sdk::core_sdk/cli.py::health_main",
       "contract": "package::pypi::core-sdk",
       "level": "ambiguous",
-      "reason": "the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-health, 2 packages declare it"
+      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-health, 2 packages declare it"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.declared_twice.steps[0]",
       "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::health_main",
       "contract": "package::pypi::core-tools",
       "level": "ambiguous",
-      "reason": "the name alone matched; package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-health, 2 packages declare it"
+      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-health, 2 packages declare it"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.earlier_line.steps[0]",
@@ -305,14 +305,14 @@
       "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::lint_main",
       "contract": "package::pypi::core-tools",
       "level": "inferred",
-      "reason": "the name alone matched; package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, no install of its package earlier in the CI job"
+      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, no install of its package earlier in the CI job"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.later.steps[0]",
       "provider": "github.com/acme/core-sdk::core_sdk/cli.py::publish_main",
       "contract": "package::pypi::core-sdk",
       "level": "inferred",
-      "reason": "the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, no install of its package earlier in the CI job"
+      "reason": "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, no install of its package earlier in the CI job"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.later.steps[1]",
@@ -326,7 +326,7 @@
       "provider": "github.com/acme/core-sdk::tools/core_tools/cli.py::lint_main",
       "contract": "package::pypi::core-tools",
       "level": "inferred",
-      "reason": "the name alone matched; package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, no install of its package earlier in the CI job"
+      "reason": "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, no install of its package earlier in the CI job"
     },
     {
       "consumer": "github.com/acme/workflows::.github/workflows/programs.yml::jobs.no_script.steps[0]",

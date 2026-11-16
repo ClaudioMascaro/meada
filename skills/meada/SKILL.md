@@ -87,8 +87,8 @@ it consumes it.
   route reaches the CI jobs that run it, and `direction: "down"` from a CI job enters the
   program. Read the level and its reason together: the link is `inferred` at best, since an
   install, `uvx <package>` and `pipx run <package>` name the package by its name alone and a
-  fork of a public package may hold that name (reason `the name alone matched`); the reason
-  then says whether an earlier command of the same CI job installs the package, the command
+  fork of a public package may hold that name (reason `the name alone matched`, where an install
+  or the command picks the package); the reason then says whether an earlier command of the same CI job installs the package, the command
   names it, or no install was seen. `ambiguous` when several packages declare the name. A
   `pip install` of a package of the workspace links the same way, `inferred`. The link names the script's function, not a
   subcommand's handler, and a missing CI caller is unproven: a path to the script, `python -m`,

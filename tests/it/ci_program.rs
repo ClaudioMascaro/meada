@@ -191,15 +191,13 @@ fn a_program_link_has_the_level_its_evidence_gives() {
     assert_eq!(
         said("jobs.no_install.steps[0]", &program(TOOLS_CLI, "lint_main")),
         format!(
-            "{BY_NAME}; package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, {NOT_INSTALLED}"
+            "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, {NOT_INSTALLED}"
         )
     );
     assert_eq!(
         said("jobs.declared_twice.steps[0]", &program(CLI, "health_main")),
-        format!(
-            "{BY_NAME}; package::pypi::core-sdk none (local 1.0.0), range unchecked; console \
-             script core-health, 2 packages declare it"
-        )
+        "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script \
+         core-health, 2 packages declare it"
     );
 }
 
@@ -443,7 +441,7 @@ fn trace_up_from_a_route_reaches_the_ci_jobs_that_run_its_caller() {
             format!("  →[{HTTP}] {SDK} {CLI}:10 publish_main"),
             // The job of the level table that installs the package after it runs the script.
             format!(
-                "    →[inferred: {BY_NAME}; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, {NOT_INSTALLED}] {WORKFLOWS} {PROGRAMS}:48 jobs.later.steps[0]"
+                "    →[inferred: package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, {NOT_INSTALLED}] {WORKFLOWS} {PROGRAMS}:48 jobs.later.steps[0]"
             ),
             format!("      {WORKFLOWS} {PROGRAMS}:45 jobs.later"),
             format!("        {WORKFLOWS} {PROGRAMS}:1 ."),
