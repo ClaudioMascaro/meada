@@ -1888,6 +1888,10 @@ repositório. Um módulo aninhado é dono da sua subárvore, e os arquivos de um
 A análise mira linux/amd64: arquivos `_windows.go`, com um `//go:build` falso ou que usam cgo
 (`import "C"`) ficam de fora.
 
+Abaixo da raiz de um módulo, um pacote num diretório `testdata` ou num cujo nome começa com `_`
+(`_gen`) fica de fora, como no `go build ./...`, a menos que um pacote que o Meada lê o importe (e,
+em cadeia, os pacotes que ele importa); os `_test.go` dele continuam de fora.
+
 **O que vira definição.** Funções, tipos, interfaces e métodos (`Tipo.Método`). Chamadas
 resolvem dentro do pacote e por imports (`pkg.F()`, com alias ou ponto). A biblioteca padrão e os
 módulos externos permanecem externos.
@@ -1937,6 +1941,8 @@ seção 8.5.
   middleware) monta o roteador onde ele não alcança, e as rotas dele não aparecem.
 - O `Add(método, caminho, handler)` do echo não é lido.
 - Código com cgo, `_windows.go` e `//go:build` falso não é indexado.
+- Um pacote em `testdata` ou num diretório `_` que só um import em branco (`import _ "..."`)
+  alcança fica de fora, embora o Go o compile.
 
 ### 9.4 Rust
 

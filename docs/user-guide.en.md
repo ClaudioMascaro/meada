@@ -1880,6 +1880,10 @@ too). Meada does not run Go's toolchain.
 The analysis targets linux/amd64: `_windows.go` files, files with a false `//go:build` or that use
 cgo (`import "C"`) are left out.
 
+Below a module's root, a package in a `testdata` directory or in one whose name begins with `_`
+(`_gen`) is left out, as `go build ./...` leaves it out, unless a package Meada reads imports it
+(and, in turn, the packages it imports); its `_test.go` files stay out.
+
 **What becomes a definition.** Functions, types, interfaces and methods (`Type.Method`). Calls
 resolve within the package and through imports (`pkg.F()`, aliased or dot). The standard library
 and external modules stay external.
@@ -1929,6 +1933,8 @@ the same file.
   middleware) mounts the router where it does not reach, and its routes do not appear.
 - echo's `Add(method, path, handler)` is not read.
 - Code with cgo, `_windows.go` and a false `//go:build` is not indexed.
+- A package in `testdata` or an `_` directory that only a blank import (`import _ "..."`) reaches
+  stays out, though Go builds it.
 
 ### 9.4 Rust
 

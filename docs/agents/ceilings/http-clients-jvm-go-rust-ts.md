@@ -6,7 +6,8 @@
   conventions the ticket names are test files (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`,
   `*_test.py`, `tests/`, `__tests__/`, `src/test/`), not `*Test.java`, `*Tests.cs` or
   `conftest.py`, nor a singular `test/` or a `spec/` directory, `*.e2e-spec.ts` apart from `*.spec.*`,
-  Swift's `Tests/` (the match is case-sensitive), Go `testdata/` or Gradle `src/integrationTest`.
+  Swift's `Tests/` (the match is case-sensitive), Go `testdata/` (a package there is read only
+  when a package read imports it, `lang/go.rs`) or Gradle `src/integrationTest`.
   A fake defined in a non-test helper file stays a provider. Channel providers and every other
   kind are untouched. `test_routes = true` keeps every one.
 - `http.rs` (`locate`, `tail_fits`, #801): a URL whose leading part Meada could not read (a hole,

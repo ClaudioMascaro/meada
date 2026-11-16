@@ -374,3 +374,88 @@ fn a_replace_by_a_module_no_repository_holds_keeps_the_dependency_out() {
     assert!(links(&json, &format!("{APP}go.mod")).is_empty());
     assert!(links(&json, &format!("{APP}main.go")).is_empty());
 }
+
+/// A service whose `testdata/` and `_gen/` hold Go programs with a route and a call each, as
+/// `<CARGO_TARGET_TMPDIR>/<case>/svc`, a repository with one commit; `main` is `main.go`.
+fn service(case: &str, main: &str) -> PathBuf {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(case)
+        .join("svc");
+    let _ = fs::remove_dir_all(&dir);
+    let program = |name: &str| {
+        format!(
+            "package {name}\n\nimport \"net/http\"\n\nfunc Serve() {{\n\
+             \tmux := http.NewServeMux()\n\
+             \tmux.HandleFunc(\"GET /{name}\", func(w http.ResponseWriter, r *http.Request) {{}})\n\
+             \thttp.Get(\"http://upstream/{name}\")\n}}\n"
+        )
+    };
+    let files = [
+        ("go.mod", "module example.com/svc\n\ngo 1.22\n".to_string()),
+        ("main.go", main.to_string()),
+        ("testdata/z.go", program("z")),
+        ("_gen/g.go", program("g")),
+    ];
+    for (path, text) in files {
+        fs::create_dir_all(dir.join(path).parent().unwrap()).unwrap();
+        fs::write(dir.join(path), text).unwrap();
+    }
+    git(&dir, &["-c", "init.defaultBranch=main", "init", "-q"]);
+    git(
+        &dir,
+        &[
+            "remote",
+            "add",
+            "origin",
+            "https://example.com/gopkg/svc.git",
+        ],
+    );
+    git(&dir, &["add", "-A"]);
+    git(&dir, &["commit", "-q", "-m", "fixture"]);
+    dir
+}
+
+/// The sites of every HTTP provider and consumer of an export.
+fn http_sides(export: &str) -> Vec<String> {
+    let json: Value = serde_json::from_str(export).unwrap();
+    let sides = ["providers", "consumers"].map(|k| json[k].as_array().unwrap().clone());
+    (sides.iter().flatten())
+        .filter(|s| s["contract"].as_str().unwrap().starts_with("http::"))
+        .map(|s| s["site"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// `go build ./...` builds no package under `testdata` or an `_` directory, but one a built
+/// package imports: a program kept there that nothing imports serves and calls nothing.
+#[test]
+fn a_program_under_testdata_is_a_side_only_once_a_built_package_imports_it() {
+    const ROUTE: &str = "mux := http.NewServeMux()\n\t\
+                         mux.HandleFunc(\"GET /orders\", func(http.ResponseWriter, *http.Request) {})\n";
+    let main = format!("package main\n\nimport \"net/http\"\n\nfunc main() {{\n\t{ROUTE}}}\n");
+    let imports = format!(
+        "package main\n\nimport (\n\t\"net/http\"\n\n\tz \"example.com/svc/testdata\"\n)\n\n\
+         func main() {{\n\t{ROUTE}\tz.Serve()\n}}\n"
+    );
+    let svc = service("gopkg_testdata", &main);
+    age(&svc);
+    let before = export(&svc);
+    fs::write(svc.join("main.go"), &imports).unwrap();
+
+    let refreshed = export(&svc);
+
+    assert_eq!(
+        http_sides(&before),
+        ["example.com/gopkg/svc::main.go::main.GET /orders"]
+    );
+    assert_eq!(
+        http_sides(&refreshed),
+        [
+            "example.com/gopkg/svc::main.go::main.GET /orders",
+            "example.com/gopkg/svc::testdata/z.go::Serve.GET /z",
+            "example.com/gopkg/svc::testdata/z.go::Serve::http.Get#0",
+        ]
+    );
+    let cold = service("gopkg_testdata_cold", &main);
+    fs::write(cold.join("main.go"), &imports).unwrap();
+    assert_eq!(refreshed, export(&cold));
+}

@@ -45,7 +45,7 @@ O AWS SDK for Go v2 reconhece clientes criados por `New` ou `NewFromConfig`, inc
 
 O caminho `module` de cada `go.mod` resolve imports para pastas de pacotes, incluindo `replace` para uma pasta do repositório. Um módulo aninhado controla sua subárvore. Arquivos na mesma pasta com o mesmo `package` compartilham escopo, inclusive `_test.go`. O Meada não executa o toolchain Go.
 
-A análise usa linux/amd64. Arquivos `_windows.go`, com `//go:build` falso ou com cgo (`import "C"`) ficam de fora. O Meada lê funções, tipos, interfaces e métodos (`Tipo.Metodo`). Resolve chamadas no pacote e por imports (`pkg.F()`, alias ou ponto); biblioteca padrão e módulos externos continuam externos.
+A análise usa linux/amd64. Arquivos `_windows.go`, com `//go:build` falso ou com cgo (`import "C"`) ficam de fora. Um pacote numa pasta `testdata` ou que começa com `_` só é lido quando um pacote que o Meada lê o importa, como o `go build ./...` o compila. O Meada lê funções, tipos, interfaces e métodos (`Tipo.Metodo`). Resolve chamadas no pacote e por imports (`pkg.F()`, alias ou ponto); biblioteca padrão e módulos externos continuam externos.
 
 Uma chamada `recv.M()` é `exact` quando o código informa o tipo em parâmetro, campo, `var`, literal composto ou resultado de função. Sem isso, a resolução pelo nome é `inferred` ou `ambiguous`. Uma chamada por interface para no método da interface.
 

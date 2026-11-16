@@ -108,6 +108,11 @@ impl Modules {
             .max_by_key(|m| m.dir.len())
     }
 
+    /// `dir` below the directory of the module that owns it, all of it when none does.
+    pub fn below<'d>(&self, dir: &'d str) -> &'d str {
+        self.owner(dir).map_or(dir, |m| &dir[m.dir.len()..])
+    }
+
     /// The package directory an import of `specifier` from a file of `from` names: through a
     /// `replace` of the importing file's module (none when it replaces the module with one from
     /// outside), else through the module path of the repository's modules, the longest that

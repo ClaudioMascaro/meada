@@ -20,7 +20,12 @@
   evaluates the build constraints (`lang/go/build.rs`: file name suffixes and the
   `//go:build` line of the header, read as the Go tools read it: before the first line of code,
   outside block comments) for `linux/amd64` and marks a file they exclude `Facts::unbuilt`,
-  which `layout` leaves out of `members`. `layout` reads the `go.mod` files once
+  which `layout` leaves out of `members`. `members` then holds the files of the packages each
+  module's `./...` lists (`build::listed`, on the directory below the root of the module that
+  owns it, `Modules::below`: no directory on the way named `testdata` or starting with `_` or
+  `.`) and, in turn, the non-test files of each directory a member imports (a `_test.go`'s
+  import counts, a blank one does not), as `go build ./...` builds them. `layout` reads the
+  `go.mod` files once
   (`lang/go/modfile.rs`: `module` and `replace` directives, a line format read with no parser
   crate) and answers `modules` with the first non-test file of the directory an import names,
   which stands for the package (`Modules::dir`: a `replace` of the importing file's module,
