@@ -935,6 +935,9 @@ Quando o código muda e uma decisão deixa de caber (a chamada sumiu, o item nã
 o provedor sumiu ou não é mais candidato), o `meada status` a mostra como **obsoleta** sob o
 repositório, e `meada decide --prune` a remove. Uma decisão que espera um par ainda não
 encontrado aparece à parte (`decision waiting on missing peer ...`) e é mantida.
+O alvo precisa ser um dos candidatos do item, os que o `meada decide` lista, também para uma URL
+dinâmica: um alvo que o repositório serve mas que a chamada não alcança (outro método, ou um
+caminho onde as partes conhecidas da URL não cabem) fica obsoleto, e o item continua aberto.
 
 ### Decisor por modelo
 

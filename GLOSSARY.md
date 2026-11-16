@@ -857,7 +857,8 @@ _Avoid_: judge, LLM, oracle
 **Stale decision**:
 A decision that no longer applies, for one cause: its call site is gone, its item is no longer
 open (the core now resolves the call on its own), its target is gone, or its target is no longer
-a candidate of the ambiguous link. Indexing ignores it, so the link stays as the core sees it;
+a candidate of its item: of the ambiguous link, or, for a dynamic URL, one of the routes `meada
+decide` lists for the call (#806). Indexing ignores it, so the link stays as the core sees it;
 `meada status` and `meada export` report it with the cause. A decision whose target repository
 is a missing peer is neither applied nor stale: it waits.
 _Avoid_: outdated decision, invalid decision

@@ -32,6 +32,14 @@ that. Neither may enter indexing (invariant 1).
   from three things: the deterministic core stays primary, the command is opt-in, and git
   history plus PR review cover the file. How decisions with a low `p` are treated is left to the
   track A spec (ADR 0003).
+- A decision applies only while its target is one of its item's candidates, the ones `meada
+  decide` offers: the providers of an ambiguous link, or the routes a dynamic URL can reach by
+  its method and the parts of the URL Meada reads. A target outside them is a stale decision and
+  the item stays open, whoever wrote the file.
+
+(Amended 2026-11-16. The first version did not say how replay checks a target, and replay
+applied a dynamic URL's decision to any contract a repository serves, so a `GET` call decided to
+a `POST` route became a `decided` link (#806).)
 
 ### Decider endpoint
 

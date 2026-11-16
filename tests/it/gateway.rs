@@ -128,3 +128,30 @@ fn a_decision_for_the_provider_behind_a_colliding_gateway_path_applies() {
         "example.com/acme/billing::app/audit/route.ts::GET"
     );
 }
+
+/// A `dynamic-url` decision to a candidate that fits by its gateway path applies: replay keeps
+/// the candidates `meada decide` lists (#806).
+#[test]
+fn a_dynamic_url_decision_for_a_candidate_by_its_gateway_path_applies() {
+    let (client, ..) = gateway("gateway_dynamic_decided");
+    let order = "example.com/acme/client::src/client.ts::order::fetch#0";
+    let toml = format!(
+        "[[decision]]\nkind = \"dynamic-url\"\ncall = \"{order}\"\n\
+         target = \"example.com/acme/orders::http::GET::/orders/{{}}\"\nby = \"human\"\n"
+    );
+    fs::write(client.join("meada.decisions.toml"), toml).unwrap();
+
+    let export = Engine::open(&client).unwrap().export().unwrap();
+
+    let export: serde_json::Value = serde_json::from_str(&export).unwrap();
+    assert_eq!(export.get("stale_decisions"), None, "{export}");
+    let links: Vec<_> = (export["links"].as_array().unwrap().iter())
+        .filter(|l| l["consumer"] == order)
+        .collect();
+    assert_eq!(links.len(), 1, "{links:?}");
+    assert_eq!(links[0]["level"], "decided");
+    assert_eq!(
+        links[0]["provider"],
+        "example.com/acme/orders::app/orders/[id]/route.ts::GET"
+    );
+}
