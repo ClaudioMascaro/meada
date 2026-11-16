@@ -149,8 +149,12 @@
   consumers costs seconds. An orphan line needs a consumer with a contract in the scope: a
   marked consumer opens it, an external `uses` and an unresolved CI step do not, a provider
   consumed only by a call to itself is no orphan, and one whose only caller is an unresolved
-  CI step is an orphan once another consumer opens the scope. A peer `meada.toml` names and
-  the disk does not hold is outside the workspace: a call to it holds no side and no mark.
+  CI step is an orphan once another consumer opens the scope. So is an action only a call that
+  leaves the root reaches at run time: `uses: ./../<directory>` holds no side, so the builder
+  actions slsa's delegator pipeline moves there, from a path its caller passes in `with`, read
+  `no consumer` (4 lines in `ci-slsa` at its pin, found by the 1.5.0 release diff). A peer
+  `meada.toml` names and the disk does not hold is outside the workspace: a call to it holds no
+  side and no mark.
   `meada status` reports and does not index: a repository never indexed prints `not indexed`
   and no orphan line. The `absent` field of `meada export` follows the links of that same
   export: a consumer row of the kind with no link.

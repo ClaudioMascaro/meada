@@ -145,7 +145,7 @@ documentation, then read every row of the export against it.
 | absent marks | 0, and none called for |
 | `ref mismatch` | 7 of 7 right, none missing |
 | `permissions mismatch` | 0, and none called for over the 20 links from a CI job; the 20 `permissions` blocks equal the files |
-| `orphan ci::` lines | 28: 26 agree with the links, 2 name an action only an unresolved CI step calls (ceiling of #827) |
+| `orphan ci::` lines | 28: 26 agree with the links, 2 name an action only an unresolved CI step calls (ceiling of #827); 4 of the 26 are false all the same, builder actions the delegator pipeline runs through `./../<directory>` (no side, ceiling of #826; found by the 1.5.0 release diff) |
 | F2 sides | 0 installs, 0 program links, 0 image builders: none of the 169 `run` scripts names a package, a console script or an image of the three, and the checker found no side that should exist under a rule Meada reads |
 | uses removed by the ownership rule (#828) | 0 of 0: neither binary reads a use in these repositories, so the corpus does not measure the rule |
 | against the base | no row gone and no site moved; the new rows are CI nodes, consumers, providers and links, and `status` differs by the 28 orphan lines |
