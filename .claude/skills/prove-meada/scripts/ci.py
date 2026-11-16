@@ -1224,12 +1224,16 @@ def corpus_selftest(pinned):
     """#904's sets, their run records and what `measure` counts, without Meada."""
     sets = corpus_sets()
     assert {name: len(repos) for name, repos in sets.items()} == {'p': 3, 'a': 6, 'b': 7, 'c': 10, 'f': 41, 'f-distractor': 47}, sets
+    # Meada refuses a manifest identity that is not its own lower-cased reading of the remote (pyBumpHunter).
+    assert sets['f']['ci-f-pybumphunter'] == 'github.com/scikit-hep/pybumphunter', sets['f']
+    assert all(identity == identity.lower() for repos in sets.values() for identity in repos.values()), sets
     records = json.loads((Path(__file__).resolve().parent / 'ci-records.json').read_text())['records']
     assert set(records) == {repo for repos in sets.values() for repo in repos}, sorted(records)
     for name, record in records.items():
         assert (record['repository'], record['sha']) == (pinned[name][1].removeprefix('https://github.com/'), pinned[name][2]), name
     for uses, job, want in (('o/hub/.github/workflows/b.yml@v1', True, ('<owner>/<repo>/.github/workflows/<file>@<ref>', 'github.com/o/hub')),
                             ('o/hub@v1', False, ('<owner>/<repo>@<ref>', 'github.com/o/hub')),
+                            ('O/Hub/a@v1', False, ('<owner>/<repo>/<folder>@<ref>', 'github.com/o/hub')),
                             ('o/hub/a/b@0123abc', False, ('<owner>/<repo>/<folder>@<ref>', 'github.com/o/hub')),
                             ('./.github/workflows/b.yml', True, ('./.github/workflows/<file>', None)),
                             ('./.github/actions/x', False, ("a CI step's ./<folder>", None)), ('./../x', False, ('./../<directory>', None)),
@@ -1754,18 +1758,19 @@ def f3(run, heads, exports, statuses):
 def corpus_sets():
     """#904's sets from `infra.tsv`, each as infra name -> repository identity: P is flow `ci` (`CORPUS`),
     each other set its `ci-<set>` rows, and the distractor (every `ci-distractor` row, three of set C among
-    them) joins F once as `f-distractor`."""
+    them) joins F once as `f-distractor`. An identity is lower-cased, as Meada reads a remote."""
     sets = {}
     for name, (flows, url, _) in prove.infra().items():
         for flow in flows:
             if flow == 'ci' or flow.startswith('ci-'):
-                sets.setdefault('p' if flow == 'ci' else flow[3:], {})[name] = 'github.com/' + url.removeprefix('https://github.com/')
+                sets.setdefault('p' if flow == 'ci' else flow[3:], {})[name] = 'github.com/' + url.removeprefix('https://github.com/').lower()
     sets['f-distractor'] = {**sets['f'], **sets.pop('distractor')}
     return sets
 
 
 def uses_form(uses, job):
-    """A `uses` as (its form in ADR 0028's table, the repository a full name names, else None)."""
+    """A `uses` as (its form in ADR 0028's table, the repository a full name names, lower-cased as ADR 0028
+    reads it, else None)."""
     if '${{' in uses:
         return 'expression', None
     if uses.startswith(('docker://', '$/')):
@@ -1777,7 +1782,7 @@ def uses_form(uses, job):
     parts = uses.partition('@')[0].split('/')
     form = ('<owner>/<repo>/.github/workflows/<file>@<ref>' if parts[2:4] == ['.github', 'workflows']
             else '<owner>/<repo>/<folder>@<ref>' if parts[2:] else '<owner>/<repo>@<ref>')
-    return form, 'github.com/' + '/'.join(parts[:2])
+    return form, 'github.com/' + '/'.join(parts[:2]).lower()
 
 
 def ci_nodes(identity, root):
