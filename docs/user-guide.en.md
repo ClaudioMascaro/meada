@@ -1996,7 +1996,9 @@ by `push_str`, `push` and `+=` also folds.
 ### 9.5 Java
 
 **Files.** `.java`, resolved by the `package` declarations. Meada needs no JDK, Maven or Gradle
-and runs no code from the repository.
+and runs no code from the repository. A unicode escape of a line break (`\u000a`, `\u000d`, with
+any number of `u`) is read as javac reads it: in a line comment it ends the comment, and the rest
+of the line is code.
 
 **What becomes a definition.** Classes, interfaces, enums, records, methods and constructors,
 nested ones included. Names carry the package and, for methods, the written parameter types

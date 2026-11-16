@@ -2005,7 +2005,9 @@ mut` String só lido e acrescido por `push_str`, `push` e `+=` também dobra.
 ### 9.5 Java
 
 **Arquivos.** `.java`, resolvidos pelas declarações de `package`. O Meada não precisa de JDK,
-Maven nem Gradle e não roda código do repositório.
+Maven nem Gradle e não roda código do repositório. Um escape unicode de quebra de linha
+(`\u000a`, `\u000d`, com qualquer número de `u`) é lido como o javac o lê: num comentário de
+linha, ele encerra o comentário e o resto da linha é código.
 
 **O que vira definição.** Classes, interfaces, enums, records, métodos e construtores, inclusive
 aninhados. Os nomes levam o pacote e, nos métodos, os tipos escritos dos parâmetros

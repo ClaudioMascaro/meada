@@ -2035,7 +2035,9 @@ solo leído y ampliado por `push_str`, `push` y `+=` también pliega.
 ### 9.5 Java
 
 **Archivos.** `.java`, resueltos por las declaraciones de `package`. Meada no necesita JDK, Maven
-ni Gradle y no ejecuta código del repositorio.
+ni Gradle y no ejecuta código del repositorio. Un escape unicode de salto de línea (`\u000a`,
+`\u000d`, con cualquier número de `u`) se lee como lo lee javac: en un comentario de línea termina
+el comentario, y el resto de la línea es código.
 
 **Qué pasa a ser definición.** Clases, interfaces, enums, records, métodos y constructores,
 también los anidados. Los nombres llevan el paquete y, en los métodos, los tipos escritos de los

@@ -33,6 +33,9 @@
   family cannot produce an exact link; other files still index, and `Facts::budget` (not
   `unbuilt`) makes `meada status` name the file, as for C#. The Java hostile-depth and
   long-prefix engine fixtures exceed these limits.
+- `lang/java.rs`: `escaped_breaks` translates only the unicode escapes of a line terminator
+  before the parse; javac translates every escape (JLS 3.3), and any other one stays as written.
+  So `\u002a/` does not end a block comment, and the code javac reads after it stays a comment.
 - `jvm/names.rs`: `LOCAL_DEPTH` (8) bounds how many locals a JVM client reader (Ktor,
   `RestTemplate`, `WebClient`, Retrofit) follows a client through (`val b = a`, `val a =
   HttpClient(..)`) where the value flow does not reach it; past it the client is not followed
