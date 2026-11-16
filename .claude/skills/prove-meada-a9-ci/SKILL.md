@@ -20,10 +20,10 @@ Read `.claude/skills/prove-meada/SKILL.md` first: it owns Scope, Sort, the answe
 
 ## A9: CI in the graph (spec #820)
 
-**Drive**: `$S/ci.py --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/ci" --http`: it generates the neutral workspaces of one slice under `github.com/acme`, indexes and exports them with both binaries and checks each case of its `CASES` table. The default slice is F1 (the reproduction of #816, one case per form of `uses`, Git refs, orphans, a repository without `origin`); `--slice f2 --run "$RUN/ci-run"` drives the `run` scripts and the chain of three contracts, `--slice f3 --run "$RUN/ci-permissions"` the declared permissions. `ci.py --corpus` drives the three pinned repositories of flow `ci` in `$S/infra.tsv`, alone and as one workspace. The cases, the keys and what could fool it: [references/ci.md](../prove-meada/references/ci.md).
+**Drive**: `$S/ci.py --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/ci" --http`: it generates the neutral workspaces of one slice under `github.com/acme`, indexes and exports them with both binaries and checks each case of its `CASES` table. The default slice is F1 (the reproduction of #816, one case per form of `uses`, Git refs, orphans, a repository without `origin`); `--slice f2 --run "$RUN/ci-run"` drives the `run` scripts and the chain of three contracts, `--slice f3 --run "$RUN/ci-permissions"` the declared permissions. `ci.py --corpus` drives set P, the three pinned repositories of flow `ci` in `$S/infra.tsv`, alone and as one workspace, then each set of the A9 yardstick (#904) as its own workspace on the head binary, saved in `sets/<set>/` for its verifier. The cases, the keys and what could fool it: [references/ci.md](../prove-meada/references/ci.md).
 
 **Copies**: nothing for the CI rows, which answer to #820. Every other row answers to the base binary, MCP over HTTP to stdio.
 
-**Done looks like**: for each command, `checks.json` with every check passed and `receipt.md` saying so; from `--corpus`, also `workspace/ci-links.json`.
+**Done looks like**: for each command, `checks.json` with every check passed and `receipt.md` saying so; from `--corpus`, also `workspace/ci-links.json` and `sets/<set>/`.
 
 **Could fool you**: a case proves something only beside its control, so read a failure as the pair; `meada status` is saved as a diff against the base and read by hand. The full list: the reference's "Could fool you".
