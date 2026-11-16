@@ -224,3 +224,26 @@ pipeline by full name across repositories, 122 to a folder action across reposit
 `$/` form, and 56 calls pinned to a commit other than the pin of `github-workflows` (`ref
 mismatch`). Report #835's corpus exercised neither the `$/` form nor more than 4 links across
 repositories. Pinning and counting it is the A9 yardstick's work, not this ticket's.
+
+## 9. Recount by the yardstick's verifier (2026-11-16)
+
+An agent that wrote neither this note nor A9 listed every statement of Set F from the source at the
+pins, before any export existed, for the A9 yardstick (#904). Its counts differ from sections 4 and
+5 in these places; the outcome stands (Set F qualifies, every count past the floor of 30):
+
+- Install steps: 61, not 62. `tox@.` in `tox-dev/tox` is a PEP 508 direct reference, which gives no
+  side (#831); the `uv pip install build` of `awkward`'s `run-s390x-tests` runs inside a `docker run
+  ... bash -c "..."` string, no side; `pyhf`'s `uv pip install --system --pre
+  'pyhf[backends,xmlio]'` was missed (`inferred`, its own repository).
+- Program steps run by name: 78 (59 `exact`, 19 `inferred`), not 70. ADR 0028 counts the console
+  script of any package of the workspace, not only the five tools: `histoprint` (1),
+  `release-creator` in `tox-dev/github-workflows` (5) and the 2 `nox --session` steps of
+  `wntrblm/nox`'s `.github/workflows/action.yml`, a pipeline (it holds `jobs`) that section 4 read
+  as an action.
+- Steps a ceiling leaves unread: 54, not 28. Besides section 5's three causes: `uvx --from build` and
+  `pipx run --spec build` (3, they do name a tool of the set, `build`), `python -m tox` (10), `uv
+  tool run` (3), a script past 1024 bytes (3), a shell other than `bash` (3), `release-creator`
+  inside `$(...)` (2), an assignment before `uvx` (1, which section 5 counted among its 20) and an
+  install inside a string (1); section 5 also missed one `--with` step.
+
+The verifier's lists and counts are the yardstick's answer key; #904's report carries them.
