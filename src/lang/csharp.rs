@@ -1423,7 +1423,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
     }
     facts.consts.extend(given);
     let locals = bound.iter().map(|b| (b.scope.as_str(), b.name.as_str()));
-    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, locals);
+    // Every mention counts, `x.Count` too (#774): `List` in the source may name a type whose
+    // `Count` runs code (a type parameter, an alias in a file or a project file, an escaped name).
+    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, locals, |_| false);
     facts.bound = bound;
     facts.bound.extend(through);
     facts.externs = outside.into_iter().collect();

@@ -67,7 +67,12 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   its parameters, so it resolves by name or to nothing.
 
 - `resolve.rs`: wrapper expansion (HTTP clients, message producers and consumers) walks every
-  simple path up the callers, and does not climb a call found only by a name match, so a wrapper
+  simple path up the callers, cut where it reaches a wrapper again (nothing more where the
+  cycle's calls pass each parameter the read needs on as itself; where they pass anything else,
+  each site the wrapper's first turn gives also gets what the wrapper reads where it stands,
+  its parameters unknown, #886; what that adds is folded on an `EVAL_BUDGET` of its own per
+  file, past which a cycle adds nothing), and does not climb a call found only by a name
+  match, so a wrapper
   method called on a receiver whose class Meada cannot tell (in TypeScript any receiver but
   `this`, a `const api = new Api()` included), or a function called by a bare name no import
   binds, is read where it stands; value flow (`Code::origins`, for a parameter's arguments) does
@@ -101,12 +106,32 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   variable says otherwise: one of the same package in another source root is not seen (#719).
   A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB
   transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that
-  declares the name mentions it twice. In Go and C#, one mentioned a third time (logged, read by two
-  requests), one held in a parameter, a field or a package variable, the first name the path meets
-  when any file of the repository assigns the field read through it (`q.TableName = ..` on any
-  variable of any type, in any package or class; a write of another field does not count), and a C#
-  request filled by property assignments have no table or bus; nor have Go locals declared together (`p, q
-  := ..`), a Go entry declared in a loop body and a Go request held by value and passed by address.
+  declares the name mentions it twice. In Go a read by the builtin `len(x)` or `cap(x)` is no
+  mention (#774), unless a file of the package declares or binds `len` or `cap`; as for every Go
+  name, a file the target does not build is not read (one target, `language-packs.md`), nor is a
+  file the repository ignores or a symlink. In Go and C#, one mentioned a third time for any other
+  reason (logged, C#'s `x.Count`, read by two requests), one held in a field or a package variable,
+  one held in a parameter (a Go wrapper's
+  apart, below), and a C# request filled by property assignments have no table or bus; in C# so
+  has the first name the path meets when any file of the repository assigns the property read
+  through it (`q.TableName = ..` on any variable of any type, in any class; a write of another
+  property does not count), since a class derived from an SDK type can keep `this` (Go judges a
+  name by its own mentions alone, #774); nor have
+  Go locals declared together (`p, q := ..`), a Go name declared in a block, an `if`, a `switch` or
+  `select` case or a loop body (the Go pack binds a constant only in a statement of the function
+  body, `language-packs.md`; #888) and a Go request held by value and passed by address.
+  A Go function, or a method whose name no other definition of the repository spells, that
+  mentions its parameter twice (declared, read by the path; `len(x)` and `cap(x)` as above) sends what each exact caller passes
+  (#774): the argument is followed in the caller by the caller's own mentions, through any number
+  of such wrappers, a spread (`xs...`, the caller's slice itself) and a variadic parameter given
+  one element included. A chain enters a function once: a wrapper that calls itself, or two that
+  call each other, give the caller's site the names of the first pass alone. A retry that passes
+  the same parameter on adds nothing; where a call of the cycle passes another value on (the
+  next parameter, a value made from one), the caller's site gets an unresolved side beside
+  those names, never the name the next turn sends, a table name in a string parameter included
+  (#886). A function literal, a method that shares its name with another
+  definition, a call with more or fewer arguments than parameters (a variadic one given two)
+  and every C# method are not followed.
   In Java the rule covers a list or an array held in a local, by position (#772): one with a
   mention that may run before the request reads it (a call on it other than `sort`, `size`,
   `get`, `isEmpty`, `contains`, `stream` or `forEach`, a hand-off to another method or name, the
