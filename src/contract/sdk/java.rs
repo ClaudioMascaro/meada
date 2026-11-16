@@ -65,6 +65,9 @@ pub(crate) fn root(value: &Value) -> Option<&str> {
     }
 }
 
+/// Methods by simple name and arity, or by name alone (`None`): `Builders::overridden`.
+type MethodCounts<'a> = std::collections::HashMap<(&'a str, Option<usize>), u32>;
+
 /// What a Java file does with the builders it names, read once for the whole run. A builder
 /// changes in place, so a name is `exact` only when every mention of its builder is a form the
 /// reader follows: a setter called on it (a member of the name's path changes it, any other does
@@ -81,9 +84,48 @@ pub(crate) struct Builders<'a> {
     /// The file and the directory of every type the repository's Java files declare, nested ones
     /// included, with its name: a type of the package or the file shadows the one an import names.
     types: std::cell::OnceCell<std::collections::HashSet<(&'a str, &'a str)>>,
+    /// How many methods of the repository have each simple name and arity, and each name of a
+    /// method no definition stands for (`Facts::anonymous`), with no arity (`overridden`). None
+    /// when a Java file is past its budget (`Facts::budget`): it keeps no facts, so it may declare
+    /// a method of any name.
+    methods: std::cell::OnceCell<Option<MethodCounts<'a>>>,
 }
 
 impl<'a> Builders<'a> {
+    /// Whether a call of the method `def` may run another (#772): a method of the repository with
+    /// its simple name and arity, however its parameters are spelled (an override), or one of its
+    /// name that no definition stands for (an anonymous class's, or a class's nested in one), or
+    /// any method at all where a Java file is past its budget.
+    fn overridden(&self, code: &Code<'a>, def: &'a crate::lang::Def) -> bool {
+        let simple = |name: &'a str| {
+            let own = name[crate::parent(name).len()..].trim_start_matches('.');
+            own.split('(').next().unwrap_or(own)
+        };
+        let methods = self.methods.get_or_init(|| {
+            let mut methods = std::collections::HashMap::new();
+            for facts in code.files().values() {
+                if facts.budget.is_some() {
+                    return None;
+                }
+                for d in (facts.defs.iter()).filter(|d| d.kind == crate::lang::Kind::Method) {
+                    *methods
+                        .entry((simple(&d.name), Some(d.params.len())))
+                        .or_insert(0) += 1;
+                }
+                for name in &facts.anonymous {
+                    *methods.entry((name.as_str(), None)).or_insert(0) += 1;
+                }
+            }
+            Some(methods)
+        });
+        let Some(methods) = methods else {
+            return true;
+        };
+        let name = simple(&def.name);
+        methods.get(&(name, Some(def.params.len()))) > Some(&1)
+            || methods.contains_key(&(name, None))
+    }
+
     /// Whether `name`, the start of a builder chain, may be a type of the repository or of a
     /// package other than the SDK's: its setters are then the repository's, not the SDK's. A type
     /// the file declares beats an import; a type of its directory beats a wildcard import only.
@@ -193,6 +235,14 @@ impl Span {
         };
         other.is_some_and(|&s| s < at.later)
     }
+
+    /// Whether a mention other than the one read at `at.own` starts before `at.later`: a list's
+    /// read is one hand-off there, and the call a receiver hands it in starts there too
+    /// (`prep(l).w(l)`, #772).
+    fn hits_once(&self, at: &At) -> bool {
+        let skip = usize::from(self.starts.first() == Some(&at.own));
+        (self.starts.get(skip)).is_some_and(|&s| s < at.later)
+    }
 }
 
 /// Where a value is made, and how far past that a mention still changes it.
@@ -267,6 +317,8 @@ impl<'a> Nest<'a> {
 struct Mentions<'a> {
     /// How many times the name is written as the start of a call (`b.set(..)`, `b.build()`).
     direct: u32,
+    /// How many times the name is handed on as itself (`f(items)`, `var same = items`).
+    bare: u32,
     /// A mention the reader cannot follow.
     other: Option<Span>,
     /// The setters called on it, by method.
@@ -274,8 +326,9 @@ struct Mentions<'a> {
 }
 
 impl<'a> Mentions<'a> {
-    fn add(&mut self, kind: Kind<'a>, range: &Range<usize>, direct: bool) {
+    fn add(&mut self, kind: Kind<'a>, range: &Range<usize>, direct: bool, bare: bool) {
         self.direct += u32::from(direct);
+        self.bare += u32::from(bare);
         let span = match kind {
             Kind::Harmless => return,
             Kind::Other => &mut self.other,
@@ -296,6 +349,16 @@ impl<'a> Mentions<'a> {
     fn changed(&self, setter: &dyn Fn(&str) -> bool, at: &At) -> bool {
         self.other.as_ref().is_some_and(|s| s.hits(at))
             || (self.sets.iter()).any(|(method, span)| setter(method) && span.hits(at))
+    }
+
+    /// Whether a mention of a list read at `at` may change it (`Walk::list_changed`): a call on it
+    /// other than one of `KEEPS`, wherever it starts, or a hand-off but the read's own
+    /// (`Span::hits_once`).
+    fn list_changed(&self, at: &At) -> bool {
+        self.other.as_ref().is_some_and(|s| s.hits_once(at))
+            || (self.sets.iter()).any(|(method, span)| {
+                !KEEPS.contains(method) && (span.starts.first()).is_some_and(|&s| s < at.later)
+            })
     }
 
     fn sorted(&mut self) {
@@ -342,13 +405,16 @@ struct Mention<'a, 'r> {
     range: &'r Range<usize>,
     /// Written once as the start of a call, not the root of a longer chain.
     direct: bool,
+    /// Handed on as the name itself, not as the root of a chain or inside a constructor.
+    bare: bool,
 }
 
 impl<'a> Uses<'a> {
     fn add(&mut self, code: &Code<'a>, path: &'a str, mention: Mention<'a, '_>) {
         work();
         let name = mention.name.strip_prefix("this.").unwrap_or(mention.name);
-        let (kind, range, direct) = (mention.kind, mention.range, mention.direct);
+        let (kind, range, direct, bare) =
+            (mention.kind, mention.range, mention.direct, mention.bare);
         // `this.name` is the field, whatever local hides the bare name.
         if name.len() == mention.name.len() {
             let declared =
@@ -356,12 +422,12 @@ impl<'a> Uses<'a> {
             self.locals
                 .entry((declared, name))
                 .or_default()
-                .add(kind, range, direct);
+                .add(kind, range, direct, bare);
         }
         self.fields
             .entry(name)
             .or_default()
-            .add(kind, range, direct);
+            .add(kind, range, direct, bare);
     }
 
     fn read(code: &Code<'a>, path: &'a str) -> Self {
@@ -410,10 +476,12 @@ impl<'a> Uses<'a> {
                     kind,
                     range,
                     direct,
+                    bare: false,
                 };
                 uses.add(code, path, mention);
             }
             for arg in &call.args {
+                let bare = matches!(arg, Value::Ref(_));
                 handed(arg, &mut |name| {
                     let range = &call.range;
                     let kind = Kind::Other;
@@ -426,6 +494,7 @@ impl<'a> Uses<'a> {
                             kind,
                             range,
                             direct: false,
+                            bare,
                         },
                     )
                 });
@@ -433,6 +502,7 @@ impl<'a> Uses<'a> {
         }
         // A name made from a builder, or assigned one, is another name of it: first in the file.
         for bound in code.bindings(path).iter().chain(code.assigned(path)) {
+            let bare = matches!(bound.value, Value::Ref(_));
             handed(&bound.value, &mut |name| {
                 let scope = bound.scope.as_str();
                 let (kind, range) = (Kind::Other, &(0..0));
@@ -445,6 +515,7 @@ impl<'a> Uses<'a> {
                         kind,
                         range,
                         direct: false,
+                        bare,
                     },
                 )
             });
@@ -472,6 +543,14 @@ impl<'a> Uses<'a> {
             .get(&(scope, name))
             .is_some_and(|m| m.changed(setter, at))
             || field && (self.fields.get(name)).is_some_and(|m| m.changed(setter, &anywhere))
+    }
+
+    /// Whether the file writes the list `name`, a local or a parameter of `scope`, more often
+    /// than its declaration, the calls started from it and the places it is handed on as itself
+    /// account for: a use the syntax model does not show (#772).
+    fn unseen_list(&self, scope: &str, name: &str) -> bool {
+        let seen = (self.locals.get(&(scope, name))).map_or(0, |m| m.direct + m.bare);
+        (self.written.get(&(scope, name))).is_none_or(|&written| written > 1 + seen)
     }
 
     /// Whether the file writes the builder `name` more often than the calls made on it account
@@ -523,10 +602,42 @@ fn handed<'v>(value: &'v Value, to: &mut dyn FnMut(&'v str)) {
     }
 }
 
+/// What one `changed` question found.
+pub(super) struct Judged {
+    pub(super) changed: bool,
+    /// The parameter of the function the value is in, by position, that the list of the path's
+    /// entries comes in unchanged: each caller's argument there is judged in turn (#772).
+    pub(super) parameter: Option<usize>,
+    /// Whether that parameter is set after the read: a later call of the function reads the
+    /// change, so only a list each call makes for it (`made_here`) keeps the read's tables.
+    pub(super) fresh: bool,
+}
+
+/// Whether `value` makes, where it is written, the list or the entry it is: a list or an array
+/// literal, `new`, `List.of`, `Arrays.asList`, or a builder chain (`T.builder()..build()`).
+pub(super) fn made_here(value: &Value) -> bool {
+    match value {
+        Value::List(_) | Value::New(..) => true,
+        Value::Call(c) => {
+            matches!(crate::resolve::method(&c.callee), "of" | "asList")
+                || std::iter::successors(Some(c), |c| match c.receiver.as_deref() {
+                    Some(Value::Call(next)) => Some(next),
+                    _ => None,
+                })
+                .last()
+                .is_some_and(|c| crate::resolve::method(&c.callee) == "builder")
+        }
+        _ => false,
+    }
+}
+
 /// Whether the request `value`, made by the call at `range`, reads a builder changed by a mention
 /// the reader cannot follow, or by a setter of a member of the path `selector`, outside `range`. A
 /// named value (`Put p = pb.build()`) is what its declaration built, so only what happened to its
-/// builder before that `.build()` counts: a value built first is an immutable copy.
+/// builder before that `.build()` counts: a value built first is an immutable copy. With `read`,
+/// `value` is instead the argument the call at `range` passes for the list of the path's entries,
+/// which the call reads when it runs.
+#[expect(clippy::too_many_arguments)]
 pub(super) fn changed<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -535,7 +646,8 @@ pub(super) fn changed<'a>(
     range: &Range<usize>,
     selector: &str,
     builders: &Builders<'a>,
-) -> bool {
+    read: bool,
+) -> Judged {
     let setter = super::setter(selector);
     // The list of a path of entries is its first member (`Entries[]`, `TransactItems[]`).
     let list = super::setter(selector.split('.').next().unwrap_or(selector));
@@ -549,15 +661,32 @@ pub(super) fn changed<'a>(
         uses: builders.uses(code, path),
         seen: std::collections::HashSet::new(),
         depth: 0,
-        on: false,
+        on: read,
         shared: false,
+        parameter: None,
+        fresh: false,
     };
-    let at = At {
-        range: range.clone(),
-        later: usize::MAX,
-        own: usize::MAX,
+    let at = match read {
+        true => At::made(range),
+        false => At {
+            range: range.clone(),
+            later: usize::MAX,
+            own: usize::MAX,
+        },
     };
-    walk.value(value, &at)
+    let changed = read && walk.passed(value, &at) || walk.value(value, &at);
+    Judged {
+        changed,
+        parameter: walk.parameter,
+        fresh: walk.fresh,
+    }
+}
+
+/// Whether `value`, an argument, hands on the name `name` (`f(l)`, `f(l.subList(..))`, `new T(l)`).
+pub(super) fn hands(value: &Value, name: &str) -> bool {
+    let mut found = false;
+    handed(value, &mut |n| found |= n == name);
+    found
 }
 
 /// The named values and builders one `changed` question has followed.
@@ -569,7 +698,7 @@ struct Walk<'a, 'c> {
     scope: &'a str,
     setter: &'c dyn Fn(&str) -> bool,
     /// The step that sets the list of a path of entries (`entries`, `transactItems`): on such a
-    /// path a list held in a name is judged (`replaced`, `passed`).
+    /// path a list held in a name is judged (`listed`, `passed`).
     lists: Option<&'c dyn Fn(&str) -> bool>,
     uses: std::rc::Rc<Uses<'a>>,
     /// Each named value judged, with how it was reached (`on`, `shared`).
@@ -582,7 +711,16 @@ struct Walk<'a, 'c> {
     /// Whether another name of a value, met on the way to the value now followed, is written
     /// more than twice.
     shared: bool,
+    /// The parameter the path's list comes in unchanged (`Judged::parameter`).
+    parameter: Option<usize>,
+    /// Whether it is set after the read (`Judged::fresh`).
+    fresh: bool,
 }
+
+/// The methods of a list that leave its entries as they are: sorting changes their order only.
+const KEEPS: [&str; 7] = [
+    "sort", "size", "isEmpty", "get", "contains", "stream", "forEach",
+];
 
 impl<'a> Walk<'a, '_> {
     fn value(&mut self, value: &'a Value, at: &At) -> bool {
@@ -613,7 +751,7 @@ impl<'a> Walk<'a, '_> {
                         let method = crate::resolve::method(&c.callee);
                         if let [sole] = &c.args[..]
                             && self.lists.is_some_and(|list| list(method))
-                            && self.passed(sole)
+                            && self.passed(sole, at)
                         {
                             return true;
                         }
@@ -631,38 +769,115 @@ impl<'a> Walk<'a, '_> {
         }
     }
 
-    /// Whether a list or an array held in a name may have changed. Either changes in place
-    /// through any name that holds it (`items.set(0, e)`, `items[0] = e`), so one on a
-    /// transaction's path is followed only when its method writes the name twice, where it is
-    /// declared and where this value reads it, and the same holds for each other name of it on
-    /// the way. A field is written by any method.
-    fn replaced(&self, value: &Value, sole: bool) -> bool {
+    /// Whether `value`, held in a name, is a list or an array on a transaction's path. Either
+    /// changes in place through any name that holds it (`items.set(0, e)`, `items[0] = e`), so
+    /// one held in a local is followed only when no mention changes it before the request reads
+    /// it (`list_changed`), and the same holds for each other name of it on the way. A field is
+    /// written by any method.
+    fn listed(&self, value: &Value) -> bool {
         let list = match value {
             Value::List(_) | Value::New(..) => true,
             Value::Call(made) => crate::resolve::method(&made.callee) == "asList",
             _ => false,
         };
-        self.lists.is_some() && self.on && list && !(sole && !self.shared)
+        self.lists.is_some() && self.on && list
+    }
+
+    /// Whether the list in the local or parameter `name` of `scope`, declared at `declared`, may
+    /// have changed before the read at `at`: the name assigned again, written where the reader
+    /// does not see it, or a call on it or a hand-off of it that runs first. A loop around the
+    /// read runs a later mention before its next turn, and code its caller runs (a lambda) any
+    /// time; a method of `KEEPS` leaves the entries as they are (#772).
+    fn list_changed(
+        &self,
+        scope: &'a str,
+        name: &'a str,
+        declared: Option<usize>,
+        at: &At,
+    ) -> bool {
+        let at = self.widened(at, declared);
+        self.uses.rewritten.contains(&(scope, name))
+            || self.uses.unseen_list(scope, name)
+            || (self.uses.locals.get(&(scope, name))).is_some_and(|m| m.list_changed(&at))
+    }
+
+    /// `at` with what a name declared at `declared` sees later in the source too: a builder or a
+    /// list declared before a loop its value is made or read in, set later in that loop, is set
+    /// before the next turn. One declared outside a lambda or class its value is made or read in
+    /// is set again wherever its caller runs it, later in the source or not.
+    fn widened(&self, at: &At, declared: Option<usize>) -> At {
+        let mut later = at.later;
+        if let Some(end) = self.uses.loops.outlived(&at.range, declared) {
+            later = later.max(end);
+        }
+        if (self.uses.deferred.outlived(&at.range, declared)).is_some() {
+            later = usize::MAX;
+        }
+        At {
+            later,
+            ..at.clone()
+        }
     }
 
     /// Whether `value`, the one argument of the step that sets the path's list, is a name that
-    /// holds no value the reader knows, itself or through other names of it: a parameter, or a
-    /// field any method assigns. Such a list has no mentions to count: its caller may change it
-    /// before the call, and this function before the request reads it.
-    // ponytail: so a list, an array or one entry that a wrapper takes and passes on unchanged
-    // names no table either; mapping each argument to its parameter would keep it (#772).
-    fn passed(&self, mut value: &'a Value) -> bool {
+    /// holds no value the reader knows, itself or through other names of it: a field any method
+    /// assigns, or a parameter the list may change through before the read at `at`. A parameter
+    /// that comes in unchanged is recorded (`parameter`), and each caller's argument is judged.
+    fn passed(&mut self, mut value: &'a Value, at: &At) -> bool {
         for _ in 0..crate::resolve::EVAL_DEPTH {
             let Value::Ref(name) = value else {
                 return false;
             };
             match self.code.local(self.path, self.scope, name) {
                 Some(bound) => value = &bound.value,
-                None => {
-                    return (self.code.constant_value(self.path, self.scope, name)).is_none();
+                None if (self.code.constant_value(self.path, self.scope, name)).is_some() => {
+                    return false;
                 }
+                None => return !self.kept(name, at),
             }
         }
+        true
+    }
+
+    /// Whether `name` is a parameter of this function that no mention changes before the read at
+    /// `at`, read where it runs (not in a lambda its caller may run after changing the list),
+    /// recording it by position. A second one on the path is not kept.
+    // ponytail: a varargs parameter, an alias of the parameter, a read in a lambda and a function
+    // another definition may stand for (an override) name no table; following them needs the
+    // caller's arguments as one list, the alias's own mentions, where the lambda runs and which
+    // override a call dispatches to.
+    fn kept(&mut self, name: &'a str, at: &At) -> bool {
+        let Some(def) = self.code.def(self.path, self.scope) else {
+            return false;
+        };
+        let Some(index) = def.params.iter().position(|p| p.name == name) else {
+            return false;
+        };
+        let declared = Some(def.range.start);
+        let function = crate::resolve::Target {
+            path: self.path,
+            name: self.scope,
+        };
+        // A hand-off after the read may reach a read again (a recursive call); a call on it
+        // after the read is seen by a later call of this function (`Judged::fresh`).
+        let everywhere = At {
+            later: usize::MAX,
+            ..at.clone()
+        };
+        let mentions = self.uses.locals.get(&(self.scope, name));
+        if def.params[index].binds != crate::lang::Binds::Any
+            || self.code.name_matched(function)
+            || self.builders.overridden(self.code, def)
+            || (self.uses.deferred.outlived(&at.range, declared)).is_some()
+            || self.list_changed(self.scope, name, declared, at)
+            || mentions
+                .is_some_and(|m| (m.other.as_ref()).is_some_and(|s| s.hits_once(&everywhere)))
+            || self.parameter.is_some_and(|p| p != index)
+        {
+            return false;
+        }
+        self.fresh |= self.list_changed(self.scope, name, declared, &everywhere);
+        self.parameter = Some(index);
         true
     }
 
@@ -677,7 +892,13 @@ impl<'a> Walk<'a, '_> {
             return self.constant(name, at);
         };
         let sole = self.uses.written.get(&(bound.scope.as_str(), name)) == Some(&2);
-        if self.replaced(&bound.value, sole) {
+        let declared = match &bound.value {
+            Value::Call(c) => Some(c.range.start),
+            _ => None,
+        };
+        if self.listed(&bound.value)
+            && (self.shared || self.list_changed(bound.scope.as_str(), name, declared, at))
+        {
             return true;
         }
         let reached = (std::ptr::from_ref(bound).cast(), self.on, self.shared);
@@ -710,7 +931,7 @@ impl<'a> Walk<'a, '_> {
         else {
             return false;
         };
-        if self.replaced(value, false) {
+        if self.listed(value) {
             return true;
         }
         let reached = (std::ptr::from_ref(value).cast(), self.on, self.shared);
@@ -789,20 +1010,7 @@ impl<'a> Walk<'a, '_> {
             Some(Value::Call(c)) => Some(c.range.start),
             _ => None,
         };
-        // A builder declared before a loop its value is made in, set later in that loop, is set
-        // before the next turn builds. One declared outside a lambda or class its value is made
-        // in is set again wherever its caller runs it, later in the source or not.
-        let mut later = at.later;
-        if let Some(end) = self.uses.loops.outlived(&at.range, declared) {
-            later = later.max(end);
-        }
-        if (self.uses.deferred.outlived(&at.range, declared)).is_some() {
-            later = usize::MAX;
-        }
-        let at = At {
-            later,
-            ..at.clone()
-        };
+        let at = self.widened(at, declared);
         if self.uses.unseen(scope, name, field)
             || self.uses.changed(scope, name, field, self.setter, &at)
         {

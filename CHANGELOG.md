@@ -8,6 +8,16 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Go: a DynamoDB transaction's list held in a name keeps its tables when it is also read by
+  `len(x)` or `cap(x)`, unless the package declares its own `len` or `cap` (#774).
+- Java: a list of DynamoDB transaction entries, or one entry, that a wrapper takes in a parameter
+  and passes on names its tables when no mention, in the wrapper or its caller, can change it
+  before the request reads it; a list that is sorted, or changed after a named request's
+  `build()` or after the call, keeps its tables too. A wrapper that changes the list after its
+  read keeps them only for a list the caller makes in the call, and one that another method of
+  its name and number of parameters, or an anonymous class's, may stand for names none, and so
+  does every wrapper while any file is past its pack's budget. An existing index is rebuilt
+  on its first open by this version (#772).
 - Pipelines, actions, CI jobs and CI steps of GitHub Actions are IaC nodes (ADR 0028). A file
   directly under `.github/workflows/` that holds `jobs` is a pipeline, and an `action.yml` or
   `action.yaml` that holds `runs` is an action; each CI job (`jobs.build`) and CI step
@@ -118,6 +128,12 @@ All notable changes to Meada are recorded here. The format follows
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
 
+- Go: the system or architecture suffix of a file name is read off the name cut at its first
+  dot, as the Go tools read it. A file such as `store.gen_windows.go`, which Go builds for every
+  target, was left out with all its definitions and calls, and `store_windows.gen.go`, which Go
+  builds for Windows alone, was read (#876). The schema version is the same: an index written
+  before the upgrade keeps its reading of such a file until the file next changes, or takes the
+  new rule at once after deleting `.meada/index.db`.
 - The Dockerfile reader counts every directory entry a wildcard source examines, matched or not,
   and a long wildcard segment as many entries: 255 sources that match none of 4,000 files no
   longer take 47 seconds to index, and fall back to the whole build context as other Dockerfiles

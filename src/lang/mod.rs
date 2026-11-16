@@ -582,14 +582,21 @@ pub struct Facts {
     /// Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub assigned: Vec<Bound>,
-    /// How many times the file writes the name of each local `bound` keeps, in the body of its
-    /// scope, and of each `final` field, in the whole file (scope `""`): every identifier of that
+    /// How many times the file writes the name of each local `bound` keeps, and in Java of each
+    /// parameter, in the body of its scope, and of each `final` field, in the whole file (scope
+    /// `""`): every identifier of that
     /// spelling, whatever it is part of. A reader that must see every use of a value compares it
     /// with the uses it reads; one more is a use its model of the syntax does not show (a cast, a
     /// ternary, a return). Java, and for the locals of a function Go (those it keeps as
     /// constants) and C# (`mentioned`). Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub mentioned: Vec<Mentioned>,
+    /// The names of the methods the file declares that no definition stands for (Java): an
+    /// anonymous class's or an enum constant body's, a class's nested in one, or past the
+    /// definition depth. A call through a base type may dispatch to one (#772). Kept in the
+    /// index: the SDK reader reads it from every file.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub anonymous: Vec<String>,
     /// A stable first binding of a multiple-result call (Go). This is a result projection,
     /// not a scalar constant: only a reader proving that call's result may follow it.
     /// Not kept in the lean index, like the bound values above.
@@ -696,6 +703,10 @@ pub struct Mentioned {
     pub scope: String,
     pub name: String,
     pub count: u32,
+    /// The mentions left out of `count` as reads that change nothing (Go's `len(x)`), for
+    /// a reader that finds the platform's name hidden by the repository's own code (#774).
+    #[serde(default)]
+    pub read: u32,
 }
 
 /// The value a name bound in `scope` holds, written in `within` (`Facts::bound`).
@@ -735,16 +746,22 @@ pub(crate) fn outermost(root: Node, kinds: &[&str]) -> Vec<Range<usize>> {
 /// how many identifiers written inside the functions named `scope` spell `name`, nested
 /// functions included, in one walk of the file. A name of no function (a field, a package
 /// variable) gets no count: code outside the file may write it. No name gets one in a file that
-/// spells an identifier with an escape (C#'s `\u0061`), which no count compares.
+/// spells an identifier with an escape (C#'s `\u0061`), which no count compares. An identifier
+/// `read` takes is no mention but a read (`Mentioned::read`): a use that reads the value and
+/// cannot change it (Go's `len(x)`, #774).
 pub(crate) fn mentioned<'l>(
     root: Node,
     src: &[u8],
     defs: &[Def],
     locals: impl Iterator<Item = (&'l str, &'l str)>,
+    read: impl Fn(Node) -> bool,
 ) -> Vec<Mentioned> {
     let locals: BTreeSet<(&str, &str)> = locals.collect();
-    let mut written: HashMap<&str, Vec<usize>> =
-        locals.iter().map(|&(_, name)| (name, Vec::new())).collect();
+    // Where each name is written, and where it is read (`read`).
+    let mut written: HashMap<&str, [Vec<usize>; 2]> = locals
+        .iter()
+        .map(|&(_, name)| (name, Default::default()))
+        .collect();
     if written.is_empty() {
         return Vec::new();
     }
@@ -756,14 +773,14 @@ pub(crate) fn mentioned<'l>(
             };
             // C# spells a name that is also a keyword `@name`.
             if let Some(at) = written.get_mut(text.trim_start_matches('@')) {
-                at.push(node.start_byte());
+                at[usize::from(read(node))].push(node.start_byte());
             }
             continue;
         }
         let mut cursor = node.walk();
         stack.extend(node.children(&mut cursor));
     }
-    written.values_mut().for_each(|at| at.sort_unstable());
+    (written.values_mut().flatten()).for_each(|at| at.sort_unstable());
     let mut functions: HashMap<&str, Vec<&Range<usize>>> = HashMap::new();
     for def in defs {
         if matches!(def.kind, Kind::Function | Kind::Method | Kind::Inline) {
@@ -772,14 +789,20 @@ pub(crate) fn mentioned<'l>(
     }
     (locals.into_iter())
         .filter_map(|(scope, name)| {
-            let at = &written[name];
-            let count: usize = (functions.get(scope)?.iter())
-                .map(|r| at.partition_point(|&s| s < r.end) - at.partition_point(|&s| s < r.start))
-                .sum();
+            let ranges = functions.get(scope)?;
+            let [count, read] = written[name].each_ref().map(|at| {
+                let count: usize = (ranges.iter())
+                    .map(|r| {
+                        at.partition_point(|&s| s < r.end) - at.partition_point(|&s| s < r.start)
+                    })
+                    .sum();
+                count.try_into().unwrap_or(u32::MAX)
+            });
             Some(Mentioned {
                 scope: scope.into(),
                 name: name.into(),
-                count: count.try_into().unwrap_or(u32::MAX),
+                count,
+                read,
             })
         })
         .collect()
