@@ -1489,6 +1489,29 @@ fn a_java_file_past_its_budget_leaves_every_wrapper_unnamed() {
     }
 }
 
+/// A unicode escape of a line terminator ends a line comment, as javac reads it (JLS 3.3): the
+/// change written after it, to a local list, a builder, a caller's list or as an override of the
+/// wrapper, names no table; the override's own `super.store` names none either. After an odd run
+/// of backslashes it starts no escape.
+#[test]
+fn java_code_after_an_escaped_line_break_in_a_comment_is_read() {
+    let repo = fixture_repo("aws_sdk_escapes", "aws-sdk-escapes", None);
+    let (export, sides) = java_sides(&repo);
+    assert_eq!(
+        sides,
+        [
+            "caller writer resource::dynamodb",
+            "dispatched writer resource::dynamodb",
+            "kept writer resource::dynamodb::kept",
+            "local writer resource::dynamodb",
+            "setter writer resource::dynamodb",
+            "store reader resource::dynamodb",
+            "store writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
 #[test]
 fn hidden_aws_client_and_command_names_never_feed_contracts() {
     let typescript = [
