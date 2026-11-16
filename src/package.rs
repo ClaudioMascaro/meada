@@ -2318,10 +2318,10 @@ impl ContractKind for Packages {
         };
         fits.into_iter()
             .flat_map(|(_, p)| {
-                let said = reason(contract, range, p.version.as_deref());
+                let plain = reason(contract, range, p.version.as_deref());
                 let said = match uncertain.or(unsourced).or(by_name) {
-                    Some(why) => format!("{why}; {said}"),
-                    None => said,
+                    Some(why) => format!("{why}; {plain}"),
+                    None => plain.clone(),
                 };
                 let said = match n {
                     Some(n) => format!("{n} providers fit; {said}"),
@@ -2343,12 +2343,18 @@ impl ContractKind for Packages {
                 (consumer.hops.iter())
                     .filter(|h| h.manifest == p.site)
                     .map(|h| {
+                        // The name alone lowers only a hop that would be `exact`; one its own
+                        // evidence already holds below keeps its reason (#850).
+                        let why = match by_name {
+                            Some(_) if h.level != Level::Exact => &plain,
+                            _ => &link.reason,
+                        };
                         Link::new(
                             link.consumer.clone(),
                             h.target.clone(),
                             link.contract.clone(),
                             link.level.max(h.level),
-                            format!("{}; {}", link.reason, h.how),
+                            format!("{why}; {}", h.how),
                             None,
                             None,
                             None,
