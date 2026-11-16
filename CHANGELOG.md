@@ -148,6 +148,11 @@ All notable changes to Meada are recorded here. The format follows
   byte of its text, so a 17 KB template in a `for` over two elements, a `%{ if }` template in a
   `for` over 2,000 elements and 40 interpolations in a `for` over 198 elements are named
   exactly again, as before 1.3.0 (#763).
+- A `bool` input of a registry module (its creation controls, `create_layer`, `create_package`,
+  `fifo_queue`, `fifo_topic` and `use_name_prefix`) or an `[[iac.module]]` mapping's `create`
+  given the string `"true"` or `"false"` reads as that bool, as Terraform converts it:
+  `create_bucket = "true"` provisions the bucket, where Meada provisioned nothing. Any other
+  string, `"True"` too, stays unknown (follow-up to #787).
 
 ## [1.4.0] - 2026-11-13
 
