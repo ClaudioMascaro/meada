@@ -143,6 +143,13 @@ All notable changes to Meada are recorded here. The format follows
   paid the estimate again. A refused expression spends the evaluation budget for each root by
   its own reads, so reading `count.index` no longer counts as copying every variable: forty
   refused instances no longer leave the names after them unresolved (#765).
+- Terraform evaluation holds every string in Unicode NFC, as Terraform and OpenTofu do: a string
+  literal, an object key and the text a template or a string function makes. A set holding two
+  spellings of one string (`e` and a combining acute accent, and `é`) is one element, a key or a
+  comparison matches either spelling, and the names are the ones Terraform gives, where Meada
+  named each spelling apart, all `exact` (#749). The schema version is the same: an index written
+  before the upgrade keeps its names until a Terraform or var file of their root module next
+  changes, or takes the new rule at once after deleting `.meada/index.db`.
 - Terraform evaluation no longer parses a template's text again each time it evaluates it: a
   template is evaluated as its parts, each charged a few steps in a `for` instead of 32 steps a
   byte of its text, so a 17 KB template in a `for` over two elements, a `%{ if }` template in a

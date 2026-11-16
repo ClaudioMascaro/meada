@@ -108,7 +108,7 @@
   another call, its key is the index (#717). A
   null beside a collection is unresolved, but for a `tomap` whose other values share one type.
   `toset` orders as cty
-  does (strings bytewise, numbers by value, `false` before `true`, a null last); a set of
+  does (strings bytewise, in NFC, numbers by value, `false` before `true`, a null last); a set of
   collections, in cty's hash order, is unresolved. An object walks its keys in lexical order, as Terraform
   does: a value a name binds, a literal whose keys are written as names or strings, a `merge`,
   anything `jsonencode` writes. A `for` whose collection expression contains, anywhere, an object
@@ -116,6 +116,8 @@
   where the order does not show (a `length` of the `for`, or a `values`, `lookup` or `jsonencode`
   of that object inside the collection), and a template `%{ for }` directive is not evaluated (a
   `*`). A file's own call of `meada_exact` is no function.
+  Every string is in NFC, as cty holds it (#749): a literal or an object key before `hcl-rs`
+  evaluates, and the text a template or a string function makes (`functions::nfc`).
   A function over an unresolved argument is `*` whole, even
   `format` or `join`, which keep no literal part. A literal
   `*` in a name reads as a wildcard. A child module's variable default its call leaves is not

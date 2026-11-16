@@ -372,7 +372,9 @@ Terraform JSON uses the same evaluation and reference rules. Ordinary strings ar
   templates and the pure functions `format`, `formatlist`, `join`, `split`, `lower`, `upper`,
   `title`, `trim`, `trimprefix`, `trimsuffix`, `trimspace`, `chomp`, `replace` (a literal
   substring), `substr`, `concat`, `coalesce`, `element`, `keys`, `values`, `lookup`, `merge`,
-  `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` and `jsonencode`. Data sources,
+  `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` and `jsonencode`. Each
+  string is held in Unicode NFC, as Terraform holds it, so two spellings of one string are one
+  value. Data sources,
   resource attributes, registry modules, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`,
   sensitive variables and any other function are never evaluated: such a part of a name is a `*` and
   the name a **pattern** (`"orders-${terraform.workspace}"` is `orders-*`), matching literal names under the pattern rules below. A

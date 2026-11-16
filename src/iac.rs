@@ -1182,6 +1182,12 @@ impl VisitMut for Exact<'_, '_> {
                 *expr = template_expr(std::mem::take(&mut h.template));
                 return;
             }
+            Expression::String(s) => {
+                if !s.is_ascii() {
+                    *expr = Expression::from(functions::nfc(s.value().clone()));
+                }
+                return;
+            }
             Expression::Number(n) => {
                 if !(n.as_repr()).is_some_and(|written| printed_as_written(n.value(), written)) {
                     self.inexact = true;
@@ -1191,10 +1197,16 @@ impl VisitMut for Exact<'_, '_> {
             }
             Expression::Object(object) => {
                 let mut entries: Vec<_> = std::mem::take(object).into_iter().collect();
-                // `hcl-edit` visits no key: a computed one is evaluated as any other expression.
+                // `hcl-edit` visits no key: a computed one is evaluated as any other expression,
+                // and a name is the string Terraform makes of it, in NFC.
                 for (key, _) in &mut entries {
-                    if let ObjectKey::Expression(key) = key {
-                        self.visit_expr_mut(key);
+                    match key {
+                        ObjectKey::Expression(key) => self.visit_expr_mut(key),
+                        ObjectKey::Ident(i) if !i.is_ascii() => {
+                            let name = functions::nfc(i.as_str().to_string());
+                            *key = ObjectKey::Expression(Expression::from(name));
+                        }
+                        ObjectKey::Ident(_) => {}
                     }
                 }
                 let keys: Option<Vec<String>> = (entries.iter())
@@ -1415,7 +1427,7 @@ fn exact_call(args: hcl::eval::FuncArgs) -> std::result::Result<Value, String> {
                     v => text.push_str(&functions::shown(v).ok_or("no text")?),
                 }
             }
-            return Ok(Value::String(text));
+            return Ok(Value::String(functions::nfc(text)));
         }
         Some("neg") => None,
         Some(o) => Some(o.parse().map_err(|_| "no operator")?),
@@ -3172,9 +3184,9 @@ impl<'m> Eval<'m> {
                 while text.contains("**") {
                     text = text.replace("**", "*");
                 }
-                Val::Pattern(text)
+                Val::Pattern(functions::nfc(text))
             }
-            false => Val::Known(Value::String(text)),
+            false => Val::Known(Value::String(functions::nfc(text))),
         };
         Evaluated { val, through }
     }
