@@ -24,6 +24,10 @@ const UNSHOWN: &[(&str, &str)] = &[
     // Only a file changing between the refresh and the read gives it: the unit test
     // `engine::tests::a_span_changed_since_indexing_keeps_the_start_alone_in_the_first_line`.
     ("context", "unavailable"),
+    // A CI step that builds an image a workload runs (#833):
+    // `images::a_workload_links_to_each_ci_step_of_the_repository_that_builds_its_image`.
+    ("context", "ci builds"),
+    ("context", "image runner"),
 ];
 
 /// Forms of a field that no golden can show, left out when the goldens are checked: a fixture's

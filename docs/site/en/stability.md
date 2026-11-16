@@ -26,7 +26,7 @@ These tools, always with these names. None of them writes. A minor version may a
 
 - `trace` takes exactly one of `from` and `changes`.
 - The default budget of 2,000 tokens is part of the surface. A token is an estimate: one token per four bytes of UTF-8 output.
-- The `search` kinds: `symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, `drift`, `community`, `process`, `duplicate`, `ambiguous` and `unresolved`.
+- The `search` kinds: `symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, `ci`, `drift`, `community`, `process`, `duplicate`, `ambiguous` and `unresolved`.
 
 ### Output grammar
 
@@ -34,7 +34,7 @@ The output of the tools is line-oriented text, and its grammar is specified in t
 
 - every line kind of each tool and the meaning of each of its fields;
 - the link notation `→[level: reason]`, with the levels `exact`, `declared`, `inferred`, `decided` and `ambiguous`;
-- contract identifiers, each starting with its contract kind: `http::`, `channel::`, `package::`, `resource::`;
+- contract identifiers, each starting with its contract kind: `http::`, `channel::`, `package::`, `resource::`, `ci::`;
 - the footer of `trace` (`chain: <weakest level> · <n> hops · <n> repos · <n> tokens`);
 - the note that ends an answer cut by the budget;
 - the token estimate.
