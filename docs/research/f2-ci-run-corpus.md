@@ -6,9 +6,10 @@
   in forms slice F2 of Spec A9 (#820, ADR 0028) already reads?
 - Outcome: one set qualifies. **Set F**, 41 repositories (the five tools `tox`, `nox`, `twine`,
   `build` and `cibuildwheel` with the repositories of `tox-dev` and `scikit-hep` that install or
-  run them), gives 64 install steps and 120 program steps by the letter of ADR 0028, 178 of the
-  184 across repositories. The program links at `inferred` are 9, under the floor of 30, and 27
-  more steps install or run a tool in a shape the gate does not read (section 5). Every other
+  run them), gives 62 install steps and 120 program steps by the letter of ADR 0028 and its
+  ceilings, 176 of the 182 across repositories. The program links at `inferred` are 11, under
+  the floor of 30, and 28 more steps install or run a tool in a shape a named ceiling leaves
+  unread (section 5). Every other
   candidate was rejected (section 6). The search was run by an agent that does not implement A9.
 
 ## 1. The rule, written before the search
@@ -50,25 +51,33 @@ were read back by hand against the raw step. The script was first run on the smo
 ## 3. Counting rules
 
 ADR 0028 ("The `run` script and the command table", "Programs of the workspace"), with the readings
-`.claude/skills/prove-meada/references/ci.md` records as settled by #831 and #832:
+#831 and #832 settled, as the known ceilings state them
+(`docs/agents/ceilings/resolution-the-index-and-shape-readers/`, `package-and-build-readers.md`
+and `compose-cloudformation-serverless-and-images/ci-github-actions.md`):
 
 - **Gate.** The shell is the step's `shell`, else `defaults.run.shell` of the CI job, else of the
-  pipeline; only `bash`, `sh` or none is read. A script holding a heredoc is not read. Lines joined
-  on a trailing `\`; a command is the first word of a line or the one after `&&` or `;`; nothing
-  after `||` or a pipe, nor behind `sudo`. A leading `if`, `then`, `do`, `else`, `elif`, `while`
-  or `until` is skipped, since a command inside `if` or a loop counts.
+  pipeline; only `bash`, `sh` or none is read, never a template (`bash -l {0}`) or an expression.
+  A script holding a heredoc, or longer than 1024 bytes, is not read. Lines joined on a trailing
+  `\`; a command is the first word of a line or the one after `&&` or `;`; what follows `||`, a
+  pipe, `&`, a redirection or a parenthesis is not read up to the next line, `&&` or `;`. A prefix
+  (`sudo`, `env`, `time`, an assignment) makes another command. A leading `if`, `then`, `do`,
+  `else`, `elif`, `while`, `until`, `!` or `{` is skipped, since a command inside `if` or a loop
+  counts.
 - **Words.** Quotes removed; `${{ ... }}` is one unresolved word, never a name. Comments dropped.
-- **Install.** A command whose leading words are a row of the table. Each argument that is no
+- **Install.** A command whose leading words are a row of the table (`python3 -m pip install`
+  is not one). Each argument that is no
   option, no option's value (by pip's, uv's and pipx's own documentation: `-r`, `-c`, `-e`,
   `--with`, `--python`, `--index-url` and the like), no path, URL or file is a name; extras
-  and version specifiers are dropped. Counted once per CI step and package.
-- **`uvx <package>`, `pipx run <package>`.** The next word, when it is a literal name and no
-  option. When the package declares a console script of that name the step starts it (`exact`);
+  and version specifiers are dropped. Counted once per CI step and package. `exact` when the one
+  provider of the name is in another repository, `inferred` when it is in the CI step's own.
+- **`uvx <package>`, `pipx run <package>`.** The next word, when it is a literal name, no
+  option and no `<package>@<version>`. When the package declares a console script of that name the step starts it (`exact`);
   otherwise the step is only a consumer of the package (#832), counted with the installs.
 - **Program.** A command whose first word is a console script of a `pyproject.toml` of the set
-  (`[project.scripts]`, else `[tool.poetry.scripts]`). `exact` when an earlier line or step of
-  the same CI job installs its package, else `inferred` (one package declares the script in each
-  set below). Counted once per CI step and script.
+  (`[project.scripts]`, else `[tool.poetry.scripts]`). `exact` when an earlier command of the
+  same CI job installs its package by a literal name, else `inferred` (one package declares the
+  script in each set below), and never above the level of the package link (a tool run in its own
+  repository is `inferred`). Counted once per CI step and script.
 
 The levels are ADR 0028's as written. #850 lowers an install by name alone, and the program link
 that rests on it (`uvx` and `pipx run` included), to `inferred`: once it lands, every install and
@@ -91,21 +100,23 @@ The tools, each the only provider of its name and of its console script in the s
 | Statement | Form | `tox` | `nox` | `twine` | `build` | Total |
 | --- | --- | --- | --- | --- | --- | --- |
 | install | `uv tool install` | 21 | 8 | 0 | 0 | 29 |
-| install | `python -m pip install`, `python3 -m pip install` | 9 | 1 | 1 | 7 | 18 |
+| install | `python -m pip install` | 7 | 1 | 1 | 7 | 16 |
 | install | `uv pip install` | 0 | 0 | 0 | 1 | 1 |
 | install | `pipx run build` (no script named `build`: consumer only) | 0 | 0 | 0 | 16 | 16 |
 | program, `exact` | `uvx <tool>`, `pipx run <tool>` | 0 | 35 | 15 | 0 | 50 |
-| program, `exact` | console script after an install in the CI job | 53 | 7 | 1 | 0 | 61 |
-| program, `inferred` | console script, no install in the CI job | 4 | 5 | 0 | 0 | 9 |
+| program, `exact` | console script after an install in the CI job | 51 | 7 | 1 | 0 | 59 |
+| program, `inferred` | console script with no install before it, or in the tool's own repository | 6 | 5 | 0 | 0 | 11 |
 
-- Install steps: 64 (48 by a row of the install table, 16 by `pipx run`). Program steps: 120 (70
-  that run the console script by name, 50 by `uvx` or `pipx run`). By the strictest reading of
-  #854 (an install row only, a console script by name only) the set gives 48 and 70.
-- 178 of the 184 statements sit in another repository than the tool's: F2 across repositories,
+- Install steps: 62 (46 by a row of the install table, 16 by `pipx run`), 61 `exact` and 1
+  `inferred` (`tox-dev/tox` installs `tox`). Program steps: 120 (70 that run the console script by
+  name, 50 by `uvx` or `pipx run`). By the strictest reading of #854 (an install row only, a
+  console script by name only) the set gives 46 and 70.
+- 176 of the 182 statements sit in another repository than the tool's: F2 across repositories,
   the case the corpus survey of the release plan found no source for.
 - No step installs or runs `cibuildwheel` in a `run` script: its consumers call the action
   `pypa/cibuildwheel@<ref>`, a CI contract to an external action. It stays as a provider.
-- No heredoc script of the set mentions a tool, so the heredoc rule hides none.
+- No heredoc script of the set mentions a tool, and the 4 scripts past 1024 bytes that do hold no
+  tool statement, so neither rule hides one.
 
 ### 4.2 Repositories
 
@@ -148,30 +159,32 @@ Pin is the commit read; size is the API's `diskUsage`. All 41 total 272 MB.
 | `tox-dev/sphinx-autodoc-typehints` | `6a0fd33786be05c0bd7303674c6a510e6c1a56bb` | MIT | 2 | 1 | 2 |
 | `tox-dev/toml-fmt` | `55515db5389687c3abae31a7316c431169c14deb` | MIT | 2 | 6 | 19 |
 | `tox-dev/tox` | `0efe53b8fe12b94e5db218f0538bb4907fe14d9f` | MIT | 17 | 1 | 2 |
-| `tox-dev/tox-extra` | `9e16b11f7a3e9acdddc5b2bb58f5b3d591882055` | MIT | 0 | 1 | 0 |
+| `tox-dev/tox-extra` | `9e16b11f7a3e9acdddc5b2bb58f5b3d591882055` | MIT | 0 | 0 | 0 |
 | `tox-dev/tox-gh` | `b6cb3a192e339b7b7ccfde596a5ec59116d28ce2` | MIT | 0 | 0 | 2 |
-| `tox-dev/tox-report` | `344d0f299c4a615db3e7ca33dc7ce421e4fe7a1a` | MIT | 0 | 3 | 2 |
+| `tox-dev/tox-report` | `344d0f299c4a615db3e7ca33dc7ce421e4fe7a1a` | MIT | 0 | 2 | 2 |
 | `tox-dev/turbohtml` | `6c6e490da0eb31fede827a489765c7ca3e3e9f6e` | MIT | 31 | 0 | 0 |
 | `tox-dev/workflow` | `d366d5b5d94cf7b72cf858f237593b1c31a5cd7e` (branch `unstable/v1`) | BSD-3-Clause | 0 | 0 | 0 |
 | `wntrblm/nox` | `6054d2ad1b0fb1e87f8922eb78abffd0ad8743e1` | Apache-2.0 | 5 | 0 | 3 |
 
 Each repository qualified the same way: it is one of the five tools, or its pipelines install or
-run one of them (section 1). `mplhep_data`, `pyhf`, `turbohtml` and `workflow` count zero by the
-letter and are in the set for what they hold in shapes the gate does not read (section 5).
+run one of them (section 1). `mplhep_data`, `pyhf`, `tox-extra`, `turbohtml` and `workflow`
+count zero by the letter and are in the set for what they hold in shapes the gate does not read
+(section 5) or name in a `run` script outside a command.
 
 ## 5. What Set F holds that the gate does not read
 
-27 steps install or run a tool of the set in a shape that gives no side under ADR 0028 as written.
-They are the open misses the A9 yardstick has to name per cause, or ceilings to decide:
+28 steps install or run a tool of the set in a shape that gives no side. Each shape is a ceiling
+the known ceilings already name, so under ADR 0029 each is an open miss whose cause and expected
+count the A9 yardstick lists before the run:
 
-| Cause | Steps | Where |
+| Cause (ceiling as named) | Steps | Where |
 | --- | --- | --- |
-| `uvx` with an option before the package (`uvx --with tox-uv tox run ...`): the next word is an option, so no package is named | 21 | `turbohtml` 19, `github-workflows` 2 |
-| a shell other than `bash`, `sh` or none (`bash -l {0}`, `bash -el {0}`) | 6 | `awkward`: 2 installs of `build`, 4 `pipx run nox` |
+| `uvx` or `pipx run` with an option before the package (`uvx --with tox-uv tox run ...`) | 20 | `turbohtml` 18, `github-workflows` 2 |
+| a shell template (`bash -l {0}`, `bash -el {0}`) | 6 | `awkward`: 2 installs of `build` (one also `python3 -m pip`), 4 `pipx run nox` |
+| `python3 -m pip install`, another spelling than the table's | 2 more | `tox-extra`, `tox-report`: 1 install of `tox` each |
 
-Neither needs a new row of the command table: the first is the `uvx` row read past its options,
-the second is the gate's shell list. This note proposes neither; both are recorded so the
-yardstick counts them before the run.
+None needs a new row of the command table, and this note proposes no change: they are recorded so
+the yardstick counts them before the run.
 
 Also outside the counts: 1 `pipx run --spec ...` and 5 `uvx --from ...` steps that name a package
 through an option's value, none of them a tool of the set. The 6 steps of the second cause are the
@@ -182,7 +195,7 @@ only tool statements the `bash` variants hide; steps whose shell is not `bash` a
 
 | Candidate | Counts from the source | Why rejected |
 | --- | --- | --- |
-| `tox-dev` alone (37 repositories, `tox-dev/tox` as the tool) | 22 install, 48 program | under 30 install steps; it is part of Set F |
+| `tox-dev` alone (37 repositories, `tox-dev/tox` as the tool) | 20 install, 48 program | under 30 install steps; it is part of Set F |
 | `scikit-hep` with the five tools, without `tox-dev` | 38 install (20 by an install row), 66 program | 20 by the install table alone; Set F holds it whole |
 | `jaraco` (94 repositories install `tox` from one template, `jaraco/skeleton`) | 189 install, 277 program | the API states no licence for 89 of the 94 (`None` or `NOASSERTION`), and the 5 with one give 10 and 10; every statement also comes from one copied file, which the floor of ADR 0029 would count 94 times |
 | `pre-commit/pre-commit` as the tool | not counted | its console script is in `setup.cfg`, a manifest the PyPI reader does not read: a new origin |
@@ -196,7 +209,8 @@ only tool statements the `bash` variants hide; steps whose shell is not `bash` a
 
 - That a name alone picks the right package: here the provider is the true publisher of every
   name. The fork probe of #850 covers that.
-- The `inferred` level of a program link past the floor: 9 statements.
+- The `inferred` level of a program link past the floor: 11 statements, and of an install link:
+  1.
 - The image builder sites of F2: Set F holds none. Across every public set read for the release
   plan there are 12 (`docker/build-push-action` 6 in `apache/devlake`, 3 in `scikit-hep/pyhf`, 2 in
   `apache/texera`; one `docker buildx build --push` in `apache/bifromq`), under the floor.
