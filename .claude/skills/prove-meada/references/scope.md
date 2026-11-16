@@ -16,8 +16,9 @@ paths run `prove.py deploy`, `scripts/compose-check` and `scripts/helm-check`. A
 fails its step, except `prove.py values` and `iac`, whose exit 1 is a difference from the base:
 recorded as evidence, as `cli-mcp`'s is (an answer their key rejects exits 3 and fails it). The
 CLI flows run after `cli-mcp`, the console's after its API checks and before its pages. Every step
-but the cleanups runs under `timeout` with what is left of a 45-minute capture, a flow for at most
-20 minutes, so the receipt is written inside the job's 60: a step that times out, or that would
+but the cleanups runs under `timeout` with what is left of a 75-minute capture, a flow for at most
+20 minutes (`ci-corpus`, about 70 public repositories, 40), so the receipt is written inside the
+job's 90: a step that times out, or that would
 start with under a minute left, is BLOCKED. A row says where CI differs, and names what CI does not
 run and what the reviewer does instead.
 

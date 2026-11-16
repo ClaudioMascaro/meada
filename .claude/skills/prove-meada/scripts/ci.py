@@ -1759,7 +1759,8 @@ def corpus_sets():
     for name, (flows, url, _) in prove.infra().items():
         for flow in flows:
             if flow == 'ci' or flow.startswith('ci-'):
-                sets.setdefault('p' if flow == 'ci' else flow[3:], {})[name] = 'github.com/' + url.removeprefix('https://github.com/')
+                # Meada writes an identity in lower case (`pyBumpHunter`'s remote is `.../pybumphunter`).
+                sets.setdefault('p' if flow == 'ci' else flow[3:], {})[name] = 'github.com/' + url.removeprefix('https://github.com/').lower()
     sets['f-distractor'] = {**sets['f'], **sets.pop('distractor')}
     return sets
 
