@@ -65,6 +65,7 @@ FLOWS = (
     ('aws-json-values', AWS, 'aws.py --json-values --head-bin {head}'),
     ('aws-sdk-jvm-go-dotnet', r'src/(channel/(aws|java|go|csharp)\.rs|resource/aws\.rs|contract/sdk)|meada-core/src/export\.rs',
      'aws-sdk-jvm-go-dotnet.py --head-bin {head} --http'),
+    ('aws-java-private-fields', r'src/(contract/sdk/java\.rs|lang/java\.rs)', 'aws-java-private-fields.py --head-bin {head} --base-bin {base}'),
     ('orphans', r'src/(iac/orphans\.rs|engine\.rs|channel\.rs|resource\.rs|contract\.rs|msg\.rs)',
      'orphans.py --head-bin {head} --base-bin {base} --base-has-orphans --http'),
     ('images-mixed', IMAGES, 'images-mixed.py --head-bin {head} --base-bin {base}'),

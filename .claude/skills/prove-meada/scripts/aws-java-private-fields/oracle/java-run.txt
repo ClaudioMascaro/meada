@@ -1,0 +1,10 @@
+openjdk version "25.0.5" 2026-10-20 LTS
+case a:
+putItem kept-private
+putItem own-private
+case b:
+putItem kept-new
+putItem own-private
+case c:
+putItem held-old
+putItem held-new
