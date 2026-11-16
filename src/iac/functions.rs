@@ -416,7 +416,7 @@ fn collection(
 }
 
 /// A scalar converted to the scalar type `elem`, as cty's `convert` does; a null stays null.
-fn scalar_as(v: &Value, elem: Elem) -> Result<Value, String> {
+pub(super) fn scalar_as(v: &Value, elem: Elem) -> Result<Value, String> {
     match (elem, v) {
         (_, Value::Null) => Ok(Value::Null),
         (Elem::String, Value::String(_))
