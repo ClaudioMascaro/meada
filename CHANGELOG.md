@@ -140,13 +140,6 @@ All notable changes to Meada are recorded here. The format follows
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
 
-- Java: a file that reads a field by reflection through a method reference
-  (`Holder.class::getDeclaredField`) or a name written with a Unicode escape no longer leaves
-  a field builder it may change with its first table. A file reads fields where it spells
-  `getDeclaredField`, `getField` or their plurals as a whole name, a comment included, with a
-  character the compiler drops from a name read as not there, and whatever its size. The
-  index stores that per file, and an existing index is rebuilt on its first open by this
-  version (#775).
 - Go: the system or architecture suffix of a file name is read off the name cut at its first
   dot, as the Go tools read it. A file such as `store.gen_windows.go`, which Go builds for every
   target, was left out with all its definitions and calls, and `store_windows.gen.go`, which Go
@@ -175,6 +168,13 @@ All notable changes to Meada are recorded here. The format follows
   paid the estimate again. A refused expression spends the evaluation budget for each root by
   its own reads, so reading `count.index` no longer counts as copying every variable: forty
   refused instances no longer leave the names after them unresolved (#765).
+- Java: a file that reads a field by reflection through a method reference
+  (`Holder.class::getDeclaredField`) or a name written with a Unicode escape no longer leaves
+  a field builder it may change with its first table. A file reads fields where it spells
+  `getDeclaredField`, `getField` or their plurals as a whole name, a comment included, with a
+  character the compiler drops from a name read as not there, and whatever its size. The
+  index stores that per file, and an existing index is rebuilt on its first open by this
+  version (#775).
 - Terraform evaluation no longer parses a template's text again each time it evaluates it: a
   template is evaluated as its parts, each charged a few steps in a `for` instead of 32 steps a
   byte of its text, so a 17 KB template in a `for` over two elements, a `%{ if }` template in a
