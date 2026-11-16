@@ -23,6 +23,23 @@ pub(crate) enum Contract {
     Resource,
 }
 
+impl Contract {
+    fn prefix(self) -> &'static str {
+        match self {
+            Contract::Channel => "channel",
+            Contract::Resource => "resource",
+        }
+    }
+}
+
+/// Whether an entry of the table provisions the broker or resource `kind` of the contract kind
+/// `prefix` (`channel`, `resource`): the only kinds with an orphan group (ADR 0026, #814).
+pub(crate) fn provisions(prefix: &str, kind: &str) -> bool {
+    ENTRIES
+        .iter()
+        .any(|e| e.kind == kind && e.contract.prefix() == prefix)
+}
+
 /// One type of the table.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -145,7 +162,7 @@ pub(crate) fn workload_of(node: &super::Node) -> Option<&'static Workload> {
     workload(format_of(&node.path)?, &node.ty)
 }
 
-static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {
+pub(super) static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {
     // The table is the repository's own file, checked by `the_table_parses`.
     toml::from_str::<Table>(TABLE).map_or_else(|_| Vec::new(), |t| t.entry)
 });
@@ -326,11 +343,7 @@ impl Entry {
     }
     /// The contract a node of this type named `name` provisions.
     pub(crate) fn contract(&self, name: &str) -> String {
-        let prefix = match self.contract {
-            Contract::Channel => "channel",
-            Contract::Resource => "resource",
-        };
-        format!("{prefix}::{}::{name}", self.kind)
+        format!("{}::{}::{name}", self.contract.prefix(), self.kind)
     }
 
     /// The name `text` holds: what `{name}` matches in the first form `text` fits, else `text`

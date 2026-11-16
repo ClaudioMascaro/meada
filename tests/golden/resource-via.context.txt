@@ -13,5 +13,5 @@ example.com/resource-via/infra main.tf:2 resource.opsgenie_team_routing_rule.tea
 consumes resource::routing::team-b
   writer: example.com/resource-via/app::values.yaml#groups[1].rules[0].labels.support [declared: resource::routing::team-b]
 resource::routing::team-b
-  example.com/resource-via/app writer values.yaml#groups[1].rules[0].labels.support (line 11) (no provisioner in the workspace)
-  example.com/resource-via/infra reader main.tf:1 opsgenie_team_routing_rule.team_b (no provisioner in the workspace)
+  example.com/resource-via/app writer values.yaml#groups[1].rules[0].labels.support (line 11)
+  example.com/resource-via/infra reader main.tf:1 opsgenie_team_routing_rule.team_b

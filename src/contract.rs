@@ -431,8 +431,9 @@ pub trait ContractKind {
         (None, last(contract))
     }
 
-    /// The broker or resource kind whose provisioners and uses share an orphan report.
-    /// No group for a kind without provisioners, or for an unresolved side.
+    /// The broker or resource kind whose provisioners and uses share an orphan report, when the
+    /// type table provisions it (`iac::orphans`). No group for a contract kind IaC never
+    /// provisions, or for an unresolved side.
     fn provisioned_group<'c>(&self, _contract: &'c str) -> Option<&'c str> {
         None
     }

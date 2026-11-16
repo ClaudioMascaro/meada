@@ -134,6 +134,11 @@ All notable changes to Meada are recorded here. The format follows
   open whole an unresolved consumer with its cause where the workspace provides a PyPI package. The
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
+- `search` and `context` no longer mark a side `(no provisioner in the workspace)` when no IaC
+  type can provision its kind: a declared `[[resource]]` of kind `postgres`, a NATS subject or a
+  resource declared through `via` of a kind the type table does not list carries no mark, and the
+  writer of a declared resource no longer reads as missing infrastructure. A kind the type table
+  provisions is marked as before, and `meada status` is unchanged (ADR 0026, amended) (#814).
 
 - Java: a unicode escape of a line terminator (`\u000a`, `\u000d`, with any number of `u`, and
   not after an odd run of backslashes) is read as javac reads it, before the file is parsed: in a

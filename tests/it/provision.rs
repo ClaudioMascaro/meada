@@ -334,6 +334,38 @@ fn code_only_scope_marks_uses_in_search_and_context_without_orphan_status() {
     assert_golden("orphan-code.context.txt", &(context + "\n" + &symbol));
 }
 
+/// ADR 0026, amended 2026-11-16 (#814): no IaC type provisions a declared `postgres` resource or a
+/// NATS subject, so their sides carry no orphan mark. An SQS queue used from code keeps it
+/// (`code_only_scope_marks_uses_in_search_and_context_without_orphan_status`).
+#[test]
+fn a_side_of_a_kind_no_iac_type_provisions_carries_no_orphan_mark() {
+    let case = "orphan_unprovisionable_kind";
+    let (web, _, _) = crate::common::chain(case);
+    let engine = Engine::open(&web).unwrap();
+    let context = engine.context("resource::postgres::orders", None).unwrap();
+    let search = engine.search("orders", Some("resource"), None).unwrap();
+    for answer in [context, search] {
+        assert!(answer.contains("example.com/chain/catalog"), "{answer}");
+        assert!(!answer.contains("(no provisioner"), "{answer}");
+    }
+    fixture_repo(
+        case,
+        "channels-queues-worker",
+        Some("https://example.com/queues/worker.git"),
+    );
+    let api = fixture_repo(
+        case,
+        "channels-queues-api",
+        Some("https://example.com/queues/api.git"),
+    );
+    let subject = Engine::open(&api)
+        .unwrap()
+        .context("channel::nats::orders.created", None)
+        .unwrap();
+    assert!(subject.contains("onOrder"), "{subject}");
+    assert!(!subject.contains("(no provisioner"), "{subject}");
+}
+
 #[test]
 fn iac_only_scope_marks_provisioners_without_orphan_status() {
     let infra = fixture_repo(
@@ -422,8 +454,9 @@ export async function send() {
             .unwrap()
             .contains("(no use in the workspace)")
     );
+    // No IaC type provisions `postgres` (ADR 0026, amended 2026-11-16).
     assert!(
-        engine
+        !engine
             .context("resource::postgres::archive", None)
             .unwrap()
             .contains("(no provisioner in the workspace)")
