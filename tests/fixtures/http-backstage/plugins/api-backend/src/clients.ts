@@ -38,3 +38,9 @@ export async function withHeader(discovery: DiscoveryService, client: { base: st
     headers: { from: await discovery.getBaseUrl('approval') },
   });
 }
+
+// A route of a module of the catalog plugin, under the catalog mount.
+export async function upsertMetadata(discovery: DiscoveryService, body: unknown) {
+  const baseUrl = await discovery.getBaseUrl('catalog');
+  return fetch(`${baseUrl}/orders-metadata/v1/metadata`, { method: 'PUT', body: JSON.stringify(body) });
+}

@@ -807,9 +807,9 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
     }
 }
 
-/// Backstage (#615): each backend plugin's router is served under `/api/<pluginId>`, and a URL
-/// from `discovery.getBaseUrl('<pluginId>')` starts there; a plugin whose `pluginId` is no
-/// literal keeps its routes at the root.
+/// Backstage (#615): each backend plugin's router is served under `/api/<pluginId>`, and so is
+/// the router of a module of that plugin (#813); a URL from `discovery.getBaseUrl('<pluginId>')`
+/// starts there; a plugin whose `pluginId` is no literal keeps its routes at the root.
 #[test]
 fn backstage_plugins_serve_under_api_and_their_plugin_id() {
     let repo = fixture_repo(
@@ -837,6 +837,7 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
             "http::GET::/chain",
             "http::GET::/health",
             "http::GET::/ping",
+            "http::PUT::/api/catalog/orders-metadata/v1/metadata",
         ]
     );
     let links: Vec<_> = (json["links"].as_array().unwrap())
@@ -867,6 +868,11 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
             (
                 "listEntities::fetch#0",
                 "GET /api/catalog/entities",
+                Some("inferred"),
+            ),
+            (
+                "upsertMetadata::fetch#0",
+                "PUT /api/catalog/orders-metadata/v1/metadata",
                 Some("inferred"),
             ),
         ]
