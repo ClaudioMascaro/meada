@@ -502,6 +502,125 @@ fn registry_modules_create_the_named_resources_and_workloads_and_honor_disabled_
     }
 }
 
+/// A module's `bool` input takes the strings `"true"` and `"false"`, as Terraform converts them
+/// (cty's `convert`, string to bool); any other string, `"True"` too, stays unknown (#787).
+#[test]
+fn module_bool_inputs_read_the_strings_terraform_converts_to_bool() {
+    let root = fixture_repo(
+        "custom_string_bools",
+        "custom-module-code",
+        Some("https://example.com/custom-671-string-bools/infra.git"),
+    );
+    std::fs::write(
+        root.join("meada.toml"),
+        "[[iac.module]]\nsource = \"private/storage\"\nentry = \"terraform:aws_s3_bucket\"\ninput = \"bucket\"\n",
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("main.tf"),
+        r#"variable "on" { default = "true" }
+module "bucket" {
+  source = "terraform-aws-modules/s3-bucket/aws"
+  bucket = "string-assets"
+  create_bucket = var.on
+  putin_khuylo = "true"
+}
+module "off_bucket" {
+  source = "terraform-aws-modules/s3-bucket/aws"
+  bucket = "off-assets"
+  create_bucket = "false"
+}
+module "capital_bucket" {
+  source = "terraform-aws-modules/s3-bucket/aws"
+  bucket = "capital-assets"
+  putin_khuylo = "True"
+}
+module "yes_table" {
+  source = "terraform-aws-modules/dynamodb-table/aws"
+  name = "yes-ledger"
+  create_table = "yes"
+}
+module "queue" {
+  source = "terraform-aws-modules/sqs/aws"
+  name = "string-parcels"
+  create = "true"
+  fifo_queue = "true"
+  use_name_prefix = "false"
+}
+module "function" {
+  source = "terraform-aws-modules/lambda/aws"
+  function_name = "string-function"
+  create_layer = "false"
+  create_package = "true"
+  source_path = "worker"
+}
+module "layer" {
+  source = "terraform-aws-modules/lambda/aws"
+  function_name = "string-layer"
+  create_layer = "true"
+  source_path = "worker"
+}
+module "package_off" {
+  source = "terraform-aws-modules/lambda/aws"
+  function_name = "string-package-off"
+  create_package = "false"
+  source_path = "worker"
+}
+module "mapped" {
+  source = "private/storage"
+  bucket = "mapped-assets"
+  create = "true"
+}
+module "mapped_off" {
+  source = "private/storage"
+  bucket = "mapped-off-assets"
+  create = "false"
+}
+"#,
+    )
+    .unwrap();
+    let value: Value =
+        serde_json::from_str(&Engine::open(&root).unwrap().export().unwrap()).unwrap();
+    let node = |name: &str| format!("example.com/custom-671-string-bools/infra::main.tf::{name}");
+    assert_eq!(
+        provisions(&value),
+        [
+            (
+                "channel::sqs::string-parcels.fifo".into(),
+                node("module.queue"),
+                ".".into()
+            ),
+            (
+                "resource::s3::mapped-assets".into(),
+                node("module.mapped"),
+                ".".into()
+            ),
+            (
+                "resource::s3::string-assets".into(),
+                node("module.bucket"),
+                ".".into()
+            ),
+        ],
+        "{value}"
+    );
+    let executions = value["executions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|row| {
+            (
+                row["workload"].as_str().unwrap(),
+                row["path"].as_str().unwrap(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        executions,
+        [(node("module.function").as_str(), "worker")],
+        "{value}"
+    );
+}
+
 #[test]
 fn private_module_workloads_use_the_supported_lambda_and_ecs_input_seams() {
     let root = fixture_repo(
