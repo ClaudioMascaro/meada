@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -116,4 +117,23 @@ func getReplaced(ctx context.Context) {
 	in := &dynamodb.TransactGetItemsInput{TransactItems: []types.TransactGetItem{{Get: &types.Get{TableName: aws.String("get-old")}}}}
 	in.TransactItems[0] = types.TransactGetItem{Get: &types.Get{TableName: aws.String("get-new")}}
 	client.TransactGetItems(ctx, in)
+}
+
+// A use that reads the value and changes nothing is no mention (#774): its length or capacity.
+func lengthRead(ctx context.Context) {
+	client := dynamodb.NewFromConfig(cfg)
+	items := []types.TransactWriteItem{{Put: &types.Put{TableName: aws.String("length-read")}}}
+	log.Println(len(items), cap(items))
+	in := &dynamodb.TransactWriteItemsInput{TransactItems: items}
+	client.TransactWriteItems(ctx, in)
+}
+
+func lengthThenSet(ctx context.Context) {
+	client := dynamodb.NewFromConfig(cfg)
+	items := []types.TransactWriteItem{{Put: &types.Put{TableName: aws.String("length-old")}}}
+	if len(items) > 0 {
+		items[0].Put.TableName = aws.String("length-new")
+	}
+	in := &dynamodb.TransactWriteItemsInput{TransactItems: items}
+	client.TransactWriteItems(ctx, in)
 }

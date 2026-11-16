@@ -6534,7 +6534,7 @@ impl<'a> Code<'a> {
     }
 
     /// The first full definition `name` of `path`.
-    fn def(&self, path: &'a str, name: &str) -> Option<&'a Def> {
+    pub(crate) fn def(&self, path: &'a str, name: &str) -> Option<&'a Def> {
         self.by_name(path)?.defs.get(name).copied()
     }
 
@@ -7234,7 +7234,7 @@ impl<'a> Code<'a> {
     /// another definition of its name (an interface's method, whose calls dispatch to it).
     // ponytail: any other definition of a method's name counts, an interface's or not, since no
     // pack marks interfaces: two types with a constructor method of one name leave it unknown.
-    fn name_matched(&self, function: Target<'a>) -> bool {
+    pub(crate) fn name_matched(&self, function: Target<'a>) -> bool {
         self.matched().0.contains(&function) || self.shares_name(function)
     }
 

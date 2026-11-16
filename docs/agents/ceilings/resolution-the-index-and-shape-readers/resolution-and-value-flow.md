@@ -106,8 +106,12 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   variable says otherwise: one of the same package in another source root is not seen (#719).
   A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB
   transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that
-  declares the name mentions it twice. In Go and C#, one mentioned a third time (logged, read by two
-  requests), one held in a field or a package variable, one held in a parameter (a Go wrapper's
+  declares the name mentions it twice. In Go a read by the builtin `len(x)` or `cap(x)` is no
+  mention (#774), unless a file of the package declares or binds `len` or `cap`; as for every Go
+  name, a file the target does not build is not read (one target, `language-packs.md`), nor is a
+  file the repository ignores or a symlink. In Go and C#, one mentioned a third time for any other
+  reason (logged, C#'s `x.Count`, read by two requests), one held in a field or a package variable,
+  one held in a parameter (a Go wrapper's
   apart, below), and a C# request filled by property assignments have no table or bus; in C# so
   has the first name the path meets when any file of the repository assigns the property read
   through it (`q.TableName = ..` on any variable of any type, in any class; a write of another
@@ -117,7 +121,7 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   `select` case or a loop body (the Go pack binds a constant only in a statement of the function
   body, `language-packs.md`; #888) and a Go request held by value and passed by address.
   A Go function, or a method whose name no other definition of the repository spells, that
-  mentions its parameter twice (declared, read by the path) sends what each exact caller passes
+  mentions its parameter twice (declared, read by the path; `len(x)` and `cap(x)` as above) sends what each exact caller passes
   (#774): the argument is followed in the caller by the caller's own mentions, through any number
   of such wrappers, a spread (`xs...`, the caller's slice itself) and a variadic parameter given
   one element included. A chain enters a function once: a wrapper that calls itself, or two that
@@ -128,17 +132,34 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   (#886). A function literal, a method that shares its name with another
   definition, a call with more or fewer arguments than parameters (a variadic one given two)
   and every C# method are not followed.
-  In Java the rule covers a list or an array: one mentioned a third time or held in a field has no
-  table or bus (a `List.of` list cannot change and keeps them), and neither has a `new T[]{..}` array
-  or a `new ArrayList<>(..)` copy mentioned twice. A method's name is no mention in Java: a list
-  `entries` passed to `.entries(entries)`, a list `transactItems` passed to
-  `.transactItems(transactItems)` and a builder `put` in `.put(put.build())` are each mentioned once
-  there (#773). A Java list, array or
-  single entry that is the one argument of the step that sets the list (`transactItems(..)`,
-  `entries(..)`) and comes in a parameter has no mentions to count and no table, one a wrapper only
-  passes on included (`write(List.of(..))`, #772); two entries passed as two arguments, and a table
-  name in a parameter, keep their tables. A path with no list of entries (a list of names: SSM
-  `Names[]`, Secrets Manager `SecretIdList[]`) keeps the rule it had.
+  In Java the rule covers a list or an array held in a local, by position (#772): one with a
+  mention that may run before the request reads it (a call on it other than `sort`, `size`,
+  `get`, `isEmpty`, `contains`, `stream` or `forEach`, a hand-off to another method or name, the
+  receiver of the reading call's own among them (`prep(l).w(l)`), a write the syntax model does
+  not show, such as `items[0] = e`) has no table or bus. In the
+  request's own function a mention after the call counts too, but not one after the `build()` of
+  a named request (the builder copies the list); in a caller of a wrapper a mention after the call
+  counts only inside a loop around it, and anywhere when the read is in a lambda.
+  A list held in a field has none (a `List.of` list cannot change and keeps them), and neither has
+  a `new T[]{..}` array or a `new ArrayList<>(..)` copy mentioned twice. A method's name is no
+  mention in Java: a list `entries` passed to `.entries(entries)`, a list `transactItems` passed
+  to `.transactItems(transactItems)` and a builder `put` in `.put(put.build())` are each mentioned
+  once there (#773). A Java list, array or single entry that is the one argument of the step that
+  sets the list (`transactItems(..)`, `entries(..)`) and comes in a parameter is followed to each
+  caller's argument at its position, by the same rule, when the wrapper mentions it nowhere that
+  runs first, hands it on nowhere else (a recursive call), reads it where it runs, and no other
+  method of the repository has its simple name and number of parameters, however their types are
+  spelled, nor does a file declare a method of its name that no definition stands for (an
+  anonymous class's, an enum constant body's or a class's nested in one: an override a call may
+  dispatch to, `Facts::anonymous`), and no file of any pack is past its budget (it keeps no
+  facts, and the check does not ask its language); a wrapper of a wrapper passes it on the same way, up to the expansion's depth. A wrapper that changes the parameter after its read
+  takes only a list the caller makes in the call (`List.of`, `Arrays.asList`, `new`, a builder
+  chain): a loop, a lambda or a recursion further up may hand a list it holds in again. A varargs
+  parameter, a call with another argument count, an alias of the parameter, a read inside a
+  lambda, a caller's argument from a getter or another call, or a caller that hands the list in
+  another argument too (`w(l, l)`) has no table. Two entries passed as two arguments, and a
+  table name in a parameter, keep their tables. A path with no list of entries (a list of names:
+  SSM `Names[]`, Secrets Manager `SecretIdList[]`) keeps the rule it had.
   `EVAL_DEPTH` (256): a value
   folded deeper than that, through the items of lists and objects, the constants it names and
   the arguments callers pass, is unknown, and a value traced through more constants,
