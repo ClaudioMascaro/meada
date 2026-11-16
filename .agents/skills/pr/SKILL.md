@@ -27,6 +27,8 @@ Use this template for writing the PR body:
 
 <optional: description>
 
+**Stored format:** <unchanged, or what the index gains>
+
 **Blast Radius:** <one-word description>
 
 <optional: potential ramifications of merge>
@@ -173,5 +175,7 @@ Each statement says what it is. A measurement names its run: the commit, the bui
 ### Merge Danger
 
 Describe whether it's a one-way or two-way door. You can walk back through two-way doors, but not one-way doors. A PR that is cheap to roll back is lower risk. Changes that involve destructive actions or hard-to-reverse decisions are one-way doors.
+
+Stored format says whether `tests/golden/schema.txt` moves. A fact kept in the index changes the format version, and every existing index is rebuilt on its first open. The E2E judge holds a golden the change re-blesses BROKEN until the maintainer approves it ("Answer keys" in `.claude/skills/prove-meada/SKILL.md`): when this line is not `unchanged`, ask for that approval before the PR is ready, and quote it here.
 
 The blast radius is the potential impact or scope of the changes introduced by this PR. Consider all possibilities. Examples are layout shift, breakages for consumers, mobile responsiveness, etc.

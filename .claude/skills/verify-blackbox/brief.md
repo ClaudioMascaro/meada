@@ -15,6 +15,7 @@ short.
 - One process at a time, in the foreground: wait on a command by running it, with no polling
   loop of your own (a `sleep` loop waiting on a file outlives you).
 - Disk is tight: delete every `.meada/` and scratch copy when done.
+- Measure no time unless a case of the claim is one: this machine may be building.
 - Your final message is the report.
 
 ## Claim
