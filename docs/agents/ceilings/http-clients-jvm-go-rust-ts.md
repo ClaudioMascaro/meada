@@ -386,7 +386,8 @@
   `http.rs` `path_literal`, for every framework). `http/ts/backstage.rs` (#615): a backend
   plugin mounts its routers under `/api/<pluginId>` only when `createBackendPlugin` is imported
   from a `@backstage/` package and writes `pluginId` as a string literal or as a `const` of the
-  same file bound to one; any other `pluginId` (an environment read, an import, a parameter,
+  same file bound to one, and a backend module (`createBackendModule`, #813) mounts under the
+  `/api/<pluginId>` of the plugin it extends by the same rule; any other `pluginId` (an environment read, an import, a parameter,
   a `const` bound to another `const`)
   mounts nothing, so its routers stay at the root, and `meada status` names the plugin
   (`Msg::BackstageUnmounted`). Only

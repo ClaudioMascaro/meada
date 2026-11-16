@@ -8,9 +8,9 @@
   `URL(string:relativeTo:)` and TS's `new URL(reference, base)`; one submodule per language: `http/ts.rs` and
   `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers, with
   `http/ts/backstage.rs` mounting each Backstage backend plugin's router at `/api/<pluginId>` (a
-  mount node per `createBackendPlugin` call in Express's `Mounts`) and folding a
-  `discovery.getBaseUrl('<id>')` base to `/api/<id>` (a `client:` `via`, so the reason names
-  it; `backstage::name` gives the same `via` to a hostless consumer of a route a plugin's mount
+  mount node per `createBackendPlugin` or `createBackendModule` call in Express's `Mounts`) and
+  folding a `discovery.getBaseUrl('<id>')` base to `/api/<id>` (a `client:` `via`, so the reason
+  names it; `backstage::name` gives the same `via` to a hostless consumer of a route a plugin's mount
   serves, from the routes `ts::providers` reports as mounted; a plugin whose `pluginId` is
   neither a literal nor a `const` of the file bound to one is a `Role::Unmounted` row that
   `Http::status` reports; `http/ts/config.rs` reads the `proxy.endpoints` of `app-config*.yaml`

@@ -1747,7 +1747,9 @@ No Backstage, o roteador que um plugin de backend entrega ao `httpRouter` (`http
 com o `httpRouter` vindo de `coreServices.httpRouter` nos `deps` do `registerInit`) vale sob
 `/api/<pluginId>`, o caminho em que o framework o monta, quando o `createBackendPlugin`, importado
 de um pacote `@backstage/`, escreve o `pluginId` como literal ou como uma `const` do mesmo arquivo
-ligada a um literal. Um plugin cujo `pluginId` não se lê assim (uma leitura de ambiente, um
+ligada a um literal. Um módulo de backend (`createBackendModule`) recebe o `httpRouter` do plugin
+que estende: o roteador que ele entrega vale sob o `/api/<pluginId>` desse plugin, com o
+`pluginId` lido do mesmo jeito. Um plugin cujo `pluginId` não se lê assim (uma leitura de ambiente, um
 import) deixa o roteador na raiz, como antes, e o `meada status` aponta o plugin. Do lado do
 consumidor, uma URL que começa por `discovery.getBaseUrl('<id>')` (numa constante ou escrito na
 própria URL) começa em `/api/<id>`, e o motivo da ligação nomeia o plugin e essa montagem; uma URL
