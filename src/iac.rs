@@ -4233,6 +4233,24 @@ mod tests {
         );
     }
 
+    /// A literal index is the key Terraform reads, in NFC as the instance keys are (#749): either
+    /// spelling picks the one instance.
+    #[test]
+    fn a_literal_index_in_either_spelling_picks_its_instance() {
+        let (_, references) = evaluate(&files(&[(
+            "main.tf",
+            concat!(
+                "resource \"a\" \"q\" { for_each = toset([\"e\\u0301\", \"z\"]) }\n",
+                "resource \"b\" \"nfd\" { x = a.q[\"e\\u0301\"].arn }\n",
+                "resource \"b\" \"nfc\" { x = a.q[\"\\u00e9\"].arn }\n",
+            ),
+        )]));
+        assert_eq!(
+            shown(&references),
+            ["b.nfd -> a.q[\"\u{e9}\"]", "b.nfc -> a.q[\"\u{e9}\"]"]
+        );
+    }
+
     /// Locals that name each other twice over resolve in linear time, a cycle of locals resolves
     /// to nothing, and a chain longer than `EVAL_DEPTH_MAX` stops.
     #[test]
