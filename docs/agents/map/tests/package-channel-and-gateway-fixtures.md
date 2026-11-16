@@ -107,7 +107,11 @@
   every import into `lib` (`exact`, `; import module path`), a directory the provider lacks, a
   module outside the workspace, a local that hides the import, a name only a test file, a file built for another target or two files of the directory define, a directory of a nested module, a `replace` by another module (no link when no repository holds it; with `gopkg-replace`, `gopkg-replace-orig` and `gopkg-replace-fork`, which declare one module path, an `exact` link to the fork alone, `ambiguous` to both without the `replace`, and none when the fork declares another path; golden `gopkg-replace.export.json`), a module path with no dot, and the freshness of
   an edited `go.mod`. Goldens `gopkg-{web,lib}.export.json`, `gopkg-lib.context-greet.txt` and
-  `gopkg-web.trace-down.txt`. Unit tests in `package/go.rs` and `lang/go/modfile.rs`.
+  `gopkg-web.trace-down.txt`. `service` writes a repository whose `testdata/` and `_gen/` hold a
+  program with a route and a call each: `testdata`'s is an HTTP side only once `main.go` imports
+  it, `_gen`'s never, and the refreshed export equals a cold one. Unit tests in `package/go.rs`,
+  `lang/go/modfile.rs` and `lang/go.rs` (`layout`'s members against what `go list ./...`,
+  `go build` and `go test` give).
 
 - `tests/it/jvmpkg.rs` (specs #26, tickets #93 and #94): the Maven and Gradle fixtures `jvm-maven`
   (modules `models` with `Order`, `Repo extends Base`, `Event` with an opaque base, `Note` with

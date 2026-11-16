@@ -3,7 +3,8 @@
 //! out when its name, up to its first dot, ends in another system or architecture (`_windows.go`,
 //! `_arm64.go`), when it starts with `_` or `.`, or when its `//go:build` line is false. Any other tag (`cgo`, a custom
 //! tag such as `integration`) is false, and a file that imports `"C"` is left out too (the pack
-//! sees its imports).
+//! sees its imports). A package directory `./...` does not list (`listed`) is built only when a
+//! built package imports it, which the whole repository tells (`Go::layout`).
 
 /// How deeply a `//go:build` expression may nest (`!`, parentheses); a deeper one is not read,
 /// and the file is left out.
@@ -70,6 +71,13 @@ pub fn builds(path: &str, src: &[u8]) -> bool {
             Header::One(expression) => holds(expression),
             Header::Unreadable => false,
         }
+}
+
+/// Whether the pattern `./...` of a module lists the package directory `below` its root, as
+/// `go help packages` says: no directory on the way is named `testdata` or begins with `_` or `.`
+/// (`mytestdata` and a file `testdata.go` are listed).
+pub fn listed(below: &str) -> bool {
+    !(below.split('/')).any(|d| d == "testdata" || d.starts_with(['_', '.']))
 }
 
 /// The `//go:build` line of a file's header.

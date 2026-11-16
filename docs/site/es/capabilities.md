@@ -45,7 +45,7 @@ Los clientes del AWS SDK for Go v2 cuentan cuando proceden de `New` o `NewFromCo
 
 La ruta `module` de cada `go.mod` resuelve imports a carpetas de paquetes, incluido `replace` a una carpeta del repositorio. Un módulo anidado controla su subárbol. Archivos de una carpeta con el mismo `package` comparten ámbito, incluidos los `_test.go`. Meada no ejecuta el toolchain Go.
 
-El análisis usa linux/amd64. Archivos `_windows.go`, con `//go:build` falso o con cgo (`import "C"`) quedan fuera. Meada lee funciones, tipos, interfaces y métodos (`Tipo.Metodo`). Resuelve llamadas dentro del paquete y mediante imports (`pkg.F()`, alias o punto); la biblioteca estándar y los módulos externos permanecen externos.
+El análisis usa linux/amd64. Archivos `_windows.go`, con `//go:build` falso o con cgo (`import "C"`) quedan fuera. Un paquete en una carpeta `testdata` o que empieza por `_` solo se lee cuando un paquete que Meada lee lo importa, como lo compila `go build ./...`. Meada lee funciones, tipos, interfaces y métodos (`Tipo.Metodo`). Resuelve llamadas dentro del paquete y mediante imports (`pkg.F()`, alias o punto); la biblioteca estándar y los módulos externos permanecen externos.
 
 Una llamada `recv.M()` es `exact` cuando el código indica el tipo en un parámetro, campo, `var`, literal compuesto o resultado de función. Sin ello, la resolución por nombre es `inferred` o `ambiguous`. Una llamada por interfaz termina en el método de la interfaz.
 

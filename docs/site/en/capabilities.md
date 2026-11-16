@@ -45,7 +45,7 @@ AWS SDK for Go v2 clients count when made by `New` or `NewFromConfig`, including
 
 The `module` path in each `go.mod` resolves imports to package directories, including `replace` to a repository directory. A nested module owns its subtree. Files in one directory with the same `package` share a scope, including `_test.go`. Meada does not run the Go toolchain.
 
-Analysis targets linux/amd64. Files named `_windows.go`, with a false `//go:build`, or using cgo (`import "C"`) stay out. Meada reads functions, types, interfaces and methods (`Type.Method`). It resolves calls within the package and through imports (`pkg.F()`, alias or dot); standard-library and external modules remain external.
+Analysis targets linux/amd64. Files named `_windows.go`, with a false `//go:build`, or using cgo (`import "C"`) stay out. A package in a `testdata` folder or one starting with `_` is read only when a package Meada reads imports it, as `go build ./...` builds it. Meada reads functions, types, interfaces and methods (`Type.Method`). It resolves calls within the package and through imports (`pkg.F()`, alias or dot); standard-library and external modules remain external.
 
 A `recv.M()` call is `exact` when the code supplies its type in a parameter, field, `var`, composite literal or function result. Otherwise, name resolution is `inferred` or `ambiguous`. A call through an interface stops at its interface method.
 

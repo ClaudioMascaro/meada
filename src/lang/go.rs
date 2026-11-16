@@ -1,7 +1,8 @@
 //! The Go language pack (spec #25). It reads `.go` files and the `go.mod` files of a repository
 //! with no Go toolchain: an import names a package directory through the module path of the
 //! `go.mod` that owns it (`modfile.rs`), the files of one package share their top-level scope
-//! (`Layout::shared`), and build constraints are evaluated for one fixed target (`build.rs`).
+//! (`Layout::shared`), build constraints are evaluated for one fixed target (`build.rs`), and a
+//! package under `testdata` or an `_` directory is read when a package read imports it (`layout`).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
@@ -82,18 +83,37 @@ impl LanguagePack for Go {
             let key = (dir(path), facts.package.as_str());
             packages.entry(key).or_default().push(path.to_string());
         }
-        // What an import of a directory names: its first file but the tests (which no other
-        // package imports), which stands for the package (`Layout::shared`).
-        let mut importable: BTreeMap<&str, &str> = BTreeMap::new();
+        // The files of each package directory but the tests, which no other package imports.
+        let mut importable: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
         for path in built.keys().filter(|p| !p.ends_with("_test.go")) {
-            importable.entry(dir(path)).or_insert(path);
+            importable.entry(dir(path)).or_default().push(path);
         }
-        let importable: BTreeMap<String, String> = (importable.into_iter())
-            .map(|(d, p)| (d.to_string(), p.to_string()))
-            .collect();
         let modules = modfile::Modules::new(configs);
+        // `./...` of each module, and what those files import, in turn: Go builds a package under
+        // `testdata` or an `_` directory only when a package it builds imports it.
+        let mut members: BTreeSet<&str> = (built.keys().copied())
+            .filter(|p| build::listed(modules.below(dir(p))))
+            .collect();
+        let mut queue: Vec<&str> = members.iter().copied().collect();
+        while let Some(path) = queue.pop() {
+            for import in &built[path].imports {
+                let Some(imported) = modules.dir(dir(path), &import.source) else {
+                    continue;
+                };
+                for &file in importable.get(imported.as_str()).into_iter().flatten() {
+                    if members.insert(file) {
+                        queue.push(file);
+                    }
+                }
+            }
+        }
+        // What an import of a directory names: its first file, which stands for the package
+        // (`Layout::shared`).
+        let importable: BTreeMap<String, String> = (importable.into_iter())
+            .map(|(d, p)| (d.to_string(), p[0].to_string()))
+            .collect();
         Ok(Layout {
-            members: Some(built.keys().map(|p| p.to_string()).collect()),
+            members: Some(members.into_iter().map(String::from).collect()),
             modules: Box::new(move |from, specifier| {
                 (modules.dir(dir(from), specifier))
                     .and_then(|d| importable.get(&d))
@@ -1432,6 +1452,80 @@ mod tests {
         };
         assert_eq!(nested(3), (true, false));
         assert_eq!(nested(values::VALUE_DEPTH + 10), (false, true));
+    }
+
+    /// Each expected value is what `go list ./...`, `go build` and `go test` (go1.27.3) give for
+    /// the module, but the blank import's: a package under `testdata` or an `_` or `.` directory
+    /// below its module's root is built when a built file imports it (a test's too), in turn, and
+    /// never its tests.
+    #[test]
+    fn a_package_under_testdata_or_an_underscore_directory_is_read_when_a_built_one_imports_it() {
+        let members = |extra: &[(&'static str, &'static str)]| {
+            let mut sources = BTreeMap::from([
+                ("go.mod", "module example.com/m\n"),
+                ("main.go", "package main\n"),
+                ("testdata.go", "package main\n"),
+                ("a_testdata.go", "package main\n"),
+                // Left out for the target, so its import builds nothing.
+                (
+                    "main_windows.go",
+                    "package main\n\nimport \"example.com/m/sub/_u\"\n",
+                ),
+                ("mytestdata/a.go", "package mytestdata\n"),
+                (
+                    "testdata/a.go",
+                    "package a\n\nimport . \"example.com/m/testdata/b\"\n",
+                ),
+                ("testdata/a_test.go", "package a\n"),
+                ("testdata/b/b.go", "package b\n"),
+                ("x/testdata/y/a.go", "package y\n"),
+                ("_gen/a.go", "package gen\n"),
+                ("_fixtures/f.go", "package fixtures\n"),
+                ("sub/_u/a.go", "package u\n"),
+                (".hidden/a.go", "package hidden\n"),
+                // Below its own module's root, nothing is left out.
+                ("testdata/mod/go.mod", "module example.com/mod\n"),
+                ("testdata/mod/a.go", "package mod\n"),
+                ("_tools/go.mod", "module example.com/tools\n"),
+                ("_tools/a.go", "package tools\n"),
+            ]);
+            sources.extend(extra.iter().copied());
+            let configs: Vec<(&str, &[u8])> = (sources.iter())
+                .filter(|(p, _)| p.ends_with("go.mod"))
+                .map(|(p, s)| (*p, s.as_bytes()))
+                .collect();
+            let facts: Vec<(&str, Facts)> = (sources.iter())
+                .filter(|(p, _)| p.ends_with(".go"))
+                .map(|(p, s)| (*p, parse(p, s.as_bytes()).unwrap()))
+                .collect();
+            let files = facts.iter().map(|(p, f)| (*p, f)).collect();
+            Go.layout(&configs, &files).unwrap().members.unwrap()
+        };
+        let listed = [
+            "_tools/a.go",
+            "a_testdata.go",
+            "main.go",
+            "mytestdata/a.go",
+            "testdata.go",
+            "testdata/mod/a.go",
+        ];
+        assert_eq!(members(&[]), BTreeSet::from(listed.map(String::from)));
+        let main = "package main\n\nimport (\n\t\"fmt\"\n\t_ \"example.com/m/_gen\"\n\t\
+                    \"example.com/m/testdata\"\n\tz \"example.com/m/x/testdata/y\"\n)\n";
+        let test = "package main\n\nimport \"example.com/m/_fixtures\"\n";
+        let imported = [
+            "_fixtures/f.go",
+            "main_test.go",
+            "testdata/a.go",
+            "testdata/b/b.go",
+            "x/testdata/y/a.go",
+        ];
+        let expected = listed.iter().chain(&imported).map(|p| p.to_string());
+        // The pack keeps no blank import: `_gen` stays out, though Go builds it.
+        assert_eq!(
+            members(&[("main.go", main), ("main_test.go", test)]),
+            expected.collect()
+        );
     }
 
     #[test]

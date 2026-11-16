@@ -128,6 +128,14 @@ All notable changes to Meada are recorded here. The format follows
   builds for Windows alone, was read (#876). The schema version is the same: an index written
   before the upgrade keeps its reading of such a file until the file next changes, or takes the
   new rule at once after deleting `.meada/index.db`.
+- Go: below a module's root, a package in a directory named `testdata` or whose name begins with
+  `_` is read only when a package Meada reads imports it, and so on in turn, as `go build ./...`
+  builds it; its `_test.go` files stay out. A program kept there as a fixture no longer shows its
+  routes and calls as providers and consumers of the repository. A package only a blank import
+  (`import _ "..."`) reaches stays out, though Go builds it. Found by the verification of #880.
+  The schema version is the same: an index written before the upgrade may keep such a package
+  until a refresh finds a change in the repository, and takes the new rule at once after deleting
+  `.meada/index.db`.
 - The Dockerfile reader counts every directory entry a wildcard source examines, matched or not,
   and a long wildcard segment as many entries: 255 sources that match none of 4,000 files no
   longer take 47 seconds to index, and fall back to the whole build context as other Dockerfiles

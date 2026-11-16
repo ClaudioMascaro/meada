@@ -1917,6 +1917,10 @@ mismo `package` comparten ámbito (los `_test.go` también). Meada no ejecuta el
 El análisis apunta a linux/amd64: los archivos `_windows.go`, con un `//go:build` falso o que
 usan cgo (`import "C"`) quedan fuera.
 
+Bajo la raíz de un módulo, un paquete en un directorio `testdata` o en uno cuyo nombre empieza por
+`_` (`_gen`) queda fuera, como en `go build ./...`, salvo que un paquete que Meada lee lo importe
+(y, en cadena, los paquetes que este importa); sus `_test.go` siguen fuera.
+
 **Qué pasa a ser definición.** Funciones, tipos, interfaces y métodos (`Tipo.Método`). Las
 llamadas se resuelven dentro del paquete y por imports (`pkg.F()`, con alias o punto). La
 biblioteca estándar y los módulos externos permanecen externos.
@@ -1966,6 +1970,8 @@ sección 8.5.
   middleware) monta el router donde no alcanza, y sus rutas no aparecen.
 - El `Add(método, ruta, handler)` de echo no se lee.
 - El código con cgo, `_windows.go` y `//go:build` falso no se indexa.
+- Un paquete en `testdata` o en un directorio `_` al que solo llega un import en blanco
+  (`import _ "..."`) queda fuera, aunque Go lo compile.
 
 ### 9.4 Rust
 
