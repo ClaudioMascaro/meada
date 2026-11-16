@@ -14,7 +14,7 @@ All notable changes to Meada are recorded here. The format follows
   `build()` or after the call, keeps its tables too. A wrapper that changes the list after its
   read keeps them only for a list the caller makes in the call, and one that another method of
   its name and number of parameters, or an anonymous class's, may stand for names none, and so
-  does every wrapper while a Java or Kotlin file is past its budget. An existing index is rebuilt
+  does every wrapper while any file is past its pack's budget. An existing index is rebuilt
   on its first open by this version (#772).
 - Java: a request builder held in a `private final` field keeps its table when another file calls
   a method on a variable of the same name. The source of another file cannot name a private

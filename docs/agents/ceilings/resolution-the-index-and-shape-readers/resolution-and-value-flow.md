@@ -148,8 +148,8 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   method of the repository has its simple name and number of parameters, however their types are
   spelled, nor does a file declare a method of its name that no definition stands for (an
   anonymous class's, an enum constant body's or a class's nested in one: an override a call may
-  dispatch to, `Facts::anonymous`), and no Java or Kotlin file is past its budget (it keeps no
-  facts); a wrapper of a wrapper passes it on the same way, up to the expansion's depth. A wrapper that changes the parameter after its read
+  dispatch to, `Facts::anonymous`), and no file of any pack is past its budget (it keeps no
+  facts, and the check does not ask its language); a wrapper of a wrapper passes it on the same way, up to the expansion's depth. A wrapper that changes the parameter after its read
   takes only a list the caller makes in the call (`List.of`, `Arrays.asList`, `new`, a builder
   chain): a loop, a lambda or a recursion further up may hand a list it holds in again. A varargs
   parameter, a call with another argument count, an alias of the parameter, a read inside a
