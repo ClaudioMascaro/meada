@@ -93,10 +93,6 @@ All notable changes to Meada are recorded here. The format follows
   is never compared: these are declared permissions, not effective ones. `meada export` gains
   the optional consumer field `permissions`. Existing indexes are rebuilt once on first use.
   Release level: minor, meada and meada-core (#834).
-- Go and C#: a request, a list or an entry of a DynamoDB transaction or of EventBridge
-  `PutEvents` held in a local keeps its table or bus when another function, class or package
-  writes the same field through another name (`q.TableName = ..`). The value written through
-  its own name, and a named request that is no list of entries, stay unresolved (#774).
 - Go: a request, a list or an entry of a DynamoDB transaction or of EventBridge `PutEvents`
   that a wrapper takes in a parameter keeps its table or bus at each caller, when the wrapper
   only declares the parameter and sends it and the caller passes a value nothing else names. A
@@ -136,13 +132,6 @@ All notable changes to Meada are recorded here. The format follows
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
 
-- A wrapper that calls itself, or two that call each other, with another value in the parameter
-  a read needs (`send(ctx, n-1, b, "")` or `send(ctx, n-1, a+"-next", b)` under
-  `send(ctx context.Context, n int, a, b string)`) no longer drops what the next turn sends:
-  each caller's site gets an unresolved side or contract for it, beside the names its own pass
-  gives. A retry that passes the same parameter on reads as before. The rule is the
-  resolver's, where every wrapper is followed to its callers; its tests cover an HTTP client
-  and the Go AWS SDK sides of a table name and of a transaction's list (#886).
 - Go: the system or architecture suffix of a file name is read off the name cut at its first
   dot, as the Go tools read it. A file such as `store.gen_windows.go`, which Go builds for every
   target, was left out with all its definitions and calls, and `store_windows.gen.go`, which Go
@@ -157,6 +146,13 @@ All notable changes to Meada are recorded here. The format follows
   does: a source whose name holds a no-break space or another Unicode blank is one path, not two,
   and a flag past ASCII, which Docker reads one byte as one character, leaves the Dockerfile
   unread (#762).
+- A wrapper that calls itself, or two that call each other, with another value in the parameter
+  a read needs (`send(ctx, n-1, b, "")` or `send(ctx, n-1, a+"-next", b)` under
+  `send(ctx context.Context, n int, a, b string)`) no longer drops what the next turn sends:
+  each caller's site gets an unresolved side or contract for it, beside the names its own pass
+  gives. A retry that passes the same parameter on reads as before. The rule is the
+  resolver's, where every wrapper is followed to its callers; its tests cover an HTTP client
+  and the Go AWS SDK sides of a table name and of a transaction's list (#886).
 - Terraform evaluation sizes a variable once per expression however many times the expression
   reads it, and a name every instance of a `count` or `for_each` shares (one that reads neither
   `each` nor `count`) is evaluated once when it is known: a name reading a 21,000-element
