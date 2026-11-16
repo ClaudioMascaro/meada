@@ -114,12 +114,52 @@ builds it lands, and that ticket changes the driver, never the reverse:
 
 ## The pinned corpus
 
-In `infra.tsv`, flow `ci`, all Apache-2.0. `--corpus` exports each alone with both binaries
-(predicted differences: CI rows for local calls, uses removed in CI files), then serves the three
-as one workspace and saves every `ci::` link in `workspace/ci-links.json` with the count per level,
-the input of #835's precision check. The workspace reads a third copy of each checkout (`clean/`),
-in which no index was written: an export alone leaves its `.meada/` in the checkout, and
-`meada index --workspace` records a commit, which each reason names, only for a clean one.
+In `infra.tsv`, every row whose second column starts with `ci`: set P (flow `ci`) and the sets of
+the A9 yardstick (#904, flows `ci-a`, `ci-b`, `ci-c`, `ci-f` and `ci-distractor`), each row with its
+URL, commit and licence. A change to a pin waits for the maintainer's word.
+
+Set P first, as #835 drove it: `--corpus` exports each of its three repositories alone with both
+binaries (predicted differences: CI rows for local calls, uses removed in CI files), then serves
+the three as one workspace and saves every `ci::` link in `workspace/ci-links.json` with the
+count per level, the input of #835's precision check. The workspace reads a third copy of each
+checkout (`clean/`), in which no index was written: an export alone leaves its `.meada/` in the
+checkout, and `meada index --workspace` records a commit, which each reason names, only for a
+clean one.
+
+Then every set of #904 is indexed as its own workspace on the head binary, P again among them,
+and the distractor once with set F (`f-distractor`). Each checkout is fetched at its pin with
+depth 1 into `work/` (F's checkouts serve `f-distractor` too, each workspace with its own index).
+`sets/<set>/` holds what the yardstick's verifier counts, and the driver judges none of it:
+
+| File | Holds |
+|---|---|
+| `counts.json` | per form of `uses` (ADR 0028's table) and whether it names its own repository, another of the set or one outside it: the `uses` read and the outcome at the site (a link per level, `ref mismatch`, an absent mark, an unresolved consumer, a consumer with no link, no row); the `ci::` links per level and across repositories; absent marks; unresolved consumers on a CI node; the `orphan ci::` lines; the F2 rows on CI nodes per side, kind and level; the F3 text of the links from a CI job (`permissions mismatch`, `not declared`); the `run` scripts that name each command form of `RUN_FORMS` (a text search: `uvx --from`, `uv tool run`, `python -m tox` and the others the verifier lists), with how many carry an F2 row; the seconds the set took |
+| `nodes.jsonl` | one line per CI job that calls with `uses` and per CI step, by the driver's reading of the files: its site, its `uses` or its `run` and `shell`, and every consumer, provider and link row Meada gave at that site |
+| `ci-rows.json` | every consumer, provider and link row of a `ci::` contract or sited in a CI file |
+| `orphans.txt`, `status.txt` | the `orphan ci::` lines of `meada status --workspace`, as it prints them (no line set apart, #923's included), and the whole status |
+| `exports/<row>.json.gz` | each repository's whole export from the workspace |
+| `run-records.json` | the set's part of `ci-records.json` |
+
+The run's root holds `ci-records.json` and `seconds.json` (per set, fetch included). The run
+records are the answer key of the pipeline calls (#904): `ci-records.py` asked GitHub once for
+the runs at each pin of every repository of the sets (`head_sha`), each with its file and the
+reusable pipelines it called, and the driver copies the file, never fetching while measuring.
+A repository with no run at its pin (four of the 70) has no record, and that silence proves
+nothing. Set P keeps its checks below; the other sets have one check each, that the workspace
+indexed and every repository exported.
+
+| Set | Entries | Why (#904) |
+|---|---|---|
+| P | `ci-slsa`, `ci-osv-scanner` and `ci-osv-action` (the next table) | the base record: pipelines and actions of one owner called locally and by full name, `ref mismatch`, unresolved `./<folder>`, the orphan lines of #835 |
+| A | `apache/logging-parent` at branch `gha/v0`, and five `apache/logging-*` repositories that call it | reusable pipelines called across repositories, both sides declaring `permissions`, `secrets`, 3 absent marks |
+| B | `apache/maven-gh-actions-shared` at branch `v5`, and six `apache/maven-*` repositories that call it | reusable pipelines called across repositories by CI jobs with no `permissions` block |
+| C | `apache/skywalking-eyes`, the three `incubator-seata` repositories, `bifromq`, the two `openserverless` ones and the three `devlake` ones (the plan's set D folded in) | root and folder actions called across repositories at commit ids (`ref mismatch`), image builder sites, an absent `./<folder>` |
+| F | 41 repositories of `pypa`, `scikit-hep`, `tox-dev` and `wntrblm`, the table of section 4.2 of `docs/research/f2-ci-run-corpus.md` (#902) | F2 across repositories: five Python tools installed and run by these CI files; also the `$/` form and the reusable pipelines of `tox-dev/github-workflows` |
+| distractor | `apache/hamilton`, `apache/burr`, `apache/texera`, and C's three `devlake` repositories | unrelated repositories run once with set F: the F2 links that rest on one provider of a name |
+
+Not pinned: #904's fork distractor (a fork of `tox-dev/tox` and one of `wntrblm/nox`), a
+Proposed item that awaits the maintainer, whose candidates belong to personal accounts that stay
+out of this repository. Set S (`meada-smoke-*`) stays the smoke corpus, outside `infra.tsv`.
 
 | Entry | Why |
 |---|---|

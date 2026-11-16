@@ -4,6 +4,9 @@
 # later A7 ticket names the flows it adds in the second column (for people: no script reads it). Change a pin only with the
 # maintainer's OK.
 # The `ci-*` rows are A9's (spec #820): `ci.py --corpus` reads them, and references/ci.md says why each.
+# The rows whose second column is `ci` are set P; `ci-a`, `ci-b`, `ci-c` and `ci-f` are the sets of the A9
+# yardstick (#904), each indexed as its own workspace, and the `ci-distractor` rows (three of their own,
+# and the three `devlake` rows of set C, the plan's former set D) join set F once.
 a7-probe	values	probe:a7-probe	-	Apache-2.0 (this repository)
 a7-noconfig	values	probe:a7-noconfig	-	Apache-2.0 (this repository)
 a7-iac	values,terraform	probe:a7-iac	-	Apache-2.0 (this repository)
@@ -19,3 +22,70 @@ a7-tf-set	terraform	probe:a7-tf-set	-	Apache-2.0 (this repository)
 ci-slsa	ci	https://github.com/slsa-framework/slsa-github-generator	bb91a05077afa6601a3d7538c4cbbdbf0abe7ed9	Apache-2.0
 ci-osv-scanner	ci	https://github.com/google/osv-scanner	80fe50567a5d6e0ec408353e2ceacca1561b91be	Apache-2.0
 ci-osv-action	ci	https://github.com/google/osv-scanner-action	d3c1414ded37de590f207572e37a7d180f1d0ef7	Apache-2.0
+ci-a-logging-parent	ci-a	https://github.com/apache/logging-parent	4499843a1a11e0be85d5c08664481df6a7f113c6	Apache-2.0
+ci-a-logging-log4j-transform	ci-a	https://github.com/apache/logging-log4j-transform	e8a35ae3e48ba5432f6b175215ac24b4631b21d0	Apache-2.0
+ci-a-logging-log4j-tools	ci-a	https://github.com/apache/logging-log4j-tools	cbf4f131e5c7c40c819ccd60612150bcecc5cb70	Apache-2.0
+ci-a-logging-log4j-jakarta	ci-a	https://github.com/apache/logging-log4j-jakarta	5de08ff5216adced9103c43ed710144bafa7113f	Apache-2.0
+ci-a-logging-log4j-kotlin	ci-a	https://github.com/apache/logging-log4j-kotlin	c5ee2ee3857dd3134725584287b108abfe244e7f	Apache-2.0
+ci-a-logging-slf4j	ci-a	https://github.com/apache/logging-slf4j	52f52f87165519a58b84c84d995d986048314265	Apache-2.0
+ci-b-maven-gh-actions-shared	ci-b	https://github.com/apache/maven-gh-actions-shared	cbba2fa6c67c83ee4eeeb92bb4986c51257e9ce1	Apache-2.0
+ci-b-maven-enforcer	ci-b	https://github.com/apache/maven-enforcer	8a6f5d3dd136419f83ff6da56739930015dc5ac0	Apache-2.0
+ci-b-maven-clean-plugin	ci-b	https://github.com/apache/maven-clean-plugin	f86ef59634197446a1a42541bdda0dc975caf8a6	Apache-2.0
+ci-b-maven-war-plugin	ci-b	https://github.com/apache/maven-war-plugin	31b900ae417aafd4b18bbb3da97a18723bb98bad	Apache-2.0
+ci-b-maven-resolver	ci-b	https://github.com/apache/maven-resolver	eef2e6632dc50d383ca8a71ad559a016c37861c0	Apache-2.0
+ci-b-maven-archetype	ci-b	https://github.com/apache/maven-archetype	b2fbca5cd8fc986b58eef34cd688a355c7898f5b	Apache-2.0
+ci-b-maven-dependency-analyzer	ci-b	https://github.com/apache/maven-dependency-analyzer	9dcde5677a0968667081390fc8ae7cbd82e14941	Apache-2.0
+ci-c-skywalking-eyes	ci-c	https://github.com/apache/skywalking-eyes	532f795c83aff65c3306638dcabee28f96f52790	Apache-2.0
+ci-c-incubator-seata	ci-c	https://github.com/apache/incubator-seata	342581f3e4a1f86400f7a9273595371eb45f2b93	Apache-2.0
+ci-c-incubator-seata-go	ci-c	https://github.com/apache/incubator-seata-go	8238fcc32a29606e3f98860e56b13b3e93a2e1ac	Apache-2.0
+ci-c-incubator-seata-samples	ci-c	https://github.com/apache/incubator-seata-samples	b28057970d43df5050971713dd6143892062f32a	Apache-2.0
+ci-c-bifromq	ci-c	https://github.com/apache/bifromq	82065f14e6e2948f4ae62ed7537621df2333ac64	Apache-2.0
+ci-c-openserverless-operator	ci-c	https://github.com/apache/openserverless-operator	fb481d243d902e4f995a14bd6bb1137c79045b6c	Apache-2.0
+ci-c-openserverless-runtimes	ci-c	https://github.com/apache/openserverless-runtimes	2450c08dda7a997e9e8423419781bca1106df814	Apache-2.0
+ci-c-devlake	ci-c,ci-distractor	https://github.com/apache/devlake	8e48364647a66ca2f9b48cf09179dcbabe730c32	Apache-2.0
+ci-c-devlake-helm-chart	ci-c,ci-distractor	https://github.com/apache/devlake-helm-chart	e36a6a8afd950f4ea4c498e93b8d80dfc89f50d2	Apache-2.0
+ci-c-devlake-playground	ci-c,ci-distractor	https://github.com/apache/devlake-playground	feaf0d4480e49f89a9a85e40215f0fdad7d8874b	Apache-2.0
+ci-f-build	ci-f	https://github.com/pypa/build	9a03927a4b0afe33ce40dbe5f36bf3bdbc612385	MIT
+ci-f-cibuildwheel	ci-f	https://github.com/pypa/cibuildwheel	3a05217802d774b6f176f8d423867b4b068ccd89	BSD-2-Clause
+ci-f-twine	ci-f	https://github.com/pypa/twine	ecad921d4a44091bf01d5b9ec8833d51bfdf58eb	Apache-2.0
+ci-f-awkward	ci-f	https://github.com/scikit-hep/awkward	ba8ff569ff54dd2a45a5fa6c32a59431cdb78787	BSD-3-Clause
+ci-f-boost-histogram	ci-f	https://github.com/scikit-hep/boost-histogram	1e5fd6f49c20ef781995c501c2d0932d6d4f5661	BSD-3-Clause
+ci-f-cabinetry	ci-f	https://github.com/scikit-hep/cabinetry	22a85f7e14759f13126016e05e118c14895fe664	BSD-3-Clause
+ci-f-cuda-histogram	ci-f	https://github.com/scikit-hep/cuda-histogram	cfdcae06bba4ade9efe3a388edbbce2d1d72d776	BSD-3-Clause
+ci-f-decaylanguage	ci-f	https://github.com/scikit-hep/decaylanguage	12a11e44bfb96deb77fbb4ba6acd1aba63b96052	BSD-3-Clause
+ci-f-fastjet	ci-f	https://github.com/scikit-hep/fastjet	46100f9b29031869b034d46ad246ee72d8a979bb	BSD-3-Clause
+ci-f-hepconvert	ci-f	https://github.com/scikit-hep/hepconvert	b0a97ebfbe948c370ec36b2822986abecad81092	BSD-3-Clause
+ci-f-hepunits	ci-f	https://github.com/scikit-hep/hepunits	40d0f1596373a1a2444c2190ad01fc7253cc655d	BSD-3-Clause
+ci-f-hist	ci-f	https://github.com/scikit-hep/hist	6706833215dcf0d99037dcd7300362d44a811acb	BSD-3-Clause
+ci-f-histoprint	ci-f	https://github.com/scikit-hep/histoprint	0fe396ea602fbc2cff4514e7d74de1c4e6d8a1e8	MIT
+ci-f-integration-tests	ci-f	https://github.com/scikit-hep/integration-tests	105d4140b7f833c0e8418b69fe6ab371f0a73f67	BSD-3-Clause
+ci-f-mplhep_data	ci-f	https://github.com/scikit-hep/mplhep_data	ca20a268aac04b4e681abbfa511277adf98aa208	MIT
+ci-f-numba-stats	ci-f	https://github.com/scikit-hep/numba-stats	09e04c3e22d55b3e7ddfd56e3f07123714a133be	MIT
+ci-f-particle	ci-f	https://github.com/scikit-hep/particle	efe699ccd75e48911bfcc71353198a0d418018a0	BSD-3-Clause
+ci-f-pybumphunter	ci-f	https://github.com/scikit-hep/pyBumpHunter	484c35ce4e2398d06b16941472c6a3d5c1f1b9b4	BSD-3-Clause
+ci-f-pyhepmc	ci-f	https://github.com/scikit-hep/pyhepmc	405e49ea04d3b924254fc3fc70da8aae42e68e94	BSD-3-Clause
+ci-f-pyhf	ci-f	https://github.com/scikit-hep/pyhf	7953abc16013759a0e07225a8547ea47ebc468d1	Apache-2.0
+ci-f-pylhe	ci-f	https://github.com/scikit-hep/pylhe	f85fee0a5dd3206620a8fe9aab1b63e068ee6d2f	Apache-2.0
+ci-f-ragged	ci-f	https://github.com/scikit-hep/ragged	14d45af4b9b086aae736f2ce7426502eaf6bdcfa	BSD-3-Clause
+ci-f-resample	ci-f	https://github.com/scikit-hep/resample	2774eaaeb30c9de727815c3a62953ad3e7fa94d7	BSD-3-Clause
+ci-f-scikit-hep	ci-f	https://github.com/scikit-hep/scikit-hep	3923b35af75209ed4c0d7508afa319b358d13212	BSD-3-Clause
+ci-f-uhi	ci-f	https://github.com/scikit-hep/uhi	fc1ca144ac9dcd181bdff87543d01a51781fa65e	BSD-3-Clause
+ci-f-uproot-browser	ci-f	https://github.com/scikit-hep/uproot-browser	a7cf4d6f03352ff7a9b0e0660dc221b3ae01c54b	BSD-3-Clause
+ci-f-vector	ci-f	https://github.com/scikit-hep/vector	955b06fdd5c489a62b46a3020896ce778dc74b4c	BSD-3-Clause (its LICENSE file; the API says NOASSERTION)
+ci-f-filelock	ci-f	https://github.com/tox-dev/filelock	39bf29042684c32407f7c34bff9f700c8df696e1	MIT
+ci-f-github-workflows	ci-f	https://github.com/tox-dev/github-workflows	ef0cd88bef592260a48345753b8b509b209ab189	MIT
+ci-f-pipdeptree	ci-f	https://github.com/tox-dev/pipdeptree	55cd28b9208423b0354ddf0e5a4f0923494b6862	MIT
+ci-f-platformdirs	ci-f	https://github.com/tox-dev/platformdirs	bb5462c86c1d578e7861e91b1ee1803b695805bc	MIT
+ci-f-release-creator	ci-f	https://github.com/tox-dev/release-creator	76a6b40e348a21afbe12c757d44c26532a950f87	MIT
+ci-f-sphinx-autodoc-typehints	ci-f	https://github.com/tox-dev/sphinx-autodoc-typehints	6a0fd33786be05c0bd7303674c6a510e6c1a56bb	MIT
+ci-f-toml-fmt	ci-f	https://github.com/tox-dev/toml-fmt	55515db5389687c3abae31a7316c431169c14deb	MIT
+ci-f-tox	ci-f	https://github.com/tox-dev/tox	0efe53b8fe12b94e5db218f0538bb4907fe14d9f	MIT
+ci-f-tox-extra	ci-f	https://github.com/tox-dev/tox-extra	9e16b11f7a3e9acdddc5b2bb58f5b3d591882055	MIT
+ci-f-tox-gh	ci-f	https://github.com/tox-dev/tox-gh	b6cb3a192e339b7b7ccfde596a5ec59116d28ce2	MIT
+ci-f-tox-report	ci-f	https://github.com/tox-dev/tox-report	344d0f299c4a615db3e7ca33dc7ce421e4fe7a1a	MIT
+ci-f-turbohtml	ci-f	https://github.com/tox-dev/turbohtml	6c6e490da0eb31fede827a489765c7ca3e3e9f6e	MIT
+ci-f-workflow	ci-f	https://github.com/tox-dev/workflow	d366d5b5d94cf7b72cf858f237593b1c31a5cd7e	BSD-3-Clause
+ci-f-nox	ci-f	https://github.com/wntrblm/nox	6054d2ad1b0fb1e87f8922eb78abffd0ad8743e1	Apache-2.0
+ci-distractor-hamilton	ci-distractor	https://github.com/apache/hamilton	e6bebcd1e3a27a84dd26f363f58aa092fb77f51f	Apache-2.0
+ci-distractor-burr	ci-distractor	https://github.com/apache/burr	36e3ff3048c8cabd7aac6d5c373307934bf3c2df	Apache-2.0
+ci-distractor-texera	ci-distractor	https://github.com/apache/texera	a915d6b7099a2dec7f37ffa3b91d22c77a00841b	Apache-2.0
