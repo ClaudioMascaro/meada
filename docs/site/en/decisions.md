@@ -26,6 +26,9 @@ the code changes and a decision no longer fits (the call is gone, the item is no
 the provider is gone or is no longer a candidate), `meada status` reports it as stale, under
 its repository, and `meada decide --prune` removes it. A decision waiting for a peer that has
 not been found yet is shown apart and kept.
+The target must be one of the item's candidates, the ones `meada decide` lists, for a dynamic
+URL too: a target its repository serves but the call cannot reach (another method, or a path the
+known parts of the URL do not fit) is stale, and the item stays open.
 
 ### Model decider
 

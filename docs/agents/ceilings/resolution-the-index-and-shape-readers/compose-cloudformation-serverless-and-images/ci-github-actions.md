@@ -111,10 +111,8 @@
   step that removes the files afterwards is not seen. A checkout's `ref` is not read: the link
   is to the own repository at its indexed commit. An unresolved CI step holds no candidate and
   `meada decide` offers nothing for it. A decision written by hand for it (`kind =
-  "dynamic-url"`, its `target` a CI provider) is accepted for any CI provider of the workspace,
-  an action or a reusable pipeline alike: it adds a `decided` link that `trace` and the
-  provider's `context` follow and closes the item, while `context` on the CI step still says
-  `consumes (unresolved)`. The export row of an unresolved CI step holds no `with` and no
+  "dynamic-url"`, its `target` a CI provider) is stale with the cause `not-candidate` (#806): it
+  adds no link and the item stays open. The export row of an unresolved CI step holds no `with` and no
   `secrets`: they are copied to a consumer with a CI contract only. On the pinned corpus (#835)
   all 32 unresolved CI steps are of this kind, 10 of them after a literal checkout of the own
   repository into a named `path` (`./<path>/<folder>`), which the value of `path` would resolve.

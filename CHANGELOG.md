@@ -175,6 +175,12 @@ All notable changes to Meada are recorded here. The format follows
   gives. A retry that passes the same parameter on reads as before. The rule is the
   resolver's, where every wrapper is followed to its callers; its tests cover an HTTP client
   and the Go AWS SDK sides of a table name and of a transaction's list (#886).
+- A `dynamic-url` decision applies only when its target is one of the candidates `meada decide`
+  lists for the call, the routes its method and the parts of its URL Meada reads can reach. A
+  target outside them, such as a `POST` route decided for a `GET` call, became a `decided` link
+  and closed the item; it is now a stale decision with the cause `not-candidate`, the item stays
+  open and `meada decide --prune` removes it (#806). A behavior change: a hand-written decision
+  that names no candidate, one for an unresolved CI step included, stops applying.
 - Terraform evaluation sizes a variable once per expression however many times the expression
   reads it, and a name every instance of a `count` or `for_each` shares (one that reads neither
   `each` nor `count`) is evaluated once when it is known: a name reading a 21,000-element
