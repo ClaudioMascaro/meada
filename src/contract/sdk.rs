@@ -210,7 +210,7 @@ pub(crate) fn extract<'a>(
                     {
                         return;
                     }
-                    let changed = changed_request(
+                    let judged = changed_request(
                         code,
                         path,
                         index,
@@ -218,23 +218,25 @@ pub(crate) fn extract<'a>(
                         language,
                         &written,
                         &builders,
-                    ) || (language != Language::Java
-                        && reads_entries(operation.field)
-                        && held_changed(code, path, index, operation.field, language, {
-                            counts.get_or_init(|| {
-                                // Where the package may declare `len` or `cap`, `len(x)` may be
-                                // the repository's code: the reads left out count again.
-                                let hides = (hiding.get_or_init(|| hiding_builtins(code)))
-                                    .contains(directory(path));
-                                (code.mentioned(path).iter())
-                                    .map(|m| {
-                                        let reads = if hides { m.read } else { 0 };
-                                        let count = m.count.saturating_add(reads);
-                                        ((m.scope.as_str(), m.name.as_str()), count)
-                                    })
-                                    .collect()
-                            })
-                        }));
+                    );
+                    let changed = judged.changed
+                        || (language != Language::Java
+                            && reads_entries(operation.field)
+                            && held_changed(code, path, index, operation.field, language, {
+                                counts.get_or_init(|| {
+                                    // Where the package may declare `len` or `cap`, `len(x)` may
+                                    // be the repository's code: the reads left out count again.
+                                    let hides = (hiding.get_or_init(|| hiding_builtins(code)))
+                                        .contains(directory(path));
+                                    (code.mentioned(path).iter())
+                                        .map(|m| {
+                                            let reads = if hides { m.read } else { 0 };
+                                            let count = m.count.saturating_add(reads);
+                                            ((m.scope.as_str(), m.name.as_str()), count)
+                                        })
+                                        .collect()
+                                })
+                            }));
                     let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
                         let [Value::Call(call)] = args else {
                             return Some(vec![Name::default()]);
@@ -263,10 +265,16 @@ pub(crate) fn extract<'a>(
                         .then_some(&inject as &crate::resolve::Inject<'a, '_>);
                     for expanded in code.expand_with(Expand::Chain(path, index), injected, &read) {
                         let (at, index) = expanded.site;
-                        let passed = language == Language::Java
-                            && passed_changed(code, &expanded.frames, operation.field, &builders);
+                        let caller_changed = language == Language::Java
+                            && passed_changed(
+                                code,
+                                &expanded.frames,
+                                operation.field,
+                                &builders,
+                                &judged,
+                            );
                         for mut name in expanded.found {
-                            if passed {
+                            if caller_changed {
                                 name = Name::default();
                             }
                             if operation.hierarchy {
@@ -353,32 +361,73 @@ fn reads_entries(selector: &str) -> bool {
 
 /// Whether a wrapper's caller passes the request on as a value that changed (Java): the request
 /// the wrapper reads is what its callers hand it, and a call judged where it is made sees only
-/// the parameter. Each argument of each call climbed is judged in the scope of that call.
+/// the parameter. Each argument of each call climbed is judged in the scope of that call; the
+/// one at the parameter the path's list comes in (`request`), by the rule of a list the call
+/// reads (#772), and when it is a parameter of that scope in turn, the next call's argument there.
+/// A parameter changed after the read takes only a list the call makes for it (`Judged::fresh`):
+/// a caller's own list may be read again, by a loop, a lambda or recursion further up.
 fn passed_changed<'a>(
     code: &Code<'a>,
     frames: &[crate::resolve::Frame<'a>],
     selector: &str,
     builders: &java::Builders<'a>,
+    request: &java::Judged,
 ) -> bool {
-    frames.iter().any(|frame| {
-        (code.call(frame.path, frame.index)).is_some_and(|call| {
-            (call.args.iter()).any(|arg| {
-                java::changed(
-                    code,
-                    frame.path,
-                    &call.scope,
-                    arg,
-                    &call.range,
-                    selector,
-                    builders,
-                )
-            })
-        })
-    })
+    let (mut parameter, mut fresh) = (request.parameter, request.fresh);
+    for frame in frames {
+        let Some(call) = code.call(frame.path, frame.index) else {
+            parameter = None;
+            continue;
+        };
+        // A call that binds its arguments to no one parameter each (varargs) is no position.
+        if parameter.is_some()
+            && code
+                .def(frame.def.path, frame.def.name)
+                .is_none_or(|def| def.params.len() != call.args.len())
+        {
+            return true;
+        }
+        let position = parameter.take();
+        if let Some(p) = position
+            && fresh
+            && !call.args.get(p).is_some_and(java::made_here)
+        {
+            return true;
+        }
+        // The list handed on twice is another name of it in the wrapper, which the read does not
+        // see: `w(l, l)` and a wrapper that sets its second parameter.
+        if let Some(Value::Ref(list)) = position.and_then(|p| call.args.get(p))
+            && (call.args.iter().enumerate())
+                .any(|(i, arg)| Some(i) != position && java::hands(arg, list))
+        {
+            return true;
+        }
+        for (i, arg) in call.args.iter().enumerate() {
+            let read = position == Some(i);
+            let judged = java::changed(
+                code,
+                frame.path,
+                &call.scope,
+                arg,
+                &call.range,
+                selector,
+                builders,
+                read,
+            );
+            if judged.changed {
+                return true;
+            }
+            if read {
+                (parameter, fresh) = (judged.parameter, judged.fresh);
+            }
+        }
+    }
+    false
 }
 
 /// A named request can change after construction, and so can a named value an inline request
 /// holds on the name's path (an EventBridge entry); inline literals cannot change before the call.
+/// In Java, also the parameter the path's list comes in unchanged (`java::Judged`).
 fn changed_request<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -387,17 +436,32 @@ fn changed_request<'a>(
     language: Language,
     written: &std::cell::OnceCell<BTreeSet<&'a str>>,
     builders: &java::Builders<'a>,
-) -> bool {
+) -> java::Judged {
+    let judged = |changed| java::Judged {
+        changed,
+        parameter: None,
+        fresh: false,
+    };
     let Some(call) = code.call(path, index) else {
-        return false;
+        return judged(false);
     };
     let request = match language {
         Language::Go => call.args.get(1),
         Language::Csharp => call.keyword("request").or_else(|| call.args.first()),
         Language::Java => {
-            return (call.args.first()).is_some_and(|r| {
-                java::changed(code, path, &call.scope, r, &call.range, selector, builders)
-            });
+            let Some(r) = call.args.first() else {
+                return judged(false);
+            };
+            return java::changed(
+                code,
+                path,
+                &call.scope,
+                r,
+                &call.range,
+                selector,
+                builders,
+                false,
+            );
         }
     };
     // Follow the name's path through the request as written: a named value met on it changes
@@ -410,7 +474,7 @@ fn changed_request<'a>(
             for field in member.split('|').map(|f| f.trim_end_matches("[]")) {
                 if let Value::Ref(_) = value {
                     if opaque(code, field, language, written) {
-                        return true;
+                        return judged(true);
                     }
                     continue;
                 }
@@ -429,7 +493,7 @@ fn changed_request<'a>(
         }
         values = next;
     }
-    false
+    judged(false)
 }
 
 /// The Go packages (directories) a file of which declares `len` or `cap` (#774): there `len(x)`

@@ -24,7 +24,9 @@ links and structured inference explanations are transient query values, never st
   call site's `decorates`), callable-to-signature and
   static-member names (`Facts::overloads`, `Facts::constructors` and
   `Facts::statics`), the namespaces and types a C# file's `global using` directives name
-  (`Facts::project`, names as `Facts::imports` holds them), the qualified names of the types a C#
+  (`Facts::project`, names as `Facts::imports` holds them), the names of the methods a Java
+  file declares that no definition stands for (an anonymous class's, an enum constant body's or
+  a class's nested in one: `Facts::anonymous`, #772), the qualified names of the types a C#
   file declares in `partial` parts (`Facts::partial`), the qualified names of the classes a
   Kotlin file declares `expect` or `actual` (`Facts::expect`, `Facts::actual`), the size of the budget a file exhausted
   (`Facts::budget`, which `meada status` names), the count of usings the project of a file
