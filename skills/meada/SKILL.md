@@ -85,10 +85,12 @@ it consumes it.
 - **Programs.** A CI step whose command is a console script of a PyPI package of the workspace
   links to the function the script names, so `trace` with `direction: "up"` from a symbol or a
   route reaches the CI jobs that run it, and `direction: "down"` from a CI job enters the
-  program. Read the level as evidence of which package runs: `exact` when an earlier command of
-  the same CI job installs the package or the command names it (`uvx <package>`, `pipx run
-  <package>`), `inferred` with no install seen (the script's name matched alone), `ambiguous`
-  when several packages declare the name. The link names the script's function, not a
+  program. Read the level and its reason together: the link is `inferred` at best, since an
+  install, `uvx <package>` and `pipx run <package>` name the package by its name alone and a
+  fork of a public package may hold that name (reason `the name alone matched`); the reason
+  then says whether an earlier command of the same CI job installs the package, the command
+  names it, or no install was seen. `ambiguous` when several packages declare the name. A
+  `pip install` of a package of the workspace links the same way, `inferred`. The link names the script's function, not a
   subcommand's handler, and a missing CI caller is unproven: a path to the script, `python -m`,
   `uv run` and a script another script calls are not read.
 - **`(absent at the indexed commit)`.** The call names a file or folder that is not there at

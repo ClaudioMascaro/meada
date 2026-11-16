@@ -71,10 +71,12 @@ All notable changes to Meada are recorded here. The format follows
   and the user guide teach the kind. Release level: minor, meada (#829).
 - A CI step whose command is a console script of a PyPI package of the workspace starts that
   program (ADR 0028): it consumes the package, with the command as written, and links to the
-  function the script names. The link is `exact` when an earlier command of the same CI job
-  installs the package or the command names it (`uvx <package>`, `pipx run <package>`),
-  `inferred` with no install and one declaring package, `ambiguous` with several, and absent
-  when none declares the name. `trace` crosses it both ways, so the CI jobs that run a program
+  function the script names. The link is `inferred` when an earlier command of the same CI job
+  installs the package, when the command names it (`uvx <package>`, `pipx run <package>`) and
+  with no install and one declaring package, its reason naming the evidence, `ambiguous` with
+  several, and absent when none declares the name: an install names the package by its name
+  alone, so the link stays `inferred` until the package yardstick approves that rule (ADR 0029,
+  #850). `trace` crosses it both ways, so the CI jobs that run a program
   show above the routes it calls. The manifest reader keeps each console script's name: the
   schema version rises and an index rebuilds on first use. Release level: minor, meada (#832).
 - `docker push <image>` and `docker buildx build --push` (each `-t`, `--tag` and `--tag=`) in a
@@ -116,8 +118,9 @@ All notable changes to Meada are recorded here. The format follows
   one after `&&` or `;`, also inside `if` or a loop, and a script with a heredoc or past 1024 bytes
   is not read. `pip install`, `pip3 install`, `python -m pip install`, `uv pip install`, `pipx
   install` and `uv tool install` make the CI step a consumer of `package::pypi::<name>` for a
-  package of the workspace, at the package kind's level and with the range as written, and `context`
-  on the package lists the CI step. A name with an unresolved part is a pattern, and a name left
+  package of the workspace, with the range as written, and `context` on the package lists the CI
+  step. One provider of the name links `inferred`, its reason starting with `the name alone
+  matched`, since a fork or a copy of a public package may hold the name (ADR 0029, #850). A name with an unresolved part is a pattern, and a name left
   open whole an unresolved consumer with its cause where the workspace provides a PyPI package. The
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed

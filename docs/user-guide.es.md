@@ -1599,8 +1599,9 @@ del job de CI, si no el del pipeline), cada línea es un comando, y también lo 
 en `echo`, en una cadena o en un comentario no da lado. `pip install`, `pip3 install`, `python -m
 pip install`, `uv pip install`, `pipx install` y `uv tool install` hacen del paso de CI un
 consumidor de `package::pypi::<nombre>` cuando un repositorio del workspace provee el paquete, con
-el rango como está escrito: `context` en el paquete lista el paso de CI, y el enlace sigue la regla
-de la sección 8.5 (`exact` para un único proveedor en otro repositorio). Una ruta, una URL, `-e`, el
+el rango como está escrito: `context` en el paquete lista el paso de CI, y un único proveedor enlaza
+en `inferred`, con el motivo empezando por `the name alone matched`: la instalación no nombra
+origen, y un fork o una copia de un paquete público puede tener el nombre (ADR 0029). Una ruta, una URL, `-e`, el
 archivo de `-r` y el valor de una opción no dan lado. Un nombre con una parte que ningún `env`
 literal da (`shared-${{ vars.X }}`) es un patrón, enlazado como `inferred` al único paquete que
 encaja; un nombre entero así (`pip install $PKG`) es, donde el workspace provee un paquete PyPI, un
@@ -1613,13 +1614,14 @@ recibe literal, y cuando una línea escribe ese archivo sin mostrar el nombre (`
 
 **Programas.** Un paso de CI cuyo comando es un script de consola de un paquete PyPI del workspace
 (un nombre bajo `[project.scripts]` o `[tool.poetry.scripts]`) inicia ese programa: el paso de CI
-consume el paquete, y el enlace sigue hasta la función que el script nombra. El nivel dice cuánta
-certeza tiene Meada del paquete que corre:
+consume el paquete, y el enlace sigue hasta la función que el script nombra. El paquete coincide
+solo por su nombre, así que el enlace es `inferred` como máximo (ADR 0029); el nivel y el motivo
+dicen cuánta certeza tiene Meada del paquete que corre:
 
 | Evidencia | Nivel |
 | --- | --- |
-| Una línea o un paso de CI anterior del mismo job de CI instala el paquete | `exact` |
-| El comando nombra el paquete: `uvx <paquete>`, `pipx run <paquete>` | `exact` |
+| Una línea o un paso de CI anterior del mismo job de CI instala el paquete | `inferred` |
+| El comando nombra el paquete: `uvx <paquete>`, `pipx run <paquete>` | `inferred` |
 | Ninguna instalación, y un solo paquete del workspace declara el nombre | `inferred` |
 | Varios paquetes del workspace declaran el nombre | `ambiguous` |
 | Ningún paquete del workspace declara el nombre | ningún lado |
@@ -1630,7 +1632,7 @@ certeza tiene Meada del paquete que corre:
 ```text
 github.com/acme/core-api app/main.py:6 register_package
   →[inferred: base URL from CORE_API_URL, a base_url_env of peer github.com/acme/core-api] github.com/acme/core-sdk core_sdk/cli.py:10 publish_main
-    →[exact: package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
+    →[inferred: the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
       github.com/acme/workflows .github/workflows/publish.yml:12 jobs.publish
         github.com/acme/workflows .github/workflows/publish.yml:1 .
           →[exact: @main (indexed 1a2b3c4)] github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish
