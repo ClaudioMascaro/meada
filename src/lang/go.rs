@@ -204,11 +204,11 @@ impl Walk<'_> {
     /// The names a parameter list binds, with the type each writes: parameters (`local` false,
     /// which `Def::params` lists), or the receiver and the named results of a function.
     fn typed_params(&mut self, scope: &str, list: Option<Node>, local: bool) {
-        for param in list.into_iter().flat_map(named) {
+        for (names, param) in declarations(list) {
             let ty = param.child_by_field_name("type");
             let ty = ty.filter(|_| param.kind() == "parameter_declaration");
             let class = ty.and_then(|t| type_name(t, self.src)).map(Class::Type);
-            for name in names(param) {
+            for name in names {
                 self.bind_as(scope, text(name, self.src), class.clone(), local, None);
             }
         }
@@ -488,8 +488,8 @@ impl Walk<'_> {
 
     /// The names a parameter list binds, of no class the source writes.
     fn bind_params(&mut self, scope: &str, list: Option<Node>) {
-        for param in list.into_iter().flat_map(named) {
-            for name in names(param) {
+        for (names, _) in declarations(list) {
+            for name in names {
                 self.local(scope, text(name, self.src));
             }
         }
@@ -1011,7 +1011,10 @@ fn value_class(node: Node, src: &[u8]) -> Option<Class> {
 fn result_class(node: Node, src: &[u8]) -> Option<Class> {
     let result = node.child_by_field_name("result")?;
     let ty = match result.kind() {
-        "parameter_list" => named(result).next()?.child_by_field_name("type")?,
+        "parameter_list" => declarations(Some(result))
+            .first()?
+            .1
+            .child_by_field_name("type")?,
         _ => result,
     };
     type_name(ty, src).map(Class::Type)
@@ -1068,12 +1071,38 @@ fn params(list: Option<Node>, src: &[u8]) -> Vec<Param> {
         closure: Default::default(),
     };
     let mut out = Vec::new();
-    for declaration in list.into_iter().flat_map(named) {
-        match names(declaration)[..] {
+    for (names, _) in declarations(list) {
+        match names[..] {
             [] => out.push(param("")),
             ref several => out.extend(several.iter().map(|n| param(text(*n, src)))),
         }
     }
+    out
+}
+
+/// The declarations of a parameter list in order, each with the names it binds. Go writes the
+/// names of a list all or none, so in a list that writes some, a nameless declaration of one bare
+/// type name is a name of the next declaration that writes its own: tree-sitter-go parses a group
+/// of ten names or more (`p0, ..., p9 string`) as nameless `p0` and the group of the last nine.
+fn declarations(list: Option<Node>) -> Vec<(Vec<Node>, Node)> {
+    let all: Vec<Node> = list.into_iter().flat_map(named).collect();
+    let writes_names = all.iter().any(|d| !names(*d).is_empty());
+    let (mut out, mut pending) = (Vec::new(), Vec::new());
+    for declaration in all {
+        let written = names(declaration);
+        let bare = (declaration.child_by_field_name("type"))
+            .filter(|t| t.kind() == "type_identifier")
+            .filter(|_| declaration.kind() == "parameter_declaration");
+        match bare {
+            Some(name) if writes_names && written.is_empty() => pending.push((name, declaration)),
+            _ => {
+                let names = (pending.drain(..).map(|(n, _)| n)).chain(written);
+                out.push((names.collect(), declaration));
+            }
+        }
+    }
+    // Nameless after the last names written: no group to join (Go refuses the list).
+    out.extend(pending.into_iter().map(|(_, d)| (Vec::new(), d)));
     out
 }
 
@@ -1643,6 +1672,61 @@ mod tests {
         assert!(held("\tg(func() { a.M() })\n\ta := S{}").is_empty());
         assert!(held("\t{\n\t\ta := S{}\n\t\ta.M()\n\t}\n\ta.M()").is_empty());
         assert!(held("\ta := a.N()").is_empty());
+    }
+
+    /// tree-sitter-go parses a group of ten names or more as one nameless declaration per name
+    /// but the last nine, typed by the name itself; the pack gives the group its names back, in
+    /// parameters and named results alike. A list that writes no names keeps its types.
+    #[test]
+    fn a_group_of_ten_names_or_more_keeps_its_first_names() {
+        let group = |p: &str, n: usize| (0..n).map(|k| format!("{p}{k}")).collect::<Vec<_>>();
+        let source = |n: usize| {
+            let (p, r) = (group("p", n).join(", "), group("r", n).join(", "));
+            format!("package x\n\nfunc f(ctx context.Context, {p} string) ({r} *T) {{}}\n")
+        };
+        let split = |n: usize| {
+            let mut parser = Parser::new();
+            parser
+                .set_language(&tree_sitter_go::LANGUAGE.into())
+                .unwrap();
+            let tree = parser.parse(source(n), None).unwrap();
+            let function = tree.root_node().named_child(1).unwrap();
+            let list = function.child_by_field_name("parameters").unwrap();
+            named(list).filter(|d| names(*d).is_empty()).count()
+        };
+        assert_eq!([split(9), split(10), split(20)], [0, 1, 11]);
+        for n in [9, 10, 20] {
+            let facts = facts(&source(n));
+            let params: Vec<_> = facts.defs[0]
+                .params
+                .iter()
+                .map(|p| p.name.clone())
+                .collect();
+            assert_eq!(
+                params,
+                [vec!["ctx".to_string()], group("p", n)].concat(),
+                "{n}"
+            );
+            let result = &facts.defs[0].result;
+            assert!(matches!(result, Some(Class::Type(t)) if t == "T"), "{n}");
+            let typed = |p: &str, ty: &str| -> Vec<String> {
+                (group(p, n).iter())
+                    .map(|k| format!("f {k} = {ty}"))
+                    .collect()
+            };
+            let mut expected = [typed("p", "string"), typed("r", "T")].concat();
+            expected.push("f ctx = context.Context".into());
+            expected.sort();
+            assert_eq!(receivers(&source(n)), expected, "{n}");
+        }
+        let params = |src: &str| -> Vec<String> {
+            (facts(src).defs[0].params.iter())
+                .map(|p| p.name.clone())
+                .collect()
+        };
+        assert_eq!(params("package x\n\nfunc f(A, B) {}\n"), ["", ""]);
+        // Go refuses a nameless type after the last name: it joins no group.
+        assert_eq!(params("package x\n\nfunc f(a int, B) {}\n"), ["a", ""]);
     }
 
     #[test]

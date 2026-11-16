@@ -1878,6 +1878,40 @@ fn aws_origin_chains_and_inline_factories_stay_bounded_at_the_file_size_ceiling(
 /// before the one where that budget ends keep their names, and that call has a writer, named or
 /// unresolved, and no reader for write entries; a reader for a `ConditionCheck` entry, unless the
 /// budget ends inside its writer row (#784).
+/// A Go wrapper whose parameters are one group of nine, ten or twenty names, the first of which
+/// names the table, is followed to its caller: tree-sitter-go parses a group of ten or more apart.
+/// The parameter hides the package constant of its name.
+#[test]
+fn a_go_wrapper_with_a_group_of_ten_parameters_or_more_names_its_callers_table() {
+    let repo = fixture_repo("aws_sdk_go_grouped_parameters", "aws-sdk-controls", None);
+    let wrapper = |n: usize| {
+        let names: Vec<String> = (0..n).map(|k| format!("p{k}")).collect();
+        let rest = ", \"\"".repeat(n - 1);
+        format!(
+            "func write{n}(ctx context.Context, {} string) {{\n\
+             \tclient := dynamodb.NewFromConfig(cfg)\n\
+             \tclient.PutItem(ctx, &dynamodb.PutItemInput{{TableName: aws.String(p0)}})\n}}\n\n\
+             func place{n}(ctx context.Context) {{ write{n}(ctx, \"orders-{n}\"{rest}) }}\n\n",
+            names.join(", ")
+        )
+    };
+    let go = format!(
+        "package app\n\nimport (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/aws\"\n\
+         \t\"github.com/aws/aws-sdk-go-v2/service/dynamodb\"\n)\n\nvar cfg aws.Config\n\nconst p0 = \"hidden\"\n\n{}",
+        [9, 10, 20].map(wrapper).concat()
+    );
+    std::fs::write(repo.join("app.go"), go).unwrap();
+    let text = Engine::open(&repo).unwrap().export().unwrap();
+    let export: Value = serde_json::from_str(&text).unwrap();
+    let sides: Vec<_> = (export["providers"].as_array().unwrap().iter())
+        .map(|s| format!("{} {}", s["site"].as_str().unwrap(), s["contract"]))
+        .collect();
+    let site = |n: usize| format!("local/aws-sdk-controls::app.go::place{n}::write{n}#0");
+    let expected = [10, 20, 9].map(|n| format!("{} \"resource::dynamodb::orders-{n}\"", site(n)));
+    assert_eq!(sides, expected, "{text}");
+    assert!(export["consumers"].as_array().unwrap().is_empty(), "{text}");
+}
+
 #[test]
 fn transaction_calls_leave_the_other_sides_of_their_file_named() {
     // `$CHECK` declares a second entry (a `ConditionCheck` of table `c$K`, or a `Put` of table
