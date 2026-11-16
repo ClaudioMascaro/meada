@@ -7,7 +7,7 @@ use crate::common;
 use std::fs;
 
 use common::{
-    assert_golden, assert_golden_but_indexed_commit, chain, decisions, fixture_repo,
+    HEALTH, TRACK, assert_golden, assert_golden_but_indexed_commit, chain, decisions, fixture_repo,
     without_processes,
 };
 use meada::engine::{Direction, Engine, Start};
@@ -135,6 +135,34 @@ fn a_decision_that_no_longer_fits_is_ignored() {
     let (core, _) = export.split_once(",\n  \"stale_decisions\"").unwrap();
     assert_golden_but_indexed_commit("chain-web.export.json", &format!("{core}\n}}\n"));
     assert_golden("chain-web.unfit.export.json", &without_processes(&export));
+}
+
+/// A `dynamic-url` decision to a route a repository serves but that is no candidate of the call
+/// (the tracking call is a `POST`, the target a `GET`) is stale with the cause `not-candidate`:
+/// the rest of the export is the core's, and the item stays open.
+#[test]
+fn a_dynamic_url_decision_outside_its_candidates_is_ignored_and_the_item_stays_open() {
+    let (web, _, _) = chain("decided_dynamic_not_candidate");
+    decisions(&web, "chain-web-dynamic-not-candidate");
+    let engine = Engine::open(&web).unwrap();
+
+    let export = engine.export().unwrap();
+
+    let (core, _) = export.split_once(",\n  \"stale_decisions\"").unwrap();
+    assert_golden_but_indexed_commit("chain-web.export.json", &format!("{core}\n}}\n"));
+    let export: serde_json::Value = serde_json::from_str(&export).unwrap();
+    assert_eq!(
+        export["stale_decisions"],
+        serde_json::json!([{
+            "call": TRACK,
+            "target": "example.com/chain/catalog::http::GET::/api/health",
+            "cause": "not-candidate",
+        }])
+    );
+    let open: Vec<_> = (engine.open_items().unwrap().into_iter())
+        .map(|i| i.id)
+        .collect();
+    assert_eq!(open, [HEALTH, TRACK]);
 }
 
 #[test]

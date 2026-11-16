@@ -320,6 +320,36 @@ fn an_ambiguous_link_decision_for_an_unread_base_goes_stale() {
     );
 }
 
+/// A `dynamic-url` decision to a route the API serves whose path holds the known part but does
+/// not end with it is no candidate: it is stale, the item stays open and the links are the core's.
+#[test]
+fn a_dynamic_url_decision_outside_the_candidates_of_an_unread_base_goes_stale() {
+    let go = unread_base("items_unread_base_not_candidate", "unread-base-go");
+    common::decisions(&go, "unread-base-go-not-candidate");
+    let engine = Engine::open(&go).unwrap();
+
+    assert_eq!(
+        items_of(&engine),
+        [
+            "client.go::Client.ViaMethodPrefix::http.Get#0: GET /api/orders, GET /orders, GET /v2/orders"
+        ]
+    );
+    let links = links_of(&engine);
+    assert_eq!(links.len(), 2, "{links:?}");
+    assert!(links.iter().all(|l| !l.contains("[decided")), "{links:?}");
+    let (listed, _, ok) = meada(&go, &["decide", "--list"], "", |c| {
+        c.env("LANG", "en_US.UTF-8");
+    });
+    assert!(ok);
+    assert!(
+        listed.ends_with(
+            "\nstale decision: example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0 \
+             -> example.com/acme/api::http::GET::/api/orders/items (target not a candidate)\n"
+        ),
+        "{listed}"
+    );
+}
+
 /// Each open item as its call and the limit it names.
 fn limits_of(engine: &Engine) -> Vec<String> {
     (engine.open_items().unwrap().iter())

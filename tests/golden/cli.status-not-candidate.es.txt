@@ -1,0 +1,6 @@
+example.com/chain/web (.) indexado, 5 archivos
+  decisión obsoleta: example.com/chain/web::src/status.ts::track::fetch#0 -> example.com/chain/catalog::http::GET::/api/health (el destino no es candidato)
+  ¿conclusión errónea? repórtala: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
+example.com/chain/gateway (../chain-gateway) indexado, 8 archivos
+example.com/chain/catalog (../chain-catalog) indexado, 4 archivos
+example.com/chain/worker (../chain-worker) indexado, 3 archivos

@@ -878,6 +878,21 @@ fn status_reports_stale_and_waiting_decisions_follow_lang() {
     }
 }
 
+/// A `dynamic-url` decision to a served route that is no candidate of the call is stale with
+/// the cause `not-candidate`, in each language.
+#[test]
+fn status_reports_a_dynamic_url_decision_outside_its_candidates_follow_lang() {
+    let (web, _, _) = chain("cli_not_candidate");
+    decisions(&web, "chain-web-dynamic-not-candidate");
+    meada(&web, "en_US.UTF-8", "index");
+    for (lang, name) in LANGS {
+        assert_golden(
+            &format!("cli.status-not-candidate.{name}.txt"),
+            &meada(&web, lang, "status"),
+        );
+    }
+}
+
 #[test]
 fn status_reports_loose_resources_follow_lang() {
     let gateway = loose_chain("cli_resources");

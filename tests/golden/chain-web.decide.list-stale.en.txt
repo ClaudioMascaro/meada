@@ -8,5 +8,5 @@ src/status.ts:8  fetch(event.url, { method: "POST" })
   1) example.com/chain/catalog POST /api/events
   2) example.com/chain/gateway POST /api/events
 
-stale decision: example.com/chain/web::src/status.ts::health::fetch#0 -> example.com/chain/catalog::http::GET::/api/products/{} (target no longer a candidate)
+stale decision: example.com/chain/web::src/status.ts::health::fetch#0 -> example.com/chain/catalog::http::GET::/api/products/{} (target not a candidate)
 decision waiting on missing peer example.com/chain/billing: example.com/chain/web::src/status.ts::track::fetch#0 -> example.com/chain/billing::http::POST::/api/events

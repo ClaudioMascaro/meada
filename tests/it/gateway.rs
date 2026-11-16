@@ -128,3 +128,34 @@ fn a_decision_for_the_provider_behind_a_colliding_gateway_path_applies() {
         "example.com/acme/billing::app/audit/route.ts::GET"
     );
 }
+
+/// A `dynamic-url` decision for a route the call fits only by its gateway path applies, as
+/// `meada decide` lists and writes it: with the route's own contract.
+#[test]
+fn a_decision_for_a_dynamic_url_s_candidate_by_its_gateway_path_applies() {
+    let (client, ..) = gateway("gateway_dynamic_decide");
+    let order = "example.com/acme/client::src/client.ts::order::fetch#0";
+
+    let (_, stderr, ok) = common::meada(&client, &["decide", "--item", order], "1\n", |c| {
+        c.env("LANG", "en_US.UTF-8");
+    });
+
+    assert!(ok, "{stderr}");
+    let written = common::written(&client).expect("the file is written");
+    assert!(
+        written.contains("\"example.com/acme/orders::http::GET::/orders/{}\""),
+        "{written}"
+    );
+    let export = Engine::open(&client).unwrap().export().unwrap();
+    let export: serde_json::Value = serde_json::from_str(&export).unwrap();
+    assert_eq!(export.get("stale_decisions"), None, "{export}");
+    let links: Vec<_> = (export["links"].as_array().unwrap().iter())
+        .filter(|l| l["consumer"] == order)
+        .collect();
+    assert_eq!(links.len(), 1, "{links:?}");
+    assert_eq!(links[0]["level"], "decided");
+    assert_eq!(
+        links[0]["provider"],
+        "example.com/acme/orders::app/orders/[id]/route.ts::GET"
+    );
+}

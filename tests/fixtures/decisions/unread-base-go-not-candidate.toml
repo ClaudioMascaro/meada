@@ -1,0 +1,7 @@
+# The issue's open item (#801), decided to a route the API serves whose path holds the call's
+# known part (`/orders`) but does not end with it: no candidate.
+[[decision]]
+kind = "dynamic-url"
+call = "example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0"
+target = "example.com/acme/api::http::GET::/api/orders/items"
+by = "human"
