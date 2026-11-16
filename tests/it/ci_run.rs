@@ -1,6 +1,6 @@
 //! The command table (#831, ADR 0028): the `run` script of a CI step, read under one gate.
-//! `pip install` and its forms make the CI step a consumer of the package they name, at the
-//! level the package kind gives a dependency by name.
+//! `pip install` and its forms make the CI step a consumer of the package they name, at
+//! `inferred` when one provider fits: the name alone matched (ADR 0029).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,6 +15,8 @@ const LIB: &str = "example.com/pkg/pylib::pyproject.toml";
 const TOOLS: &str = "example.com/pkg/pylib::tools/pyproject.toml";
 const FILE: &str = ".github/workflows/ci.yml";
 const SHARED: &str = "package::pypi::shared-lib";
+/// What the reason of a link from a CI step says first when the name alone matched (ADR 0029).
+const BY_NAME: &str = "the name alone matched";
 
 /// The PyPI fixtures: `pylib` provides `shared-lib` 1.2.0 and `shared-tools` 0.3.0, and `pyweb`
 /// names it as its peer.
@@ -100,15 +102,15 @@ fn an_install_by_name_makes_the_ci_step_a_consumer_of_the_package() {
     );
     let export = exported(&web);
     assert_eq!(sides(&export), [side("jobs.build.steps[0]", SHARED)]);
-    // One provider of the name in the workspace is `exact`, the range as written
-    // (`python_dependencies_and_imports_link_to_the_distribution` shows the manifest's).
-    let reason = "package::pypi::shared-lib >=1.0,<2 (local 1.2.0)";
+    // One provider of the name in the workspace is `inferred`, the range as written: a fork or
+    // a copy of a public package of that name may be what the workspace provides (ADR 0029).
+    let reason = format!("{BY_NAME}; package::pypi::shared-lib >=1.0,<2 (local 1.2.0)");
     assert_eq!(
         links(&export),
         [(
             "jobs.build.steps[0]".to_string(),
             LIB.to_string(),
-            "exact".to_string(),
+            "inferred".to_string(),
             reason.to_string()
         )]
     );
@@ -164,15 +166,15 @@ fn each_install_command_of_the_table_reads_the_names_it_is_given() {
             at(6, TOOLS_PACKAGE),
         ]
     );
-    // Every link is the package kind's `exact`, with the range as written and its flag; the
+    // Every link is `inferred` by the name alone, with the range as written and its flag; the
     // first install of a name by a CI step gives the range.
-    let said = |range: &str, flag: &str| format!("{SHARED} {range} (local 1.2.0){flag}");
+    let said = |range: &str, flag: &str| format!("{BY_NAME}; {SHARED} {range} (local 1.2.0){flag}");
     let tools = |n: usize| {
-        let reason = format!("{TOOLS_PACKAGE} none (local 0.3.0), range unchecked");
+        let reason = format!("{BY_NAME}; {TOOLS_PACKAGE} none (local 0.3.0), range unchecked");
         (
             format!("jobs.build.steps[{n}]"),
             TOOLS.to_string(),
-            "exact".to_string(),
+            "inferred".to_string(),
             reason,
         )
     };
@@ -181,7 +183,7 @@ fn each_install_command_of_the_table_reads_the_names_it_is_given() {
         (
             format!("jobs.build.steps[{n}]"),
             LIB.to_string(),
-            "exact".to_string(),
+            "inferred".to_string(),
             reason,
         )
     };
@@ -441,8 +443,8 @@ fn a_name_is_a_literal_a_pattern_or_left_open() {
         of(1),
         [(
             LIB,
-            "exact",
-            "package::pypi::shared-lib ==1.2.0 (local 1.2.0)"
+            "inferred",
+            "the name alone matched; package::pypi::shared-lib ==1.2.0 (local 1.2.0)"
         )]
     );
     assert_eq!(
@@ -610,20 +612,20 @@ fn a_literal_name_is_the_package_whatever_its_range_or_extra_holds() {
     assert_eq!(
         of(1),
         [(
-            "exact",
-            "package::pypi::shared-lib ==${{ matrix.v }} (local 1.2.0), range unchecked"
+            "inferred",
+            "the name alone matched; package::pypi::shared-lib ==${{ matrix.v }} (local 1.2.0), range unchecked"
         )]
     );
     assert_eq!(
         of(2),
         [
             (
-                "exact",
-                "package::pypi::shared-lib >=$MIN (local 1.2.0), range unchecked"
+                "inferred",
+                "the name alone matched; package::pypi::shared-lib >=$MIN (local 1.2.0), range unchecked"
             ),
             (
-                "exact",
-                "package::pypi::shared-tools none (local 0.3.0), range unchecked"
+                "inferred",
+                "the name alone matched; package::pypi::shared-tools none (local 0.3.0), range unchecked"
             ),
         ]
     );
@@ -631,12 +633,12 @@ fn a_literal_name_is_the_package_whatever_its_range_or_extra_holds() {
         of(4),
         [
             (
-                "exact",
-                "package::pypi::shared-lib $X (local 1.2.0), range unchecked"
+                "inferred",
+                "the name alone matched; package::pypi::shared-lib $X (local 1.2.0), range unchecked"
             ),
             (
-                "exact",
-                "package::pypi::shared-tools ${{ matrix.spec }} (local 0.3.0), range unchecked"
+                "inferred",
+                "the name alone matched; package::pypi::shared-tools ${{ matrix.spec }} (local 0.3.0), range unchecked"
             ),
         ]
     );
@@ -702,7 +704,7 @@ fn the_answers_show_a_ci_step_that_installs_a_package() {
     assert_eq!(
         listed(&step, "  provider: "),
         [
-            "example.com/pkg/pylib pyproject.toml [exact: package::pypi::shared-lib >=1.0 (local 1.2.0)]"
+            "example.com/pkg/pylib pyproject.toml [inferred: the name alone matched; package::pypi::shared-lib >=1.0 (local 1.2.0)]"
         ],
         "{step}"
     );
