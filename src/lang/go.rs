@@ -303,6 +303,14 @@ impl Walk<'_> {
         false
     }
 
+    /// Whether a binding of the file hides the builtin `name` (`len`).
+    // ponytail: a package-level one another file of the package declares is not seen here.
+    fn hides(&self, name: &str) -> bool {
+        (self.bound.keys()).any(|(_, n)| n == name)
+            || (self.facts.defs.iter()).any(|d| d.name == name)
+            || (self.facts.consts.iter()).any(|c| c.name == name)
+    }
+
     /// Makes the names held by one binding constants, and gives each definition what it
     /// returns. A name bound again anywhere in its function, or assigned in it or in a literal
     /// inside it, holds no one value.
@@ -352,10 +360,7 @@ impl Walk<'_> {
         }
         // A guard holds when no binding of the file hides `len`, and when `ok` is the second
         // result of the `os.LookupEnv` that bound the read, bound once and never assigned.
-        // ponytail: a package-level `len` another file of the package declares is not seen.
-        let hides_len = (self.bound.keys()).any(|(_, n)| n == "len")
-            || (self.facts.defs.iter()).any(|d| d.name == "len")
-            || (self.facts.consts.iter()).any(|c| c.name == "len");
+        let hides_len = self.hides("len");
         let guarded = |found: &str, name: &str, scope: &str, guard: &values::Guard| {
             let Some(ok) = &guard.ok else {
                 return !(guard.len && hides_len);
@@ -1395,6 +1400,8 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
     }
     // The values read `bound`, which `finish` takes.
     walk.finish_values();
+    // Before `finish`, which takes the bindings `hides` reads.
+    let [free_len, free_cap] = ["len", "cap"].map(|name| !walk.hides(name));
     walk.finish();
     let mut facts = walk.facts;
     unbind_clashes(&mut facts.imports);
@@ -1405,9 +1412,29 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         })
         .collect();
     facts.loops = super::outermost(tree.root_node(), &["for_statement"]);
-    // A local kept as a constant is named `function.name`.
+    // A local kept as a constant is named `function.name`. A parameter is counted in its
+    // function too: a wrapper that writes it twice sends what its caller passes (#774).
     let held = (facts.consts.iter()).filter_map(|c| c.name.rsplit_once('.'));
-    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, held);
+    let params = (facts.defs.iter()).flat_map(|d| {
+        let named = d.params.iter().filter(|p| !p.name.is_empty());
+        named.map(move |p| (d.name.as_str(), p.name.as_str()))
+    });
+    // `len(x)` and `cap(x)` read the value and change nothing (#774), where no binding of the file
+    // hides them (the SDK reader checks the package's other files, `sdk::hiding_builtins`).
+    let read = |name: Node| {
+        let args = name.parent().filter(|a| a.kind() == "argument_list");
+        let call = (args.filter(|a| a.named_child_count() == 1)).and_then(|a| a.parent());
+        let function = (call.filter(|c| c.kind() == "call_expression"))
+            .and_then(|c| c.child_by_field_name("function"))
+            .filter(|f| f.kind() == "identifier");
+        match function.map(|f| text(f, src)) {
+            Some("len") => free_len,
+            Some("cap") => free_cap,
+            _ => false,
+        }
+    };
+    let locals = held.chain(params);
+    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, locals, read);
     Ok(facts)
 }
 
@@ -1525,17 +1552,22 @@ mod tests {
     }
 
     /// `Facts::mentioned`: the identifiers of a function that spell a local it keeps as a
-    /// constant, a function literal inside it included. A package variable gets no count.
+    /// constant or one of its parameters, a function literal inside it included. A package
+    /// variable and a blank parameter get no count.
     #[test]
-    fn the_locals_kept_as_constants_are_counted_where_their_function_writes_them() {
+    fn the_locals_kept_and_the_parameters_are_counted_where_their_function_writes_them() {
         let facts = facts(
             "package p\n\nvar shared = T{}\n\nfunc f() {\n\ta := T{}\n\tb := T{}\n\tg(a)\n\t\
-             go func() { g(a) }()\n\tg(b, shared)\n}\n\nfunc h() {\n\ta := T{}\n\tg(a)\n}\n",
+             go func() { g(a) }()\n\tg(b, shared)\n}\n\nfunc h() {\n\ta := T{}\n\tg(a)\n}\n\n\
+             func k(p T, _ T, q T) {\n\tg(p)\n}\n\nfunc (r R) m(p T) {\n\tp = T{}\n\tg(p)\n}\n",
         );
         let counted: Vec<String> = (facts.mentioned.iter())
             .map(|m| format!("{} {} {}", m.scope, m.name, m.count))
             .collect();
-        assert_eq!(counted, ["f a 3", "f b 2", "h a 2"]);
+        assert_eq!(
+            counted,
+            ["R.m p 3", "f a 3", "f b 2", "h a 2", "k p 2", "k q 1"]
+        );
     }
 
     #[test]

@@ -8,6 +8,8 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Added
 
+- Go: a DynamoDB transaction's list held in a name keeps its tables when it is also read by
+  `len(x)` or `cap(x)`, unless the package declares its own `len` or `cap` (#774).
 - Java: a list of DynamoDB transaction entries, or one entry, that a wrapper takes in a parameter
   and passes on names its tables when no mention, in the wrapper or its caller, can change it
   before the request reads it; a list that is sorted, or changed after a named request's
@@ -99,6 +101,14 @@ All notable changes to Meada are recorded here. The format follows
   is never compared: these are declared permissions, not effective ones. `meada export` gains
   the optional consumer field `permissions`. Existing indexes are rebuilt once on first use.
   Release level: minor, meada and meada-core (#834).
+- Go: a request, a list or an entry of a DynamoDB transaction or of EventBridge `PutEvents`
+  that a wrapper takes in a parameter keeps its table or bus at each caller, when the wrapper
+  only declares the parameter and sends it and the caller passes a value nothing else names. A
+  function, and a method whose name no other definition spells, are followed (#774).
+- Go: a request, a list or an entry of a DynamoDB transaction or of EventBridge `PutEvents`
+  held in a local keeps its table or bus when another function or package writes the same field
+  through another name (`q.TableName = ..`). The value written through its own name, and a
+  named request that is no list of entries, stay unresolved; C# keeps its rule (#774).
 
 ### Changed
 
@@ -151,6 +161,13 @@ All notable changes to Meada are recorded here. The format follows
   does: a source whose name holds a no-break space or another Unicode blank is one path, not two,
   and a flag past ASCII, which Docker reads one byte as one character, leaves the Dockerfile
   unread (#762).
+- A wrapper that calls itself, or two that call each other, with another value in the parameter
+  a read needs (`send(ctx, n-1, b, "")` or `send(ctx, n-1, a+"-next", b)` under
+  `send(ctx context.Context, n int, a, b string)`) no longer drops what the next turn sends:
+  each caller's site gets an unresolved side or contract for it, beside the names its own pass
+  gives. A retry that passes the same parameter on reads as before. The rule is the
+  resolver's, where every wrapper is followed to its callers; its tests cover an HTTP client
+  and the Go AWS SDK sides of a table name and of a transaction's list (#886).
 - Terraform evaluation sizes a variable once per expression however many times the expression
   reads it, and a name every instance of a `count` or `for_each` shares (one that reads neither
   `each` nor `count`) is evaluated once when it is known: a name reading a 21,000-element

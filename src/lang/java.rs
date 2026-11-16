@@ -908,6 +908,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 scope: scope.clone(),
                 name: name.to_string(),
                 count,
+                read: 0,
             });
         }
     }
@@ -917,6 +918,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
             scope: String::new(),
             name: name.to_string(),
             count,
+            read: 0,
         });
     }
     // Lombok adds members the source does not show (a `@Getter`'s accessor hands a private field

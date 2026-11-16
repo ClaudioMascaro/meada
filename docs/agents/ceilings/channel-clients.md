@@ -97,10 +97,13 @@
   in each language. Java builder requests, Go input literals, .NET request initializers,
   lists, table-keyed maps and supported named/string overloads name sides. A named request
   whose name field is written is opaque, with C# writes followed through receiver aliases, and
-  so is a named value an inline request holds on the name's path (an EventBridge entry in a
-  list literal, a Java entry builder a request step takes). The C# and Go checks go by field name
-  across the group, so a write in an unrelated function makes every named entry of that field
-  opaque, and one opaque entry makes its whole list name nothing. An SQS command a TypeScript
+  so is a named value an inline request holds on the name's path (a Java entry builder a
+  request step takes). The C# and Go checks go by field name across the group, so a write in an
+  unrelated function makes every named request of that field opaque (`PutItem`'s `TableName`).
+  On a path of entries (EventBridge `Entries[]`, a DynamoDB transaction) Go judges each name
+  by its own mentions instead (#774, `resolution-and-value-flow.md`): a write through another
+  name changes nothing there. C# applies both rules, and in either language one entry not
+  followed makes its whole list name nothing. An SQS command a TypeScript
   variable holds reads its input where it is made, not at the `send`. Operations not in
   the documented table do not. A hierarchy query (`GetParametersByPath`) has no physical
   parameter name and stays unresolved. RDS and ElastiCache control-plane clients establish
