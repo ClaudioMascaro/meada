@@ -1793,11 +1793,12 @@ def f3(run, heads, exports, statuses):
 def corpus_sets():
     """#904's sets from `infra.tsv`, each as infra name -> repository identity: P is flow `ci` (`CORPUS`),
     each other set its `ci-<set>` rows, and the distractor (every `ci-distractor` row, three of set C among
-    them) joins F once as `f-distractor`. An identity is lower-cased, as Meada reads a remote."""
+    them) joins F once as `f-distractor`."""
     sets = {}
     for name, (flows, url, _) in prove.infra().items():
         for flow in flows:
             if flow == 'ci' or flow.startswith('ci-'):
+                # Meada writes an identity in lower case (`pyBumpHunter`'s remote is `.../pybumphunter`).
                 sets.setdefault('p' if flow == 'ci' else flow[3:], {})[name] = 'github.com/' + url.removeprefix('https://github.com/').lower()
     sets['f-distractor'] = {**sets['f'], **sets.pop('distractor')}
     return sets

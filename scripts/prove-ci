@@ -23,11 +23,13 @@ SURFACES = ('cli', 'console', 'accounts', 'deploy', 'container', 'goldens')
 # before #662 (`PRE_IMAGE`), `config_uses.py` against one before #661 (`PRE_CONFIG`).
 HISTORICAL = {'pre_image': 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62',
               'pre_config': '6a5eca5853193d205bcf756983b41e9cb16ffa9d'}
-# A flow's ceiling, the audit's: one hung driver must not spend the job's 75 minutes. Every step but
+# A flow's ceiling, the audit's: one hung driver must not spend the job's 90 minutes. Every step but
 # the cleanups runs under timeout(1) with what is left of CAPTURE_END, and one with under a minute
-# left is BLOCKED unrun: with the setup before and the upload after, the receipt fits the job's 75.
+# left is BLOCKED unrun: with the setup before and the upload after, the receipt fits the job's 90.
+# `ci-corpus` fetches and indexes about 70 public repositories in six workspaces (#904): its own ceiling.
 FLOW_TIMEOUT = 1200
-CAPTURE_END = 60 * 60
+FLOW_CEILINGS = {'ci-corpus': 2400}
+CAPTURE_END = 75 * 60
 VALUES = r'src/(config_values|index\.rs|document/|msg\.rs)'
 IAC = r'src/(iac\.rs|iac/(functions|cloudformation|serverless)\.rs|document/events\.rs|index\.rs|engine\.rs)'
 AWS = r'src/(iac/subscription\.rs|iac/types\.toml|config_values(\.rs|/hcl\.rs)|channel\.rs|document/asyncapi\.rs)'
@@ -198,7 +200,8 @@ def capture(run, scope, base, head, repos, paths=()):
         if failed:
             steps.append({'name': flow[0], 'exit_code': 2, 'blocked': f'{failed[0]} failed'})
         else:
-            command(flow[0], flow_command(run, flow), compares=flow[2].startswith('prove.py'), ceiling=FLOW_TIMEOUT)
+            command(flow[0], flow_command(run, flow), compares=flow[2].startswith('prove.py'),
+                    ceiling=FLOW_CEILINGS.get(flow[0], FLOW_TIMEOUT))
 
     try:
         if scope['cli']:
