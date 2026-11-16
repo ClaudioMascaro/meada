@@ -461,8 +461,7 @@ _Avoid_: revision, snapshot, manifest version
 A named query context over a deployment's shared indexed repositories: a record with a
 deterministic id, a name and a description, its operators and a versioned manifest of the
 repositories and links it selects. It decides what an answer can see and says nothing about how a
-repository is indexed or published. Accepted by ADR 0020, whose contracts are ADR 0021; not yet
-delivered: the delivered console serves one workspace per deployment.
+repository is indexed or published. Accepted by ADR 0020, whose contracts are ADR 0021.
 _Avoid_: tenant, project, environment, isolated workspace
 
 **Deployment workspace**:

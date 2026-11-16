@@ -551,6 +551,54 @@ fn a_module_lead_is_what_a_bullet_with_an_area_link_names_before_its_colon() {
     );
 }
 
+/// Phrases that say where a feature stands, which the roadmap and the site say and a glossary
+/// entry does not: the glossary defines a term (#853).
+const STATE_PHRASES: &[&str] = &[
+    "not yet delivered",
+    "delivered",
+    "planned",
+    "not yet implemented",
+];
+
+/// The phrases of `STATE_PHRASES` the text holds, as whole words, across line breaks.
+fn state_phrases(text: &str) -> Vec<&'static str> {
+    let words = |t: &str| -> Vec<String> {
+        (t.split(|c: char| !c.is_alphanumeric()))
+            .filter(|w| !w.is_empty())
+            .map(str::to_lowercase)
+            .collect()
+    };
+    let text = words(text);
+    (STATE_PHRASES.iter().copied())
+        .filter(|phrase| {
+            let phrase = words(phrase);
+            text.windows(phrase.len()).any(|w| w == phrase.as_slice())
+        })
+        .collect()
+}
+
+#[test]
+fn the_glossary_holds_no_sentence_of_state() {
+    let glossary = fs::read_to_string("GLOSSARY.md").unwrap();
+    assert_eq!(
+        state_phrases(&glossary),
+        Vec::<&str>::new(),
+        "GLOSSARY.md defines terms; the roadmap and the site say what is delivered (#853)"
+    );
+}
+
+#[test]
+fn a_phrase_of_state_counts_across_a_line_break_and_not_inside_another_word() {
+    assert_eq!(
+        state_phrases("Accepted by ADR 0020; not yet\ndelivered: one workspace."),
+        vec!["not yet delivered", "delivered"]
+    );
+    assert_eq!(
+        state_phrases("Unplanned work, undelivered mail."),
+        Vec::<&str>::new()
+    );
+}
+
 /// `CHANGELOG.md merge=union` (#576): two branches adding a bullet under the same heading merge
 /// clean and keep both.
 #[test]
