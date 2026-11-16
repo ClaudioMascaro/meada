@@ -61,7 +61,7 @@ Uma chamada num campo, parâmetro ou variável local de tipo escrito resolve nes
 
 Tipos públicos e seus membros públicos ou protegidos compõem a superfície exportada.
 
-Um arquivo é pulado por abrangente demais quando os nomes envolventes que ele repete (cobrados em cada nó sob eles) passam de 4 MiB no total: ele fica sem símbolos nem chamadas, os outros arquivos são indexados e `meada status` o nomeia. A indexação não precisa de JDK, Maven ou Gradle e não executa código do repositório.
+Um arquivo é pulado por abrangente demais quando os nomes envolventes que ele repete (cobrados em cada nó sob eles) passam de 4 MiB no total: ele fica sem símbolos nem chamadas, os outros arquivos são indexados e `meada status` o nomeia. Um escape unicode de quebra de linha (`\u000a`, `\u000d`, com qualquer número de `u`) é lido como o javac o lê: num comentário de linha, ele encerra o comentário e o resto da linha é código. A indexação não precisa de JDK, Maven ou Gradle e não executa código do repositório.
 
 ### Kotlin
 

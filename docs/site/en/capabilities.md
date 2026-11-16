@@ -61,7 +61,7 @@ A call on a field, parameter or local variable whose type is written resolves wi
 
 Public types and their public or protected members form the exported surface.
 
-A file is skipped as too broad when the enclosing names it repeats (charged at every node under them) pass 4 MiB in all: it has no symbols or calls, other files index, and `meada status` names it. Indexing needs no JDK, Maven or Gradle and executes no repository code.
+A file is skipped as too broad when the enclosing names it repeats (charged at every node under them) pass 4 MiB in all: it has no symbols or calls, other files index, and `meada status` names it. A unicode escape of a line break (`\u000a`, `\u000d`, with any number of `u`) is read as javac reads it: in a line comment it ends the comment, and the rest of the line is code. Indexing needs no JDK, Maven or Gradle and executes no repository code.
 
 ### Kotlin
 

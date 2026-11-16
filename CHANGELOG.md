@@ -122,6 +122,11 @@ All notable changes to Meada are recorded here. The format follows
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
 
+- Java: a unicode escape of a line terminator (`\u000a`, `\u000d`, with any number of `u`, and
+  not after an odd run of backslashes) is read as javac reads it, before the file is parsed: in a
+  line comment it ends the comment, and the rest of the line is code. A change written there, to
+  a list, a builder, a wrapper's argument or as an override of a wrapper, no longer leaves the old
+  DynamoDB table named `exact` (found by the verification of #772).
 - Go: the system or architecture suffix of a file name is read off the name cut at its first
   dot, as the Go tools read it. A file such as `store.gen_windows.go`, which Go builds for every
   target, was left out with all its definitions and calls, and `store_windows.gen.go`, which Go

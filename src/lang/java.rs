@@ -1,5 +1,6 @@
 //! The Java language pack: one source file's syntax, with no compiler or build tool.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 use std::rc::Rc;
@@ -162,6 +163,33 @@ impl LanguagePack for Java {
     }
 }
 
+/// The source with each unicode escape of a line terminator (`\u000a`, `\uu000D`) as a line
+/// feed padded with spaces to its length: javac translates escapes before it lexes (JLS 3.3), so
+/// one ends a line comment and the rest of the line is code. Every byte keeps its offset. A
+/// backslash after an odd run of raw backslashes starts no escape.
+fn escaped_breaks(src: &[u8]) -> Cow<'_, [u8]> {
+    let mut out: Option<Vec<u8>> = None;
+    let (mut at, mut slashes) = (0, 0);
+    while at < src.len() {
+        if src[at] == b'\\' && slashes % 2 == 0 {
+            let hex = at + 1 + src[at + 1..].iter().take_while(|&&b| b == b'u').count();
+            let digits = src.get(hex..hex + 4).filter(|_| hex > at + 1);
+            if digits
+                .is_some_and(|d| d.eq_ignore_ascii_case(b"000a") || d.eq_ignore_ascii_case(b"000d"))
+            {
+                let out = out.get_or_insert_with(|| src.to_vec());
+                out[at] = b'\n';
+                out[at + 1..hex + 4].fill(b' ');
+                (at, slashes) = (hex + 4, 0);
+                continue;
+            }
+        }
+        slashes = if src[at] == b'\\' { slashes + 1 } else { 0 };
+        at += 1;
+    }
+    out.map_or(Cow::Borrowed(src), Cow::Owned)
+}
+
 struct Visit<'t> {
     node: Node<'t>,
     scope: Rc<String>,
@@ -175,6 +203,7 @@ struct Visit<'t> {
 }
 
 fn parse(src: &[u8]) -> Result<Facts> {
+    let src = &*escaped_breaks(src);
     let mut parser = Parser::new();
     parser.set_language(&tree_sitter_java::LANGUAGE.into())?;
     let tree = parser
@@ -1682,6 +1711,22 @@ mod tests {
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
         assert_eq!(facts.budget, None);
         assert!(!facts.defs.is_empty());
+    }
+
+    /// Each escape of a line terminator, with any number of `u`, becomes a line feed and spaces
+    /// of its length; one after an odd run of backslashes, or of another character, stays.
+    #[test]
+    fn escaped_line_breaks_are_line_feeds_of_their_length() {
+        for (src, read) in [
+            (r"// a \u000a f();", "// a \n      f();"),
+            (r"// \uuu000D f();", "// \n        f();"),
+            (r"\u000A\u000d", "\n     \n     "),
+            (r"// \\\u000a f();", "// \\\\\n      f();"),
+            (r"// \\u000a f();", r"// \\u000a f();"),
+            (r"// A \u000 \x000a \u000", r"// A \u000 \x000a \u000"),
+        ] {
+            assert_eq!(escaped_breaks(src.as_bytes()), read.as_bytes(), "{src}");
+        }
     }
 
     /// The methods no definition stands for (#772): an anonymous class's or an enum constant

@@ -61,7 +61,7 @@ Una llamada sobre un campo, parámetro o variable local de tipo escrito se resue
 
 Los tipos públicos y sus miembros públicos o protegidos forman la superficie exportada.
 
-Un archivo se omite por demasiado amplio cuando los nombres envolventes que repite (cobrados en cada nodo bajo ellos) pasan de 4 MiB en total: queda sin símbolos ni llamadas, los demás archivos se indexan y `meada status` lo nombra. La indexación no necesita JDK, Maven ni Gradle y no ejecuta código del repositorio.
+Un archivo se omite por demasiado amplio cuando los nombres envolventes que repite (cobrados en cada nodo bajo ellos) pasan de 4 MiB en total: queda sin símbolos ni llamadas, los demás archivos se indexan y `meada status` lo nombra. Un escape unicode de salto de línea (`\u000a`, `\u000d`, con cualquier número de `u`) se lee como lo lee javac: en un comentario de línea termina el comentario, y el resto de la línea es código. La indexación no necesita JDK, Maven ni Gradle y no ejecuta código del repositorio.
 
 ### Kotlin
 

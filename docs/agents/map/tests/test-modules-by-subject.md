@@ -437,7 +437,10 @@
   constructor evidence, exact and opaque factory alternatives, hidden constructors and
   constructor-scoped fields, named arguments, hidden standard-collection heads, request alias
   writes, batch names, ARN normalization and aliased environment
-  provenance through the engine export. Sibling Go/.NET repositories assert the whole set of
+  provenance through the engine export. `aws-sdk-escapes` writes a Java change after an escaped
+  line terminator in a line comment (to a local list, a builder, a caller's list, or as a
+  wrapper's override): none leaves the old table named, and after an odd run of backslashes the
+  line stays a comment. Sibling Go/.NET repositories assert the whole set of
   data/provisioning links and exact versus declared evidence, and reject unresolved links.
   Generated full-file-ceiling Java/Go/C# factory lattices must retain both uses within 30 s.
 
