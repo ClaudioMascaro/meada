@@ -591,6 +591,23 @@ pub struct Facts {
     /// constants) and C# (`mentioned`). Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub mentioned: Vec<Mentioned>,
+    /// The names of the `final` fields that every field declaration of the file spelling them
+    /// makes `private` (Java): no other file can write a call on one, so a call on that name
+    /// there is on another variable. None for a file that names Lombok, whose accessors the
+    /// source does not show, or that holds a Unicode escape or a character the compiler drops
+    /// from a name, which may spell that name or a step on a field where the pack reads other
+    /// text. Not kept in the index (see `Call::args`).
+    #[serde(default, skip_serializing_if = "lean")]
+    pub private_fields: Vec<String>,
+    /// Whether the file spells, as a whole name, a method of `Class` that reads a field by its
+    /// name (Java: `getDeclaredField`, `getField` and their plurals): in a call, a method
+    /// reference, a comment or a string, a Unicode escape read as the character it stands for
+    /// and a character the compiler drops from a name as not there. Read off the file's bytes:
+    /// a file a budget leaves without facts still says so. A `private` field of any file may
+    /// change where a file does (#775). Kept in the index: the SDK reader reads it from every
+    /// file.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reflects: bool,
     /// The names of the methods the file declares that no definition stands for (Java): an
     /// anonymous class's or an enum constant body's, a class's nested in one, or past the
     /// definition depth. A call through a base type may dispatch to one (#772). Kept in the
@@ -1812,6 +1829,8 @@ mod tests {
         ("go/build.rs:ARCHITECTURES", "runtime"),
         ("go/build.rs:SYSTEMS", "runtime"),
         ("go/values.rs:METHODS", "exception"),
+        // `java.lang.Class`: the names the pack looks for in the bytes, escapes decoded (#775).
+        ("java.rs:REFLECTIVE", "runtime"),
         ("kotlin.rs:CLOSEABLE", "runtime"),
         ("kotlin.rs:COMPARABLE", "runtime"),
         ("kotlin.rs:DECLARATION_KEYWORDS", "syntax"),

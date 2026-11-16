@@ -100,9 +100,31 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   and `ConditionCheck` entries names both (#784). Where the budget ends inside a row, the call's
   later rows are not read, as the calls after it are not: a call whose writer row it cuts has a
   writer, named or unresolved, and no reader, a `ConditionCheck` included. A Java builder held in a `final` field is read in its own
-  file, and a call on its name from another Java file leaves it unresolved; one handed to a call
+  file, and a call on its name from another Java file leaves it unresolved, whatever variable
+  that file calls it on; one handed to a call
   or aliased there, or reached by reflection from there, is not seen, and the field keeps its
-  first name. A request type is the SDK's unless a type of its directory, an import or a
+  first name. A field its own file declares, `private` in every field declaration of that file
+  that spells the name, is out of another file's reach, so a call on its name there does not
+  count (#775). Still judged by every Java file: a name the file also declares without
+  `private`, in any class and `final` or not; a field of a file that spells `lombok` anywhere
+  (an import, an annotation, a comment: Lombok's accessors are not in the source) or holds a
+  Unicode escape (`\u..`) or a character the compiler drops from a name (JLS 3.8: a control
+  that is no white space, a format character such as a soft hyphen or a byte order mark; any
+  character past the Basic Multilingual Plane and any file that is not UTF-8 count), which may
+  spell that name or a step on the field; a field a
+  class inherits from another file; and every field of a repository where a Java file spells
+  `getDeclaredField`, `getField` or their plurals as a whole name (`Facts::reflects`: a call, a
+  method reference, a comment, a Unicode escape read as its character, a control and any
+  character past ASCII read as not there, in a file past `QUALIFICATION_BYTES` too; no other
+  reflection API, and no Kotlin, Groovy or Scala file's), since the file that reads one may hand it to
+  any other. A Java file that is not UTF-8, or holds a zero byte, counts as one that does: the
+  scan reads each ASCII byte as UTF-8 does, which UTF-16, EBCDIC and GB18030 do not keep, and a
+  Latin-1 file is not told from them, so its repository names no private field. A Lombok
+  accessor or a reflective read whose result is set under another name is
+  not seen, as before, and neither is a step on a field written with a Unicode escape, nor a
+  reflective read in a Java file the index does not read (under a hidden directory, or one an
+  ignore file lists).
+  A request type is the SDK's unless a type of its directory, an import or a
   variable says otherwise: one of the same package in another source root is not seen (#719).
   A request, a list, an item or an entry held in a name on a path of entries (a DynamoDB
   transaction's, EventBridge `PutEvents`' `Entries[]`, #773) is followed only when the function that

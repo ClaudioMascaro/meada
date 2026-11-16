@@ -73,8 +73,13 @@
   aliases): the wrapper and each of its callers may change such a list, and no mention count
   sees both.
   A chain with `applyMutation` anywhere in it hands its builder to caller code, a file that
-  reads a field by name (`getDeclaredField`) or calls a method on a field builder's name from
-  another file may change it, and a chain that starts at a type another type of its file or
+  spells a reflective field read (`getDeclaredField`, `Facts::reflects`) or calls a method on a
+  field builder's name from
+  another file may change it (for a field its own file declares `private` wherever it spells
+  the name, `Facts::private_fields`, such a call counts only where a Java file of the
+  repository spells such a read; a file that names Lombok or holds a Unicode escape lists
+  none, #775), and a chain that starts at a type another
+  type of its file or
   directory, an import outside the SDK or a variable shadows is not the SDK's.
   The question is asked per request call, so one entry the reader cannot follow leaves every
   entry of that request unresolved. Past `EVAL_DEPTH` nested named values the name stays

@@ -316,7 +316,8 @@ within 24 KiB. Other areas keep their existing 64 KiB budget until split:
   `&[&str]` or `[&str; N]` table in a pack is of one of three classes: `syntax` (the language's grammar:
   `FUNCTIONS`, `DECLARATION_KEYWORDS`), `runtime` (the language's own library that value
   evaluation passes through: string methods, environment reads, standard macros, collection
-  callbacks, default imports, build constraints) or `exception` (a library table the pack keeps
+  callbacks, default imports, build constraints, and the methods of Java's `Class` that read a
+  field by name, which the pack alone can find in the bytes behind a Unicode escape) or `exception` (a library table the pack keeps
   for a decided reason, below). The forms of the libraries a kind reads (web frameworks and HTTP
   clients, message brokers) live under the kind, one module per language
   (`http/<language>.rs`, `channel/<language>.rs`); a form may live in a submodule of that module
