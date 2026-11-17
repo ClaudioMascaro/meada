@@ -213,7 +213,7 @@ def main():
         elif '::secret::' in p['site'] or '::side::' in p['site']:
             assert p['contract'] == 'channel::sqs', p
     status = capture(binary, infra, run, 'status', 'status')
-    assert 'orphan resource::gcs::unused-assets: no use;' in status, status
+    assert 'orphan resource::gcs::unused-assets: no use in ' in status, status
     queries = [
         {'tool': 'search', 'arguments': {'query': 'google_cloud_run', 'kind': 'iac', 'budget': 12000}},
         {'tool': 'context', 'arguments': {'symbol': 'google_pubsub_subscription.notice', 'budget': 12000}},

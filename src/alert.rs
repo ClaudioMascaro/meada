@@ -401,13 +401,14 @@ impl ContractKind for Alert {
 }
 
 struct Status<'a> {
+    scope: crate::msg::Scope<'a>,
     roles: (bool, bool),
     limit: Option<Limit>,
     emitted: BTreeSet<(&'a str, &'a str)>,
     received: BTreeSet<(&'a str, &'a str)>,
 }
 impl<'a> Status<'a> {
-    fn new(exports: &[Export], links: &'a [Link]) -> Self {
+    fn new(exports: &'a [Export], links: &'a [Link]) -> Self {
         // A nonempty alert result already proves the whole pass finished. Empty results
         // need one diagnostic pass to distinguish an unmatched workspace from a limit.
         let limit = if links
@@ -419,6 +420,7 @@ impl<'a> Status<'a> {
             linked(exports, exports.iter().flat_map(|e| &e.providers)).err()
         };
         Self {
+            scope: crate::msg::Scope::of(exports),
             roles: roles(exports),
             limit,
             emitted: links
@@ -460,13 +462,14 @@ impl<'a> Status<'a> {
                 .is_some_and(|(key, _)| self.emitted.contains(&(provider.site.as_str(), key)))
             {
                 rows.insert(
-                    crate::msg::Msg::OrphanAlert {
+                    crate::msg::Msg::Orphan {
                         contract: &provider.contract,
+                        absent: crate::msg::Absent::Matcher,
+                        scope: self.scope,
                         place: provider
                             .site
                             .strip_prefix(&prefix)
                             .unwrap_or(&provider.site),
-                        emitter: false,
                     }
                     .text(),
                 );
@@ -480,13 +483,14 @@ impl<'a> Status<'a> {
             let contract = consumer.contract.as_deref().unwrap_or_default();
             if !self.received.contains(&(consumer.site.as_str(), contract)) {
                 rows.insert(
-                    crate::msg::Msg::OrphanAlert {
+                    crate::msg::Msg::Orphan {
                         contract,
+                        absent: crate::msg::Absent::Emitter,
+                        scope: self.scope,
                         place: consumer
                             .site
                             .strip_prefix(&prefix)
                             .unwrap_or(&consumer.site),
-                        emitter: true,
                     }
                     .text(),
                 );

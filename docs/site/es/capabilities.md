@@ -331,6 +331,15 @@ código o solo de IaC no genera esas líneas; `search` y `context` marcan el pro
 incluidos patrones y módulos raíz independientes, determinan si hay contraparte. Los avisos
 existentes de recursos declarados sin escritores y lectores siguen separados.
 
+Cada línea de huérfano nombra el ámbito en el que vale su ausencia:
+`huérfano resource::s3::unused: ningún uso en el workspace; main.tf:4 aws_s3_bucket.unused (root .)`
+o, en un workspace de un solo repositorio, `ningún uso en <repositorio>`. Las líneas
+`ningún provisionador` y las de huérfanos de imágenes, alertas y CI lo nombran de la misma forma, y
+la primera línea de `meada status` da el número de repositorios del workspace
+(`workspace: 3 repositorios`). La ausencia vale en el workspace consultado: un uso en un
+repositorio que este no selecciona no se ve. Una línea de huérfano es una pista para revisión,
+nunca por sí sola un motivo para borrar un recurso.
+
 Solo tiene grupo de huérfanos un broker o tipo de recurso que la tabla de tipos aprovisiona. Un
 `[[resource]]` declarado de tipo `postgres` o un subject NATS, que ningún tipo de IaC crea, no
 lleva marca en `search` ni en `context` y nunca es una línea de huérfano.

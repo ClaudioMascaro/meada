@@ -414,6 +414,7 @@ impl ContractKind for Image {
             };
             found == (true, true)
         };
+        let scope = crate::msg::Scope::of(exports);
         let mut rows = std::collections::BTreeSet::new();
         for p in export.providers.iter().filter(|p| scoped(&p.contract)) {
             if !exports.iter().flat_map(|e| &e.consumers).any(|c| {
@@ -422,10 +423,11 @@ impl ContractKind for Image {
                     .is_some_and(|c| patterns::active_match(exports, p, c))
             }) {
                 rows.insert(
-                    crate::msg::Msg::OrphanCounterpart {
+                    crate::msg::Msg::Orphan {
                         contract: &p.contract,
+                        absent: crate::msg::Absent::Runner,
+                        scope,
                         place: p.at.as_deref().unwrap_or("(repository-level)"),
-                        builder: false,
                     }
                     .text(),
                 );
@@ -441,13 +443,14 @@ impl ContractKind for Image {
                 .any(|p| patterns::active_match(exports, p, contract))
             {
                 rows.insert(
-                    crate::msg::Msg::OrphanCounterpart {
+                    crate::msg::Msg::Orphan {
                         contract,
+                        absent: crate::msg::Absent::Builder,
+                        scope,
                         place: c
                             .site
                             .strip_prefix(&format!("{}::", export.repository))
                             .unwrap_or(&c.site),
-                        builder: true,
                     }
                     .text(),
                 );

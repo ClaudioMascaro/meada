@@ -61,8 +61,8 @@ job, one that names `repository` or `path`): its consumer then has no contract. 
 `Engine::search` (no line in the default search or under the kind `contract`); `search` with
 the kind `unresolved`, `context` on the CI step and `meada decide --list` show the cause.
 
-Orphans and the absent mark (#827): `scope_status` gives `meada status` one `Msg::OrphanCi` line
-per provider of the repository that no consumer of the visible exports consumes, and nothing
+Orphans and the absent mark (#827): `scope_status` gives `meada status` one `Msg::Orphan` line
+(`Absent::Consumer`) per provider of the repository that no consumer of the visible exports consumes, and nothing
 while those exports hold no CI consumer with a contract (the scope rule of ADR 0026). `absent`
 names the mark of a consumer whose contract no export provides, with its second reason when the
 path is a pipeline's file node that is not reusable. `side_note` hands it to the engine for

@@ -548,6 +548,15 @@ código ou só de IaC não gera essas linhas; `search` e `context` marcam o pró
 inclusive padrões e módulos raiz independentes, determinam se há contraparte. Os avisos
 existentes de recursos declarados sem escritor e leitor continuam separados.
 
+Cada linha de órfão nomeia o escopo em que vale a sua ausência:
+`órfão resource::s3::unused: nenhum uso no workspace; main.tf:4 aws_s3_bucket.unused (root .)`
+ou, num workspace de um só repositório, `nenhum uso em <repositório>`. As linhas
+`nenhum provisionador` e as de órfãos de imagens, alertas e CI o nomeiam do mesmo jeito, e a
+primeira linha do `meada status` dá o número de repositórios do workspace
+(`workspace: 3 repositórios`). A ausência vale no workspace consultado: um uso num repositório que
+ele não seleciona não é visto. Uma linha de órfão é uma pista para revisão, nunca, por si só,
+motivo para apagar um recurso.
+
 Só tem grupo de órfãos um broker ou tipo de recurso que a tabela de tipos provisiona. Um
 `[[resource]]` declarado de tipo `postgres` ou um subject NATS, que nenhum tipo de IaC cria, não
 leva marca em `search` nem em `context` e nunca vira linha de órfão.
@@ -1064,7 +1073,8 @@ servidor).
 meada status [--workspace <manifesto>]
 ```
 
-Mostra os repositórios do workspace e o estado de cada índice. Sob cada repositório, mostra os
+Mostra quantos repositórios o workspace contém (`workspace: 3 repositórios`, o escopo das linhas
+de órfãos) e, em seguida, cada um e o estado do seu índice. Sob cada repositório, mostra os
 recursos sem ligação, os `via` que não correspondem a nenhum símbolo, nó IaC ou chave, as decisões obsoletas ou à
 espera de um par e cada arquivo-fonte que um language pack descartou por passar do seu
 orçamento. Os pares que não foram encontrados aparecem como `missing peer`.

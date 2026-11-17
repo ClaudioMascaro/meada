@@ -43,6 +43,11 @@ weakest:
 - **Unproven absence.** An empty callers list is unproven, never proof of dead code: calls
   inside macros (`assert!`, `format!`, `vec!`) are not indexed. Before you delete, rename or
   call something unused, confirm with a text search across the workspace.
+- **Orphan lines.** An orphan line of `meada status`
+  (`orphan <contract>: no use in the workspace; <place>`) states an absence in the scope it names:
+  the workspace, or the repository of a workspace of one. A use in a repository the workspace does
+  not select is not seen. An orphan line is a lead for review, never by itself a reason to delete
+  a resource.
 - **`(unresolved)`.** A URL or channel name computed at run time; Meada shows it and never links
   it. The code is the only source for where it goes.
 - **Open items.** `search` with `kind` `ambiguous` or `unresolved` lists them, each with the

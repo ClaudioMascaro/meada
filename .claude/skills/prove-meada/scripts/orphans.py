@@ -36,7 +36,7 @@ def declare(kind, name, role='read'):
 def orphan_set_matches(text, expected):
     lines = [l for l in text.splitlines() if l.strip().startswith('orphan ')]
     got = {(m.group(1), m.group(2)) for line in lines
-           if (m := re.search(r'orphan (\S+): (no use|no provisioner);', line))}
+           if (m := re.search(r'orphan (\S+): (no use|no provisioner) in [^;]+;', line))}
     return got == set(expected.items()) and len(lines) == len(expected)
 
 
@@ -355,7 +355,7 @@ class Probe:
         write(directory, 'export-wrong-identity.json', json.dumps(mutated, indent=2))
         export_rejected = base != mutated
         status = (self.run / 'head/mixed-infra/status.out').read_text()
-        status += '  orphan channel::sqs::parcel-injected: no use; injected negative control\n'
+        status += '  orphan channel::sqs::parcel-injected: no use in the workspace; injected negative control\n'
         write(directory, 'status-extra-orphan.out', status)
         expected = {'channel::sqs::parcel-idle': 'no use', 'channel::sqs::parcel-lost': 'no provisioner'}
         status_rejected = not orphan_set_matches(status, expected)

@@ -17,6 +17,7 @@ use meada_core::export::{Access, AllPermissions, Permissions};
 use crate::contract::{ContractKind, Found, Hit, Level, Link, Role, Search};
 use crate::iac::{Node, actions};
 use crate::index::{Consumer, Export, Indexed, Provider};
+use crate::msg;
 use crate::resolve::Code;
 use crate::workspace::Repository;
 
@@ -587,6 +588,7 @@ impl ContractKind for Ci {
         if consumed.is_empty() {
             return Vec::new();
         }
+        let scope = msg::Scope::of(exports);
         let ours = export
             .providers
             .iter()
@@ -595,7 +597,13 @@ impl ContractKind for Ci {
             .map(|p| {
                 let place = self.place(&export.repository, &p.site).unwrap_or_default();
                 let (contract, place) = (p.contract.as_str(), place.as_str());
-                crate::msg::Msg::OrphanCi { contract, place }.text()
+                msg::Msg::Orphan {
+                    contract,
+                    absent: msg::Absent::Consumer,
+                    scope,
+                    place,
+                }
+                .text()
             })
             .collect()
     }

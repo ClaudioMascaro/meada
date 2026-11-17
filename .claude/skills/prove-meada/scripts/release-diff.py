@@ -32,8 +32,9 @@ from prove import corpus, fetch, infra
 
 # Strongest first, as meada-core's `Level` orders them (ADR 0005); a name it does not know is weakest.
 LEVELS = ("exact", "declared", "inferred", "decided", "ambiguous")
-# `meada status` in English (`LANG`, ADR 0008): `orphan <contract>: no <counterpart>; <place>[ [level]]`.
-ORPHAN = re.compile(r"^\s+orphan (.+?): (no [a-z]+); (.*?)(?: \[(" + "|".join(LEVELS) + r")\])?$")
+# `meada status` in English (`LANG`, ADR 0008): `orphan <contract>: no <counterpart>[ in <scope>]; <place>[ [level]]`.
+# A tag before #849 names no scope; both sides read one workspace, so the scope is not compared.
+ORPHAN = re.compile(r"^\s+orphan (.+?): (no [a-z]+)(?: in [^;]+)?; (.*?)(?: \[(" + "|".join(LEVELS) + r")\])?$")
 LINK_TYPES = ("new", "vanished", "raised", "dropped")
 ORPHAN_TYPES = ("appeared", "vanished", "level moved")
 
@@ -258,7 +259,7 @@ def selftest():
               "  orphan channel::sns::alerts: no use; main.tf:3 module.t[0].aws_sns_topic.this (root live)\n"
               "  orphan resource::s3::logs: no provisioner; app.py:9 logs [inferred]\n"
               "github.com/acme/b (b) indexed, 1 files\n"
-              "  orphan channel::sns::alerts: no use; main.tf:3 module.t[0].aws_sns_topic.this (root live)\n"
+              "  orphan channel::sns::alerts: no use in the workspace; main.tf:3 module.t[0].aws_sns_topic.this (root live)\n"
               "  config files: 1 read, 0 skipped\n")
     with tempfile.TemporaryDirectory(prefix="release-diff-selftest-") as tmp:
         tmp = Path(tmp)
