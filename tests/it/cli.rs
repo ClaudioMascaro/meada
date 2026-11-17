@@ -986,6 +986,24 @@ fn status_reports_a_file_over_a_pack_limit_follow_lang() {
     );
 }
 
+/// The Backstage plugins and modules whose `pluginId` is not read (#615) are named in each
+/// language.
+#[test]
+fn status_reports_unmounted_backstage_follow_lang() {
+    let repo = fixture_repo(
+        "cli_backstage",
+        "http-backstage",
+        Some("https://example.com/acme/backstage.git"),
+    );
+    meada(&repo, "en_US.UTF-8", "index");
+    for (lang, name) in LANGS {
+        assert_golden(
+            &format!("cli.status-backstage.{name}.txt"),
+            &meada(&repo, lang, "status"),
+        );
+    }
+}
+
 #[test]
 fn status_reports_drift_follow_lang() {
     let (web, _, _) = drift_chain("cli_drift");

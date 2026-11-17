@@ -1,0 +1,6 @@
+example.com/acme/backstage (.) indexed, 14 files
+  plugins/audit-backend-module/src/module.ts::createBackendModule#0: Backstage module whose pluginId is neither a string literal nor a const of its file bound to one: its routes stay at the root, not under /api/<pluginId>
+  plugins/chained-backend/src/plugin.ts::createBackendPlugin#0: Backstage plugin whose pluginId is neither a string literal nor a const of its file bound to one: its routes stay at the root, not under /api/<pluginId>
+  plugins/legacy-backend/src/plugin.ts::createBackendPlugin#0: Backstage plugin whose pluginId is neither a string literal nor a const of its file bound to one: its routes stay at the root, not under /api/<pluginId>
+  plugins/shared-backend/src/plugin.ts::createBackendPlugin#0: Backstage plugin whose pluginId is neither a string literal nor a const of its file bound to one: its routes stay at the root, not under /api/<pluginId>
+  wrong conclusion? report it: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml

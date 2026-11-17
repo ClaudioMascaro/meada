@@ -807,9 +807,10 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
     }
 }
 
-/// Backstage (#615): each backend plugin's router is served under `/api/<pluginId>`, and a URL
-/// from `discovery.getBaseUrl('<pluginId>')` starts there; a plugin whose `pluginId` is no
-/// literal keeps its routes at the root.
+/// Backstage (#615): each backend plugin's router is served under `/api/<pluginId>`, as is the
+/// router of a backend module of it, and a URL from `discovery.getBaseUrl('<pluginId>')` starts
+/// there; a plugin or module whose `pluginId` is no literal keeps its routes at the root, and so
+/// does a `createBackendModule` that is not Backstage's.
 #[test]
 fn backstage_plugins_serve_under_api_and_their_plugin_id() {
     let repo = fixture_repo(
@@ -826,17 +827,22 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
         .filter_map(|p| p["contract"].as_str())
         .collect();
     providers.sort();
-    // `legacy` reads its `pluginId` from the environment, `shared` imports it and `chained` binds
-    // it to another constant: their routers stay at the root.
+    // `legacy` and the `audit` module read their `pluginId` from the environment, `shared`
+    // imports it and `chained` binds it to another constant: their routers stay at the root, as
+    // does the `local` module's, whose `createBackendModule` is the repository's own. The
+    // `catalog` module's router shares its plugin's mount.
     assert_eq!(
         providers,
         [
             "http::GET::/api/approval/requests/{}",
             "http::GET::/api/catalog/entities",
             "http::GET::/api/orders/requests/{}",
+            "http::GET::/audit",
             "http::GET::/chain",
             "http::GET::/health",
+            "http::GET::/local",
             "http::GET::/ping",
+            "http::PUT::/api/catalog/orders-metadata/v1/metadata",
         ]
     );
     let links: Vec<_> = (json["links"].as_array().unwrap())
@@ -869,6 +875,11 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
                 "GET /api/catalog/entities",
                 Some("inferred"),
             ),
+            (
+                "upsertMetadata::fetch#0",
+                "PUT /api/catalog/orders-metadata/v1/metadata",
+                Some("inferred"),
+            ),
         ]
     );
     // Each names the mount: through `getBaseUrl`, or by a route the plugin's mount serves.
@@ -896,22 +907,36 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
         (Some("http::GET::/api/orders/notes"), None)
     );
     assert_eq!(consumer("::withHeader::"), (None, None));
-    // `meada status` names each plugin it left at the root, and no other.
+    // `meada status` names each plugin and module it left at the root, and no other.
     let status = meada::engine::status(&repo).unwrap();
     let left: Vec<&str> = (status.lines())
         .filter(|l| l.contains("Backstage"))
         .map(str::trim)
         .collect();
-    let line = |path: &str| {
+    let line = |site: &str, what: &str| {
         format!(
-            "plugins/{path}/src/plugin.ts::createBackendPlugin#0: Backstage plugin whose pluginId \
-             is neither a string literal nor a const of its file bound to one: its routes stay at \
-             the root, not under /api/<pluginId>"
+            "plugins/{site}#0: Backstage {what} whose pluginId is neither a string literal nor a \
+             const of its file bound to one: its routes stay at the root, not under \
+             /api/<pluginId>"
+        )
+    };
+    let plugin = |path: &str| {
+        line(
+            &format!("{path}/src/plugin.ts::createBackendPlugin"),
+            "plugin",
         )
     };
     assert_eq!(
         left,
-        ["chained-backend", "legacy-backend", "shared-backend"].map(line),
+        [
+            line(
+                "audit-backend-module/src/module.ts::createBackendModule",
+                "module"
+            ),
+            plugin("chained-backend"),
+            plugin("legacy-backend"),
+            plugin("shared-backend"),
+        ],
         "{status}"
     );
 }

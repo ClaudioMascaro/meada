@@ -1,0 +1,6 @@
+example.com/acme/backstage (.) indexado, 14 archivos
+  plugins/audit-backend-module/src/module.ts::createBackendModule#0: módulo de Backstage cuyo pluginId no es literal de texto ni const de su archivo ligada a uno: sus rutas quedan en la raíz, no bajo /api/<pluginId>
+  plugins/chained-backend/src/plugin.ts::createBackendPlugin#0: plugin de Backstage cuyo pluginId no es literal de texto ni const de su archivo ligada a uno: sus rutas quedan en la raíz, no bajo /api/<pluginId>
+  plugins/legacy-backend/src/plugin.ts::createBackendPlugin#0: plugin de Backstage cuyo pluginId no es literal de texto ni const de su archivo ligada a uno: sus rutas quedan en la raíz, no bajo /api/<pluginId>
+  plugins/shared-backend/src/plugin.ts::createBackendPlugin#0: plugin de Backstage cuyo pluginId no es literal de texto ni const de su archivo ligada a uno: sus rutas quedan en la raíz, no bajo /api/<pluginId>
+  ¿conclusión errónea? repórtala: https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml
