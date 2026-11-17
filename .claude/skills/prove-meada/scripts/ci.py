@@ -1252,6 +1252,12 @@ def selftest():
     for name in CORPUS:
         assert re.fullmatch(r'[0-9a-f]{40}', pinned[name][2]) and pinned[name][1].startswith('https://github.com/'), name
     corpus_selftest(pinned)
+    note, gha = ' (no provisioner in the workspace)', 'resource::gha-workflow::acme/workflows/.github/workflows/publish.yml'
+    found = f'github.com/acme/app-a ci.yml (line 29) {gha}{note}\ngithub.com/acme/x f.tf (line 1) resource::s3::b{note}\n'
+    assert without_814(('search', {'query': 'publish'}), found) == found.replace(gha + note, gha), found
+    shown = f'{gha}\n  github.com/acme/workflows writer publish.yml (line 6){note}\n'
+    assert without_814(('context', {'symbol': gha}), shown) == shown.replace(note, ''), shown
+    assert without_814(('context', {'symbol': 'resource::s3::b'}), shown.replace(gha, 'resource::s3::b')) == shown.replace(gha, 'resource::s3::b')
     print(f'ci.py self-test: {len(CASES)} cases, each with a control that can fail')
 
 
@@ -1603,9 +1609,17 @@ def f1(run, heads, exports, statuses):
             ('context', {'symbol': 'resource::gha-workflow::acme/workflows/.github/workflows/publish.yml', **big})]
     before, after = (run.ask(side, calls(side, 'hub'), 'existing', same) for side in ('base', 'head'))
     for query, left, right in zip(same, before, after):
-        run.check(f'existing answer equal to the base: {json.dumps(query)}', left == right, [left, right])
+        run.check(f'existing answer equal to the base: {json.dumps(query)}', without_814(query, left) == right, [left, right])
     run.check('control: the base finds the four `uses` lines of `publish.yml` as config values', before[0].count('publish.yml@') >= 4, before[0])
     run.check('control: the base answers the hand declaration of #816 with its declared consumer', f'{HOST}/app-a' in before[3], before[3])
+
+
+def without_814(query, text):
+    """A base answer as #814 reads it: a base before #914 notes `no provisioner in the workspace` on the
+    hand-declared `gha-workflow`, a kind no IaC type provisions, which #814 leaves unmarked. Only those lines
+    lose the note, so a head that keeps it, or a note on any other kind, still differs."""
+    note, whole = ' (no provisioner in the workspace)', query[0] == 'context' and '::gha-workflow::' in query[1].get('symbol', '')
+    return '\n'.join(line.replace(note, '') if whole or 'resource::gha-workflow::' in line else line for line in text.split('\n'))
 
 
 def gathered(exports, workspace, section, side='head'):
