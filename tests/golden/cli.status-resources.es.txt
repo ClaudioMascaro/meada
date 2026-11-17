@@ -1,3 +1,4 @@
+workspace: 4 repositorios
 example.com/chain/gateway (.) indexado, 8 archivos
 example.com/chain/catalog (../chain-catalog) indexado, 4 archivos
   resource::s3-bucket::invoices sin vínculo: ningún escritor y lector en repositorios diferentes

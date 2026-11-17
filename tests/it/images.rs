@@ -257,7 +257,9 @@ fn an_image_is_an_orphan_only_in_a_group_that_builds_and_runs() {
     .unwrap();
     assert_eq!(
         orphans(),
-        ["orphan image::ghcr.io/acme/worker: no builder; docker-compose.yaml::services.worker"]
+        [
+            "orphan image::ghcr.io/acme/worker: no builder in example.com/acme/o4; docker-compose.yaml::services.worker"
+        ]
     );
 }
 

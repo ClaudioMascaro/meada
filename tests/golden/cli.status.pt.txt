@@ -1,2 +1,3 @@
+workspace: 1 repositório
 example.com/acme/web (.) não indexado
 par não encontrado: example.com/acme/api, citado por example.com/acme/web

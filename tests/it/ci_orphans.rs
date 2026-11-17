@@ -83,9 +83,11 @@ fn status_lists_the_providers_nothing_calls_and_nothing_else() {
         orphans(&status),
         [
             format!(
-                "orphan {WORKFLOWS}/.github/workflows/forms.yml: no consumer; .github/workflows/forms.yml"
+                "orphan {WORKFLOWS}/.github/workflows/forms.yml: no consumer in the workspace; .github/workflows/forms.yml"
             ),
-            format!("orphan {WORKFLOWS}/tools/unused: no consumer; tools/unused/action.yml"),
+            format!(
+                "orphan {WORKFLOWS}/tools/unused: no consumer in the workspace; tools/unused/action.yml"
+            ),
         ],
         "{status}"
     );
@@ -214,7 +216,7 @@ fn a_scope_without_a_consumer_prints_no_orphan_line() {
     );
     assert_eq!(orphans(&status(&repo)), [""; 0]);
     // One call inside the repository opens the scope: every provider nothing calls is listed,
-    // and the pipeline it calls is not.
+    // and the pipeline it calls is not. The scope is the repository, and each line names it.
     write(
         &repo,
         ".github/workflows/call.yml",
@@ -223,9 +225,9 @@ fn a_scope_without_a_consumer_prints_no_orphan_line() {
     assert_eq!(
         orphans(&status(&repo)),
         [
-            "orphan ci::example.com/acme/app: no consumer; action.yml",
-            "orphan ci::example.com/acme/app/tools/only: no consumer; tools/only/action.yaml",
-            "orphan ci::example.com/acme/app/tools/setup: no consumer; tools/setup/action.yml",
+            "orphan ci::example.com/acme/app: no consumer in example.com/acme/app; action.yml",
+            "orphan ci::example.com/acme/app/tools/only: no consumer in example.com/acme/app; tools/only/action.yaml",
+            "orphan ci::example.com/acme/app/tools/setup: no consumer in example.com/acme/app; tools/setup/action.yml",
         ]
     );
 }

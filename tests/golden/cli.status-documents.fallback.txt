@@ -1,3 +1,4 @@
+workspace: 4 repositories
 example.com/chain/gateway (.) indexed, 8 files
   broken.openapi.yaml:7: unreadable document (while parsing a flow sequence, expected ',' or ']'), ignored
   docs/api-contract.yaml: openapi 3.0.3, routes: 1

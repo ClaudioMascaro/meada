@@ -1,3 +1,4 @@
+workspace: 2 repositories
 example.com/resource-via/infra (.) indexed, 0 files
   resource::routing::team-b: `via` stack.yaml::Gone matches no symbol, ignored
   resource::routing::team-b: `via` custom_rule.open (root .) matches no symbol, ignored

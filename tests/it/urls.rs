@@ -1211,6 +1211,7 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         )
     };
     let expected = [
+        "workspace: 2 repositories".to_string(),
         "example.com/backstage/web (.) indexed, 1 files".to_string(),
         unread("/disputed", 1),
         unread("/ignored", 1),
