@@ -383,15 +383,17 @@
 - `http/ts.rs`: `router.route(path)` chains and `require` are not followed. A route path or
   prefix that depends on a parameter is not read through callers (it yields no route;
   `http.rs` `path_literal`, for every framework). `http/ts/backstage.rs` (#615): a backend
-  plugin mounts its routers under `/api/<pluginId>` only when `createBackendPlugin` is imported
-  from a `@backstage/` package and writes `pluginId` as a string literal or as a `const` of the
-  same file bound to one; any other `pluginId` (an environment read, an import, a parameter,
-  a `const` bound to another `const`)
-  mounts nothing, so its routers stay at the root, and `meada status` names the plugin
+  plugin, or a backend module of one, mounts its routers under `/api/<pluginId>` only when
+  `createBackendPlugin` (`createBackendModule` for a module) is imported from a `@backstage/`
+  package and writes `pluginId` as a string literal or as a `const` of the same file bound to
+  one; a module's routers take that mount whether or not the plugin it names is in the
+  repository, and its `moduleId` is not read. Any other `pluginId` (an environment read, an
+  import, a parameter, a `const` bound to another `const`)
+  mounts nothing, so its routers stay at the root, and `meada status` names the plugin or module
   (`Msg::BackstageUnmounted`). Only
   what `register` itself gives `<dep>.use(...)` is read, `<dep>` a `deps` key of a `registerInit`
   written in `register` and bound to `coreServices.httpRouter`: a helper `register` calls and a
-  renamed destructured `httpRouter` (`{ httpRouter: r }`) are not followed, and such a plugin,
+  renamed destructured `httpRouter` (`{ httpRouter: r }`) are not followed, and such a plugin or module,
   like one whose `register` is not a function written in place, is neither mounted nor named by
   `meada status`. On the consumer side only
   a URL whose first part is `<x>.getBaseUrl('<literal>')`, held by a constant or written in

@@ -1013,15 +1013,16 @@ impl ContractKind for Http {
         true
     }
 
-    /// The Backstage plugins whose routers stay at the root for want of a literal `pluginId`
-    /// (#615), the proxy endpoints whose target is not read (#616), with their calls, and the
-    /// `$include`s of `app-config*.yaml` not followed, with their reason (#689).
+    /// The Backstage plugins and modules whose routers stay at the root for want of a literal
+    /// `pluginId` (#615), the proxy endpoints whose target is not read (#616), with their calls,
+    /// and the `$include`s of `app-config*.yaml` not followed, with their reason (#689).
     fn status(&self, repo: &Repository, export: &IndexExport, _links: &[Link]) -> Vec<String> {
         let prefix = format!("{}::", repo.identity);
         let mut lines: Vec<String> = (export.unmounted.iter())
             .map(|site| {
                 let site = site.strip_prefix(&prefix).unwrap_or(site);
-                Msg::BackstageUnmounted { site }.text()
+                let module = ts::module(site);
+                Msg::BackstageUnmounted { site, module }.text()
             })
             .collect();
         let mut unread = std::collections::BTreeMap::new();

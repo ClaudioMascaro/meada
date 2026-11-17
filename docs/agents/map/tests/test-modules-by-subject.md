@@ -137,6 +137,8 @@
   every repository's communities and processes, and the chain's export byte-identical under
   `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures
   `open-few` and `open-generated`), `cli` (the binary under pt_BR, en_US, es_ES and de_DE `LANG`;
+  the Backstage plugins and modules `status` leaves at the root, over `http-backstage`, goldens
+  `cli.status-backstage.*`;
   with `oidc`, the identity provider's errors: an unknown `type`, `[oidc.entra]` under `okta` and
   an `overage` other than `ignore` and `directory`; with `oidc` and `directory`,
   `overage = "directory"` without `groups_claim` and without `[directory]` (#336); without `directory`, `[directory]` naming the feature; with

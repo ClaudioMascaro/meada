@@ -91,9 +91,9 @@ pub enum Role {
     /// (`shape::Want`). Stored, never exported; at query time it fills the parts of the shapes
     /// that import the name.
     Shape,
-    /// Neither side: a Backstage backend plugin whose `pluginId` Meada cannot read (#615), at its
-    /// `createBackendPlugin` call, no `contract`: its routers stay at the root. Stored, never
-    /// exported; `meada status` reports it.
+    /// Neither side: a Backstage backend plugin or module whose `pluginId` Meada cannot read
+    /// (#615), at its `createBackendPlugin` or `createBackendModule` call, no `contract`: its
+    /// routers stay at the root. Stored, never exported; `meada status` reports it.
     Unmounted,
     /// Neither side: a Backstage `$include` Meada did not follow (#689), no `contract`: the
     /// including config file in `via`, the reason in `method` and the include as written in

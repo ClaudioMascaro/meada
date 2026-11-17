@@ -3,7 +3,9 @@
 //! A `createBackendPlugin({ pluginId: '<literal>', register })` imported from a `@backstage/`
 //! package is a mount node: what its `register` gives `<dep>.use(...)`, `<dep>` a key of a
 //! `registerInit` `deps` object bound to `coreServices.httpRouter`, is mounted under
-//! `/api/<pluginId>`, the `pluginId` a literal or a `const` of the file bound to one. A plugin
+//! `/api/<pluginId>`, the `pluginId` a literal or a `const` of the file bound to one. A
+//! `createBackendModule` is read the same way: a module gets the `httpRouter` of the plugin its
+//! `pluginId` names, so its routers share that plugin's mount. A plugin or module
 //! whose `pluginId` cannot be read mounts nothing, so its routers stay at the root, and
 //! `meada status` says so (`Role::Unmounted`). On the consumer side a URL that starts with `discovery.getBaseUrl('<literal>')`,
 //! held by a constant or written in place, starts at `/api/<literal>`, and a hostless consumer of
@@ -18,6 +20,16 @@ use crate::resolve::Code;
 /// Where Backstage mounts the router of the plugin `id`.
 pub(super) fn mount(id: &str) -> String {
     format!("/api/{id}")
+}
+
+/// The calls whose `register` gives routers to a plugin's mount: a plugin's own, and a module's,
+/// which gets the `httpRouter` of the plugin it extends.
+const MOUNTS: [&str; 2] = ["createBackendPlugin", "createBackendModule"];
+
+/// Whether the `unmounted` row at `site` (`Role::Unmounted`) is a module's call.
+pub(in crate::http) fn module(site: &str) -> bool {
+    site.rsplit_once('#')
+        .is_some_and(|(call, _)| call.ends_with("createBackendModule"))
 }
 
 /// The id a string literal names.
@@ -35,18 +47,18 @@ fn within(scope: &str, def: &str) -> bool {
         .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
 }
 
-/// A backend plugin: its `createBackendPlugin` call, its `pluginId` (`None` when it cannot be
-/// read: its routers stay at the root), and each argument its
-/// `httpRouter.use(...)` calls give, with the file and the scope it is written in.
+/// A backend plugin or module: its `createBackendPlugin` or `createBackendModule` call, its
+/// `pluginId` (`None` when it cannot be read: its routers stay at the root), and each argument
+/// its `httpRouter.use(...)` calls give, with the file and the scope it is written in.
 type Plugin<'a> = (
     CallAt<'a>,
     Option<String>,
     Vec<(&'a str, &'a str, &'a Value)>,
 );
 
-/// Each backend plugin: its `createBackendPlugin` call, its `pluginId` when it is a literal or a
-/// `const` of the file bound to one, and every argument of each `httpRouter.use(...)` its
-/// `register` makes, with the file and the scope it is written in.
+/// Each backend plugin or module: its `createBackendPlugin` or `createBackendModule` call, its
+/// `pluginId` when it is a literal or a `const` of the file bound to one, and every argument of
+/// each `httpRouter.use(...)` its `register` makes, with the file and the scope it is written in.
 // ponytail: `register` and `init` are read where they are written (a helper they call and a
 // renamed destructured `httpRouter` are not followed); follow them through `Code::origins` if
 // plugins in the wild are written that way.
@@ -54,7 +66,7 @@ pub(super) fn plugins<'a>(code: &Code<'a>) -> Vec<Plugin<'a>> {
     let mut out = Vec::new();
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
-            if !call.callee.ends_with("createBackendPlugin") {
+            if !MOUNTS.iter().any(|m| call.callee.ends_with(m)) {
                 continue;
             }
             let from_backstage = code.outside(path, &call.scope, &call.callee, false);

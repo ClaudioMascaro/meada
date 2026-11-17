@@ -122,6 +122,12 @@ All notable changes to Meada are recorded here. The format follows
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
 
+- Backstage: a backend module (`createBackendModule`, imported from a `@backstage/` package) is
+  read like a backend plugin. Its router, given to `coreServices.httpRouter`, is served under
+  `/api/<pluginId>` of the plugin it extends, where it was served at the root, so a client that
+  starts at `discovery.getBaseUrl('<pluginId>')` links to it. A module whose `pluginId` is neither
+  a literal nor a `const` of its file bound to one stays at the root, and `meada status` names it,
+  as the reader of #615 does for a plugin.
 - Go: the system or architecture suffix of a file name is read off the name cut at its first
   dot, as the Go tools read it. A file such as `store.gen_windows.go`, which Go builds for every
   target, was left out with all its definitions and calls, and `store_windows.gen.go`, which Go

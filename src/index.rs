@@ -82,12 +82,12 @@ pub(crate) fn schema_version() -> i32 {
 /// row of `contracts` is a call through a binding imported from a bare specifier (`via`), naming `method` of it. A `shape`
 /// row (issue #175) is the shape of the module-level constant or type `method` a file exports,
 /// read for the view `via` (`shape::Want`), kept only in a repository with a named manifest.
-/// An `unmounted` row (#615) is a Backstage plugin whose `pluginId` cannot be read, at its
-/// `createBackendPlugin` call, no `contract`: `meada status` reports it. An `unfollowed` row
-/// (#689) is a Backstage `$include` not followed, at the first file of the TS and JavaScript
-/// group, no `contract`: the including file in `via`, the reason in `method` and the include as
-/// written in `fragments`; `meada status` reports it. `exports` holds what each file exports
-/// (`resolve::Exported`): a `name` with the `file` and `target` definition, constant or type it names (`target`
+/// An `unmounted` row (#615) is a Backstage plugin or module whose `pluginId` cannot be read, at
+/// its `createBackendPlugin` or `createBackendModule` call, no `contract`: `meada status` reports
+/// it. An `unfollowed` row (#689) is a Backstage `$include` not followed, at the first file of
+/// the TS and JavaScript group, no `contract`: the including file in `via`, the reason in
+/// `method` and the include as written in `fragments`; `meada status` reports it. `exports` holds
+/// what each file exports (`resolve::Exported`): a `name` with the `file` and `target` definition, constant or type it names (`target`
 /// NULL for a whole file, `file` NULL for nothing the repository holds), or, with `name` NULL,
 /// an `export * from` the file `file`. Both are rewritten with the contracts, and read at query
 /// time to resolve imports of a package into another repository (spec #22). `communities`
@@ -2938,7 +2938,7 @@ pub(crate) struct Export {
     pub(crate) processes: Vec<Process>,
     /// The repository's decisions that do not apply, each with its cause (`meada export` only).
     pub(crate) stale_decisions: Vec<Stale>,
-    /// The sites of the Backstage plugins whose `pluginId` cannot be read (`unmounted` rows,
+    /// The sites of the Backstage plugins and modules whose `pluginId` cannot be read (`unmounted` rows,
     /// #615), sorted. Shown by `meada status` only.
     pub(crate) unmounted: Vec<String>,
     /// The Backstage `$include`s not followed (`unfollowed` rows, #689), as stored: `via`,

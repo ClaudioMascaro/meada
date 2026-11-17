@@ -16,7 +16,7 @@ mod config;
 
 use std::collections::BTreeSet;
 
-pub(super) use backstage::{name, unread};
+pub(super) use backstage::{module, name, unread};
 pub(super) use clients::consumers;
 #[cfg(test)]
 pub(crate) use config::probe as app_config_probe;
@@ -239,11 +239,12 @@ fn express(code: &Code, literals: &mut Literals) -> (Vec<Found>, Vec<(String, St
             }
         }
     }
-    // A Backstage plugin is a mount node nothing mounts: its routers take `/api/<pluginId>`.
+    // A Backstage plugin, or a module of one, is a mount node nothing mounts: its routers take
+    // `/api/<pluginId>`.
     let mut plugins = BTreeSet::new();
     let mut unmounted = Vec::new();
     for (plugin, id, uses) in backstage::plugins(code) {
-        // A plugin that mounts nothing has no routes to leave at the root.
+        // A plugin or module that mounts nothing has no routes to leave at the root.
         if uses.is_empty() {
             continue;
         }

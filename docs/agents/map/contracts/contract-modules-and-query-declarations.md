@@ -7,13 +7,16 @@
   machinery and the shared consumer readers, and `http/join.rs`, the RFC 3986 join of Swift's
   `URL(string:relativeTo:)` and TS's `new URL(reference, base)`; one submodule per language: `http/ts.rs` and
   `http/ts/clients.rs`, Express and Next.js route-file providers and `fetch` consumers, with
-  `http/ts/backstage.rs` mounting each Backstage backend plugin's router at `/api/<pluginId>` (a
-  mount node per `createBackendPlugin` call in Express's `Mounts`) and folding a
+  `http/ts/backstage.rs` mounting each Backstage backend plugin's router, and each backend
+  module's under the plugin it extends, at `/api/<pluginId>` (a mount node per
+  `createBackendPlugin` or `createBackendModule` call, `backstage::MOUNTS`, in Express's
+  `Mounts`) and folding a
   `discovery.getBaseUrl('<id>')` base to `/api/<id>` (a `client:` `via`, so the reason names
   it; `backstage::name` gives the same `via` to a hostless consumer of a route a plugin's mount
-  serves, from the routes `ts::providers` reports as mounted; a plugin whose `pluginId` is
+  serves, from the routes `ts::providers` reports as mounted; a plugin or module whose `pluginId` is
   neither a literal nor a `const` of the file bound to one is a `Role::Unmounted` row that
-  `Http::status` reports; `http/ts/config.rs` reads the `proxy.endpoints` of `app-config*.yaml`
+  `Http::status` reports, `backstage::module` telling a module's site apart for
+  `Msg::BackstageUnmounted`; `http/ts/config.rs` reads the `proxy.endpoints` of `app-config*.yaml`
   (#616; with no `endpoints` key in any file, nor an include not followed at the root, `proxy` or
   `proxy.endpoints`, `config::TABLE_PATHS` and `includes::Grafted::watched_unread`, #709, the keys of `proxy` that start with `/`,
   and a string value as `{ target }` in either shape, #690): a URL that starts with

@@ -112,7 +112,7 @@ Meada conecta consumidores y proveedores entre lenguajes, incluso detrás de gat
 
 | Lenguaje | Consumidores HTTP | Proveedores HTTP |
 | --- | --- | --- |
-| TypeScript / JavaScript | `fetch`, `discovery.getBaseUrl` y `proxy.endpoints` de Backstage (también la forma antigua, las claves de `proxy` que empiezan por `/` cuando ningún archivo tiene `endpoints` ni un `$include` ahí, en `proxy` o en la raíz que Meada no sigue, y el endpoint escrito como texto, `'/ep': https://...`) | Next.js app router, Express, plugins de backend de Backstage |
+| TypeScript / JavaScript | `fetch`, `discovery.getBaseUrl` y `proxy.endpoints` de Backstage (también la forma antigua, las claves de `proxy` que empiezan por `/` cuando ningún archivo tiene `endpoints` ni un `$include` ahí, en `proxy` o en la raíz que Meada no sigue, y el endpoint escrito como texto, `'/ep': https://...`) | Next.js app router, Express, plugins y módulos de backend de Backstage |
 | Python | `requests`, `httpx`, `aiohttp` | FastAPI, Flask, Django |
 | Rust | `reqwest`, `ureq` | axum, actix-web, Rocket |
 | Go | `net/http`, resty | `net/http`, gin, echo, chi, gorilla/mux |
