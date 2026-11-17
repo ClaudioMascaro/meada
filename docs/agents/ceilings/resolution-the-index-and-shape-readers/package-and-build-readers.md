@@ -54,7 +54,9 @@
   the package as the next word: `--from`, `--spec`, another option first, `<package>@<version>`
   and `uv tool run` give no side, and a range after the package (`uvx 'core-sdk>=1'`) gives
   the package and no program. A script whose function is no program entry point of its
-  repository (a module outside the declared roots, generated code) gives no side, and neither
+  repository (a module outside the declared roots, generated code, a name the module only
+  imports: `nox = "nox.__main__:main"` behind `from nox._cli import nox_main as main`, 49 CI
+  steps of the A9 yardstick's set F with no program link, #931) gives no side, and neither
   does a Poetry script written as a table (`{ callable = ... }`, `{ reference = ... }`), an
   object reference with blanks (`"mod : fn"`) or a script run inside a command substitution.
   The evidence that picks the package is an install by a literal name in an earlier command of the same CI
