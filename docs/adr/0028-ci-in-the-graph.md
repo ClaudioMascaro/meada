@@ -191,14 +191,15 @@ The rows of v1:
 
 | Evidence | Level |
 | --- | --- |
-| An earlier line or step of the same CI job installs the package that declares the script | `exact` |
-| The command names the package itself (`uvx <package>`, `pipx run <package>`) | `exact` |
+| An earlier line or step of the same CI job installs the package that declares the script | `exact` (amended: `inferred`) |
+| The command names the package itself (`uvx <package>`, `pipx run <package>`) | `exact` (amended: `inferred`) |
 | No install; one package of the workspace declares a script of that name | `inferred` |
 | Several packages of the workspace declare a script of that name | `ambiguous` |
 | No package of the workspace declares it | no side: an external command |
 
 An install by name follows the package kind's rule as it stands: one provider of that name in the
-workspace is `exact`, whatever index serves it.
+workspace is `exact`, whatever index serves it. (Amended 2026-11-16: an install by name alone,
+and the program link that rests on it, are `inferred` under ADR 0029, see Amendment below.)
 
 ### Expressions
 
@@ -322,7 +323,8 @@ Each enters `docs/agents/ceilings` with its slice:
 - A command links to its script's function, not to the handler of a subcommand.
 - An install outside the CI job (a container image, a setup action, a self-hosted CI runner)
   leaves the program link `inferred`.
-- A name the workspace provides wins over a public package of the same name.
+- A name the workspace provides wins over a public package of the same name. (Amended
+  2026-11-16: at `inferred`, see Amendment below.)
 - Only PyPI console scripts are programs with a command name.
 - Declared permissions are not effective permissions.
 
@@ -339,6 +341,35 @@ ADR 0002):
   search kinds gain GitHub Actions.
 - ADR 0026: its use sides, image builder forms, queries, orphans and export change in pipelines
   and actions as the sections above say.
+
+## Amendment (2026-11-16): an install by name alone is `inferred` (ADR 0029, #850)
+
+A workspace that holds a fork or a copy of a public package under the same name got two wrong
+`exact` links from every pipeline that installs the public one: the CI step to the package, and
+the CI step to the program of its console script. ADR 0029 ("Spec A9") decides that both rest on
+a name alone, and a wrong statement is worse than a missing one.
+
+- **Install.** A CI step that installs a package by its name alone (every row of the install
+  command, `pip install` to `uv tool install`) links to the one provider of that name in the
+  workspace at `inferred`, whatever index serves it. Its reason starts with `the name alone
+  matched`. One provider in the CI step's own repository keeps the package kind's reason for an
+  entry with no source, at the same level. Several providers stay `ambiguous`, and a pattern of
+  the name keeps its own reason.
+- **Programs.** The program link that rests on such an install, or on `uvx <package>` or
+  `pipx run <package>`, is `inferred`: the first two rows of the level table of programs read
+  `inferred`, the other rows stand. The evidence of an install still picks which of the packages
+  that declare the script the CI step runs, and the reason still names it.
+- **An install that names its origin.** It would stay `exact`, but no form of the command table
+  reads one today: a path, a URL and a direct reference give no side (#831). No row is added; a
+  row that reads an origin (a path of the repository, a VCS URL of a repository of the
+  workspace) is another change, made with its own fixture.
+- **The ceiling** "A name the workspace provides wins over a public package of the same name"
+  holds at `inferred`.
+
+The package kind's rule for a dependency written in a manifest does not change: the package
+yardstick judges it. Raising these levels again is another change, made when that yardstick
+approves the rule that one provider of a name in the workspace is the package installed.
+Lowering them is a fix: the stability document does not freeze which links Meada finds.
 
 ## Considered options
 

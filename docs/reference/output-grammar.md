@@ -78,7 +78,7 @@ file whose path holds a space reads as more fields than it has.
 | `<identity>` | `<repository>::<path>::<address>` | An IaC node's source identity. |
 | `<n>` | `<number>` | A count. |
 | `<query>` | `<text>` | What the call was given, echoed. |
-| `<orphan-note>` | ` (no provisioner in the workspace)` | The visible scope has uses but no provisioner of this contract kind and broker or resource kind. |
+| `<orphan-note>` | ` (no provisioner in the workspace)` | The visible scope has uses but no provisioner of this contract kind and broker or resource kind, a kind an IaC type of the type table provisions. |
 | `<orphan-note>` | ` (no use in the workspace)` | The visible scope has provisioners but no use of this group. |
 | `<orphan-note>` | ` (no builder in the workspace)` | The visible scope has no builder of an image in this registry and namespace. |
 | `<orphan-note>` | ` (no runner in the workspace)` | The visible scope has no runner of an image in this registry and namespace. |
@@ -126,7 +126,11 @@ of a CI contract reads `@<ref> (indexed <short commit>)`: the Git ref the call w
 commit the provider's index was read at, followed by `, ref mismatch` when the ref is a full
 commit id (40 or 64 hexadecimal digits) other than that commit, or `@<ref> (indexed commit
 unknown)` when the provider's repository records none. A call inside its repository (a local
-call, `$/`, a CI step's `./<folder>`) writes no ref and reads `own repository`.
+call, `$/`, a CI step's `./<folder>`) writes no ref and reads `own repository`. When a CI job of
+the called pipeline declares a permission above what the calling CI job's `permissions` block
+holds, the reason ends with `, permissions mismatch: ` and each such permission as
+`<name> <level> against <level>` (`every other permission` for the rest of a block), joined by
+`, `, after `, ref mismatch` when both hold.
 
 The reason of a call's mark is how many definitions have its name: `one method named render`,
 `2 functions or classes named render`, `one of several methods named run` (a match narrowed to
@@ -308,6 +312,8 @@ a `fits` line and one line per node, with what to pass for it. Declared resource
 node add the same `provides`, `consumes`, `reader:` and `writer:` lines as a declared key.
 Workload context also lists environment names, their targets and available checked-in values.
 Secret targets are marked `redacted`; absent, secret or unresolved values print `unresolved`.
+A CI step that builds an image adds a `builds` line and, under it, a `runner:` line for each
+workload that runs the image.
 A decided physical-name pattern adds `resolved names:` with
 `<contract> [decided: <reason>]` for each selected name.
 
@@ -376,7 +382,9 @@ words:
 | iac root | `root: <iac-root>` | The IaC node's root module; for a pipeline or an action and the nodes under it, the file's path. |
 | iac role | `role: <text>` | What a Kubernetes object is to Crossplane: `crossplane composite resource definition`, `crossplane composition`, `crossplane claim`, `crossplane composite resource`, `crossplane managed resource` or `crossplane composed resource`. |
 | iac image | `image: <text><iac-mark?>` | A Compose service's image quoted as JSON, or a workload's image contract with its optional missing-builder note. |
-| image builder | `  builder: <repository> [<level>: <reason>]` | A workload's image builder, with its evaluated evidence. |
+| image builder | `  builder: <builder> [<level>: <reason>]` | A workload's image builder, with its evaluated evidence. |
+| ci builds | `builds <contract>` | The selected CI step builds the image of the contract. |
+| image runner | `  runner: <identity><runner-root?> [<level>: <reason>]` | Under `builds`: a workload that runs the image, with the link's level and reason. |
 | workload code | `code: <repository> <path> [<level>]` | A same-repository path the workload runs directly, at the level of its execution. |
 | workload environment | `env <container> <environment-name> -> <environment-target>: <environment-value?>` | One environment entry of the workload, with its checked-in source and available value. |
 | alert emitter | `emitter: <contract><orphan-note?>` | A rule's known label. |
@@ -396,6 +404,7 @@ words:
 | Field | Form | Meaning |
 | --- | --- | --- |
 | `<last>` | `<number>` | The last line of the span. |
+| `<runner-root>` | ` (root <iac-root>)` | The root module or overlay the runner's evaluation starts from. |
 | `<physical-name>` | `<text>` | The node's `name` argument as static evaluation resolves it, quoted as JSON, or `none`. |
 | `<container>` | `<word>` | The name of a Kubernetes container or Compose service. |
 | `<environment-name>` | `<word>` | The environment entry's name, or a prefix followed by `*` for an unresolved `envFrom`. |
@@ -448,13 +457,15 @@ words:
 | `<key>` | `<word>` | A routing key. |
 | `<role>` | `use` | Names the resource in config, with no direction; links only to provisioners. |
 | `<role>` | `policy grant` | Names the resource in the resource list of an IAM policy statement, with no direction; links to nothing, is no orphan and carries no orphan note. |
-| `<role>` | `builder` | The repository whose configuration publishes an image. |
+| `<role>` | `builder` | The repository whose configuration publishes an image, or in a pipeline the CI step that builds it. |
 | `<role>` | `runner` | A workload that runs an image. |
 | `<role>` | `emitter` | An alert rule that attaches a known label. |
 | `<role>` | `matcher` | An Alertmanager route that tests a label. |
 | `<role>` | `provisioner` | Creates the resource. |
 | `<role>` | `writer` | Writes the resource. |
 | `<role>` | `reader` | Reads the resource. |
+| `<builder>` | `<repository>` | The repository whose configuration publishes the image. |
+| `<builder>` | `<identity>` | In a pipeline, the CI step that builds the image. |
 | `<role>` | `producer` | Produces to the channel: the symbol around the producing call. |
 | `<role>` | `producer <broker> send <channel>` | A documented producer on a subscription's source channel, shown in the target channel's context. |
 | `<role>` | `consumer` | Consumes the channel (its handler), or calls the route. |
@@ -568,11 +579,13 @@ carries its level with no reason.
 | `<sided-kind>` | `channel` | A channel. |
 | `<sided-kind>` | `package` | A package. |
 | `<sided-kind>` | `image` | An image. |
+| `<sided-kind>` | `ci` | A CI contract no pipeline or action of the workspace provides. |
 | `<sides>` | `writers and readers` | A resource's sides. |
 | `<sides>` | `producers and consumers` | A channel's sides. |
 | `<sides>` | `packages and dependents` | A package's sides. |
 | `<sides>` | `builders and runners` | An image's sides. |
 | `<sides>` | `emitters and matchers` | An alert contract's sides. |
+| `<sides>` | `providers and consumers` | A CI contract's sides. |
 | `<call-site>` | `<identity>::<callee>#<n>` | A call site's identity: its caller's (a symbol, or a file for a call at its top level), what it calls, and its ordinal among the caller's calls of that name. |
 
 ## Every tool

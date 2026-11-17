@@ -371,8 +371,9 @@ O JSON Terraform usa as mesmas regras de avaliação e referência. Strings comu
   `each`, `count.index`, templates e as funções puras `format`, `formatlist`, `join`, `split`,
   `lower`, `upper`, `title`, `trim`, `trimprefix`, `trimsuffix`, `trimspace`, `chomp`, `replace`
   (uma substring literal), `substr`, `concat`, `coalesce`, `element`, `keys`, `values`, `lookup`,
-  `merge`, `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` e `jsonencode`. Data
-  sources, atributos de resources, módulos do registro, `terraform.workspace`, `-var`, `-var-file`,
+  `merge`, `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` e `jsonencode`. Cada
+  string fica em Unicode NFC, como o Terraform a guarda, então duas grafias de uma string são um
+  valor só. Data sources, atributos de resources, módulos do registro, `terraform.workspace`, `-var`, `-var-file`,
   `TF_VAR_`, variáveis sensíveis e qualquer outra função nunca são avaliados: essa parte do nome
   vira um `*` e o nome um **padrão** (`"orders-${terraform.workspace}"` é `orders-*`), que liga
   nomes literais pelas regras de padrões abaixo. Um nome que passou por uma variável do módulo raiz a lista em
@@ -546,6 +547,10 @@ código ou só de IaC não gera essas linhas; `search` e `context` marcam o pró
 `no provisioner in the workspace` ou `no use in the workspace`. As ligações de provisionamento,
 inclusive padrões e módulos raiz independentes, determinam se há contraparte. Os avisos
 existentes de recursos declarados sem escritor e leitor continuam separados.
+
+Só tem grupo de órfãos um broker ou tipo de recurso que a tabela de tipos provisiona. Um
+`[[resource]]` declarado de tipo `postgres` ou um subject NATS, que nenhum tipo de IaC cria, não
+leva marca em `search` nem em `context` e nunca vira linha de órfão.
 
 Um uso que o Meada só infere pelo nome de uma chave (um valor simples sob `queue`, `topic`,
 `bucket`, `table` ou um alias tipado, `inferred`) não abre o escopo de órfãos do seu grupo e
@@ -935,6 +940,9 @@ Quando o código muda e uma decisão deixa de caber (a chamada sumiu, o item nã
 o provedor sumiu ou não é mais candidato), o `meada status` a mostra como **obsoleta** sob o
 repositório, e `meada decide --prune` a remove. Uma decisão que espera um par ainda não
 encontrado aparece à parte (`decision waiting on missing peer ...`) e é mantida.
+O alvo precisa ser um dos candidatos do item, os que o `meada decide` lista, também para uma URL
+dinâmica: um alvo que o repositório serve mas que a chamada não alcança (outro método, ou um
+caminho onde as partes conhecidas da URL não cabem) fica obsoleto, e o item continua aberto.
 
 ### Decisor por modelo
 
@@ -1575,8 +1583,9 @@ dentro de `if` e de laços. Um script com heredoc ou com mais de 1024 bytes não
 `echo`, em uma string ou em um comentário não dá lado. `pip install`, `pip3 install`, `python -m pip
 install`, `uv pip install`, `pipx install` e `uv tool install` fazem do passo de CI um consumidor de
 `package::pypi::<nome>` quando um repositório do workspace fornece o pacote, com a faixa como
-escrita: `context` no pacote lista o passo de CI, e a ligação segue a regra da seção 8.5 (`exact`
-para um único provedor em outro repositório). Um caminho, uma URL, `-e`, o arquivo de `-r` e o valor
+escrita: `context` no pacote lista o passo de CI, e um único provedor liga em `inferred`, com o
+motivo começando por `the name alone matched`: a instalação não nomeia origem, e um fork ou uma
+cópia de um pacote público pode ter o nome (ADR 0029). Um caminho, uma URL, `-e`, o arquivo de `-r` e o valor
 de uma opção não dão lado. Um nome com uma parte que nenhum `env` literal dá (`shared-${{ vars.X
 }}`) é um padrão, ligado como `inferred` ao único pacote que cabe nele; um nome inteiro assim (`pip
 install $PKG`) é, onde o workspace fornece um pacote PyPI, um consumidor não resolvido, um item
@@ -1589,13 +1598,14 @@ dá um.
 
 **Programas.** Um passo de CI cujo comando é um script de console de um pacote PyPI do workspace
 (um nome sob `[project.scripts]` ou `[tool.poetry.scripts]`) inicia esse programa: o passo de CI
-consome o pacote, e a ligação segue até a função que o script nomeia. O nível diz quanta certeza o
-Meada tem do pacote que roda:
+consome o pacote, e a ligação segue até a função que o script nomeia. O pacote casa só pelo nome,
+então a ligação é no máximo `inferred` (ADR 0029); o nível e o motivo dizem quanta certeza o Meada
+tem do pacote que roda:
 
 | Evidência | Nível |
 | --- | --- |
-| Uma linha ou um passo de CI anterior do mesmo job de CI instala o pacote | `exact` |
-| O comando nomeia o pacote: `uvx <pacote>`, `pipx run <pacote>` | `exact` |
+| Uma linha ou um passo de CI anterior do mesmo job de CI instala o pacote | `inferred` |
+| O comando nomeia o pacote: `uvx <pacote>`, `pipx run <pacote>` | `inferred` |
 | Nenhuma instalação, e um só pacote do workspace declara o nome | `inferred` |
 | Vários pacotes do workspace declaram o nome | `ambiguous` |
 | Nenhum pacote do workspace declara o nome | nenhum lado |
@@ -1606,7 +1616,7 @@ e com `direction=down` a partir de um job de CI ele entra no programa:
 ```text
 github.com/acme/core-api app/main.py:6 register_package
   →[inferred: base URL from CORE_API_URL, a base_url_env of peer github.com/acme/core-api] github.com/acme/core-sdk core_sdk/cli.py:10 publish_main
-    →[exact: package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
+    →[inferred: the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
       github.com/acme/workflows .github/workflows/publish.yml:12 jobs.publish
         github.com/acme/workflows .github/workflows/publish.yml:1 .
           →[exact: @main (indexed 1a2b3c4)] github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish
@@ -1738,7 +1748,9 @@ No Backstage, o roteador que um plugin de backend entrega ao `httpRouter` (`http
 com o `httpRouter` vindo de `coreServices.httpRouter` nos `deps` do `registerInit`) vale sob
 `/api/<pluginId>`, o caminho em que o framework o monta, quando o `createBackendPlugin`, importado
 de um pacote `@backstage/`, escreve o `pluginId` como literal ou como uma `const` do mesmo arquivo
-ligada a um literal. Um plugin cujo `pluginId` não se lê assim (uma leitura de ambiente, um
+ligada a um literal. Um módulo de backend (`createBackendModule`) recebe o `httpRouter` do plugin
+que estende: o roteador que ele entrega vale sob o `/api/<pluginId>` desse plugin, com o
+`pluginId` lido do mesmo jeito. Um plugin cujo `pluginId` não se lê assim (uma leitura de ambiente, um
 import) deixa o roteador na raiz, como antes, e o `meada status` aponta o plugin. Do lado do
 consumidor, uma URL que começa por `discovery.getBaseUrl('<id>')` (numa constante ou escrito na
 própria URL) começa em `/api/<id>`, e o motivo da ligação nomeia o plugin e essa montagem; uma URL
@@ -1888,6 +1900,10 @@ repositório. Um módulo aninhado é dono da sua subárvore, e os arquivos de um
 A análise mira linux/amd64: arquivos `_windows.go`, com um `//go:build` falso ou que usam cgo
 (`import "C"`) ficam de fora.
 
+Abaixo da raiz de um módulo, um pacote num diretório `testdata` ou num cujo nome começa com `_`
+(`_gen`) fica de fora, como no `go build ./...`, a menos que um pacote que o Meada lê o importe (e,
+em cadeia, os pacotes que ele importa); os `_test.go` dele continuam de fora.
+
 **O que vira definição.** Funções, tipos, interfaces e métodos (`Tipo.Método`). Chamadas
 resolvem dentro do pacote e por imports (`pkg.F()`, com alias ou ponto). A biblioteca padrão e os
 módulos externos permanecem externos.
@@ -1937,6 +1953,8 @@ seção 8.5.
   middleware) monta o roteador onde ele não alcança, e as rotas dele não aparecem.
 - O `Add(método, caminho, handler)` do echo não é lido.
 - Código com cgo, `_windows.go` e `//go:build` falso não é indexado.
+- Um pacote em `testdata` ou num diretório `_` que só um import em branco (`import _ "..."`)
+  alcança fica de fora, embora o Go o compile.
 
 ### 9.4 Rust
 
@@ -2005,7 +2023,9 @@ mut` String só lido e acrescido por `push_str`, `push` e `+=` também dobra.
 ### 9.5 Java
 
 **Arquivos.** `.java`, resolvidos pelas declarações de `package`. O Meada não precisa de JDK,
-Maven nem Gradle e não roda código do repositório.
+Maven nem Gradle e não roda código do repositório. Um escape unicode de quebra de linha
+(`\u000a`, `\u000d`, com qualquer número de `u`) é lido como o javac o lê: num comentário de
+linha, ele encerra o comentário e o resto da linha é código.
 
 **O que vira definição.** Classes, interfaces, enums, records, métodos e construtores, inclusive
 aninhados. Os nomes levam o pacote e, nos métodos, os tipos escritos dos parâmetros

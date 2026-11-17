@@ -60,7 +60,8 @@ write tools; one index per repository; determinism) live in
 - GitHub Actions owns the full integration, UI and deployment checks. CI for the exact PR
   head must be green before marking the PR ready for review or merging into main. A branch
   push runs `diff.yml` first (`scripts/check --scope auto` on a runner): a fast answer, never
-  the gate.
+  the gate. A newer push waits for the run in progress (a red run is a test's evidence), and a
+  green product run keeps its debug binary as the artifact `meada-debug-<sha>`.
 - `.githooks/` runs part of the gate locally: `cargo fmt --check` and no em dash in staged
   Markdown on commit; on push, a check against the maintainer's private-term list. Enable it
   once per clone with `git config core.hooksPath .githooks`.
@@ -80,8 +81,10 @@ write tools; one index per repository; determinism) live in
 ## Code graph
 
 Meada indexes this repository too: `.mcp.json` serves it as the `meada` MCP server (`search`,
-`context`, `trace`). Reach for it first to find where a symbol lives, who calls it and what a
-change touches, then read the files it names.
+`context`, `trace`). The trigger: a question shaped "who calls X", "what does X call or hold" or
+"what does a change to X reach" goes to `context` or `trace` on X before a grep or the read of
+a file to answer it; `search` first gives X's full name when only part is known (a method is
+`Type.method`). Then read the files it names.
 
 - The index follows the working tree on every query, but the server runs the installed binary:
   read `docs/agents/code-graph.md` on a new machine, after a change to a language pack or a

@@ -7,7 +7,7 @@ use crate::common;
 use std::fs;
 
 use common::{
-    assert_golden, assert_golden_but_indexed_commit, chain, decisions, fixture_repo,
+    TRACK, assert_golden, assert_golden_but_indexed_commit, chain, decisions, fixture_repo,
     without_processes,
 };
 use meada::engine::{Direction, Engine, Start};
@@ -148,6 +148,29 @@ fn a_decision_of_the_wrong_kind_for_its_call_is_ignored() {
         "chain-web.unfit-kind.export.json",
         &without_processes(&export),
     );
+}
+
+/// A dynamic URL decided to a route its repository serves but the call cannot reach is stale
+/// (#806): the tracking call posts, the target is a `GET`. The item stays open.
+#[test]
+fn a_dynamic_url_decision_to_a_route_that_is_no_candidate_is_stale() {
+    let (web, _, _) = chain("decided_dynamic_not_candidate");
+    let target = "example.com/chain/catalog::http::GET::/api/health";
+    let toml = format!(
+        "[[decision]]\nkind = \"dynamic-url\"\ncall = \"{TRACK}\"\n\
+         target = \"{target}\"\nby = \"human\"\n"
+    );
+    fs::write(web.join("meada.decisions.toml"), toml).unwrap();
+
+    let export = Engine::open(&web).unwrap().export().unwrap();
+
+    let export: serde_json::Value = serde_json::from_str(&export).unwrap();
+    assert_eq!(
+        export["stale_decisions"],
+        serde_json::json!([{"call": TRACK, "target": target, "cause": "not-candidate"}])
+    );
+    let links = export["links"].as_array().unwrap();
+    assert!(links.iter().all(|l| l["level"] != "decided"), "{links:?}");
 }
 
 #[test]

@@ -6,7 +6,8 @@
   conventions the ticket names are test files (`*_test.go`, `*.test.*`, `*.spec.*`, `test_*.py`,
   `*_test.py`, `tests/`, `__tests__/`, `src/test/`), not `*Test.java`, `*Tests.cs` or
   `conftest.py`, nor a singular `test/` or a `spec/` directory, `*.e2e-spec.ts` apart from `*.spec.*`,
-  Swift's `Tests/` (the match is case-sensitive), Go `testdata/` or Gradle `src/integrationTest`.
+  Swift's `Tests/` (the match is case-sensitive), Go `testdata/` (a package there is read only
+  when a package read imports it, `lang/go.rs`) or Gradle `src/integrationTest`.
   A fake defined in a non-test helper file stays a provider. Channel providers and every other
   kind are untouched. `test_routes = true` keeps every one.
 - `http.rs` (`locate`, `tail_fits`, #801): a URL whose leading part Meada could not read (a hole,
@@ -385,7 +386,8 @@
   `http.rs` `path_literal`, for every framework). `http/ts/backstage.rs` (#615): a backend
   plugin mounts its routers under `/api/<pluginId>` only when `createBackendPlugin` is imported
   from a `@backstage/` package and writes `pluginId` as a string literal or as a `const` of the
-  same file bound to one; any other `pluginId` (an environment read, an import, a parameter,
+  same file bound to one, and a backend module (`createBackendModule`, #813) mounts under the
+  `/api/<pluginId>` of the plugin it extends by the same rule; any other `pluginId` (an environment read, an import, a parameter,
   a `const` bound to another `const`)
   mounts nothing, so its routers stay at the root, and `meada status` names the plugin
   (`Msg::BackstageUnmounted`). Only

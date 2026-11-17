@@ -52,10 +52,11 @@ impl<'m> Eval<'m> {
         };
         let value = self.value(at, each, &arg.expr, 0);
         through.extend(value.through);
-        match value.val {
-            Val::Known(Value::Bool(value)) => Some(value),
-            _ => None,
-        }
+        // The input is a `bool` variable of the module, which takes `"true"` and `"false"` too.
+        let Val::Known(value) = value.val else {
+            return None;
+        };
+        functions::scalar_as(&value, Elem::Bool).ok()?.as_bool()
     }
 
     fn module_created(

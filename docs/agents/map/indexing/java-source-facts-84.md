@@ -1,6 +1,10 @@
 # Java source facts (#84)
 
-`lang/java.rs` reads `.java` with tree-sitter-java, with no JDK or build tool. Types carry their
+`lang/java.rs` reads `.java` with tree-sitter-java, with no JDK or build tool. Before the parse,
+`escaped_breaks` turns each unicode escape of a line terminator (`\u000a`, `\uu000D`: any number
+of `u`, not after an odd run of backslashes) into a line feed padded with spaces to the escape's
+length, as javac translates escapes before it lexes (JLS 3.3): one ends a line comment, and the
+rest of the line is code. Every byte keeps its offset, so spans stay the file's. Types carry their
 package-qualified names; methods and constructors carry the parameter types as written.
 `Facts::overloads` maps method names to their definitions with signatures; `Facts::constructors`
 keeps constructor families under their class names. The shared resolver selects the family by

@@ -937,7 +937,8 @@ fn dynamodb_transactions_keep_every_entry_table_and_direction_in_java_go_and_dot
 /// method of the list, a helper. A name on the path to an entry's table is followed only when
 /// its function writes it twice, where it is declared and where the path reads it, and every
 /// other mention leaves the transaction's entries unresolved. The same values left alone keep
-/// their tables.
+/// their tables, and so do values Go's `len` or `cap` reads (#774), unless the package hides the
+/// builtin. Their twins changed in place stay unresolved.
 #[test]
 fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
     let repo = fixture_repo(
@@ -947,36 +948,20 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
     );
     let export: Value =
         serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
-    let mut by_language: std::collections::BTreeMap<String, Vec<String>> = Default::default();
-    for (role, sides) in [("writer", "providers"), ("reader", "consumers")] {
-        for side in export[sides].as_array().unwrap() {
-            let mut parts = side["site"].as_str().unwrap().split("::").skip(1);
-            let file = parts.next().unwrap();
-            let method = parts.next().unwrap().trim_end_matches("()");
-            let method = method.rsplit('.').next().unwrap().to_lowercase();
-            by_language
-                .entry(file.rsplit('.').next().unwrap().into())
-                .or_default()
-                .push(format!(
-                    "{method} {role} {}",
-                    side["contract"].as_str().unwrap()
-                ));
-        }
-    }
-    let sides = |language: &str| {
-        let mut sides = by_language[language].clone();
-        sides.sort();
-        sides
-    };
+    let by_language = sides_by_extension(&export);
     assert_eq!(
-        sides("go"),
+        by_language["go"],
         [
+            "capbound writer resource::dynamodb",
             "elementreplaced writer resource::dynamodb",
             "entryreplaced writer resource::dynamodb",
             "getreplaced reader resource::dynamodb",
             "heldentry writer resource::dynamodb",
+            "hiddenlen writer resource::dynamodb",
             "itemcopied writer resource::dynamodb",
             "itemwritten writer resource::dynamodb",
+            "lengthread writer resource::dynamodb::length-read",
+            "lengththenset writer resource::dynamodb",
             "loopwritten writer resource::dynamodb",
             "plainget reader resource::dynamodb::plain-get",
             "plainparts writer resource::dynamodb::plain-parts",
@@ -984,12 +969,14 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
             "slicehanded writer resource::dynamodb",
             "slicereplaced writer resource::dynamodb",
             "slicewritten writer resource::dynamodb",
+            "splitlen writer resource::dynamodb",
             "throughrequest writer resource::dynamodb",
+            "unbuiltlen writer resource::dynamodb::unbuilt-old",
         ],
         "{export}"
     );
     assert_eq!(
-        sides("cs"),
+        by_language["cs"],
         [
             "elementreplaced writer resource::dynamodb",
             "getreplaced reader resource::dynamodb",
@@ -1006,6 +993,189 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
             "shareditem writer resource::dynamodb",
             "shareditem writer resource::dynamodb",
             "throughrequest writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
+/// The sides of an export as `method role contract`, sorted, by the extension of their file.
+fn sides_by_extension(export: &Value) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut by_extension: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+    for (role, sides) in [("writer", "providers"), ("reader", "consumers")] {
+        for side in export[sides].as_array().unwrap() {
+            let mut parts = side["site"].as_str().unwrap().split("::").skip(1);
+            let file = parts.next().unwrap();
+            let method = parts.next().unwrap().trim_end_matches("()");
+            let method = method.rsplit('.').next().unwrap().to_lowercase();
+            by_extension
+                .entry(file.rsplit('.').next().unwrap().into())
+                .or_default()
+                .push(format!(
+                    "{method} {role} {}",
+                    side["contract"].as_str().unwrap()
+                ));
+        }
+    }
+    by_extension.values_mut().for_each(|sides| sides.sort());
+    by_extension
+}
+
+/// A chain of wrappers enters a function once (#886). Where the calls of a cycle hand the
+/// wrapper's parameters on as they are (a retry, two wrappers that call each other), another turn
+/// sends what the first did and adds no side. Where they hand on another value in the parameter
+/// the request reads (the second of two names, a name made from the first, the second of two
+/// lists, two wrappers that swap theirs), what that turn sends is not followed: each caller's
+/// site gets an unresolved side beside the name its own pass gives, and a wrapper nothing but its
+/// cycle calls gets it where it stands (`spin`). A list of entries no caller gives is a write and
+/// a read, as for a wrapper nobody calls (`aloneList`).
+#[test]
+fn a_recursive_wrapper_that_passes_another_value_on_is_unresolved_at_each_caller() {
+    let fixture = "aws-sdk-recursive-wrappers";
+    let repo = fixture_repo("aws_sdk_recursive_wrappers", fixture, None);
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    assert_eq!(
+        sides_by_extension(&export)["go"],
+        [
+            "alonelist reader resource::dynamodb",
+            "alonelist writer resource::dynamodb",
+            "placechanged reader resource::dynamodb",
+            "placechanged writer resource::dynamodb",
+            "placechanged writer resource::dynamodb::changed-first",
+            "placelist reader resource::dynamodb",
+            "placelist writer resource::dynamodb",
+            "placelist writer resource::dynamodb::list-first",
+            "placenext writer resource::dynamodb",
+            "placenext writer resource::dynamodb::next-first",
+            "placeping writer resource::dynamodb",
+            "placeping writer resource::dynamodb::ping-first",
+            "placeretry writer resource::dynamodb::retried",
+            "placetable writer resource::dynamodb",
+            "placetable writer resource::dynamodb::table-first",
+            "placetick writer resource::dynamodb::ticked",
+            "spin writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
+/// On a path of entries (a DynamoDB transaction's, EventBridge `PutEvents`' `Entries[]`) Go judges
+/// each name by its own mentions alone (#774): a field written through another name, in any
+/// function or package of the repository, reaches no value a local holds alone, so a request, a
+/// list or an entry held in a local mentioned twice keeps its table or bus. Its twin written
+/// through its own name or through a second local stays unresolved, and so does a named request
+/// that is no list of entries, whose `TableName` some file writes. Go's two locals of one name
+/// in one function are counted together. C# keeps the repository-wide rule as well: a class
+/// derived from an SDK type can keep `this`, and a write through that reference changes a value
+/// its local mentions twice (`trackedentry`).
+#[test]
+fn a_field_written_through_another_name_leaves_a_held_entry_its_table() {
+    let repo = fixture_repo(
+        "aws_sdk_transactions_fields",
+        "aws-sdk-transactions-fields",
+        None,
+    );
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let by_language = sides_by_extension(&export);
+    assert_eq!(
+        by_language["go"],
+        [
+            "aliasedentry writer resource::dynamodb",
+            "heldbus writer channel::eventbridge::held-bus",
+            "heldentry writer resource::dynamodb::held-entry",
+            "heldget reader resource::dynamodb::held-get",
+            "heldlist writer resource::dynamodb::held-list",
+            "heldrequest writer resource::dynamodb::held-request",
+            "plainput writer resource::dynamodb",
+            "putwritten writer resource::dynamodb",
+            "shadowedentry writer resource::dynamodb",
+            "writtenbus writer channel::eventbridge",
+            "writtenentry writer resource::dynamodb",
+            "writtenget reader resource::dynamodb",
+            "writtenlist writer resource::dynamodb",
+            "writtenrequest writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+    assert_eq!(
+        by_language["cs"],
+        [
+            "aliasedentry writer resource::dynamodb",
+            "heldbus writer channel::eventbridge",
+            "heldentry writer resource::dynamodb",
+            "heldget reader resource::dynamodb",
+            "heldlist writer resource::dynamodb",
+            "heldrequest writer resource::dynamodb",
+            "plainput writer resource::dynamodb",
+            "putwritten writer resource::dynamodb",
+            "trackedentry writer resource::dynamodb",
+            "writtenbus writer channel::eventbridge",
+            "writtenentry writer resource::dynamodb",
+            "writtenget reader resource::dynamodb",
+            "writtenlist writer resource::dynamodb",
+            "writtenrequest writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
+/// A Go wrapper that mentions its parameter twice, where it declares it and where a path of
+/// entries reads it, sends what each caller passes (#774): the request, list or entry the caller
+/// writes in the call or holds in a local it mentions twice keeps its table or bus, through a
+/// function, a method and two wrappers, and through a variadic parameter given a spread or one
+/// element; an entry with no bus goes to `default` there too. Each form has its twin: a third
+/// mention in the wrapper (a write, a helper, a new value), in the wrapper between two, or in the
+/// caller leaves it unresolved, and so do more arguments than parameters and a method whose name
+/// another type's method spells. C# is not followed.
+#[test]
+fn a_go_wrapper_s_parameter_is_followed_to_what_its_caller_passes() {
+    let repo = fixture_repo(
+        "aws_sdk_transactions_passed",
+        "aws-sdk-transactions-passed",
+        None,
+    );
+    let export: Value =
+        serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let by_language = sides_by_extension(&export);
+    assert_eq!(
+        by_language["go"],
+        [
+            "changedbus writer channel::eventbridge",
+            "changedbycaller writer resource::dynamodb",
+            "changedbywrapper writer resource::dynamodb",
+            "changedentry writer resource::dynamodb",
+            "changedgets reader resource::dynamodb",
+            "changedinrelay writer resource::dynamodb",
+            "changedmethod writer resource::dynamodb",
+            "changedone writer resource::dynamodb",
+            "changedrequest writer resource::dynamodb",
+            "handedbywrapper writer resource::dynamodb",
+            "hiddencounted writer resource::dynamodb",
+            "othershared writer resource::dynamodb",
+            "passedbus writer channel::eventbridge::passed-bus",
+            "passedcounted writer resource::dynamodb::passed-counted",
+            "passeddefault writer channel::eventbridge::default",
+            "passedentry writer resource::dynamodb::passed-entry",
+            "passedgets reader resource::dynamodb::passed-gets",
+            "passedinline writer resource::dynamodb::passed-inline",
+            "passedlist writer resource::dynamodb::passed-list",
+            "passedmethod writer resource::dynamodb::passed-method",
+            "passedone writer resource::dynamodb::passed-one",
+            "passedrequest writer resource::dynamodb::passed-request",
+            "passedshared writer resource::dynamodb",
+            "passedslice writer resource::dynamodb::passed-slice",
+            "passedtwice writer resource::dynamodb::passed-twice",
+            "passedtwo writer resource::dynamodb",
+            "resetbywrapper writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+    assert_eq!(
+        by_language["cs"],
+        [
+            "passedinline writer resource::dynamodb",
+            "passedlist writer resource::dynamodb",
         ],
         "{export}"
     );
@@ -1389,6 +1559,53 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     );
 }
 
+/// A `private` `final` field builder is named in its own file alone, so a variable of its name
+/// that another file calls a method on is another variable and leaves the field its table
+/// (#775). A field another file can name (package-private, `protected`, `public`) is still
+/// unnamed by such a call, set from there or not; a private one a nested class of its file sets,
+/// one a method hands out, and a name another class of the file declares without `private` have
+/// no table either. Nor has a private field of a file that uses Lombok (`@Getter`: the reach is
+/// not in the source), and a name that is private in its file but, where it is read, the field a
+/// class of another file declares.
+#[test]
+fn a_private_final_field_builder_keeps_its_table_beside_another_file_s_variable() {
+    let repo = fixture_repo("aws_sdk_private_fields", "aws-sdk-private-fields", None);
+    let (export, sides) = java_sides(&repo);
+    assert_eq!(
+        sides,
+        [
+            "exposedField writer resource::dynamodb",
+            "givenField writer resource::dynamodb",
+            "guardedField writer resource::dynamodb",
+            "keptField writer resource::dynamodb::kept-private",
+            "leakedField writer resource::dynamodb",
+            "nestedField writer resource::dynamodb",
+            "openField writer resource::dynamodb",
+            "ownField writer resource::dynamodb::own-private",
+            "plainField writer resource::dynamodb",
+            "sharedField writer resource::dynamodb",
+            "twinField writer resource::dynamodb",
+        ],
+        "{export}"
+    );
+}
+
+/// A file that reads fields by reflection reaches a `private` one and may hand it to any other
+/// file: where a Java file of the repository does, a call on the field's name counts from
+/// every file, as before the private-field rule (#775). The fixture reads the field through a
+/// method reference (`Reached.class::getDeclaredField`): no call spells the method's name.
+#[test]
+fn a_private_field_builder_has_no_table_where_a_file_reads_fields_by_reflection() {
+    let fixture = "aws-sdk-private-fields-reflected";
+    let repo = fixture_repo("aws_sdk_private_fields_reflected", fixture, None);
+    let (export, sides) = java_sides(&repo);
+    assert_eq!(
+        sides,
+        ["reachedField writer resource::dynamodb"],
+        "{export}"
+    );
+}
+
 /// Each Java side of an export, as `method role contract`, sorted.
 fn java_sides(repo: &std::path::Path) -> (Value, Vec<String>) {
     let export: Value =
@@ -1487,6 +1704,29 @@ fn a_java_file_past_its_budget_leaves_every_wrapper_unnamed() {
             "{side}: {export}"
         );
     }
+}
+
+/// A unicode escape of a line terminator ends a line comment, as javac reads it (JLS 3.3): the
+/// change written after it, to a local list, a builder, a caller's list or as an override of the
+/// wrapper, names no table; the override's own `super.store` names none either. After an odd run
+/// of backslashes it starts no escape.
+#[test]
+fn java_code_after_an_escaped_line_break_in_a_comment_is_read() {
+    let repo = fixture_repo("aws_sdk_escapes", "aws-sdk-escapes", None);
+    let (export, sides) = java_sides(&repo);
+    assert_eq!(
+        sides,
+        [
+            "caller writer resource::dynamodb",
+            "dispatched writer resource::dynamodb",
+            "kept writer resource::dynamodb::kept",
+            "local writer resource::dynamodb",
+            "setter writer resource::dynamodb",
+            "store reader resource::dynamodb",
+            "store writer resource::dynamodb",
+        ],
+        "{export}"
+    );
 }
 
 #[test]
@@ -1848,6 +2088,40 @@ fn aws_origin_chains_and_inline_factories_stay_bounded_at_the_file_size_ceiling(
         );
         assert_eq!(export["consumers"], serde_json::json!([]));
     }
+}
+
+/// A Go wrapper whose parameters are one group of nine, ten or twenty names, the first of which
+/// names the table, is followed to its caller: tree-sitter-go parses a group of ten or more apart.
+/// The parameter hides the package constant of its name.
+#[test]
+fn a_go_wrapper_with_a_group_of_ten_parameters_or_more_names_its_callers_table() {
+    let repo = fixture_repo("aws_sdk_go_grouped_parameters", "aws-sdk-controls", None);
+    let wrapper = |n: usize| {
+        let names: Vec<String> = (0..n).map(|k| format!("p{k}")).collect();
+        let rest = ", \"\"".repeat(n - 1);
+        format!(
+            "func write{n}(ctx context.Context, {} string) {{\n\
+             \tclient := dynamodb.NewFromConfig(cfg)\n\
+             \tclient.PutItem(ctx, &dynamodb.PutItemInput{{TableName: aws.String(p0)}})\n}}\n\n\
+             func place{n}(ctx context.Context) {{ write{n}(ctx, \"orders-{n}\"{rest}) }}\n\n",
+            names.join(", ")
+        )
+    };
+    let go = format!(
+        "package app\n\nimport (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/aws\"\n\
+         \t\"github.com/aws/aws-sdk-go-v2/service/dynamodb\"\n)\n\nvar cfg aws.Config\n\nconst p0 = \"hidden\"\n\n{}",
+        [9, 10, 20].map(wrapper).concat()
+    );
+    std::fs::write(repo.join("app.go"), go).unwrap();
+    let text = Engine::open(&repo).unwrap().export().unwrap();
+    let export: Value = serde_json::from_str(&text).unwrap();
+    let sides: Vec<_> = (export["providers"].as_array().unwrap().iter())
+        .map(|s| format!("{} {}", s["site"].as_str().unwrap(), s["contract"]))
+        .collect();
+    let site = |n: usize| format!("local/aws-sdk-controls::app.go::place{n}::write{n}#0");
+    let expected = [10, 20, 9].map(|n| format!("{} \"resource::dynamodb::orders-{n}\"", site(n)));
+    assert_eq!(sides, expected, "{text}");
+    assert!(export["consumers"].as_array().unwrap().is_empty(), "{text}");
 }
 
 /// The transaction calls of a file fold on a budget of their own: however many they are, the

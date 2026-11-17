@@ -26,9 +26,11 @@
   and never gives a wrong one. An argument is a requirement by name: a path, a URL, a direct
   reference, `-e` and the file of `-r` (not followed) give no side, and a wheel or a folder
   written with no slash reads as a name. A name the workspace provides wins over a public
-  package of the same name: one provider in another repository is `exact`, whatever index
-  serves the install, and one in the CI step's own repository is `inferred`, as for a manifest
-  entry with no source. A name with an open part is a pattern within `iac/pattern.rs`'s limits
+  package of the same name, at `inferred` (ADR 0029, until the package yardstick approves the
+  rule): one provider in another repository is `inferred`, whatever index serves the install,
+  its reason starting with `the name alone matched`, and one in the CI step's own repository
+  is `inferred` with the reason of a manifest entry with no source. No form of the table names
+  an origin (a path or a URL gives no side), so no install link is `exact`. A name with an open part is a pattern within `iac/pattern.rs`'s limits
   (`inferred` to the one package it fits, `ambiguous` to several, no side when it fits none: an
   open part glued to a word, `shared-lib$X`, replaces no whole segment and fits nothing); a
   literal name with an open range or extra, or an open part right after the extras
@@ -52,17 +54,21 @@
   the package as the next word: `--from`, `--spec`, another option first, `<package>@<version>`
   and `uv tool run` give no side, and a range after the package (`uvx 'core-sdk>=1'`) gives
   the package and no program. A script whose function is no program entry point of its
-  repository (a module outside the declared roots, generated code) gives no side, and neither
+  repository (a module outside the declared roots, generated code, a name the module only
+  imports: `nox = "nox.__main__:main"` behind `from nox._cli import nox_main as main`, 49 CI
+  steps of the A9 yardstick's set F with no program link, #931) gives no side, and neither
   does a Poetry script written as a table (`{ callable = ... }`, `{ reference = ... }`), an
   object reference with blanks (`"mod : fn"`) or a script run inside a command substitution.
-  The evidence for `exact` is an install by a literal name in an earlier command of the same CI
+  The evidence that picks the package is an install by a literal name in an earlier command of the same CI
   job, in file order of its CI steps: an install in a later CI step, in another CI job, in a
   called script or a composite action, by a pattern, by `-e .`, by `-r` or by a path is not
   seen, and neither is an `if:` that skips the installing CI step. With no install the name
   alone links `inferred`, so a script of the workspace wins over a shell builtin or a public
   tool of the same name. `MAX_DECLARING` (8): a name more packages of the workspace declare
   gives no side at all, even when the CI job installs one of them. The link is at the weaker of
-  the evidence's level and the package link's, and its range is the install's. A script a CI
+  the evidence's level and the package link's, so `inferred` at best: an install, `uvx
+  <package>` and `pipx run <package>` name the package by its name alone (ADR 0029). Its range
+  is the install's. A script a CI
   step runs again on the same evidence adds no row, so the consumer's text is its first
   command. The reason says "in the CI job" for the CI steps of a composite action too.
   `context` on the program's symbol lists no CI step (`callers` are calls in code): `trace` up

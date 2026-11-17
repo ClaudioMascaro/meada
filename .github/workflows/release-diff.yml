@@ -1,0 +1,92 @@
+name: Release diff
+
+# ADR 0029, "The release diff" (#852): on the release pull request, the links and orphan lines of the
+# candidate built from its head against the previous tag's release binary, over prove-meada's pinned public
+# corpora. The release pull request is the one titled `chore(release): <version>`, as the release notes'
+# checklist names it: the title is in the event, so every other pull request skips the job without a runner.
+# A pull request retitled after it opened runs the job on its next push. The job also leaves the candidate
+# binary, which the release's smoke slices run: the release workflow only plans on a pull request.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+concurrency:
+  group: release-diff-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# The image is pinned as in `proof.yml`: a new image is a change of its own.
+jobs:
+  release-diff:
+    if: "startsWith(github.event.pull_request.title, 'chore(release): ')"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Name the previous tag and download its release binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          # The highest release tag below the candidate's version; prerelease tags are no release.
+          base=$( { git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vxF "v$version"; echo "v$version"; } \
+            | sort -V | grep -B1 -xF "v$version" | head -n 1)
+          if [ "$base" = "v$version" ]; then echo "no release tag below v$version"; exit 1; fi
+          dir=$RUNNER_TEMP/base
+          gh release download "$base" --repo "$GITHUB_REPOSITORY" --dir "$dir" \
+            --pattern meada-x86_64-unknown-linux-gnu.tar.xz --pattern meada-x86_64-unknown-linux-gnu.tar.xz.sha256
+          (cd "$dir" && sha256sum -c meada-x86_64-unknown-linux-gnu.tar.xz.sha256)
+          tar -xJf "$dir/meada-x86_64-unknown-linux-gnu.tar.xz" -C "$dir"
+          bin=$(find "$dir" -type f -name meada -perm -u+x | head -n 1)
+          [ -n "$bin" ]
+          echo "BASE_BIN=$bin" >> "$GITHUB_ENV"
+          echo "BASE_LABEL=release $base at $(git rev-list -n 1 "$base"), $("$bin" --version)" >> "$GITHUB_ENV"
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      # The profile and the default features the release workflow (cargo-dist) builds with.
+      - name: Build the candidate
+        run: |
+          cargo build --locked --profile dist
+          mkdir -p "$RUNNER_TEMP/candidate"
+          cp target/dist/meada "$RUNNER_TEMP/candidate/meada"
+          printf '%s\n' "$HEAD_SHA" "$(target/dist/meada --version)" "cargo build --locked --profile dist" \
+            > "$RUNNER_TEMP/candidate/meada.from"
+          echo "HEAD_LABEL=candidate at $HEAD_SHA, $(target/dist/meada --version)" >> "$GITHUB_ENV"
+      - name: Retain the candidate binary for the release's smoke slices
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: meada-candidate-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/candidate
+          if-no-files-found: error
+          retention-days: 30
+      - name: Diff links and orphan lines over the pinned public corpora
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3
+          S=.claude/skills/prove-meada/scripts
+          RUN=$RUNNER_TEMP/release-diff
+          "$RUNNER_TEMP/venv/bin/python" "$S/release-diff.py" --selftest
+          "$RUNNER_TEMP/venv/bin/python" "$S/release-diff.py" run --base-bin "$BASE_BIN" --head-bin "$RUNNER_TEMP/candidate/meada" \
+            --run "$RUN" --base-label "$BASE_LABEL" --head-label "$HEAD_LABEL"
+          cat "$RUN/summary.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain the full diff and both captures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-diff-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/release-diff/diff.json
+            ${{ runner.temp }}/release-diff/summary.md
+            ${{ runner.temp }}/release-diff/base
+            ${{ runner.temp }}/release-diff/head
+            !${{ runner.temp }}/release-diff/*/*/indexes
+          if-no-files-found: warn
+          retention-days: 30

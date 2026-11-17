@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Drive #657 on neutral inputs; answer keys are the issue and base ADR 0026.
+"""Drive #657 on neutral inputs; answer keys are the issue and base ADR 0026, with its
+2026-11-16 amendment (#814): a kind no IaC type provisions, such as a resource of kind `sqs`,
+has no orphan group and its sides carry no mark.
 
 No feature-test fixtures or product matching code are imported. The generated files and
 their SHA256 inventory stay with every raw CLI/MCP response, even when a check fails.
@@ -251,8 +253,10 @@ class Probe:
             if name == 'isolation':
                 for i, q in enumerate(qs[:-1]):
                     key = q['arguments'].get('symbol', q['arguments'].get('query', ''))
-                    wanted = NO_PROVIDER if ('::amqp::' in key or '::gcs::' in key
-                                             or key.startswith('resource::sqs::')) else NO_USE
+                    if key.startswith('resource::sqs::'):
+                        self.check(f'isolation marker {i}', NO_PROVIDER not in texts[i] and NO_USE not in texts[i], texts[i])
+                        continue
+                    wanted = NO_PROVIDER if ('::amqp::' in key or '::gcs::' in key) else NO_USE
                     opposite = NO_USE if wanted == NO_PROVIDER else NO_PROVIDER
                     self.check(f'isolation marker {i}', wanted in texts[i] and opposite not in texts[i], texts[i])
             if name == 'patterns':
@@ -330,8 +334,10 @@ class Probe:
         self.check('cross-kind whole status parity', captures['base'][1] == captures['head'][1])
         self.check('cross-kind no orphan status lines', orphan_set_matches(captures['head'][1], {}))
         for i, text in enumerate(captures['head'][2]):
-            wanted, opposite = (NO_USE, NO_PROVIDER) if i < 2 else (NO_PROVIDER, NO_USE)
-            self.check(f'cross-kind marker {i}', wanted in text and opposite not in text, text)
+            # `channel::sqs` has a provisioner and no use; `resource::sqs` no group at all.
+            wanted = [NO_USE] if i < 2 else []
+            ok = all((m in text) == (m in wanted) for m in [NO_USE, NO_PROVIDER])
+            self.check(f'cross-kind marker {i}', ok, text)
         write(self.run, 'orphans.md', '\n'.join([
             '# #657 cross-kind same-token addendum', '',
             f'{len(self.steps) - len(self.failures)}/{len(self.steps)} checks passed.', '',

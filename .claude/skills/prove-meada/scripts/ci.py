@@ -626,7 +626,7 @@ PROBES = {
     'uv_pip': probe('conda_install', 'uv pip install acme-lib', consumer('acme-lib')),
     'pipx_install': probe('conda_install', 'pipx install acme-tool', consumer('acme-tool')),
     'uv_tool': probe('pip_download', 'uv tool install acme-tool', consumer('acme-tool')),
-    'console_script': probe('level_none', 'pip install acme-sync-kit\nacme-sync --all', consumer('acme-sync-kit'), program('exact', 'sync')),
+    'console_script': probe('level_none', 'pip install acme-sync-kit\nacme-sync --all', consumer('acme-sync-kit'), program('inferred', 'sync')),
     'docker_push': probe('docker_build', 'docker push ghcr.io/acme/pushed:1.0', image('ghcr.io/acme/pushed')),
     'buildx_push': probe('buildx_no_push', 'docker buildx build --push -t ghcr.io/acme/built:1.0 --tag ghcr.io/acme/built-alt:1.0 .',
                          image('ghcr.io/acme/built'), image('ghcr.io/acme/built-alt')),
@@ -688,18 +688,20 @@ PROBES = {
     'shell_job_over_pipeline': probe('shell_pipeline_default', 'pip install acme-lib', consumer('acme-lib'), file='defaults.yml',
                                      job={'defaults': {'run': {'shell': 'sh'}}}),
     # One per row of the level table. No CI job but its own installs for `level_inferred`: an install in
-    # another CI job, as in a later CI step, is no evidence (#832).
-    'level_earlier_step': probe('level_inferred', 'acme-sync --all', program('exact', 'sync'), before=['acme-sync-kit'], file='levels.yml'),
-    'level_uvx': probe('level_uvx_no_script', 'uvx acme-fmt --check .', program('exact', 'fmt'), file='levels.yml'),
-    'level_pipx_run': probe('level_uvx_no_script', 'pipx run acme-fmt --check .', program('exact', 'fmt'), file='levels.yml'),
+    # another CI job, as in a later CI step, is no evidence (#832). An install and `uvx` or `pipx run` name the
+    # package by its name alone, so their rows read `inferred` too (ADR 0029, #850): the rows that differ only
+    # by that evidence are no control of each other any more, and each takes a control with another answer.
+    'level_earlier_step': probe('level_none', 'acme-sync --all', program('inferred', 'sync'), before=['acme-sync-kit'], file='levels.yml'),
+    'level_uvx': probe('level_uvx_no_script', 'uvx acme-fmt --check .', program('inferred', 'fmt'), file='levels.yml'),
+    'level_pipx_run': probe('level_uvx_no_script', 'pipx run acme-fmt --check .', program('inferred', 'fmt'), file='levels.yml'),
     'level_uvx_no_script': probe('level_uvx', 'uvx acme-plain', consumer('acme-plain'), file='levels.yml'),
-    'level_inferred': probe('level_earlier_step', 'acme-sync --all', program('inferred', 'sync'), file='levels.yml'),
-    'level_later_step': probe('level_earlier_step', 'acme-sync --all', program('inferred', 'sync'), after=['acme-sync-kit'], file='levels.yml'),
+    'level_inferred': probe('level_ambiguous', 'acme-sync --all', program('inferred', 'sync'), file='levels.yml'),
+    'level_later_step': probe('level_none', 'acme-sync --all', program('inferred', 'sync'), after=['acme-sync-kit'], file='levels.yml'),
     'level_ambiguous': probe('level_inferred', 'acme-dup --fast', program('ambiguous', 'dup-a', 'dup-b'), file='levels.yml'),
     'level_none': probe('level_inferred', 'acme-unknown --fast', file='levels.yml'),
-    'level_later_line': probe('console_script', 'acme-sync --all\npip install acme-sync-kit', consumer('acme-sync-kit'), program('inferred', 'sync'),
+    'level_later_line': probe('level_none', 'acme-sync --all\npip install acme-sync-kit', consumer('acme-sync-kit'), program('inferred', 'sync'),
                               file='levels.yml'),
-    'level_pipx_install': probe('level_none', 'pipx install acme-fmt\nacme-fmt --check .', consumer('acme-fmt'), program('exact', 'fmt'), file='levels.yml'),
+    'level_pipx_install': probe('level_none', 'pipx install acme-fmt\nacme-fmt --check .', consumer('acme-fmt'), program('inferred', 'fmt'), file='levels.yml'),
 }
 # Each unresolved form, with the variable its side names when it names one, in the three places of the gate:
 # in part of a name (a pattern one package of the workspace fits), as the whole name, inside an option's value.
@@ -834,13 +836,39 @@ PEER_KEYS = {('core-sdk', 'core-api'): 'base_url_env = ["CORE_API_URL"]\n'}
 PUBLISH_MAIN, ROUTE = f'{SDK}::core_sdk/cli.py::publish_main', (f'{HOST}/core-api::app/main.py::register_package', 'http::POST::/v1/packages')
 CASES.update({
     'chain_install': ('chain', 'workflows', W + 'publish.yml', 'publish', 'chain_install', ('run', consumer('core-sdk'))),
-    'chain_run': ('chain', 'workflows', W + 'publish.yml', 'publish', 'chain_run', ('run', ('program', 'exact', (('core-sdk', PUBLISH_MAIN),)))),
+    'chain_run': ('chain', 'workflows', W + 'publish.yml', 'publish', 'chain_run', ('run', ('program', 'inferred', (('core-sdk', PUBLISH_MAIN),)))),
+})
+# The fork probe (#850, ADR 0029): `acme/httpie` holds a fork of a public PyPI package under its public name, and
+# `acme/deploy` installs that name and runs its console script. Both links rest on the name alone, so both are
+# `inferred` and none is `exact`. Its control is the same CI step in a workspace with no provider of the name:
+# no side. A pass or a fail of its own, outside the thresholds of the A9 yardstick (ADR 0029, "Spec A9").
+FORK, FORK_MAIN = f'{HOST}/httpie', f'{HOST}/httpie::httpie/cli.py::main'
+
+
+def fork_pipeline(case, control):
+    return ('name: fork\non: push\njobs:\n  smoke:\n    runs-on: ubuntu-latest\n    steps:\n'
+            f'      # case: {case}\n      # control: {control}\n'
+            '      - id: install_and_run\n        run: |\n          pip install httpie\n          http --version\n')
+
+
+WORKSPACES['fork'] = {
+    'httpie': {'pyproject.toml': manifest('httpie', '3.2.4', {'http': 'main'}), 'httpie/__init__.py': 'VERSION = "3.2.4"\n',
+               'httpie/cli.py': 'def main():\n    return 0\n'},
+    'deploy': {W + 'fork.yml': fork_pipeline('fork_install_run', 'fork_no_provider')},
+}
+WORKSPACES['fork-control'] = {'deploy': {W + 'fork.yml': fork_pipeline('fork_no_provider', 'fork_install_run')}}
+SLICES['f2'] += ('fork', 'fork-control')
+CASES.update({
+    'fork_install_run': ('fork', 'deploy', W + 'fork.yml', 'smoke', 'install_and_run',
+                         ('run', consumer('httpie'), ('program', 'inferred', (('httpie', FORK_MAIN),)))),
+    'fork_no_provider': ('fork-control', 'deploy', W + 'fork.yml', 'smoke', 'install_and_run', ('run',)),
 })
 # The site of every console script's function: a link from a CI step to one of them starts a program.
 ENTRIES = {f'{LIBS}::{folder}/{name.replace("-", "_")}/cli.py::{function}' for folder, (name, _, scripts) in PACKAGES.items()
-           for function in scripts.values()} | {PUBLISH_MAIN, f'{SDK}::core_sdk/cli.py::health_main'}
+           for function in scripts.values()} | {PUBLISH_MAIN, f'{SDK}::core_sdk/cli.py::health_main', FORK_MAIN}
 # The provider of a package: the site of its manifest.
-MANIFESTS = {package(name): f'{LIBS}::{folder}/pyproject.toml' for folder, (name, _, _) in PACKAGES.items()} | {package('core-sdk'): f'{SDK}::pyproject.toml'}
+MANIFESTS = ({package(name): f'{LIBS}::{folder}/pyproject.toml' for folder, (name, _, _) in PACKAGES.items()}
+             | {package('core-sdk'): f'{SDK}::pyproject.toml', package('httpie'): f'{FORK}::pyproject.toml'})
 CHAIN_CALLERS = [('app-a', 'jobs.publish'), ('app-b', 'jobs["publish-prd"]'), ('app-b', 'jobs["publish-stg"]'), ('wrapper', 'jobs.release'),
                  ('app-c', 'jobs.release')]
 
@@ -1158,19 +1186,19 @@ def selftest():
     assert all(len(doc.get('jobs', [])) <= 64 for workspace in SLICES['f2'] for doc in ci_files(workspace).values())
     for site in ENTRIES:  # every entry point is a function the generated files define
         repo, file, function = site.split('::')
-        assert any(f'def {function}(' in files.get(file, '') for files in (WORKSPACES['run']['libs'], WORKSPACES['chain']['core-sdk'])), site
+        assert any(f'def {function}(' in files.get(file, '') for files in (WORKSPACES['run']['libs'], WORKSPACES['chain']['core-sdk'], WORKSPACES['fork']['httpie'])), site
     assert [name for name, _, _ in PACKAGES.values() if re.fullmatch('acme-.+-suite', name)] == ['acme-fast-suite'], 'one package fits the pattern'
     assert not any(re.fullmatch('other-.+-kit', name) for name, _, _ in PACKAGES.values()), 'no package fits the control pattern'
     assert entry('fmt') == ('acme-fmt', f'{LIBS}::fmt/acme_fmt/cli.py::fmt_main') and f'{LIBS}::fmt/acme_fmt/cli.py::fmt_all_main' in ENTRIES
     assert located('composite_run')[0] == f'{STEPS}::tools/install/action.yml::runs.steps[0]' and located('composite_run')[1]['shell'] == 'bash'
     assert read(WORKSPACES['run']['steps'][W + 'run.yml'])['env'] == {'WHICH': 'acme-tool'}
     want = wanted('run')
-    assert want[located('level_earlier_step')[0]][3] == {(package('acme-sync-kit'), entry('sync')[1], 'exact')}
+    assert want[located('level_earlier_step')[0]][3] == {(package('acme-sync-kit'), entry('sync')[1], 'inferred')}
     assert want[located('level_earlier_step')[0].replace('steps[1]', 'steps[0]')][0] == {package('acme-sync-kit')}
     assert want[located('level_later_step')[0].replace('steps[0]', 'steps[1]')][0] == {package('acme-sync-kit')}
     assert want[located('whole_vars')[0]][0] == {None} and want[located('heredoc')[0]] == (set(), set(), set(), set())
-    assert fits(({package('acme-lib')}, set(), {(package('acme-lib'), f'{LIBS}::lib/pyproject.toml', 'exact')}), want[located('pip_install')[0]])
-    assert not fits(({package('acme-lib')}, set(), {(package('acme-lib'), f'{LIBS}::lib/pyproject.toml', 'inferred')}), want[located('pip_install')[0]])
+    assert fits(({package('acme-lib')}, set(), {(package('acme-lib'), f'{LIBS}::lib/pyproject.toml', 'inferred')}), want[located('pip_install')[0]])
+    assert not fits(({package('acme-lib')}, set(), {(package('acme-lib'), f'{LIBS}::lib/pyproject.toml', 'exact')}), want[located('pip_install')[0]])
     assert not fits(({package('acme-lib')}, set(), set()), want[located('echo')[0]])
     assert not fits((set(), set(), {(package('acme-sync-kit'), entry('sync')[1], 'exact')}), want[located('level_inferred')[0]])
     assert not fits(({package('acme-lib')}, set(), {(package('acme-lib'), f'{LIBS}::tool/pyproject.toml', 'exact')}), want[located('pip_install')[0]])
@@ -1180,7 +1208,14 @@ def selftest():
     assert not fits(({pattern}, set(), set()), part) and not fits(({pattern}, set(), {(pattern, f'{LIBS}::suite/pyproject.toml', 'exact')}), part)
     assert not fits(({pattern}, set(), {(pattern, f'{LIBS}::lib/pyproject.toml', 'ambiguous')}), part)
     assert not fits(({None, package('flavor')}, set(), {(package('flavor'), f'{LIBS}::flavor/pyproject.toml', 'exact')}), want[located('whole_vars')[0]])
-    assert fits((set(), set(), {(package('acme-fmt'), entry('fmt')[1], 'exact')}), want[located('level_uvx')[0]])
+    assert fits((set(), set(), {(package('acme-fmt'), entry('fmt')[1], 'inferred')}), want[located('level_uvx')[0]])
+    assert not fits((set(), set(), {(package('acme-fmt'), entry('fmt')[1], 'exact')}), want[located('level_uvx')[0]])
+    # The fork probe: both links `inferred`, an `exact` one on either side fails, and the control holds no side.
+    fork, inferred = wanted('fork')[located('fork_install_run')[0]], (package('httpie'), f'{FORK}::pyproject.toml', 'inferred')
+    assert fits(({package('httpie')}, set(), {inferred, (package('httpie'), FORK_MAIN, 'inferred')}), fork)
+    assert not fits(({package('httpie')}, set(), {inferred[:2] + ('exact',), (package('httpie'), FORK_MAIN, 'inferred')}), fork)
+    assert not fits(({package('httpie')}, set(), {inferred, (package('httpie'), FORK_MAIN, 'exact')}), fork)
+    assert wanted('fork-control')[located('fork_no_provider')[0]] == (set(), set(), set(), set())
     assert not fits((set(), set(), {(package('acme-fmt'), f'{LIBS}::fmt/acme_fmt/cli.py::fmt_all_main', 'exact')}), want[located('level_uvx')[0]])
     assert located('chain_run')[0] == f'{HOST}/workflows::{W}publish.yml::jobs.publish.steps[1]'
     assert 'case:' not in WORKSPACES['chain']['app-a'][W + 'ci.yml'] and 'publish.yml@main' in WORKSPACES['chain']['app-a'][W + 'ci.yml']
@@ -1217,6 +1252,12 @@ def selftest():
     for name in CORPUS:
         assert re.fullmatch(r'[0-9a-f]{40}', pinned[name][2]) and pinned[name][1].startswith('https://github.com/'), name
     corpus_selftest(pinned)
+    note, gha = ' (no provisioner in the workspace)', 'resource::gha-workflow::acme/workflows/.github/workflows/publish.yml'
+    found = f'github.com/acme/app-a ci.yml (line 29) {gha}{note}\ngithub.com/acme/x f.tf (line 1) resource::s3::b{note}\n'
+    assert without_814(('search', {'query': 'publish'}), found) == found.replace(gha + note, gha), found
+    shown = f'{gha}\n  github.com/acme/workflows writer publish.yml (line 6){note}\n'
+    assert without_814(('context', {'symbol': gha}), shown) == shown.replace(note, ''), shown
+    assert without_814(('context', {'symbol': 'resource::s3::b'}), shown.replace(gha, 'resource::s3::b')) == shown.replace(gha, 'resource::s3::b')
     print(f'ci.py self-test: {len(CASES)} cases, each with a control that can fail')
 
 
@@ -1224,12 +1265,16 @@ def corpus_selftest(pinned):
     """#904's sets, their run records and what `measure` counts, without Meada."""
     sets = corpus_sets()
     assert {name: len(repos) for name, repos in sets.items()} == {'p': 3, 'a': 6, 'b': 7, 'c': 10, 'f': 41, 'f-distractor': 47}, sets
+    # Meada refuses a manifest identity that is not its own lower-cased reading of the remote (pyBumpHunter).
+    assert sets['f']['ci-f-pybumphunter'] == 'github.com/scikit-hep/pybumphunter', sets['f']
+    assert all(identity == identity.lower() for repos in sets.values() for identity in repos.values()), sets
     records = json.loads((Path(__file__).resolve().parent / 'ci-records.json').read_text())['records']
     assert set(records) == {repo for repos in sets.values() for repo in repos}, sorted(records)
     for name, record in records.items():
         assert (record['repository'], record['sha']) == (pinned[name][1].removeprefix('https://github.com/'), pinned[name][2]), name
     for uses, job, want in (('o/hub/.github/workflows/b.yml@v1', True, ('<owner>/<repo>/.github/workflows/<file>@<ref>', 'github.com/o/hub')),
                             ('o/hub@v1', False, ('<owner>/<repo>@<ref>', 'github.com/o/hub')),
+                            ('O/Hub/a@v1', False, ('<owner>/<repo>/<folder>@<ref>', 'github.com/o/hub')),
                             ('o/hub/a/b@0123abc', False, ('<owner>/<repo>/<folder>@<ref>', 'github.com/o/hub')),
                             ('./.github/workflows/b.yml', True, ('./.github/workflows/<file>', None)),
                             ('./.github/actions/x', False, ("a CI step's ./<folder>", None)), ('./../x', False, ('./../<directory>', None)),
@@ -1564,9 +1609,17 @@ def f1(run, heads, exports, statuses):
             ('context', {'symbol': 'resource::gha-workflow::acme/workflows/.github/workflows/publish.yml', **big})]
     before, after = (run.ask(side, calls(side, 'hub'), 'existing', same) for side in ('base', 'head'))
     for query, left, right in zip(same, before, after):
-        run.check(f'existing answer equal to the base: {json.dumps(query)}', left == right, [left, right])
+        run.check(f'existing answer equal to the base: {json.dumps(query)}', without_814(query, left) == right, [left, right])
     run.check('control: the base finds the four `uses` lines of `publish.yml` as config values', before[0].count('publish.yml@') >= 4, before[0])
     run.check('control: the base answers the hand declaration of #816 with its declared consumer', f'{HOST}/app-a' in before[3], before[3])
+
+
+def without_814(query, text):
+    """A base answer as #814 reads it: a base before #914 notes `no provisioner in the workspace` on the
+    hand-declared `gha-workflow`, a kind no IaC type provisions, which #814 leaves unmarked. Only those lines
+    lose the note, so a head that keeps it, or a note on any other kind, still differs."""
+    note, whole = ' (no provisioner in the workspace)', query[0] == 'context' and '::gha-workflow::' in query[1].get('symbol', '')
+    return '\n'.join(line.replace(note, '') if whole or 'resource::gha-workflow::' in line else line for line in text.split('\n'))
 
 
 def gathered(exports, workspace, section, side='head'):
@@ -1605,14 +1658,14 @@ def sided(rows, site):
 
 def fits(got, want):
     """A link to an entry point starts a program. A name the CI step installs links to the manifest of its
-    package at `exact`: each package of the cases has one provider, in another repository (#820, "Programs
-    of the workspace"). A pattern links to each package it fits, never at `exact`. The link of a package
+    package at `inferred`: each package of the cases has one provider, in another repository, and the name
+    alone matched it (ADR 0029, #850, amending #820's `exact`). A pattern links to each package it fits, never at `exact`. The link of a package
     the CI step only starts a program of is allowed, to that manifest."""
     (consumers, builders, links), (must, may, images, programs) = got, want
     started = {link for link in links if link[1] in ENTRIES}
     names = {contract for contract in must if contract and '*' not in contract}
     patterns = {contract for contract in must if contract and '*' in contract}
-    installs = {(contract, MANIFESTS[contract], 'exact') for contract in names}
+    installs = {(contract, MANIFESTS[contract], 'inferred') for contract in names}
     fitting = lambda pattern: {site for name, site in MANIFESTS.items() if re.fullmatch(re.escape(pattern).replace(r'\*', '.+'), name)}
 
     def other(link):
@@ -1759,13 +1812,15 @@ def corpus_sets():
     for name, (flows, url, _) in prove.infra().items():
         for flow in flows:
             if flow == 'ci' or flow.startswith('ci-'):
-                sets.setdefault('p' if flow == 'ci' else flow[3:], {})[name] = 'github.com/' + url.removeprefix('https://github.com/')
+                # Meada writes an identity in lower case (`pyBumpHunter`'s remote is `.../pybumphunter`).
+                sets.setdefault('p' if flow == 'ci' else flow[3:], {})[name] = 'github.com/' + url.removeprefix('https://github.com/').lower()
     sets['f-distractor'] = {**sets['f'], **sets.pop('distractor')}
     return sets
 
 
 def uses_form(uses, job):
-    """A `uses` as (its form in ADR 0028's table, the repository a full name names, else None)."""
+    """A `uses` as (its form in ADR 0028's table, the repository a full name names, lower-cased as ADR 0028
+    reads it, else None)."""
     if '${{' in uses:
         return 'expression', None
     if uses.startswith(('docker://', '$/')):
@@ -1777,7 +1832,7 @@ def uses_form(uses, job):
     parts = uses.partition('@')[0].split('/')
     form = ('<owner>/<repo>/.github/workflows/<file>@<ref>' if parts[2:4] == ['.github', 'workflows']
             else '<owner>/<repo>/<folder>@<ref>' if parts[2:] else '<owner>/<repo>@<ref>')
-    return form, 'github.com/' + '/'.join(parts[:2])
+    return form, 'github.com/' + '/'.join(parts[:2]).lower()
 
 
 def ci_nodes(identity, root):

@@ -111,10 +111,8 @@
   step that removes the files afterwards is not seen. A checkout's `ref` is not read: the link
   is to the own repository at its indexed commit. An unresolved CI step holds no candidate and
   `meada decide` offers nothing for it. A decision written by hand for it (`kind =
-  "dynamic-url"`, its `target` a CI provider) is accepted for any CI provider of the workspace,
-  an action or a reusable pipeline alike: it adds a `decided` link that `trace` and the
-  provider's `context` follow and closes the item, while `context` on the CI step still says
-  `consumes (unresolved)`. The export row of an unresolved CI step holds no `with` and no
+  "dynamic-url"`, its `target` a CI provider) is stale with the cause `not-candidate` (#806): it
+  adds no link and the item stays open. The export row of an unresolved CI step holds no `with` and no
   `secrets`: they are copied to a consumer with a CI contract only. On the pinned corpus (#835)
   all 32 unresolved CI steps are of this kind, 10 of them after a literal checkout of the own
   repository into a named `path` (`./<path>/<folder>`), which the value of `path` would resolve.
@@ -151,8 +149,12 @@
   consumers costs seconds. An orphan line needs a consumer with a contract in the scope: a
   marked consumer opens it, an external `uses` and an unresolved CI step do not, a provider
   consumed only by a call to itself is no orphan, and one whose only caller is an unresolved
-  CI step is an orphan once another consumer opens the scope. A peer `meada.toml` names and
-  the disk does not hold is outside the workspace: a call to it holds no side and no mark.
+  CI step is an orphan once another consumer opens the scope. So is an action only a call that
+  leaves the root reaches at run time: `uses: ./../<directory>` holds no side, so the builder
+  actions slsa's delegator pipeline moves there, from a path its caller passes in `with`, read
+  `no consumer` (4 lines in `ci-slsa` at its pin, found by the 1.5.0 release diff). A peer
+  `meada.toml` names and the disk does not hold is outside the workspace: a call to it holds no
+  side and no mark.
   `meada status` reports and does not index: a repository never indexed prints `not indexed`
   and no orphan line. The `absent` field of `meada export` follows the links of that same
   export: a consumer row of the kind with no link.

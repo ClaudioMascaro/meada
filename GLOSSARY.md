@@ -461,8 +461,7 @@ _Avoid_: revision, snapshot, manifest version
 A named query context over a deployment's shared indexed repositories: a record with a
 deterministic id, a name and a description, its operators and a versioned manifest of the
 repositories and links it selects. It decides what an answer can see and says nothing about how a
-repository is indexed or published. Accepted by ADR 0020, whose contracts are ADR 0021; not yet
-delivered: the delivered console serves one workspace per deployment.
+repository is indexed or published. Accepted by ADR 0020, whose contracts are ADR 0021.
 _Avoid_: tenant, project, environment, isolated workspace
 
 **Deployment workspace**:
@@ -857,7 +856,8 @@ _Avoid_: judge, LLM, oracle
 **Stale decision**:
 A decision that no longer applies, for one cause: its call site is gone, its item is no longer
 open (the core now resolves the call on its own), its target is gone, or its target is no longer
-a candidate of the ambiguous link. Indexing ignores it, so the link stays as the core sees it;
+a candidate of its item: of the ambiguous link, or, for a dynamic URL, one of the routes `meada
+decide` lists for the call (#806). Indexing ignores it, so the link stays as the core sees it;
 `meada status` and `meada export` report it with the cause. A decision whose target repository
 is a missing peer is neither applied nor stale: it waits.
 _Avoid_: outdated decision, invalid decision

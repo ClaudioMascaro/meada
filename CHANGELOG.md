@@ -6,8 +6,32 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-16
+
+A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md)
+that brings GitHub Actions into the graph (ADR 0028): pipelines, actions, CI jobs and CI steps are
+IaC nodes, the new `ci` contract kind links each call of a reusable pipeline or an action across
+the repositories of a workspace, and a CI step's `run` script links to the packages it installs,
+the programs it starts and the images it publishes. It is minor because `search` gains the kind
+`ci`, contract identifiers gain `ci::`, `context` and `search` gain line kinds and marks, and the
+export gains optional fields. It also reads more of the AWS SDKs in Go and Java and fixes the
+reading of Go, Java, Terraform, Dockerfile, Backstage and decisions. The index schema changes, so
+existing indexes are rebuilt once on first use, and every fix below applies then, those whose
+entry says the schema version is the same included; export format stays 1. `meada-core` 1.5.0
+gives `export::Consumer` the fields `git_ref` (serialized as `ref`), `with`, `secrets`, `absent`
+and `permissions`, with the new `export::Permissions`, `AllPermissions`, `Access`, `Secrets` and
+`Inherit`. There is no Postgres migration. The tree, the `meada-core` pin, the Dockerfile, the
+compose defaults and the Helm chart declare `1.5.0`, and the `v1.5.0` tag goes on the
+`release/1.5` branch, cut from this entry's merge on main. Publication (crates, the staged npm
+package, the GitHub draft release) belongs to the maintainer. Release notes are available in
+[pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.5.0.md),
+[English](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.5.0.en.md) and
+[Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.5.0.es.md).
+
 ### Added
 
+- Go: a DynamoDB transaction's list held in a name keeps its tables when it is also read by
+  `len(x)` or `cap(x)`, unless the package declares its own `len` or `cap` (#774).
 - Java: a list of DynamoDB transaction entries, or one entry, that a wrapper takes in a parameter
   and passes on names its tables when no mention, in the wrapper or its caller, can change it
   before the request reads it; a list that is sorted, or changed after a named request's
@@ -16,6 +40,14 @@ All notable changes to Meada are recorded here. The format follows
   its name and number of parameters, or an anonymous class's, may stand for names none, and so
   does every wrapper while any file is past its pack's budget. An existing index is rebuilt
   on its first open by this version (#772).
+- Java: a request builder held in a `private final` field keeps its table when another file calls
+  a method on a variable of the same name. The source of another file cannot name a private
+  field, so that variable is another one; before, a call there on that name, other than
+  `build()`, left the field's side unresolved. As before, every Java file judges a name its file
+  also declares without `private`, a field of a file that names Lombok (a `@Getter` hands the
+  field out with no mention in the source) or holds a Unicode escape, and every field of a
+  repository where a Java file reads fields by reflection, is not UTF-8 or holds a zero byte
+  (#775).
 - Pipelines, actions, CI jobs and CI steps of GitHub Actions are IaC nodes (ADR 0028). A file
   directly under `.github/workflows/` that holds `jobs` is a pipeline, and an `action.yml` or
   `action.yaml` that holds `runs` is an action; each CI job (`jobs.build`) and CI step
@@ -71,10 +103,12 @@ All notable changes to Meada are recorded here. The format follows
   and the user guide teach the kind. Release level: minor, meada (#829).
 - A CI step whose command is a console script of a PyPI package of the workspace starts that
   program (ADR 0028): it consumes the package, with the command as written, and links to the
-  function the script names. The link is `exact` when an earlier command of the same CI job
-  installs the package or the command names it (`uvx <package>`, `pipx run <package>`),
-  `inferred` with no install and one declaring package, `ambiguous` with several, and absent
-  when none declares the name. `trace` crosses it both ways, so the CI jobs that run a program
+  function the script names. The link is `inferred` when an earlier command of the same CI job
+  installs the package, when the command names it (`uvx <package>`, `pipx run <package>`) and
+  with no install and one declaring package, its reason naming the evidence, `ambiguous` with
+  several, and absent when none declares the name: an install names the package by its name
+  alone, so the link stays `inferred` until the package yardstick approves that rule (ADR 0029,
+  #850). `trace` crosses it both ways, so the CI jobs that run a program
   show above the routes it calls. The manifest reader keeps each console script's name: the
   schema version rises and an index rebuilds on first use. Release level: minor, meada (#832).
 - `docker push <image>` and `docker buildx build --push` (each `-t`, `--tag` and `--tag=`) in a
@@ -91,6 +125,14 @@ All notable changes to Meada are recorded here. The format follows
   is never compared: these are declared permissions, not effective ones. `meada export` gains
   the optional consumer field `permissions`. Existing indexes are rebuilt once on first use.
   Release level: minor, meada and meada-core (#834).
+- Go: a request, a list or an entry of a DynamoDB transaction or of EventBridge `PutEvents`
+  that a wrapper takes in a parameter keeps its table or bus at each caller, when the wrapper
+  only declares the parameter and sends it and the caller passes a value nothing else names. A
+  function, and a method whose name no other definition spells, are followed (#774).
+- Go: a request, a list or an entry of a DynamoDB transaction or of EventBridge `PutEvents`
+  held in a local keeps its table or bus when another function or package writes the same field
+  through another name (`q.TableName = ..`). The value written through its own name, and a
+  named request that is no list of entries, stay unresolved; C# keeps its rule (#774).
 
 ### Changed
 
@@ -116,26 +158,66 @@ All notable changes to Meada are recorded here. The format follows
   one after `&&` or `;`, also inside `if` or a loop, and a script with a heredoc or past 1024 bytes
   is not read. `pip install`, `pip3 install`, `python -m pip install`, `uv pip install`, `pipx
   install` and `uv tool install` make the CI step a consumer of `package::pypi::<name>` for a
-  package of the workspace, at the package kind's level and with the range as written, and `context`
-  on the package lists the CI step. A name with an unresolved part is a pattern, and a name left
+  package of the workspace, with the range as written, and `context` on the package lists the CI
+  step. One provider of the name links `inferred`, its reason starting with `the name alone
+  matched`, since a fork or a copy of a public package may hold the name (ADR 0029, #850). A name with an unresolved part is a pattern, and a name left
   open whole an unresolved consumer with its cause where the workspace provides a PyPI package. The
   index stores nothing new. Release level: minor, meada (#831).
 ### Fixed
-
+- `search` and `context` no longer mark a side `(no provisioner in the workspace)` when no IaC
+  type can provision its kind: a declared `[[resource]]` of kind `postgres`, a NATS subject or a
+  resource declared through `via` of a kind the type table does not list carries no mark, and the
+  writer of a declared resource no longer reads as missing infrastructure. A kind the type table
+  provisions is marked as before, and `meada status` is unchanged (ADR 0026, amended) (#814).
+- Java: a unicode escape of a line terminator (`\u000a`, `\u000d`, with any number of `u`, and
+  not after an odd run of backslashes) is read as javac reads it, before the file is parsed: in a
+  line comment it ends the comment, and the rest of the line is code. A change written there, to
+  a list, a builder, a wrapper's argument or as an override of a wrapper, no longer leaves the old
+  DynamoDB table named `exact` (found by the verification of #772).
 - Go: the system or architecture suffix of a file name is read off the name cut at its first
   dot, as the Go tools read it. A file such as `store.gen_windows.go`, which Go builds for every
   target, was left out with all its definitions and calls, and `store_windows.gen.go`, which Go
   builds for Windows alone, was read (#876). The schema version is the same: an index written
   before the upgrade keeps its reading of such a file until the file next changes, or takes the
   new rule at once after deleting `.meada/index.db`.
+- Go: below a module's root, a package in a directory named `testdata` or whose name begins with
+  `_` is read only when a package Meada reads imports it, and so on in turn, as `go build ./...`
+  builds it; its `_test.go` files stay out. A program kept there as a fixture no longer shows its
+  routes and calls as providers and consumers of the repository. A package only a blank import
+  (`import _ "..."`) reaches stays out, though Go builds it. Found by the verification of #880.
+  The schema version is the same: an index written before the upgrade may keep such a package
+  until a refresh finds a change in the repository, and takes the new rule at once after deleting
+  `.meada/index.db`.
 - The Dockerfile reader counts every directory entry a wildcard source examines, matched or not,
   and a long wildcard segment as many entries: 255 sources that match none of 4,000 files no
   longer take 47 seconds to index, and fall back to the whole build context as other Dockerfiles
   past the reader's work do (#761).
+- Go: a parameter list or named results that group ten names or more under one type
+  (`p0, p1, ..., p9 string`) keep their first names. tree-sitter-go parses each name before the
+  last nine as a nameless parameter of that type name, and Go writes the names of a list all or
+  none, so the pack gives them back to the group: a wrapper whose table comes in `p0` is followed
+  to its callers, where the table is named, instead of leaving one unresolved side at its own
+  call, or naming the table of a package constant the parameter hides. The schema version is
+  the same: an index written before the upgrade keeps its reading of such a file until the file
+  next changes, or takes the new rule at once after deleting `.meada/index.db` (found by the
+  verification of #886).
 - The Dockerfile reader splits an instruction and its sources at ASCII blanks only, as Docker
   does: a source whose name holds a no-break space or another Unicode blank is one path, not two,
   and a flag past ASCII, which Docker reads one byte as one character, leaves the Dockerfile
   unread (#762).
+- A wrapper that calls itself, or two that call each other, with another value in the parameter
+  a read needs (`send(ctx, n-1, b, "")` or `send(ctx, n-1, a+"-next", b)` under
+  `send(ctx context.Context, n int, a, b string)`) no longer drops what the next turn sends:
+  each caller's site gets an unresolved side or contract for it, beside the names its own pass
+  gives. A retry that passes the same parameter on reads as before. The rule is the
+  resolver's, where every wrapper is followed to its callers; its tests cover an HTTP client
+  and the Go AWS SDK sides of a table name and of a transaction's list (#886).
+- A `dynamic-url` decision applies only when its target is one of the candidates `meada decide`
+  lists for the call, the routes its method and the parts of its URL Meada reads can reach. A
+  target outside them, such as a `POST` route decided for a `GET` call, became a `decided` link
+  and closed the item; it is now a stale decision with the cause `not-candidate`, the item stays
+  open and `meada decide --prune` removes it (#806). A behavior change: a hand-written decision
+  that names no candidate, one for an unresolved CI step included, stops applying.
 - Terraform evaluation sizes a variable once per expression however many times the expression
   reads it, and a name every instance of a `count` or `for_each` shares (one that reads neither
   `each` nor `count`) is evaluated once when it is known: a name reading a 21,000-element
@@ -143,11 +225,35 @@ All notable changes to Meada are recorded here. The format follows
   paid the estimate again. A refused expression spends the evaluation budget for each root by
   its own reads, so reading `count.index` no longer counts as copying every variable: forty
   refused instances no longer leave the names after them unresolved (#765).
+- A Backstage backend module (`createBackendModule`) serves its routes under the
+  `/api/<pluginId>` of the plugin it extends, where Backstage mounts them, and no longer at the
+  root, where nothing serves them; a `discovery.getBaseUrl('<pluginId>')` call to such a route
+  links to it (#813).
+- Java: a file that reads a field by reflection through a method reference
+  (`Holder.class::getDeclaredField`) or a name written with a Unicode escape no longer leaves
+  a field builder it may change with its first table. A file reads fields where it spells
+  `getDeclaredField`, `getField` or their plurals as a whole name, a comment included, with a
+  character the compiler drops from a name read as not there, and whatever its size. The
+  index stores that per file, and an existing index is rebuilt on its first open by this
+  version (#775).
+- Terraform evaluation holds every string in Unicode NFC, as Terraform and OpenTofu do: a string
+  literal (a name, a local, a variable default, a module argument), an object key, a literal
+  index, a `.tfvars.json` value and key, and the text a template or a string function makes. A
+  set holding two spellings of one string (`e` and a combining acute accent, and `é`) is one
+  element, a key, an index or a comparison matches either spelling, and the names are the ones
+  Terraform gives, where Meada named each spelling apart, all `exact` (#749). The schema version is the same: an index written
+  before the upgrade keeps its names until a Terraform or var file of their root module next
+  changes, or takes the new rule at once after deleting `.meada/index.db`.
 - Terraform evaluation no longer parses a template's text again each time it evaluates it: a
   template is evaluated as its parts, each charged a few steps in a `for` instead of 32 steps a
   byte of its text, so a 17 KB template in a `for` over two elements, a `%{ if }` template in a
   `for` over 2,000 elements and 40 interpolations in a `for` over 198 elements are named
   exactly again, as before 1.3.0 (#763).
+- A `bool` input of a registry module (its creation controls, `create_layer`, `create_package`,
+  `fifo_queue`, `fifo_topic` and `use_name_prefix`) or an `[[iac.module]]` mapping's `create`
+  given the string `"true"` or `"false"` reads as that bool, as Terraform converts it:
+  `create_bucket = "true"` provisions the bucket, where Meada provisioned nothing. Any other
+  string, `"True"` too, stays unknown (follow-up to #787).
 
 ## [1.4.0] - 2026-11-13
 

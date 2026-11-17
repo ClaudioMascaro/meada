@@ -33,6 +33,9 @@
   family cannot produce an exact link; other files still index, and `Facts::budget` (not
   `unbuilt`) makes `meada status` name the file, as for C#. The Java hostile-depth and
   long-prefix engine fixtures exceed these limits.
+- `lang/java.rs`: `escaped_breaks` translates only the unicode escapes of a line terminator
+  before the parse; javac translates every escape (JLS 3.3), and any other one stays as written.
+  So `\u002a/` does not end a block comment, and the code javac reads after it stays a comment.
 - `jvm/names.rs`: `LOCAL_DEPTH` (8) bounds how many locals a JVM client reader (Ktor,
   `RestTemplate`, `WebClient`, Retrofit) follows a client through (`val b = a`, `val a =
   HttpClient(..)`) where the value flow does not reach it; past it the client is not followed
@@ -205,7 +208,12 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   is left out); a legacy `// +build` line
   alone is not read. A file name's system or architecture suffix is read off the name cut at its
   first dot, as the Go tools read it (#876): `disk.gen_windows.go` is built, `disk_windows.gen.go`
-  is not. A plain import binds the name the Go tools assume for its path
+  is not. A package under `testdata` or an `_` or `.` directory below its module's root
+  (`build::listed`) is read only when a package read imports it, in turn; one only a blank
+  import (`import _ "..."`) reaches stays out, though Go builds it, since the facts keep no blank
+  import (found by the verification of #880). The schema version is the same, so an index written
+  before this rule may keep such a package until a refresh finds a change in the repository.
+  A plain import binds the name the Go tools assume for its path
   (`assumed_name`: the last element, the one before a `vN`, without `go-`, up to the first
   character no identifier holds), not the package clause of the directory it names, so a
   package whose clause differs from its directory is reached by its alias alone, and a name two

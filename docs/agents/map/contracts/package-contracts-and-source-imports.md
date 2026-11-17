@@ -147,7 +147,9 @@
   consumer of the package whose `via` is `run <command as written>` and whose `hops` name the
   program's symbol with the level of the evidence (`installed`, the literal installs of the CI
   job so far, in the order `step_of` gives); `Packages::link` turns each hop into a link at
-  the weaker level, as it does for an import. A PyPI range is checked by
+  the weaker level, as it does for an import. Both sides of a CI step name the package by its
+  name alone, so `Packages::link` gives their one fitting provider `inferred` with the reason
+  `BY_NAME` (ADR 0029), finding the CI step among the `Export::scripts` of its repository. A PyPI range is checked by
   `package/pep440.rs` (`Pypi::flag`, a hand-written subset: a comma-separated set of `==`, `!=`,
   `<`, `<=`, `>`, `>=`, `~=`, `==X.*` and `===`, over PEP 440 versions with epoch, pre-, post-,
   dev-releases and local labels, no crate: the subset is small, and the evaluator stays inside the clean-room rules and the

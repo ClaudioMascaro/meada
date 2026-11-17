@@ -1540,7 +1540,7 @@ dependencies = [
 
 [[package]]
 name = "meada"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "argon2",
  "async-trait",
@@ -1590,13 +1590,14 @@ dependencies = [
  "tree-sitter-rust",
  "tree-sitter-swift",
  "tree-sitter-typescript",
+ "unicode-normalization",
  "ureq",
  "yaml-rust2",
 ]
 
 [[package]]
 name = "meada-core"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "blake3",
  "serde",

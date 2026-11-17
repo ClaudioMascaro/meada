@@ -1,14 +1,16 @@
 //! Backstage backends (#615): the framework mounts every backend plugin's router at
 //! `/api/<pluginId>`, and plugins reach each other through `discovery.getBaseUrl('<pluginId>')`.
 //! A `createBackendPlugin({ pluginId: '<literal>', register })` imported from a `@backstage/`
-//! package is a mount node: what its `register` gives `<dep>.use(...)`, `<dep>` a key of a
-//! `registerInit` `deps` object bound to `coreServices.httpRouter`, is mounted under
-//! `/api/<pluginId>`, the `pluginId` a literal or a `const` of the file bound to one. A plugin
-//! whose `pluginId` cannot be read mounts nothing, so its routers stay at the root, and
-//! `meada status` says so (`Role::Unmounted`). On the consumer side a URL that starts with `discovery.getBaseUrl('<literal>')`,
-//! held by a constant or written in place, starts at `/api/<literal>`, and a hostless consumer of
-//! a route a plugin's mount serves names that mount in its reason (`name`). A URL through a
-//! proxy endpoint (`/api/proxy/<ep>`, #616) names the endpoint in its `via` (`proxied`).
+//! package is a mount node, and so is a `createBackendModule` (#813), whose `pluginId` is the
+//! plugin it extends and whose plugin-scoped `httpRouter` is that plugin's own: what its
+//! `register` gives `<dep>.use(...)`, `<dep>` a key of a `registerInit` `deps` object bound to
+//! `coreServices.httpRouter`, is mounted under `/api/<pluginId>`, the `pluginId` a literal or a
+//! `const` of the file bound to one. A plugin whose `pluginId` cannot be read mounts nothing, so
+//! its routers stay at the root, and `meada status` says so (`Role::Unmounted`). On the consumer
+//! side a URL that starts with `discovery.getBaseUrl('<literal>')`, held by a constant or written
+//! in place, starts at `/api/<literal>`, and a hostless consumer of a route a plugin's mount
+//! serves names that mount in its reason (`name`). A URL through a proxy endpoint
+//! (`/api/proxy/<ep>`, #616) names the endpoint in its `via` (`proxied`).
 
 use super::super::{CLIENT_VIA, CallAt, PROXY_VIA, fits};
 use crate::contract::Found;
@@ -44,9 +46,9 @@ type Plugin<'a> = (
     Vec<(&'a str, &'a str, &'a Value)>,
 );
 
-/// Each backend plugin: its `createBackendPlugin` call, its `pluginId` when it is a literal or a
-/// `const` of the file bound to one, and every argument of each `httpRouter.use(...)` its
-/// `register` makes, with the file and the scope it is written in.
+/// Each backend plugin or module: its `createBackendPlugin` or `createBackendModule` call, its
+/// `pluginId` when it is a literal or a `const` of the file bound to one, and every argument of
+/// each `httpRouter.use(...)` its `register` makes, with the file and the scope it is written in.
 // ponytail: `register` and `init` are read where they are written (a helper they call and a
 // renamed destructured `httpRouter` are not followed); follow them through `Code::origins` if
 // plugins in the wild are written that way.
@@ -54,7 +56,11 @@ pub(super) fn plugins<'a>(code: &Code<'a>) -> Vec<Plugin<'a>> {
     let mut out = Vec::new();
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
-            if !call.callee.ends_with("createBackendPlugin") {
+            // A module's `pluginId` is the plugin it extends, and it gets that plugin's router.
+            if !["createBackendPlugin", "createBackendModule"]
+                .iter()
+                .any(|c| call.callee.ends_with(c))
+            {
                 continue;
             }
             let from_backstage = code.outside(path, &call.scope, &call.callee, false);

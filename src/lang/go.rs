@@ -1,7 +1,8 @@
 //! The Go language pack (spec #25). It reads `.go` files and the `go.mod` files of a repository
 //! with no Go toolchain: an import names a package directory through the module path of the
 //! `go.mod` that owns it (`modfile.rs`), the files of one package share their top-level scope
-//! (`Layout::shared`), and build constraints are evaluated for one fixed target (`build.rs`).
+//! (`Layout::shared`), build constraints are evaluated for one fixed target (`build.rs`), and a
+//! package under `testdata` or an `_` directory is read when a package read imports it (`layout`).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
@@ -82,18 +83,37 @@ impl LanguagePack for Go {
             let key = (dir(path), facts.package.as_str());
             packages.entry(key).or_default().push(path.to_string());
         }
-        // What an import of a directory names: its first file but the tests (which no other
-        // package imports), which stands for the package (`Layout::shared`).
-        let mut importable: BTreeMap<&str, &str> = BTreeMap::new();
+        // The files of each package directory but the tests, which no other package imports.
+        let mut importable: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
         for path in built.keys().filter(|p| !p.ends_with("_test.go")) {
-            importable.entry(dir(path)).or_insert(path);
+            importable.entry(dir(path)).or_default().push(path);
         }
-        let importable: BTreeMap<String, String> = (importable.into_iter())
-            .map(|(d, p)| (d.to_string(), p.to_string()))
-            .collect();
         let modules = modfile::Modules::new(configs);
+        // `./...` of each module, and what those files import, in turn: Go builds a package under
+        // `testdata` or an `_` directory only when a package it builds imports it.
+        let mut members: BTreeSet<&str> = (built.keys().copied())
+            .filter(|p| build::listed(modules.below(dir(p))))
+            .collect();
+        let mut queue: Vec<&str> = members.iter().copied().collect();
+        while let Some(path) = queue.pop() {
+            for import in &built[path].imports {
+                let Some(imported) = modules.dir(dir(path), &import.source) else {
+                    continue;
+                };
+                for &file in importable.get(imported.as_str()).into_iter().flatten() {
+                    if members.insert(file) {
+                        queue.push(file);
+                    }
+                }
+            }
+        }
+        // What an import of a directory names: its first file, which stands for the package
+        // (`Layout::shared`).
+        let importable: BTreeMap<String, String> = (importable.into_iter())
+            .map(|(d, p)| (d.to_string(), p[0].to_string()))
+            .collect();
         Ok(Layout {
-            members: Some(built.keys().map(|p| p.to_string()).collect()),
+            members: Some(members.into_iter().map(String::from).collect()),
             modules: Box::new(move |from, specifier| {
                 (modules.dir(dir(from), specifier))
                     .and_then(|d| importable.get(&d))
@@ -184,11 +204,11 @@ impl Walk<'_> {
     /// The names a parameter list binds, with the type each writes: parameters (`local` false,
     /// which `Def::params` lists), or the receiver and the named results of a function.
     fn typed_params(&mut self, scope: &str, list: Option<Node>, local: bool) {
-        for param in list.into_iter().flat_map(named) {
+        for (names, param) in declarations(list) {
             let ty = param.child_by_field_name("type");
             let ty = ty.filter(|_| param.kind() == "parameter_declaration");
             let class = ty.and_then(|t| type_name(t, self.src)).map(Class::Type);
-            for name in names(param) {
+            for name in names {
                 self.bind_as(scope, text(name, self.src), class.clone(), local, None);
             }
         }
@@ -303,6 +323,14 @@ impl Walk<'_> {
         false
     }
 
+    /// Whether a binding of the file hides the builtin `name` (`len`).
+    // ponytail: a package-level one another file of the package declares is not seen here.
+    fn hides(&self, name: &str) -> bool {
+        (self.bound.keys()).any(|(_, n)| n == name)
+            || (self.facts.defs.iter()).any(|d| d.name == name)
+            || (self.facts.consts.iter()).any(|c| c.name == name)
+    }
+
     /// Makes the names held by one binding constants, and gives each definition what it
     /// returns. A name bound again anywhere in its function, or assigned in it or in a literal
     /// inside it, holds no one value.
@@ -352,10 +380,7 @@ impl Walk<'_> {
         }
         // A guard holds when no binding of the file hides `len`, and when `ok` is the second
         // result of the `os.LookupEnv` that bound the read, bound once and never assigned.
-        // ponytail: a package-level `len` another file of the package declares is not seen.
-        let hides_len = (self.bound.keys()).any(|(_, n)| n == "len")
-            || (self.facts.defs.iter()).any(|d| d.name == "len")
-            || (self.facts.consts.iter()).any(|c| c.name == "len");
+        let hides_len = self.hides("len");
         let guarded = |found: &str, name: &str, scope: &str, guard: &values::Guard| {
             let Some(ok) = &guard.ok else {
                 return !(guard.len && hides_len);
@@ -468,8 +493,8 @@ impl Walk<'_> {
 
     /// The names a parameter list binds, of no class the source writes.
     fn bind_params(&mut self, scope: &str, list: Option<Node>) {
-        for param in list.into_iter().flat_map(named) {
-            for name in names(param) {
+        for (names, _) in declarations(list) {
+            for name in names {
                 self.local(scope, text(name, self.src));
             }
         }
@@ -991,7 +1016,10 @@ fn value_class(node: Node, src: &[u8]) -> Option<Class> {
 fn result_class(node: Node, src: &[u8]) -> Option<Class> {
     let result = node.child_by_field_name("result")?;
     let ty = match result.kind() {
-        "parameter_list" => named(result).next()?.child_by_field_name("type")?,
+        "parameter_list" => declarations(Some(result))
+            .first()?
+            .1
+            .child_by_field_name("type")?,
         _ => result,
     };
     type_name(ty, src).map(Class::Type)
@@ -1048,12 +1076,38 @@ fn params(list: Option<Node>, src: &[u8]) -> Vec<Param> {
         closure: Default::default(),
     };
     let mut out = Vec::new();
-    for declaration in list.into_iter().flat_map(named) {
-        match names(declaration)[..] {
+    for (names, _) in declarations(list) {
+        match names[..] {
             [] => out.push(param("")),
             ref several => out.extend(several.iter().map(|n| param(text(*n, src)))),
         }
     }
+    out
+}
+
+/// The declarations of a parameter list in order, each with the names it binds. Go writes the
+/// names of a list all or none, so in a list that writes some, a nameless declaration of one bare
+/// type name is a name of the next declaration that writes its own: tree-sitter-go parses a group
+/// of ten names or more (`p0, ..., p9 string`) as nameless `p0` and the group of the last nine.
+fn declarations(list: Option<Node>) -> Vec<(Vec<Node>, Node)> {
+    let all: Vec<Node> = list.into_iter().flat_map(named).collect();
+    let writes_names = all.iter().any(|d| !names(*d).is_empty());
+    let (mut out, mut pending) = (Vec::new(), Vec::new());
+    for declaration in all {
+        let written = names(declaration);
+        let bare = (declaration.child_by_field_name("type"))
+            .filter(|t| t.kind() == "type_identifier")
+            .filter(|_| declaration.kind() == "parameter_declaration");
+        match bare {
+            Some(name) if writes_names && written.is_empty() => pending.push((name, declaration)),
+            _ => {
+                let names = (pending.drain(..).map(|(n, _)| n)).chain(written);
+                out.push((names.collect(), declaration));
+            }
+        }
+    }
+    // Nameless after the last names written: no group to join (Go refuses the list).
+    out.extend(pending.into_iter().map(|(_, d)| (Vec::new(), d)));
     out
 }
 
@@ -1395,6 +1449,8 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
     }
     // The values read `bound`, which `finish` takes.
     walk.finish_values();
+    // Before `finish`, which takes the bindings `hides` reads.
+    let [free_len, free_cap] = ["len", "cap"].map(|name| !walk.hides(name));
     walk.finish();
     let mut facts = walk.facts;
     unbind_clashes(&mut facts.imports);
@@ -1405,9 +1461,29 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         })
         .collect();
     facts.loops = super::outermost(tree.root_node(), &["for_statement"]);
-    // A local kept as a constant is named `function.name`.
+    // A local kept as a constant is named `function.name`. A parameter is counted in its
+    // function too: a wrapper that writes it twice sends what its caller passes (#774).
     let held = (facts.consts.iter()).filter_map(|c| c.name.rsplit_once('.'));
-    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, held);
+    let params = (facts.defs.iter()).flat_map(|d| {
+        let named = d.params.iter().filter(|p| !p.name.is_empty());
+        named.map(move |p| (d.name.as_str(), p.name.as_str()))
+    });
+    // `len(x)` and `cap(x)` read the value and change nothing (#774), where no binding of the file
+    // hides them (the SDK reader checks the package's other files, `sdk::hiding_builtins`).
+    let read = |name: Node| {
+        let args = name.parent().filter(|a| a.kind() == "argument_list");
+        let call = (args.filter(|a| a.named_child_count() == 1)).and_then(|a| a.parent());
+        let function = (call.filter(|c| c.kind() == "call_expression"))
+            .and_then(|c| c.child_by_field_name("function"))
+            .filter(|f| f.kind() == "identifier");
+        match function.map(|f| text(f, src)) {
+            Some("len") => free_len,
+            Some("cap") => free_cap,
+            _ => false,
+        }
+    };
+    let locals = held.chain(params);
+    facts.mentioned = super::mentioned(tree.root_node(), src, &facts.defs, locals, read);
     Ok(facts)
 }
 
@@ -1432,6 +1508,80 @@ mod tests {
         };
         assert_eq!(nested(3), (true, false));
         assert_eq!(nested(values::VALUE_DEPTH + 10), (false, true));
+    }
+
+    /// Each expected value is what `go list ./...`, `go build` and `go test` (go1.27.3) give for
+    /// the module, but the blank import's: a package under `testdata` or an `_` or `.` directory
+    /// below its module's root is built when a built file imports it (a test's too), in turn, and
+    /// never its tests.
+    #[test]
+    fn a_package_under_testdata_or_an_underscore_directory_is_read_when_a_built_one_imports_it() {
+        let members = |extra: &[(&'static str, &'static str)]| {
+            let mut sources = BTreeMap::from([
+                ("go.mod", "module example.com/m\n"),
+                ("main.go", "package main\n"),
+                ("testdata.go", "package main\n"),
+                ("a_testdata.go", "package main\n"),
+                // Left out for the target, so its import builds nothing.
+                (
+                    "main_windows.go",
+                    "package main\n\nimport \"example.com/m/sub/_u\"\n",
+                ),
+                ("mytestdata/a.go", "package mytestdata\n"),
+                (
+                    "testdata/a.go",
+                    "package a\n\nimport . \"example.com/m/testdata/b\"\n",
+                ),
+                ("testdata/a_test.go", "package a\n"),
+                ("testdata/b/b.go", "package b\n"),
+                ("x/testdata/y/a.go", "package y\n"),
+                ("_gen/a.go", "package gen\n"),
+                ("_fixtures/f.go", "package fixtures\n"),
+                ("sub/_u/a.go", "package u\n"),
+                (".hidden/a.go", "package hidden\n"),
+                // Below its own module's root, nothing is left out.
+                ("testdata/mod/go.mod", "module example.com/mod\n"),
+                ("testdata/mod/a.go", "package mod\n"),
+                ("_tools/go.mod", "module example.com/tools\n"),
+                ("_tools/a.go", "package tools\n"),
+            ]);
+            sources.extend(extra.iter().copied());
+            let configs: Vec<(&str, &[u8])> = (sources.iter())
+                .filter(|(p, _)| p.ends_with("go.mod"))
+                .map(|(p, s)| (*p, s.as_bytes()))
+                .collect();
+            let facts: Vec<(&str, Facts)> = (sources.iter())
+                .filter(|(p, _)| p.ends_with(".go"))
+                .map(|(p, s)| (*p, parse(p, s.as_bytes()).unwrap()))
+                .collect();
+            let files = facts.iter().map(|(p, f)| (*p, f)).collect();
+            Go.layout(&configs, &files).unwrap().members.unwrap()
+        };
+        let listed = [
+            "_tools/a.go",
+            "a_testdata.go",
+            "main.go",
+            "mytestdata/a.go",
+            "testdata.go",
+            "testdata/mod/a.go",
+        ];
+        assert_eq!(members(&[]), BTreeSet::from(listed.map(String::from)));
+        let main = "package main\n\nimport (\n\t\"fmt\"\n\t_ \"example.com/m/_gen\"\n\t\
+                    \"example.com/m/testdata\"\n\tz \"example.com/m/x/testdata/y\"\n)\n";
+        let test = "package main\n\nimport \"example.com/m/_fixtures\"\n";
+        let imported = [
+            "_fixtures/f.go",
+            "main_test.go",
+            "testdata/a.go",
+            "testdata/b/b.go",
+            "x/testdata/y/a.go",
+        ];
+        let expected = listed.iter().chain(&imported).map(|p| p.to_string());
+        // The pack keeps no blank import: `_gen` stays out, though Go builds it.
+        assert_eq!(
+            members(&[("main.go", main), ("main_test.go", test)]),
+            expected.collect()
+        );
     }
 
     #[test]
@@ -1525,17 +1675,22 @@ mod tests {
     }
 
     /// `Facts::mentioned`: the identifiers of a function that spell a local it keeps as a
-    /// constant, a function literal inside it included. A package variable gets no count.
+    /// constant or one of its parameters, a function literal inside it included. A package
+    /// variable and a blank parameter get no count.
     #[test]
-    fn the_locals_kept_as_constants_are_counted_where_their_function_writes_them() {
+    fn the_locals_kept_and_the_parameters_are_counted_where_their_function_writes_them() {
         let facts = facts(
             "package p\n\nvar shared = T{}\n\nfunc f() {\n\ta := T{}\n\tb := T{}\n\tg(a)\n\t\
-             go func() { g(a) }()\n\tg(b, shared)\n}\n\nfunc h() {\n\ta := T{}\n\tg(a)\n}\n",
+             go func() { g(a) }()\n\tg(b, shared)\n}\n\nfunc h() {\n\ta := T{}\n\tg(a)\n}\n\n\
+             func k(p T, _ T, q T) {\n\tg(p)\n}\n\nfunc (r R) m(p T) {\n\tp = T{}\n\tg(p)\n}\n",
         );
         let counted: Vec<String> = (facts.mentioned.iter())
             .map(|m| format!("{} {} {}", m.scope, m.name, m.count))
             .collect();
-        assert_eq!(counted, ["f a 3", "f b 2", "h a 2"]);
+        assert_eq!(
+            counted,
+            ["R.m p 3", "f a 3", "f b 2", "h a 2", "k p 2", "k q 1"]
+        );
     }
 
     #[test]
@@ -1549,6 +1704,61 @@ mod tests {
         assert!(held("\tg(func() { a.M() })\n\ta := S{}").is_empty());
         assert!(held("\t{\n\t\ta := S{}\n\t\ta.M()\n\t}\n\ta.M()").is_empty());
         assert!(held("\ta := a.N()").is_empty());
+    }
+
+    /// tree-sitter-go parses a group of ten names or more as one nameless declaration per name
+    /// but the last nine, typed by the name itself; the pack gives the group its names back, in
+    /// parameters and named results alike. A list that writes no names keeps its types.
+    #[test]
+    fn a_group_of_ten_names_or_more_keeps_its_first_names() {
+        let group = |p: &str, n: usize| (0..n).map(|k| format!("{p}{k}")).collect::<Vec<_>>();
+        let source = |n: usize| {
+            let (p, r) = (group("p", n).join(", "), group("r", n).join(", "));
+            format!("package x\n\nfunc f(ctx context.Context, {p} string) ({r} *T) {{}}\n")
+        };
+        let split = |n: usize| {
+            let mut parser = Parser::new();
+            parser
+                .set_language(&tree_sitter_go::LANGUAGE.into())
+                .unwrap();
+            let tree = parser.parse(source(n), None).unwrap();
+            let function = tree.root_node().named_child(1).unwrap();
+            let list = function.child_by_field_name("parameters").unwrap();
+            named(list).filter(|d| names(*d).is_empty()).count()
+        };
+        assert_eq!([split(9), split(10), split(20)], [0, 1, 11]);
+        for n in [9, 10, 20] {
+            let facts = facts(&source(n));
+            let params: Vec<_> = facts.defs[0]
+                .params
+                .iter()
+                .map(|p| p.name.clone())
+                .collect();
+            assert_eq!(
+                params,
+                [vec!["ctx".to_string()], group("p", n)].concat(),
+                "{n}"
+            );
+            let result = &facts.defs[0].result;
+            assert!(matches!(result, Some(Class::Type(t)) if t == "T"), "{n}");
+            let typed = |p: &str, ty: &str| -> Vec<String> {
+                (group(p, n).iter())
+                    .map(|k| format!("f {k} = {ty}"))
+                    .collect()
+            };
+            let mut expected = [typed("p", "string"), typed("r", "T")].concat();
+            expected.push("f ctx = context.Context".into());
+            expected.sort();
+            assert_eq!(receivers(&source(n)), expected, "{n}");
+        }
+        let params = |src: &str| -> Vec<String> {
+            (facts(src).defs[0].params.iter())
+                .map(|p| p.name.clone())
+                .collect()
+        };
+        assert_eq!(params("package x\n\nfunc f(A, B) {}\n"), ["", ""]);
+        // Go refuses a nameless type after the last name: it joins no group.
+        assert_eq!(params("package x\n\nfunc f(a int, B) {}\n"), ["a", ""]);
     }
 
     #[test]

@@ -372,7 +372,9 @@ Terraform JSON uses the same evaluation and reference rules. Ordinary strings ar
   templates and the pure functions `format`, `formatlist`, `join`, `split`, `lower`, `upper`,
   `title`, `trim`, `trimprefix`, `trimsuffix`, `trimspace`, `chomp`, `replace` (a literal
   substring), `substr`, `concat`, `coalesce`, `element`, `keys`, `values`, `lookup`, `merge`,
-  `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` and `jsonencode`. Data sources,
+  `length`, `toset`, `tolist`, `tomap`, `tostring`, `tonumber` and `jsonencode`. Each
+  string is held in Unicode NFC, as Terraform holds it, so two spellings of one string are one
+  value. Data sources,
   resource attributes, registry modules, `terraform.workspace`, `-var`, `-var-file`, `TF_VAR_`,
   sensitive variables and any other function are never evaluated: such a part of a name is a `*` and
   the name a **pattern** (`"orders-${terraform.workspace}"` is `orders-*`), matching literal names under the pattern rules below. A
@@ -545,6 +547,10 @@ IaC-only repository produces no such lines; `search` and `context` mark the side
 `no provisioner in the workspace` or `no use in the workspace`. Provisioning links, including
 patterns and independent root modules, determine whether a counterpart exists. Existing
 warnings about declared resources without writers and readers remain separate.
+
+Only a broker or resource kind that the type table provisions has an orphan group. A declared
+`[[resource]]` of kind `postgres` or a NATS subject, which no IaC type creates, carries no mark in
+`search` or `context` and is never an orphan line.
 
 A use Meada only infers from a key name (a plain value under `queue`, `topic`, `bucket`, `table`
 or a typed alias, `inferred`) opens no orphan scope for its group and is never an orphan line: a
@@ -932,6 +938,9 @@ When the code changes and a decision no longer fits (the call is gone, the item 
 the provider is gone or is no longer a candidate), `meada status` shows it as **stale** under the
 repository, and `meada decide --prune` removes it. A decision waiting on a peer not yet found
 appears separately (`decision waiting on missing peer ...`) and is kept.
+The target must be one of the item's candidates, the ones `meada decide` lists, for a dynamic
+URL too: a target its repository serves but the call cannot reach (another method, or a path the
+known parts of the URL do not fit) is stale, and the item stays open.
 
 ### Model decider
 
@@ -1565,8 +1574,9 @@ follows `&&` or `;`, inside `if` and loops too. A script with a heredoc or past 
 read, and text in `echo`, in a string or in a comment gives no side. `pip install`, `pip3 install`,
 `python -m pip install`, `uv pip install`, `pipx install` and `uv tool install` make the CI step a
 consumer of `package::pypi::<name>` when a repository of the workspace provides the package, with
-the range as written: `context` on the package lists the CI step, and the link follows the rule of
-section 8.5 (`exact` for a single provider in another repository). A path, a URL, `-e`, the file of
+the range as written: `context` on the package lists the CI step, and a single provider links
+`inferred`, its reason starting with `the name alone matched`: the install names no origin, and a
+fork or a copy of a public package may hold the name (ADR 0029). A path, a URL, `-e`, the file of
 `-r` and the value of an option give no side. A name with a part no literal `env` gives (`shared-${{
 vars.X }}`) is a pattern, linked `inferred` to the one package it fits; a whole name like that (`pip
 install $PKG`) is an unresolved consumer where the workspace provides a PyPI package, an open item
@@ -1579,13 +1589,14 @@ one.
 
 **Programs.** A CI step whose command is a console script of a PyPI package of the workspace (a
 name under `[project.scripts]` or `[tool.poetry.scripts]`) starts that program: the CI step
-consumes the package, and its link goes on to the function the script names. The level says how
-sure Meada is of the package that runs:
+consumes the package, and its link goes on to the function the script names. The package is
+matched by its name alone, so the link is `inferred` at best (ADR 0029); the level and the reason
+say how sure Meada is of the package that runs:
 
 | Evidence | Level |
 | --- | --- |
-| An earlier line or CI step of the same CI job installs the package | `exact` |
-| The command names the package: `uvx <package>`, `pipx run <package>` | `exact` |
+| An earlier line or CI step of the same CI job installs the package | `inferred` |
+| The command names the package: `uvx <package>`, `pipx run <package>` | `inferred` |
 | No install, and one package of the workspace declares the name | `inferred` |
 | Several packages of the workspace declare the name | `ambiguous` |
 | No package of the workspace declares the name | no side |
@@ -1596,7 +1607,7 @@ sure Meada is of the package that runs:
 ```text
 github.com/acme/core-api app/main.py:6 register_package
   →[inferred: base URL from CORE_API_URL, a base_url_env of peer github.com/acme/core-api] github.com/acme/core-sdk core_sdk/cli.py:10 publish_main
-    →[exact: package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
+    →[inferred: the name alone matched; package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, its package installed earlier in the CI job] github.com/acme/workflows .github/workflows/publish.yml:20 jobs.publish.steps[2]
       github.com/acme/workflows .github/workflows/publish.yml:12 jobs.publish
         github.com/acme/workflows .github/workflows/publish.yml:1 .
           →[exact: @main (indexed 1a2b3c4)] github.com/acme/app-a .github/workflows/ci.yml:12 jobs.publish
@@ -1727,7 +1738,9 @@ In Backstage, the router a backend plugin gives its `httpRouter` (`httpRouter.us
 `httpRouter` taken from `coreServices.httpRouter` in the `deps` of `registerInit`) holds under
 `/api/<pluginId>`, the path where the framework mounts it, when `createBackendPlugin`, imported
 from a `@backstage/` package, writes its `pluginId` as a literal or as a `const` of the same file
-bound to one. A plugin whose `pluginId` cannot be read that way (an environment read, an import)
+bound to one. A backend module (`createBackendModule`) gets the `httpRouter` of the plugin it
+extends: the router it gives holds under that plugin's `/api/<pluginId>`, its `pluginId` read the
+same way. A plugin whose `pluginId` cannot be read that way (an environment read, an import)
 leaves its router at the root, as before, and `meada status` names the plugin. On the
 consumer side, a URL that starts with `discovery.getBaseUrl('<id>')` (held by a constant or
 written in the URL itself) starts at `/api/<id>`, and the link's reason names the plugin and that
@@ -1880,6 +1893,10 @@ too). Meada does not run Go's toolchain.
 The analysis targets linux/amd64: `_windows.go` files, files with a false `//go:build` or that use
 cgo (`import "C"`) are left out.
 
+Below a module's root, a package in a `testdata` directory or in one whose name begins with `_`
+(`_gen`) is left out, as `go build ./...` leaves it out, unless a package Meada reads imports it
+(and, in turn, the packages it imports); its `_test.go` files stay out.
+
 **What becomes a definition.** Functions, types, interfaces and methods (`Type.Method`). Calls
 resolve within the package and through imports (`pkg.F()`, aliased or dot). The standard library
 and external modules stay external.
@@ -1929,6 +1946,8 @@ the same file.
   middleware) mounts the router where it does not reach, and its routes do not appear.
 - echo's `Add(method, path, handler)` is not read.
 - Code with cgo, `_windows.go` and a false `//go:build` is not indexed.
+- A package in `testdata` or an `_` directory that only a blank import (`import _ "..."`) reaches
+  stays out, though Go builds it.
 
 ### 9.4 Rust
 
@@ -1996,7 +2015,9 @@ by `push_str`, `push` and `+=` also folds.
 ### 9.5 Java
 
 **Files.** `.java`, resolved by the `package` declarations. Meada needs no JDK, Maven or Gradle
-and runs no code from the repository.
+and runs no code from the repository. A unicode escape of a line break (`\u000a`, `\u000d`, with
+any number of `u`) is read as javac reads it: in a line comment it ends the comment, and the rest
+of the line is code.
 
 **What becomes a definition.** Classes, interfaces, enums, records, methods and constructors,
 nested ones included. Names carry the package and, for methods, the written parameter types

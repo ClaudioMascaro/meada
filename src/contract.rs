@@ -91,8 +91,9 @@ pub enum Role {
     /// (`shape::Want`). Stored, never exported; at query time it fills the parts of the shapes
     /// that import the name.
     Shape,
-    /// Neither side: a Backstage backend plugin whose `pluginId` Meada cannot read (#615), at its
-    /// `createBackendPlugin` call, no `contract`: its routers stay at the root. Stored, never
+    /// Neither side: a Backstage backend plugin or module whose `pluginId` Meada cannot read
+    /// (#615, #813), at its `createBackendPlugin` or `createBackendModule` call, no `contract`:
+    /// its routers stay at the root. Stored, never
     /// exported; `meada status` reports it.
     Unmounted,
     /// Neither side: a Backstage `$include` Meada did not follow (#689), no `contract`: the
@@ -431,8 +432,9 @@ pub trait ContractKind {
         (None, last(contract))
     }
 
-    /// The broker or resource kind whose provisioners and uses share an orphan report.
-    /// No group for a kind without provisioners, or for an unresolved side.
+    /// The broker or resource kind whose provisioners and uses share an orphan report, when the
+    /// type table provisions it (`iac::orphans`). No group for a contract kind IaC never
+    /// provisions, or for an unresolved side.
     fn provisioned_group<'c>(&self, _contract: &'c str) -> Option<&'c str> {
         None
     }

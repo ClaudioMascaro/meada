@@ -26,7 +26,7 @@ Estas ferramentas, sempre com estes nomes. Nenhuma escreve. Uma versão menor po
 
 - `trace` pede exatamente um entre `from` e `changes`.
 - O orçamento padrão de 2.000 tokens é parte da superfície. Um token é uma estimativa: um token por quatro bytes de saída em UTF-8.
-- Os tipos de `search`: `symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, `drift`, `community`, `process`, `duplicate`, `ambiguous` e `unresolved`.
+- Os tipos de `search`: `symbol`, `contract`, `route`, `resource`, `channel`, `document`, `package`, `ci`, `drift`, `community`, `process`, `duplicate`, `ambiguous` e `unresolved`.
 
 ### Gramática da saída
 
@@ -34,7 +34,7 @@ A saída das ferramentas é texto em linhas, e sua gramática é especificada no
 
 - cada tipo de linha de cada ferramenta e o significado de cada um dos seus campos;
 - a notação de link `→[nível: motivo]`, com os níveis `exact`, `declared`, `inferred`, `decided` e `ambiguous`;
-- os identificadores de contrato, cada um começando pelo seu tipo de contrato: `http::`, `channel::`, `package::`, `resource::`;
+- os identificadores de contrato, cada um começando pelo seu tipo de contrato: `http::`, `channel::`, `package::`, `resource::`, `ci::`;
 - o rodapé de `trace` (`chain: <nível mais fraco> · <n> hops · <n> repos · <n> tokens`);
 - a nota que encerra uma resposta cortada pelo orçamento;
 - a estimativa de tokens.

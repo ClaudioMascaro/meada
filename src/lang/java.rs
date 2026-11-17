@@ -1,5 +1,6 @@
 //! The Java language pack: one source file's syntax, with no compiler or build tool.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 use std::rc::Rc;
@@ -162,6 +163,33 @@ impl LanguagePack for Java {
     }
 }
 
+/// The source with each unicode escape of a line terminator (`\u000a`, `\uu000D`) as a line
+/// feed padded with spaces to its length: javac translates escapes before it lexes (JLS 3.3), so
+/// one ends a line comment and the rest of the line is code. Every byte keeps its offset. A
+/// backslash after an odd run of raw backslashes starts no escape.
+fn escaped_breaks(src: &[u8]) -> Cow<'_, [u8]> {
+    let mut out: Option<Vec<u8>> = None;
+    let (mut at, mut slashes) = (0, 0);
+    while at < src.len() {
+        if src[at] == b'\\' && slashes % 2 == 0 {
+            let hex = at + 1 + src[at + 1..].iter().take_while(|&&b| b == b'u').count();
+            let digits = src.get(hex..hex + 4).filter(|_| hex > at + 1);
+            if digits
+                .is_some_and(|d| d.eq_ignore_ascii_case(b"000a") || d.eq_ignore_ascii_case(b"000d"))
+            {
+                let out = out.get_or_insert_with(|| src.to_vec());
+                out[at] = b'\n';
+                out[at + 1..hex + 4].fill(b' ');
+                (at, slashes) = (hex + 4, 0);
+                continue;
+            }
+        }
+        slashes = if src[at] == b'\\' { slashes + 1 } else { 0 };
+        at += 1;
+    }
+    out.map_or(Cow::Borrowed(src), Cow::Owned)
+}
+
 struct Visit<'t> {
     node: Node<'t>,
     scope: Rc<String>,
@@ -175,6 +203,7 @@ struct Visit<'t> {
 }
 
 fn parse(src: &[u8]) -> Result<Facts> {
+    let src = &*escaped_breaks(src);
     let mut parser = Parser::new();
     parser.set_language(&tree_sitter_java::LANGUAGE.into())?;
     let tree = parser
@@ -234,6 +263,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // mentions are counted (`Facts::mentioned`).
     let mut bodies: Vec<(String, Node, Vec<String>)> = Vec::new();
     let mut final_fields: BTreeSet<String> = BTreeSet::new();
+    // The field names some declaration leaves open to another file (`Facts::private_fields`).
+    let mut open_fields: BTreeSet<String> = BTreeSet::new();
     let mut seen = Declared::new(tree.root_node());
     let mut qualification_bytes = QUALIFICATION_BYTES;
     while let Some(Visit {
@@ -251,6 +282,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
             // A partial overload family could turn an ambiguous call into a false exact one.
             return Ok(Facts {
                 budget: Some(QUALIFICATION_BYTES),
+                // Read off the bytes: a file with no facts still says so (#775).
+                reflects: reflects(src),
                 ..Facts::default()
             });
         };
@@ -481,6 +514,16 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
             for (name, _, _) in parameters(node, src, &generics) {
                 facts.locals.push(qualify(&scope, &name));
+            }
+        }
+        // An interface's constant is public, whatever it writes.
+        if matches!(node.kind(), "field_declaration" | "constant_declaration")
+            && !modifiers(node).contains(&"private")
+        {
+            for declaration in named(node).filter(|n| n.kind() == "variable_declarator") {
+                if let Some(name) = declaration.child_by_field_name("name") {
+                    open_fields.insert(text(name, src).to_string());
+                }
             }
         }
         match node.kind() {
@@ -894,6 +937,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 scope: scope.clone(),
                 name: name.to_string(),
                 count,
+                read: 0,
             });
         }
     }
@@ -903,8 +947,18 @@ fn parse(src: &[u8]) -> Result<Facts> {
             scope: String::new(),
             name: name.to_string(),
             count,
+            read: 0,
         });
     }
+    // Lombok adds members the source does not show (a `@Getter`'s accessor hands a private field
+    // out), so a file that spells its name anywhere, a comment included, lists none. Nor does a
+    // file that holds a Unicode escape (JLS 3.3) or a character the compiler drops from a name
+    // (JLS 3.8): one may spell that name, or a step on a field, where this pack reads other text.
+    let holds = |needle: &[u8]| src.windows(needle.len()).any(|bytes| bytes == needle);
+    if !holds(b"lombok") && !holds(b"\\u") && !ignorable(src) {
+        facts.private_fields = (final_fields.difference(&open_fields).cloned()).collect();
+    }
+    facts.reflects = reflects(src);
     facts.loops = super::outermost(
         tree.root_node(),
         &[
@@ -1663,6 +1717,85 @@ fn encloses(class: &str, scope: &str) -> bool {
             .is_some_and(|rest| rest.starts_with('.'))
 }
 
+/// The methods of `Class` that read a field by its name (`Facts::reflects`).
+const REFLECTIVE: [&str; 4] = [
+    "getDeclaredField",
+    "getField",
+    "getDeclaredFields",
+    "getFields",
+];
+
+/// Whether a file may read a field by its name (`Facts::reflects`): it spells one of
+/// `REFLECTIVE`, or `spells` cannot read it. UTF-16 puts a zero byte beside each letter and
+/// inside each Unicode escape, EBCDIC writes no letter in ASCII, and a multi-byte encoding
+/// writes a character the compiler drops from a name with bytes the scan keeps (GB18030's soft
+/// hyphen is 81 30 85 32).
+// ponytail: every file that is not UTF-8 counts, a Latin-1 one among them, so its repository
+// names no private field; tell the encodings of one byte a character apart when a repository
+// shows the need.
+fn reflects(src: &[u8]) -> bool {
+    spells(src, &REFLECTIVE) || src.contains(&0) || std::str::from_utf8(src).is_err()
+}
+
+/// Whether `src` may hold a character the compiler drops from a name (JLS 3.8,
+/// `Character.isIdentifierIgnorable`): a control that is no white space, or a format character
+/// (a soft hyphen, a zero-width space, a byte order mark). Text that is not UTF-8 may, and any
+/// character past the Basic Multilingual Plane counts, as do the unassigned ones beside the
+/// format characters of today's Unicode: a later version may make one of them.
+fn ignorable(src: &[u8]) -> bool {
+    let Ok(text) = std::str::from_utf8(src) else {
+        return true;
+    };
+    text.chars().any(|c| {
+        matches!(
+            u32::from(c),
+            0x00..=0x08 | 0x0e..=0x1b | 0x7f..=0x9f | 0xad | 0x600..=0x605 | 0x61c | 0x6dd
+                | 0x70f | 0x890..=0x89f | 0x8e2 | 0x180e | 0x200b..=0x200f | 0x202a..=0x202e
+                | 0x2060..=0x206f | 0xfeff | 0xfff0..=0xfffb | 0x1_0000..
+        )
+    })
+}
+
+/// Whether `src` spells one of `names` as a whole identifier, anywhere: a call, a method
+/// reference, a comment, a string. A Unicode escape (`\u0046`, JLS 3.3) is read as the character
+/// it stands for, as the compiler reads it before anything else; one after an escaped backslash
+/// is read so too, which can only find a name the file does not spell. A control that is no
+/// white space and every character past ASCII, escaped or not, is read as not there: the
+/// compiler drops some from a name (JLS 3.8), and a letter among them makes a longer name, which
+/// this takes for the listed one, never the reverse. Each ASCII byte is read as the character it
+/// is in UTF-8: `reflects` answers for a file where it may be another.
+fn spells(src: &[u8], names: &[&str]) -> bool {
+    let mut token: Vec<u8> = Vec::new();
+    let mut at = 0;
+    while at <= src.len() {
+        // One character: `\uXXXX`, with any number of `u`, or a byte.
+        let escape = src[at..].strip_prefix(b"\\u").and_then(|rest| {
+            let hex = &rest[rest.iter().take_while(|&&b| b == b'u').count()..];
+            let digits = hex
+                .get(..4)
+                .filter(|d| d.iter().all(u8::is_ascii_hexdigit))?;
+            let code = u32::from_str_radix(std::str::from_utf8(digits).ok()?, 16).ok()?;
+            Some((Some(code), src.len() - at - hex.len() + 4))
+        });
+        let (character, length) = escape.unwrap_or((src.get(at).map(|&b| u32::from(b)), 1));
+        let named = (character.and_then(|c| u8::try_from(c).ok()))
+            .filter(|&c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'$'));
+        match (named, character) {
+            (Some(c), _) => token.push(c),
+            (None, Some(0x00..=0x08 | 0x0e..=0x1b | 0x7f..)) => {}
+            // Any other character, and the end of the file, end a name.
+            _ => {
+                if names.iter().any(|name| name.as_bytes() == token) {
+                    return true;
+                }
+                token.clear();
+            }
+        }
+        at += length;
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1677,11 +1810,31 @@ mod tests {
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
         assert!(facts.defs.is_empty() && facts.calls.is_empty());
         assert_eq!(facts.budget, Some(QUALIFICATION_BYTES));
-        assert!(!facts.unbuilt);
+        assert!(!facts.unbuilt && !facts.reflects);
+        // Whether it reads fields by reflection is read off its bytes, which no budget bounds.
+        let reflective = src.replacen("f();", "getClass().getDeclaredField(\"b\");", 1);
+        let facts = Java.parse("C.java", reflective.as_bytes()).unwrap();
+        assert!(facts.budget.is_some() && facts.reflects);
         let src = format!("class {name} {{\nvoid m() {{ f(); }}\n}}\n");
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
         assert_eq!(facts.budget, None);
         assert!(!facts.defs.is_empty());
+    }
+
+    /// Each escape of a line terminator, with any number of `u`, becomes a line feed and spaces
+    /// of its length; one after an odd run of backslashes, or of another character, stays.
+    #[test]
+    fn escaped_line_breaks_are_line_feeds_of_their_length() {
+        for (src, read) in [
+            (r"// a \u000a f();", "// a \n      f();"),
+            (r"// \uuu000D f();", "// \n        f();"),
+            (r"\u000A\u000d", "\n     \n     "),
+            (r"// \\\u000a f();", "// \\\\\n      f();"),
+            (r"// \\u000a f();", r"// \\u000a f();"),
+            (r"// A \u000 \x000a \u000", r"// A \u000 \x000a \u000"),
+        ] {
+            assert_eq!(escaped_breaks(src.as_bytes()), read.as_bytes(), "{src}");
+        }
     }
 
     /// The methods no definition stands for (#772): an anonymous class's or an enum constant
@@ -1694,6 +1847,116 @@ mod tests {
             class M { void m() {} } }; class L { void l() {} } } }";
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
         assert_eq!(facts.anonymous, ["a", "hold", "k", "m"]);
+    }
+
+    /// A `final` field is private when every field declaration of the file that spells its name
+    /// is (#775): a name another class declares without `private`, final or not, an interface's
+    /// constant and a field that is not `final` are not. A file that names Lombok lists none.
+    #[test]
+    fn final_fields_private_wherever_the_file_declares_them_are_listed() {
+        let src = "class C { private static final B kept = b(); private final B own = b(); \
+            static final B open = b(); protected final B guarded = b(); \
+            public final B shown = b(); private final B twin = b(); \
+            private final B loose = b(); private B plain; } \
+            class D { B twin; static B loose; } interface I { B shared = b(); }";
+        let facts = Java.parse("C.java", src.as_bytes()).unwrap();
+        assert_eq!(facts.private_fields, ["kept", "own"]);
+        // Lombok adds members the source does not show: its file lists none.
+        let lombok = format!("import lombok.Getter; {src}");
+        let facts = Java.parse("C.java", lombok.as_bytes()).unwrap();
+        assert_eq!(facts.private_fields, Vec::<String>::new());
+        // A Unicode escape may spell Lombok's name, or a step on a field: its file lists none.
+        let escaped = format!("{src} class E {{ String e = \"\\u00e9\"; }}");
+        let facts = Java.parse("C.java", escaped.as_bytes()).unwrap();
+        assert_eq!(facts.private_fields, Vec::<String>::new());
+        // So may a character the compiler drops from a name (JLS 3.8), which this pack reads as
+        // other text: a file that holds one, or is not UTF-8, lists none.
+        for dropped in [
+            "\u{ad}",
+            "\u{200b}",
+            "\u{7f}",
+            "\u{85}",
+            "\u{feff}",
+            "\u{1f600}",
+        ] {
+            let hidden = format!("{src} class E {{ String e = \"{dropped}\"; }}");
+            let facts = Java.parse("C.java", hidden.as_bytes()).unwrap();
+            assert_eq!(facts.private_fields, Vec::<String>::new(), "{dropped:?}");
+        }
+        let latin = [src.as_bytes(), b" // caf\xe9"].concat();
+        let facts = Java.parse("C.java", &latin).unwrap();
+        assert_eq!(facts.private_fields, Vec::<String>::new());
+        // Other text past ASCII is no such character.
+        let accented = format!("{src} // \u{e9} \u{201c}ok\u{201d} \u{e7}\u{e3}o \u{d7}");
+        let facts = Java.parse("C.java", accented.as_bytes()).unwrap();
+        assert_eq!(facts.private_fields, ["kept", "own"]);
+    }
+
+    /// A file reads fields by reflection where it spells one of the four methods of `Class` as a
+    /// whole name (#775): in a call, a method reference, a name written with a Unicode escape, a
+    /// comment. A longer name is another method.
+    #[test]
+    fn a_file_that_spells_a_reflective_field_read_says_so() {
+        let reflects = |body: &str| {
+            let src = format!("class C {{ void f() throws Exception {{ {body} }} }}");
+            Java.parse("C.java", src.as_bytes()).unwrap().reflects
+        };
+        assert!(reflects("Holder.class.getDeclaredField(\"b\");"));
+        assert!(reflects("o.getClass().getFields();"));
+        assert!(reflects("Lookup l = Holder.class::getDeclaredField;"));
+        assert!(reflects("Holder.class.getDeclared\\u0046ield(\"b\");"));
+        assert!(reflects("Holder.class.\\uu0067etField(\"b\");"));
+        assert!(reflects("/* through getField */ lookup.find(\"b\");"));
+        assert!(!reflects(
+            "errors.getFieldErrors(); form.getFieldName(); my_getField();"
+        ));
+        assert!(!reflects("holder.build(); String e = \"\\u00e9\";"));
+        // A character the compiler drops from a name (JLS 3.8) is read as not there: a soft
+        // hyphen, raw or escaped, a control, a zero-width space, in any encoding.
+        assert!(reflects("Holder.class.getDeclared\u{ad}Field(\"b\");"));
+        assert!(reflects("Holder.class.getDeclared\\u00adField(\"b\");"));
+        assert!(reflects("Holder.class.getDeclared\u{7f}Field(\"b\");"));
+        assert!(reflects("Holder.class.getF\\u200bield(\"b\");"));
+        assert!(spells(b"x.getDeclared\xadField()", &REFLECTIVE));
+        // White space and punctuation end a name, escaped or not.
+        assert!(!reflects(
+            "get Field(); getDeclared.Field(); getDeclared\\u000aField();"
+        ));
+        // The name ends the file.
+        assert!(spells(b"x::getFields", &REFLECTIVE));
+        assert!(!spells(b"x::getFieldsOf", &REFLECTIVE));
+    }
+
+    /// A file the scan cannot read counts as reading fields by reflection (#775). The scan takes
+    /// each ASCII byte for the character it is in UTF-8, which UTF-16 (a zero byte beside every
+    /// letter), EBCDIC (no letter is ASCII) and a multi-byte encoding (GB18030 writes a soft
+    /// hyphen with two ASCII digits in it) do not keep. A file that is not UTF-8, or holds a zero
+    /// byte, may be any of them: a Latin-1 file is not told from the others.
+    #[test]
+    fn a_file_that_is_not_utf_8_or_holds_a_zero_byte_counts_as_reflecting() {
+        let reflects = |src: &[u8]| Java.parse("C.java", src).unwrap().reflects;
+        let utf16 = |text: &str, bytes: fn(u16) -> [u8; 2]| -> Vec<u8> {
+            text.encode_utf16().flat_map(bytes).collect()
+        };
+        // An escape in UTF-16 has a zero byte between its backslash and its `u`.
+        let escaped = "class C { void f() { c.getDeclared\\u0046ield(n); } }";
+        assert!(reflects(&utf16(escaped, u16::to_le_bytes)));
+        // A zero-width space in UTF-16 is the bytes 20 0B, a space. Big-endian text with no byte
+        // order mark is valid UTF-8.
+        let spaced = utf16(
+            "class C { void f() { c.getDeclared\u{200b}Field(n); } }",
+            u16::to_be_bytes,
+        );
+        assert!(std::str::from_utf8(&spaced).is_ok() && reflects(&spaced));
+        // GB18030 writes U+00AD as 81 30 85 32.
+        assert!(reflects(
+            b"class C { void f() { c.getDeclared\x81\x30\x85\x32Field(n); } }"
+        ));
+        // `class C { }` in EBCDIC (IBM037).
+        assert!(reflects(b"\x83\x93\x81\xa2\xa2\x40\xc3\x40\xc0\x40\xd0"));
+        assert!(reflects(b"class C { /* caf\xe9 */ }"));
+        // UTF-8 text past ASCII is read as before.
+        assert!(!reflects("class C { /* caf\u{e9} */ }".as_bytes()));
     }
 
     /// Code that runs when its caller says: every lambda and local or anonymous class, nested ones

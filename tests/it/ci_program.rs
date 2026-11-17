@@ -1,6 +1,7 @@
 //! A CI step that runs a console script of the workspace (#832, ADR 0028): the step is a
 //! consumer of the script's package and links to the program entry point the script names, at
-//! the level its evidence gives. `trace` crosses the link both ways.
+//! the level its evidence gives, never above `inferred` while the package is matched by its
+//! name alone (ADR 0029). `trace` crosses the link both ways.
 
 use std::fs;
 use std::path::PathBuf;
@@ -19,13 +20,16 @@ const CLI: &str = "core_sdk/cli.py";
 const TOOLS_CLI: &str = "tools/core_tools/cli.py";
 const INSTALLED: &str = "its package installed earlier in the CI job";
 const NOT_INSTALLED: &str = "no install of its package earlier in the CI job";
+/// What the reason of a link from a CI step says first when the name alone matched (ADR 0029).
+const BY_NAME: &str = "the name alone matched";
 /// The SDK's call to the API, a link Meada found before #832: the base URL is read from the
 /// environment, whatever the pipeline sets it to.
 const HTTP: &str =
     "inferred: base URL from CORE_API_URL, a base_url_env of peer github.com/acme/core-api";
 /// The link from the CI step of `publish.yml` that runs `core-publish` to its program.
-const RUNS: &str = "exact: package::pypi::core-sdk none (local 1.0.0), range unchecked; console \
-                    script core-publish, its package installed earlier in the CI job";
+const RUNS: &str = "inferred: the name alone matched; package::pypi::core-sdk none (local 1.0.0), \
+                    range unchecked; console script core-publish, its package installed earlier \
+                    in the CI job";
 
 /// The chain of F2 as siblings in one case directory: the API, the SDK whose console scripts
 /// call it, the reusable pipeline that runs them, and the callers of #816's reproduction
@@ -103,23 +107,25 @@ fn a_program_link_has_the_level_its_evidence_gives() {
     );
     // Every link that leaves the file: an install links to its package's manifest, a console
     // script to its program, and `jobs.outside` (a command no package declares) to nothing.
+    // The package is matched by its name alone, so no link is above `inferred` (ADR 0029): the
+    // evidence of an install still picks the package among those that declare the script.
     let mut expected = vec![
-        row("jobs.earlier_step.steps[0]", tools.clone(), "exact"),
+        row("jobs.earlier_step.steps[0]", tools.clone(), "inferred"),
         row(
             "jobs.earlier_step.steps[1]",
             program(TOOLS_CLI, "lint_main"),
-            "exact",
+            "inferred",
         ),
-        row("jobs.earlier_line.steps[0]", sdk.clone(), "exact"),
+        row("jobs.earlier_line.steps[0]", sdk.clone(), "inferred"),
         row(
             "jobs.earlier_line.steps[0]",
             program(CLI, "health_main"),
-            "exact",
+            "inferred",
         ),
-        row("jobs.by_package.steps[0]", program(CLI, "main"), "exact"),
-        row("jobs.by_package.steps[1]", program(CLI, "main"), "exact"),
+        row("jobs.by_package.steps[0]", program(CLI, "main"), "inferred"),
+        row("jobs.by_package.steps[1]", program(CLI, "main"), "inferred"),
         // `uvx core-tools`: the package declares no script of its own name.
-        row("jobs.no_script.steps[0]", tools.clone(), "exact"),
+        row("jobs.no_script.steps[0]", tools.clone(), "inferred"),
         row(
             "jobs.no_install.steps[0]",
             program(TOOLS_CLI, "lint_main"),
@@ -135,18 +141,18 @@ fn a_program_link_has_the_level_its_evidence_gives() {
             program(TOOLS_CLI, "health_main"),
             "ambiguous",
         ),
-        row("jobs.picked.steps[0]", tools.clone(), "exact"),
+        row("jobs.picked.steps[0]", tools.clone(), "inferred"),
         row(
             "jobs.picked.steps[0]",
             program(TOOLS_CLI, "health_main"),
-            "exact",
+            "inferred",
         ),
         row(
             "jobs.later.steps[0]",
             program(CLI, "publish_main"),
             "inferred",
         ),
-        row("jobs.later.steps[1]", sdk.clone(), "exact"),
+        row("jobs.later.steps[1]", sdk.clone(), "inferred"),
         row(
             "jobs.elsewhere.steps[1]",
             program(TOOLS_CLI, "lint_main"),
@@ -165,20 +171,22 @@ fn a_program_link_has_the_level_its_evidence_gives() {
             &program(TOOLS_CLI, "lint_main")
         ),
         format!(
-            "package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, {INSTALLED}"
+            "{BY_NAME}; package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, {INSTALLED}"
         )
     );
     // The range is the install's.
     assert_eq!(
         said("jobs.earlier_line.steps[0]", &program(CLI, "health_main")),
         format!(
-            "package::pypi::core-sdk >=1.0 (local 1.0.0); console script core-health, {INSTALLED}"
+            "{BY_NAME}; package::pypi::core-sdk >=1.0 (local 1.0.0); console script core-health, {INSTALLED}"
         )
     );
     assert_eq!(
         said("jobs.by_package.steps[0]", &program(CLI, "main")),
-        "package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-sdk, \
-         run by its package's name"
+        format!(
+            "{BY_NAME}; package::pypi::core-sdk none (local 1.0.0), range unchecked; console \
+             script core-sdk, run by its package's name"
+        )
     );
     assert_eq!(
         said("jobs.no_install.steps[0]", &program(TOOLS_CLI, "lint_main")),
@@ -288,8 +296,8 @@ jobs:
     assert_eq!(
         twice,
         [
-            (program(CLI, "publish_main"), "exact".to_string()),
-            (format!("{SDK}::pyproject.toml"), "exact".to_string()),
+            (program(CLI, "publish_main"), "inferred".to_string()),
+            (format!("{SDK}::pyproject.toml"), "inferred".to_string()),
         ]
     );
 }

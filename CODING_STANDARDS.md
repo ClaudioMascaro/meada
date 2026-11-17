@@ -91,6 +91,18 @@ a review finding.
   locals, a module argument, a declared type, an override) tests the negative case on each
   route it follows: #720 kept a list exact only in a local, and a typed variable and an override
   turned a set into a list unseen.
+- **Guards by absence.** A check that allows an answer because something is absent (no call of
+  a name, no file that spells it, no other definition) lists every route by which the thing is
+  there unseen, with a negative case on each: a file that keeps no facts (past its budget, not
+  parsed), the language's other spellings of the name (an escape, a character the compiler
+  drops, a method reference, a string), another API with the same effect, a file of another
+  language. A route the check does not see is a limit in the ceilings, never silence. #775 read
+  reflection off the names of calls: three verifier rounds found a method reference, a Unicode
+  escape, a dropped character and a file past its budget, each a wrong name.
+- **Budget of new work.** Work a change adds to a walk (a second read, a check at each site, a
+  fold at each cycle) says which budget it spends, and has a test where that budget runs out:
+  every answer the walk gave before is still given. #886's cycle check spent the file's shared
+  `EVAL_BUDGET`, and a file of heavy cycles lost 821 of the 4,500 sides it had.
 
 ## Equivalence tests
 
@@ -238,6 +250,12 @@ Check each claim a diff adds at its source, never against the ticket's wording:
   measurement with its commit, build, case and numbers. One that nothing isolates is worded as
   a reading of the code. A draft of #704's PR body, and its ceilings entry, gave as fact the
   cause of a failed run whose report named two candidate paths and confirmed neither.
+- A resolution the diff adds (a call or a link that newly resolves, a level that rises) names
+  the proof input that shows it: the flow of `prove-meada`, or the corpus entry, and the file.
+  A form with none says so in the PR body's Evidence, beside the tests that stand for it: the
+  E2E judge holds a new flow with no input unproven. The judges of PRs 863 and 872 found forms
+  whose one input, this repository's own fixtures, another fixture's names refused (#894 asks
+  for a neutral one).
 - A reference the diff moves or reflows still sits next to the thing it names.
 - A change to a skill or a harness script searches the skill's own texts for the behaviour it
   changes; a ticket premise they contradict is a finding.
@@ -298,7 +316,8 @@ within 24 KiB. Other areas keep their existing 64 KiB budget until split:
   `&[&str]` or `[&str; N]` table in a pack is of one of three classes: `syntax` (the language's grammar:
   `FUNCTIONS`, `DECLARATION_KEYWORDS`), `runtime` (the language's own library that value
   evaluation passes through: string methods, environment reads, standard macros, collection
-  callbacks, default imports, build constraints) or `exception` (a library table the pack keeps
+  callbacks, default imports, build constraints, and the methods of Java's `Class` that read a
+  field by name, which the pack alone can find in the bytes behind a Unicode escape) or `exception` (a library table the pack keeps
   for a decided reason, below). The forms of the libraries a kind reads (web frameworks and HTTP
   clients, message brokers) live under the kind, one module per language
   (`http/<language>.rs`, `channel/<language>.rs`); a form may live in a submodule of that module

@@ -28,6 +28,11 @@ pub struct Target<'a> {
     pub name: &'a str,
 }
 
+/// A definition's own name, without the definitions that enclose it (`Type.method` is `method`).
+fn own_name(name: &str) -> &str {
+    name[crate::parent(name).len()..].trim_start_matches('.')
+}
+
 #[derive(Clone)]
 pub enum Resolution<'a> {
     /// Scope and import resolution found one definition.
@@ -4808,6 +4813,9 @@ pub struct Expanded<'a, R> {
     pub found: R,
 }
 
+/// Positional and keyword arguments, folded (`Code::folded`).
+type Folded = (Vec<Value>, Vec<(String, Value)>);
+
 /// Arguments as written in `path` within `scope`, read on behalf of the call `at`.
 struct Written<'a, 'i> {
     path: &'a str,
@@ -4991,6 +4999,11 @@ pub struct Code<'a> {
     /// `folded` and `field_reads` for the work `Code::apart` runs.
     folded_apart: RefCell<HashMap<&'a str, usize>>,
     field_reads_apart: RefCell<HashMap<Field<'a>, Value>>,
+    /// `folded` and `field_reads` for what a cut cycle adds to a walk (`Code::cut_apart`).
+    folded_cuts: RefCell<HashMap<&'a str, usize>>,
+    field_reads_cuts: RefCell<HashMap<Field<'a>, Value>>,
+    /// Whether a budget refused a charge since this was last cleared.
+    refused: Cell<bool>,
     /// Each file of `full` by name, built the first time a name is looked up in it.
     by_name: HashMap<&'a str, OnceCell<ByName<'a>>>,
     /// The marker constants of the literals that set each field (`field_values`), by field name
@@ -5172,6 +5185,9 @@ impl<'a> Code<'a> {
             folded: RefCell::new(HashMap::new()),
             folded_apart: RefCell::new(HashMap::new()),
             field_reads_apart: RefCell::new(HashMap::new()),
+            folded_cuts: RefCell::new(HashMap::new()),
+            field_reads_cuts: RefCell::new(HashMap::new()),
+            refused: Cell::new(false),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
             literals: OnceCell::new(),
             field_reads: RefCell::new(HashMap::new()),
@@ -5187,16 +5203,36 @@ impl<'a> Code<'a> {
         let mut folded = self.folded.borrow_mut();
         let spent = folded.entry(file).or_default();
         *spent = spent.saturating_add(cost);
-        *spent <= EVAL_BUDGET
+        let within = *spent <= EVAL_BUDGET;
+        self.refused.set(self.refused.get() || !within);
+        within
     }
 
     /// `work` on an `EVAL_BUDGET` of its own for each file, with the field reads it folds kept
     /// to itself: whatever it spends, every other reader of a file folds what it folds without
     /// it. Not to be nested.
     pub(crate) fn apart<T>(&self, work: impl FnOnce() -> T) -> T {
+        self.aside(&self.folded_apart, &self.field_reads_apart, work)
+    }
+
+    /// `work` on the `EVAL_BUDGET` that what cut cycles add to the walks of a file shares
+    /// (telling whether a cycle sends more, and reading its sites once more, #886): a file's
+    /// readers fold what they folded before the walk told such cycles apart. It may run inside
+    /// `apart`. Past that budget a value is unknown, and a cycle adds nothing.
+    fn cut_apart<T>(&self, work: impl FnOnce() -> T) -> T {
+        self.aside(&self.folded_cuts, &self.field_reads_cuts, work)
+    }
+
+    /// `work` with `folded` and `field_reads` standing in for the budgets and the field reads.
+    fn aside<T>(
+        &self,
+        folded: &RefCell<HashMap<&'a str, usize>>,
+        field_reads: &RefCell<HashMap<Field<'a>, Value>>,
+        work: impl FnOnce() -> T,
+    ) -> T {
         let swap = || {
-            self.folded.swap(&self.folded_apart);
-            self.field_reads.swap(&self.field_reads_apart);
+            self.folded.swap(folded);
+            self.field_reads.swap(field_reads);
         };
         swap();
         let done = work();
@@ -5572,6 +5608,12 @@ impl<'a> Code<'a> {
     /// How often `path` writes the names of its locals and `final` fields (`Facts::mentioned`).
     pub fn mentioned(&self, path: &'a str) -> &'a [crate::lang::Mentioned] {
         self.full(path).map_or(&[], |f| f.mentioned.as_slice())
+    }
+
+    /// The `final` fields `path` declares `private` wherever it declares them
+    /// (`Facts::private_fields`).
+    pub fn private_fields(&self, path: &'a str) -> &'a [String] {
+        self.full(path).map_or(&[], |f| f.private_fields.as_slice())
     }
 
     /// Every value `path` assigns to a bare name, and every initializer `bindings` drops
@@ -6517,7 +6559,7 @@ impl<'a> Code<'a> {
     /// unknown.
     pub fn value(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Value {
         let folded = self.eval(path, scope, value, &[], 0, &mut Fold::default(), &mut None);
-        unbind(folded, false)
+        unbind(folded, false, &[])
     }
 
     /// The constant `name` refers to from `scope` in `path`: its file and qualified name, and
@@ -6893,8 +6935,12 @@ impl<'a> Code<'a> {
     /// depend on its parameters. `read` answers `None` when what it needs holds a `Ref`: a
     /// parameter of the enclosing function, which makes that function a client wrapper. Each
     /// call site of the wrapper is then read with its own arguments substituted, through any
-    /// number of wrapper levels. A wrapper reached again through its own callers (a cycle) adds
-    /// nothing; a wrapper nobody calls is read where it stands, its parameters unknown.
+    /// number of wrapper levels. A wrapper reached again through its own callers closes a cycle.
+    /// Where the cycle's calls hand on, in each parameter `read` needs, that parameter itself,
+    /// another turn reads what the first did and adds nothing; where they hand on anything else,
+    /// each site the wrapper's first turn gives also gets what the wrapper reads where it
+    /// stands, its parameters unknown, and with no such site the wrapper's own does (#886). A
+    /// wrapper nobody calls is read where it stands too.
     // ponytail: every simple path up the wrappers' callers is walked; memoize per (wrapper,
     // call site) if a dense call graph makes this slow.
     pub fn expand<R>(
@@ -6937,7 +6983,7 @@ impl<'a> Code<'a> {
                     inject,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out);
+                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
             }
             Expand::Chain(path, index) => {
                 let Some(call) = self.call(path, index) else {
@@ -6953,7 +6999,7 @@ impl<'a> Code<'a> {
                     inject,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out);
+                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
             }
             Expand::Constructed {
                 held: (file, constant),
@@ -6972,7 +7018,7 @@ impl<'a> Code<'a> {
                     inject,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out);
+                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
             }
         }
         out
@@ -7002,17 +7048,112 @@ impl<'a> Code<'a> {
             inject: None,
             writes: Some(writes),
         };
-        self.walk(&written, &mut Vec::new(), read, &mut out);
+        self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
         out
     }
 
+    /// `cuts` holds, for each cycle met whose turn sends what its first did not, how many frames
+    /// were under the wrapper it closes on when the walk first climbed from it.
     fn walk<R>(
         &self,
         written: &Written<'a, '_>,
         frames: &mut Vec<Frame<'a>>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
         out: &mut Vec<Expanded<'a, R>>,
+        cuts: &mut Vec<usize>,
     ) {
+        let (site, at) = frames.last().map_or(written.at, |f| (f.path, f.index));
+        if !self.charge(site, 1) {
+            return;
+        }
+        let chain = written.chain.is_some();
+        let ((values, kwargs), wants) = self.folded(written, frames);
+        if let Some(found) = read(&values, &kwargs) {
+            out.push(Expanded {
+                site: (site, at),
+                frames: frames.clone(),
+                found,
+            });
+            return;
+        }
+        let Some(wrapper) = wants else {
+            return;
+        };
+        // A wrapper reached again closes a cycle: another turn of it is climbed no further.
+        if let Some(first) = frames.iter().position(|f| f.def == wrapper) {
+            // A value the check could not fold for its budget is not one the cycle changed.
+            let more = || {
+                self.refused.set(false);
+                self.cycle_sends_more(written, frames, first, wrapper, read) && !self.refused.get()
+            };
+            if self.cut_apart(more) {
+                cuts.push(first);
+            }
+            return;
+        }
+        // A call that only matches the wrapper's name may be on any object, or reach another
+        // function: it is not climbed.
+        // ponytail: so a wrapper reached only by a name match (a method on a receiver whose
+        // class Meada cannot tell, a bare name no import binds) is read where it stands, its
+        // parameters unknown.
+        let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
+            .copied()
+            .collect();
+        // A wrapper `WRAPPER_DEPTH` calls up is read where it stands too.
+        if callers.is_empty() || frames.len() >= WRAPPER_DEPTH {
+            let (values, kwargs) = unbound((values, kwargs), chain, &[]);
+            out.extend(read(&values, &kwargs).map(|found| Expanded {
+                site: (site, at),
+                frames: frames.clone(),
+                found,
+            }));
+            return;
+        }
+        let (under, climbed) = (frames.len(), out.len());
+        for caller in callers {
+            frames.push(Frame {
+                def: wrapper,
+                path: caller.path,
+                index: caller.index,
+            });
+            self.walk(written, frames, read, out, cuts);
+            frames.pop();
+        }
+        if !cuts.contains(&under) {
+            return;
+        }
+        cuts.retain(|&cut| cut != under);
+        // A cycle through this wrapper sends more than its first turn, which nothing follows:
+        // each site that turn reached also sends what the wrapper reads where it stands, and
+        // with no such site (nothing but the cycle calls the wrapper) the wrapper itself does.
+        let mut reached: Vec<((&'a str, usize), Vec<Frame<'a>>)> = Vec::new();
+        for expanded in &out[climbed..] {
+            if reached.iter().all(|(site, _)| *site != expanded.site) {
+                reached.push((expanded.site, expanded.frames.clone()));
+            }
+        }
+        if reached.is_empty() {
+            reached.push(((site, at), frames.clone()));
+        }
+        let (values, kwargs) = unbound((values, kwargs), chain, &[]);
+        self.cut_apart(|| {
+            for (site, frames) in reached {
+                out.extend(read(&values, &kwargs).map(|found| Expanded {
+                    site,
+                    frames,
+                    found,
+                }));
+            }
+        });
+    }
+
+    /// The arguments of `written` folded under `frames`, and the function whose parameter one
+    /// of them still names (`eval`).
+    fn folded(
+        &self,
+        written: &Written<'a, '_>,
+        frames: &[Frame<'a>],
+    ) -> (Folded, Option<Target<'a>>) {
         let &Written {
             path,
             scope,
@@ -7020,10 +7161,6 @@ impl<'a> Code<'a> {
             kwargs,
             ..
         } = written;
-        let (site, at) = frames.last().map_or(written.at, |f| (f.path, f.index));
-        if !self.charge(site, 1) {
-            return;
-        }
         let mut wants = None;
         let chain = written.chain.is_some();
         let mut eval = |v: &'a Value| {
@@ -7038,7 +7175,7 @@ impl<'a> Code<'a> {
             };
             self.eval(path, scope, v, frames, 0, fold, &mut wants)
         };
-        let (values, kwargs): (Vec<Value>, Vec<(String, Value)>) = match written.chain {
+        let folded = match written.chain {
             Some(call) => {
                 let receiver = call.receiver.as_ref().map(|r| Box::new(eval(r)));
                 let invocation = Invocation {
@@ -7056,50 +7193,46 @@ impl<'a> Code<'a> {
                 (kwargs.iter()).map(|(k, v)| (k.clone(), eval(v))).collect(),
             ),
         };
-        if let Some(found) = read(&values, &kwargs) {
-            out.push(Expanded {
-                site: (site, at),
-                frames: frames.clone(),
-                found,
-            });
-            return;
-        }
-        let Some(wrapper) = wants else {
-            return;
-        };
-        if frames.iter().any(|f| f.def == wrapper) {
-            return;
-        }
-        // A call that only matches the wrapper's name may be on any object, or reach another
-        // function: it is not climbed.
-        // ponytail: so a wrapper reached only by a name match (a method on a receiver whose
-        // class Meada cannot tell, a bare name no import binds) is read where it stands, its
-        // parameters unknown.
-        let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
-            .copied()
+        (folded, wants)
+    }
+
+    /// Whether a turn of the cycle `frames[first..]` closes on `wrapper` sends what the first
+    /// did not: its calls hand on, in a parameter `read` needs, anything but that parameter
+    /// (another parameter, a value made from one). A retry that passes its parameters on and
+    /// counts down does not (#886).
+    fn cycle_sends_more<R>(
+        &self,
+        written: &Written<'a, '_>,
+        frames: &[Frame<'a>],
+        first: usize,
+        wrapper: Target<'a>,
+        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
+    ) -> bool {
+        let chain = written.chain.is_some();
+        let def = self.resolver.defs[wrapper.path][wrapper.name];
+        let names = (def.params.iter())
+            .flat_map(|p| std::iter::once(&p.name).chain(p.fields.iter().map(|f| &f.name)));
+        // The parameters a turn gives another value: each is read as the cycle's calls bind it.
+        let changed: Vec<&str> = names
+            .map(String::as_str)
+            .filter(|&name| {
+                let fold = &mut Fold {
+                    chain,
+                    ..Fold::default()
+                };
+                let (path, scope) = (wrapper.path, wrapper.name);
+                let handed = self.name(path, scope, name, frames, first, fold, &mut None);
+                !matches!(&handed, Value::Ref(same) if same == name)
+            })
             .collect();
-        // A wrapper `WRAPPER_DEPTH` calls up is read where it stands too.
-        if callers.is_empty() || frames.len() >= WRAPPER_DEPTH {
-            let values: Vec<Value> = values.into_iter().map(|v| unbind(v, chain)).collect();
-            let kwargs: Vec<(String, Value)> = (kwargs.into_iter())
-                .map(|(k, v)| (k, unbind(v, chain)))
-                .collect();
-            out.extend(read(&values, &kwargs).map(|found| Expanded {
-                site: (site, at),
-                frames: frames.clone(),
-                found,
-            }));
-            return;
+        if changed.is_empty() {
+            return false;
         }
-        for caller in callers {
-            frames.push(Frame {
-                def: wrapper,
-                path: caller.path,
-                index: caller.index,
-            });
-            self.walk(written, frames, read, out);
-            frames.pop();
-        }
+        // What the first turn read, with those parameters alone left as names: `read` answers
+        // `None` when it needs one of them.
+        let (first_turn, _) = self.folded(written, &frames[..first]);
+        let (values, kwargs) = unbound(first_turn, chain, &changed);
+        read(&values, &kwargs).is_none()
     }
 
     /// Whether a call that is no exact caller may reach `function`: a name match (`Inferred`,
@@ -7108,8 +7241,13 @@ impl<'a> Code<'a> {
     // ponytail: any other definition of a method's name counts, an interface's or not, since no
     // pack marks interfaces: two types with a constructor method of one name leave it unknown.
     pub(crate) fn name_matched(&self, function: Target<'a>) -> bool {
-        let own = |name: &'a str| name[crate::parent(name).len()..].trim_start_matches('.');
-        let (matched, names) = self.matched.get_or_init(|| {
+        self.matched().0.contains(&function) || self.shares_name(function)
+    }
+
+    /// The functions a call reaches by a name match, and how many definitions spell each own
+    /// name (`Type.method` is `method`).
+    fn matched(&self) -> &(HashSet<Target<'a>>, HashMap<&'a str, usize>) {
+        self.matched.get_or_init(|| {
             let matched = (self.resolver.built.values().flatten())
                 .flat_map(|r| match r {
                     Resolution::Inferred(t) | Resolution::Narrowed(t) => std::slice::from_ref(t),
@@ -7120,12 +7258,28 @@ impl<'a> Code<'a> {
                 .collect();
             let mut names = HashMap::new();
             for name in self.resolver.defs.values().flat_map(|d| d.keys()) {
-                *names.entry(own(name)).or_insert(0) += 1;
+                *names.entry(own_name(name)).or_insert(0) += 1;
             }
             (matched, names)
-        });
+        })
+    }
+
+    /// Whether `function` is a method whose own name another definition spells.
+    fn shares_name(&self, function: Target<'a>) -> bool {
         let method = self.resolver.defs[function.path][function.name].kind == Kind::Method;
-        matched.contains(&function) || (method && names.get(own(function.name)) > Some(&1))
+        method && self.matched().1.get(own_name(function.name)) > Some(&1)
+    }
+
+    /// Whether an exact call of `function` runs it and no other definition: a function, or a
+    /// method whose own name no other definition of the repository spells, so that the
+    /// receiver's type has nothing to choose between. A function literal is held in a name that
+    /// can be set again.
+    pub fn runs_alone(&self, function: Target<'a>) -> bool {
+        match self.resolver.defs[function.path][function.name].kind {
+            Kind::Function => true,
+            Kind::Method => !self.shares_name(function),
+            _ => false,
+        }
     }
 
     /// Whether a call of the repository may reach `function`, at any level: an exact caller, or
@@ -7673,16 +7827,26 @@ fn object_value(value: &Value) -> Option<usize> {
     }
 }
 
-fn unbind(value: Value, chain: bool) -> Value {
-    let unbind = |v| unbind(v, chain);
+/// Folded arguments with the parameters they still name unknown, but the ones of `keep`.
+fn unbound((values, kwargs): Folded, chain: bool, keep: &[&str]) -> Folded {
+    let values = values.into_iter().map(|v| unbind(v, chain, keep));
+    let kwargs = (kwargs.into_iter()).map(|(k, v)| (k, unbind(v, chain, keep)));
+    (values.collect(), kwargs.collect())
+}
+
+/// `value` with the parameters it still names unknown, but the ones of `keep`.
+fn unbind(value: Value, chain: bool, keep: &[&str]) -> Value {
+    let unbind = |v| unbind(v, chain, keep);
     match value {
-        Value::Ref(_) => Value::Unknown,
+        Value::Ref(name) if !keep.contains(&name.as_str()) => Value::Unknown,
         Value::Str(parts) => Value::Str(
             parts
                 .into_iter()
                 .map(|p| match p {
                     // What remains a name is a parameter no call site binds (#801).
-                    Part::Ref(name) => Part::Limit(crate::lang::Limit::Parameter(name)),
+                    Part::Ref(name) if !keep.contains(&name.as_str()) => {
+                        Part::Limit(crate::lang::Limit::Parameter(name))
+                    }
                     p => p,
                 })
                 .collect(),
@@ -9275,6 +9439,112 @@ mod tests {
     }
 
     #[test]
+    fn a_wrapper_cycle_that_hands_another_value_on_is_read_where_it_stands() {
+        // The URL each site reads, sorted; `?` for one not known.
+        let urls = |wrappers: &str, call: &str| {
+            let src = format!("{wrappers}\nfunction place() {{ {call}; }}\n");
+            let mut found: Vec<String> = (fetched(&src).into_iter())
+                .map(|url| url.unwrap_or_else(|| "?".into()))
+                .collect();
+            found.sort();
+            found
+        };
+        // The cycle's call sends the other parameter: beside what the caller's turn reads,
+        // its site gets the wrapper read where it stands, the URL not known (#886).
+        let send = "function send(n: number, a: string, b: string) {\n\
+                    fetch(a); if (n > 0) send(n - 1, b, ''); }";
+        assert_eq!(urls(send, "send(1, '/first', '/second')"), ["/first", "?"]);
+        // Nothing but its own cycle calls the wrapper: it is read where it stands.
+        assert_eq!(urls(send, "0"), ["?"]);
+        // So is one that hands the same parameter on in the place of the one the read needs.
+        let twice = "function send(n: number, a: string, b: string) {\n\
+                     fetch(a); if (n > 0) send(n - 1, b, b); }";
+        assert_eq!(urls(twice, "send(1, '/first', '/second')"), ["/first", "?"]);
+        // Two wrappers that call each other and swap the parameters.
+        let ping = "function ping(n: number, a: string, b: string) {\n\
+                    fetch(a); if (n > 0) pong(n, a, b); }\n\
+                    function pong(n: number, a: string, b: string) { ping(n - 1, b, a); }";
+        assert_eq!(urls(ping, "ping(1, '/first', '/second')"), ["/first", "?"]);
+        // A retry hands the parameter the read needs on as itself, whatever else it changes:
+        // another turn reads what the first did, and adds nothing.
+        let retry = "function retry(n: number, a: string, b: string) {\n\
+                     fetch(a); if (n > 0) retry(n - 1, a, a); }";
+        assert_eq!(urls(retry, "retry(1, '/first', '/second')"), ["/first"]);
+        let tick = "function tick(n: number, a: string) { fetch(a); if (n > 0) tock(n, a); }\n\
+                    function tock(n: number, a: string) { tick(n - 1, a); }";
+        assert_eq!(urls(tick, "tick(1, '/first')"), ["/first"]);
+    }
+
+    /// What telling a cycle that sends more apart, and reading its sites once more, folds is
+    /// charged to a budget of its own (`Code::cut_apart`): the file's budget is spent as it was
+    /// before the walk told such cycles apart, however much the check folds. A wrapper with
+    /// thirty more parameters, each handed on through the cycle, costs the check thirty more
+    /// values and the file's budget nothing.
+    #[test]
+    fn what_a_cut_cycle_adds_spends_nothing_of_the_file_s_budget() {
+        use crate::lang::ts::TsJs;
+        let spent = |extra: usize| {
+            let more: String = (0..extra).map(|i| format!(", p{i}")).collect();
+            let zeros = ", 0".repeat(extra);
+            let src = format!(
+                "function send(n, a, b{more}) {{ fetch(a); if (n > 0) send(n - 1, b, a{more}); }}\n\
+                 function place() {{ send(1, '/first', '/second'{zeros}); }}\n"
+            );
+            let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+            let files = BTreeMap::from([("a.ts", &facts)]);
+            let resolver = Resolver::new(&files, TsJs.modules(&[], &files).unwrap(), &TsJs);
+            let code = Code::new(&resolver, &files, crate::lang::pack(0));
+            let n = (facts.calls.iter())
+                .position(|c| c.callee == "fetch")
+                .unwrap();
+            // A reader folds to read, too: here what it reads of a value not known, which only
+            // the second answer of the caller's site holds, costs a thousand.
+            let url = |args: &[Value], _: &Keywords| match args.first()? {
+                Value::Ref(_) => None,
+                Value::Unknown => code.charge("a.ts", 1000).then_some(Value::Unknown),
+                url => Some(url.clone()),
+            };
+            // The caller's own URL and what the next turn sends, not known.
+            assert_eq!(code.expand(Expand::Call("a.ts", n), &url).len(), 2);
+            let of = |budget: &RefCell<HashMap<&str, usize>>| {
+                budget.borrow().get("a.ts").copied().unwrap_or_default()
+            };
+            (of(&code.folded), of(&code.folded_cuts))
+        };
+        let ((file, cuts), (file_wide, cuts_wide)) = (spent(0), spent(30));
+        assert_eq!(file, file_wide);
+        assert!(file < 1000 && cuts >= 1000, "{file} {cuts}");
+        assert!(cuts_wide >= cuts + 30, "{cuts} {cuts_wide}");
+    }
+
+    /// Past the budget of what cut cycles add, a cycle adds nothing, as before the walk told
+    /// such cycles apart: a value the check could not fold is not one the cycle changed.
+    #[test]
+    fn past_its_budget_a_cut_cycle_adds_nothing() {
+        use crate::lang::ts::TsJs;
+        let src = "function send(n, a, b) { fetch(`/x/${a}`); if (n > 0) send(n - 1, b, a); }\n\
+                   function place() { send(1, 'first', 'second'); }\n";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let files = BTreeMap::from([("a.ts", &facts)]);
+        let resolver = Resolver::new(&files, TsJs.modules(&[], &files).unwrap(), &TsJs);
+        let n = (facts.calls.iter())
+            .position(|c| c.callee == "fetch")
+            .unwrap();
+        // Like a reader of requests, this one reads no URL off a value it knows nothing of.
+        let url = |args: &[Value], _: &Keywords| match args.first()? {
+            Value::Str(parts) if !parts.iter().any(|p| matches!(p, Part::Ref(_))) => Some(()),
+            _ => None,
+        };
+        // The sites the `fetch` is read at, with `spent` of the cut budget gone beforehand.
+        let sites = |spent: usize| {
+            let code = Code::new(&resolver, &files, crate::lang::pack(0));
+            code.cut_apart(|| code.charge("a.ts", spent));
+            code.expand(Expand::Call("a.ts", n), &url).len()
+        };
+        assert_eq!((sites(0), sites(EVAL_BUDGET)), (2, 1));
+    }
+
+    #[test]
     fn a_value_folded_deeper_than_the_limit_is_unknown() {
         let chain = |n: usize| {
             let consts: String = (0..n)
@@ -10407,6 +10677,33 @@ mod tests {
         assert_eq!(param(&both), ["a.py Router"]);
         let only = format!("{def}{matched}");
         assert_eq!(param(&only), Vec::<String>::new());
+    }
+
+    /// `Code::runs_alone`: an exact call of a function, or of a method whose own name no other
+    /// definition spells, runs that definition. A method that shares its name with another
+    /// type's method or with an interface's does not, and neither does a function literal.
+    #[test]
+    fn a_function_and_a_method_of_a_name_of_its_own_run_alone() {
+        let src = "package p\n\ntype A struct{}\n\ntype B struct{}\n\n\
+                   type I interface {\n\tshown()\n}\n\nfunc plain() {}\n\nfunc (A) own() {}\n\n\
+                   func (A) both() {}\n\nfunc (B) both() {}\n\nfunc (A) shown() {}\n\n\
+                   func holder() {\n\tf := func() {}\n\tf()\n}\n";
+        let alone = over(go(), &[("a.go", src)], |code| {
+            let (&path, &facts) = code.files().get_key_value("a.go").unwrap();
+            let mut alone: Vec<String> = (facts.defs.iter())
+                .filter(|d| matches!(d.kind, Kind::Function | Kind::Method | Kind::Inline))
+                .filter(|d| {
+                    code.runs_alone(Target {
+                        path,
+                        name: &d.name,
+                    })
+                })
+                .map(|d| d.name.clone())
+                .collect();
+            alone.sort();
+            alone
+        });
+        assert_eq!(alone, ["A.own", "holder", "plain"]);
     }
 
     #[test]

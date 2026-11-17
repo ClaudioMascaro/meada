@@ -1899,6 +1899,7 @@ sample.java
     "example.Store.later()"
   ],
   "package": "example",
+  "reflects": true,
   "anonymous": [
     "run"
   ],
