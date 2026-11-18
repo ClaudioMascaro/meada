@@ -132,7 +132,9 @@
   one group, the whitespace near copy left out, groups by span length, a match by path, and the
   export's `hash`), `decisions`
   (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
-  (the binary in human mode over scripted stdin), `decider` (decider mode against the stub),
+  (the binary in human mode over scripted stdin; a linked decisions file, dangling too, refused
+  by every mode that can save and read through by the rest), `decider` (decider mode against the
+  stub; the same refusal before any request),
   `freshness` (cold vs refreshed, also an edited zod schema dropping a field, edited calls moving
   every repository's communities and processes, and the chain's export byte-identical under
   `meada::with_reversed_walk`), `items` (open items and their `search` goldens, fixtures

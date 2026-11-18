@@ -158,8 +158,22 @@ fn render(mut all: Vec<Decision>) -> Result<String> {
     Ok(toml::to_string(&Decisions { items: all })?)
 }
 
+/// Refuses a `<root>/meada.decisions.toml` that is a symbolic link, a dangling one included
+/// (`config::unlinked`), before a run that can `save` asks or sends anything: the rename would
+/// replace the link with a regular file and leave its target as it was. Meada writes the file
+/// in the repository root only (ADR 0006).
+pub(crate) fn writable(root: &Path) -> Result<()> {
+    let file = root.join(FILE);
+    match config::unlinked(&file) {
+        Ok(None) => Err(format!("{}: {}", file.display(), Msg::DecisionsLinked.text()).into()),
+        // A missing file is created by `save`; another error is the load's or the save's.
+        _ => Ok(()),
+    }
+}
+
 /// Writes `text`, from `canonical`, as `<root>/meada.decisions.toml`. It goes to a temporary
 /// file first and is renamed over the old one, so a failed write keeps the old decisions.
+/// A run that saves checks `writable` first.
 pub(crate) fn save(root: &Path, text: &str) -> Result<()> {
     let temp = root.join(format!("{FILE}.tmp"));
     std::fs::write(&temp, text)?;

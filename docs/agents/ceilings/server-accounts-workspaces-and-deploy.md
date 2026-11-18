@@ -263,6 +263,12 @@
   `O_NONBLOCK | O_NOFOLLOW` and a direct `libc` dependency, declined in #548.
 - `decisions.rs`: a repository serving a decision's contract from several sites links to the
   first by site; the target names no site.
+- `decisions.rs` (#506): `writable` tests only the name `meada.decisions.toml`, once, when a run
+  that can save starts (a reading of the code, untested). A link made at the name while the run
+  asks is replaced by `save`'s rename, its target left as it was. `save` writes through a link
+  at `meada.decisions.toml.tmp`, a dangling one included, putting the decisions at its target,
+  and the rename then moves that link to the name (the next run that can save refuses it). Both
+  take write access to the repository root.
 - `decider/decisions.rs`: the upstream documentation gives no range for `confidence`; [0,1] is
   assumed.
 - `drift_view.rs`: `context`, `search` and `status` find each shown link's consumer call by
