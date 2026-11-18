@@ -302,7 +302,8 @@
   `fmt`, `net/http`, `os`, `strings` and `aws` only where nothing else in the file spells the
   name they are imported by (`hidden`: a parameter, a local or a function of that name in any
   function of the file leaves every call of the package in the file unfolded, whatever its
-  scope).
+  scope; a literal's key alone, `&C{http: ..}`, is a field or a name declared elsewhere and
+  hides nothing).
 - `http/rust.rs` (spec #30): `ITEM_WORK` (16384): the values the expansion of constants and
   returned lists adds, over the whole repository, to the handlers a call names; a list past it
   is read no further, and a handler it left out is taken as mentioned. `macro_use`: the crate
