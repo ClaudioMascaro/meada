@@ -14,7 +14,10 @@ this file, and a change to these modules updates it.
   writes nothing), `list` (`--list`: open items, then the repository's stale and waiting
   decisions from `Engine::local_decisions`) and `prune` (`--prune`: `decisions::pruned` drops
   exactly the stale entries and `save` rewrites the file; waiting ones stay; no write when none
-  is stale) and `run`, the public entry. Human mode reads no environment variable and
+  is stale) and `run`, the public entry. Before any question, request or write, `run` asks
+  `decisions::writable` in every mode that can save (human, `--item`, `--decider`, `--prune`),
+  whether or not the run ends up saving; `--list`, `--dry-run` and `--show-request` skip it and
+  read a linked file through the link (#506). Human mode reads no environment variable and
   opens no connection. With `--decider` (and neither `--list` nor `--prune`), `run` reads
   `decider::Config` first (and validates `--min-p` with `decider::min_p`, before the
   variables), then hands the items to `decider::run`, which returns an `Outcome {decisions,
@@ -42,7 +45,11 @@ this file, and a change to these modules updates it.
   `call` (parse error `<file>:<line>: `call`: ...` at the repeat): one entry per call is a file
   invariant, so replay and the writers never see duplicates. The writer is `canonical(root, new)`
   (existing entries minus those of the same `call`, plus `new`, sorted by `call`, no comments or
-  timestamps; `Decision::human(item, candidate)` builds a human pick) and `save(root, text)`.
+  timestamps; `Decision::human(item, candidate)` builds a human pick) and `save(root, text)`
+  (`<file>.tmp`, then renamed over the name). `writable(root)` refuses a `meada.decisions.toml`
+  that is a symbolic link, a dangling one included (`config::unlinked`; error `<path>: ` then
+  `Msg::DecisionsLinked`), since the rename would replace the link and leave its target as it
+  was; a missing file passes (`save` creates it), another error is left to the load or the save.
 - `decider/`: decider mode, the **only network path of Meada**. `mod.rs` owns
   `Config::from_env` (the four `MEADA_DECIDER_*` variables, read nowhere else: errors name the
   variable, `decisions` defaults to OpenRouter and `typesafe/jev-1.14` and needs the key, `chat`
