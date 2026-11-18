@@ -30,6 +30,13 @@ O alvo precisa ser um dos candidatos do item, os que o `meada decide` lista, tam
 dinâmica: um alvo que o repositório serve mas que a chamada não alcança (outro método, ou um
 caminho onde as partes conhecidas da URL não cabem) fica obsoleto, e o item continua aberto.
 
+Num checkout local, `meada.decisions.toml` pode ser um link simbólico: a indexação, `meada
+status`, `meada export`, o servidor MCP e os modos do `meada decide` que não gravam (`--list`,
+`--dry-run`, `--show-request`) leem o arquivo através dele. Os modos que podem gravar (o
+interativo, `--item`, `--decider` e `--prune`) recusam o link, mesmo quebrado, antes de perguntar
+ou enviar qualquer coisa, e saem com erro sem gravar nada, tenham ou não algo a gravar: o Meada
+grava este arquivo só na raiz do repositório, nunca no destino de um link.
+
 ### Decisor por modelo
 
 `meada decide --decider` é o único caminho de Meada até um modelo de linguagem, e só roda quando você o pede.

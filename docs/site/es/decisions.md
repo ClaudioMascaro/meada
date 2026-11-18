@@ -31,6 +31,13 @@ una URL dinámica: un destino que su repositorio sirve pero que la llamada no al
 método, o una ruta en la que no encajan las partes conocidas de la URL) queda obsoleto, y el
 ítem sigue abierto.
 
+En un checkout local, `meada.decisions.toml` puede ser un enlace simbólico: la indexación,
+`meada status`, `meada export`, el servidor MCP y los modos de `meada decide` que no graban
+(`--list`, `--dry-run`, `--show-request`) leen el archivo a través de él. Los modos que pueden
+grabar (el interactivo, `--item`, `--decider` y `--prune`) rechazan el enlace, también uno roto,
+antes de preguntar o enviar nada, y salen con error sin grabar nada, tengan o no algo que grabar:
+Meada graba este archivo solo en la raíz del repositorio, nunca en el destino de un enlace.
+
 ### Decisor por modelo
 
 `meada decide --decider` es el único camino de Meada hacia un modelo de lenguaje, y solo corre cuando lo

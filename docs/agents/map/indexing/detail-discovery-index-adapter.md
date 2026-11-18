@@ -17,7 +17,9 @@
   gateway_path(path)` applies it with `[serve]` prefix and strip, `Http::declare` with a
   document's server path as the prefix. `config::read<T>(root, name)` is the shared TOML reader (file, line and key in
   every error), also used for the decisions file; `Repository` carries both `config` and
-  `decisions`, loaded together at discovery.
+  `decisions`, loaded together at discovery. `config::unlinked(path)` (the path's own metadata,
+  `None` for a symbolic link, a dangling one included) is the one test of a link for a file the
+  repository holds: a mirror's reads (`read_unlinked`) and `decisions::writable` ask it.
 - `repo.rs`: root, identity (normalized `origin`, else `local/<dir>`), `uncommitted()`, `head`,
   `unclean` (status with ignored files, for snapshots and server-mode recording) and `changed`
   (status without them, for a local export's `dirty`), all by shelling out to `git`.

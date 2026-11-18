@@ -30,6 +30,13 @@ The target must be one of the item's candidates, the ones `meada decide` lists, 
 URL too: a target its repository serves but the call cannot reach (another method, or a path the
 known parts of the URL do not fit) is stale, and the item stays open.
 
+In a local checkout, `meada.decisions.toml` may be a symbolic link: indexing, `meada status`,
+`meada export`, the MCP server and the modes of `meada decide` that write nothing (`--list`,
+`--dry-run`, `--show-request`) read the file through it. The modes that can write (interactive,
+`--item`, `--decider` and `--prune`) refuse the link, a dangling one too, before they ask or send
+anything, and exit with an error writing nothing, whether or not they had something to write:
+Meada writes this file in the repository root only, never at a link's target.
+
 ### Model decider
 
 `meada decide --decider` is the only path from Meada to a language model, and it runs only when you

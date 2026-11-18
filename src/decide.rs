@@ -102,8 +102,9 @@ pub(crate) fn ask(
 
 /// Runs the command: `--list` shows the items; otherwise it asks a person, or the decider with
 /// `--decider`, then writes the file once, at the end (or prints it for `--dry-run`). Nothing
-/// is written when nothing was picked. Only decider mode reads the decider variables, and
-/// `--list` reads none.
+/// is written when nothing was picked. A run that can write refuses a decisions file that is a
+/// symbolic link before it asks or sends anything (`decisions::writable`). Only decider mode
+/// reads the decider variables, and `--list` reads none.
 pub fn run(
     engine: &Engine,
     options: &Options,
@@ -112,6 +113,10 @@ pub fn run(
 ) -> Result<()> {
     // Checked whenever it is given, whatever else the run does.
     let min_p = options.min_p.map_or(Ok(decider::MIN_P), decider::min_p)?;
+    // Before any question, request or write, whether or not the run ends up saving.
+    if options.prune || !(options.list || options.dry_run || options.show_request) {
+        decisions::writable(engine.root())?;
+    }
     if options.prune {
         return prune(engine, out);
     }
