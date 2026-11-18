@@ -1,0 +1,24 @@
+package nolit
+
+import (
+	"context"
+	"net/http"
+	"os"
+)
+
+type Client struct {
+	http *http.Client
+}
+
+func New() *Client {
+	return &Client{http.DefaultClient}
+}
+
+func (c *Client) CreateOrder(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, os.Getenv("API_URL")+"/orders", nil)
+	if err != nil {
+		return err
+	}
+	_, err = c.http.Do(req)
+	return err
+}

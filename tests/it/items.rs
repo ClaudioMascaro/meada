@@ -407,3 +407,34 @@ fn a_swift_base_meada_did_not_read_makes_open_items_that_name_it() {
         )]
     );
 }
+
+/// The key of a Go struct literal named like an import (`&Client{http: ..}`, `&Client{os: ..}`)
+/// is a field: the file still reads the package, so each call keeps its method and its base,
+/// as with another key (`good`) or none (`nolit`), and links with no open item.
+#[test]
+fn a_go_literal_key_named_like_an_import_leaves_its_call_linked() {
+    fixture_repo(
+        "items_go_literal_key",
+        "go-literal-key-api",
+        Some("https://example.com/acme/api.git"),
+    );
+    let cli = fixture_repo(
+        "items_go_literal_key",
+        "go-literal-key-cli",
+        Some("https://example.com/acme/cli.git"),
+    );
+    let engine = Engine::open(&cli).unwrap();
+
+    assert_eq!(items_of(&engine), Vec::<String>::new());
+    let reason = "base URL from API_URL, a base_url_env of peer example.com/acme/api";
+    assert_eq!(
+        links_of(&engine),
+        ["bad", "good", "nolit", "osk"].map(|package| format!(
+            "{package}/x.go::Client.CreateOrder::http.NewRequestWithContext#0 -> \
+             http::POST::/orders [{reason}]"
+        ))
+    );
+    let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let levels = (export["links"].as_array().unwrap().iter()).map(|l| l["level"].clone());
+    assert_eq!(levels.collect::<Vec<_>>(), ["inferred"; 4]);
+}
