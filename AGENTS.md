@@ -42,6 +42,12 @@ write tools; one index per repository; determinism) live in
   through `bounded` when it is on PATH, else one at a time under a lock. `scripts/gate` runs
   the push gate detached in its own worktree (`scripts/gate --wait` gives its result): reach
   for it where a command's time limit would cut the gate, as in a cloud session.
+- Whoever changes a file maintains it. A change made for an issue leaves the unit and `tests/it`
+  tests of each file it touches under `src/` running every line of that file, the lines it did
+  not write included: 100%, or the nearest to it, and each branch and edge case with a test that
+  fails without it. The PR names the lines still left out and why. Where `cargo-llvm-cov` is
+  installed, `cargo llvm-cov test --show-missing-lines` with the scope's tests lists them; it is
+  not part of the gate.
 - Keep implementing while a gate, a check or a verifier runs: draft the next ticket in a
   worktree outside the tree, and bring it in once the current one is committed.
 - Product E2E runs only in GitHub Actions, for a relevant large implementation marked with the
