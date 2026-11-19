@@ -1,3 +1,4 @@
 workspace: 1 repositório
 example.com/acme/web (.) não indexado
+decisões e demais linhas do workspace não avaliadas: nem todo repositório está indexado nesta versão; rode meada index
 par não encontrado: example.com/acme/api, citado por example.com/acme/web

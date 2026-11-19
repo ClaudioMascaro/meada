@@ -1,0 +1,6 @@
+workspace: 4 repositories
+example.com/chain/web (.) indexed, 5 files
+example.com/chain/gateway (../chain-gateway) indexed, 8 files
+example.com/chain/catalog (../chain-catalog) indexed by another version; rebuilt on next use
+example.com/chain/worker (../chain-worker) indexed, 3 files
+decisions and other workspace lines not evaluated: not every repository is indexed at this version; run meada index

@@ -1,4 +1,5 @@
 workspace: 2 repositories
 example.com/acme/web (.) not indexed
 example.com/acme/api (../http-api) not indexed
+decisions and other workspace lines not evaluated: not every repository is indexed at this version; run meada index
 missing peer: example.com/acme/billing, named by example.com/acme/web
