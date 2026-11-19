@@ -19,6 +19,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- `meada status` no longer drops the stale and waiting decisions, and the other lines under each
+  repository, without a word. When a repository of the workspace is not indexed, is indexed by
+  another version or is locked, a line in their place says they were not evaluated and to run
+  `meada index` (`meada index --workspace` with `--workspace`); when an index fails to open or
+  refresh, the line gives the repository and the error, where every state said `indexed` and
+  nothing else. The exit code is what it was, and `meada status` still creates and rebuilds no
+  index. With every repository indexed and no error the output is unchanged (#934).
 - `meada decide` no longer replaces a `meada.decisions.toml` that is a symbolic link with a
   regular file, leaving the link's target as it was: every mode that can write (interactive,
   `--item`, `--decider`, `--prune`) refuses the link, a dangling one too, before it asks a

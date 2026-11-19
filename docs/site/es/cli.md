@@ -7,7 +7,11 @@ En la raíz del repositorio:
   índice y los pares que no se encontraron; bajo cada repositorio, los recursos sin enlace y los `via` que no
   corresponden a ningún símbolo, y cada archivo fuente que un language pack descartó por pasar de un
   límite (`too broad`, en inglés, por el presupuesto de nombres cualificados, o un proyecto que da
-  demasiados usings a sus archivos);
+  demasiados usings a sus archivos). No crea ningún índice: solo evalúa las decisiones y las líneas
+  bajo cada repositorio cuando todo repositorio del workspace está indexado en esta versión, y
+  entonces actualiza los índices como una consulta. Si no, o cuando un índice no abre o no se
+  actualiza, una línea dice que no las evaluó y por qué (`ejecuta meada index`, o el repositorio y
+  el error), y el código de salida no cambia;
 - `meada export` imprime todo el índice como JSON ordenado, útil para comparar dos ejecuciones
   con `diff`;
 - `meada decide` resuelve enlaces ambiguos y URLs dinámicas, ver Decisiones;
