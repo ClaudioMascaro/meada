@@ -7,7 +7,10 @@ Na raiz do repositório:
   e os pares que não foram encontrados; sob cada repositório, os recursos sem ligação e os `via` que não
   correspondem a nenhum símbolo, e cada arquivo-fonte que um language pack descartou por passar de um
   limite (`abrangente demais`, para o orçamento de nomes qualificados, ou um projeto que dá usings demais
-  aos seus arquivos);
+  aos seus arquivos). Ele não cria índice: só avalia as decisões e as linhas sob cada repositório
+  quando todo repositório do workspace está indexado nesta versão, e então atualiza os índices como
+  uma consulta. Senão, ou quando um índice não abre ou não se atualiza, uma linha diz que não as
+  avaliou e por quê (`rode meada index`, ou o repositório e o erro), e o código de saída não muda;
 - `meada export` imprime o índice inteiro em JSON ordenado, bom para `diff` entre duas execuções;
 - `meada decide` resolve ligações ambíguas e URLs dinâmicas, veja Decisões;
 - `meada mcp` serve as [ferramentas MCP](mcp.md).

@@ -25,7 +25,9 @@ the file back: the decided link gets the level `decided` and its reason says who
 the code changes and a decision no longer fits (the call is gone, the item is no longer open,
 the provider is gone or is no longer a candidate), `meada status` reports it as stale, under
 its repository, and `meada decide --prune` removes it. A decision waiting for a peer that has
-not been found yet is shown apart and kept.
+not been found yet is shown apart and kept. `meada status` evaluates the decisions only when
+every repository of the workspace is indexed at this version and each one's index opens and
+refreshes; otherwise one line in their place says they were not evaluated and why.
 The target must be one of the item's candidates, the ones `meada decide` lists, for a dynamic
 URL too: a target its repository serves but the call cannot reach (another method, or a path the
 known parts of the URL do not fit) is stale, and the item stays open.

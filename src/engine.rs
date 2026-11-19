@@ -26,6 +26,10 @@ use meada_core::search;
 #[doc(hidden)]
 pub use crate::partial::with_every_row;
 
+/// What `Engine::status_report` gives: the decisions of each repository that are stale or
+/// waiting, and each repository's status lines, in workspace order.
+pub type Report = (Vec<Evaluation>, Vec<Vec<String>>);
+
 pub struct Engine {
     /// The index of each repository of the workspace, one connection each (SQLite attaches at
     /// most 10 databases to one), in `workspace.repos` order: the first is where Meada runs.
@@ -165,9 +169,17 @@ impl Engine {
     /// (`Repository::index`).
     fn over(workspace: Workspace) -> Result<Self> {
         // Opening builds a missing index, or rebuilds one of another schema.
-        let dbs = (workspace.repos.iter())
-            .map(|r| index::open(&r.index, &r.root, &r.identity, &r.config.serve))
-            .collect::<Result<_>>()?;
+        Self::over_with(workspace, |r| {
+            index::open(&r.index, &r.root, &r.identity, &r.config.serve)
+        })
+    }
+
+    /// `over`, each index opened by `open`, one repository at a time in workspace order.
+    fn over_with(
+        workspace: Workspace,
+        open: impl Fn(&Repository) -> Result<Connection>,
+    ) -> Result<Self> {
+        let dbs = (workspace.repos.iter()).map(open).collect::<Result<_>>()?;
         let here = &workspace.repos[0];
         Ok(Self {
             dbs,
@@ -428,8 +440,13 @@ impl Engine {
     /// status lines: each kind's own (a `via` that names no symbol, a resource no link reaches),
     /// its documents' (one ignored, a route listed twice), the source files a pack dropped for
     /// passing a budget and the shape drift's.
-    pub fn status_report(&self) -> Result<(Vec<Evaluation>, Vec<Vec<String>>)> {
+    pub fn status_report(&self) -> Result<Report> {
         self.refresh()?;
+        self.report()
+    }
+
+    /// `status_report` over the indexes as they are, refreshed or not.
+    fn report(&self) -> Result<Report> {
         let exports = self.exports()?;
         let (links, evaluations) = self.links_and_decisions(&exports);
         let repos = &self.workspace.repos;
@@ -1812,16 +1829,16 @@ fn line(identity: &str, files: &mut Files, symbol: &Symbol, name: &str) -> Strin
 /// its `meada.decisions.toml` that are stale or wait on a missing peer; then every peer not
 /// found. It never creates an index: only when every repository is indexed at the current
 /// schema does it refresh them, like a query, to evaluate the decisions against the files as they
-/// are; otherwise it reports the states and no decision.
+/// are; otherwise, or when an index fails to open or refresh, one line says the decisions and
+/// the lines under each repository were not evaluated, and why (#934).
 pub fn status(dir: &Path) -> Result<String> {
     let workspace = Workspace::discover(dir)?;
     let here = workspace.repos[0].root.clone();
     let indexed =
         (workspace.repos.iter()).all(|m| matches!(index::state(&m.index), State::Indexed { .. }));
-    // A failure to open or refresh drops the decision and status lines, not the whole status.
-    let report = match indexed.then(|| Engine::open(dir)) {
-        Some(Ok(engine)) => engine.status_report().unwrap_or_default(),
-        _ => Default::default(),
+    let report = match indexed {
+        true => fresh_report(dir).map_err(|e| Msg::EvaluationFailed(&e.to_string()).text()),
+        false => Err(Msg::Unevaluated.text()),
     };
     let heads = (workspace.repos.iter()).map(|m| {
         let state = state_text(index::state(&m.index), Msg::OtherVersion);
@@ -1831,12 +1848,29 @@ pub fn status(dir: &Path) -> Result<String> {
     Ok(status_lines(heads, report, &workspace.missing))
 }
 
+/// `status_report` of the workspace of `dir`, each index opened and refreshed in turn, so that
+/// a failure names the repository it came from: `<identity>: <error>`.
+fn fresh_report(dir: &Path) -> Result<Report> {
+    let fresh = |r: &Repository| -> Result<Connection> {
+        let db = index::open(&r.index, &r.root, &r.identity, &r.config.serve);
+        db.and_then(|db| {
+            index::refresh(&db, &r.root, &r.identity, &|| {
+                Ok(config::load(&r.root)?.serve)
+            })?;
+            Ok(db)
+        })
+        .map_err(|e| format!("{}: {e}", r.identity).into())
+    };
+    Engine::over_with(Workspace::discover(dir)?, fresh)?.report()
+}
+
 /// `status` in server mode (ADR 0011): every repository the manifest at `manifest` lists, in
 /// manifest order, with its `path` as the manifest writes it and its index state, or why it
 /// cannot be served; then every peer a `meada.toml` names that the manifest does not list, and
 /// every entry block a mirror's own `meada.toml` overrides. The decision and status lines come,
-/// as locally, only when every repository is indexed at the current schema. It only reads, as
-/// `Engine::open_manifest` does.
+/// as locally, only when every repository is indexed at the current schema and its index reads;
+/// otherwise one line says why they did not (#934). It only reads, as `Engine::open_manifest`
+/// does.
 pub fn status_workspace(manifest: &Path) -> Result<String> {
     let listed = Manifest::read_listed(manifest)?;
     Ok(status_listed(&listed, manifest))
@@ -1890,8 +1924,9 @@ fn status_listed(listed: &Manifest, manifest: &Path) -> String {
         (true, Some(first)) => (listed.clone().workspace(&first, &|_| true))
             .and_then(|workspace| Engine::read(workspace, Fix::Index(&shown)))
             .and_then(|engine| engine.status_report())
-            .unwrap_or_default(),
-        _ => Default::default(),
+            .map_err(|e| Msg::EvaluationFailed(&e.to_string()).text()),
+        (true, None) => Ok(Default::default()),
+        (false, _) => Err(Msg::UnevaluatedWorkspace.text()),
     };
     let heads = rows.into_iter().map(|(repo, path, index)| {
         let state = match index {
@@ -2110,13 +2145,18 @@ fn state_text(state: State, other: Msg) -> String {
 
 /// `status`'s text: how many repositories the workspace holds, the scope of its orphan lines;
 /// each repository's line, by identity in workspace order, followed by its decisions that are
-/// stale or waiting and its status lines (`Engine::status_report`, empty when it did not run),
-/// then the missing peers.
+/// stale or waiting and its status lines (`Engine::status_report`), or, when the report was not
+/// evaluated, the one line `report` gives in their place after the last repository; then the
+/// missing peers.
 fn status_lines(
     heads: impl ExactSizeIterator<Item = (String, String)>,
-    (evaluations, status_lines): (Vec<Evaluation>, Vec<Vec<String>>),
+    report: std::result::Result<Report, String>,
     missing: &[Missing],
 ) -> String {
+    let (evaluations, status_lines, unevaluated) = match report {
+        Ok((evaluations, status_lines)) => (evaluations, status_lines, None),
+        Err(line) => (vec![], vec![], Some(line)),
+    };
     let mut lines = vec![Msg::Repositories(heads.len()).text()];
     for (n, (identity, head)) in heads.enumerate() {
         lines.push(head);
@@ -2125,6 +2165,7 @@ fn status_lines(
         }
         lines.extend((status_lines.get(n).into_iter().flatten()).map(|l| format!("  {l}")));
     }
+    lines.extend(unevaluated);
     lines.extend(missing.iter().map(Missing::text));
     lines.iter().map(|l| format!("{l}\n")).collect()
 }
