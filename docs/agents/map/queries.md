@@ -119,8 +119,12 @@ this file, and a change to these modules updates it.
   `local_item`, `decision_report`, `local_decisions`, `root`, plus `status(dir)` (never creates
   an index; when every repository is already indexed at the current schema it refreshes them
   like a query, to evaluate decisions, and writes
-  only inside `.meada/`; otherwise, or when that fails, it prints the states and no decision
-  lines). It builds the results of `context` and `search` (each line placed: a `path:line` reads
+  only inside `.meada/`; otherwise it prints the states and, after the last repository, one
+  `Msg::Unevaluated` line in place of the decision and status lines, or `Msg::EvaluationFailed`
+  with `<identity>: <error>` when an index fails to open or refresh (`fresh_report` opens and
+  refreshes each in turn through `Engine::over_with`); the exit code does not change (#934).
+  `status_workspace` does the same over a manifest: `Msg::UnevaluatedWorkspace`, or
+  `EvaluationFailed` with the bare error, and nothing for a manifest that lists nothing). It builds the results of `context` and `search` (each line placed: a `path:line` reads
   the file) and `meada-core` turns them into the answer: `search::answer` sorts and cuts the hits,
   `context::Symbol::answer` cuts a symbol's context; `trace` lives in `trace.rs`. `export` writes
   through `meada_core::export` (`index::Export::written`, then `Export::write`). It imports no kind

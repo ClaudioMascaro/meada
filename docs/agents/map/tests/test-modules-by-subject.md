@@ -131,7 +131,9 @@
   (`search` kind `duplicate` over `duplicates-a` and its peer `duplicates-b`: three exact copies in
   one group, the whitespace near copy left out, groups by span length, a match by path, and the
   export's `hash`), `decisions`
-  (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`), `decide`
+  (replay, parse errors), `stale` (stale and waiting decisions in `status` and `export`, and
+  the one line in their place when an index is missing, of another version or fails to
+  refresh, #934), `decide`
   (the binary in human mode over scripted stdin; a linked decisions file, dangling too, refused
   by every mode that can save and read through by the rest), `decider` (decider mode against the
   stub; the same refusal before any request),
