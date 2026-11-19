@@ -124,6 +124,13 @@ pub enum Msg<'a> {
     OtherVersion,
     Indexed(i64),
     OtherVersionWorkspace,
+    /// The line `meada status` prints in place of the decisions and the lines under each
+    /// repository when not every repository is indexed at the current schema (#934);
+    /// `UnevaluatedWorkspace` with `--workspace`.
+    Unevaluated,
+    UnevaluatedWorkspace,
+    /// The same line when opening, refreshing or reading an index failed with this error.
+    EvaluationFailed(&'a str),
     /// The last line of a failed `meada index --workspace`: the stage and how many of its
     /// repositories, each named on its own line before it, failed (#316).
     IndexFailed(usize),
@@ -1612,6 +1619,33 @@ impl Msg<'_> {
                 "indexed by another version; rebuilt by meada index --workspace".into(),
                 "indexado por outra versão; reconstruído por meada index --workspace".into(),
                 "indexado por otra versión; reconstruido por meada index --workspace".into(),
+            ),
+            Msg::Unevaluated => pick(
+                "decisions and other workspace lines not evaluated: not every repository is \
+                 indexed at this version; run meada index"
+                    .into(),
+                "decisões e demais linhas do workspace não avaliadas: nem todo repositório está \
+                 indexado nesta versão; rode meada index"
+                    .into(),
+                "decisiones y demás líneas del workspace no evaluadas: no todo repositorio está \
+                 indexado en esta versión; ejecuta meada index"
+                    .into(),
+            ),
+            Msg::UnevaluatedWorkspace => pick(
+                "decisions and other workspace lines not evaluated: not every repository is \
+                 indexed at this version; run meada index --workspace"
+                    .into(),
+                "decisões e demais linhas do workspace não avaliadas: nem todo repositório está \
+                 indexado nesta versão; rode meada index --workspace"
+                    .into(),
+                "decisiones y demás líneas del workspace no evaluadas: no todo repositorio está \
+                 indexado en esta versión; ejecuta meada index --workspace"
+                    .into(),
+            ),
+            Msg::EvaluationFailed(error) => pick(
+                format!("decisions and other workspace lines not evaluated: {error}"),
+                format!("decisões e demais linhas do workspace não avaliadas: {error}"),
+                format!("decisiones y demás líneas del workspace no evaluadas: {error}"),
             ),
             Msg::IndexFailed(1) => pick(
                 "index failed for 1 repository".into(),

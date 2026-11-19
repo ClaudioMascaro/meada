@@ -25,7 +25,9 @@ indexação só relê o arquivo: a ligação decidida ganha o nível `decided` e
 decidiu. Quando o código muda e uma decisão deixa de caber (a chamada sumiu, o item não está
 mais aberto, o provedor sumiu ou não é mais candidato), `meada status` a mostra como obsoleta,
 sob o repositório, e `meada decide --prune` a remove. Uma decisão que espera um par ainda não
-encontrado aparece à parte e é mantida.
+encontrado aparece à parte e é mantida. `meada status` avalia as decisões só quando todo
+repositório do workspace está indexado nesta versão e o índice de cada um abre e se atualiza;
+senão, uma linha no lugar delas diz que não foram avaliadas e por quê.
 O alvo precisa ser um dos candidatos do item, os que o `meada decide` lista, também para uma URL
 dinâmica: um alvo que o repositório serve mas que a chamada não alcança (outro método, ou um
 caminho onde as partes conhecidas da URL não cabem) fica obsoleto, e o item continua aberto.
