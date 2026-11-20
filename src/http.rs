@@ -1082,6 +1082,38 @@ impl ContractKind for Http {
         serves(provider, contract)
     }
 
+    fn no_candidates(
+        &self,
+        consumer: &Consumer,
+        providers: &mut dyn Iterator<Item = &Provider>,
+        missing: &str,
+    ) -> Option<String> {
+        let routes: Vec<_> = providers.filter_map(|p| route(&p.contract)).collect();
+        if routes.is_empty() {
+            return Some(crate::msg::Msg::UrlNoRoutes(missing).text());
+        }
+        let method = consumer.method.as_deref();
+        let mut paths = (routes.iter())
+            .filter(|(served, _)| method.is_none_or(|m| m == *served || *served == ANY))
+            .map(|(_, path)| *path)
+            .peekable();
+        if paths.peek().is_none() {
+            return Some(crate::msg::Msg::UrlNoMethod(method.unwrap_or_default()).text());
+        }
+        // Suggest a prefix only when the whole server path is an exact suffix at a
+        // segment boundary. A fragment in the middle of a path proves less.
+        let written = consumer.lead.as_ref().map(|l| l.path.as_str()).or(
+            match consumer.fragments.as_slice() {
+                [one] => Some(one.as_str()),
+                _ => None,
+            },
+        );
+        let prefix = written.is_some_and(|written| {
+            paths.any(|path| path != "/" && written.len() > path.len() && written.ends_with(path))
+        });
+        Some(crate::msg::Msg::UrlNoPath { prefix }.text())
+    }
+
     /// A route fits a dynamic URL by its code path or by a gateway path: by the literal fragments
     /// of the URL, or, after a base Meada could not read, by the end of the path (#801).
     fn candidate(&self, consumer: &Consumer, provider: &Provider) -> bool {

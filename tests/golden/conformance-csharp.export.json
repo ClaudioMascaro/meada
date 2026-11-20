@@ -12866,5 +12866,69 @@
         }
       ]
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::http.GetAsync#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/api/Orders/any/Anything",
+        "example.com/acme/conformance::http::GET::/",
+        "example.com/acme/conformance::http::GET::/api/Orders",
+        "example.com/acme/conformance::http::GET::/api/Orders/{}",
+        "example.com/acme/conformance::http::GET::/api/v1/orders",
+        "example.com/acme/conformance::http::GET::/api/v1/orders/{}",
+        "example.com/acme/conformance::http::GET::/api/v2/orders",
+        "example.com/acme/conformance::http::GET::/api/v2/orders/{}",
+        "example.com/acme/conformance::http::GET::/edges/Jobs/List",
+        "example.com/acme/conformance::http::GET::/edges/Jobs/done",
+        "example.com/acme/conformance::http::GET::/health",
+        "example.com/acme/conformance::http::GET::/loop/again/leaf",
+        "example.com/acme/conformance::http::GET::/loop/leaf",
+        "example.com/acme/conformance::http::GET::/ping",
+        "example.com/acme/conformance::http::GET::/reports/daily",
+        "example.com/acme/conformance::http::GET::/status/{}"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reassigned.Run(bool)::http.SendAsync#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/api/Orders/any/Anything",
+        "example.com/acme/conformance::http::DELETE::/api/Orders/{}",
+        "example.com/acme/conformance::http::DELETE::/api/admin/users/{}",
+        "example.com/acme/conformance::http::DELETE::/api/v1/orders/{}",
+        "example.com/acme/conformance::http::DELETE::/api/v2/orders/{}",
+        "example.com/acme/conformance::http::GET::/",
+        "example.com/acme/conformance::http::GET::/api/Orders",
+        "example.com/acme/conformance::http::GET::/api/Orders/{}",
+        "example.com/acme/conformance::http::GET::/api/v1/orders",
+        "example.com/acme/conformance::http::GET::/api/v1/orders/{}",
+        "example.com/acme/conformance::http::GET::/api/v2/orders",
+        "example.com/acme/conformance::http::GET::/api/v2/orders/{}",
+        "example.com/acme/conformance::http::GET::/edges/Jobs/List",
+        "example.com/acme/conformance::http::GET::/edges/Jobs/done",
+        "example.com/acme/conformance::http::GET::/health",
+        "example.com/acme/conformance::http::GET::/loop/again/leaf",
+        "example.com/acme/conformance::http::GET::/loop/leaf",
+        "example.com/acme/conformance::http::GET::/ping",
+        "example.com/acme/conformance::http::GET::/reports/daily",
+        "example.com/acme/conformance::http::GET::/status/{}",
+        "example.com/acme/conformance::http::HEAD::/api/Orders",
+        "example.com/acme/conformance::http::OPTIONS::/api/Orders",
+        "example.com/acme/conformance::http::PATCH::/api/Orders/{}/Touch",
+        "example.com/acme/conformance::http::PATCH::/sync",
+        "example.com/acme/conformance::http::POST::/api/Orders",
+        "example.com/acme/conformance::http::POST::/echo",
+        "example.com/acme/conformance::http::PUT::/api/Orders/{}",
+        "example.com/acme/conformance::http::PUT::/sync"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::src/Acme.Api/Remote.cs::Acme.Api.Remote.IReportsApi.All()",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base of a client Meada did not read"
+    }
   ]
 }

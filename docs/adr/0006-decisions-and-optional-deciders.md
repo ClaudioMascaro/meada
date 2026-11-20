@@ -41,6 +41,12 @@ that. Neither may enter indexing (invariant 1).
 applied a dynamic URL's decision to any contract a repository serves, so a `GET` call decided to
 a `POST` route became a `decided` link (#806).)
 
+(Amended 2026-11-20, #804. The CLI orders dynamic URL candidates by the length of path the
+literal fragments leave uncovered, using the original order for ties. The overview shows
+the first five, or only the count when no fragment is known. `--list --item` and the prompt
+number the full list in the same order as the overview. MCP keeps its existing candidate
+order and reports the full count.)
+
 ### Decider endpoint
 
 A decider speaks one of two protocols. Its URL, key and model come from the environment.

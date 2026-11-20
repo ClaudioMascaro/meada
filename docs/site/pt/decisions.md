@@ -18,14 +18,26 @@ modo humano, ou um modelo, se você pedir.
   imprime cada requisição que seria enviada e não envia nenhuma; `--min-p <p>` (só com
   `--decider`, de 0 a 1) é a probabilidade mínima para o modelo gravar.
 
+A visão geral de `meada decide --list` mostra o `kind = "..."` aceito pelo TOML e até cinco
+candidatos. Para uma URL dinâmica, aparecem primeiro as rotas com a menor parte do caminho sem
+cobertura pelos fragmentos literais. Quando a chamada não tem fragmento literal, aparece só a
+contagem. `meada decide --list --item <id>` mostra a lista completa com a mesma numeração do modo
+interativo. Um item sem candidatos informa a causa, por exemplo um método sem rota ou um caminho que
+precisa de `[serve] prefix` no provedor.
+
+O array opcional `open_items` do export contém `call`, `kind`, a lista completa e ordenada de
+`candidates` para usar em `target` e `limit` quando houver um limite de extração.
+
 `meada.decisions.toml` é um arquivo versionado no git, como um lockfile: o diff dele é o que se
 revisa. Cada `[[decision]]` traz a chamada (`call`), o provedor escolhido (`target`), quem
 decidiu (`by`: `human` ou o id do modelo) e, para um modelo, a probabilidade (`p`). A
 indexação só relê o arquivo: a ligação decidida ganha o nível `decided` e o motivo mostra quem
 decidiu. Quando o código muda e uma decisão deixa de caber (a chamada sumiu, o item não está
 mais aberto, o provedor sumiu ou não é mais candidato), `meada status` a mostra como obsoleta,
-sob o repositório, e `meada decide --prune` a remove. Uma decisão que espera um par ainda não
-encontrado aparece à parte e é mantida. `meada status` avalia as decisões só quando todo
+sob o repositório, e `meada decide --prune` remove decisões com `call-gone`, `item-not-open`, `target-gone` ou `not-candidate`. O comando mantém as que esperam um par ausente ou trazem a causa `wrong-kind`,
+`unknown-repository` ou `no-candidates`. As três causas indicam, respectivamente, o tipo a
+usar, uma identidade que precisa seguir o formato de `meada status` e a falta de qualquer
+target que sirva ao item. Uma decisão que espera um par ainda não encontrado aparece à parte. `meada status` avalia as decisões só quando todo
 repositório do workspace está indexado nesta versão e o índice de cada um abre e se atualiza;
 senão, uma linha no lugar delas diz que não foram avaliadas e por quê.
 O alvo precisa ser um dos candidatos do item, os que o `meada decide` lista, também para uma URL
@@ -71,6 +83,9 @@ candidatos (repositório, método e caminho), mais o id do repositório que a ch
 código do provedor, nenhum outro arquivo. `--show-request` mostra tudo isso antes, com a chave
 trocada por `<hidden>`. Cada resposta é validada por item; uma inválida ou uma requisição
 que falhou é relatada sem gravar aquele item, e o comando sai com erro.
+
+O decisor grava cada resposta aceita antes de enviar a próxima requisição. Se a execução for
+interrompida, repetir o comando com os mesmos arquivos envia apenas os itens que continuam abertos.
 
 Constantes fixas:
 

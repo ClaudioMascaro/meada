@@ -15,6 +15,7 @@ En la raíz del repositorio:
 - `meada export` imprime todo el índice como JSON ordenado, útil para comparar dos ejecuciones
   con `diff`;
 - `meada decide` resuelve enlaces ambiguos y URLs dinámicas, ver Decisiones;
+  `meada decide --list` muestra el tipo que acepta el TOML, por ejemplo `kind = "ambiguous-link"`;
 - `meada mcp` sirve las [herramientas MCP](mcp.md).
 
 El export empieza por tres campos que dicen de dónde viene. `format` nombra el formato del

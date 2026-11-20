@@ -241,11 +241,14 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   constructor read as a value (`mk := New; mk(x)`) is not seen: its exact callers alone give the
   field.
 
-- `Code::built` folds strings returned by exact calls of repository functions and methods (#810).
+- The HTTP reader uses `Code::built` to fold strings returned by exact calls of repository
+  functions and methods (#810).
   Arguments bind by the usual wrapper rules. Async TypeScript and Python returns require an
   awaited call. A call with possible repository dispatch alternatives, different returns,
   an unread part, or a recursive return stays unknown. Return folding shares `EVAL_DEPTH`
   and `EVAL_BUDGET` with other value flow and uses `WRAPPER_DEPTH` for nested returned calls.
+- `decide.rs`: `LIST_CANDIDATE_LIMIT` (5) is the number of candidates the unfiltered CLI overview
+  shows per item. The focused list, prompt, MCP counts and export use the complete candidate set.
 - A parameter the pack sees reassigned is unknown, including a write in a branch (#891). The
   write is counted for its whole function. The reader does not compute the new value by
   execution order. Parameterized environment reads in the eight HTTP client packs bind their

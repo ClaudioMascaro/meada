@@ -7,21 +7,27 @@ this file, and a change to these modules updates it.
 - `decide.rs`: `meada decide`. `items(engine, only)` (`Engine::local_items`: the open items
   whose call lives in the repository where Meada runs, id order; with `--item`,
   `Engine::local_item`, which also takes a decided call, offered with every candidate so the
-  new pick replaces its entry; an id that is neither is an error),
+  new pick replaces its entry; an id that is neither is an error). CLI and decider mode rank
+  dynamic URLs by uncovered path length, retaining engine order where lengths tie. Ordinary
+  `--list` shows up to five candidates, or just the count for a URL with no literal fragments.
+  The `--item` listing and prompt use the same numbers for the full list. Export's optional
+  `open_items` holds the engine's complete, sorted decision targets without source text.
   `ask(items, input, out) -> Vec<Decision>` (human mode: prints each item and its numbered
   candidates, reads plain lines, `s` or empty skips, end of input ends), `finish(engine, picks,
-  dry_run, out)` (one write at the end through `decisions::canonical` + `save`; nothing picked
+  dry_run, out)` (one interactive write at the end through `decisions::record`; nothing picked
   writes nothing), `list` (`--list`: open items, then the repository's stale and waiting
   decisions from `Engine::local_decisions`) and `prune` (`--prune`: `decisions::pruned` drops
-  exactly the stale entries and `save` rewrites the file; waiting ones stay; no write when none
-  is stale) and `run`, the public entry. Before any question, request or write, `run` asks
+  the entries with one of the original four stale causes, keeping waiting decisions and the
+  entries with a wrong kind, unknown repository or no candidates) and `run`. Before discovery
+  loads the file, `open` asks
   `decisions::writable` in every mode that can save (human, `--item`, `--decider`, `--prune`),
   whether or not the run ends up saving; `--list`, `--dry-run` and `--show-request` skip it and
   read a linked file through the link (#506). Human mode reads no environment variable and
   opens no connection. With `--decider` (and neither `--list` nor `--prune`), `run` reads
   `decider::Config` first (and validates `--min-p` with `decider::min_p`, before the
-  variables), then hands the items to `decider::run`, which returns an `Outcome {decisions,
-  failed}`; the decisions go to `finish` and, when `failed > 0`, `run` then returns an error
+  variables), then hands the items to `decider::run`. Saving mode tests that staging can work
+  before the request and records each accepted answer before sending another. When a response
+  fails validation, `decider::run` includes it in `Outcome {decisions, failed}` and `run` reports
   (`meada: N item(s) failed`, exit 1) so a script sees the failure while the other items are
   already written. `--show-request` stops after printing.
 - `decisions.rs`: `meada.decisions.toml` (ADR 0006). `Decisions { items: Vec<Decision> }`,
@@ -31,10 +37,12 @@ this file, and a change to these modules updates it.
   files, so nothing is stored and a changed file needs no reindex. `evaluate` is the one place
   that decides a decision's `Fate`, in this order: call gone (`Cause::CallGone`), target
   repository a missing peer (`Waiting`, neither applied nor stale, whatever else holds), item no
-  longer open (the core resolves the call on its own, or the item is not of the decision's kind:
-  `ItemNotOpen`), target gone (`TargetGone`), target not among the item's candidates (`NotCandidate`: the
-  ambiguous link's, or for a dynamic URL the providers `items::fits` keeps, none for a consumer
-  `items::causes` names, the rule `items::list` offers by, #806); else it applies. A stale or waiting decision changes no link. `Evaluation {
+  longer open (`ItemNotOpen`), a different decision kind (`WrongKind`), unknown provider identity
+  (`UnknownRepository`), target absent (`TargetGone`), no candidates (`NoCandidates`) or a target
+  outside them (`NotCandidate`). For a dynamic URL, `items::fits` matches a provider, and a
+  `OnceCell` loads the kind-owned causes only when a candidate would otherwise fit. The display
+  diagnostics that explain why an HTTP URL has no candidates run when rendering items.
+  Else replay applies at the first fitting site. A stale or waiting decision changes no link. `Evaluation {
   repository, stale: Vec<Stale {call, target, cause}>, waiting: Vec<Waiting {call, target, peer}>
   }` is per repository, in file order; `Engine::decision_report()` returns them for the workspace
   (`Engine::local_decisions()` the one of the repository where Meada runs,
@@ -45,8 +53,9 @@ this file, and a change to these modules updates it.
   `call` (parse error `<file>:<line>: `call`: ...` at the repeat): one entry per call is a file
   invariant, so replay and the writers never see duplicates. The writer is `canonical(root, new)`
   (existing entries minus those of the same `call`, plus `new`, sorted by `call`, no comments or
-  timestamps; `Decision::human(item, candidate)` builds a human pick) and `save(root, text)`
-  (`<file>.tmp`, then renamed over the name). `writable(root)` refuses a `meada.decisions.toml`
+  timestamps; `Decision::human(item, candidate)` builds a human pick). `record` merges and saves
+  under `.meada/decisions.lock`, which also serializes pruning. `save` syncs a unique staging file
+  and renames it over the root file. `writable(root)` refuses a `meada.decisions.toml`
   that is a symbolic link, a dangling one included (`config::unlinked`; error `<path>: ` then
   `Msg::DecisionsLinked`), since the rename would replace the link and leave its target as it
   was; a missing file passes (`save` creates it), another error is left to the load or the save.

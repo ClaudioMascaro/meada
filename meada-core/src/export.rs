@@ -127,6 +127,9 @@ pub struct Export {
     /// The process of each entry point (spec #31), in entry point order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub processes: Vec<Process>,
+    /// Open decision items of this repository, sorted by call, with their complete targets.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub open_items: Vec<OpenItem>,
     /// The repository's decisions that do not apply, each with its cause.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stale_decisions: Vec<Stale>,
@@ -160,6 +163,7 @@ impl Default for Export {
             provisions: Vec::new(),
             subscriptions: Vec::new(),
             processes: Vec::new(),
+            open_items: Vec::new(),
             stale_decisions: Vec::new(),
         }
     }
@@ -867,6 +871,46 @@ impl Mark {
     }
 }
 
+/// The CLI and TOML names of the two kinds of decision.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum DecisionKind {
+    AmbiguousLink,
+    DynamicUrl,
+}
+
+impl DecisionKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::AmbiguousLink => "ambiguous-link",
+            Self::DynamicUrl => "dynamic-url",
+        }
+    }
+}
+
+/// A decision can use the call, kind and one candidate target verbatim.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OpenItem {
+    pub call: String,
+    pub kind: DecisionKind,
+    pub candidates: Vec<String>,
+    /// Why the call's base could not be read, where the index has that evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<String>,
+}
+
+impl OpenItem {
+    pub fn new(call: String, kind: DecisionKind, candidates: Vec<String>) -> Self {
+        Self {
+            call,
+            kind,
+            candidates,
+            limit: None,
+        }
+    }
+}
+
 /// Why a decision does not apply. A decision that waits on a missing peer has none: it is
 /// neither applied nor stale.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -874,12 +918,17 @@ impl Mark {
 pub enum Cause {
     /// No call with the decision's `call` id is in the repository.
     CallGone,
-    /// The call is there, but the core resolves it on its own or it is no item of the
-    /// decision's kind: nothing is left to decide.
+    /// The call is there but no longer has an open decision item.
     ItemNotOpen,
-    /// No repository of the workspace serves the target's contract.
+    /// The open item takes a different decision kind.
+    WrongKind,
+    /// No listed repository or declared peer has the target's identity.
+    UnknownRepository,
+    /// The workspace repository named by the decision no longer serves the contract.
     TargetGone,
-    /// The target is served, but is not among the candidates of the ambiguous link.
+    /// The open item has no candidate for any decision.
+    NoCandidates,
+    /// The target is served and the item has candidates, but that target is outside them.
     NotCandidate,
 }
 
@@ -890,6 +939,9 @@ pub struct Stale {
     pub call: String,
     pub target: String,
     pub cause: Cause,
+    /// The TOML kind the item takes if the stored decision used a different one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_kind: Option<DecisionKind>,
 }
 
 impl Stale {
@@ -900,6 +952,7 @@ impl Stale {
             call,
             target,
             cause,
+            expected_kind: None,
         }
     }
 }

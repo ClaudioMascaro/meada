@@ -17112,5 +17112,80 @@
         }
       ]
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/acme/conformance::clients/dynamic.py::formatted::requests.get#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/about",
+        "example.com/acme/conformance::http::ANY::/contact",
+        "example.com/acme/conformance::http::ANY::/health",
+        "example.com/acme/conformance::http::ANY::/vintage/{}",
+        "example.com/acme/conformance::http::GET::/",
+        "example.com/acme/conformance::http::GET::/api/v1/items/catalog/{}",
+        "example.com/acme/conformance::http::GET::/catalog/products",
+        "example.com/acme/conformance::http::GET::/echo",
+        "example.com/acme/conformance::http::GET::/health",
+        "example.com/acme/conformance::http::GET::/legacy/catalog/{}",
+        "example.com/acme/conformance::http::GET::/orders/{}",
+        "example.com/acme/conformance::http::GET::/partial/{}",
+        "example.com/acme/conformance::http::GET::/ping",
+        "example.com/acme/conformance::http::GET::/relay/catalog/{}",
+        "example.com/acme/conformance::http::GET::/reports/daily/{}",
+        "example.com/acme/conformance::http::GET::/shop/items/{}/stock",
+        "example.com/acme/conformance::http::GET::/shop/orders",
+        "example.com/acme/conformance::http::GET::/shop/orders/{}"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::clients/dynamic.py::percent::requests.delete#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/about",
+        "example.com/acme/conformance::http::ANY::/contact",
+        "example.com/acme/conformance::http::ANY::/health",
+        "example.com/acme/conformance::http::ANY::/vintage/{}",
+        "example.com/acme/conformance::http::DELETE::/internal/admin/users/{}",
+        "example.com/acme/conformance::http::DELETE::/orders/{}",
+        "example.com/acme/conformance::http::DELETE::/shop/orders/{}"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::clients/dynamic.py::unknown_method::requests.request#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::DELETE::/orders/{}",
+        "example.com/acme/conformance::http::DELETE::/shop/orders/{}",
+        "example.com/acme/conformance::http::GET::/orders/{}",
+        "example.com/acme/conformance::http::GET::/shop/orders",
+        "example.com/acme/conformance::http::GET::/shop/orders/{}",
+        "example.com/acme/conformance::http::POST::/shop/orders"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::clients/environment.py::computed_name::requests.get#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::GET::/shop/orders"
+      ],
+      "limit": "base from the parameter name"
+    },
+    {
+      "call": "example.com/acme/conformance::clients/environment.py::default_reads_another::requests.get#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::GET::/shop/orders"
+      ],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::clients/environment.py::two_variables::requests.get#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::GET::/shop/orders"
+      ],
+      "limit": "base Meada could not read"
+    }
   ]
 }

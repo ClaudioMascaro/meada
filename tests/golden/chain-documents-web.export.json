@@ -489,5 +489,23 @@
       "level": "ambiguous",
       "reason": "2 providers fit; host unresolved; served by example.com/chain/gateway"
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "kind": "ambiguous-link",
+      "candidates": [
+        "example.com/chain/catalog::http::GET::/api/health",
+        "example.com/chain/gateway::http::GET::/api/health"
+      ]
+    },
+    {
+      "call": "example.com/chain/web::src/status.ts::track::fetch#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/chain/catalog::http::POST::/api/events",
+        "example.com/chain/gateway::http::POST::/api/events"
+      ]
+    }
   ]
 }

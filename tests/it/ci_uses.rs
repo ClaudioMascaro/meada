@@ -327,7 +327,8 @@ fn a_steps_local_folder_is_an_open_item_where_the_workspace_is_not_known() {
     }
     // `meada decide` shows the cause and offers nothing.
     let (list, _, ok) = meada(&app_a, &["decide", "--list"], "", |_| {});
-    let shown = format!("{FORMS}:22  - uses: ./tools/local\n  {no_checkout}\n");
+    let shown =
+        format!("{FORMS}:22  - uses: ./tools/local\n  kind = \"dynamic-url\"\n  {no_checkout}\n");
     assert!(ok && list.contains(&shown), "{list}");
     let _ = workflows;
 }
@@ -455,4 +456,34 @@ fn the_forms_answer_as_their_goldens() {
     let down = traced(&engine, &start, Direction::Down);
     assert_golden("ci-uses.trace.txt", &format!("{up}\n{down}"));
     let _ = workflows;
+}
+
+#[test]
+fn a_decision_for_a_ci_step_without_candidates_remains_unapplied() {
+    let [_, _, app, ..] = reproduction("ci_uses_decision_without_candidate");
+    let id = format!("{APP_A}::{FORMS}::jobs.elsewhere.steps[1]");
+    let decision = format!(
+        "[[decision]]\nkind = \"dynamic-url\"\ncall = {id:?}\ntarget = \"{WORKFLOWS}::ci::{WORKFLOWS}\"\nby = \"human\"\n"
+    );
+    fs::write(app.join("meada.decisions.toml"), decision).unwrap();
+    let export = exported(&Engine::open(&app).unwrap());
+    let stale = export["stale_decisions"].as_array().unwrap();
+    assert!(
+        matches!(stale.as_slice(), [one] if one["call"] == id && one["cause"] == "no-candidates"),
+        "{stale:?}"
+    );
+    assert!(
+        export["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|link| link["consumer"] != id)
+    );
+    let item = export["open_items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["call"] == id)
+        .unwrap();
+    assert_eq!(item["candidates"], serde_json::json!([]));
 }
