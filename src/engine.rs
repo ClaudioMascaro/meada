@@ -1307,6 +1307,24 @@ impl Engine {
             if view.follows_drift() {
                 let entries = drift_view::entries(repos, &exports, &links);
                 lines.extend(drift_view::consumers(&entries, contract));
+                let listed: HashSet<_> = entries
+                    .iter()
+                    .filter(|e| e.link.contract == contract)
+                    .map(|e| e.link.item_site())
+                    .collect();
+                let omitted: HashSet<_> = links
+                    .iter()
+                    .filter(|link| link.contract == contract)
+                    .map(|link| link.item_site())
+                    .filter(|site| !listed.contains(site))
+                    .collect();
+                let count = omitted.len();
+                if count != 0 {
+                    let noun = if count == 1 { "consumer" } else { "consumers" };
+                    lines.push(format!(
+                        r#"  {count} linked {noun} omitted. See trace with direction "up"."#
+                    ));
+                }
             }
             return Ok(render::budgeted(&lines, budget));
         }

@@ -264,7 +264,7 @@ Drift is a field a `fetch` consumer reads from a response but the route does not
 | Query | Result |
 | --- | --- |
 | `trace` | Adds `drift: missing <path>` to the link |
-| `context` on a route | Shows shape origin, consumers, drift, level and unchecked reads under open parts |
+| `context` on a route | Shows the provider shape, consumers that read response fields, drift, and the count of linked consumers that appear in `trace` with `direction: "up"` |
 | `search` with kind `drift` | Lists detected drift |
 | `meada status` | Counts missing reads in the consumer repository; the provider receives no count |
 
