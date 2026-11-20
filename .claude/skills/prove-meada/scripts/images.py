@@ -636,7 +636,8 @@ class Probe:
             actual = head.get(key)
             if key == 'consumers':
                 actual = [r for r in actual if not str(r.get('contract','')).startswith('image::')]
-            self.comparisons.compare('boutique complete '+key+' with source-authorized A7 additions', expected_rows, actual)
+            self.comparisons.compare('boutique complete '+key+' with source-authorized A7 additions',
+                                     expected_rows, actual, oracle=True)
         frontend=head['repository']+'::kubernetes-manifests/frontend.yaml::Deployment.apps/frontend'
         qs=[{'tool':'context','arguments':{'symbol':frontend,'budget':200000}},
             {'tool':'trace','arguments':{'from':frontend,'direction':'down','budget':200000}},

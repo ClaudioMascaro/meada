@@ -209,13 +209,16 @@ def sqs(rig, data, binary, *, historical=False):
         expected = [QUEUE, QUEUE_NODE, 'exact'] if known else 'no exact queue at runtime choice'
         if historical:
             # The inherited SDK regression drops the single-return helper at this tier.
-            historical_known = name == 'publishLiteral'
-            rig.check(f'68f1c0b {name} historical observation', [QUEUE, QUEUE_NODE, 'exact'] if historical_known else
-                      'no exact queue', rows, matches=len(rows['providers']) == 1
-                      and provision_ok(rows['provisions'], historical_known))
+            known = name == 'publishLiteral'
+        providers = rows['providers']
+        matches = (len(providers) == 1 and providers[0]['contract'] == (QUEUE if known else 'channel::sqs')
+                   and provision_ok(rows['provisions'], known)
+                   and all(row['side'] == providers[0]['site'] for row in rows['provisions']))
+        if historical:
+            rig.check(f'68f1c0b {name} historical observation', [QUEUE, QUEUE_NODE, 'exact'] if known else
+                      'channel::sqs with no exact queue', rows, matches=matches)
         else:
-            rig.score(binary, f'SQS {name}', expected, rows,
-                      len(rows['providers']) == 1 and provision_ok(rows['provisions'], known))
+            rig.score(binary, f'SQS {name}', expected, rows, matches)
 
 
 def jvm(rig, data, binary, variant, path, owner, helper):
@@ -309,9 +312,16 @@ def peer_controls(rig, app, lib, baseline):
               matches=sorted((row['provider'], row['level']) for row in links) == wanted
               and len(relative['items']) == 1 and relative['items'][0]['kind'] == 'ambiguous-link'
               and relative['items'][0]['candidates'] == [f'{LIB}::{ROUTE}', f'{SHARED}::{ROUTE}'])
-    for name in ('Archive', 'Choose', 'Current'):
-        rows = rows_at(baseline, 'providers', 'site', 'orders/mutation/store.go', name)
+    for name, symbol in [('Archive', 'write'), ('Choose', 'writeConditional'), ('Current', 'Current')]:
+        file = 'orders/mutation/store.go'
+        rows = [row for row in rows_at(baseline, 'providers', 'site', file, symbol)
+                if row['site'].split('::')[2] == symbol]
         named_orders = [row for row in rows if row['contract'] == 'resource::dynamodb::orders']
+        if name != 'Current':
+            target = f'{APP}::{file}::{symbol}'
+            calls = [row for row in rows_at(baseline, 'calls', 'id', file, name) if row['target'] == target]
+            rig.check(f'#891 {name} reaches {symbol} exactly', 'exact',
+                      [row['level'] for row in calls], matches=len(calls) == 1 and calls[0]['level'] == 'exact')
         rig.check(f'#891 {name} orders writer', 'orders' if name == 'Current' else 'no unconditional orders writer',
                   rows, matches=len(rows) == 1 and len(named_orders) == (1 if name == 'Current' else 0))
     config = app / 'meada.toml'
@@ -435,18 +445,21 @@ def configuration_matrix(rig):
 
 
 def kotlin_shadow(rig):
-    root = rig.work / 'kotlin-shadow'
-    shutil.copytree(ROOT / 'tests/fixtures/conformance-kotlin', root)
-    git('init', '-q', cwd=root)
-    git('remote', 'add', 'origin', 'https://example.com/proof/kotlin-shadow.git', cwd=root)
-    git('add', '.', cwd=root)
-    git('commit', '-qm', 'Kotlin shadowing fixture', cwd=root)
     path = 'src/main/kotlin/example/jvm/Typed.kt'
-    (rig.run / 'kotlin-shadow-typed.kt').write_bytes((root / path).read_bytes())
+    fixture = ROOT / 'tests/fixtures/conformance-kotlin'
+    (rig.run / 'kotlin-shadow-typed.kt').write_bytes((fixture / path).read_bytes())
     for binary in ('base', 'head'):
         if binary in rig.bins:
+            root = rig.work / f'kotlin-shadow-{binary}'
+            shutil.copytree(fixture, root)
+            git('init', '-q', cwd=root)
+            git('remote', 'add', 'origin', 'https://example.com/proof/kotlin-shadow.git', cwd=root)
+            git('add', '.', cwd=root)
+            git('commit', '-qm', 'Kotlin shadowing fixture', cwd=root)
             data = rig.export(f'kotlin-shadow/{binary}', root, binary)
             got = endpoint_observation(data, path, 'Shadowing.hidden')
+            witness = endpoint_observation(data, path, 'Typed.typed')
+            save(rig.run / f'kotlin-shadow-{binary}.json', {'shadowed': got, 'other_class': witness})
             resolved = [row for row in got['consumers'] if row['contract'] == 'http::GET::/persons/hidden']
             rig.check(f'#952 {binary} Kotlin shadowing, behavior pending maintainer decision',
                       'retain the documented receiver ceiling or recover the literal GET /persons/hidden',

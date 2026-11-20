@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import time
@@ -81,16 +82,17 @@ def provider(contract, site):
     return {'contract': contract, 'site': PREFIX + site}
 
 
-def code_source_display_control(head, base, control, run, comparisons):
+def code_source_display_control(binaries, controls, run, comparisons):
     """The old binary supplies missing-code display policy, independently of IaC providers."""
-    path = control / 'app/ready/route.ts'
-    source = path.read_bytes()
     queries = [
         {'tool': 'trace', 'arguments': {'from': 'checkReady', 'direction': 'down', 'budget': 10000}},
         {'tool': 'context', 'arguments': {'symbol': 'http::GET::/ready', 'budget': 10000}},
     ]
     records = {}
-    for label, binary in [('head', head), ('base', base)]:
+    for label, binary in binaries.items():
+        control = controls[label]
+        path = control / 'app/ready/route.ts'
+        source = path.read_bytes()
         manifest = f'control-{label}.toml'
         write(run, manifest, f'index_dir = "control-{label}-indexes"\n[[repository]]\nrepo = "{PREFIX}control"\npath = "{control}"\n')
         subprocess.run([binary, 'index', '--workspace', manifest], cwd=run, check=True,
@@ -240,8 +242,8 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
 
     if args.base_bin:
         # A standalone code HTTP flow must retain every existing export field and query byte.
-        control = run / 'control'
-        control.mkdir()
+        control = run / 'work' / 'existing-head' / 'control'
+        control.mkdir(parents=True)
         git('init', '-q', cwd=control)
         git('remote', 'add', 'origin', f'https://{PREFIX}control.git', cwd=control)
         write(control, 'meada.toml', '[serve]\nhosts = ["control.example.test"]\n')
@@ -249,18 +251,21 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
         write(control, 'client.ts', "export function checkReady() { return fetch('https://control.example.test/ready'); }\n")
         git('add', '.', cwd=control)
         git('commit', '-qm', 'existing code HTTP control', cwd=control)
-        head, base = export(binary, control), export(str(Path(args.base_bin).resolve()), control)
-        dump(run, 'control-head.json', head)
-        dump(run, 'control-base.json', base)
-        comparisons.compare('whole existing code HTTP export', base, head)
+        controls = {'base': run / 'work' / 'existing-base' / 'control', 'head': control}
+        shutil.copytree(control, controls['base'])
+        binaries = {'base': str(Path(args.base_bin).resolve()), 'head': binary}
+        exports = {label: export(exe, controls[label]) for label, exe in binaries.items()}
+        for label, data in exports.items():
+            dump(run, f'control-{label}.json', data)
+        comparisons.compare('whole existing code HTTP export', exports['base'], exports['head'])
         query = [{'tool': 'context', 'arguments': {'symbol': 'checkReady', 'budget': 10000}}]
         observations = {}
-        for name, exe in [('base', str(Path(args.base_bin).resolve())), ('head', binary)]:
-            tools, texts, _ = mcp_answers(exe, control, query, run / f'control-{name}.err')
+        for name, exe in binaries.items():
+            tools, texts, _ = mcp_answers(exe, controls[name], query, run / f'control-{name}.err')
             observations[name] = {'queries': query, 'tools': tools, 'answers': texts}
             dump(run, f'control-{name}-stdio.json', observations[name])
         comparisons.compare('existing code HTTP context and catalog', observations['base'], observations['head'])
-        code_source_display_control(binary, str(Path(args.base_bin).resolve()), control, run, comparisons)
+        code_source_display_control(binaries, controls, run, comparisons)
 
     queries = [
         {'tool': 'context', 'arguments': {'symbol': 'readGarden', 'budget': 10000}},

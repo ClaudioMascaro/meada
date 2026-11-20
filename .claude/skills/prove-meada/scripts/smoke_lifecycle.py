@@ -212,9 +212,12 @@ def manifest_status(rig):
         db.execute('PRAGMA user_version=2')
     before = hashes(indexes)
     result = status('old-schema')
+    old = [line for line in result.stdout.splitlines() if 'another version' in line]
     rig.check('#934 old lib schema is diagnosed without rebuilding',
-              [1, True, True], [result.returncode, LIB in result.stdout
-              and 'another version' in result.stdout and 'not evaluated' in result.stdout, before == hashes(indexes)])
+              [1, LIB, 'another version', 'not evaluated', True],
+              [result.returncode, old, result.stdout, before == hashes(indexes)],
+              matches=result.returncode == 1 and len(old) == 1 and old[0].startswith(LIB + ' ')
+              and 'not evaluated' in result.stdout and before == hashes(indexes))
     with sqlite3.connect(lib_db) as db:
         db.execute(f'PRAGMA user_version={version}')
         db.execute('DROP TABLE symbols')

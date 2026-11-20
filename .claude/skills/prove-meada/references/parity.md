@@ -22,6 +22,7 @@ The source and answer key for a step are in its Scope row and its own evidence d
 | `config_uses.py` | `6a5eca5853193d205bcf756983b41e9cb16ffa9d` | The release before #661 is the source of the pre-feature parity keys. Keep the raw historical catalog, exports and status when #855 or later MCP wording changes them. |
 | `images.py` | `eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62` | The release before #662 is the source of existing non-image rows. The pinned Boutique input also has source-derived keys for the new image behavior. |
 | `custom-iac.py` | `e6d27d0` in the manual audit, no base in PR Proof | The historical oracle requires no provisioner. Current source-keyed package, channel and workload checks are independent. |
+| `smoke_stack.py` | PR merge-base for resolution and lifecycle, plus named reference revisions for upgrade and SQS | The public corpus pins are in the receipt. Scope follows the source, running-probe transport records and complete per-site expected answers. #941 and #943 supply the historical upgrade pair. 68f1c0b supplies the SQS extraction control. |
 | `release-diff.py` | Previous release tag, Release diff workflow | Exports and orphan policy deltas are retained for the release reviewer. It exits 0 with a diff and 2 on a capture failure. |
 
 The PR comparison drivers use exit 4 for a comparison delta, 3 for a rejected oracle and 2
