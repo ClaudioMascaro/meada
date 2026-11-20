@@ -7398,9 +7398,13 @@ impl<'a> Code<'a> {
         }
         fold.nested += 1;
         let folded = match value {
-            Value::Await(inner) if let Value::Call(call) = inner.as_ref() => self
-                .built(path, &call.range, true, frames, depth, fold, wants)
-                .unwrap_or_else(|| inner.as_ref().clone()),
+            Value::Await(inner)
+                if self.fold_returned_strings.get()
+                    && let Value::Call(call) = inner.as_ref() =>
+            {
+                self.built(path, &call.range, true, frames, depth, fold, wants)
+                    .unwrap_or_else(|| inner.as_ref().clone())
+            }
             Value::Await(value) => self.eval(path, scope, value, frames, depth, fold, wants),
             Value::Str(parts) => self.eval_string(path, scope, parts, frames, depth, fold, wants),
             Value::Object(_) => self.eval_object(path, scope, value, frames, depth, fold, wants),
@@ -7411,6 +7415,9 @@ impl<'a> Code<'a> {
             ),
             Value::New(callee, args) => {
                 self.eval_new(path, scope, callee, args, frames, depth, fold, wants)
+            }
+            Value::Call(call) if fold.chain && !self.fold_returned_strings.get() => {
+                self.eval_chain(path, scope, call, frames, depth, fold, wants)
             }
             Value::Call(call) => self
                 .built(path, &call.range, false, frames, depth, fold, wants)
@@ -7494,12 +7501,15 @@ impl<'a> Code<'a> {
                     range,
                     awaited,
                 } => {
-                    let Some(value) = self.built(path, range, *awaited, frames, depth, fold, wants)
-                    else {
+                    if self.fold_returned_strings.get()
+                        && let Some(value) =
+                            self.built(path, range, *awaited, frames, depth, fold, wants)
+                    {
+                        value
+                    } else {
                         out.push(Part::Limit(crate::lang::Limit::Returned(callee.clone())));
                         continue;
-                    };
-                    value
+                    }
                 }
                 _ => {
                     out.push(part.clone());
@@ -7672,8 +7682,8 @@ impl<'a> Code<'a> {
         result
     }
 
-    /// The string returned by an exact, unambiguous call, under its argument frame. If
-    /// there is more than one return, they must agree. A recursive return is unknown.
+    /// The string returned by an exact call under its argument frame. HTTP also folds
+    /// functions with multiple agreeing returns. A recursive return is unknown.
     #[expect(clippy::too_many_arguments)]
     fn built(
         &self,
@@ -7685,7 +7695,9 @@ impl<'a> Code<'a> {
         fold: &mut Fold<'a, '_>,
         wants: &mut Option<Target<'a>>,
     ) -> Option<Value> {
-        if !self.fold_returned_strings.get() {
+        let extended = self.fold_returned_strings.get();
+        let javascript = self.pack.extensions().contains(&"ts");
+        if !extended && !javascript {
             return None;
         }
         let index = self.call_index(path, range)?;
@@ -7694,7 +7706,15 @@ impl<'a> Code<'a> {
             return None;
         }
         let stored = &self.resolver.files[path].calls[index];
-        let Resolution::Exact(function) = self.resolver.resolved_at(path, index) else {
+        let resolution = if extended {
+            self.resolver.resolved_at(path, index)
+        } else {
+            self.resolver.call(path, stored)
+        };
+        let Resolution::Exact(function) = resolution else {
+            if !extended {
+                return None;
+            }
             let read = fold.external_value?;
             let call = self.call(path, index)?;
             let mut eval = |i| {
@@ -7704,21 +7724,37 @@ impl<'a> Code<'a> {
             };
             return read(call, &mut eval);
         };
-        if stored.constructs || !self.runs_alone(function) {
-            return None;
-        }
         let def = self.def(function.path, function.name)?;
-        if (def.asynchronous && !(awaited || stored.awaited))
-            || (self.pack.extensions().contains(&"ts") && !def.terminal_return)
-            || (self.pack.extensions().contains(&"py")
-                && def
-                    .decorators
-                    .iter()
-                    .any(|name| !matches!(name.as_str(), "staticmethod" | "classmethod")))
-        {
+        let (first, rest) = def.return_values.split_first()?;
+        if extended {
+            if stored.constructs
+                || !self.runs_alone(function)
+                || (def.asynchronous && !(awaited || stored.awaited))
+                || (javascript && !def.terminal_return)
+                || (self.pack.extensions().contains(&"py")
+                    && def
+                        .decorators
+                        .iter()
+                        .any(|name| !matches!(name.as_str(), "staticmethod" | "classmethod")))
+            {
+                return None;
+            }
+        } else if !(def.single_return && matches!(first, Value::Str(_)) && rest.is_empty()) {
             return None;
         }
-        let (first, rest) = def.return_values.split_first()?;
+        let mut bound = vec![Frame {
+            def: function,
+            path,
+            index,
+        }];
+        bound.extend_from_slice(frames.get(depth..).unwrap_or_default());
+        if !extended {
+            let value = self.eval(function.path, function.name, first, &bound, 0, fold, wants);
+            return matches!(&value, Value::Str(parts) if parts.iter().all(|p| {
+                matches!(p, Part::Text(_) | Part::Ref(_))
+            }))
+            .then_some(value);
+        }
         // Do not fold an object or a chain used as a constructor into a string by accident.
         let string = |value: &Value| match value {
             Value::Str(parts) => parts.iter().all(|p| {
@@ -7736,12 +7772,6 @@ impl<'a> Code<'a> {
             Value::Ref(_) => true,
             _ => false,
         };
-        let mut bound = vec![Frame {
-            def: function,
-            path,
-            index,
-        }];
-        bound.extend_from_slice(frames.get(depth..).unwrap_or_default());
         let mut pending = None;
         fold.returning.push(site);
         let mut returned = |value| {

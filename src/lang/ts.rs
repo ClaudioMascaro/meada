@@ -140,6 +140,7 @@ impl LanguagePack for TsJs {
                     returns: (node.child_by_field_name("return_type"))
                         .and_then(|t| types::returned(t, src, &parents)),
                     type_params: types::type_parameters(node, src),
+                    single_return: single_return(node),
                     terminal_return: (node.child_by_field_name("body")).is_some_and(|b| {
                         if b.kind() == "statement_block" {
                             named(b)
@@ -1315,6 +1316,26 @@ fn selector_writes(node: Node, src: &[u8], scope: &str, facts: &mut Facts, spent
             );
         }
     }
+}
+
+/// Whether the whole body is one return from a synchronous function.
+fn single_return(node: Node) -> bool {
+    if !(FUNCTIONS.contains(&node.kind()) || node.kind() == "function_declaration")
+        || node.kind() == "generator_function"
+        || children(node).any(|n| n.kind() == "async")
+    {
+        return false;
+    }
+    node.child_by_field_name("body").is_some_and(|body| {
+        if body.kind() != "statement_block" {
+            return true;
+        }
+        let mut statements = named(body).filter(|n| n.kind() != "comment");
+        statements
+            .next()
+            .is_some_and(|n| n.kind() == "return_statement")
+            && statements.next().is_none()
+    })
 }
 
 /// The kinds of anonymous function expressions.
