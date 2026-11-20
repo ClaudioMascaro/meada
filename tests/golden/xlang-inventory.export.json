@@ -467,5 +467,17 @@
       "level": "inferred",
       "reason": "base URL from INVENTORY_URL, a base_url_env of peer example.com/xlang/inventory"
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/xlang/inventory::inventory/jobs.py::restock::requests.get#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/xlang/inventory::http::GET::/stock/{}",
+        "example.com/xlang/storefront::http::GET::/api/health",
+        "example.com/xlang/storefront::http::GET::/api/prices/{}",
+        "example.com/xlang/storefront::http::GET::/api/promotions"
+      ]
+    }
   ]
 }

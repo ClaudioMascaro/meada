@@ -8,7 +8,9 @@ use std::path::Path;
 #[cfg(unix)]
 use std::path::PathBuf;
 
-use common::{HEALTH, TRACK, assert_golden, chain, without_processes, written as file};
+use common::{
+    HEALTH, TRACK, assert_golden, chain, fixture_repo, without_processes, written as file,
+};
 use meada::engine::Engine;
 
 /// Runs `meada decide <args>` in `repo` under `lang`, feeding it `stdin`. Returns stdout,
@@ -221,7 +223,7 @@ fn item_redoes_a_decided_call_from_the_core_view_and_the_new_pick_replaces_its_e
     assert!(ok, "{stderr}");
     assert!(
         stdout.starts_with(&format!(
-            "{HEALTH}\nsrc/status.ts:3  fetch(\"/api/health\")\n\
+            "{HEALTH}\nsrc/status.ts:3  fetch(\"/api/health\")\n  kind = \"ambiguous-link\"\n\
              \x20 1) example.com/chain/catalog GET /api/health\n\
              \x20 2) example.com/chain/gateway GET /api/health\n"
         )),
@@ -250,6 +252,12 @@ fn item_redoes_a_decided_call_from_the_core_view_and_the_new_pick_replaces_its_e
 fn messages_follow_lang() {
     let (web, _, _) = chain("decide_pt");
 
+    for lang in ["en_US.UTF-8", "pt_BR.UTF-8", "es_ES.UTF-8"] {
+        let (stdout, stderr, ok) = decide(&web, lang, &["--list"], "");
+        assert!(ok && stderr.is_empty(), "{stderr}");
+        assert!(stdout.contains("kind = \"ambiguous-link\""), "{stdout}");
+        assert!(stdout.contains("kind = \"dynamic-url\""), "{stdout}");
+    }
     let (stdout, _, ok) = decide(&web, "pt_BR.UTF-8", &[], "2\n1\n");
 
     assert!(ok);
@@ -448,6 +456,35 @@ fn the_refusal_of_a_linked_decisions_file_does_not_depend_on_what_the_run_would_
 
 #[cfg(unix)]
 #[test]
+fn saving_modes_check_the_link_before_loading_its_malformed_target() {
+    let (web, _, _) = chain("decide_linked_malformed");
+    let bytes = b"decision = [\n";
+    fs::write(web.join("meada.decisions.toml"), bytes).unwrap();
+    let linked = link_out(&web);
+    let destination = fs::read_link(&linked.0).unwrap();
+    for args in [&[][..], &["--item", HEALTH], &["--prune"], &["--decider"]] {
+        assert_eq!(
+            decide(&web, "en_US.UTF-8", args, "1\n"),
+            (String::new(), format!("meada: {LINKED}\n"), false),
+            "{args:?}"
+        );
+        untouched(&web, &linked, Some(bytes));
+        assert_eq!(fs::read_link(&linked.0).unwrap(), destination);
+    }
+    for args in [
+        &["--list"][..],
+        &["--dry-run"],
+        &["--decider", "--show-request"],
+    ] {
+        let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", args, "");
+        assert!(!ok && stdout.is_empty(), "{args:?}: {stdout}");
+        assert!(stderr.contains("unclosed array"), "{args:?}: {stderr}");
+        untouched(&web, &linked, Some(bytes));
+    }
+}
+
+#[cfg(unix)]
+#[test]
 fn what_never_saves_reads_a_linked_decisions_file_as_a_regular_one() {
     let (web, _, _) = chain("decide_linked_reads");
     common::decisions(&web, "chain-web-stale-and-waiting");
@@ -477,4 +514,96 @@ fn what_never_saves_reads_a_linked_decisions_file_as_a_regular_one() {
     assert_golden("chain-web.decide.list-stale.en.txt", &through[0].0);
     assert_eq!(through, regular);
     untouched(&web, &linked, Some(&before));
+}
+
+#[test]
+fn the_overview_ranks_and_shortens_candidates_without_changing_picks() {
+    let repo = fixture_repo(
+        "decide_overview_paths",
+        "open-few",
+        Some("https://example.com/open/few.git"),
+    );
+    fs::write(
+        repo.join("src/rank.ts"),
+        r#"
+declare function tenant(): string;
+export function Pick(suffix: string) {
+    return fetch(`https://${tenant()}.example.com/api/orders${suffix}`);
+}
+export function Count(url: string) {
+    return fetch(url);
+}
+"#,
+    )
+    .unwrap();
+    let base = repo.join("app/api/orders");
+    for path in ["", "[id]", "export", "inventory", "history", "downloads"] {
+        let dir = base.join(path);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("route.ts"),
+            "export function GET() { return new Response('ok'); }",
+        )
+        .unwrap();
+    }
+    let call = "example.com/open/few::src/rank.ts::Pick::fetch#0";
+    let counted = "example.com/open/few::src/rank.ts::Count::fetch#0";
+    let read = |args: &[&str]| decide(&repo, "en_US.UTF-8", args, "2\n");
+    let block = |text: String, id: &str| {
+        text.split("\n\n")
+            .find(|block| block.starts_with(id))
+            .unwrap()
+            .to_owned()
+    };
+    let choices = |shown: String| {
+        shown
+            .lines()
+            .filter(|line| line.starts_with("  ") && line.contains(") example.com"))
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    let (overview, err, ok) = read(&["--list"]);
+    assert!(ok, "{err}");
+    let limited = block(overview.clone(), call);
+    assert_eq!(choices(limited.clone()).len(), 5);
+    assert!(
+        limited.contains(&format!("1 more. Run meada decide --list --item {call}")),
+        "{limited}"
+    );
+    let count = block(overview, counted);
+    assert!(count.contains("candidates matching the method"), "{count}");
+    assert!(choices(count).is_empty());
+    let (counted_full, error, ok) = read(&["--list", "--item", counted]);
+    assert!(
+        ok && !counted_full.contains("candidates matching the method"),
+        "{error}"
+    );
+    assert!(choices(counted_full).len() >= 6);
+
+    let (full, _, ok) = read(&["--list", "--item", call]);
+    assert!(ok);
+    let full = choices(full);
+    assert_eq!(full.len(), 6);
+    assert_eq!(
+        &full[..3],
+        [
+            "  1) example.com/open/few GET /api/orders",
+            "  2) example.com/open/few GET /api/orders/{}",
+            "  3) example.com/open/few GET /api/orders/export",
+        ]
+    );
+    let (prompt, err, ok) = read(&["--item", call]);
+    assert!(ok, "{err}");
+    assert_eq!(choices(prompt), full);
+    let stored = common::written(&repo).unwrap();
+    assert!(
+        stored.contains("example.com/open/few::http::GET::/api/orders/{}"),
+        "{stored}"
+    );
+
+    fs::remove_file(repo.join("meada.decisions.toml")).unwrap();
+    fs::remove_file(base.join("downloads/route.ts")).unwrap();
+    let exactly_five = block(read(&["--list"]).0, call);
+    assert_eq!(choices(exactly_five.clone()).len(), 5);
+    assert!(!exactly_five.contains(" more."), "{exactly_five}");
 }

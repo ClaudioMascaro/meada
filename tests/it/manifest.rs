@@ -1632,8 +1632,16 @@ fn each_mirrors_decisions_are_replayed_and_the_stale_ones_reported() {
 fn status_says_why_it_did_not_evaluate_the_decisions() {
     let dir = chain_manifest("manifest_status_unevaluated");
     assert!(run(&dir, "index").2);
-    let web = rusqlite::Connection::open(dir.join("indexes/example.com/chain/web/index.db"));
-    web.unwrap().execute_batch("DROP TABLE symbols").unwrap();
+    let (healthy, stderr, ok) = run(&dir, "status");
+    assert!(ok && stderr.is_empty(), "{stderr}");
+    assert!(!healthy.contains("not evaluated"), "{healthy}");
+
+    let path = dir.join("indexes/example.com/chain/gateway/index.db");
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute_batch("DROP TABLE symbols")
+        .unwrap();
+    let before = fs::read(&path).unwrap();
 
     let (status, stderr, ok) = run(&dir, "status");
 
@@ -1641,10 +1649,11 @@ fn status_says_why_it_did_not_evaluate_the_decisions() {
     assert!(
         status.ends_with(
             " indexed, 3 files\n\
-             decisions and other workspace lines not evaluated: no such table: symbols\n"
+             decisions and other workspace lines not evaluated: example.com/chain/gateway: no such table: symbols\n"
         ),
         "{status}"
     );
+    assert_eq!(fs::read(&path).unwrap(), before);
     write_manifest(&dir, "index_dir = \"../indexes\"\n");
     assert_eq!(run(&dir, "status").0, "workspace: 0 repositories\n");
 }

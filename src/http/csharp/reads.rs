@@ -65,11 +65,15 @@ impl<'i> Reads<'i> {
     fn part<'a>(&self, code: &Code<'a>, path: &'a str, part: Part) -> Vec<Part> {
         match part {
             // The pack drops the trims: a read with a member left is unknown.
+            pending @ Part::Read {
+                parameter: true, ..
+            } => vec![pending],
             Part::Read {
                 scope,
                 callee,
                 key,
                 then,
+                ..
             } if then.is_empty() => self.read(code, (path, &scope), &callee, &key),
             Part::Read { .. } => vec![Part::Hole],
             part => vec![part],

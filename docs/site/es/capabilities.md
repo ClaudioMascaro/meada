@@ -89,6 +89,8 @@ Los nombres se resuelven primero en el módulo del archivo y después en los mó
 
 ## HTTP y documentos de contrato
 
+Los clientes HTTP pueden usar la base que devuelve una función o método resuelto de forma exacta. Un wrapper puede pasar una clave de entorno literal o un identificador de plugin de Backstage. La ruta se conserva cuando las alternativas al final de la URL solo cambian la cadena de consulta. Las reasignaciones de parámetros y las alternativas de despacho pueden dejar abierto el origen.
+
 Las declaraciones IaC también ofrecen rutas HTTP: API Gateway HTTP y REST en Terraform/OpenTofu (HCL y JSON), eventos SAM `Api`/`HttpApi` y Serverless `http`/`httpApi`. Los métodos y rutas literales usan la misma normalización de parámetros que las rutas en código. El provider apunta al símbolo del handler local cuando se resuelve con certeza, o al repositorio completo. Los consumidores de otros repositorios usan las reglas comunes de host y peers. Las referencias, métodos o rutas desconocidos no inventan rutas; las integraciones que no sean Lambda y las rutas catch-all sin una ruta finita quedan fuera del mapa (#666).
 
 Las URLs base de la configuración o del entorno de un workload pueden nombrar un Service
@@ -263,7 +265,7 @@ Drift es un campo que un consumidor `fetch` lee de una respuesta pero que la rut
 | Consulta | Resultado |
 | --- | --- |
 | `trace` | Añade `drift: missing <ruta>` al vínculo |
-| `context` de una ruta | Muestra origen del formato, consumidores, drift, nivel y lecturas no comprobadas en partes abiertas |
+| `context` de una ruta | Muestra la forma del proveedor, los consumidores que leen campos de la respuesta, el drift y la cantidad de consumidores vinculados que aparecen en `trace` con `direction: "up"` |
 | `search` con tipo `drift` | Lista el drift encontrado |
 | `meada status` | Cuenta lecturas ausentes en el repositorio consumidor; el proveedor no recibe esa cuenta |
 

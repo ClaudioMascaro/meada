@@ -208,7 +208,8 @@ impl<'c, 'a> Factories<'c, 'a> {
                         awaited,
                         depth + 1,
                     )
-                } else if let Some((function, n)) = self.code.param_of(path, scope, name) {
+                } else if let Some((function, n)) = self.code.unchanged_param_of(path, scope, name)
+                {
                     match self.stack.last().map(|&frame| &self.frames[frame]) {
                         Some(frame) if frame.function == function => {
                             frame.arguments.get(&(n, awaited)).cloned()

@@ -13547,6 +13547,11 @@
     },
     {
       "contract": null,
+      "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::(call_expression).uri#0",
+      "via": null
+    },
+    {
+      "contract": null,
       "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::(call_expression).uri#0",
       "via": null
     }
@@ -19473,6 +19478,14 @@
         {
           "depth": 1,
           "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::(call_expression).uri#0",
+          "mark": "unresolved"
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
           "level": "ambiguous",
           "via": "call",
           "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::client.get#0",
@@ -20944,6 +20957,175 @@
           "node": "example.com/acme/conformance::src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()"
         }
       ]
+    }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.builder()::orders.get#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/api/orders/any",
+        "example.com/acme/conformance::http::GET::/",
+        "example.com/acme/conformance::http::GET::/api/admin/orders",
+        "example.com/acme/conformance::http::GET::/api/kw",
+        "example.com/acme/conformance::http::GET::/api/named",
+        "example.com/acme/conformance::http::GET::/api/orders",
+        "example.com/acme/conformance::http::GET::/api/orders/multi",
+        "example.com/acme/conformance::http::GET::/api/orders/{}",
+        "example.com/acme/conformance::http::GET::/api/v1",
+        "example.com/acme/conformance::http::GET::/api/v1/orders",
+        "example.com/acme/conformance::http::GET::/cyc/loop",
+        "example.com/acme/conformance::http::GET::/health",
+        "example.com/acme/conformance::http::GET::/health/live",
+        "example.com/acme/conformance::http::GET::/local",
+        "example.com/acme/conformance::http::GET::/p/a",
+        "example.com/acme/conformance::http::GET::/p/b",
+        "example.com/acme/conformance::http::GET::/pages/{}",
+        "example.com/acme/conformance::http::GET::/q/a",
+        "example.com/acme/conformance::http::GET::/q/b",
+        "example.com/acme/conformance::http::GET::/star/one",
+        "example.com/acme/conformance::http::GET::/top"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.lookup()::orders.get#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/api/orders/any",
+        "example.com/acme/conformance::http::GET::/",
+        "example.com/acme/conformance::http::GET::/api/admin/orders",
+        "example.com/acme/conformance::http::GET::/api/kw",
+        "example.com/acme/conformance::http::GET::/api/named",
+        "example.com/acme/conformance::http::GET::/api/orders",
+        "example.com/acme/conformance::http::GET::/api/orders/multi",
+        "example.com/acme/conformance::http::GET::/api/orders/{}",
+        "example.com/acme/conformance::http::GET::/api/v1",
+        "example.com/acme/conformance::http::GET::/api/v1/orders",
+        "example.com/acme/conformance::http::GET::/cyc/loop",
+        "example.com/acme/conformance::http::GET::/health",
+        "example.com/acme/conformance::http::GET::/health/live",
+        "example.com/acme/conformance::http::GET::/local",
+        "example.com/acme/conformance::http::GET::/p/a",
+        "example.com/acme/conformance::http::GET::/p/b",
+        "example.com/acme/conformance::http::GET::/pages/{}",
+        "example.com/acme/conformance::http::GET::/q/a",
+        "example.com/acme/conformance::http::GET::/q/b",
+        "example.com/acme/conformance::http::GET::/star/one",
+        "example.com/acme/conformance::http::GET::/top"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/clients/Client.kt::example.clients.reassigned()::orders.get#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/api/orders/any",
+        "example.com/acme/conformance::http::GET::/",
+        "example.com/acme/conformance::http::GET::/api/admin/orders",
+        "example.com/acme/conformance::http::GET::/api/kw",
+        "example.com/acme/conformance::http::GET::/api/named",
+        "example.com/acme/conformance::http::GET::/api/orders",
+        "example.com/acme/conformance::http::GET::/api/orders/multi",
+        "example.com/acme/conformance::http::GET::/api/orders/{}",
+        "example.com/acme/conformance::http::GET::/api/v1",
+        "example.com/acme/conformance::http::GET::/api/v1/orders",
+        "example.com/acme/conformance::http::GET::/cyc/loop",
+        "example.com/acme/conformance::http::GET::/health",
+        "example.com/acme/conformance::http::GET::/health/live",
+        "example.com/acme/conformance::http::GET::/local",
+        "example.com/acme/conformance::http::GET::/p/a",
+        "example.com/acme/conformance::http::GET::/p/b",
+        "example.com/acme/conformance::http::GET::/pages/{}",
+        "example.com/acme/conformance::http::GET::/q/a",
+        "example.com/acme/conformance::http::GET::/q/b",
+        "example.com/acme/conformance::http::GET::/star/one",
+        "example.com/acme/conformance::http::GET::/top"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/clients/Local.kt::example.clients.varBase()::(call_expression).get#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.blockValue(HttpRequestBuilder.()->Unit)::orders.request#0",
+      "kind": "dynamic-url",
+      "candidates": []
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.conditional(Boolean)::orders.request#0",
+      "kind": "dynamic-url",
+      "candidates": []
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.nested()::orders.request#0",
+      "kind": "dynamic-url",
+      "candidates": []
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/clients/Methods.kt::example.clients.parsed()::orders.request#0",
+      "kind": "dynamic-url",
+      "candidates": []
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/declarative/Archive.kt::example.declarative.Notes.save()",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base of a client Meada did not read"
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/declarative/Qualified.kt::example.declarative.Qualified.a()",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::GET::/p/a",
+        "example.com/acme/conformance::http::GET::/q/a"
+      ],
+      "limit": "base of a client Meada did not read"
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/jvm/Assigned.kt::example.jvm.Assigned.send()::rest.getForObject#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.lookup()::rest.getForObject#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/api/orders/any",
+        "example.com/acme/conformance::http::GET::/",
+        "example.com/acme/conformance::http::GET::/api/admin/orders",
+        "example.com/acme/conformance::http::GET::/api/kw",
+        "example.com/acme/conformance::http::GET::/api/named",
+        "example.com/acme/conformance::http::GET::/api/orders",
+        "example.com/acme/conformance::http::GET::/api/orders/multi",
+        "example.com/acme/conformance::http::GET::/api/orders/{}",
+        "example.com/acme/conformance::http::GET::/api/v1",
+        "example.com/acme/conformance::http::GET::/api/v1/orders",
+        "example.com/acme/conformance::http::GET::/cyc/loop",
+        "example.com/acme/conformance::http::GET::/health",
+        "example.com/acme/conformance::http::GET::/health/live",
+        "example.com/acme/conformance::http::GET::/local",
+        "example.com/acme/conformance::http::GET::/p/a",
+        "example.com/acme/conformance::http::GET::/p/b",
+        "example.com/acme/conformance::http::GET::/pages/{}",
+        "example.com/acme/conformance::http::GET::/q/a",
+        "example.com/acme/conformance::http::GET::/q/b",
+        "example.com/acme/conformance::http::GET::/star/one",
+        "example.com/acme/conformance::http::GET::/top"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::(call_expression).uri#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base of a client Meada did not read"
+    },
+    {
+      "call": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::(call_expression).uri#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base of a client Meada did not read"
     }
   ]
 }

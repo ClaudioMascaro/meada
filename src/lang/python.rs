@@ -391,9 +391,7 @@ impl LanguagePack for Python {
         }
         facts.locals.extend(module.hidden.iter().cloned());
         (facts.exports, facts.star) = module.exports();
-        let hidden;
-        (facts.receivers, facts.consts, hidden) = locals.finish();
-        facts.locals.extend(hidden);
+        locals.finish(&mut facts);
         // A settings field is the variable it reads, not the default it is written with.
         let settings = settings_consts(tree.root_node(), src);
         facts
@@ -871,6 +869,8 @@ struct Locals {
     values: Vec<(usize, Value)>,
     /// The position in `values` of the latest value each scope and name was assigned.
     latest: HashMap<(String, String), usize>,
+    query_initial: HashSet<usize>,
+    query_writes: Vec<(usize, super::QueryWrite)>,
     /// Every scope and name bound or defined so far.
     bound: HashSet<(String, String)>,
 }
@@ -989,7 +989,30 @@ impl Locals {
         {
             let value = value(right, src);
             if left.kind() == "identifier" || matches!(value, Value::Call(_)) {
+                if left.kind() == "identifier" {
+                    let change = super::QueryWrite::of(&value, text(left, src), "=");
+                    if change != super::QueryWrite::Other {
+                        self.query_writes.push((at, change));
+                    }
+                    if node
+                        .parent()
+                        .and_then(|s| s.parent())
+                        .and_then(|b| b.parent())
+                        .is_some_and(|p| p.kind() == "function_definition")
+                    {
+                        self.query_initial.insert(at);
+                    }
+                }
                 self.assigned(at, value);
+            }
+        } else if node.kind() == "augmented_assignment"
+            && left.kind() == "identifier"
+            && let Some(right) = right
+            && let Some(op) = node.child_by_field_name("operator")
+        {
+            let change = super::QueryWrite::of(&value(right, src), text(left, src), text(op, src));
+            if change != super::QueryWrite::Other {
+                self.query_writes.push((at, change));
             }
         }
     }
@@ -1069,7 +1092,7 @@ impl Locals {
     /// annotation decides; other bindings that disagree make the class unknown. A name its
     /// scope binds once, by `name = value`, is also a constant holding that value. Last, the
     /// definitions in a function whose name its last binding there is not (`Facts::locals`).
-    fn finish(self) -> (Vec<Receiver>, Vec<Const>, Vec<String>) {
+    fn finish(self, facts: &mut Facts) {
         let defs = (self.defs.iter()).map(|(_, scope, name, _)| (scope.as_str(), name.as_str()));
         let own: HashSet<(&str, &str)> = (self.written.iter())
             .map(|(scope, name, ..)| (scope.as_str(), name.as_str()))
@@ -1097,8 +1120,10 @@ impl Locals {
             .map(|(scope, name, ..)| (home(scope, name), name.clone()))
             .collect();
         let mut times: HashMap<&(String, String), usize> = HashMap::new();
-        for key in &homes {
+        let mut first = HashMap::new();
+        for (at, key) in homes.iter().enumerate() {
             *times.entry(key).or_default() += 1;
+            first.entry(key).or_insert(at);
         }
         // The last binding of each name in its function decides: a definition is hidden when the
         // name is bound after it there, or from a nested function through `nonlocal`, which may
@@ -1121,17 +1146,51 @@ impl Locals {
                 defined.insert((scope.as_str(), name.as_str()), (*at, *kept));
             }
         }
+        for def in &mut facts.defs {
+            def.reassigned_params = (def.params.iter())
+                .filter(|p| {
+                    times.get(&(def.name.clone(), p.name.clone())) > Some(&1)
+                        || defined.contains_key(&(def.name.as_str(), p.name.as_str()))
+                })
+                .map(|p| p.name.clone())
+                .collect();
+        }
         let hidden = (defined.into_iter())
             .filter(|(key, (at, kept))| *kept || last.get(key).is_some_and(|latest| latest >= at))
-            .map(|((scope, name), _)| qualify(scope, name))
-            .collect();
-        let consts = (self.values.into_iter())
-            .filter(|(at, _)| times[&homes[*at]] == 1 && homes[*at].0 == self.written[*at].0)
-            .map(|(at, value)| Const {
-                name: qualify(&homes[at].0, &homes[at].1),
-                value,
-                ty: None,
-                scope: None,
+            .map(|((scope, name), _)| qualify(scope, name));
+        facts.locals.extend(hidden);
+        // Count writes by their binding's home. A nonlocal write or another binding
+        // (a parameter, a loop variable) prevents the query-only proof.
+        let mut queries = HashMap::new();
+        for (at, change) in self.query_writes {
+            if first[&homes[at]] == at || homes[at].0 != self.written[at].0 {
+                continue;
+            }
+            let entry = queries.entry(&homes[at]).or_insert((0, change));
+            entry.0 += 1;
+            entry.1 = entry.1.merge(change);
+        }
+        facts.consts = (self.values.into_iter())
+            .filter_map(|(at, mut value)| {
+                let home = &homes[at];
+                let once = times[home] == 1;
+                let is_first = first[home] == at;
+                let mut query = || {
+                    queries.get(home).is_some_and(|(writes, change)| {
+                        *writes + 1 == times[home] && change.keep(&mut value)
+                    })
+                };
+                if home.0 != self.written[at].0
+                    || (!once && !(self.query_initial.contains(&at) && is_first && query()))
+                {
+                    return None;
+                }
+                Some(Const {
+                    name: qualify(&home.0, &home.1),
+                    value,
+                    ty: None,
+                    scope: None,
+                })
             })
             .collect();
         let mut bound: BTreeMap<(String, String), (Class, Evidence)> = BTreeMap::new();
@@ -1146,11 +1205,10 @@ impl Locals {
             };
             bound.insert(key, merged);
         }
-        let locals = (bound.into_iter())
+        facts.receivers = (bound.into_iter())
             .filter(|(_, (_, how))| *how != Evidence::Param)
             .map(|((scope, name), (class, _))| Receiver { scope, name, class })
             .collect();
-        (locals, consts, hidden)
     }
 }
 
@@ -1640,17 +1698,21 @@ fn parts(node: Node, src: &[u8]) -> Option<Vec<Part>> {
 
 /// What an expression `parts` does not fold stands for in a string: the return value of the call
 /// it makes, by its callee, or a hole (#801).
-fn unread(node: Node, src: &[u8]) -> Part {
-    match node.kind() {
-        "call" => node
-            .child_by_field_name("function")
-            .map_or(Part::Hole, |f| {
-                Part::Limit(super::Limit::Returned(text(f, src).to_string()))
-            }),
-        "await" | "parenthesized_expression" => {
-            named(node).next().map_or(Part::Hole, |n| unread(n, src))
-        }
-        _ => Part::Hole,
+fn unread(mut node: Node, src: &[u8]) -> Part {
+    let mut awaited = false;
+    while matches!(node.kind(), "await" | "parenthesized_expression") {
+        awaited |= node.kind() == "await";
+        let Some(inner) = named(node).next() else {
+            return Part::Hole;
+        };
+        node = inner;
+    }
+    match node
+        .child_by_field_name("function")
+        .filter(|_| node.kind() == "call")
+    {
+        Some(function) => Part::invoke(callee(function, src), node.byte_range(), awaited),
+        None => Part::Hole,
     }
 }
 
@@ -1677,6 +1739,15 @@ fn parts_at(node: Node, src: &[u8], depth: usize) -> Option<Vec<Part>> {
                 .collect(),
         ),
         "concatenated_string" => Some(named(node).flat_map(inside).collect()),
+        "conditional_expression" => {
+            let mut terms = named(node).filter(|n| n.kind() != "comment");
+            let yes = Value::Str(parts(terms.next()?)?);
+            let no = Value::Str(parts(terms.nth(1)?)?);
+            match super::query_alternative(yes, no) {
+                Value::Str(parts) => Some(parts),
+                _ => None,
+            }
+        }
         "binary_operator" => {
             let left = node.child_by_field_name("left")?;
             let right = node.child_by_field_name("right")?;
@@ -1728,6 +1799,16 @@ fn name(node: Node, src: &[u8]) -> Option<Part> {
 /// another variable makes the whole read a hole. `depth` is the level of `node` in `parts`.
 // ponytail: the names are matched as written, not through the file's imports, so `import os
 // as o` is not read and a local `getenv` function is.
+fn env_key(node: Node, src: &[u8], reader: String) -> Option<Part> {
+    if node.kind() == "identifier" {
+        return Some(Part::EnvKey {
+            name: text(node, src).into(),
+            reader: Some(reader),
+        });
+    }
+    string(node, src).map(Part::Env)
+}
+
 fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
     const STRING_METHODS: &[&str] = &[
         "strip",
@@ -1740,17 +1821,20 @@ fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
     ];
     match node.kind() {
         "subscript" => {
-            let name = string(node.child_by_field_name("subscript")?, src)?;
+            let key = node.child_by_field_name("subscript")?;
             let environ = callee(node.child_by_field_name("value")?, src);
-            matches!(environ.as_str(), "os.environ" | "environ").then_some(Part::Env(name))
+            matches!(environ.as_str(), "os.environ" | "environ")
+                .then(|| env_key(key, src, environ))?
         }
         "call" => {
             let function = node.child_by_field_name("function")?;
-            if let "os.getenv" | "getenv" | "os.environ.get" | "environ.get" =
-                callee(function, src).as_str()
-            {
+            let reader = callee(function, src);
+            if matches!(
+                reader.as_str(),
+                "os.getenv" | "getenv" | "os.environ.get" | "environ.get"
+            ) {
                 let list = node.child_by_field_name("arguments")?;
-                let name = string(named(list).next()?, src)?;
+                let key = env_key(named(list).next()?, src, reader)?;
                 // The second positional argument, else the `default` keyword, read as `parts`
                 // at the next level rather than as a whole value.
                 let mut positional = named(list).filter(|a| {
@@ -1768,7 +1852,7 @@ fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
                 let reads = default.and_then(|d| parts_at(d, src, depth + 1));
                 return Some(match reads {
                     Some(p) if p.iter().any(|p| matches!(p, Part::Env(_))) => Part::Hole,
-                    _ => Part::Env(name),
+                    _ => key,
                 });
             }
             let method = function.child_by_field_name("attribute")?;

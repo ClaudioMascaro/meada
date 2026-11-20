@@ -297,5 +297,17 @@
       "level": "exact",
       "reason": "@main (indexed 2344e45)"
     }
+  ],
+  "open_items": [
+    {
+      "call": "github.com/acme/workflows::.github/workflows/forms.yml::jobs.steps.steps[1]",
+      "kind": "dynamic-url",
+      "candidates": []
+    },
+    {
+      "call": "github.com/acme/workflows::action.yml::runs.steps[1]",
+      "kind": "dynamic-url",
+      "candidates": []
+    }
   ]
 }

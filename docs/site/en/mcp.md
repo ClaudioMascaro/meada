@@ -71,6 +71,8 @@ There are three tools, always in English, and none of them writes:
   of an ambiguous call that are overloads of one method (one file, one class, one name) show
   as one set, `(one of N overloads)`, and `trace` writes them as `Class.name (N overloads)`;
   the call stays `ambiguous` and the export lists every candidate as before;
+  For a route such as `http::GET::/orders`, it shows providers and consumers that read
+  response fields. A count of other linked consumers points to `trace` with `direction: "up"`.
 - `trace` follows a chain of calls across repositories, downstream (`down`) or upstream (`up`);
   with `changes: uncommitted`, it starts from the working-tree diff, which covers the impact
   analysis of what was just edited.

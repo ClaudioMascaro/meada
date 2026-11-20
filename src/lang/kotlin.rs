@@ -274,6 +274,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     // The classes that declare a property, by its name.
     let mut members: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut classes: BTreeSet<String> = BTreeSet::new();
+    let mut query_locals = Vec::new();
+    let mut query_writes = HashMap::new();
     let mut locals: Vec<Receiver> = Vec::new();
     // The `val`s of unknown class a `Bound` was recorded for, by qualified name.
     let mut vals: Vec<String> = Vec::new();
@@ -441,6 +443,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     .filter(|c| matches!(c, Class::Type(_)));
                 facts.defs.push(Def {
                     result,
+                    return_values: function_returns(node, src),
                     ..definition(&inner, kind, node.byte_range(), params)
                 });
                 let family = qualify(&scope, &base);
@@ -745,6 +748,25 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                         .any(|op| step.starts_with(op) || step.ends_with(op));
                     node.child_by_field_name("argument").filter(|_| step)
                 };
+                if let Some(target) = target.filter(|n| n.kind() == "identifier") {
+                    let name = text(target, src);
+                    let op = node
+                        .child_by_field_name("operator")
+                        .map_or("", |n| text(n, src));
+                    let change = node
+                        .child_by_field_name("right")
+                        .map_or(super::QueryWrite::Other, |right| {
+                            super::QueryWrite::of(&value(right, src, 0), name, op)
+                        });
+                    let mut at = scope.as_str();
+                    while !at.is_empty() {
+                        query_writes
+                            .entry(qualify(at, name))
+                            .and_modify(|old: &mut super::QueryWrite| *old = old.merge(change))
+                            .or_insert(change);
+                        at = crate::parent(at);
+                    }
+                }
                 if let Some((name, own)) = target.and_then(|t| write_target(t, src, &mut seen)) {
                     // The `this` and the members of a lambda or an object literal are not the
                     // class's.
@@ -810,6 +832,15 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 if class == Class::Unknown {
                     vals.push(qualify(&scope, text(name, src)));
                 }
+            }
+            if place == Place::Code
+                && node.kind() == "variable_declaration"
+                && let Some(initializer) = node
+                    .parent()
+                    .filter(|p| children(*p).any(|c| c.kind() == "var"))
+                    .and_then(initial)
+            {
+                query_locals.push((scope.to_string(), text(name, src).to_owned(), initializer));
             }
             if class == Class::Unknown {
                 facts.locals.push(qualify(&scope, text(name, src)));
@@ -918,6 +949,33 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
     facts
         .bound
         .retain(|b| !shared.contains(&qualify(&b.scope, &b.name)));
+    let mut declarations = HashMap::new();
+    for name in facts
+        .locals
+        .iter()
+        .cloned()
+        .chain(facts.receivers.iter().map(|r| qualify(&r.scope, &r.name)))
+    {
+        *declarations.entry(name).or_insert(0) += 1;
+    }
+    for (scope, name, initializer) in query_locals {
+        let qualified = qualify(&scope, &name);
+        if declarations.get(&qualified) != Some(&1) {
+            continue;
+        }
+        let Some(change) = query_writes.get(&qualified) else {
+            continue;
+        };
+        let mut value = value(initializer, src, 0);
+        if change.keep(&mut value) {
+            facts.bound.push(Bound {
+                within: scope.clone(),
+                scope,
+                name,
+                value,
+            });
+        }
+    }
     facts.locals.sort();
     facts.locals.dedup();
     for names in facts.overloads.values_mut() {
@@ -2256,18 +2314,7 @@ fn getenv(callee: &str) -> bool {
 
 /// The variable a value is when it is exactly one environment read.
 fn read_variable(value: &Value) -> bool {
-    matches!(value, Value::Str(parts) if matches!(parts[..], [Part::Env(_)]))
-}
-
-/// The name a literal argument or key holds.
-fn name_of(value: &Value) -> Option<&str> {
-    match value {
-        Value::Str(parts) => match &parts[..] {
-            [Part::Text(name)] => Some(name),
-            _ => None,
-        },
-        _ => None,
-    }
+    matches!(value, Value::Str(parts) if matches!(parts[..], [Part::Env(_) | Part::EnvKey { .. }]))
 }
 
 /// Whether a fallback reads the environment too: an environment read, or a name of a property
@@ -2317,6 +2364,39 @@ fn env_names(root: Node, src: &[u8]) -> HashSet<String> {
         }
     }
     names
+}
+
+/// The expression body or the explicit returns of a Kotlin function. A nested function's
+/// return cannot supply the outer value. A lambda may return nonlocally, so leave it unknown.
+fn function_returns(function: Node, src: &[u8]) -> Vec<Value> {
+    let Some(body) = named(function).find(|n| n.kind() == "function_body") else {
+        return Vec::new();
+    };
+    if children(body).any(|n| n.kind() == "=") {
+        return named(body)
+            .last()
+            .map(|n| value(n, src, 0))
+            .into_iter()
+            .collect();
+    }
+    let mut out = Vec::new();
+    let mut stack = vec![body];
+    while let Some(node) = stack.pop() {
+        match node.kind() {
+            "return_expression" => out.push(
+                named(node)
+                    .last()
+                    .map_or(Value::Unknown, |n| value(n, src, 0)),
+            ),
+            "lambda_literal" => return Vec::new(),
+            "function_declaration"
+            | "anonymous_function"
+            | "object_literal"
+            | "class_declaration" => {}
+            _ => stack.extend(named(node)),
+        }
+    }
+    out
 }
 
 fn value(node: Node, src: &[u8], depth: usize) -> Value {
@@ -2374,9 +2454,9 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 && getenv(&callee)
                 && keywords.is_empty()
                 && let [arg] = &args[..]
-                && let Some(name) = name_of(arg)
+                && let Some(read) = Part::env_key(arg)
             {
-                return Value::Str(vec![Part::Env(name.to_string())]);
+                return Value::Str(vec![read]);
             }
             let receiver = navigation
                 .then(|| named(function).next())
@@ -2412,8 +2492,8 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                         && args.is_empty()
                         && getenv(&callee(function, src)) =>
                 {
-                    match name_of(&value(key, src, depth + 1)) {
-                        Some(name) => Value::Str(vec![Part::Env(name.to_string())]),
+                    match Part::env_key(&value(key, src, depth + 1)) {
+                        Some(read) => Value::Str(vec![read]),
                         None => Value::Unknown,
                     }
                 }
@@ -2444,6 +2524,25 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                         false => left,
                     }
                 }
+                _ => Value::Unknown,
+            }
+        }
+        "if_expression" => {
+            let terms: Vec<_> = named(node)
+                .filter(|n| !n.kind().ends_with("comment"))
+                .collect();
+            let side = |branch: Node| match branch.kind() {
+                "block" => {
+                    let mut terms = named(branch).filter(|n| !n.kind().ends_with("comment"));
+                    match (terms.next(), terms.next()) {
+                        (Some(one), None) => value(one, src, depth + 1),
+                        _ => Value::Unknown,
+                    }
+                }
+                _ => value(branch, src, depth + 1),
+            };
+            match terms.as_slice() {
+                [_, yes, no] => super::query_alternative(side(*yes), side(*no)),
                 _ => Value::Unknown,
             }
         }
@@ -2594,10 +2693,14 @@ mod tests {
             text("/"),
             name("a.b"),
             text("/"),
-            Part::Limit(crate::lang::Limit::Returned("f".into())),
             text("/$5 and $"),
         ];
-        assert_eq!(parts, expected);
+        let [before @ .., invocation, tail] = parts.as_slice() else {
+            panic!("a template has literal parts");
+        };
+        assert_eq!(before, &expected[..6]);
+        assert!(matches!(invocation, Part::Invoke { callee, awaited: false, .. } if callee == "f"));
+        assert_eq!(*tail, expected[6]);
         assert!(matches!(value_of("\"a\\nb\""), Value::Unknown));
         let Value::Str(parts) = value_of("\"\"") else {
             panic!("an empty literal folds");

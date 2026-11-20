@@ -1,7 +1,7 @@
 import Foundation
 
 func loadBase() -> String {
-    ProcessInfo.processInfo.environment["API_URL"]! + "/v2"
+    CommandLine.arguments[1] + "/v2"
 }
 
 func viaCall() async throws {

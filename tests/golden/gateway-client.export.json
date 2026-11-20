@@ -341,5 +341,22 @@
       "level": "inferred",
       "reason": "host unresolved; the only repository serving it is example.com/acme/billing"
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/acme/client::src/client.ts::audit::fetch#0",
+      "kind": "ambiguous-link",
+      "candidates": [
+        "example.com/acme/billing::http::GET::/audit",
+        "example.com/acme/orders::http::GET::/billing/audit"
+      ]
+    },
+    {
+      "call": "example.com/acme/client::src/client.ts::order::fetch#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/orders::http::GET::/orders/{}"
+      ]
+    }
   ]
 }

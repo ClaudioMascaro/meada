@@ -131,5 +131,18 @@
       "level": "inferred",
       "reason": "host unresolved; the only repository serving it is example.com/acme/conformance; any method"
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/acme/client::src/client.ts::archived::fetch#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/about",
+        "example.com/acme/conformance::http::ANY::/contact",
+        "example.com/acme/conformance::http::ANY::/health",
+        "example.com/acme/conformance::http::ANY::/vintage/{}",
+        "example.com/acme/conformance::http::PUT::/members/{}"
+      ]
+    }
   ]
 }

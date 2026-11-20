@@ -45,5 +45,15 @@
       "level": "ambiguous",
       "reason": "resource::s3::receipts-west; pattern resource::s3::receipts-*"
     }
+  ],
+  "open_items": [
+    {
+      "call": "provision-use::example.com/pattern/app::resource::s3::receipts-*",
+      "kind": "ambiguous-link",
+      "candidates": [
+        "example.com/pattern/infra::resource::s3::receipts-east",
+        "example.com/pattern/infra::resource::s3::receipts-west"
+      ]
+    }
   ]
 }

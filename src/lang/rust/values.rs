@@ -131,6 +131,20 @@ impl<'a, 't> Reader<'a, 't> {
         self.value_at(at, node, 0)
     }
 
+    /// Read the shape of the assignment before expanding the local it updates. Query
+    /// detection must leave the builder's depth budget and cached prefixes alone.
+    pub fn query_write(
+        &mut self,
+        at: &Where,
+        node: Node<'t>,
+        name: &str,
+        operator: &str,
+    ) -> crate::lang::QueryWrite {
+        let builders = Builders::new();
+        let mut syntax = Reader::new(self.src, self.scan, self.heads, &builders);
+        crate::lang::QueryWrite::of(&syntax.value(at, node), name, operator)
+    }
+
     fn value_at(&mut self, at: &Where, node: Node<'t>, depth: usize) -> Value {
         let mut node = node;
         for level in depth..VALUE_DEPTH {
@@ -183,6 +197,27 @@ impl<'a, 't> Reader<'a, 't> {
                 name => Value::Ref(name),
             },
             "call_expression" => self.call_value(at, node, level),
+            "if_expression" => {
+                let single = |branch: Node<'t>| {
+                    let block = if branch.kind() == "else_clause" {
+                        named(branch).next()?
+                    } else {
+                        branch
+                    };
+                    let mut statements = named(block).filter(|n| !is_comment(*n));
+                    let one = statements.next()?;
+                    (block.kind() == "block" && statements.next().is_none()).then_some(one)
+                };
+                if let (Some(yes), Some(no)) = (
+                    field(node, "consequence").and_then(single),
+                    field(node, "alternative").and_then(single),
+                ) {
+                    let yes = self.value_at(at, yes, level + 1);
+                    let no = self.value_at(at, no, level + 1);
+                    return crate::lang::query_alternative(yes, no);
+                }
+                Value::Unknown
+            }
             "binary_expression" => self.sum(at, node, level),
             "macro_invocation" => self.macro_value(at, node),
             _ => Value::Unknown,
@@ -294,7 +329,7 @@ impl<'a, 't> Reader<'a, 't> {
         let parts = sides.into_iter().flat_map(|side| match side {
             Value::Str(parts) => parts,
             Value::Ref(name) => vec![Part::Ref(name)],
-            _ => vec![Part::Hole],
+            other => vec![Part::unread(&other)],
         });
         Value::Str(merge(parts))
     }
@@ -431,6 +466,10 @@ impl<'a, 't> Reader<'a, 't> {
         }
         let mut args = field(call, "arguments").into_iter().flat_map(named);
         match (args.next(), args.next()) {
+            (Some(name), None) if name.kind() == "identifier" => Some(Part::EnvKey {
+                name: text(name, self.src).into(),
+                reader: None,
+            }),
             (Some(name), None) => self.literal(name).map(Part::Env),
             _ => None,
         }

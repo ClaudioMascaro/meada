@@ -1096,11 +1096,18 @@ pub struct Def {
     /// `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub return_values: Vec<Value>,
-    /// The string a function returns when that is all its body does (an arrow function's
-    /// expression body, or one lone `return`): a call to it folds to this string, its parameters
-    /// replaced by the call's arguments (`Code::eval`). Not kept in the index (see `Call::args`).
+    /// Parameter names written again in this function. The argument alone no longer gives
+    /// their value. Only the full facts used in extraction retain them.
     #[serde(default, skip_serializing_if = "lean")]
-    pub lone_string: Option<Value>,
+    pub reassigned_params: Vec<String>,
+    /// Whether an untyped function has a terminal return or an expression body. Without
+    /// this evidence, a Python or JS/TS function can also return implicitly.
+    #[serde(default, skip_serializing_if = "lean")]
+    pub terminal_return: bool,
+    /// A synchronous JS/TS function whose entire body is one return expression.
+    /// Contract kinds outside HTTP only fold a string written in this form.
+    #[serde(default, skip_serializing_if = "lean")]
+    pub single_return: bool,
     /// A function's declared return type, inside the `Promise` and `NextResponse` it is wrapped
     /// in (`Promise<z.infer<typeof S>>` gives that schema), when it lists any fields. Not kept in
     /// the index (see `Call::args`).
@@ -1145,7 +1152,9 @@ impl Def {
             bases: Vec::new(),
             decorators: Vec::new(),
             return_values: Vec::new(),
-            lone_string: None,
+            reassigned_params: Vec::new(),
+            terminal_return: false,
+            single_return: false,
             returns: None,
             type_params: Vec::new(),
             result: None,
@@ -1564,6 +1573,18 @@ pub enum Part {
     /// A read of one environment variable, such as `process.env.X`, through `||`/`??`
     /// fallbacks and string method calls. Its value is never known.
     Env(String),
+    /// The key of a recognized environment read is a name to bind at the call site.
+    EnvKey {
+        name: String,
+        /// When the parser only knows the spelling of the reader, the binding to verify.
+        reader: Option<String>,
+    },
+    /// A call embedded in a string, identified by the same span as the pack's call fact.
+    Invoke {
+        callee: String,
+        range: Range<usize>,
+        awaited: bool,
+    },
     /// A read of one environment variable with the default the source writes for it when the
     /// variable is unset (Spring's `${X:http://api.example.com}`): the variable and the default's
     /// parts. Its value is never known, as `Env`'s.
@@ -1581,24 +1602,142 @@ pub enum Part {
         scope: std::sync::Arc<str>,
         callee: String,
         key: String,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        parameter: bool,
         then: Vec<String>,
     },
     /// An expression inside a string that value flow stops at, with why (#801). Its value is
     /// never known, as `Hole`'s.
     Limit(Limit),
+    /// The empty string or text starting with a literal '?'.
+    QuerySuffix,
     /// Any other expression inside a string.
     Hole,
 }
 
 impl Part {
+    pub(crate) fn invoke(callee: String, range: Range<usize>, awaited: bool) -> Self {
+        Self::Invoke {
+            callee,
+            range,
+            awaited,
+        }
+    }
+
+    /// An environment reader has already identified its API. Its key may still need binding.
+    pub(crate) fn env_key(value: &Value) -> Option<Self> {
+        match value {
+            Value::Str(parts) => literal(parts)
+                .filter(|name| !name.is_empty())
+                .map(Self::Env),
+            Value::Ref(name) => Some(Self::EnvKey {
+                name: name.clone(),
+                reader: None,
+            }),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn parameter(&self) -> Option<&str> {
+        match self {
+            Self::Ref(name) | Self::EnvKey { name, .. } => Some(name),
+            Self::Read {
+                key,
+                parameter: true,
+                ..
+            } => Some(key),
+            _ => None,
+        }
+    }
+
     /// What a string holds where it embeds `value` and cannot read its text: the return value of
     /// a call names its callee, anything else is a hole.
     pub fn unread(value: &Value) -> Part {
         match value {
-            Value::Call(call) => Part::Limit(Limit::Returned(call.callee.clone())),
+            Value::Call(call) => Self::invoke(call.callee.clone(), call.range.clone(), false),
+            Value::Await(inner) if let Value::Call(call) = inner.as_ref() => {
+                Self::invoke(call.callee.clone(), call.range.clone(), true)
+            }
             Value::Await(inner) => Part::unread(inner),
             _ => Part::Hole,
         }
+    }
+}
+
+/// Only the path before a proven optional query is common to its alternatives.
+pub(crate) fn query_alternative(left: Value, right: Value) -> Value {
+    if matches!((&left, &right), (Value::Str(a), Value::Str(b)) if query_only(a) && query_only(b)) {
+        Value::Str(vec![Part::QuerySuffix])
+    } else {
+        Value::Unknown
+    }
+}
+
+fn first_text(parts: &[Part]) -> Option<&str> {
+    match parts
+        .iter()
+        .find(|p| !matches!(p, Part::Text(t) if t.is_empty()))
+    {
+        Some(Part::Text(t)) => Some(t),
+        None => Some(""),
+        _ => None,
+    }
+}
+
+fn query_only(parts: &[Part]) -> bool {
+    matches!(parts, [Part::QuerySuffix])
+        || first_text(parts).is_some_and(|text| text.is_empty() || text.starts_with('?'))
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum QueryWrite {
+    Append,
+    Replace,
+    Other,
+}
+
+impl QueryWrite {
+    /// The assignment's effect on a single local, if its right hand side only changes the query.
+    pub(crate) fn of(value: &Value, name: &str, operator: &str) -> Self {
+        let Value::Str(parts) = value else {
+            return Self::Other;
+        };
+        let append = match (operator, parts.as_slice()) {
+            ("+=", parts) => Some(parts),
+            ("=", [Part::Ref(target), tail @ ..]) if target == name => Some(tail),
+            _ => None,
+        };
+        if append
+            .and_then(first_text)
+            .is_some_and(|text| text.starts_with('?'))
+        {
+            Self::Append
+        } else if operator == "=" && query_only(parts) {
+            Self::Replace
+        } else {
+            Self::Other
+        }
+    }
+
+    /// Combine two writes, keeping the most restrictive condition on the initializer.
+    pub(crate) fn merge(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Other, _) | (_, Self::Other) => Self::Other,
+            (Self::Replace, _) | (_, Self::Replace) => Self::Replace,
+            _ => Self::Append,
+        }
+    }
+
+    pub(crate) fn keep(self, value: &mut Value) -> bool {
+        let Value::Str(parts) = value else {
+            return false;
+        };
+        match self {
+            Self::Append => parts.push(Part::QuerySuffix),
+            Self::Replace if query_only(parts) => *parts = vec![Part::QuerySuffix],
+            _ => return false,
+        }
+        true
     }
 }
 

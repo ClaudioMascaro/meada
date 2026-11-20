@@ -4,6 +4,7 @@
 //! Decider mode (`--decider`, `crate::decider`) asks a model instead.
 
 use std::io::{BufRead, Write};
+use std::path::Path;
 
 use crate::Result;
 use crate::decider;
@@ -30,31 +31,81 @@ pub struct Options {
     pub min_p: Option<f64>,
 }
 
-/// The open items of this repository to work on, in id order; with `only`, that one item,
-/// open or decided, so that a decision can be redone.
-pub(crate) fn items(engine: &Engine, only: Option<&str>) -> Result<Vec<OpenItem>> {
-    let Some(id) = only else {
-        return engine.local_items();
-    };
-    match engine.local_item(id)? {
-        Some(item) => Ok(vec![item]),
-        None => Err(Msg::DecideUnknownItem(id).text().into()),
+impl Options {
+    fn can_save(&self) -> bool {
+        self.prune || !(self.list || self.dry_run || self.show_request)
     }
 }
 
-/// The item as `--list` and the prompt show it: id, location and call, the cause of one that
-/// takes no candidate, then every candidate numbered from 1.
-fn show(item: &OpenItem, out: &mut impl Write) -> Result<()> {
+/// Opens the workspace for decide, checking the local decisions file before discovery reads it.
+pub fn open(dir: &Path, options: &Options) -> Result<Engine> {
+    if options.can_save() {
+        let root = crate::repo::root(dir)?;
+        if options.decider && !options.prune {
+            decisions::check_destination(&root)?;
+        } else {
+            decisions::writable(&root)?;
+        }
+    }
+    Engine::open(dir)
+}
+
+/// The open items of this repository to work on, in id order; with `only`, that one item,
+/// open or decided, so that a decision can be redone.
+pub(crate) fn items(engine: &Engine, only: Option<&str>) -> Result<Vec<OpenItem>> {
+    let mut items = match only {
+        Some(id) => vec![
+            engine
+                .local_item(id)?
+                .ok_or_else(|| Msg::DecideUnknownItem(id).text())?,
+        ],
+        None => engine.local_items()?,
+    };
+    for item in &mut items {
+        item.rank_candidates();
+    }
+    Ok(items)
+}
+
+/// The maximum number of candidates shown per item in the overview.
+/// ponytail: the full item listing, prompt, export and MCP have their own output contracts.
+const LIST_CANDIDATE_LIMIT: usize = 5;
+
+/// The item as the CLI shows it, with a shortened candidate list only in the overview.
+fn show(item: &OpenItem, out: &mut impl Write, overview: bool) -> Result<()> {
     writeln!(out, "{}", item.id)?;
     writeln!(out, "{}  {}", item.location(), item.expression)?;
-    if let Some(cause) = item.cause {
+    writeln!(out, r#"  kind = "{}""#, item.decision_kind().name())?;
+    if let Some(cause) = &item.cause {
         writeln!(out, "  {cause}")?;
     }
     if let Some(limit) = &item.limit {
         writeln!(out, "  {}", Msg::ItemLimit(limit).text())?;
     }
-    for (n, c) in item.candidates.iter().enumerate() {
+    let count = item.candidates.len();
+    let id = &item.id;
+    if overview && item.literal_coverage == Some(0) && count > 0 {
+        writeln!(out, "  {}", Msg::CandidateCount { count, id }.text())?;
+        return Ok(());
+    }
+    let shown = if overview {
+        count.min(LIST_CANDIDATE_LIMIT)
+    } else {
+        count
+    };
+    for (n, c) in item.candidates[..shown].iter().enumerate() {
         writeln!(out, "  {}) {}", n + 1, c.describe())?;
+    }
+    if count > shown {
+        writeln!(
+            out,
+            "  {}",
+            Msg::CandidatesMore {
+                count: count - shown,
+                id
+            }
+            .text()
+        )?;
     }
     Ok(())
 }
@@ -72,7 +123,7 @@ pub(crate) fn ask(
         if n > 0 {
             writeln!(out)?;
         }
-        show(item, out)?;
+        show(item, out, false)?;
         let count = item.candidates.len();
         if count == 0 {
             writeln!(out, "{}", Msg::DecideNoCandidates.text())?;
@@ -101,8 +152,8 @@ pub(crate) fn ask(
 }
 
 /// Runs the command: `--list` shows the items; otherwise it asks a person, or the decider with
-/// `--decider`, then writes the file once, at the end (or prints it for `--dry-run`). Nothing
-/// is written when nothing was picked. A run that can write refuses a decisions file that is a
+/// `--decider`. A model answer is saved on acceptance, and interactive picks are saved
+/// together. `--dry-run` prints the resulting file. A run that can write refuses a decisions file that is a
 /// symbolic link before it asks or sends anything (`decisions::writable`). Only decider mode
 /// reads the decider variables, and `--list` reads none.
 pub fn run(
@@ -114,7 +165,7 @@ pub fn run(
     // Checked whenever it is given, whatever else the run does.
     let min_p = options.min_p.map_or(Ok(decider::MIN_P), decider::min_p)?;
     // Before any question, request or write, whether or not the run ends up saving.
-    if options.prune || !(options.list || options.dry_run || options.show_request) {
+    if options.can_save() {
         decisions::writable(engine.root())?;
     }
     if options.prune {
@@ -126,25 +177,57 @@ pub fn run(
     };
     let items = items(engine, options.item.as_deref())?;
     if options.list {
-        return list(engine, &items, out);
+        return list(engine, &items, options.item.is_none(), out);
     }
     if items.is_empty() {
         writeln!(out, "{}", Msg::DecideNoItems.text())?;
         return Ok(());
     }
-    let (picks, failed) = match &config {
+    let failed = match &config {
         Some((config, min_p)) => {
-            let (items, show) = (&items, options.show_request);
+            let show = options.show_request;
+            if !show && !options.dry_run {
+                decisions::locked(engine.root(), || Ok(()))?;
+            }
             let stored = |path: &str| engine.stored_setting(path);
-            let outcome = decider::run(config, engine.root(), &stored, items, show, *min_p, out)?;
+            let accept = |decision: &Decision| {
+                if options.dry_run {
+                    return Ok(());
+                }
+                decisions::record(engine.root(), vec![decision.clone()])
+            };
+            let outcome = decider::run(
+                config,
+                engine.root(),
+                &stored,
+                &items,
+                show,
+                *min_p,
+                accept,
+                out,
+            )?;
             if show {
                 return Ok(());
             }
-            (outcome.decisions, outcome.failed)
+            if options.dry_run {
+                finish(engine, outcome.decisions, true, out)?;
+            } else {
+                writeln!(out)?;
+                let count = outcome.decisions.len();
+                let message = if count == 0 {
+                    Msg::DecideNothing
+                } else {
+                    Msg::DecideWrote(count)
+                };
+                writeln!(out, "{}", message.text())?;
+            }
+            outcome.failed
         }
-        None => (ask(&items, input, out)?, 0),
+        None => {
+            finish(engine, ask(&items, input, out)?, options.dry_run, out)?;
+            0
+        }
     };
-    finish(engine, picks, options.dry_run, out)?;
     // The decisions of the other items are written; the status tells a script some failed.
     match failed {
         0 => Ok(()),
@@ -153,7 +236,7 @@ pub fn run(
 }
 
 /// `--list`: the open items, then the stale decisions and those waiting on a missing peer.
-fn list(engine: &Engine, items: &[OpenItem], out: &mut impl Write) -> Result<()> {
+fn list(engine: &Engine, items: &[OpenItem], overview: bool, out: &mut impl Write) -> Result<()> {
     if items.is_empty() {
         writeln!(out, "{}", Msg::DecideNoItems.text())?;
     }
@@ -161,7 +244,7 @@ fn list(engine: &Engine, items: &[OpenItem], out: &mut impl Write) -> Result<()>
         if n > 0 {
             writeln!(out)?;
         }
-        show(item, out)?;
+        show(item, out, overview)?;
     }
     let here = engine.local_decisions()?;
     if !here.stale.is_empty() || !here.waiting.is_empty() {
@@ -177,13 +260,16 @@ fn list(engine: &Engine, items: &[OpenItem], out: &mut impl Write) -> Result<()>
 /// and reads no network; a decision waiting on a missing peer stays.
 fn prune(engine: &Engine, out: &mut impl Write) -> Result<()> {
     let stale = engine.local_decisions()?.stale;
-    match decisions::pruned(engine.root(), &stale)? {
-        Some((text, removed)) => {
-            decisions::save(engine.root(), &text)?;
-            writeln!(out, "{}", Msg::DecidePruned(removed).text())?;
+    decisions::locked(engine.root(), || {
+        match decisions::pruned(engine.root(), &stale)? {
+            Some((text, removed)) => {
+                decisions::save(engine.root(), &text)?;
+                writeln!(out, "{}", Msg::DecidePruned(removed).text())?;
+            }
+            None => writeln!(out, "{}", Msg::DecideNothingToPrune.text())?,
         }
-        None => writeln!(out, "{}", Msg::DecideNothingToPrune.text())?,
-    }
+        Ok(())
+    })?;
     Ok(())
 }
 
@@ -200,12 +286,12 @@ pub(crate) fn finish(
         return Ok(());
     }
     let count = picks.len();
-    let text = decisions::canonical(engine.root(), picks)?;
     if dry_run {
+        let text = decisions::canonical(engine.root(), picks)?;
         writeln!(out, "{}", Msg::DecideDryRun.text())?;
         write!(out, "{text}")?;
     } else {
-        decisions::save(engine.root(), &text)?;
+        decisions::record(engine.root(), picks)?;
         writeln!(out, "{}", Msg::DecideWrote(count).text())?;
     }
     Ok(())

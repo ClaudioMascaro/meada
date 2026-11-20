@@ -171,3 +171,143 @@ fn status_names_the_peer_whose_read_only_index_cannot_be_refreshed() {
     assert!(status.starts_with(INDEXED), "{status}");
     assert_eq!(status.lines().count(), 6, "{status}");
 }
+
+#[test]
+fn replay_reports_kind_identity_and_candidate_failures_separately() {
+    let (web, _, _) = chain("stale_distinct_causes");
+    use common::{HEALTH, TRACK};
+    common::age(&web);
+    fs::write(
+        web.join("src/diagnose.ts"),
+        r#"
+export function WrongTarget(url: string) { return fetch(url); }
+export function NoCandidates(url: string) { return fetch(url, { method: "TRACE" }); }
+export function Unknown(url: string) { return fetch(url); }
+export function Malformed(url: string) { return fetch(url); }
+export function Scheme(url: string) { return fetch(url); }
+export function Suffix(url: string) { return fetch(url); }
+export function Gone(url: string) { return fetch(url); }
+export function Waiting(url: string) { return fetch(url); }
+"#,
+    )
+    .unwrap();
+    let config = web.join("meada.toml");
+    let peers =
+        fs::read_to_string(&config).unwrap() + "\n[[peer]]\nrepo = \"example.com/chain/ghost\"\n";
+    fs::write(config, peers).unwrap();
+    let diagnose = |name| format!("example.com/chain/web::src/diagnose.ts::{name}::fetch#0");
+    let router = "example.com/chain/catalog";
+    let route = "http::GET::/api/health";
+    let cases = [
+        (
+            HEALTH.to_owned(),
+            "dynamic-url",
+            format!("{router}::{route}"),
+            "wrong-kind",
+        ),
+        (
+            TRACK.to_owned(),
+            "ambiguous-link",
+            format!("{router}::{route}"),
+            "wrong-kind",
+        ),
+        (
+            diagnose("WrongTarget"),
+            "dynamic-url",
+            "example.com/chain/gateway::http::POST::/api/events".into(),
+            "not-candidate",
+        ),
+        (
+            diagnose("NoCandidates"),
+            "dynamic-url",
+            format!("{router}::{route}"),
+            "no-candidates",
+        ),
+        (
+            diagnose("Unknown"),
+            "dynamic-url",
+            format!("short::{route}"),
+            "unknown-repository",
+        ),
+        (
+            diagnose("Malformed"),
+            "dynamic-url",
+            "short".into(),
+            "unknown-repository",
+        ),
+        (
+            diagnose("Scheme"),
+            "dynamic-url",
+            format!("https://{router}::{route}"),
+            "unknown-repository",
+        ),
+        (
+            diagnose("Suffix"),
+            "dynamic-url",
+            format!("{router}.git::{route}"),
+            "unknown-repository",
+        ),
+        (
+            diagnose("Gone"),
+            "dynamic-url",
+            format!("{router}::http::GET::/gone"),
+            "target-gone",
+        ),
+        (
+            diagnose("Waiting"),
+            "dynamic-url",
+            format!("example.com/chain/ghost::{route}"),
+            "",
+        ),
+    ];
+    let decisions = (cases.iter())
+        .map(|(call, kind, target, _)| format!("[[decision]]\nkind = {kind:?}\ncall = {call:?}\ntarget = {target:?}\nby = \"human\"\n\n"))
+        .collect::<String>();
+    let file = web.join("meada.decisions.toml");
+    fs::write(&file, decisions).unwrap();
+    let engine = Engine::open(&web).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let rows = json["stale_decisions"].as_array().unwrap();
+    assert_eq!(rows.len(), cases.len() - 1, "{rows:?}");
+    for (row, (call, _, target, cause)) in rows.iter().zip(&cases) {
+        assert_eq!(row["call"], *call);
+        assert_eq!(row["target"], *target);
+        assert_eq!(row["cause"], *cause, "{row:?}");
+    }
+    let run = |args: &[&str]| {
+        let (out, error, ok) = common::meada(&web, args, "", |c| {
+            c.env("LANG", "en_US.UTF-8");
+        });
+        assert!(ok && error.is_empty(), "{error}");
+        out
+    };
+    for out in [run(&["status"]), run(&["decide", "--list"])] {
+        for diagnostic in [
+            "target no longer a candidate",
+            "item has no candidates for a decision",
+            "unknown repository identity `short`",
+            "target gone",
+            "Use kind = \"ambiguous-link\"",
+            "Use kind = \"dynamic-url\"",
+            "decision waiting on missing peer example.com/chain/ghost",
+        ] {
+            assert!(out.contains(diagnostic), "{diagnostic}: {out}");
+        }
+    }
+    assert!(
+        json["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|link| link["level"] != "decided")
+    );
+    assert_eq!(
+        run(&["decide", "--prune"]),
+        "pruned 2 stale decisions from meada.decisions.toml\n"
+    );
+    let kept = fs::read_to_string(&file).unwrap();
+    for (call, _, _, cause) in &cases {
+        let preserve = !matches!(*cause, "target-gone" | "not-candidate");
+        assert_eq!(kept.contains(call), preserve, "{call}: {kept}");
+    }
+}

@@ -237,6 +237,7 @@ fn a_base_a_call_returns_makes_an_open_item_that_names_the_callee() {
     assert!(
         listed.contains(
             "client.go:16  http.Get(c.baseV2() + \"/orders\")\n  \
+             kind = \"dynamic-url\"\n  \
              limit: base from the return value of c.baseV2\n  1) "
         ),
         "{listed}"
@@ -314,7 +315,8 @@ fn an_ambiguous_link_decision_for_an_unread_base_goes_stale() {
     assert!(
         listed.contains(
             "stale decision: example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0 \
-             -> example.com/acme/api::http::GET::/v2/orders (item no longer open)"
+             -> example.com/acme/api::http::GET::/v2/orders (kind `ambiguous-link` needs to be \
+             `dynamic-url`. Use kind = \"dynamic-url\")"
         ),
         "{listed}"
     );
@@ -437,4 +439,463 @@ fn a_go_literal_key_named_like_an_import_leaves_its_call_linked() {
     let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
     let levels = (export["links"].as_array().unwrap().iter()).map(|l| l["level"].clone());
     assert_eq!(levels.collect::<Vec<_>>(), ["inferred"; 4]);
+}
+
+fn http_value_flow(case: &str) -> serde_json::Value {
+    fixture_repo(
+        case,
+        "http-value-flow-api",
+        Some("https://example.com/flow/api.git"),
+    );
+    let client = fixture_repo(
+        case,
+        "http-value-flow",
+        Some("https://example.com/flow/client.git"),
+    );
+    serde_json::from_str(&Engine::open(&client).unwrap().export().unwrap()).unwrap()
+}
+
+#[test]
+fn exact_returns_keys_and_optional_queries_reach_http_consumers() {
+    let export = http_value_flow("http_value_flow_folded");
+    let consumers = export["consumers"].as_array().unwrap();
+    let links = export["links"].as_array().unwrap();
+    let mut differences = Vec::new();
+    for path in [
+        "client.go",
+        "client.py",
+        "client.ts",
+        "Client.java",
+        "Client.kt",
+        "Client.cs",
+        "Sources/Client/Client.swift",
+        "src/lib.rs",
+    ] {
+        let cases = [
+            ("ViaMethod", "/api/orders", "API_URL"),
+            ("ViaFunction", "/v2/orders", "API_URL"),
+            ("MethodWithPrefix", "/v2/orders", "API_URL"),
+            ("FunctionWithoutPrefix", "/api/orders", "API_URL"),
+            ("ParamA", "/api/orders", "API_URL"),
+            ("ParamB", "/api/orders", "SECOND_URL"),
+            ("QueryAppend", "/api/orders", "API_URL"),
+            ("QueryRewrite", "/api/orders", "API_URL"),
+            ("QuerySuffix", "/api/orders", "API_URL"),
+            ("QueryConditional", "/api/orders", "API_URL"),
+        ];
+        for (name, route, variable) in cases {
+            if path == "client.go" && name == "QueryConditional" {
+                continue;
+            }
+            let matches: Vec<_> = consumers
+                .iter()
+                .filter(|c| {
+                    let site = c["site"].as_str().unwrap();
+                    site.contains(&format!("::{path}::")) && site.contains(name)
+                })
+                .collect();
+            let contract = format!("http::GET::{route}");
+            let via = format!("env:{variable}");
+            let found = match matches.as_slice() {
+                [row] if row["contract"] == contract && row["via"] == via => {
+                    let linked: Vec<_> = links
+                        .iter()
+                        .filter(|l| l["consumer"] == row["site"])
+                        .collect();
+                    matches!(linked.as_slice(), [link] if link["contract"] == contract
+                        && link["level"] == "inferred"
+                        && link["provider"].as_str().unwrap().starts_with("example.com/flow/api::openapi.yaml::"))
+                }
+                _ => false,
+            };
+            if !found {
+                differences.push(format!("{path} {name}: {matches:?}"));
+            }
+        }
+        let unknown: Vec<_> = consumers
+            .iter()
+            .filter(|c| {
+                let site = c["site"].as_str().unwrap();
+                site.contains(&format!("::{path}::")) && site.contains("ParamUnknown")
+            })
+            .collect();
+        if !matches!(unknown.as_slice(), [row] if row["contract"].is_null() && row["via"].is_null())
+        {
+            differences.push(format!("{path} ParamUnknown: {unknown:?}"));
+        }
+    }
+    assert!(differences.is_empty(), "{}", differences.join("\n"));
+}
+
+#[test]
+fn an_awaited_helper_and_discovery_arguments_keep_their_base() {
+    let export = http_value_flow("http_value_flow_async");
+    let consumers = export["consumers"].as_array().unwrap();
+    for (name, route, via) in [
+        ("ViaAwait", "http::GET::/v2/orders", "env:API_URL"),
+        (
+            "PluginMethod",
+            "http::GET::/api/orders/items",
+            "client:Backstage plugin orders at /api/orders",
+        ),
+        (
+            "PluginParameter",
+            "http::GET::/api/orders/items",
+            "client:Backstage plugin orders at /api/orders",
+        ),
+    ] {
+        let rows: Vec<_> = consumers
+            .iter()
+            .filter(|c| c["site"].as_str().unwrap().contains(name))
+            .collect();
+        assert!(
+            matches!(rows.as_slice(), [row] if row["contract"] == route && row["via"] == via),
+            "{name}: {rows:?}"
+        );
+    }
+}
+
+#[test]
+fn unknown_returns_and_path_changes_remain_unresolved() {
+    let export = http_value_flow("http_value_flow_unknown");
+    let consumers = export["consumers"].as_array().unwrap();
+    for name in [
+        "ViaPromise",
+        "ViaDispatch",
+        "ViaRecursive",
+        "ViaUnknownReturn",
+        "ViaNameReturn",
+        "ViaDivergent",
+        "unsafeDispatch",
+        "PathChanged",
+        "PathReplaced",
+        "MiddleQuery",
+        "BrowserQueryOnly",
+    ] {
+        let rows: Vec<_> = consumers
+            .iter()
+            .filter(|c| c["site"].as_str().unwrap().contains(name))
+            .collect();
+        assert!(
+            matches!(rows.as_slice(), [row] if row["contract"].is_null()),
+            "{name}: {rows:?}"
+        );
+    }
+    let unknown: Vec<_> = consumers
+        .iter()
+        .filter(|c| c["site"].as_str().unwrap().contains("PathUnknown"))
+        .collect();
+    assert!(matches!(unknown.as_slice(), [row] if row["contract"] == "http::GET::/api/{}"));
+    assert!(!consumers.iter().any(|c| {
+        c["site"].as_str().unwrap().contains("ViaNameMatch") && !c["contract"].is_null()
+    }));
+}
+
+#[test]
+fn an_environment_key_needs_a_reader_bound_to_the_runtime() {
+    let export = http_value_flow("http_value_flow_env_reader");
+    let consumers = export["consumers"].as_array().unwrap();
+    let links = export["links"].as_array().unwrap();
+    let shadows: Vec<_> = consumers
+        .iter()
+        .filter(|row| {
+            let site = row["site"].as_str().unwrap();
+            site.contains("ShadowedEnvKey")
+                || site.contains("shadowed_read")
+                || site.contains("shadowedRead")
+        })
+        .collect();
+    assert!(
+        shadows
+            .iter()
+            .any(|row| row["site"].as_str().unwrap().contains("client.py")),
+        "{shadows:?}"
+    );
+    assert!(
+        shadows
+            .iter()
+            .any(|row| row["site"].as_str().unwrap().contains("client.ts")),
+        "{shadows:?}"
+    );
+    for row in shadows {
+        assert_ne!(row["via"], "env:API_URL", "{row:?}");
+        assert!(!links.iter().any(|link| link["consumer"] == row["site"]
+            && link["reason"].as_str().unwrap().contains("base_url_env")));
+    }
+    let imported = consumers
+        .iter()
+        .find(|row| row["site"].as_str().unwrap().contains("ImportedEnvKey"))
+        .unwrap();
+    assert_eq!(imported["via"], "env:API_URL", "{imported:?}");
+    assert!(
+        links
+            .iter()
+            .any(|link| link["consumer"] == imported["site"] && link["level"] == "inferred")
+    );
+}
+
+#[test]
+fn a_reassigned_parameter_does_not_take_the_callers_value() {
+    let export = http_value_flow("http_value_flow_reassigned");
+    for path in ["client.py", "client.ts"] {
+        let consumers: Vec<_> = export["consumers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| {
+                row["site"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("::{path}::"))
+            })
+            .collect();
+        for name in [
+            "mutated",
+            if path.ends_with(".ts") {
+                "possiblyMutated"
+            } else {
+                "possibly_mutated"
+            },
+        ] {
+            let rows: Vec<_> = consumers
+                .iter()
+                .filter(|c| c["site"].as_str().unwrap().contains(&format!("::{name}::")))
+                .collect();
+            assert!(
+                matches!(rows.as_slice(), [row] if row["contract"].is_null()),
+                "{path} {name}: {rows:?}"
+            );
+        }
+        let intact: Vec<_> = consumers
+            .iter()
+            .filter(|c| c["site"].as_str().unwrap().contains("::Intact::"))
+            .collect();
+        assert!(matches!(intact.as_slice(), [row] if row["contract"] == "http::GET::/api/orders"));
+        for name in ["::Reassigned::", "::Conditional::"] {
+            assert!(!consumers.iter().any(|c| c["site"].as_str().unwrap().contains(name) && !c["contract"].is_null()));
+        }
+    }
+    let writes: Vec<_> = export["providers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| {
+            row["site"]
+                .as_str()
+                .unwrap()
+                .contains("::mutation/store.go::")
+                && !row["contract"].is_null()
+        })
+        .map(|row| {
+            (
+                row["site"].as_str().unwrap(),
+                row["contract"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        writes,
+        [
+            (
+                "example.com/flow/client::mutation/store.go::write::client.PutItem#0",
+                "resource::dynamodb"
+            ),
+            (
+                "example.com/flow/client::mutation/store.go::writeConditional::client.PutItem#0",
+                "resource::dynamodb"
+            ),
+            (
+                "example.com/flow/client::mutation/store.go::Current::writeIntact#0",
+                "resource::dynamodb::orders"
+            ),
+        ]
+    );
+    let cycle: Vec<_> = export["consumers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["site"].as_str().unwrap().contains("::ViaCycle::"))
+        .collect();
+    assert!(
+        cycle
+            .iter()
+            .any(|r| r["contract"] == "http::GET::/api/orders")
+    );
+    assert!(
+        export["consumers"].as_array().unwrap().iter().any(|r| {
+            r["site"].as_str().unwrap().contains("::cycle::") && r["contract"].is_null()
+        })
+    );
+    assert!(
+        !cycle
+            .iter()
+            .any(|r| r["contract"] == "http::GET::/v2/orders")
+    );
+}
+
+#[test]
+fn a_rotating_go_wrapper_leaves_its_neighbors_readable() {
+    let since = std::time::Instant::now();
+    let export = http_value_flow("http_value_flow_cycle");
+    let consumers: Vec<_> = export["consumers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| {
+            row["site"]
+                .as_str()
+                .unwrap()
+                .contains("::recursive/recursive.go::")
+        })
+        .collect();
+    for (name, contract) in [
+        ("PlainA", "http::GET::/plain-a"),
+        ("PlainB", "http::GET::/plain-b"),
+        ("UseGet", "http::GET::/g0"),
+    ] {
+        assert!(
+            consumers
+                .iter()
+                .any(|row| row["site"].as_str().unwrap().contains(name)
+                    && row["contract"] == contract),
+            "{name}: {consumers:?}"
+        );
+    }
+    assert!(since.elapsed() < std::time::Duration::from_secs(20));
+}
+
+#[test]
+fn exported_open_items_supply_canonical_decisions_and_keep_the_full_candidate_set() {
+    let (web, _, _) = chain("items_export_contract");
+    let read = || Engine::open(&web).unwrap().export().unwrap();
+    let first = read();
+    assert_eq!(read(), first);
+    let parsed = meada_core::export::parse(&first).unwrap();
+    assert_eq!(parsed.open_items.len(), 2);
+    let decoded: serde_json::Value = serde_json::from_str(&first).unwrap();
+    let data = decoded["open_items"].as_array().unwrap();
+    assert_eq!(data.len(), 2, "{data:?}");
+    assert_eq!(data[0]["kind"], "ambiguous-link");
+    assert_eq!(data[1]["kind"], "dynamic-url");
+    assert!(data[0]["call"].as_str() < data[1]["call"].as_str());
+    let mut decisions = Vec::new();
+    for item in data {
+        let candidates = item["candidates"].as_array().unwrap();
+        let targets = candidates
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert!(!targets.is_empty() && targets.windows(2).all(|pair| pair[0] < pair[1]));
+        let pick = targets[0];
+        let (repo, contract) = pick.split_once("::").unwrap();
+        decisions.push((
+            item["call"].as_str().unwrap(),
+            item["kind"].as_str().unwrap(),
+            repo,
+            contract,
+            pick,
+        ));
+    }
+    let text = decisions.iter().map(|(call, kind, _, _, pick)| {
+        format!("[[decision]]\ncall = {call:?}\nkind = {kind:?}\ntarget = {pick:?}\nby = \"human\"\n\n")
+    }).collect::<String>();
+    fs::write(web.join("meada.decisions.toml"), text).unwrap();
+    let applied: serde_json::Value = serde_json::from_str(&read()).unwrap();
+    assert!(applied.get("open_items").is_none(), "{applied}");
+    for (call, _, repo, contract, _) in decisions {
+        let links: Vec<_> = applied["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|l| l["consumer"] == call)
+            .collect();
+        assert!(matches!(links.as_slice(), [l] if l["level"] == "decided"
+            && l["contract"] == contract && l["provider"].as_str().unwrap().starts_with(&format!("{repo}::"))));
+    }
+    let generated: serde_json::Value =
+        serde_json::from_str(&generated("items_export_many").export().unwrap()).unwrap();
+    assert_eq!(
+        generated["open_items"][0]["candidates"]
+            .as_array()
+            .unwrap()
+            .len(),
+        55
+    );
+}
+
+#[test]
+fn a_dynamic_url_without_candidates_explains_method_path_and_missing_peers() {
+    use common::fixture_repo;
+    let peer = "example.com/open/api";
+    let src = r#"
+export function WithPath(base: string) { return fetch(`${base}/v1/orders`); }
+export function WithMethod(input: { url: string }) { return fetch(input.url, { method: 'PATCH' }); }
+export function WithCandidate(base: string) { return fetch(`${base}/orders`); }
+"#;
+    for (case, present, named) in [
+        ("items_url_cause", true, true),
+        ("items_url_missing_peer", false, true),
+        ("items_url_own_scope", false, false),
+    ] {
+        let repo = fixture_repo(
+            case,
+            "open-few",
+            Some("https://example.com/open/client.git"),
+        );
+        fs::remove_dir_all(repo.join("app")).unwrap();
+        fs::remove_dir_all(repo.join("src")).unwrap();
+        fs::write(repo.join("client.ts"), src).unwrap();
+        if named {
+            fs::write(
+                repo.join("meada.toml"),
+                format!("[[peer]]\nrepo = {peer:?}\npath = \"../http-value-flow-api\"\n"),
+            )
+            .unwrap();
+        }
+        if present {
+            let api = fixture_repo(
+                case,
+                "http-value-flow-api",
+                Some("https://example.com/open/api.git"),
+            );
+            let openapi = api.join("openapi.yaml");
+            let content = fs::read_to_string(&openapi)
+                .unwrap()
+                .replace("/api/orders:", "/orders:");
+            fs::write(openapi, content).unwrap();
+        }
+        let engine = Engine::open(&repo).unwrap();
+        let items = engine.local_items().unwrap();
+        assert_eq!(items.len(), 3);
+        let cause = |name| {
+            items
+                .iter()
+                .find(|i| i.id.contains(name))
+                .unwrap()
+                .cause
+                .as_deref()
+        };
+        if present {
+            assert!(cause("WithPath").unwrap().contains("[serve] prefix"));
+            assert!(cause("WithMethod").unwrap().contains("method PATCH"));
+            assert_eq!(cause("WithCandidate"), None);
+        } else {
+            assert!(items.iter().all(|i| i.candidates.is_empty()));
+            assert!(items.iter().all(|i| {
+                i.cause
+                    .as_deref()
+                    .unwrap()
+                    .contains("no repository in the workspace serves a route")
+            }));
+            assert!(
+                items
+                    .iter()
+                    .all(|i| i.cause.as_deref().unwrap().contains(peer) == named)
+            );
+        }
+        let search = engine.search("WithPath", Some("unresolved"), None).unwrap();
+        assert!(search.contains(cause("WithPath").unwrap()), "{search}");
+        let (list, _, ok) = meada(&repo, &["decide", "--list"], "", |_| {});
+        assert!(ok && list.contains(cause("WithPath").unwrap()), "{list}");
+    }
 }

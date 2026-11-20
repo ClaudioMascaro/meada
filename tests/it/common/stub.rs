@@ -82,6 +82,10 @@ impl Stub {
     /// Starts a stub that answers the n-th protocol request with `script[n]`, and with a 500
     /// once the script has run out. The server lives until the test process ends.
     pub fn start(script: Vec<Reply>) -> Self {
+        Self::observed(script, |_| {})
+    }
+
+    pub fn observed(script: Vec<Reply>, mut observe: impl FnMut(usize) + Send + 'static) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("a loopback port");
         let url = format!("http://{}", listener.local_addr().unwrap());
         let received = Arc::new(Mutex::new(Vec::new()));
@@ -99,7 +103,12 @@ impl Stub {
                     Reply::status(404, "not a decider path")
                 };
                 // Recorded before answering, so a client that got its answer finds it here.
-                log.lock().unwrap().push(request);
+                let count = {
+                    let mut log = log.lock().unwrap();
+                    log.push(request);
+                    log.len()
+                };
+                observe(count);
                 write(stream, &reply);
             }
         });

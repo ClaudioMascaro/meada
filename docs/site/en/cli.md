@@ -11,7 +11,8 @@ At the root of the repository:
   as a query does. Otherwise, or when an index fails to open or refresh, one line says it did not evaluate them and
   why (`run meada index`, or the repository and the error), and the exit code does not change;
 - `meada export` prints the whole index as sorted JSON, good for diffing two runs;
-- `meada decide` resolves ambiguous links and dynamic URLs, see Decisions;
+- `meada decide` resolves ambiguous links and dynamic URLs, see Decisions.
+  `meada decide --list` shows the kind the TOML takes, for example `kind = "ambiguous-link"`;
 - `meada mcp` serves the [MCP tools](mcp.md).
 
 The export starts with three fields that say where it comes from. `format` names the export format (1

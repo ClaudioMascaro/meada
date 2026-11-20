@@ -35,25 +35,23 @@ pub(in crate::http) fn consumers(
             if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                 continue;
             }
-            // A URL from Backstage's `discovery.getBaseUrl('<id>')` starts at the plugin's mount.
-            let plugin = backstage::base(code, path, n);
-            let expanded = code.expand(Expand::Call(path, n), &|args, _| {
-                let decided = config.decided(&joined(args));
-                let folded =
-                    (plugin.as_deref()).and_then(|id| Some((id, backstage::based(&decided, id)?)));
-                let args = folded.as_ref().map_or(&decided, |(_, args)| args);
-                // A URL through a proxy endpoint goes to the endpoint's target.
-                let proxied = config.proxied(args);
-                let target = proxied.as_ref().and_then(|p| p.args.as_ref());
-                let mut read = fetch(target.unwrap_or(args))?;
-                if let (None, Some((id, _))) = (&read.via, folded) {
-                    read.via = Some(backstage::client(id));
-                }
-                if let Some(p) = proxied {
-                    read.via = backstage::proxied(read.via, &p.endpoint, p.args.is_some());
-                }
-                Some(read)
-            });
+            let expanded =
+                code.expand_with_call(Expand::Call(path, n), &backstage::discovered, &|args, _| {
+                    let mut args = joined(args);
+                    let plugin = backstage::based(&mut args);
+                    let args = config.decided(&args);
+                    // A URL through a proxy endpoint goes to the endpoint's target.
+                    let proxied = config.proxied(&args);
+                    let target = proxied.as_ref().and_then(|p| p.args.as_ref());
+                    let mut read = fetch(target.unwrap_or(&args))?;
+                    if let (None, Some(id)) = (&read.via, plugin) {
+                        read.via = Some(backstage::client(&id));
+                    }
+                    if let Some(p) = proxied {
+                        read.via = backstage::proxied(read.via, &p.endpoint, p.args.is_some());
+                    }
+                    Some(read)
+                });
             for Expanded {
                 site: (site, at),
                 frames,

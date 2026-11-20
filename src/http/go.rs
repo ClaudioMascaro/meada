@@ -403,7 +403,7 @@ impl<'c, 'a> Go<'c, 'a> {
                 _ => true,
             };
         }
-        let Some((function, n)) = self.code.param_of(path, scope, name) else {
+        let Some((function, n)) = self.code.unchanged_param_of(path, scope, name) else {
             return true;
         };
         if let Some(groups) = self.callbacks.get(&function)
@@ -829,6 +829,15 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             // `http.HandleFunc(..)` registers on the router of the package itself; any other
             // call is a method of a router, whatever its head's type reads as.
             let external = package_call(go.code, path, &call.scope, &call.callee);
+            if external
+                .as_deref()
+                .and_then(split)
+                .is_some_and(|(package, name)| clients::is_package_send(&package, name))
+            {
+                // A URL argument of net/http.Get cannot mount a router. Tracing it as one
+                // follows every caller through rotated parameters before the client reader runs.
+                continue;
+            }
             let package_call =
                 external
                     .as_deref()

@@ -748,6 +748,79 @@ fn typescript_aws_commands_require_the_sdk_client_origin() {
 }
 
 #[test]
+fn typescript_sqs_queue_urls_keep_exact_single_return_helpers() {
+    let repo = fixture_repo(
+        "aws_sdk_ts_queue_helpers",
+        "aws-sdk",
+        Some("https://example.com/aws/app.git"),
+    );
+    std::fs::write(
+        repo.join("queue-returns.tf"),
+        r#"
+resource "aws_sqs_queue" "nested" { name = "orders-nested" }
+resource "aws_sqs_queue" "literal" { name = "orders-literal" }
+resource "aws_sqs_queue" "branch" { name = "orders-branch" }
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("queueReturns.ts"),
+        r#"
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+const sqs = new SQSClient({});
+function queue(name: string) { return `https://sqs.us-east-1.amazonaws.com/123456789012/${name}`; }
+function branches(test: boolean) {
+  if (test) return 'https://sqs.us-east-1.amazonaws.com/123456789012/orders-branch';
+  return 'https://sqs.us-east-1.amazonaws.com/123456789012/orders-branch';
+}
+export function Nested() {
+  const dest = queue('orders-nested');
+  return sqs.send(new SendMessageCommand({QueueUrl: dest, MessageBody: 'x'}));
+}
+export function Literal() {
+  return sqs.send(new SendMessageCommand({QueueUrl: 'https://sqs.us-east-1.amazonaws.com/123456789012/orders-literal', MessageBody: 'x'}));
+}
+export function Branch(test: boolean) {
+  return sqs.send(new SendMessageCommand({QueueUrl: branches(test), MessageBody: 'x'}));
+}
+"#,
+    )
+    .unwrap();
+    let text = Engine::open(&repo).unwrap().export().unwrap();
+    let export: Value = serde_json::from_str(&text).unwrap();
+    let mut provisions: Vec<_> = export["provisions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|p| {
+            let (_, side) = p["side"].as_str()?.split_once("::queueReturns.ts::")?;
+            Some((
+                side,
+                p["contract"].as_str().unwrap(),
+                p["level"].as_str().unwrap(),
+            ))
+        })
+        .collect();
+    provisions.sort_unstable();
+    assert_eq!(
+        provisions,
+        [
+            (
+                "Literal::SendMessageCommand#0",
+                "channel::sqs::orders-literal",
+                "exact"
+            ),
+            (
+                "Nested::SendMessageCommand#0",
+                "channel::sqs::orders-nested",
+                "exact"
+            ),
+        ],
+        "{text}"
+    );
+}
+
+#[test]
 fn typescript_aws_resources_keep_directions_and_environment_names() {
     let repo = fixture_repo(
         "aws_sdk_ts_resources",

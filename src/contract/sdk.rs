@@ -55,6 +55,7 @@ pub(crate) fn argument<'a>(
                     scope,
                     callee,
                     key,
+                    parameter: false,
                     then,
                 },
             ] if then.is_empty() => {
@@ -275,7 +276,17 @@ pub(crate) fn extract<'a>(
                     };
                     let injected = (language == Language::Java)
                         .then_some(&inject as &crate::resolve::Inject<'a, '_>);
-                    for expanded in code.expand_with(Expand::Chain(path, index), injected, &read) {
+                    let checked = match language {
+                        // These readers preserve the request's shape and check its writes at
+                        // the relevant call. Other reads may carry a reassigned scalar.
+                        Language::Go => entries,
+                        Language::Java => true,
+                        _ => false,
+                    };
+                    let expanded = code.with_request_parameters(checked, || {
+                        code.expand_with(Expand::Chain(path, index), injected, &read)
+                    });
+                    for expanded in expanded {
                         let (at, index) = expanded.site;
                         // A site with no name to lose is not judged: a second answer a cut
                         // cycle gives a site spends nothing more of the file's budget (#886).
@@ -930,6 +941,7 @@ fn name<'a>(
                     scope,
                     callee,
                     key,
+                    parameter: false,
                     then,
                 } if then.is_empty() && csharp::environment(code, path, scope, callee, aliases) => {
                     Some(key.clone())

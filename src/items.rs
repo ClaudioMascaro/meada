@@ -2,14 +2,15 @@
 //! candidates a decision may pick (spec #18). `search` lists them and `meada decide` resolves
 //! them.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
 use crate::contract::{self, Link, kind_of};
 use crate::index::{Consumer, Export, Provider};
 use crate::lang::Limit;
 use crate::render::{Files, callee};
-use crate::workspace::Repository;
+use crate::workspace::{Missing, Repository};
+use meada_core::export::DecisionKind;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ItemKind {
@@ -95,12 +96,48 @@ pub struct OpenItem {
     pub candidates: Vec<Candidate>,
     /// Why no provider can be a candidate, for an unresolved consumer whose kind says so
     /// (`ContractKind::unresolved_causes`): `meada decide` has nothing to offer for it.
-    pub cause: Option<&'static str>,
+    pub cause: Option<String>,
+    /// Total length of the URL's known path fragments, when it is an unresolved URL.
+    pub literal_coverage: Option<usize>,
     /// For a consumer whose URL starts with a part Meada could not read, why (#801).
     pub limit: Option<Limit>,
 }
 
 impl OpenItem {
+    pub(crate) fn decision_kind(&self) -> DecisionKind {
+        match self.kind {
+            ItemKind::Ambiguous => DecisionKind::AmbiguousLink,
+            ItemKind::Unresolved => DecisionKind::DynamicUrl,
+        }
+    }
+
+    pub(crate) fn written(&self) -> meada_core::export::OpenItem {
+        let mut targets: Vec<String> = self
+            .candidates
+            .iter()
+            .map(crate::decisions::Decision::target)
+            .collect();
+        targets.sort();
+        targets.dedup();
+        let mut item =
+            meada_core::export::OpenItem::new(self.id.clone(), self.decision_kind(), targets);
+        item.limit = self.limit.as_ref().map(Limit::describe);
+        item
+    }
+
+    /// Keep the engine order as the tie-breaker. Only decide calls this before numbering.
+    pub(crate) fn rank_candidates(&mut self) {
+        if let Some(coverage) = self.literal_coverage {
+            self.candidates.sort_by_cached_key(|candidate| {
+                contract::parts(&candidate.contract)
+                    .1
+                    .map_or(usize::MAX, |path| {
+                        path.chars().count().saturating_sub(coverage)
+                    })
+            });
+        }
+    }
+
     /// `path:line`, or `path` when the line is unknown.
     pub fn location(&self) -> String {
         match self.line {
@@ -145,7 +182,12 @@ pub(crate) fn fits(consumer: &Consumer, provider: &Provider) -> bool {
 /// ones). The candidates of an ambiguous link are the providers `links` lists for it; those of
 /// an unresolved consumer are the providers of the workspace that its kind's `candidate` leaves
 /// (HTTP: by method and literal URL fragments).
-pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> Vec<OpenItem> {
+pub(crate) fn list(
+    repos: &[Repository],
+    exports: &[Export],
+    links: &[Link],
+    missing: &[Missing],
+) -> Vec<OpenItem> {
     let mut ambiguous: HashMap<String, Vec<&Link>> = HashMap::new();
     for link in links.iter().filter(|l| contract::consumer_item(l, exports)) {
         ambiguous
@@ -163,6 +205,8 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
         (repository, p.contract.as_str(), p.site.as_str())
     }
     let causes = causes(exports);
+    let missing: BTreeSet<&str> = missing.iter().map(|m| m.repo.as_str()).collect();
+    let missing = missing.into_iter().collect::<Vec<_>>().join(", ");
     let mut items = Vec::new();
     for (export, repo) in exports.iter().zip(repos) {
         let calls: HashMap<&str, _> = export.calls.iter().map(|c| (c.id.as_str(), c)).collect();
@@ -244,6 +288,20 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
             // repository that serve one contract are one candidate.
             let mut listed = HashSet::new();
             candidates.retain(|c| listed.insert((c.repository.clone(), c.contract.clone())));
+            let (mut cause, mut literal_coverage) = (None, None);
+            if kind == ItemKind::Unresolved {
+                cause = causes.get(&consumer.site).map(|cause| (*cause).to_string());
+                if cause.is_none() {
+                    literal_coverage =
+                        Some(consumer.fragments.iter().map(|s| s.chars().count()).sum());
+                    if candidates.is_empty() {
+                        let providers = exports.iter().flat_map(|e| &e.providers);
+                        cause = contract::KINDS.iter().find_map(|kind| {
+                            kind.no_candidates(consumer, &mut providers.clone(), &missing)
+                        });
+                    }
+                }
+            }
             items.push(OpenItem {
                 id: consumer.item_site().into_owned(),
                 kind,
@@ -256,9 +314,8 @@ pub(crate) fn list(repos: &[Repository], exports: &[Export], links: &[Link]) -> 
                     span: range(s.span.start, s.span.end),
                 }),
                 candidates,
-                cause: (consumer.contract.is_none())
-                    .then(|| causes.get(consumer.site.as_str()).copied())
-                    .flatten(),
+                cause,
+                literal_coverage,
                 limit: (consumer.contract.is_none())
                     .then(|| consumer.lead.as_ref().map(|l| l.limit.clone()))
                     .flatten(),

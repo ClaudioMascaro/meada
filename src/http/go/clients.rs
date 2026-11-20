@@ -38,6 +38,11 @@ const HTTP_METHODS: &[(&str, &str)] = &[
     ("PostForm", "POST"),
 ];
 
+/// Standard-library send functions can share a name with a router's registration methods.
+pub(super) fn is_package_send(package: &str, name: &str) -> bool {
+    package == HTTP && HTTP_METHODS.iter().any(|(member, _)| *member == name)
+}
+
 /// The methods of a resty request that send it, with the HTTP method each sends.
 const RESTY_METHODS: &[(&str, &str)] = &[
     ("Get", "GET"),
@@ -280,7 +285,7 @@ impl<'c, 'a> Clients<'c, 'a> {
         depth: usize,
         request: bool,
     ) -> bool {
-        let Some((function, n)) = self.code.param_of(path, scope, name) else {
+        let Some((function, n)) = self.code.unchanged_param_of(path, scope, name) else {
             return false;
         };
         let args = self.code.param_args(function, n);

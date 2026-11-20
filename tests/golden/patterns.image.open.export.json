@@ -42,5 +42,15 @@
       "reason": "image::ghcr.io/pattern/orders-west; .github/workflows/build.yml#jobs.image.steps[0].with.tags; pattern image::ghcr.io/pattern/orders-* on image::ghcr.io/pattern/orders-west; multiple literal runner names",
       "root": "."
     }
+  ],
+  "open_items": [
+    {
+      "call": "image-builder::example.com/pattern/app::image::ghcr.io/pattern/orders-*",
+      "kind": "ambiguous-link",
+      "candidates": [
+        "example.com/pattern/infra::image::ghcr.io/pattern/orders-east",
+        "example.com/pattern/infra::image::ghcr.io/pattern/orders-west"
+      ]
+    }
   ]
 }
