@@ -223,7 +223,7 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
                 if let Some((at, index)) = self.code.first_result(path, scope, name) {
                     return self.called(at, index, None, awaited, depth);
                 }
-                let (function, n) = self.code.param_of(path, scope, name)?;
+                let (function, n) = self.code.unchanged_param_of(path, scope, name)?;
                 if let Some(&context) = self.stack.last() {
                     let context = &self.contexts[context];
                     return (context.function == function)

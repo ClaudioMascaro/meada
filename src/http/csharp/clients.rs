@@ -850,7 +850,7 @@ mod tests {
     #[test]
     fn a_call_whose_url_cannot_be_evaluated_is_an_unresolved_consumer_of_its_method() {
         let body = format!(
-            "{CLIENT}string Build() => \"\";\n\
+            "{CLIENT}string Build() => System.Console.ReadLine();\n\
              async void F() {{\n\
              await _http.GetAsync(Build());\n\
              await _http.PostAsJsonAsync(Build(), 1);\n\
@@ -1123,7 +1123,7 @@ mod tests {
 
     #[test]
     fn a_base_with_no_literal_scheme_is_cut_at_the_first_path_for_a_rooted_url() {
-        let body = "static string Cfg() => \"x\";\n\
+        let body = "static string Cfg() => System.Console.ReadLine();\n\
              async Task F() {\n\
              var c = new HttpClient { BaseAddress = new Uri(Cfg() + \"/api/\") };\n\
              await c.GetAsync(\"/x\");\n}";

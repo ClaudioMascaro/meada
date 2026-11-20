@@ -6,6 +6,10 @@ class Client {
     private static String javaFunctionBase() { return System.getenv("API_URL") + "/v2"; }
     void ViaMethod() { rest.getForObject(javaMethodBase() + "/api/orders", String.class); }
     void ViaFunction() { rest.getForObject(javaFunctionBase() + "/orders", String.class); }
+    private String javaMethodPrefix() { return System.getenv("API_URL") + "/v2"; }
+    private static String javaPlainBase() { return System.getenv("API_URL"); }
+    void MethodWithPrefix() { rest.getForObject(javaMethodPrefix() + "/orders", String.class); }
+    void FunctionWithoutPrefix() { rest.getForObject(javaPlainBase() + "/api/orders", String.class); }
     void envGet(String key, String path) { rest.getForObject(System.getenv(key) + path, String.class); }
     void ParamA() { envGet("API_URL", "/api/orders"); }
     void ParamB() { envGet("SECOND_URL", "/api/orders"); }

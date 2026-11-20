@@ -576,7 +576,7 @@ pub(super) fn plain(value: &Value, scope: &str, consts: &HashMap<&str, &Value>) 
                 | Part::EnvOr(..)
                 | Part::Read { .. }
                 | Part::Limit(_)
-                | Part::EnvKey(_)
+                | Part::EnvKey { .. }
                 | Part::Invoke { .. }
                 | Part::QuerySuffix
                 | Part::Hole => false,
@@ -1037,7 +1037,7 @@ mod tests {
                     | Part::EnvOr(..)
                     | Part::Read { .. }
                     | Part::Limit(_)
-                    | Part::EnvKey(_)
+                    | Part::EnvKey { .. }
                     | Part::Invoke { .. }
                     | Part::QuerySuffix
                     | Part::Hole => "{}".into(),

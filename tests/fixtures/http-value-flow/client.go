@@ -12,6 +12,11 @@ func functionBase() string        { return os.Getenv("API_URL") + "/v2" }
 func (c Client) ViaMethod()       { _, _ = http.Get(c.methodBase() + "/api/orders") }
 func ViaFunction()               { _, _ = http.Get(functionBase() + "/orders") }
 
+func (Client) methodPrefix() string { return os.Getenv("API_URL") + "/v2" }
+func plainFunctionBase() string { return os.Getenv("API_URL") }
+func (c Client) MethodWithPrefix() { _, _ = http.Get(c.methodPrefix() + "/orders") }
+func FunctionWithoutPrefix() { _, _ = http.Get(plainFunctionBase() + "/api/orders") }
+
 func envGet(key, path string) { _, _ = http.Get(os.Getenv(key) + path) }
 func ParamA()                { envGet("API_URL", "/api/orders") }
 func ParamB()                { envGet("SECOND_URL", "/api/orders") }

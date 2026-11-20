@@ -5012,6 +5012,9 @@ pub struct Code<'a> {
     field_reads_cuts: RefCell<HashMap<Field<'a>, Value>>,
     /// Whether a budget refused a charge since this was last cleared.
     refused: Cell<bool>,
+    fold_returned_strings: Cell<bool>,
+    /// Keep request argument frames for readers that independently check writes to the request.
+    follow_request_parameters: Cell<bool>,
     /// Each file of `full` by name, built the first time a name is looked up in it.
     by_name: HashMap<&'a str, OnceCell<ByName<'a>>>,
     /// The marker constants of the literals that set each field (`field_values`), by field name
@@ -5196,6 +5199,8 @@ impl<'a> Code<'a> {
             folded_cuts: RefCell::new(HashMap::new()),
             field_reads_cuts: RefCell::new(HashMap::new()),
             refused: Cell::new(false),
+            fold_returned_strings: Cell::new(false),
+            follow_request_parameters: Cell::new(false),
             by_name: full.keys().map(|&path| (path, OnceCell::new())).collect(),
             literals: OnceCell::new(),
             field_reads: RefCell::new(HashMap::new()),
@@ -5204,6 +5209,20 @@ impl<'a> Code<'a> {
             mutations: RefCell::new(HashMap::new()),
             pack,
         }
+    }
+
+    pub(crate) fn with_returned_strings<T>(&self, read: impl FnOnce() -> T) -> T {
+        let previous = self.fold_returned_strings.replace(true);
+        let result = read();
+        self.fold_returned_strings.set(previous);
+        result
+    }
+
+    pub(crate) fn with_request_parameters<T>(&self, checked: bool, read: impl FnOnce() -> T) -> T {
+        let previous = self.follow_request_parameters.replace(checked);
+        let result = read();
+        self.follow_request_parameters.set(previous);
+        result
     }
 
     /// Charges `cost` to the `EVAL_BUDGET` of `file`; `false` once it is spent.
@@ -6702,11 +6721,19 @@ impl<'a> Code<'a> {
             .resolver
             .lexical(path, scope, name, &mut self.resolver.seen(path, scope))
         {
-            Binding::Param(function, n, None) if self.unchanged_parameter(function, name) => {
-                Some((function, n))
-            }
+            Binding::Param(function, n, None) => Some((function, n)),
             _ => None,
         }
+    }
+
+    pub(crate) fn unchanged_param_of(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+    ) -> Option<(Target<'a>, usize)> {
+        self.param_of(path, scope, name)
+            .filter(|(function, _)| self.unchanged_parameter(*function, name))
     }
 
     /// The arguments the exact callers of `function` pass for its parameter `n` (a call found
@@ -7421,7 +7448,14 @@ impl<'a> Code<'a> {
         for part in parts {
             let value = match part {
                 Part::Ref(name) => self.name(path, scope, name, frames, depth, fold, wants),
-                Part::EnvKey(name) => {
+                Part::EnvKey { name, reader } => {
+                    if reader.as_deref().is_some_and(|reader| {
+                        !matches!(self.imported(path, scope, reader),
+                            Some(("os", name)) if matches!(name.as_str(), "getenv" | "environ" | "environ.get"))
+                    }) {
+                        out.push(Part::Hole);
+                        continue;
+                    }
                     let key = self.name(path, scope, name, frames, depth, fold, wants);
                     out.push(Part::env_key(&key).unwrap_or(Part::Hole));
                     continue;
@@ -7651,6 +7685,9 @@ impl<'a> Code<'a> {
         fold: &mut Fold<'a, '_>,
         wants: &mut Option<Target<'a>>,
     ) -> Option<Value> {
+        if !self.fold_returned_strings.get() {
+            return None;
+        }
         let index = self.call_index(path, range)?;
         let site = (path, index);
         if fold.returning.len() >= WRAPPER_DEPTH || fold.returning.contains(&site) {
@@ -7691,7 +7728,7 @@ impl<'a> Code<'a> {
                         | Part::Ref(_)
                         | Part::Env(_)
                         | Part::EnvOr(..)
-                        | Part::EnvKey(_)
+                        | Part::EnvKey { .. }
                         | Part::QuerySuffix
                         | Part::Read { .. }
                 )
@@ -7774,7 +7811,10 @@ impl<'a> Code<'a> {
                 }
                 folded
             }
-            Binding::Param(function, _, _) if !self.unchanged_parameter(function, name) => {
+            Binding::Param(function, _, _)
+                if !self.follow_request_parameters.get()
+                    && !self.unchanged_parameter(function, name) =>
+            {
                 Value::Unknown
             }
             // `*args` and `**kwargs` hold what no single argument gives.

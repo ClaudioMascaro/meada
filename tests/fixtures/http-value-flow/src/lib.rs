@@ -7,10 +7,16 @@ impl Client {
     async fn ViaMethod(&self) {
         let _ = reqwest::get(self.method_base() + "/api/orders").await;
     }
+    fn method_prefix(&self) -> String { env::var("API_URL").unwrap() + "/v2" }
+    async fn MethodWithPrefix(&self) {
+        let _ = reqwest::get(self.method_prefix() + "/orders").await;
+    }
 }
 
 fn function_base() -> String { env::var("API_URL").unwrap() + "/v2" }
 async fn ViaFunction() { let _ = reqwest::get(function_base() + "/orders").await; }
+fn plain_base() -> String { env::var("API_URL").unwrap() }
+async fn FunctionWithoutPrefix() { let _ = reqwest::get(plain_base() + "/api/orders").await; }
 
 async fn env_get(key: &str, path: &str) {
     let _ = reqwest::get(env::var(key).unwrap() + path).await;

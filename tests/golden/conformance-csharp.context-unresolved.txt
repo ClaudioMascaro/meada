@@ -14,4 +14,4 @@ example.com/acme/conformance src/Acme.Api/Clients.cs:117 (unresolved) factory.Cr
 example.com/acme/conformance src/Acme.Api/Clients.cs:116 (unresolved) http.GetAsync
 example.com/acme/conformance src/Acme.Api/Clients.cs:118 (unresolved) named.GetAsync
 contracts:
-example.com/acme/conformance src/Acme.Api/Clients.cs:116 consumes (unresolved) http.GetAsync
+example.com/acme/conformance src/Acme.Api/Clients.cs:116 consumes http::GET::/x

@@ -131,6 +131,20 @@ impl<'a, 't> Reader<'a, 't> {
         self.value_at(at, node, 0)
     }
 
+    /// Read the shape of the assignment before expanding the local it updates. Query
+    /// detection must leave the builder's depth budget and cached prefixes alone.
+    pub fn query_write(
+        &mut self,
+        at: &Where,
+        node: Node<'t>,
+        name: &str,
+        operator: &str,
+    ) -> crate::lang::QueryWrite {
+        let builders = Builders::new();
+        let mut syntax = Reader::new(self.src, self.scan, self.heads, &builders);
+        crate::lang::QueryWrite::of(&syntax.value(at, node), name, operator)
+    }
+
     fn value_at(&mut self, at: &Where, node: Node<'t>, depth: usize) -> Value {
         let mut node = node;
         for level in depth..VALUE_DEPTH {
@@ -452,9 +466,10 @@ impl<'a, 't> Reader<'a, 't> {
         }
         let mut args = field(call, "arguments").into_iter().flat_map(named);
         match (args.next(), args.next()) {
-            (Some(name), None) if name.kind() == "identifier" => {
-                Some(Part::EnvKey(text(name, self.src).into()))
-            }
+            (Some(name), None) if name.kind() == "identifier" => Some(Part::EnvKey {
+                name: text(name, self.src).into(),
+                reader: None,
+            }),
             (Some(name), None) => self.literal(name).map(Part::Env),
             _ => None,
         }

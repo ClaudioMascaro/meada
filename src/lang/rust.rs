@@ -1105,7 +1105,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                         .iter()
                         .map(|(at, local, operator, right)| {
                             right.map_or(super::QueryWrite::Other, |right| {
-                                super::QueryWrite::of(&reader.value(at, right), local, operator)
+                                reader.query_write(at, right, local, operator)
                             })
                         })
                         .reduce(super::QueryWrite::merge);
@@ -2178,7 +2178,7 @@ mod tests {
                     Part::EnvOr(..)
                     | Part::Read { .. }
                     | Part::Limit(_)
-                    | Part::EnvKey(_)
+                    | Part::EnvKey { .. }
                     | Part::Invoke { .. }
                     | Part::QuerySuffix
                     | Part::Hole => "{}".into(),

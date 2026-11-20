@@ -13547,6 +13547,11 @@
     },
     {
       "contract": null,
+      "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::(call_expression).uri#0",
+      "via": null
+    },
+    {
+      "contract": null,
       "site": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Typed.typed()::(call_expression).uri#0",
       "via": null
     }
@@ -19469,6 +19474,14 @@
             "example.com/acme/conformance::src/main/kotlin/example/jvm/Reactive.kt::example.jvm.Other.uri(String)",
             "example.com/acme/conformance::src/main/kotlin/example/jvm/fake/Fake.kt::example.jvm.fake.WebClient.uri(String)"
           ]
+        },
+        {
+          "depth": 1,
+          "repository": "example.com/acme/conformance",
+          "level": null,
+          "via": "call",
+          "node": "example.com/acme/conformance::src/main/kotlin/example/jvm/Typed.kt::example.jvm.Shadowing.hidden()::(call_expression).uri#0",
+          "mark": "unresolved"
         },
         {
           "depth": 1,

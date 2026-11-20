@@ -2314,7 +2314,7 @@ fn getenv(callee: &str) -> bool {
 
 /// The variable a value is when it is exactly one environment read.
 fn read_variable(value: &Value) -> bool {
-    matches!(value, Value::Str(parts) if matches!(parts[..], [Part::Env(_) | Part::EnvKey(_)]))
+    matches!(value, Value::Str(parts) if matches!(parts[..], [Part::Env(_) | Part::EnvKey { .. }]))
 }
 
 /// Whether a fallback reads the environment too: an environment read, or a name of a property
