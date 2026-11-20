@@ -403,7 +403,7 @@ impl<'c, 'a> Go<'c, 'a> {
                 _ => true,
             };
         }
-        let Some((function, n)) = self.code.param_of(path, scope, name) else {
+        let Some((function, n)) = self.code.unchanged_param_of(path, scope, name) else {
             return true;
         };
         if let Some(groups) = self.callbacks.get(&function)

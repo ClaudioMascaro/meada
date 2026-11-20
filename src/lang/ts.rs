@@ -835,6 +835,8 @@ struct Parents<'t> {
     url_declared: bool,
     /// Merged lexical scopes that hide the runtime String conversion.
     string_shadows: Vec<Range<usize>>,
+    /// Merged lexical scopes that hide the Node.js process object.
+    process_shadows: Vec<Range<usize>>,
     /// Modules, class bodies and functions/programs with a strict directive prologue.
     strict_scopes: HashSet<usize>,
     /// Bare `undefined =>` parameters the grammar recovered as a comparison.
@@ -852,6 +854,8 @@ impl<'t> Parents<'t> {
         let mut arrow_parameters = Vec::new();
         let mut string_bindings = Vec::new();
         let mut string_writes = Vec::new();
+        let mut process_bindings = Vec::new();
+        let mut process_writes = Vec::new();
         let mut strict_scopes = HashSet::new();
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
@@ -887,17 +891,22 @@ impl<'t> Parents<'t> {
             url_declared |= shadows_runtime(node, src, "URL");
             url_required |= runtime_url_require(node, src);
             require_declared |= shadows_runtime(node, src, "require");
-            if shadows_runtime(node, src, "String")
-                && !(node.kind() == "for_in_statement"
-                    && node.child_by_field_name("kind").is_none())
-            {
-                string_bindings.push(node);
+            if !(node.kind() == "for_in_statement" && node.child_by_field_name("kind").is_none()) {
+                if shadows_runtime(node, src, "String") {
+                    string_bindings.push(node);
+                }
+                if shadows_runtime(node, src, "process") {
+                    process_bindings.push(node);
+                }
             }
             members_written(node, src, &mut written);
             let target = written_name_target(node);
             let names = target.map(|t| bound(t, src)).unwrap_or_default();
             if names.iter().any(|name| name == "String") {
                 string_writes.push(node.start_byte());
+            }
+            if names.iter().any(|name| name == "process") {
+                process_writes.push(node.start_byte());
             }
             assigned.extend(names);
             for child in children(node) {
@@ -913,31 +922,43 @@ impl<'t> Parents<'t> {
             written,
             url_declared,
             string_shadows: Vec::new(),
+            process_shadows: Vec::new(),
             strict_scopes,
             arrow_parameters,
         };
-        let mut scopes: Vec<_> = string_bindings
+        parents.string_shadows = parents.runtime_shadows(string_bindings, string_writes, root, src);
+        parents.process_shadows =
+            parents.runtime_shadows(process_bindings, process_writes, root, src);
+        parents
+    }
+
+    fn runtime_shadows(
+        &self,
+        bindings: Vec<Node<'t>>,
+        writes: Vec<usize>,
+        root: Node<'t>,
+        src: &[u8],
+    ) -> Vec<Range<usize>> {
+        let mut scopes: Vec<_> = bindings
             .into_iter()
-            .map(|node| parents.string_scope(node, src, root))
+            .map(|node| self.runtime_scope(node, src, root))
             .collect();
         scopes.sort_by_key(|scope| scope.start);
+        let mut shadows: Vec<Range<usize>> = Vec::new();
         for scope in scopes {
-            if let Some(last) = parents.string_shadows.last_mut()
+            if let Some(last) = shadows.last_mut()
                 && last.end >= scope.start
             {
                 last.end = last.end.max(scope.end);
             } else {
-                parents.string_shadows.push(scope);
+                shadows.push(scope);
             }
         }
-        // An assignment outside a lexical String binding can replace the global itself.
-        if string_writes
-            .into_iter()
-            .any(|at| !parents.string_hidden(at))
-        {
-            parents.string_shadows = vec![root.byte_range()];
+        // An assignment outside a lexical binding can replace the global itself.
+        if writes.into_iter().any(|at| !runtime_hidden(&shadows, at)) {
+            return vec![root.byte_range()];
         }
-        parents
+        shadows
     }
 
     fn of(&self, node: Node) -> Option<Node<'t>> {
@@ -945,16 +966,13 @@ impl<'t> Parents<'t> {
     }
 
     fn string_hidden(&self, at: usize) -> bool {
-        let next = self
-            .string_shadows
-            .partition_point(|scope| scope.start <= at);
-        next > 0 && at < self.string_shadows[next - 1].end
+        runtime_hidden(&self.string_shadows, at)
     }
 
     /// Parameters and expression names belong to their own function; declarations belong
     /// to their enclosing lexical scope, or function for var. A bounded lookup that cannot
     /// establish the scope conservatively hides the runtime throughout the file.
-    fn string_scope(&self, node: Node<'t>, src: &[u8], root: Node<'t>) -> Range<usize> {
+    fn runtime_scope(&self, node: Node<'t>, src: &[u8], root: Node<'t>) -> Range<usize> {
         match node.kind() {
             "formal_parameters" => {
                 return self.of(node).unwrap_or(root).byte_range();
@@ -1012,6 +1030,11 @@ impl<'t> Parents<'t> {
         }
         false
     }
+}
+
+fn runtime_hidden(shadows: &[Range<usize>], at: usize) -> bool {
+    let next = shadows.partition_point(|scope| scope.start <= at);
+    next > 0 && at < shadows[next - 1].end
 }
 
 /// Only raw string-literal directive statements can enable strict mode. Comments do not
@@ -2051,7 +2074,15 @@ fn env_read(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Part> 
             let name = match node.child_by_field_name("index") {
                 Some(index) if index.kind() == "string" => unquote(index, src),
                 Some(index) if index.kind() == "identifier" => {
-                    return Some(Part::EnvKey(text(index, src).into()));
+                    if object == "process.env"
+                        && runtime_hidden(&up.process_shadows, node.start_byte())
+                    {
+                        return None;
+                    }
+                    return Some(Part::EnvKey {
+                        name: text(index, src).into(),
+                        reader: None,
+                    });
                 }
                 Some(_) => return None,
                 None => text(node.child_by_field_name("property")?, src).to_string(),

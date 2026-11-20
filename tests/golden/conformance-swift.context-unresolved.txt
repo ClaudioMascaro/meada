@@ -34,7 +34,7 @@ example.com/acme/conformance Sources/Checkout/Clients.swift:136 (unresolved) URL
 example.com/acme/conformance Sources/Checkout/Clients.swift:139 (unresolved) URLSession.shared.data
 example.com/acme/conformance Sources/Checkout/Clients.swift:143 (unresolved) URLSession.shared.data
 contracts:
-example.com/acme/conformance Sources/Checkout/Clients.swift:132 consumes (unresolved) URLSession.shared.data
+example.com/acme/conformance Sources/Checkout/Clients.swift:132 consumes http::GET::/lookup
 example.com/acme/conformance Sources/Checkout/Clients.swift:133 consumes (unresolved) URLSession.shared.data
 example.com/acme/conformance Sources/Checkout/Clients.swift:136 consumes (unresolved) URLSession.shared.data
 example.com/acme/conformance Sources/Checkout/Clients.swift:139 consumes (unresolved) URLSession.shared.data

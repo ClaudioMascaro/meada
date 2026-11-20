@@ -9,6 +9,12 @@ class Client:
     def ViaMethod(self):
         return requests.get(self.method_base() + "/api/orders")
 
+    def method_prefix(self):
+        return os.environ["API_URL"] + "/v2"
+
+    def MethodWithPrefix(self):
+        return requests.get(self.method_prefix() + "/orders")
+
 
 def function_base():
     return os.getenv("API_URL") + "/v2"
@@ -16,6 +22,14 @@ def function_base():
 
 def ViaFunction():
     return requests.get(function_base() + "/orders")
+
+
+def plain_base():
+    return os.getenv("API_URL")
+
+
+def FunctionWithoutPrefix():
+    return requests.get(plain_base() + "/api/orders")
 
 
 def env_get(key, path):
@@ -32,6 +46,26 @@ def ParamB():
 
 def ParamUnknown(key):
     return env_get(key, "/api/orders")
+
+
+def getenv(key):
+    return "https://different"
+
+
+def shadowed_read(key):
+    return requests.get(getenv(key) + "/api/orders")
+
+
+def ShadowedEnvKey():
+    return shadowed_read("API_URL")
+
+
+def imported_read(key):
+    return requests.get(os.getenv(key) + "/api/orders")
+
+
+def ImportedEnvKey():
+    return imported_read("API_URL")
 
 
 def QueryAppend(flag):

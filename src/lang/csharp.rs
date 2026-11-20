@@ -2483,7 +2483,7 @@ mod tests {
     }
 
     /// A read under a long `Trim` chain or a long `??` chain stays linear: past `VALUE_DEPTH` it
-    /// is an unknown part, never a read.
+    /// is opaque to the string reader.
     #[test]
     fn a_long_trim_or_fallback_chain_around_a_read_is_read_in_linear_time() {
         let get = "Environment.GetEnvironmentVariable(\"X\")";
@@ -2496,7 +2496,10 @@ mod tests {
         let found = strings(&source, "H.Get");
         // 1.0 s measured in a local debug build; the bound is over twenty times that.
         assert!(start.elapsed().as_secs() < 25, "{:?}", start.elapsed());
-        assert_eq!(found[0], [Part::Hole, Part::Text("/a".into())]);
+        assert!(
+            matches!(&found[0][..], [Part::Invoke { callee, .. }, Part::Text(path)]
+            if callee == "(invocation_expression).Trim" && path == "/a")
+        );
         assert_eq!(found[1], [Part::Hole, Part::Text("/b".into())]);
         // Within the depth, the chain is one read.
         let short = format!(

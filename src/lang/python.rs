@@ -1799,9 +1799,12 @@ fn name(node: Node, src: &[u8]) -> Option<Part> {
 /// another variable makes the whole read a hole. `depth` is the level of `node` in `parts`.
 // ponytail: the names are matched as written, not through the file's imports, so `import os
 // as o` is not read and a local `getenv` function is.
-fn env_key(node: Node, src: &[u8]) -> Option<Part> {
+fn env_key(node: Node, src: &[u8], reader: String) -> Option<Part> {
     if node.kind() == "identifier" {
-        return Some(Part::EnvKey(text(node, src).into()));
+        return Some(Part::EnvKey {
+            name: text(node, src).into(),
+            reader: Some(reader),
+        });
     }
     string(node, src).map(Part::Env)
 }
@@ -1820,15 +1823,18 @@ fn env_read(node: Node, src: &[u8], depth: usize) -> Option<Part> {
         "subscript" => {
             let key = node.child_by_field_name("subscript")?;
             let environ = callee(node.child_by_field_name("value")?, src);
-            matches!(environ.as_str(), "os.environ" | "environ").then(|| env_key(key, src))?
+            matches!(environ.as_str(), "os.environ" | "environ")
+                .then(|| env_key(key, src, environ))?
         }
         "call" => {
             let function = node.child_by_field_name("function")?;
-            if let "os.getenv" | "getenv" | "os.environ.get" | "environ.get" =
-                callee(function, src).as_str()
-            {
+            let reader = callee(function, src);
+            if matches!(
+                reader.as_str(),
+                "os.getenv" | "getenv" | "os.environ.get" | "environ.get"
+            ) {
                 let list = node.child_by_field_name("arguments")?;
-                let key = env_key(named(list).next()?, src)?;
+                let key = env_key(named(list).next()?, src, reader)?;
                 // The second positional argument, else the `default` keyword, read as `parts`
                 // at the next level rather than as a whole value.
                 let mut positional = named(list).filter(|a| {

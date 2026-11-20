@@ -472,6 +472,8 @@ fn exact_returns_keys_and_optional_queries_reach_http_consumers() {
         let cases = [
             ("ViaMethod", "/api/orders", "API_URL"),
             ("ViaFunction", "/v2/orders", "API_URL"),
+            ("MethodWithPrefix", "/v2/orders", "API_URL"),
+            ("FunctionWithoutPrefix", "/api/orders", "API_URL"),
             ("ParamA", "/api/orders", "API_URL"),
             ("ParamB", "/api/orders", "SECOND_URL"),
             ("QueryAppend", "/api/orders", "API_URL"),
@@ -559,11 +561,14 @@ fn unknown_returns_and_path_changes_remain_unresolved() {
         "ViaPromise",
         "ViaDispatch",
         "ViaRecursive",
+        "ViaUnknownReturn",
+        "ViaNameReturn",
         "ViaDivergent",
         "unsafeDispatch",
         "PathChanged",
         "PathReplaced",
         "MiddleQuery",
+        "BrowserQueryOnly",
     ] {
         let rows: Vec<_> = consumers
             .iter()
@@ -582,6 +587,49 @@ fn unknown_returns_and_path_changes_remain_unresolved() {
     assert!(!consumers.iter().any(|c| {
         c["site"].as_str().unwrap().contains("ViaNameMatch") && !c["contract"].is_null()
     }));
+}
+
+#[test]
+fn an_environment_key_needs_a_reader_bound_to_the_runtime() {
+    let export = http_value_flow("http_value_flow_env_reader");
+    let consumers = export["consumers"].as_array().unwrap();
+    let links = export["links"].as_array().unwrap();
+    let shadows: Vec<_> = consumers
+        .iter()
+        .filter(|row| {
+            let site = row["site"].as_str().unwrap();
+            site.contains("ShadowedEnvKey")
+                || site.contains("shadowed_read")
+                || site.contains("shadowedRead")
+        })
+        .collect();
+    assert!(
+        shadows
+            .iter()
+            .any(|row| row["site"].as_str().unwrap().contains("client.py")),
+        "{shadows:?}"
+    );
+    assert!(
+        shadows
+            .iter()
+            .any(|row| row["site"].as_str().unwrap().contains("client.ts")),
+        "{shadows:?}"
+    );
+    for row in shadows {
+        assert_ne!(row["via"], "env:API_URL", "{row:?}");
+        assert!(!links.iter().any(|link| link["consumer"] == row["site"]
+            && link["reason"].as_str().unwrap().contains("base_url_env")));
+    }
+    let imported = consumers
+        .iter()
+        .find(|row| row["site"].as_str().unwrap().contains("ImportedEnvKey"))
+        .unwrap();
+    assert_eq!(imported["via"], "env:API_URL", "{imported:?}");
+    assert!(
+        links
+            .iter()
+            .any(|link| link["consumer"] == imported["site"] && link["level"] == "inferred")
+    );
 }
 
 #[test]
@@ -645,10 +693,20 @@ fn a_reassigned_parameter_does_not_take_the_callers_value() {
         .collect();
     assert_eq!(
         writes,
-        [(
-            "example.com/flow/client::mutation/store.go::Current::writeIntact#0",
-            "resource::dynamodb::orders"
-        )]
+        [
+            (
+                "example.com/flow/client::mutation/store.go::write::client.PutItem#0",
+                "resource::dynamodb"
+            ),
+            (
+                "example.com/flow/client::mutation/store.go::writeConditional::client.PutItem#0",
+                "resource::dynamodb"
+            ),
+            (
+                "example.com/flow/client::mutation/store.go::Current::writeIntact#0",
+                "resource::dynamodb::orders"
+            ),
+        ]
     );
     let cycle: Vec<_> = export["consumers"]
         .as_array()

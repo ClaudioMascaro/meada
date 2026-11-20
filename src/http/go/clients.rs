@@ -285,7 +285,7 @@ impl<'c, 'a> Clients<'c, 'a> {
         depth: usize,
         request: bool,
     ) -> bool {
-        let Some((function, n)) = self.code.param_of(path, scope, name) else {
+        let Some((function, n)) = self.code.unchanged_param_of(path, scope, name) else {
             return false;
         };
         let args = self.code.param_args(function, n);

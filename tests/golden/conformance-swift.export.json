@@ -5426,9 +5426,9 @@
       "via": "host:billing.example.com"
     },
     {
-      "contract": null,
+      "contract": "http::GET::/lookup",
       "site": "example.com/acme/conformance::Sources/Checkout/Clients.swift::unresolved(path:flag:)::URLSession.shared.data#0",
-      "via": null
+      "via": "host:api.example.com"
     },
     {
       "contract": null,
