@@ -1,13 +1,24 @@
-# root	type	names Terraform v1.17.1 gives (#740, the maintainer's 2026-11-09 comment), or rejected
-no-override	aws_sqs_queue	queue-a-a queue-b-b
-tolist	aws_sqs_queue	queue-0-a queue-1-b
-list	aws_sqs_queue	queue-0-a queue-1-b
-list-pair	aws_sqs_queue	queue-0-a queue-1-b
-any	aws_sqs_queue	queue-a-a queue-b-b
-set	aws_sqs_queue	queue-a-a queue-b-b
-tuple	aws_sqs_queue	rejected
-tuple-pair	aws_sqs_queue	rejected
-list-own-default	aws_sqs_queue	queue-0-b queue-1-a queue-2-a
-default-only	aws_sqs_queue	queue-a-a queue-b-b
-default-then-list	aws_sqs_queue	queue-0-a queue-1-b
-declared-list	aws_sqs_queue	queue-a-a queue-b-b
+# root	type	address	name in Terraform v1.17.1 (#740 comment, 2026-11-09)
+no-override	aws_sqs_queue	aws_sqs_queue.q["a"]	queue-a-a
+no-override	aws_sqs_queue	aws_sqs_queue.q["b"]	queue-b-b
+tolist	aws_sqs_queue	aws_sqs_queue.q["0"]	queue-0-a
+tolist	aws_sqs_queue	aws_sqs_queue.q["1"]	queue-1-b
+list	aws_sqs_queue	aws_sqs_queue.q["0"]	queue-0-a
+list	aws_sqs_queue	aws_sqs_queue.q["1"]	queue-1-b
+list-pair	aws_sqs_queue	aws_sqs_queue.q["0"]	queue-0-a
+list-pair	aws_sqs_queue	aws_sqs_queue.q["1"]	queue-1-b
+any	aws_sqs_queue	aws_sqs_queue.q["a"]	queue-a-a
+any	aws_sqs_queue	aws_sqs_queue.q["b"]	queue-b-b
+set	aws_sqs_queue	aws_sqs_queue.q["a"]	queue-a-a
+set	aws_sqs_queue	aws_sqs_queue.q["b"]	queue-b-b
+tuple	aws_sqs_queue	rejected	-
+tuple-pair	aws_sqs_queue	rejected	-
+list-own-default	aws_sqs_queue	aws_sqs_queue.q["0"]	queue-0-b
+list-own-default	aws_sqs_queue	aws_sqs_queue.q["1"]	queue-1-a
+list-own-default	aws_sqs_queue	aws_sqs_queue.q["2"]	queue-2-a
+default-only	aws_sqs_queue	aws_sqs_queue.q["a"]	queue-a-a
+default-only	aws_sqs_queue	aws_sqs_queue.q["b"]	queue-b-b
+default-then-list	aws_sqs_queue	aws_sqs_queue.q["0"]	queue-0-a
+default-then-list	aws_sqs_queue	aws_sqs_queue.q["1"]	queue-1-b
+declared-list	aws_sqs_queue	aws_sqs_queue.q["a"]	queue-a-a
+declared-list	aws_sqs_queue	aws_sqs_queue.q["b"]	queue-b-b

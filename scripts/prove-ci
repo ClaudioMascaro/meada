@@ -32,6 +32,7 @@ FLOW_CEILINGS = {'ci-corpus': 2400}
 CAPTURE_END = 75 * 60
 VALUES = r'src/(config_values|index\.rs|document/|msg\.rs)'
 IAC = r'src/(iac\.rs|iac/(functions|cloudformation|serverless)\.rs|document/events\.rs|index\.rs|engine\.rs)'
+AWS_WORKLOADS = r'src/(iac\.rs|iac/(cloudformation|serverless|json|types)\.rs|iac/types/|iac/types\.toml|iac/workload(\.rs|/)|image/code\.rs)'
 AWS = r'src/(iac/subscription\.rs|iac/types\.toml|config_values(\.rs|/hcl\.rs)|channel\.rs|document/asyncapi\.rs)'
 IMAGES = r'src/(image\.rs|image/|iac/types|index\.rs|engine\.rs|trace\.rs|items\.rs)|meada-core/src/export\.rs|ui/src/(graph|GraphPage)'
 PATTERNS = r'src/(iac/(pattern|provision)\.rs|image/patterns\.rs|decisions\.rs)'
@@ -59,7 +60,7 @@ FLOWS = (
     ('serverless-values', IAC, 'prove.py values --head-bin {head} --base-bin {base} --repos a7-sls --http'),
     ('terraform-json', r'src/(iac\.rs|iac/(json|functions|provision)\.rs)', 'terraform-json.py --head-bin {head} --http'),
     ('environment', r'src/(image|kube|iac)/environment\.rs', 'environment.py --head-bin {head}'),
-    ('aws-workloads', r'src/(iac/workload(\.rs|/)|image/code\.rs)', 'aws-workloads.py --head-bin {head}'),
+    ('aws-workloads', AWS_WORKLOADS, 'aws-workloads.py --head-bin {head}'),
     ('provisions', r'src/iac/(provision|types)|meada-core/src/export\.rs', 'provisions.py --head-bin {head}'),
     ('gcp', r'src/(contract|iac)/gcp\.rs', 'gcp.py --head-bin {head}'),
     ('gcp-sdk', r'src/contract/(gcp/)?sdk', 'gcp-sdk.py --head-bin {head} --http'),
@@ -109,17 +110,19 @@ def scope_table():
     return list(itertools.takewhile(lambda line: line.startswith('|'), lines[start:]))
 
 
+def row_patterns(row):
+    for token in re.findall(r'`([^`]+)`', row.split(' | ')[0]):
+        brace = re.fullmatch(r'([^{]*)\{([^}]*)\}(.*)', token)
+        yield from (brace[1] + choice + brace[3] for choice in brace[2].split(',')) if brace else (token,)
+
+
 def rows_for(paths):
     """The Scope rows whose first cell names one of the paths: a file, a directory, a glob or `{a,b}` choices."""
     # shortcut: a row's "but" exclusions are not read, so a path can also show a row that excludes it;
     # CI's selection is `selected()`, these rows are only the reviewer's map.
-    def patterns(cell):
-        for token in re.findall(r'`([^`]+)`', cell):
-            brace = re.fullmatch(r'([^{]*)\{([^}]*)\}(.*)', token)
-            yield from (brace[1] + choice + brace[3] for choice in brace[2].split(',')) if brace else (token,)
     names = lambda pattern, path: fnmatch.fnmatchcase(path, pattern + '*' if pattern.endswith('/') else pattern)
     return [row for row in scope_table()[2:]
-            if any(names(pattern, path) for pattern in patterns(row.split(' | ')[0]) for path in paths)]
+            if any(names(pattern, path) for pattern in row_patterns(row) for path in paths)]
 
 
 def flow_command(run, flow):
@@ -426,7 +429,17 @@ def selftest():
         assert check in chosen([mutation['file']]), mutation['id']
     audit = (SCRIPTS / 'a7-a8-audit.py').read_text()
     assert all(f"{key.upper()} = '{revision}'" in audit for key, revision in HISTORICAL.items())
-    assert 'aws-workloads' in chosen(['src/iac/workload/ecs.rs'])  # the row's ECS readers
+    workload_row, = (row for row in rows if '`aws-workloads.py ' in row)
+    workload_paths = [file.as_posix() for path in row_patterns(workload_row)
+                      for file in (sorted(Path(path).rglob('*')) if path.endswith('/') else [Path(path)])
+                      if file.is_file()]
+    assert {'src/iac.rs', 'src/iac/cloudformation.rs', 'src/iac/serverless.rs',
+            'src/iac/workload/ecs.rs'} <= set(workload_paths), workload_paths
+    for path in workload_paths:
+        assert 'aws-workloads' in chosen([path]), f'Scope only: aws-workloads ({path})'
+    # The address column is a required part of the input this verifier selects.
+    names = (SCRIPTS / 'a7-tf-set/terraform-names.tsv').read_text().splitlines()
+    assert all(len(row.split('\t')) == 4 for row in names if row and not row.startswith('#'))
     # `--rows` reads a row's first cell: a file, a directory, a glob, `{a,b}` choices.
     first = lambda path: [row.split(' | ')[0] for row in rows_for([path])]
     assert first('src/contract/gcp.rs')[0].startswith('| `src/contract/gcp.rs`')
