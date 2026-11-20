@@ -264,7 +264,7 @@ Drift é um campo que um consumidor `fetch` lê da resposta, mas que a rota não
 | Consulta | Resultado |
 | --- | --- |
 | `trace` | Acrescenta `drift: missing <caminho>` à ligação |
-| `context` de uma rota | Mostra origem do formato, consumidores, drift, nível e leituras não conferidas em partes abertas |
+| `context` de uma rota | Mostra o formato do provedor, os consumidores que leem campos da resposta, o drift e a quantidade de consumidores vinculados que aparecem em `trace` com `direction: "up"` |
 | `search` com tipo `drift` | Lista o drift encontrado |
 | `meada status` | Conta leituras ausentes no repositório consumidor; o provedor não recebe essa contagem |
 

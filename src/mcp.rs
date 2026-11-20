@@ -67,7 +67,7 @@ struct SearchArgs {
 
 #[derive(Deserialize, JsonSchema)]
 struct ContextArgs {
-    /// Symbol name, `<path>::<name>` or full identity; a resource, `resource::<kind>::<id>`; a channel, `channel::<broker>::<name>`; or an IaC node's address.
+    /// Symbol, `<path>::<name>` or full identity. Also accepts `http::GET::/orders`, `resource::<kind>::<id>`, `channel::<broker>::<name>`, or an IaC address.
     symbol: String,
     /// Token budget for the answer (default 2000).
     budget: Option<u32>,

@@ -1,2 +1,3 @@
 http::GET::/api/shipments/{}
   example.com/chain/gateway provider openapi.yaml (documented only)
+  2 linked consumers omitted. See trace with direction "up".

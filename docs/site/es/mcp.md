@@ -71,6 +71,9 @@ Son tres herramientas, siempre en inglés, y ninguna escribe:
   son sobrecargas de un método (un archivo, una clase, un nombre) aparecen como un conjunto,
   `(one of N overloads)`, y `trace` los escribe como `Class.name (N overloads)`; la llamada
   sigue `ambiguous` y el export lista cada candidato como antes;
+  Para una ruta como `http::GET::/orders`, muestra los proveedores y los consumidores que leen
+  campos de la respuesta. La cantidad de los demás consumidores vinculados apunta a `trace`
+  con `direction: "up"`.
 - `trace` sigue una cadena de llamadas por varios repositorios, río abajo (`down`) o río arriba
   (`up`); con `changes: uncommitted`, parte del diff del árbol de trabajo y sirve para analizar
   el impacto de lo que se acaba de editar.
