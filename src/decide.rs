@@ -4,6 +4,7 @@
 //! Decider mode (`--decider`, `crate::decider`) asks a model instead.
 
 use std::io::{BufRead, Write};
+use std::path::Path;
 
 use crate::Result;
 use crate::decider;
@@ -28,6 +29,20 @@ pub struct Options {
     pub show_request: bool,
     /// Decider mode: write a model decision only from this probability up; `MIN_P` when unset.
     pub min_p: Option<f64>,
+}
+
+impl Options {
+    fn can_save(&self) -> bool {
+        self.prune || !(self.list || self.dry_run || self.show_request)
+    }
+}
+
+/// Opens the workspace for decide, checking the local decisions file before discovery reads it.
+pub fn open(dir: &Path, options: &Options) -> Result<Engine> {
+    if options.can_save() {
+        decisions::writable(&crate::repo::root(dir)?)?;
+    }
+    Engine::open(dir)
 }
 
 /// The open items of this repository to work on, in id order; with `only`, that one item,
@@ -114,7 +129,7 @@ pub fn run(
     // Checked whenever it is given, whatever else the run does.
     let min_p = options.min_p.map_or(Ok(decider::MIN_P), decider::min_p)?;
     // Before any question, request or write, whether or not the run ends up saving.
-    if options.prune || !(options.list || options.dry_run || options.show_request) {
+    if options.can_save() {
         decisions::writable(engine.root())?;
     }
     if options.prune {

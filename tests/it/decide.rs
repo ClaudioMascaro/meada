@@ -448,6 +448,35 @@ fn the_refusal_of_a_linked_decisions_file_does_not_depend_on_what_the_run_would_
 
 #[cfg(unix)]
 #[test]
+fn saving_modes_check_the_link_before_loading_its_malformed_target() {
+    let (web, _, _) = chain("decide_linked_malformed");
+    let bytes = b"decision = [\n";
+    fs::write(web.join("meada.decisions.toml"), bytes).unwrap();
+    let linked = link_out(&web);
+    let destination = fs::read_link(&linked.0).unwrap();
+    for args in [&[][..], &["--item", HEALTH], &["--prune"], &["--decider"]] {
+        assert_eq!(
+            decide(&web, "en_US.UTF-8", args, "1\n"),
+            (String::new(), format!("meada: {LINKED}\n"), false),
+            "{args:?}"
+        );
+        untouched(&web, &linked, Some(bytes));
+        assert_eq!(fs::read_link(&linked.0).unwrap(), destination);
+    }
+    for args in [
+        &["--list"][..],
+        &["--dry-run"],
+        &["--decider", "--show-request"],
+    ] {
+        let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", args, "");
+        assert!(!ok && stdout.is_empty(), "{args:?}: {stdout}");
+        assert!(stderr.contains("unclosed array"), "{args:?}: {stderr}");
+        untouched(&web, &linked, Some(bytes));
+    }
+}
+
+#[cfg(unix)]
+#[test]
 fn what_never_saves_reads_a_linked_decisions_file_as_a_regular_one() {
     let (web, _, _) = chain("decide_linked_reads");
     common::decisions(&web, "chain-web-stale-and-waiting");
