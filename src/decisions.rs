@@ -4,8 +4,11 @@
 //! tree: indexing and replay read no model and no network.
 
 use std::cell::OnceCell;
-use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::collections::HashSet;
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +16,7 @@ use crate::Result;
 use crate::config;
 use crate::contract::{self, Level, Link};
 use crate::index::{Consumer, Export};
-use crate::items::{self, Candidate, ItemKind, OpenItem};
+use crate::items::{self, Candidate, OpenItem};
 use crate::msg::Msg;
 use crate::workspace::{Missing, Workspace};
 
@@ -42,24 +45,7 @@ pub struct Decision {
     pub p: Option<f64>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum Kind {
-    /// A call with several fitting providers.
-    AmbiguousLink,
-    /// A consumer whose URL Meada could not evaluate.
-    DynamicUrl,
-}
-
-impl Kind {
-    /// The kind of decision that resolves `item`.
-    pub(crate) fn of(item: &OpenItem) -> Self {
-        match item.kind {
-            ItemKind::Ambiguous => Kind::AmbiguousLink,
-            ItemKind::Unresolved => Kind::DynamicUrl,
-        }
-    }
-}
+pub use meada_core::export::DecisionKind as Kind;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -143,7 +129,13 @@ pub(crate) fn pruned(root: &Path, stale: &[Stale]) -> Result<Option<(String, usi
     let mut all = load(root)?.items;
     let before = all.len();
     for s in stale {
-        all.retain(|d| d.call != s.call);
+        if matches!(
+            s.cause,
+            Cause::WrongKind | Cause::UnknownRepository | Cause::NoCandidates
+        ) {
+            continue;
+        }
+        all.retain(|d| d.call != s.call || d.target != s.target);
     }
     let removed = before - all.len();
     Ok(if removed == 0 {
@@ -171,20 +163,80 @@ pub(crate) fn writable(root: &Path) -> Result<()> {
     }
 }
 
-/// Writes `text`, from `canonical`, as `<root>/meada.decisions.toml`. It goes to a temporary
-/// file first and is renamed over the old one, so a failed write keeps the old decisions.
-/// A run that saves checks `writable` first.
+/// A newly created staging file in the same directory as the decisions. Only this process
+/// can have created the name. Drop removes a staging file after a failed write or rename.
+struct Staged(PathBuf);
+
+impl Staged {
+    fn new(root: &Path) -> Result<(Self, File)> {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        loop {
+            let sequence = NEXT.fetch_add(1, Ordering::Relaxed);
+            let path = root.join(format!("{FILE}.tmp.{}.{sequence}", std::process::id()));
+            match File::create_new(&path) {
+                Ok(file) => return Ok((Self(path), file)),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(at_path(&path, error)),
+            }
+        }
+    }
+}
+
+impl Drop for Staged {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
+}
+
+pub(crate) fn at_path(path: &Path, error: io::Error) -> Box<dyn std::error::Error> {
+    format!("{}: {error}", path.display()).into()
+}
+
+/// Check that the directory accepts a same-directory staging file before contacting the model.
+pub(crate) fn check_destination(root: &Path) -> Result<()> {
+    writable(root)?;
+    let (staged, file) = Staged::new(root)?;
+    drop(file);
+    drop(staged);
+    Ok(())
+}
+
+/// Serializes read/merge/write operations by saving commands, including simultaneous CLI runs.
+pub(crate) fn locked<T>(root: &Path, update: impl FnOnce() -> Result<T>) -> Result<T> {
+    let path = root.join(".meada/decisions.lock");
+    let lock = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&path)
+        .map_err(|error| at_path(&path, error))?;
+    lock.lock().map_err(|error| at_path(&path, error))?;
+    writable(root)?;
+    update()
+}
+
+/// Merge picks against the latest file before the atomic save.
+pub(crate) fn record(root: &Path, new: Vec<Decision>) -> Result<()> {
+    locked(root, || save(root, &canonical(root, new)?))
+}
+
+/// Write a complete canonical file beside its destination before replacing the previous one.
 pub(crate) fn save(root: &Path, text: &str) -> Result<()> {
-    let temp = root.join(format!("{FILE}.tmp"));
-    std::fs::write(&temp, text)?;
-    Ok(std::fs::rename(temp, root.join(FILE))?)
+    let destination = root.join(FILE);
+    let (staged, mut file) = Staged::new(root)?;
+    file.write_all(text.as_bytes())
+        .map_err(|error| at_path(&staged.0, error))?;
+    file.sync_all().map_err(|error| at_path(&staged.0, error))?;
+    drop(file);
+    writable(root)?;
+    fs::rename(&staged.0, &destination).map_err(|error| at_path(&destination, error))
 }
 
 impl Decision {
     /// A person's pick of `candidate` for `item`.
     pub(crate) fn human(item: &OpenItem, candidate: &Candidate) -> Self {
         Self {
-            kind: Kind::of(item),
+            kind: item.decision_kind(),
             call: item.id.clone(),
             target: Self::target(candidate),
             by: "human".into(),
@@ -250,6 +302,7 @@ impl Evaluation {
                 call,
                 target,
                 cause,
+                expected_kind: s.expected_kind,
             }
             .text()
         });
@@ -266,6 +319,7 @@ enum Fate {
     /// Links the call to this provider through this contract.
     Applies(String, String),
     Stale(Cause),
+    WrongKind(Kind),
     Waiting(String),
 }
 
@@ -274,15 +328,15 @@ enum Fate {
 /// decides: the call is there, the target's repository is not a missing peer (the decision
 /// waits, whatever else), its item is still open (an ambiguous link, or an unresolved
 /// consumer), the target is still served, and it is still among the item's candidates: the
-/// link's, or those `meada decide` lists for the unresolved consumer (#806). `causes` holds
-/// `items::causes(exports)`, read on the first `dynamic-url` decision that needs it.
+/// link's, or those `meada decide` lists for the unresolved consumer (#806). The workspace
+/// causes are read only if an unresolved item has a provider that passes the candidate rule.
 fn evaluate(
     d: &Decision,
     export: &Export,
     exports: &[Export],
     core: &[Link],
     missing: &[Missing],
-    causes: &OnceCell<HashMap<String, &'static str>>,
+    owned: &dyn Fn(&Consumer) -> bool,
 ) -> Fate {
     let at = |l: &&Link| l.item_site() == d.call && contract::consumer_item(l, exports);
     if !(export.calls.iter().any(|c| c.id == d.call)
@@ -299,22 +353,28 @@ fn evaluate(
     }
     let consumer =
         (export.consumers.iter()).find(|c| c.item_site() == d.call && c.contract.is_none());
-    let open = match d.kind {
-        Kind::AmbiguousLink => core.iter().any(|l| at(&l)),
-        Kind::DynamicUrl => consumer.is_some(),
+    let own_kind = match (core.iter().any(|l| at(&l)), consumer.is_some()) {
+        // A call can have multiple sides. Keep the kind the decision addresses if both
+        // exist, as replay did before it reported a kind mismatch.
+        (true, true) => d.kind,
+        (true, false) => Kind::AmbiguousLink,
+        (false, true) => Kind::DynamicUrl,
+        (false, false) => return Fate::Stale(Cause::ItemNotOpen),
     };
-    if !open {
-        return Fate::Stale(Cause::ItemNotOpen);
+    if own_kind != d.kind {
+        return Fate::WrongKind(own_kind);
     }
     let Some((identity, contract)) = target else {
-        return Fate::Stale(Cause::TargetGone);
+        return Fate::Stale(Cause::UnknownRepository);
+    };
+    let Some(repository) = exports.iter().find(|e| e.repository == identity) else {
+        return Fate::Stale(Cause::UnknownRepository);
     };
     // ponytail: a repository serving one contract from several sites links to the first by
     // site; the target names no site.
-    let served: Vec<_> = exports
+    let served: Vec<_> = repository
+        .providers
         .iter()
-        .filter(|e| e.repository == identity)
-        .flat_map(|e| &e.providers)
         .filter(|p| p.contract == contract)
         .collect();
     if served.is_empty() {
@@ -324,16 +384,27 @@ fn evaluate(
         // A provider of the target that `meada decide` lists for the consumer: none for a
         // consumer a kind owns.
         Kind::DynamicUrl => {
-            let owned = |c: &Consumer| {
-                (causes.get_or_init(|| items::causes(exports))).contains_key(&c.site)
-            };
-            (served.iter())
-                .filter(|p| consumer.is_some_and(|c| items::fits(c, p) && !owned(c)))
+            let consumer = consumer.expect("a dynamic URL has an unresolved consumer");
+            let fits = |provider| items::fits(consumer, provider);
+            if let Some(site) = served
+                .iter()
+                .copied()
+                .filter(|p| fits(p))
                 .map(|p| &p.site)
                 .min()
-                .map_or(Fate::Stale(Cause::NotCandidate), |site| {
+            {
+                return if owned(consumer) {
+                    Fate::Stale(Cause::NoCandidates)
+                } else {
                     Fate::Applies(site.clone(), contract.into())
-                })
+                };
+            }
+            let any_fit = exports.iter().flat_map(|e| &e.providers).any(fits);
+            if any_fit && !owned(consumer) {
+                Fate::Stale(Cause::NotCandidate)
+            } else {
+                Fate::Stale(Cause::NoCandidates)
+            }
         }
         // The ambiguous link to a provider of the target, by its code path or its gateway
         // path; the decided link keeps the contract the call uses.
@@ -379,6 +450,11 @@ pub(crate) fn replay_repositories(
     let mut evaluations = Vec::new();
     let mut applied = Vec::new();
     let causes = OnceCell::new();
+    let owned = |consumer: &Consumer| {
+        causes
+            .get_or_init(|| items::causes(exports))
+            .contains_key(&consumer.site)
+    };
     for (repo, export) in repositories.iter().zip(exports) {
         let mut evaluation = Evaluation {
             repository: repo.identity.clone(),
@@ -386,11 +462,16 @@ pub(crate) fn replay_repositories(
             waiting: Vec::new(),
         };
         for d in repo.decisions.items.iter().filter(|d| include(d)) {
-            let fate = evaluate(d, export, exports, &links, missing, &causes);
+            let fate = evaluate(d, export, exports, &links, missing, &owned);
             let (call, target) = (d.call.clone(), d.target.clone());
             match fate {
                 Fate::Applies(provider, contract) => applied.push((d, provider, contract)),
                 Fate::Stale(cause) => evaluation.stale.push(Stale::new(call, target, cause)),
+                Fate::WrongKind(kind) => {
+                    let mut stale = Stale::new(call, target, Cause::WrongKind);
+                    stale.expected_kind = Some(kind);
+                    evaluation.stale.push(stale);
+                }
                 Fate::Waiting(peer) => evaluation.waiting.push(Waiting { call, target, peer }),
             }
         }
@@ -411,4 +492,77 @@ pub(crate) fn replay_repositories(
     }
     links.sort_by(|a, b| (&a.consumer, &a.provider).cmp(&(&b.consumer, &b.provider)));
     (links, evaluations)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::index::{Gateway, Provider};
+    use std::cell::Cell;
+
+    #[test]
+    fn a_decision_uses_the_first_fitting_site_and_only_reads_causes_when_needed() {
+        let call = "example.com/shop::web.ts::load::fetch#0";
+        let contract = "http::GET::/orders/{}";
+        let shop = Export {
+            repository: "example.com/shop".into(),
+            consumers: vec![Consumer {
+                site: call.into(),
+                contract: None,
+                via: None,
+                shape: None,
+                method: Some("GET".into()),
+                identity: None,
+                fragments: vec!["/shop/orders/".into()],
+                lead: None,
+                hops: Vec::new(),
+                root: None,
+            }],
+            ..Export::default()
+        };
+        let api = Export {
+            repository: "example.com/api".into(),
+            providers: vec![
+                Provider {
+                    contract: contract.into(),
+                    site: "example.com/api::a/route.ts::GET".into(),
+                    ..Provider::default()
+                },
+                Provider {
+                    contract: contract.into(),
+                    site: "example.com/api::b/route.ts::GET".into(),
+                    gateways: vec![Gateway {
+                        path: "/shop/orders/{}".into(),
+                        reason: "gateway prefix /shop".into(),
+                    }],
+                    ..Provider::default()
+                },
+            ],
+            ..Export::default()
+        };
+        let exports = [shop, api];
+        let mut picked = Decision {
+            kind: Kind::DynamicUrl,
+            call: call.into(),
+            target: "example.com/api::http::GET::/missing".into(),
+            by: "human".into(),
+            p: None,
+        };
+        let reads = Cell::new(0);
+        let owned = |_: &Consumer| {
+            reads.set(reads.get() + 1);
+            false
+        };
+        assert!(matches!(
+            evaluate(&picked, &exports[0], &exports, &[], &[], &owned),
+            Fate::Stale(Cause::TargetGone)
+        ));
+        assert_eq!(reads.get(), 0);
+        picked.target = format!("example.com/api::{contract}");
+        let result = evaluate(&picked, &exports[0], &exports, &[], &[], &owned);
+        assert!(
+            matches!(result, Fate::Applies(site, _) if site == "example.com/api::b/route.ts::GET")
+        );
+        assert_eq!(reads.get(), 1);
+    }
 }

@@ -1071,3 +1071,141 @@ fn a_malformed_decisions_answer_fails_its_item_or_the_whole_response() {
         );
     }
 }
+
+#[test]
+fn the_next_request_sees_the_previous_answer_and_a_retry_only_sends_open_items() {
+    let (web, _, _) = chain("decider_save_each");
+    let file = web.join("meada.decisions.toml");
+    let (seen, observed) = std::sync::mpsc::channel();
+    let probe = file.clone();
+    let stub = Stub::observed(
+        vec![
+            Reply::chat("local/test-model", answer("2", 0.9)),
+            Reply::status(500, "stop"),
+        ],
+        move |n| {
+            if n == 2 {
+                seen.send(fs::read(&probe).ok()).unwrap();
+            }
+        },
+    );
+    let run = |stub: &Stub| meada(&web, &["decide", "--decider"], &chat(stub), "", Some(stub));
+    let (out, error, ok) = run(&stub);
+    assert!(!ok && error.contains("1 item(s) failed"), "{out}\n{error}");
+    assert_eq!(stub.requests().len(), 2);
+    let bytes = fs::read(&file).unwrap();
+    let during = observed
+        .recv_timeout(std::time::Duration::from_secs(2))
+        .unwrap()
+        .unwrap();
+    assert_eq!(during, bytes);
+    let first = toml::from_str::<toml::Table>(std::str::from_utf8(&bytes).unwrap()).unwrap();
+    let rows = first["decision"].as_array().unwrap();
+    assert!(matches!(rows.as_slice(), [only] if only["call"].as_str() == Some(HEALTH)));
+
+    let next = Stub::start(vec![Reply::chat("local/test-model", answer("1", 0.9))]);
+    let (out, error, ok) = run(&next);
+    assert!(ok && error.is_empty(), "{out}\n{error}");
+    let requests = next.requests();
+    assert!(matches!(requests.as_slice(), [only] if only.body == stub.requests()[1].body));
+    let resumed = fs::read(&file).unwrap();
+    let (cold, _, _) = chain("decider_save_each_uninterrupted");
+    let full = Stub::start(vec![
+        Reply::chat("local/test-model", answer("2", 0.9)),
+        Reply::chat("local/test-model", answer("1", 0.9)),
+    ]);
+    let (out, error, ok) = meada(
+        &cold,
+        &["decide", "--decider"],
+        &chat(&full),
+        "",
+        Some(&full),
+    );
+    assert!(
+        ok && error.is_empty() && out.contains("wrote 2 decisions"),
+        "{out}\n{error}"
+    );
+    assert_eq!(
+        resumed,
+        fs::read(cold.join("meada.decisions.toml")).unwrap()
+    );
+    assert!(fs::read_dir(&web).unwrap().all(|entry| {
+        !entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .contains("decisions.toml.tmp")
+    }));
+}
+
+#[cfg(unix)]
+#[test]
+fn an_unwritable_repository_fails_before_contacting_the_decider() {
+    use std::os::unix::fs::PermissionsExt;
+    let (web, _, _) = chain("decider_unwritable");
+    Engine::open(&web).unwrap().refresh().unwrap();
+    let mode = fs::metadata(&web).unwrap().permissions();
+    fs::set_permissions(&web, fs::Permissions::from_mode(0o555)).unwrap();
+    let probe = web.join("write-probe");
+    if fs::File::create(&probe).is_ok() {
+        fs::set_permissions(&web, mode).unwrap();
+        fs::remove_file(probe).unwrap();
+        return;
+    }
+    let stub = Stub::start(vec![]);
+    let (out, error, ok) = meada(
+        &web,
+        &["decide", "--decider"],
+        &chat(&stub),
+        "",
+        Some(&stub),
+    );
+    fs::set_permissions(&web, mode).unwrap();
+    assert!(!ok && out.is_empty(), "{out}\n{error}");
+    assert!(
+        error.contains("<repo>/meada.decisions.toml.tmp."),
+        "{error}"
+    );
+    assert!(stub.requests().is_empty());
+    assert!(!web.join("meada.decisions.toml").exists());
+}
+
+#[test]
+fn a_failed_second_save_keeps_the_first_answer() {
+    let (web, _, _) = chain("decider_failed_second_save");
+    let probe = web.join(".meada/decisions.lock");
+    let file = web.join("meada.decisions.toml");
+    let snapshot = file.clone();
+    let (send, seen) = std::sync::mpsc::channel();
+    let stub = Stub::observed(
+        vec![
+            Reply::chat("local/test-model", answer("2", 0.9)),
+            Reply::chat("local/test-model", answer("1", 0.9)),
+        ],
+        move |n| {
+            if n == 2 {
+                send.send(fs::read(&snapshot).ok()).unwrap();
+                fs::remove_file(&probe).unwrap();
+                fs::create_dir(&probe).unwrap();
+            }
+        },
+    );
+    let (_, error, ok) = meada(
+        &web,
+        &["decide", "--decider"],
+        &chat(&stub),
+        "",
+        Some(&stub),
+    );
+    assert!(
+        !ok && error.contains("<repo>/.meada/decisions.lock"),
+        "{error}"
+    );
+    assert_eq!(stub.requests().len(), 2);
+    let during = seen
+        .recv_timeout(std::time::Duration::from_secs(2))
+        .unwrap()
+        .unwrap();
+    assert_eq!(fs::read(file).unwrap(), during);
+    assert!(std::str::from_utf8(&during).unwrap().contains(HEALTH));
+}

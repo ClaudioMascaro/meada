@@ -18,15 +18,26 @@ modo humano, o un modelo, si lo pides.
   `--decider`) imprime cada solicitud que se enviaría y no envía ninguna; `--min-p <p>` (solo
   con `--decider`, de 0 a 1) es la probabilidad mínima para que el modelo grabe una decisión.
 
+La vista general de `meada decide --list` muestra el `kind = "..."` que acepta el TOML y hasta cinco
+candidatos. Para una URL dinámica, aparecen primero las rutas con menos caracteres fuera de los
+fragmentos literales. Si la llamada carece de fragmentos literales, aparece solo la cantidad. `meada
+decide --list --item <id>` muestra la lista completa con la misma numeración del modo interactivo.
+Un ítem sin candidatos indica la causa, por ejemplo un método sin ruta o una ruta que requiere
+`[serve] prefix` en el proveedor.
+
+El array opcional `open_items` del export contiene `call`, `kind`, la lista completa y ordenada de
+`candidates` para usar en `target` y `limit` cuando hay un límite de extracción.
+
 `meada.decisions.toml` es un archivo versionado en git, como un lockfile: su diff es lo que se
 revisa. Cada `[[decision]]` trae la llamada (`call`), el proveedor elegido (`target`), quién
 decidió (`by`: `human` o el id del modelo) y, para un modelo, la probabilidad (`p`). La
 indexación solo vuelve a leer el archivo: el enlace decidido recibe el nivel `decided` y su
 motivo dice quién decidió. Cuando el código cambia y una decisión deja de encajar (la llamada
 desapareció, el ítem ya no está abierto, el proveedor desapareció o ya no es candidato),
-`meada status` la muestra como obsoleta, bajo su repositorio, y `meada decide --prune` la quita.
-Una decisión que espera un par aún no encontrado aparece aparte y se conserva. `meada status`
-evalúa las decisiones solo cuando todo repositorio del workspace está indexado en esta versión y
+`meada status` la muestra como obsoleta, bajo su repositorio, y `meada decide --prune` elimina las decisiones con `call-gone`, `item-not-open`, `target-gone` o `not-candidate`. El comando conserva las decisiones que esperan un par ausente o tienen la causa `wrong-kind`,
+`unknown-repository` o `no-candidates`. Las causas indican, respectivamente, qué tipo usar, que
+la identidad necesita el formato de `meada status` y que el ítem carece de candidatos.
+`meada status` evalúa las decisiones solo cuando todo repositorio del workspace está indexado en esta versión y
 el índice de cada uno abre y se actualiza; si no, una línea en su lugar dice que no se evaluaron y
 por qué.
 El destino debe ser uno de los candidatos del ítem, los que lista `meada decide`, también para
@@ -73,6 +84,9 @@ la lista de candidatos (repositorio, método y ruta), más el id del repositorio
 llamada. Nada de código del proveedor, ningún otro archivo. `--show-request` muestra todo eso
 antes, con la clave cambiada por `<hidden>`. Cada respuesta se valida por ítem; una inválida, o
 una solicitud que falló, se informa sin grabar ese ítem, y el comando termina con error.
+
+El decisor guarda cada respuesta aceptada antes de enviar la siguiente solicitud. Si la ejecución
+se interrumpe, al repetir el comando con los mismos archivos se envían los ítems que siguen abiertos.
 
 Constantes fijas:
 

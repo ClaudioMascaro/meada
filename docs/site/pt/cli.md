@@ -12,7 +12,8 @@ Na raiz do repositório:
   uma consulta. Senão, ou quando um índice não abre ou não se atualiza, uma linha diz que não as
   avaliou e por quê (`rode meada index`, ou o repositório e o erro), e o código de saída não muda;
 - `meada export` imprime o índice inteiro em JSON ordenado, bom para `diff` entre duas execuções;
-- `meada decide` resolve ligações ambíguas e URLs dinâmicas, veja Decisões;
+- `meada decide` resolve ligações ambíguas e URLs dinâmicas, veja Decisões, e
+  `meada decide --list` mostra o tipo aceito pelo TOML, por exemplo `kind = "ambiguous-link"`;
 - `meada mcp` serve as [ferramentas MCP](mcp.md).
 
 O export começa por três campos que dizem de onde vem. `format` nomeia o formato do export (1

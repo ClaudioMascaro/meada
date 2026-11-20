@@ -202,6 +202,7 @@ pub enum Msg<'a> {
         call: &'a str,
         target: &'a str,
         cause: Cause,
+        expected_kind: Option<crate::decisions::Kind>,
     },
     WaitingDecision {
         call: &'a str,
@@ -1432,6 +1433,19 @@ pub enum Msg<'a> {
     DecideNoCandidates,
     /// The line of an open item's block that names why value flow stopped at its URL (#801).
     ItemLimit(&'a crate::lang::Limit),
+    CandidateCount {
+        count: usize,
+        id: &'a str,
+    },
+    CandidatesMore {
+        count: usize,
+        id: &'a str,
+    },
+    UrlNoRoutes(&'a str),
+    UrlNoMethod(&'a str),
+    UrlNoPath {
+        prefix: bool,
+    },
     DecidePrompt(usize),
     DecideRetry(usize),
     DecideNothing,
@@ -1890,8 +1904,8 @@ impl Msg<'_> {
                 format!("par não encontrado: {repo}, citado por {named_by}"),
                 format!("par no encontrado: {repo}, citado por {named_by}"),
             ),
-            Msg::StaleDecision { call, target, cause } => {
-                let (en, pt_br, es) = match cause {
+            Msg::StaleDecision { call, target, cause, expected_kind } => {
+                let message = match cause {
                     Cause::CallGone => ("call site gone", "chamada removida", "llamada eliminada"),
                     Cause::ItemNotOpen => (
                         "item no longer open",
@@ -1904,11 +1918,41 @@ impl Msg<'_> {
                         "alvo não é mais candidato",
                         "el destino ya no es candidato",
                     ),
+                    Cause::NoCandidates => (
+                        "item has no candidates for a decision",
+                        "o item não tem candidatos para uma decisão",
+                        "el ítem no tiene candidatos para una decisión",
+                    ),
+                    Cause::WrongKind => ("wrong decision kind", "tipo de decisão incorreto", "tipo de decisión incorrecto"),
+                    Cause::UnknownRepository => ("unknown repository identity", "identidade de repositório desconhecida", "identidad de repositorio desconocida"),
+                };
+                let explanation = match cause {
+                    Cause::WrongKind if let Some(expected) = expected_kind => {
+                        let actual = match expected {
+                            crate::decisions::Kind::DynamicUrl => crate::decisions::Kind::AmbiguousLink,
+                            crate::decisions::Kind::AmbiguousLink => crate::decisions::Kind::DynamicUrl,
+                        }.name();
+                        let expected = expected.name();
+                        pick(
+                            format!(r#"kind `{actual}` needs to be `{expected}`. Use kind = "{expected}""#),
+                            format!(r#"o tipo `{actual}` precisa ser `{expected}`. Use kind = "{expected}""#),
+                            format!(r#"el tipo `{actual}` debe ser `{expected}`. Usa kind = "{expected}""#),
+                        )
+                    }
+                    Cause::UnknownRepository => {
+                        let identity = target.split_once("::").map_or(*target, |(id, _)| id);
+                        pick(
+                            format!("unknown repository identity `{identity}`. Use <repository identity from meada status>::<contract>"),
+                            format!("identidade de repositório desconhecida `{identity}`. Use <identidade do meada status>::<contrato>"),
+                            format!("identidad de repositorio desconocida `{identity}`. Usa <identidad de meada status>::<contrato>"),
+                        )
+                    }
+                    _ => pick(message.0.into(), message.1.into(), message.2.into()),
                 };
                 pick(
-                    format!("stale decision: {call} -> {target} ({en})"),
-                    format!("decisão obsoleta: {call} -> {target} ({pt_br})"),
-                    format!("decisión obsoleta: {call} -> {target} ({es})"),
+                    format!("stale decision: {call} -> {target} ({explanation})"),
+                    format!("decisão obsoleta: {call} -> {target} ({explanation})"),
+                    format!("decisión obsoleta: {call} -> {target} ({explanation})"),
                 )
             }
             Msg::WaitingDecision { call, target, peer } => pick(
@@ -5261,6 +5305,41 @@ impl Msg<'_> {
                 "no candidate fits; skipped".into(),
                 "nenhum candidato serve; pulado".into(),
                 "ningún candidato sirve; omitido".into(),
+            ),
+            Msg::CandidateCount { count, id } => pick(
+                format!("{count} candidates matching the method. Run meada decide --list --item {id}"),
+                format!("{count} candidatos compatíveis com o método. Execute meada decide --list --item {id}"),
+                format!("{count} candidatos compatibles con el método. Ejecuta meada decide --list --item {id}"),
+            ),
+            Msg::CandidatesMore { count, id } => pick(
+                format!("{count} more. Run meada decide --list --item {id}"),
+                format!("mais {count}. Execute meada decide --list --item {id}"),
+                format!("{count} más. Ejecuta meada decide --list --item {id}"),
+            ),
+            Msg::UrlNoRoutes(missing) if !missing.is_empty() => pick(
+                format!("no repository in the workspace serves a route (missing peers {missing})"),
+                format!("nenhum repositório do workspace serve uma rota (pares ausentes {missing})"),
+                format!("ningún repositorio del workspace sirve una ruta (pares ausentes {missing})"),
+            ),
+            Msg::UrlNoRoutes(_) => pick(
+                "no repository in the workspace serves a route".into(),
+                "nenhum repositório do workspace serve uma rota".into(),
+                "ningún repositorio del workspace sirve una ruta".into(),
+            ),
+            Msg::UrlNoMethod(method) => pick(
+                format!("no route in the workspace serves method {method}"),
+                format!("nenhuma rota do workspace aceita o método {method}"),
+                format!("ninguna ruta del workspace acepta el método {method}"),
+            ),
+            Msg::UrlNoPath { prefix: true } => pick(
+                "no route matches the path read. Set [serve] prefix on the provider if it serves the leading segments".into(),
+                "nenhuma rota corresponde ao caminho lido. Configure [serve] prefix no provedor se ele servir os segmentos iniciais".into(),
+                "ninguna ruta coincide con la ruta leída. Configura [serve] prefix en el proveedor si sirve los segmentos iniciales".into(),
+            ),
+            Msg::UrlNoPath { prefix: false } => pick(
+                "no route of the method matches the path read".into(),
+                "nenhuma rota do método corresponde ao caminho lido".into(),
+                "ninguna ruta del método coincide con la ruta leída".into(),
             ),
             Msg::ItemLimit(limit) => {
                 use crate::lang::Limit;

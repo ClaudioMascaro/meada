@@ -83,7 +83,7 @@ The crates are described in the [crate overview](overview/crates.md). The module
   distinguish module instances, and provisioning links keep their own level and reason.
 - `meada-core/src/export.rs`: the export's types as `meada export` writes them (`Export` and
   every piece, `Level`, `Link`, `Process` with its `Step`, `Via` and `Mark`, `Stale`, `Cause`,
-  `EntryKind`, `Format`, `How`), `Serialize` and `Deserialize`, so a parsed export written again
+  `EntryKind`, `Format`, `How`, `OpenItem`, `DecisionKind`), `Serialize` and `Deserialize`, so a parsed export written again
   (`Export::write`) is the same bytes; `parse` reads one or names the field that does not fit
   (`calls[3].span: missing field ...`), which `parseExport` exports to the browser. The binary
   re-exports the shared pieces where they lived (`index`, `contract`, `package`, `decisions`,

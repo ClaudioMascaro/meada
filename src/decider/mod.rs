@@ -190,7 +190,9 @@ impl Question {
     fn new(root: &Path, stored: Stored, item: &OpenItem) -> Result<Self> {
         let enclosing = match &item.enclosing {
             Some(symbol) => {
-                let source = fs::read(root.join(&item.path))?;
+                let path = root.join(&item.path);
+                let source =
+                    fs::read(&path).map_err(|error| crate::decisions::at_path(&path, error))?;
                 function_like(root, stored, &item.path, &source, &symbol.span).then(|| {
                     let text = source.get(symbol.span.clone()).unwrap_or_default();
                     String::from_utf8_lossy(text).into_owned()
@@ -211,7 +213,7 @@ impl Question {
                     target: Decision::target(c),
                 })
                 .collect(),
-            kind: Kind::of(item),
+            kind: item.decision_kind(),
         })
     }
 
@@ -409,6 +411,8 @@ impl Config {
 /// Each answer is validated for its item alone: a proposal with `p` at least `min_p` is printed
 /// and returned to be written, a weaker one is printed as a suggestion, and a failed request
 /// or an invalid answer is printed under the item id and counted in `Outcome::failed`.
+/// Collect answers in request order and commit each accepted one before asking again.
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn run(
     config: &Config,
     root: &Path,
@@ -416,6 +420,7 @@ pub(crate) fn run(
     items: &[OpenItem],
     show_request: bool,
     min_p: f64,
+    mut accept: impl FnMut(&Decision) -> Result<()>,
     out: &mut impl Write,
 ) -> Result<Outcome> {
     let mut questions = Vec::new();
@@ -468,6 +473,11 @@ pub(crate) fn run(
             }
         };
         for (id, answer) in request.items.iter().zip(answers) {
+            if let Ok(proposal) = &answer
+                && proposal.p >= min_p
+            {
+                accept(&proposal.decision)?;
+            }
             writeln!(out, "{id}")?;
             match answer {
                 Ok(proposal) if proposal.p >= min_p => {

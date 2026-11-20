@@ -8724,5 +8724,63 @@
         }
       ]
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Assigned.java::example.clients.Assigned.send()::rest.getForObject#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::maven/api/src/main/java/example/clients/OwnEnum.java::example.clients.OwnEnum.get()::rest.exchange#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/api/orders/any",
+        "example.com/acme/conformance::http::DELETE::/api/orders/{}",
+        "example.com/acme/conformance::http::GET::/api/orders",
+        "example.com/acme/conformance::http::GET::/api/orders/multi",
+        "example.com/acme/conformance::http::GET::/api/orders/{}",
+        "example.com/acme/conformance::http::HEAD::/api/orders/multi",
+        "example.com/acme/conformance::http::PATCH::/api/orders/{}/flag",
+        "example.com/acme/conformance::http::POST::/api/orders/new",
+        "example.com/acme/conformance::http::POST::/api/orders/single",
+        "example.com/acme/conformance::http::PUT::/api/orders/by-ref/{}",
+        "example.com/acme/conformance::http::PUT::/api/orders/{}"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Reassigned.java::example.clients.Reassigned.send(String)::rest.getForObject#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::maven/api/src/main/java/example/clients/Rest.java::example.clients.Rest.lookup()::rest.getForObject#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/api/orders/any",
+        "example.com/acme/conformance::http::ANY::/shadow/ok",
+        "example.com/acme/conformance::http::ANY::/wildshadow/ok",
+        "example.com/acme/conformance::http::GET::/api/jakarta/{}",
+        "example.com/acme/conformance::http::GET::/api/orders",
+        "example.com/acme/conformance::http::GET::/api/orders/multi",
+        "example.com/acme/conformance::http::GET::/api/orders/{}",
+        "example.com/acme/conformance::http::GET::/app/alive",
+        "example.com/acme/conformance::http::GET::/inner/echo",
+        "example.com/acme/conformance::http::GET::/items",
+        "example.com/acme/conformance::http::GET::/items/{}",
+        "example.com/acme/conformance::http::GET::/known",
+        "example.com/acme/conformance::http::GET::/s",
+        "example.com/acme/conformance::http::GET::/v1/pages/{}",
+        "example.com/acme/conformance::http::GET::/wild/card"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::maven/api/src/main/java/example/declarative/Qualified.java::example.declarative.Qualified.a()",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base of a client Meada did not read"
+    }
   ]
 }

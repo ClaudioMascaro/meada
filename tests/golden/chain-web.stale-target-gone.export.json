@@ -295,6 +295,15 @@
       "by": "human"
     }
   ],
+  "open_items": [
+    {
+      "call": "example.com/chain/web::src/status.ts::track::fetch#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/chain/gateway::http::POST::/api/events"
+      ]
+    }
+  ],
   "stale_decisions": [
     {
       "call": "example.com/chain/web::src/status.ts::track::fetch#0",
