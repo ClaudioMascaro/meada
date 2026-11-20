@@ -252,5 +252,12 @@
       ]
     }
   ],
-  "links": []
+  "links": [],
+  "open_items": [
+    {
+      "call": "example.com/acme/portal::src/call.ts::forward::call#0",
+      "kind": "dynamic-url",
+      "candidates": []
+    }
+  ]
 }
