@@ -561,8 +561,8 @@ PACKAGES = {
     'fmt': ('acme-fmt', '1.0.0', {'acme-fmt-all': 'fmt_all_main', 'acme-fmt': 'fmt_main'}),  # `uvx` names the package: its own script
     'suite': ('acme-fast-suite', '1.0.0', {}),  # the one package the pattern of the forms fits
     'flavor': ('flavor', '0.1.0', {}),  # named like a variable of the forms: never matched by that name
-    'dup-a': ('acme-dup-a', '1.0.0', {'acme-dup': 'dup_a_main'}),
-    'dup-b': ('acme-dup-b', '1.0.0', {'acme-dup': 'dup_b_main'}),
+    'dup-a': ('dup-a', '1.0.0', {'acme-dup': 'dup_a_main'}),
+    'dup-b': ('dup-b', '1.0.0', {'acme-dup': 'dup_b_main'}),
 }
 
 
@@ -698,7 +698,9 @@ PROBES = {
     'level_uvx_no_script': probe('level_uvx', 'uvx acme-plain', consumer('acme-plain'), file='levels.yml'),
     'level_inferred': probe('level_ambiguous', 'acme-sync --all', program('inferred', 'sync'), file='levels.yml'),
     'level_later_step': probe('level_none', 'acme-sync --all', program('inferred', 'sync'), after=['acme-sync-kit'], file='levels.yml'),
-    'level_ambiguous': probe('level_inferred', 'acme-dup --fast', program('ambiguous', 'dup-a', 'dup-b'), file='levels.yml'),
+    'level_ambiguous': probe('level_picked', 'acme-dup --fast', program('ambiguous', 'dup-a', 'dup-b'), file='levels.yml'),
+    'level_picked': probe('level_ambiguous', 'pip install dup-a && acme-dup --fast',
+                          consumer('dup-a'), program('inferred', 'dup-a'), file='levels.yml'),
     'level_none': probe('level_inferred', 'acme-unknown --fast', file='levels.yml'),
     'level_later_line': probe('level_none', 'acme-sync --all\npip install acme-sync-kit', consumer('acme-sync-kit'), program('inferred', 'sync'),
                               file='levels.yml'),
@@ -1204,6 +1206,13 @@ def selftest():
     assert not fits((set(), set(), {(package('acme-sync-kit'), entry('sync')[1], 'exact')}), want[located('level_inferred')[0]])
     assert not fits(({package('acme-lib')}, set(), {(package('acme-lib'), f'{LIBS}::tool/pyproject.toml', 'exact')}), want[located('pip_install')[0]])
     assert not fits(({package('acme-lib')}, set(), set()), want[located('pip_install')[0]]), 'a name the workspace provides links'
+    dup = package('dup-a')
+    install = (dup, MANIFESTS[dup], 'inferred')
+    picked = want[located('level_picked')[0]]
+    ambiguous = want[located('level_ambiguous')[0]]
+    assert fits(({dup}, set(), {install, (dup, entry('dup-a')[1], 'inferred')}), picked)
+    assert fits((set(), set(), ambiguous[3]), ambiguous)
+    assert not fits(({dup}, set(), {install, *ambiguous[3]}), picked), 'ignoring the install leaves two targets'
     pattern, part = package('acme-*-suite'), want[located('part_vars')[0]]
     assert fits(({pattern}, set(), {(pattern, f'{LIBS}::suite/pyproject.toml', 'ambiguous')}), part)
     assert not fits(({pattern}, set(), set()), part) and not fits(({pattern}, set(), {(pattern, f'{LIBS}::suite/pyproject.toml', 'exact')}), part)

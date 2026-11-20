@@ -24,7 +24,10 @@ SURFACES = ('cli', 'console', 'accounts', 'deploy', 'container', 'goldens')
 # before #662 (`PRE_IMAGE`), `config_uses.py` against one before #661 (`PRE_CONFIG`).
 HISTORICAL = {'pre_image': 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62',
               'pre_config': '6a5eca5853193d205bcf756983b41e9cb16ffa9d',
-              'pre_private_fields': 'b73e1e5318508d69a8e98e1081e2e9fb3c61076e'}
+              'pre_private_fields': 'b73e1e5318508d69a8e98e1081e2e9fb3c61076e',
+              'before_go_keys': 'e4058ebc17f97f0ae08adfd89374be159fe11040',
+              'before_invalidation': 'e0925fe4463ea44b6d1a928509fc68c0d8c14b81',
+              'before_sqs_restore': '68f1c0ba675f951a191c4fc7a87f75d77de02bef'}
 # A flow's ceiling, the audit's: one hung driver must not spend the job's 90 minutes. Every step but
 # the cleanups runs under timeout(1) with what is left of CAPTURE_END, and one with under a minute
 # left is BLOCKED unrun: with the setup before and the upload after, the receipt fits the job's 90.
@@ -70,6 +73,8 @@ FLOWS = (
     ('aws-json-values', AWS, 'aws.py --json-values --head-bin {head}'),
     ('aws-sdk-jvm-go-dotnet', r'src/(channel/(aws|java|go|csharp)\.rs|resource/aws\.rs|contract/sdk)|meada-core/src/export\.rs',
      'aws-sdk-jvm-go-dotnet.py --head-bin {head} --http'),
+    ('dynamodb-transactions', r'src/(contract/sdk|resource/aws\.rs|lang/(java|go)(\.rs|/))',
+     'dynamodb-transactions.py --head-bin {head} --repos dynamodb-transactions'),
     ('aws-java-private-fields', r'src/(contract/sdk/java\.rs|lang/java\.rs)',
      'aws-java-private-fields.py --head-bin {head} --base-bin {base} --historical-bin {pre_private_fields}'),
     ('orphans', r'src/(iac/orphans\.rs|engine\.rs|channel\.rs|resource\.rs|contract\.rs|msg\.rs)',
@@ -90,6 +95,14 @@ FLOWS = (
     ('ci-permissions', CI, 'ci.py --slice f3 --head-bin {head} --base-bin {base} --http'),
     ('a8-peers', A8, 'a8-peers.sh check {base} {head} {out}'),
     ('a8-mcp', A8, 'a8-mcp.py --head-bin {head} --base-bin {base}'),
+    ('smoke-resolution', r'src/(http|lang|resolve|index|contract/sdk|ci|iac/actions)(\.rs|/)|tests/fixtures/conformance-kotlin/',
+     'smoke_stack.py --slice resolution --head-bin {head} --base-bin {base}'),
+    ('smoke-lifecycle', r'src/(decid|status|iac/orphans|workspace|index|engine|main)|meada-core/src/export\.rs',
+     'smoke_stack.py --slice lifecycle --head-bin {head} --base-bin {base}'),
+    ('smoke-upgrade', r'src/(index(\.rs|/)|lang/go(\.rs|/)|http/go(\.rs|/))',
+     'smoke_stack.py --slice upgrade --head-bin {head} --old-bin {before_go_keys} --middle-bin {before_invalidation}'),
+    ('smoke-sqs', r'src/(index(\.rs|/)|channel/aws\.rs|contract/sdk)',
+     'smoke_stack.py --slice sqs --head-bin {head} --old-bin {before_sqs_restore}'),
     ('console-graph', None, 'console-graph.py --head-bin {ui} --ui-dir ui/dist'),
     ('aws-sdk', r'src/(channel|resource)/', 'aws-sdk.py --head-bin {head} --base-bin {base} --ui-bin {ui} --ui-dir ui/dist'),
     ('config-uses', r'src/(iac/config_uses\.rs|config_values\.rs|index\.rs|engine\.rs|trace\.rs|contract\.rs|iac/orphans\.rs)'
