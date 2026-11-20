@@ -81,6 +81,13 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
         return Value::Unknown;
     }
     match node.kind() {
+        "ternary_expression" => {
+            let side = |field| {
+                node.child_by_field_name(field)
+                    .map_or(Value::Unknown, |n| value_at(n, src, ctx, depth + 1))
+            };
+            crate::lang::query_alternative(side("if_true"), side("if_false"))
+        }
         "simple_identifier" => Value::Ref(unbacktick(text(node, src))),
         "self_expression" => Value::Ref("self".into()),
         // `URL(string: s)!`: the force unwrap is its operand.
@@ -141,7 +148,15 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
         }
         // `(read)`, and `read ?? "fallback"`: a fallback but a text-only literal is a hole.
         "tuple_expression" => match &named(node).collect::<Vec<_>>()[..] {
-            [only] => env(value_at(*only, src, ctx, depth + 1)),
+            [only] => {
+                let value = value_at(*only, src, ctx, depth + 1);
+                if matches!(&value, Value::Str(parts) if matches!(parts.as_slice(), [Part::QuerySuffix]))
+                {
+                    value
+                } else {
+                    env(value)
+                }
+            }
             _ => Value::Unknown,
         },
         "nil_coalescing_expression" => {
@@ -231,13 +246,7 @@ fn subscript_read(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Option<Part
         Some(v) if key.child_by_field_name("name").is_none() => value_at(v, src, ctx, depth + 1),
         _ => return None,
     };
-    Some(match literal {
-        Value::Str(p) => match &p[..] {
-            [Part::Text(name)] if !name.is_empty() => Part::Env(name.clone()),
-            _ => Part::Hole,
-        },
-        _ => Part::Hole,
-    })
+    Some(Part::env_key(&literal).unwrap_or(Part::Hole))
 }
 
 /// `value` when it is one environment read (a string of one `Env` or `Hole` part, see the
@@ -252,7 +261,14 @@ fn env(value: Value) -> Value {
 /// The parts of `value` when it is one environment read.
 pub(super) fn read(value: &Value) -> Option<&[Part]> {
     match value {
-        Value::Str(p) if matches!(p[..], [Part::Env(_) | Part::Hole | Part::Limit(_)]) => Some(p),
+        Value::Str(p)
+            if matches!(
+                p[..],
+                [Part::Env(_) | Part::EnvKey(_) | Part::Hole | Part::Limit(_)]
+            ) =>
+        {
+            Some(p)
+        }
         _ => None,
     }
 }

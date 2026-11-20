@@ -116,91 +116,48 @@ pub(super) fn plugins<'a>(code: &Code<'a>) -> Vec<Plugin<'a>> {
     out
 }
 
-/// The plugin id `getBaseUrl('<literal>')` names, on a receiver named for Backstage's
-/// discovery service (`discovery`, `this.discovery`, `discoveryApi`).
-fn discovered(callee: &str, args: &[Value]) -> Option<String> {
-    let (receiver, "getBaseUrl") = callee.rsplit_once('.')? else {
+/// The Backstage discovery service's `getBaseUrl(id)`. The fold supplies the argument
+/// under the current call frames, including inside a helper that returns it.
+pub(super) fn discovered(
+    call: &crate::lang::Call,
+    arg: &mut dyn FnMut(usize) -> Value,
+) -> Option<Value> {
+    let (receiver, "getBaseUrl") = call.callee.rsplit_once('.')? else {
         return None;
     };
     let receiver = receiver.rsplit('.').next().unwrap_or(receiver);
-    if !receiver.to_lowercase().contains("discovery") {
+    if !receiver.to_lowercase().contains("discovery") || call.args.len() != 1 {
         return None;
     }
-    match args {
-        [id] => id_of(id),
-        _ => None,
+    let value = arg(0);
+    if matches!(value, Value::Ref(_)) {
+        return Some(value);
     }
+    let key = id_of(&value)?;
+    Some(Value::Str(vec![Part::Read {
+        scope: std::sync::Arc::from(""),
+        callee: call.callee.clone(),
+        key,
+        parameter: false,
+        then: Vec::new(),
+    }]))
 }
 
-/// The plugin id the URL of the `fetch` at `n` of `path` starts with: its first part is a
-/// constant holding `discovery.getBaseUrl('<literal>')`, or that call written in place, the
-/// first call inside the `fetch`.
-pub(super) fn base<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<String> {
-    let fetch = code.call(path, n)?;
-    let Some(Value::Str(parts)) = fetch.args.first() else {
-        return None;
-    };
-    match parts.first()? {
-        Part::Ref(name) => {
-            let (_, mut value) = code.constant(path, &fetch.scope, name)?;
-            // Await is retained for constructor evidence; this discovery result is its URL.
-            while let Value::Await(inner) = value {
-                value = inner;
-            }
-            match value {
-                Value::Call(call) => discovered(&call.callee, &call.args),
-                _ => None,
-            }
-        }
-        Part::Hole | Part::Limit(_) => {
-            // A call written in another argument (`{ headers: ... }`) is not the URL's.
-            let mut elsewhere = Vec::new();
-            fetch.args[1..]
-                .iter()
-                .for_each(|a| calls_in(a, &mut elsewhere));
-            let calls = code.files().get(path)?.calls.iter().enumerate();
-            let inside = calls.filter(|&(i, c)| {
-                i != n
-                    && fetch.range.start <= c.range.start
-                    && c.range.end <= fetch.range.end
-                    && !elsewhere.contains(&c.range.start)
-            });
-            let (first, _) = inside.min_by_key(|(_, c)| c.range.start)?;
-            let call = code.call(path, first)?;
-            discovered(&call.callee, &call.args)
-        }
-        _ => None,
-    }
-}
-
-/// Where every call `value` holds starts, at any depth.
-fn calls_in(value: &Value, out: &mut Vec<usize>) {
-    match value {
-        Value::Await(value) => calls_in(value, out),
-        Value::Call(call) => {
-            out.push(call.range.start);
-            call.receiver.iter().for_each(|r| calls_in(r, out));
-            call.args.iter().for_each(|a| calls_in(a, out));
-        }
-        Value::Object(properties) => properties.iter().for_each(|(_, v)| calls_in(v, out)),
-        Value::List(items) | Value::New(_, items) => items.iter().for_each(|v| calls_in(v, out)),
-        _ => {}
-    }
-}
-
-/// `args` of a `fetch` with the unknown first part of its URL (what `getBaseUrl('<id>')` folded
-/// to) replaced by the mount of the plugin `id`; `None` when the URL does not start with an
-/// unknown part.
-pub(super) fn based(args: &[Value], id: &str) -> Option<Vec<Value>> {
-    let mut args = args.to_vec();
+/// Replace a leading discovery result with the plugin's mount and retain its identity.
+pub(super) fn based(args: &mut [Value]) -> Option<String> {
     let Some(Value::Str(parts)) = args.first_mut() else {
         return None;
     };
-    let first @ (Part::Hole | Part::Limit(_)) = parts.first_mut()? else {
+    let first = parts.first_mut()?;
+    let Part::Read { callee, key, .. } = first else {
         return None;
     };
-    *first = Part::Text(mount(id));
-    Some(args)
+    if !callee.ends_with(".getBaseUrl") {
+        return None;
+    }
+    let id = key.clone();
+    *first = Part::Text(mount(&id));
+    Some(id)
 }
 
 /// Names, in the reason of each hostless consumer of `consumers` with a route a Backstage

@@ -8,7 +8,7 @@ use tree_sitter::{Language, Node, Parser};
 
 use super::{
     Binds, Call, ConfigInput, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind,
-    LanguagePack, Limit, Modules, Param, Part, Ty, Value, children, named, text,
+    LanguagePack, Modules, Param, Part, Ty, Value, children, named, text,
 };
 use crate::{Result, package, qualify};
 
@@ -99,6 +99,9 @@ impl LanguagePack for TsJs {
         let typescript = path.ends_with(".ts") || path.ends_with(".tsx");
         let mut sealed: Vec<(String, String, Option<Value>)> = Vec::new();
         let mut writes: BTreeMap<(Option<String>, String), Vec<Option<Value>>> = BTreeMap::new();
+        let mut assigned = HashSet::new();
+        let mut query_writes = HashMap::new();
+        let mut query_locals = Vec::new();
         // Each function definition by its node: the `return`s written in its body.
         let mut functions: HashMap<usize, usize> = HashMap::new();
         // Explicit stack instead of recursion: generated code can nest deeper than the call
@@ -137,7 +140,16 @@ impl LanguagePack for TsJs {
                     returns: (node.child_by_field_name("return_type"))
                         .and_then(|t| types::returned(t, src, &parents)),
                     type_params: types::type_parameters(node, src),
-                    lone_string: lone_string(node, src, &inner, &parents),
+                    terminal_return: (node.child_by_field_name("body")).is_some_and(|b| {
+                        if b.kind() == "statement_block" {
+                            named(b)
+                                .filter(|n| n.kind() != "comment")
+                                .last()
+                                .is_some_and(|n| n.kind() == "return_statement")
+                        } else {
+                            node.kind() == "arrow_function"
+                        }
+                    }),
                     // An arrow function's expression body is what it returns.
                     return_values: (node.child_by_field_name("body"))
                         .filter(|b| {
@@ -249,15 +261,15 @@ impl LanguagePack for TsJs {
                 // A `return` of a function that is no definition (one returned in place, or
                 // one past `DEFINITION_DEPTH`) is nobody's.
                 "return_statement" => {
-                    if let (Some(&at), Some(returned)) =
-                        (functions.get(&body.id()), named(node).next())
-                    {
+                    if let Some(&at) = functions.get(&body.id()) {
                         // A generator's call returns its iterator, not what it returns.
                         let generator = body.kind().starts_with("generator_function")
                             || children(body).any(|n| n.kind() == "*");
                         let returned = match generator {
                             true => Value::Unknown,
-                            false => value(returned, src, &scope, &parents),
+                            false => named(node)
+                                .next()
+                                .map_or(Value::Undefined, |r| value(r, src, &scope, &parents)),
                         };
                         facts.defs[at].return_values.push(returned);
                     }
@@ -265,6 +277,52 @@ impl LanguagePack for TsJs {
                 _ => {}
             }
             let named = binds(node, src, &parents);
+            if let Some(target) = written_name_target(node) {
+                for name in bound(target, src) {
+                    let change = if target.kind() == "identifier" {
+                        let op = node
+                            .child_by_field_name("operator")
+                            .map_or("=", |n| text(n, src));
+                        node.child_by_field_name("right")
+                            .filter(|right| src[right.byte_range()].contains(&b'?'))
+                            .map_or(super::QueryWrite::Other, |right| {
+                                super::QueryWrite::of(
+                                    &value(right, src, &scope, &parents),
+                                    &name,
+                                    op,
+                                )
+                            })
+                    } else {
+                        super::QueryWrite::Other
+                    };
+                    let mut at = scope.as_str();
+                    // A nested function can write its enclosing function's local or parameter.
+                    while !at.is_empty() {
+                        let local = qualify(at, &name);
+                        query_writes
+                            .entry(local.clone())
+                            .and_modify(|old: &mut super::QueryWrite| *old = old.merge(change))
+                            .or_insert(change);
+                        assigned.insert(local);
+                        at = crate::parent(at);
+                    }
+                }
+            }
+            if node.kind() == "variable_declarator"
+                && named.is_none()
+                && let Some(declaration) = parents.of(node)
+                && declaration.kind() == "lexical_declaration"
+                && parents.of(declaration).is_some_and(|block| {
+                    block.kind() == "statement_block" && parents.of(block) == Some(body)
+                })
+                && let Some(name) = node
+                    .child_by_field_name("name")
+                    .filter(|n| n.kind() == "identifier")
+                && let Some(initial) = node.child_by_field_name("value")
+                && !scope.is_empty()
+            {
+                query_locals.push((qualify(&scope, text(name, src)), scope.clone(), initial));
+            }
             selector_writes(node, src, &scope, &mut facts, &mut write_bytes);
             if node.kind() == "assignment_expression"
                 && named.is_some()
@@ -382,6 +440,39 @@ impl LanguagePack for TsJs {
                     scope,
                 });
             }
+        }
+        let mut names = HashMap::new();
+        for name in &facts.locals {
+            *names.entry(name.as_str()).or_insert(0) += 1;
+        }
+        let mut kept = HashSet::new();
+        let constants: HashSet<_> = facts.consts.iter().map(|c| c.name.clone()).collect();
+        for (name, scope, initial) in query_locals {
+            if names.get(name.as_str()) != Some(&1) || constants.contains(&name) {
+                continue;
+            }
+            let Some(change) = query_writes.get(&name) else {
+                continue;
+            };
+            let mut value = value(initial, src, &scope, &parents);
+            if change.keep(&mut value) {
+                kept.insert(name.clone());
+                facts.consts.push(Const {
+                    name,
+                    value,
+                    ty: None,
+                    scope: None,
+                });
+            }
+        }
+        facts.locals.retain(|name| !kept.contains(name));
+        for def in &mut facts.defs {
+            let names = (def.params.iter())
+                .flat_map(|p| std::iter::once(&p.name).chain(p.fields.iter().map(|f| &f.name)));
+            def.reassigned_params = names
+                .filter(|name| assigned.contains(&qualify(&def.name, name)))
+                .cloned()
+                .collect();
         }
         facts.loops = super::outermost(
             root,
@@ -803,18 +894,7 @@ impl<'t> Parents<'t> {
                 string_bindings.push(node);
             }
             members_written(node, src, &mut written);
-            let target = match node.kind() {
-                "assignment_expression" | "augmented_assignment_expression" => {
-                    node.child_by_field_name("left")
-                }
-                "update_expression" => node.child_by_field_name("argument"),
-                "for_in_statement" => node
-                    .child_by_field_name("kind")
-                    .is_none()
-                    .then(|| node.child_by_field_name("left"))
-                    .flatten(),
-                _ => None,
-            };
+            let target = written_name_target(node);
             let names = target.map(|t| bound(t, src)).unwrap_or_default();
             if names.iter().any(|name| name == "String") {
                 string_writes.push(node.start_byte());
@@ -1142,6 +1222,21 @@ fn members_written(node: Node, src: &[u8], out: &mut HashSet<String>) {
     }
 }
 
+fn written_name_target(node: Node) -> Option<Node> {
+    match node.kind() {
+        "assignment_expression" | "augmented_assignment_expression" => {
+            node.child_by_field_name("left")
+        }
+        "update_expression" => node
+            .child_by_field_name("argument")
+            .or_else(|| named(node).next()),
+        "for_in_statement" if node.child_by_field_name("kind").is_none() => {
+            node.child_by_field_name("left")
+        }
+        _ => None,
+    }
+}
+
 fn selector_writes(node: Node, src: &[u8], scope: &str, facts: &mut Facts, spent: &mut usize) {
     if facts.member_writes.is_none() {
         return;
@@ -1197,31 +1292,6 @@ fn selector_writes(node: Node, src: &[u8], scope: &str, facts: &mut Facts, spent
             );
         }
     }
-}
-
-/// The string a function returns when that is all its body does: an arrow function's expression
-/// body, or a body of one `return`. An `async` function returns a promise, not a string.
-fn lone_string(node: Node, src: &[u8], scope: &str, up: &Parents) -> Option<Value> {
-    if !(FUNCTIONS.contains(&node.kind()) || node.kind() == "function_declaration")
-        || node.kind() == "generator_function"
-        || node.children(&mut node.walk()).any(|c| c.kind() == "async")
-    {
-        return None;
-    }
-    let body = node.child_by_field_name("body")?;
-    let returned = if body.kind() == "statement_block" {
-        let mut statements = named(body).filter(|s| s.kind() != "comment");
-        let (Some(only), None) = (statements.next(), statements.next()) else {
-            return None;
-        };
-        if only.kind() != "return_statement" {
-            return None;
-        }
-        named(only).next()?
-    } else {
-        body
-    };
-    Some(value(returned, src, scope, up)).filter(|v| matches!(v, Value::Str(_)))
 }
 
 /// The kinds of anonymous function expressions.
@@ -1825,6 +1895,14 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
             out.retain(|p| !matches!(p, Part::Text(t) if t.is_empty()));
             Some(out)
         }
+        "ternary_expression" => {
+            let yes = Value::Str(parts(node.child_by_field_name("consequence")?)?);
+            let no = Value::Str(parts(node.child_by_field_name("alternative")?)?);
+            match super::query_alternative(yes, no) {
+                Value::Str(parts) => Some(parts),
+                _ => None,
+            }
+        }
         "binary_expression" => {
             let left = node.child_by_field_name("left")?;
             let right = node.child_by_field_name("right")?;
@@ -1865,16 +1943,35 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
 
 /// What a string holds where the expression `node` is written and no part of it can be read: the
 /// return value of a call names its callee (#801), anything else is a hole.
-fn unread(node: Node, src: &[u8]) -> Part {
-    match node.kind() {
-        "call_expression" => {
-            callee_node(node).map_or(Part::Hole, |f| Part::Limit(Limit::Returned(callee(f, src))))
-        }
-        "await_expression" | "parenthesized_expression" | "non_null_expression" => {
-            named(node).next().map_or(Part::Hole, |n| unread(n, src))
-        }
-        _ => Part::Hole,
+fn unread(mut node: Node, src: &[u8]) -> Part {
+    let mut awaited = false;
+    while matches!(
+        node.kind(),
+        "await_expression" | "parenthesized_expression" | "non_null_expression"
+    ) {
+        awaited |= node.kind() == "await_expression";
+        let Some(inner) = named(node).next() else {
+            return Part::Hole;
+        };
+        node = inner;
     }
+    if node.kind() != "call_expression" {
+        return Part::Hole;
+    }
+    let Some(function) = callee_node(node) else {
+        return Part::Hole;
+    };
+    let artifact = awaited_artifact(node);
+    let start = if artifact {
+        function.start_byte()
+    } else {
+        node.start_byte()
+    };
+    Part::invoke(
+        callee(function, src),
+        start..node.end_byte(),
+        awaited || artifact,
+    )
 }
 
 /// The URL forms that pass a string through, as the WHATWG URL Standard reads them: `new URL(x)`
@@ -1953,6 +2050,9 @@ fn env_read(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Part> 
             }
             let name = match node.child_by_field_name("index") {
                 Some(index) if index.kind() == "string" => unquote(index, src),
+                Some(index) if index.kind() == "identifier" => {
+                    return Some(Part::EnvKey(text(index, src).into()));
+                }
                 Some(_) => return None,
                 None => text(node.child_by_field_name("property")?, src).to_string(),
             };
@@ -1996,6 +2096,7 @@ fn config_read(call: Node, function: Node, src: &[u8]) -> Option<Part> {
         scope: std::sync::Arc::from(""),
         callee: callee(function, src),
         key: unquote(key, src),
+        parameter: false,
         then: Vec::new(),
     })
 }

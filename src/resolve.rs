@@ -4827,6 +4827,7 @@ struct Written<'a, 'i> {
     chain: Option<&'a Call>,
     /// What the kind reads off annotated fields and parameters (`Code::expand_with`).
     inject: Option<&'i Inject<'a, 'i>>,
+    external_value: Option<&'i ExternalValue<'a, 'i>>,
     /// The calls that write a member (`Code::expand_written`).
     writes: Option<CallWrites>,
 }
@@ -4877,6 +4878,8 @@ struct Fold<'a, 'i> {
     selected: Option<mutations::Selection<'a>>,
     objects: Vec<(mutations::Object<'a>, usize)>,
     inject: Option<&'i Inject<'a, 'i>>,
+    external_value: Option<&'i ExternalValue<'a, 'i>>,
+    returning: Vec<(&'a str, usize)>,
     foreign: usize,
     /// How many struct fields deep the value is folded (`Code::field_read`).
     field_depth: usize,
@@ -4885,6 +4888,11 @@ struct Fold<'a, 'i> {
 /// What a contract kind injects where the source gives no value (`Code::expand_with`), given
 /// the file and what it is asked about: the value, or `None` when it injects nothing there.
 pub type Inject<'a, 'i> = dyn Fn(&Code<'a>, &'a str, Injected<'a>) -> Option<Value> + 'i;
+
+/// A contract reader's value for a recognized external call. Its arguments are folded lazily
+/// under the wrapper frames that reach the call.
+pub(crate) type ExternalValue<'a, 'i> =
+    dyn Fn(&'a Call, &mut dyn FnMut(usize) -> Value) -> Option<Value> + 'i;
 
 /// What `Inject` is asked about.
 #[derive(Clone, Copy)]
@@ -6413,7 +6421,7 @@ impl<'a> Code<'a> {
                     trail.held = None;
                 }
             }
-            Binding::Param(function, n, None) => {
+            Binding::Param(function, n, None) if self.unchanged_parameter(function, name) => {
                 // Inside a function whose return value is followed, its call binds the
                 // parameter; else every call of it does.
                 let sites = match trail.frames.last() {
@@ -6555,6 +6563,11 @@ impl<'a> Code<'a> {
         self.def(function.path, function.name)?.params.get(n)
     }
 
+    fn unchanged_parameter(&self, function: Target<'a>, name: &str) -> bool {
+        self.def(function.path, function.name)
+            .is_some_and(|d| d.reassigned_params.iter().all(|p| p != name))
+    }
+
     /// `value`, written in `path` within `scope`, with its constants folded. Parameters are
     /// unknown.
     pub fn value(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Value {
@@ -6689,7 +6702,9 @@ impl<'a> Code<'a> {
             .resolver
             .lexical(path, scope, name, &mut self.resolver.seen(path, scope))
         {
-            Binding::Param(function, n, None) => Some((function, n)),
+            Binding::Param(function, n, None) if self.unchanged_parameter(function, name) => {
+                Some((function, n))
+            }
             _ => None,
         }
     }
@@ -6966,6 +6981,25 @@ impl<'a> Code<'a> {
         inject: Option<&Inject<'a, '_>>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
     ) -> Vec<Expanded<'a, R>> {
+        self.expand_using(from, inject, None, read)
+    }
+
+    pub(crate) fn expand_with_call<R>(
+        &self,
+        from: Expand<'a>,
+        external_value: &ExternalValue<'a, '_>,
+        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
+    ) -> Vec<Expanded<'a, R>> {
+        self.expand_using(from, None, Some(external_value), read)
+    }
+
+    fn expand_using<R>(
+        &self,
+        from: Expand<'a>,
+        inject: Option<&Inject<'a, '_>>,
+        external_value: Option<&ExternalValue<'a, '_>>,
+        read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
+    ) -> Vec<Expanded<'a, R>> {
         let mut out = Vec::new();
         match from {
             Expand::Call(path, index) => {
@@ -6981,6 +7015,7 @@ impl<'a> Code<'a> {
                     at: (path, index),
                     chain: None,
                     inject,
+                    external_value,
                     writes: None,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
@@ -6997,6 +7032,7 @@ impl<'a> Code<'a> {
                     at: (path, index),
                     chain: Some(call),
                     inject,
+                    external_value,
                     writes: None,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
@@ -7016,6 +7052,7 @@ impl<'a> Code<'a> {
                     at,
                     chain: None,
                     inject,
+                    external_value,
                     writes: None,
                 };
                 self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
@@ -7046,6 +7083,7 @@ impl<'a> Code<'a> {
             at: (path, index),
             chain: None,
             inject: None,
+            external_value: None,
             writes: Some(writes),
         };
         self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
@@ -7167,6 +7205,7 @@ impl<'a> Code<'a> {
             let fold = &mut Fold {
                 chain,
                 inject: written.inject,
+                external_value: written.external_value,
                 selected: (written.writes).map(|writes| mutations::Selection {
                     site: Some(written.at),
                     writes,
@@ -7332,6 +7371,9 @@ impl<'a> Code<'a> {
         }
         fold.nested += 1;
         let folded = match value {
+            Value::Await(inner) if let Value::Call(call) = inner.as_ref() => self
+                .built(path, &call.range, true, frames, depth, fold, wants)
+                .unwrap_or_else(|| inner.as_ref().clone()),
             Value::Await(value) => self.eval(path, scope, value, frames, depth, fold, wants),
             Value::Str(parts) => self.eval_string(path, scope, parts, frames, depth, fold, wants),
             Value::Object(_) => self.eval_object(path, scope, value, frames, depth, fold, wants),
@@ -7343,12 +7385,15 @@ impl<'a> Code<'a> {
             Value::New(callee, args) => {
                 self.eval_new(path, scope, callee, args, frames, depth, fold, wants)
             }
-            Value::Call(call) if fold.chain => {
-                self.eval_chain(path, scope, call, frames, depth, fold, wants)
-            }
             Value::Call(call) => self
-                .built(path, call, frames, depth, fold, wants)
-                .unwrap_or_else(|| value.clone()),
+                .built(path, &call.range, false, frames, depth, fold, wants)
+                .unwrap_or_else(|| {
+                    if fold.chain {
+                        self.eval_chain(path, scope, call, frames, depth, fold, wants)
+                    } else {
+                        value.clone()
+                    }
+                }),
             Value::Ref(name) => self.name(path, scope, name, frames, depth, fold, wants),
             Value::Member(name, member) if fold.selected.is_some() => {
                 self.eval_member(path, scope, name, member, frames, depth, fold, wants)
@@ -7374,11 +7419,60 @@ impl<'a> Code<'a> {
     ) -> Value {
         let mut out = Vec::new();
         for part in parts {
-            let Part::Ref(name) = part else {
-                out.push(part.clone());
-                continue;
+            let value = match part {
+                Part::Ref(name) => self.name(path, scope, name, frames, depth, fold, wants),
+                Part::EnvKey(name) => {
+                    let key = self.name(path, scope, name, frames, depth, fold, wants);
+                    out.push(Part::env_key(&key).unwrap_or(Part::Hole));
+                    continue;
+                }
+                Part::Read {
+                    scope: read_scope,
+                    callee,
+                    key,
+                    parameter: true,
+                    then,
+                } => {
+                    let key = self.name(path, scope, key, frames, depth, fold, wants);
+                    out.push(match key {
+                        Value::Str(parts) if let Some(key) = crate::lang::literal(&parts) => {
+                            Part::Read {
+                                scope: read_scope.clone(),
+                                callee: callee.clone(),
+                                key,
+                                parameter: false,
+                                then: then.clone(),
+                            }
+                        }
+                        Value::Ref(key) => Part::Read {
+                            scope: read_scope.clone(),
+                            callee: callee.clone(),
+                            key,
+                            parameter: true,
+                            then: then.clone(),
+                        },
+                        _ => Part::Hole,
+                    });
+                    continue;
+                }
+                Part::Invoke {
+                    callee,
+                    range,
+                    awaited,
+                } => {
+                    let Some(value) = self.built(path, range, *awaited, frames, depth, fold, wants)
+                    else {
+                        out.push(Part::Limit(crate::lang::Limit::Returned(callee.clone())));
+                        continue;
+                    };
+                    value
+                }
+                _ => {
+                    out.push(part.clone());
+                    continue;
+                }
             };
-            match self.name(path, scope, name, frames, depth, fold, wants) {
+            match value {
                 // The parts copied are charged: a string doubled through constants grows
                 // faster than the values visited.
                 Value::Str(parts) => match self.charge(path, parts.len()) {
@@ -7544,41 +7638,102 @@ impl<'a> Code<'a> {
         result
     }
 
-    /// What `call`, written in `path`, folds to when it is an exact call of a function that only
-    /// returns a string (`Def::lone_string`): that string, its parameters replaced by the call's
-    /// arguments, when every part of it folds. A call a name match answered is not folded: it may
-    /// reach another function.
+    /// The string returned by an exact, unambiguous call, under its argument frame. If
+    /// there is more than one return, they must agree. A recursive return is unknown.
+    #[expect(clippy::too_many_arguments)]
     fn built(
         &self,
         path: &'a str,
-        call: &'a Invocation,
+        range: &std::ops::Range<usize>,
+        awaited: bool,
         frames: &[Frame<'a>],
         depth: usize,
         fold: &mut Fold<'a, '_>,
         wants: &mut Option<Target<'a>>,
     ) -> Option<Value> {
-        let calls = &self.resolver.files[path].calls;
-        let index = call_at(calls, &call.range)?;
-        let Resolution::Exact(function) = self.resolver.call(path, &calls[index]) else {
+        let index = self.call_index(path, range)?;
+        let site = (path, index);
+        if fold.returning.len() >= WRAPPER_DEPTH || fold.returning.contains(&site) {
             return None;
+        }
+        let stored = &self.resolver.files[path].calls[index];
+        let Resolution::Exact(function) = self.resolver.resolved_at(path, index) else {
+            let read = fold.external_value?;
+            let call = self.call(path, index)?;
+            let mut eval = |i| {
+                call.args.get(i).map_or(Value::Unknown, |value| {
+                    self.eval(path, &call.scope, value, frames, depth, fold, wants)
+                })
+            };
+            return read(call, &mut eval);
         };
-        let body = self
-            .def(function.path, function.name)?
-            .lone_string
-            .as_ref()?;
-        // The function's own parameters are bound by this call, then its callers' by the frames
-        // the call was folded under.
+        if stored.constructs || !self.runs_alone(function) {
+            return None;
+        }
+        let def = self.def(function.path, function.name)?;
+        if (def.asynchronous && !(awaited || stored.awaited))
+            || (self.pack.extensions().contains(&"ts") && !def.terminal_return)
+            || (self.pack.extensions().contains(&"py")
+                && def
+                    .decorators
+                    .iter()
+                    .any(|name| !matches!(name.as_str(), "staticmethod" | "classmethod")))
+        {
+            return None;
+        }
+        let (first, rest) = def.return_values.split_first()?;
+        // Do not fold an object or a chain used as a constructor into a string by accident.
+        let string = |value: &Value| match value {
+            Value::Str(parts) => parts.iter().all(|p| {
+                matches!(
+                    p,
+                    Part::Text(_)
+                        | Part::Ref(_)
+                        | Part::Env(_)
+                        | Part::EnvOr(..)
+                        | Part::EnvKey(_)
+                        | Part::QuerySuffix
+                        | Part::Read { .. }
+                )
+            }),
+            Value::Ref(_) => true,
+            _ => false,
+        };
         let mut bound = vec![Frame {
             def: function,
             path,
             index,
         }];
         bound.extend_from_slice(frames.get(depth..).unwrap_or_default());
-        let folded = self.eval(function.path, function.name, body, &bound, 0, fold, wants);
-        // A part that does not fold (a base read from the environment, a hole, a budget spent)
-        // leaves the call as written: the URL stays unresolved, never a guessed path.
-        let known = |p: &Part| matches!(p, Part::Text(_) | Part::Ref(_));
-        matches!(&folded, Value::Str(parts) if parts.iter().all(known)).then_some(folded)
+        let mut pending = None;
+        fold.returning.push(site);
+        let mut returned = |value| {
+            self.eval(
+                function.path,
+                function.name,
+                value,
+                &bound,
+                0,
+                fold,
+                &mut pending,
+            )
+        };
+        let value = returned(first);
+        let agrees = string(&value)
+            && rest.iter().all(|other| match (&value, returned(other)) {
+                (Value::Str(first), Value::Str(other)) => *first == other,
+                (Value::Ref(first), Value::Ref(other)) => *first == other,
+                _ => false,
+            });
+        fold.returning.pop();
+        if agrees {
+            if let Some(pending) = pending {
+                wants.get_or_insert(pending);
+            }
+            Some(value)
+        } else {
+            None
+        }
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -7618,6 +7773,9 @@ impl<'a> Code<'a> {
                     fold.objects.pop();
                 }
                 folded
+            }
+            Binding::Param(function, _, _) if !self.unchanged_parameter(function, name) => {
+                Value::Unknown
             }
             // `*args` and `**kwargs` hold what no single argument gives.
             Binding::Param(function, n, _)
@@ -7842,12 +8000,13 @@ fn unbind(value: Value, chain: bool, keep: &[&str]) -> Value {
         Value::Str(parts) => Value::Str(
             parts
                 .into_iter()
-                .map(|p| match p {
+                .map(|p| {
                     // What remains a name is a parameter no call site binds (#801).
-                    Part::Ref(name) if !keep.contains(&name.as_str()) => {
-                        Part::Limit(crate::lang::Limit::Parameter(name))
+                    if let Some(name) = p.parameter().filter(|name| !keep.contains(name)) {
+                        Part::Limit(crate::lang::Limit::Parameter(name.to_owned()))
+                    } else {
+                        p
                     }
-                    p => p,
                 })
                 .collect(),
         ),
