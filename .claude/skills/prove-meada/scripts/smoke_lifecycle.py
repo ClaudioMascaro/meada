@@ -153,7 +153,7 @@ def linked_decisions(rig, variant):
             ('status', ('status',)), ('export', ('export',)),
         ):
             result = rig.cli(f'{label}/read-{name}', app, 'head', *argv, env=env, check=False)
-            if variant == 'malformed' and name != 'status':
+            if variant == 'malformed':
                 ok = result.returncode != 0 and 'symbolic link' not in result.stderr and 'meada.decisions.toml' in result.stderr
                 expected = 'decision parse error from the linked bytes'
             elif variant == 'waiting-peer' and name == 'list':

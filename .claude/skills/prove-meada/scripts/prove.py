@@ -558,7 +558,7 @@ def http_parity(bin, name, repo, run, rec):
     (d / "meada.workspace.toml").write_text(f'index_dir = "indexes"\n\n[[repository]]\nrepo = "{identity}"\npath = "{repo}"\n')
     idx = timed([bin, "index", "--workspace", "meada.workspace.toml"], d, d / "index.out", d / "index.err")
     if idx["exit"]:
-        return f"  {name}: BLOCKED, meada index --workspace exited {idx['exit']}, see {d}/index.err", True
+        return f"  {name}: BLOCKED, meada index --workspace exited {idx['exit']}, see {d}/index.err", 2
     port = free_port()
     server = subprocess.Popen([bin, "mcp", "--listen", f"127.0.0.1:{port}", "--workspace", "meada.workspace.toml"],
                               cwd=d, stdin=subprocess.DEVNULL,
@@ -572,15 +572,18 @@ def http_parity(bin, name, repo, run, rec):
             except OSError:
                 time.sleep(0.2)
         client = Http(f"http://127.0.0.1:{port}/{identity}")
-        tools = client.call("tools/list", {}).get("result", {}).get("tools")
+        tools = client.call("tools/list", {})["result"]["tools"]
+        if not tools:
+            raise ValueError("empty HTTP tool catalog")
+        (d / "tools.json").write_text(json.dumps(tools, indent=1))
         same_tools = json.dumps(tools, sort_keys=True) == json.dumps(rec.get("tools"), sort_keys=True)
         answers = [answer(client.call("tools/call", {"name": q["tool"], "arguments": q["arguments"]})) for q in rec["queries"]]
         (d / "answers.json").write_text(json.dumps(answers, indent=1))
         diffs = [i for i, a in enumerate(answers) if a != rec["answers"][i]]
         return (f"  {name}: tools {'same' if same_tools else 'DIFFER'}, {len(answers) - len(diffs)}/{len(answers)} answers "
-                f"byte-equal to stdio" + (f", differ at queries {diffs} ({d}/answers.json)" if diffs else "")), bool(diffs) or not same_tools
+                f"byte-equal to stdio" + (f", differ at queries {diffs} ({d}/answers.json)" if diffs else "")), 3 if diffs or not same_tools else 0
     except Exception as e:
-        return f"  {name}: BLOCKED, HTTP client: {e!r}, see {d}/server.err", True
+        return f"  {name}: BLOCKED, HTTP client: {e!r}, see {d}/server.err", 2
     finally:
         server.terminate()
         server.wait(timeout=30)
@@ -672,12 +675,17 @@ def cmd_run(a):
                 report.append(f"MCP {q['tool']} {json.dumps(q['arguments'])}: differs\n```\n" + "\n".join(diff[:60]) + "\n```")
         same = sum(b["answers"][i] == h["answers"][i] for i in range(len(h["queries"])))
         report.append(f"MCP stdio: {same}/{len(h['queries'])} answers byte-equal; queries in {run}/queries/{name}.jsonl\n")
-    if a.http and not blocked:
+    if a.http:
         lines = []
         for n in names:
-            line, failed = http_parity(Path(a.head_bin).resolve(), n, run / "work" / "head" / n, run, records["head"][n])
+            if records["head"][n].get("failed"):
+                lines.append(f"  {n}: BLOCKED, head's CLI/stdio capture failed")
+                continue
+            line, outcome = http_parity(Path(a.head_bin).resolve(), n, run / "work" / "head" / n, run, records["head"][n])
             lines.append(line)
-            differences += failed
+            blocked |= outcome == 2
+            hard += outcome == 3
+            differences += outcome != 0
         report.append("## MCP HTTP vs stdio (head)\n\n" + "\n".join(lines) + "\n")
     verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}")
     (run / "compare.md").write_text(f"# prove.py run\n\n{verdict}\n\n" + "\n".join(report) + "\n")
@@ -1674,9 +1682,10 @@ def cmd_values(a):
         report.append(f"Value queries over stdio: {len(queries) - fails}/{len(queries)} equal to the oracle; slowest "
                       f"{max(secs)} s (story 16 has no number: the checker judges)\n" + "\n".join(lines))
         if a.http:
-            line, failed = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
-            differences += failed
-            hard += failed
+            line, outcome = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
+            blocked |= outcome == 2
+            differences += outcome != 0
+            hard += outcome == 3
             report.append("MCP HTTP vs stdio (head):\n" + line)
         report.append("")
     verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}"
@@ -1875,9 +1884,10 @@ def cmd_iac(a):
         differences += fails
         report.append(f"IaC queries over stdio: {len(queries) - fails}/{len(queries)} equal to the oracle (or base); slowest {max(secs)} s\n" + "\n".join(lines))
         if a.http:
-            line, failed = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
-            differences += failed
-            hard += failed
+            line, outcome = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
+            blocked |= outcome == 2
+            differences += outcome != 0
+            hard += outcome == 3
             report.append("MCP HTTP vs stdio (head):\n" + line)
         report.append("")
     verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}"

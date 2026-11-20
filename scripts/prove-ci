@@ -185,7 +185,7 @@ def capture(run, scope, base, head, repos, paths=()):
     def command(name, args, required=False, compares=False, driver=False, ceiling=None, cleanup=False):
         left = int(end - time.monotonic())
         if left < 60 and not cleanup:
-            steps.append({'name': name, 'exit_code': 2, 'blocked': 'no time left in this job'})
+            steps.append({'name': name, 'exit_code': 2, 'outcome': 'not-run', 'blocked': 'no time left in this job'})
             print(f'{name}: no time left', flush=True)
             if required:
                 raise RuntimeError(f'{name}: no time left in this job')
@@ -223,7 +223,7 @@ def capture(run, scope, base, head, repos, paths=()):
         failed = [step['name'] for step in steps if step['exit_code'] and step['name'] in
                   {'build-' + key.replace('_', '-') for key in HISTORICAL if f'{{{key}}}' in flow[2]}]
         if failed:
-            steps.append({'name': flow[0], 'exit_code': 2, 'blocked': f'{failed[0]} failed'})
+            steps.append({'name': flow[0], 'exit_code': 2, 'outcome': 'not-run', 'blocked': f'{failed[0]} failed'})
         else:
             argv = flow_command(run, flow)
             if flow[0] == 'aws-java-private-fields':
@@ -558,7 +558,8 @@ def selftest():
         # `prove.py values`' exit 1 is a difference from the base; a hung driver times out, alone.
         assert [exits[name] for name in ('image-ko', 'orphans', 'native-hcl-values')] == [124, -9, 137], exits
         assert receipt['steps'][names.index('values')]['differences'] and receipt['blocked'] == 'image-ko timed out'
-        assert receipt['steps'][names.index('images')] == {'name': 'images', 'exit_code': 2, 'blocked': 'build-pre-image failed'}
+        assert receipt['steps'][names.index('images')] == {
+            'name': 'images', 'exit_code': 2, 'outcome': 'not-run', 'blocked': 'build-pre-image failed'}
         assert receipt['capture'] == 'BLOCKED' and 'images.py' not in argv and 'aws.py' not in argv
         summary = (run / 'summary.md').read_text()
         assert f'- Steps: {len(names)}; ' in summary and '- Timed out: image-ko\n' in summary, summary

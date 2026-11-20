@@ -448,6 +448,7 @@ def kotlin_shadow(rig):
     path = 'src/main/kotlin/example/jvm/Typed.kt'
     fixture = ROOT / 'tests/fixtures/conformance-kotlin'
     (rig.run / 'kotlin-shadow-typed.kt').write_bytes((fixture / path).read_bytes())
+    controls = {}
     for binary in ('base', 'head'):
         if binary in rig.bins:
             root = rig.work / f'kotlin-shadow-{binary}'
@@ -459,11 +460,14 @@ def kotlin_shadow(rig):
             data = rig.export(f'kotlin-shadow/{binary}', root, binary)
             got = endpoint_observation(data, path, 'Shadowing.hidden')
             witness = endpoint_observation(data, path, 'Typed.typed')
+            controls[binary] = witness
             save(rig.run / f'kotlin-shadow-{binary}.json', {'shadowed': got, 'other_class': witness})
             resolved = [row for row in got['consumers'] if row['contract'] == 'http::GET::/persons/hidden']
             rig.check(f'#952 {binary} Kotlin shadowing, behavior pending maintainer decision',
                       'retain the documented receiver ceiling or recover the literal GET /persons/hidden',
                       got, matches=not got['consumers'] or len(resolved) == len(got['consumers']) == 1)
+    if 'base' in controls:
+        rig.check('#952 neighboring Typed.typed control is stable', controls['base'], controls['head'])
 
 
 def order_rows(data):
