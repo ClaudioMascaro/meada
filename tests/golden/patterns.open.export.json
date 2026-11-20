@@ -80,5 +80,15 @@
       "level": "inferred",
       "reason": "channel::sqs::*-orders; pattern"
     }
+  ],
+  "open_items": [
+    {
+      "call": "provision::example.com/pattern/infra::main.tf::aws_s3_bucket.several::root=.",
+      "kind": "ambiguous-link",
+      "candidates": [
+        "example.com/pattern/app::resource::s3::archive-prod",
+        "example.com/pattern/app::resource::s3::archive-stage"
+      ]
+    }
   ]
 }

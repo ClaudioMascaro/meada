@@ -1,7 +1,7 @@
 const BASE = process.env.API_URL;
 const url = (p: string) => `${BASE}/${p}`;
 
-// The base is read from the environment: no host, so no link.
+// The helper keeps the base URL read from the environment.
 export function vets() {
   return fetch(url("api/vets"));
 }

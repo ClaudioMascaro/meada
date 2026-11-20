@@ -216,5 +216,12 @@
       ]
     }
   ],
-  "links": []
+  "links": [],
+  "open_items": [
+    {
+      "call": "example.com/acme/portal::src/client.ts::mirrors::fetch#0",
+      "kind": "dynamic-url",
+      "candidates": []
+    }
+  ]
 }
