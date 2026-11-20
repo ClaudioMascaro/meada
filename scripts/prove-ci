@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -234,7 +235,7 @@ def capture(run, scope, base, head, repos, paths=()):
         for key, revision in HISTORICAL.items():
             label = key.replace('_', '-')
             if any(f'{{{key}}}' in flow[2] for flow in group):
-                command('build-' + label, [SCRIPTS / 'build.sh', label, revision, run])
+                command('build-' + label, ['env', 'PROVE_FIXED_REFERENCE=true', SCRIPTS / 'build.sh', label, revision, run])
 
     try:
         if scope['cli']:
@@ -289,7 +290,19 @@ def capture(run, scope, base, head, repos, paths=()):
             command('compose-contract', [python, 'scripts/compose-check'])
             command('helm-contract', [python, 'scripts/helm-check'])
         if scope['container']:
-            command('container-build', ['docker', 'build', '-t', 'meada:zz-prove', '.'], required=True)
+            cache = run.parent / 'meada-docker-cache'
+            if os.environ.get('PROVE_DOCKER_CACHE') == str(cache):
+                updated = run / 'docker-cache'
+                restore = ['--cache-from', f'type=local,src={cache}'] if (cache / 'index.json').is_file() else []
+                command('container-build', ['docker', 'buildx', 'build', '--load', *restore,
+                                            '--cache-to', f'type=local,dest={updated},mode=min',
+                                            '-t', 'meada:zz-prove', '.'], required=True)
+                if updated.is_dir():
+                    if cache.is_dir():
+                        shutil.rmtree(cache)
+                    updated.rename(cache)
+            else:
+                command('container-build', ['docker', 'build', '-t', 'meada:zz-prove', '.'], required=True)
             command('container-smoke', [python, 'scripts/container-smoke', 'meada:zz-prove'])
     except (OSError, RuntimeError) as error:
         blocked = str(error)
