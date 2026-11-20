@@ -49,7 +49,8 @@ The `build-*` and `clean*` steps of a receipt are the runner's own: [references/
 3. Read workflow `Proof` (`.github/workflows/proof.yml`), job `prove-meada`, and artifact
    `prove-meada-<PR number>-<head SHA>` for the tested SHA (each Scope driver under
    `flows/<name>`, its exit in `receipt.json`). Confirm its base/head identity, scope, raw
-   captures and checker provenance before interpreting results.
+   captures and checker provenance before interpreting results. [Binary comparisons](references/parity.md)
+   names every base and the exit codes that distinguish a delta, an oracle failure and blocked execution.
 4. Give the evidence and answer keys to an independent judge using Check in a fresh agent.
    A missing or pending judgment stays pending.
 5. Report the tested SHA, run/artifact or CI receipt, verdict and limitations.

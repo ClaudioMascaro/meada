@@ -28,6 +28,7 @@ import time
 import yaml
 
 import prove
+from proof_result import Comparisons, run_driver
 from prove import Http, answer, fetch, free_port, git, mcp_answers
 
 HOST = 'github.com/acme'
@@ -1313,6 +1314,7 @@ def corpus_selftest(pinned):
 class Run:
     def __init__(self, folder, head, base):
         self.folder, self.bins, self.checks, self.asked = folder, {'head': head, 'base': base}, [], []
+        self.comparisons = Comparisons(folder)
 
     def check(self, name, ok, evidence):
         self.checks.append({'name': name, 'passed': bool(ok), 'evidence': evidence})
@@ -1330,9 +1332,10 @@ class Run:
         """The MCP answers of one stdio server started in `cwd`, in the order of `queries`."""
         log = self.folder / side / 'captures' / (label + '.mcp.err')
         log.parent.mkdir(parents=True, exist_ok=True)
-        _, answers, _ = mcp_answers(self.bins[side], cwd, [{'tool': tool, 'arguments': arguments} for tool, arguments in queries], log)
+        tools, answers, _ = mcp_answers(self.bins[side], cwd, [{'tool': tool, 'arguments': arguments} for tool, arguments in queries], log)
         dump(log.with_suffix('.answers.json'), [{'tool': tool, 'arguments': arguments, 'answer': text}
                                                 for (tool, arguments), text in zip(queries, answers)])
+        dump(log.with_suffix('.tools.json'), tools)
         self.asked.append((side, Path(cwd), queries, answers))
         return answers
 
@@ -1366,15 +1369,12 @@ def owned(section, row, own_files):
 
 def parity(run, name, base, head, own_files):
     """Everything outside the rows this spec predicts is the base's, byte for byte."""
-    differing = []
-    for section in sorted(set(base) | set(head)):
-        left, right = base.get(section), head.get(section)
-        if isinstance(left, list) and isinstance(right, list):
-            left = [row for row in left if not (isinstance(row, dict) and owned(section, row, own_files))]
-            right = [row for row in right if not (isinstance(row, dict) and owned(section, row, own_files))]
-        if left != right:
-            differing.append(section)
-    run.check(f'{name}: the export outside the CI rows equals the base', not differing, differing)
+    def outside_ci(doc):
+        return {
+            section: [row for row in value if not (isinstance(row, dict) and owned(section, row, own_files))]
+            if isinstance(value, list) else value for section, value in doc.items()
+        }
+    run.comparisons.compare(f'{name}: the export outside the CI rows', outside_ci(base), outside_ci(head))
 
 
 def drive(run, http, name):
@@ -1603,13 +1603,13 @@ def f1(run, heads, exports, statuses):
     # that the key-name rule still gives a use outside a pipeline.
     for case, suffix in (('use_typed_key', '.with.bucket'), ('use_role_arn', 'role-to-assume"]'), ('use_structured', '.with.target'),
                          ('use_other_file', 'storage.bucket')):
-        run.check(f'{case}: equal to the base', at('head', suffix) == at('base', suffix), at('base', suffix))
+        run.comparisons.compare(f'{case}: config use', at('base', suffix), at('head', suffix))
     # Existing answers: the `uses` lines as config values, the hand declaration, kind `iac` and the default search.
     same = [('search', {'query': 'publish.yml', 'kind': 'value', **big}), ('search', {'query': 'publish', 'kind': 'iac'}), ('search', {'query': 'publish'}),
             ('context', {'symbol': 'resource::gha-workflow::acme/workflows/.github/workflows/publish.yml', **big})]
     before, after = (run.ask(side, calls(side, 'hub'), 'existing', same) for side in ('base', 'head'))
     for query, left, right in zip(same, before, after):
-        run.check(f'existing answer equal to the base: {json.dumps(query)}', without_814(query, left) == right, [left, right])
+        run.comparisons.compare(f'existing answer: {json.dumps(query)}', without_814(query, left), right)
     run.check('control: the base finds the four `uses` lines of `publish.yml` as config values', before[0].count('publish.yml@') >= 4, before[0])
     run.check('control: the base answers the hand declaration of #816 with its declared consumer', f'{HOST}/app-a' in before[3], before[3])
 
@@ -1736,14 +1736,14 @@ def f2(run, heads, exports, statuses):
         run.check(f'{case}: each builder row is on its CI step, read at a key of that step',
                   len(after) == len(contracts) and all(found['site'] == located(case)[0] and found.get('at', '').startswith(f'{row[2]}#{address(case)}.')
                                                        for found in after), after)
-        run.check(f'{case}: equal to the base', before == after, before)
+        run.comparisons.compare(f'{case}: image builder', before, after)
     # The chain: the HTTP link is read from the SDK's code and equals the base, and `trace` crosses the
     # three contracts both ways.
     links = lambda side: sorted(json.dumps(row, sort_keys=True) for row in gathered(exports, 'chain', 'links', side) if row['contract'].startswith('http::'))
     known = [row for row in map(json.loads, links('base'))
              if row['consumer'].startswith(PUBLISH_MAIN + '::') and (row['provider'], row['contract']) == ROUTE]
     run.check("control: the base links the SDK's program to the route of the API", len(known) == 1, links('base'))
-    run.check('the HTTP links of the chain equal the base', links('head') == links('base'), links('head'))
+    run.comparisons.compare('the HTTP links of the chain', links('base'), links('head'))
     reaches = lambda reply, repo, word: any(f'{HOST}/{repo}' in line and word in line for line in reply.splitlines())
     up, control = run.ask('head', at('chain', 'core-api'), 'chain-up', [('trace', {'from': 'register_package', 'direction': 'up', **big}),
                                                                         ('trace', {'from': 'service_health', 'direction': 'up', **big})])
@@ -2064,8 +2064,8 @@ def main():
     title = 'the pinned corpus' if args.corpus else f'slice {args.slice.upper()}'
     write(folder / 'receipt.md', f'# CI in the graph, {title} (#820)\n\nAnswer key: #820 and the generated files, in `input/`.\n\n'
           + ('Checks passed; independent verdict pending.\n' if not failed else 'BROKEN checks:\n' + ''.join(f'- {name}\n' for name in failed)))
-    return bool(failed)
+    return run.comparisons.exit_code(failed)
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    run_driver(main)

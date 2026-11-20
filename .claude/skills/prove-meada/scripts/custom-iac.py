@@ -13,6 +13,7 @@ import socket
 import subprocess
 import time
 
+from proof_result import run_driver
 from prove import Http, answer, free_port, git, mcp_answers
 from provisions import write
 
@@ -385,4 +386,5 @@ export async function receive() { const connection = await amqp.connect('amqp://
     saved(run, 'checks.json', {'checks':'passed','independent_verdict':False,'answer_keys':['#671','#642','ADR0025/26'],'surfaces':['CLI','MCP stdio']+(['MCP HTTP'] if args.http else [])})
 
 
-if __name__ == '__main__': main()
+if __name__ == '__main__':
+    run_driver(main)

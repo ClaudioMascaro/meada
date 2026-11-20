@@ -18,6 +18,7 @@ import difflib
 import re
 import yaml
 from console import http, query_equal
+from proof_result import Comparisons, run_driver
 from prove import Http, Stdio, answer, free_port, git, fetch, infra
 
 PREFIX = 'example.com/image-proof/'
@@ -389,6 +390,7 @@ class Probe:
                 process.wait(timeout=30)
 
     def execute(self):
+        self.comparisons = Comparisons(self.run)
         write(self.run,'synthetic-process-env.json',json.dumps({k:os.environ[k] for k in ['REGISTRY','KO_DOCKER_REPO','STAGE','IMAGE']},indent=2))
         src = seed(self.run / 'input')
         inventory = {str(p.relative_to(self.run/'input')): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -410,9 +412,9 @@ class Probe:
             base,head=exports['base',name],exports['head',name]
             for key in ['providers','consumers','links']:
                 existing=[row for row in head[key] if not str(row.get('contract') or '').startswith('image::')]
-                self.check(f'{name} existing {key} whole-row base parity',existing==base[key])
+                self.comparisons.compare(f'{name} existing {key} whole rows', base[key], existing)
             for key in ['files','symbols','calls']:
-                self.check(f'{name} existing {key} full-field base parity',head[key]==base[key])
+                self.comparisons.compare(f'{name} existing {key} full field', base[key], head[key])
         expected = {'ghcr.io/parcel/'+n for n in ['worker', 'meta', 'skaffold', 'ko', 'jib-maven', 'jib-gradle', 'idle', 'init']}
         expected |= {'docker.io/library/alpine', 'docker.io/parcel/api', 'registry.example:5000/parcel/tool'}
         got = {p['contract'].removeprefix('image::') for p in app['providers'] if p['contract'].startswith('image::')}
@@ -622,17 +624,19 @@ class Probe:
         raw_base=(self.run/'boutique/base/export.out').read_text()
         raw_head=(self.run/'boutique/head/export.out').read_text()
         write(self.run,'boutique/export.diff',''.join(difflib.unified_diff(raw_base.splitlines(True),raw_head.splitlines(True),fromfile='base',tofile='head')))
-        self.check('boutique unchanged whole fields outside new image model',not(set(changes)-allowed),repr(sorted(changes)))
+        outside_images = lambda doc: {key: value for key, value in doc.items() if key not in allowed}
+        self.comparisons.compare('boutique unchanged whole fields outside new image model',
+                                 outside_images(base), outside_images(head))
         for key in ['providers','links']:
             old=[r for r in head[key] if not str(r.get('contract','')).startswith('image::')]
-            self.check('boutique all existing '+key+' rows unchanged',old==base[key])
+            self.comparisons.compare('boutique all existing '+key+' rows', base[key], old)
         non_image = boutique_non_image_key(source, base)
         write(self.run,'boutique/non-image-source-key.json',json.dumps(non_image,indent=2))
         for key, expected_rows in non_image.items():
             actual = head.get(key)
             if key == 'consumers':
                 actual = [r for r in actual if not str(r.get('contract','')).startswith('image::')]
-            self.check('boutique complete '+key+' equals base plus source-authorized A7 additions',actual==expected_rows)
+            self.comparisons.compare('boutique complete '+key+' with source-authorized A7 additions', expected_rows, actual)
         frontend=head['repository']+'::kubernetes-manifests/frontend.yaml::Deployment.apps/frontend'
         qs=[{'tool':'context','arguments':{'symbol':frontend,'budget':200000}},
             {'tool':'trace','arguments':{'from':frontend,'direction':'down','budget':200000}},
@@ -749,7 +753,7 @@ class Probe:
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--base-bin', required=True)
+    p.add_argument('--historical-bin', '--base-bin', dest='base_bin', required=True)
     p.add_argument('--head-bin', required=True)
     p.add_argument('--run', required=True)
     p.add_argument('--http', action='store_true')
@@ -772,8 +776,8 @@ def main():
     report = '# Image contract proof\n\n' + '\n'.join(f"- [{'PASS' if s['pass'] else 'FAIL'}] {s['check']}: {s['detail']}" for s in probe.steps)
     write(probe.run, 'images.md', report+'\n')
     print(f"{'differences found' if failures else 'checks passed'}: {len(probe.steps)-len(failures)}/{len(probe.steps)}; {probe.run}/images.md")
-    return bool(failures)
+    return probe.comparisons.exit_code(failures)
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    run_driver(main)
