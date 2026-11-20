@@ -368,7 +368,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     let mut mut_lets: HashSet<String> = HashSet::new();
     // The scope and name of each assignment: it changes the nearest binding of the name, which
     // an enclosing scope may hold (a closure given to a call is a scope of its own).
-    let mut assigned: Vec<(String, String)> = Vec::new();
+    let mut assigned = Vec::new();
     // The Strings a function builds, by scope and name, and the names two of them share.
     let mut candidates: values::Builders = HashMap::new();
     let mut clash: HashSet<(String, String)> = HashSet::new();
@@ -901,7 +901,28 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             // A name assigned again is not a constant.
             "assignment_expression" | "compound_assignment_expr" => {
                 if let Some(left) = field(node, "left").filter(|n| n.kind() == "identifier") {
-                    assigned.push((scope.clone(), text(left, src).to_string()));
+                    let operator = field(node, "operator").map_or("=", |op| text(op, src));
+                    let at = Where {
+                        scope: scope.clone(),
+                        module: module.clone(),
+                        pure,
+                    };
+                    assigned.push((
+                        at,
+                        text(left, src).to_string(),
+                        operator,
+                        field(node, "right"),
+                    ));
+                }
+            }
+            "reference_expression" if named(node).any(|n| n.kind() == "mutable_specifier") => {
+                if let Some(target) = field(node, "value").filter(|n| n.kind() == "identifier") {
+                    let at = Where {
+                        scope: scope.clone(),
+                        module: module.clone(),
+                        pure,
+                    };
+                    assigned.push((at, text(target, src).to_string(), "", None));
                 }
             }
             // A closure given to a call is a definition of its own: the shared side names it
@@ -980,17 +1001,29 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             items: items.clone(),
         }));
     }
-    for (scope, name) in assigned {
-        let mut at = scope.as_str();
+    let mut reassignments: HashMap<String, Vec<_>> = HashMap::new();
+    for (at, name, operator, right) in assigned {
+        let mut scope = at.scope.as_str();
         let home = loop {
-            let local = qualify(at, &name);
-            if bindings.contains_key(&local) || at.is_empty() {
+            let local = qualify(scope, &name);
+            if bindings.contains_key(&local) || scope.is_empty() {
                 break local;
             }
-            at = crate::parent(at);
+            scope = crate::parent(scope);
         };
-        // A name nothing binds is counted where it is written, as it always was.
-        *bindings.entry(home).or_default() += 1;
+        *bindings.entry(home.clone()).or_default() += 1;
+        reassignments
+            .entry(home)
+            .or_default()
+            .push((at, name, operator, right));
+    }
+    for def in &mut facts.defs {
+        def.reassigned_params = def
+            .params
+            .iter()
+            .filter(|p| reassignments.contains_key(&qualify(&def.name, &p.name)))
+            .map(|p| p.name.clone())
+            .collect();
     }
     let mut heads = Heads::default();
     for Use { path, name, public } in &imported {
@@ -1063,7 +1096,30 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 });
             }
             Put::Let(name) => {
-                let value = reader.value(&at, node);
+                let mut value = reader.value(&at, node);
+                if let Some(writes) = reassignments.get(&name)
+                    && mut_lets.contains(&name)
+                    && bindings.get(&name) == Some(&(writes.len() + 2))
+                {
+                    let change = writes
+                        .iter()
+                        .map(|(at, local, operator, right)| {
+                            right.map_or(super::QueryWrite::Other, |right| {
+                                super::QueryWrite::of(&reader.value(at, right), local, operator)
+                            })
+                        })
+                        .reduce(super::QueryWrite::merge);
+                    if change.is_some_and(|change| change.keep(&mut value)) {
+                        constants.insert(name.clone());
+                        facts.consts.push(Const {
+                            name,
+                            value,
+                            ty: None,
+                            scope: None,
+                        });
+                        continue;
+                    }
+                }
                 // Declared `mut` once, and bound or assigned nowhere else.
                 if bindings.get(&name) == Some(&2) && mut_lets.contains(&name) {
                     facts.mutable.insert(name.clone(), value.clone());
@@ -2119,9 +2175,13 @@ mod tests {
                     Part::Text(t) => t.clone(),
                     Part::Ref(r) => format!("<{r}>"),
                     Part::Env(e) => format!("env:{e}"),
-                    Part::EnvOr(..) | Part::Read { .. } | Part::Limit(_) | Part::Hole => {
-                        "{}".into()
-                    }
+                    Part::EnvOr(..)
+                    | Part::Read { .. }
+                    | Part::Limit(_)
+                    | Part::EnvKey(_)
+                    | Part::Invoke { .. }
+                    | Part::QuerySuffix
+                    | Part::Hole => "{}".into(),
                 })
                 .collect::<String>(),
             Value::Ref(name) => format!("@{name}"),

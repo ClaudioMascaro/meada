@@ -257,7 +257,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // The locals declared with an initializer, and every name the file assigns: a local the
     // file assigns holds no one value, so its bound is dropped (`Facts::bound`).
     let mut initialized: Vec<Bound> = Vec::new();
-    let mut reassigned: Vec<(String, String)> = Vec::new();
+    let mut reassigned = Vec::new();
     let mut rebound: Vec<Bound> = Vec::new();
     // The method or constructor of each scope, and the names of the `final` fields: where their
     // mentions are counted (`Facts::mentioned`).
@@ -726,15 +726,22 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     _ => named(node).next(),
                 };
                 if let Some(n) = left.filter(|n| n.kind() == "identifier") {
-                    reassigned.push((scope.as_ref().clone(), text(n, src).to_string()));
+                    let name = text(n, src);
+                    let operator = node
+                        .child_by_field_name("operator")
+                        .map_or("", |op| text(op, src));
+                    let mut change = super::QueryWrite::Other;
                     if let Some(right) = node.child_by_field_name("right") {
+                        let value = value(right, src, 0);
+                        change = super::QueryWrite::of(&value, name, operator);
                         rebound.push(Bound {
                             scope: scope.as_ref().clone(),
                             within: scope.as_ref().clone(),
-                            name: text(n, src).to_string(),
-                            value: value(right, src, 0),
+                            name: name.to_string(),
+                            value,
                         });
                     }
+                    reassigned.push((scope.as_ref().clone(), name.to_string(), change));
                 }
                 let write = match left {
                     Some(n) if n.kind() == "identifier" => {
@@ -892,31 +899,50 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // A bare write whose binding is not known stays conservative by spelling. Dropping
     // it would prove an initializer unchanged from incomplete assignment knowledge.
     let mut unknown_writes = BTreeSet::new();
-    let reassigned: BTreeSet<(String, String)> = reassigned
-        .into_iter()
-        .filter_map(|(scope, name)| {
-            let mut at = scope.as_str();
-            loop {
-                if bindings.contains(&(at, name.as_str())) {
-                    return Some((at.to_string(), name));
-                }
-                if at.is_empty() {
-                    unknown_writes.insert(name);
-                    return None;
-                }
-                at = crate::parent(at);
+    let mut reassignments = BTreeMap::new();
+    for (scope, name, change) in reassigned {
+        let mut at = scope.as_str();
+        loop {
+            if bindings.contains(&(at, name.as_str())) {
+                reassignments
+                    .entry((at.to_owned(), name))
+                    .and_modify(|old: &mut super::QueryWrite| *old = old.merge(change))
+                    .or_insert(change);
+                break;
             }
-        })
-        .collect();
+            if at.is_empty() {
+                unknown_writes.insert(name);
+                break;
+            }
+            at = crate::parent(at);
+        }
+    }
+    for def in &mut facts.defs {
+        def.reassigned_params = def
+            .params
+            .iter()
+            .filter(|p| reassignments.contains_key(&(def.name.clone(), p.name.clone())))
+            .map(|p| p.name.clone())
+            .collect();
+    }
     let field_hides = |name: &str, scope: &str| {
         (fields.get(name)).is_some_and(|at| at.iter().any(|at| encloses(at, scope)))
     };
-    let (kept, dropped): (Vec<Bound>, Vec<Bound>) = initialized.into_iter().partition(|b| {
-        declared.get(&(b.scope.as_str(), b.name.as_str())) == Some(&1)
-            && !reassigned.contains(&(b.scope.clone(), b.name.clone()))
-            && !unknown_writes.contains(&b.name)
-            && !field_hides(&b.name, &b.scope)
-    });
+    let (mut kept, mut dropped) = (Vec::new(), Vec::new());
+    for mut bound in initialized {
+        let at = (bound.scope.clone(), bound.name.clone());
+        if declared.get(&(bound.scope.as_str(), bound.name.as_str())) == Some(&1)
+            && !unknown_writes.contains(&bound.name)
+            && !field_hides(&bound.name, &bound.scope)
+            && reassignments
+                .get(&at)
+                .is_none_or(|q| q.keep(&mut bound.value))
+        {
+            kept.push(bound);
+        } else {
+            dropped.push(bound);
+        }
+    }
     facts.bound = kept;
     rebound.extend(dropped);
     facts.assigned = rebound;
@@ -1557,7 +1583,7 @@ fn callee(node: Node, src: &[u8]) -> String {
 /// binds `System` to another type: by a single-type import, or by declaring one.
 // ponytail: a `System` type another file of the package declares is not seen; it hides
 // `java.lang.System` there, and its `getenv` still reads as an environment read.
-fn getenv(node: Node, src: &[u8]) -> Option<String> {
+fn getenv(node: Node, src: &[u8], depth: usize) -> Option<Part> {
     let callee = callee(node, src);
     if callee != "System.getenv" && callee != "java.lang.System.getenv" {
         return None;
@@ -1565,11 +1591,8 @@ fn getenv(node: Node, src: &[u8]) -> Option<String> {
     if callee == "System.getenv" && SYSTEM_BOUND.get() {
         return None;
     }
-    let [Value::Str(parts)] = &arguments(node, src, 0)[..] else {
-        return None;
-    };
-    match &parts[..] {
-        [Part::Text(name)] => Some(name.clone()),
+    match arguments(node, src, depth).as_slice() {
+        [argument] => Part::env_key(argument),
         _ => None,
     }
 }
@@ -1622,13 +1645,18 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         return Value::Unknown;
     }
     match node.kind() {
+        "ternary_expression" => {
+            let side = |field| {
+                node.child_by_field_name(field)
+                    .map_or(Value::Unknown, |n| value(n, src, depth + 1))
+            };
+            crate::lang::query_alternative(side("consequence"), side("alternative"))
+        }
         "string_literal" => serde_json::from_slice::<String>(&src[node.byte_range()])
             .map_or(Value::Unknown, |s| Value::Str(vec![Part::Text(s)])),
         "identifier" | "field_access" | "scoped_identifier" => Value::Ref(callee(node, src)),
         "this" => Value::Ref("this".into()),
-        "method_invocation" if let Some(name) = getenv(node, src) => {
-            Value::Str(vec![Part::Env(name)])
-        }
+        "method_invocation" if let Some(read) = getenv(node, src, depth) => Value::Str(vec![read]),
         "method_invocation" => Value::Call(Invocation {
             callee: callee(node, src),
             receiver: node
@@ -1683,7 +1711,8 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 {
                     Some(Value::Str(found)) => parts.extend(found),
                     Some(Value::Ref(name)) => parts.push(Part::Ref(name)),
-                    _ => parts.push(Part::Hole),
+                    Some(value) => parts.push(Part::unread(&value)),
+                    None => parts.push(Part::Hole),
                 }
             }
             Value::Str(parts)

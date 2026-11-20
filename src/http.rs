@@ -337,17 +337,26 @@ fn tail_fits(contract: &str, method: Option<&str>, known: &str) -> bool {
 fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead>)> {
     let method = method(args.get(1)).ok()?;
     let parts = match args.first() {
-        Some(Value::Str(parts)) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => return None,
+        Some(Value::Str(parts)) if parts.iter().any(|p| p.parameter().is_some()) => return None,
         Some(Value::Str(parts)) => parts,
         Some(Value::Ref(_)) => return None,
         _ => return Some((None, None, None)),
     };
-    let (via, path, lead) = match parts.split_first() {
+    // Only a terminal optional query is irrelevant. If path text follows it, that text
+    // can be either part of the path or part of the query.
+    let end = parts.iter().rposition(|p| {
+        !matches!(p, Part::QuerySuffix) && !matches!(p, Part::Text(t) if t.is_empty())
+    });
+    let path_parts = end.map_or(&[][..], |end| &parts[..=end]);
+    if path_parts.iter().any(|p| matches!(p, Part::QuerySuffix)) {
+        return Some((None, None, None));
+    }
+    let (via, path, lead) = match path_parts.split_first() {
         Some((Part::Env(var) | Part::EnvOr(var, _), rest)) => {
             (Some(format!("env:{var}")), Some(render(rest)), None)
         }
         _ => {
-            let url = render(parts);
+            let url = render(path_parts);
             match url.split_once("://") {
                 Some((_, rest)) => {
                     let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
@@ -364,10 +373,11 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead
                 // `${base}/users`: the rest is appended to a base Meada could not read, which may
                 // hold a path of its own, so only the end of the path is known.
                 None => {
-                    let rest = render(&parts[parts.iter().take_while(|p| unknown(p)).count()..]);
+                    let rest =
+                        render(&path_parts[path_parts.iter().take_while(|p| unknown(p)).count()..]);
                     let lead = rest.is_empty() || rest.starts_with(['/', '?', '#']);
                     let lead = lead.then(|| Lead {
-                        limit: match &parts[0] {
+                        limit: match &path_parts[0] {
                             Part::Limit(limit) => limit.clone(),
                             _ => Limit::Other,
                         },
@@ -388,7 +398,10 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead
 
 /// A part of a URL Meada could not read, which a base may hold (#801).
 fn unknown(part: &Part) -> bool {
-    matches!(part, Part::Hole | Part::Read { .. } | Part::Limit(_))
+    matches!(
+        part,
+        Part::Hole | Part::Read { .. } | Part::Invoke { .. } | Part::Limit(_)
+    )
 }
 
 /// The base of a client Meada did not read (#801): a path appended to it leaves the consumer an
@@ -423,7 +436,7 @@ fn method(init: Option<&Value>) -> Result<Option<String>, Depends> {
         value => value,
     };
     match value {
-        Value::Str(parts) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => Err(Depends),
+        Value::Str(parts) if parts.iter().any(|p| p.parameter().is_some()) => Err(Depends),
         Value::Str(parts) => Ok(literal(parts)),
         Value::Ref(_) => Err(Depends),
         Value::Undefined => Ok(Some("GET".into())),
@@ -524,6 +537,9 @@ fn render(parts: &[Part]) -> String {
             Part::Env(_)
             | Part::EnvOr(..)
             | Part::Read { .. }
+            | Part::Invoke { .. }
+            | Part::EnvKey(_)
+            | Part::QuerySuffix
             | Part::Ref(_)
             | Part::Limit(_)
             | Part::Hole => PARAM,
@@ -1124,6 +1140,7 @@ mod tests {
             scope: "".into(),
             callee: "c[]".into(),
             key: "K".into(),
+            parameter: false,
             then: Vec::new(),
         };
         let text = |t: &str| Value::Str(vec![Part::Text(t.into())]);

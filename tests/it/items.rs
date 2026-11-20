@@ -438,3 +438,268 @@ fn a_go_literal_key_named_like_an_import_leaves_its_call_linked() {
     let levels = (export["links"].as_array().unwrap().iter()).map(|l| l["level"].clone());
     assert_eq!(levels.collect::<Vec<_>>(), ["inferred"; 4]);
 }
+
+fn http_value_flow(case: &str) -> serde_json::Value {
+    fixture_repo(
+        case,
+        "http-value-flow-api",
+        Some("https://example.com/flow/api.git"),
+    );
+    let client = fixture_repo(
+        case,
+        "http-value-flow",
+        Some("https://example.com/flow/client.git"),
+    );
+    serde_json::from_str(&Engine::open(&client).unwrap().export().unwrap()).unwrap()
+}
+
+#[test]
+fn exact_returns_keys_and_optional_queries_reach_http_consumers() {
+    let export = http_value_flow("http_value_flow_folded");
+    let consumers = export["consumers"].as_array().unwrap();
+    let links = export["links"].as_array().unwrap();
+    let mut differences = Vec::new();
+    for path in [
+        "client.go",
+        "client.py",
+        "client.ts",
+        "Client.java",
+        "Client.kt",
+        "Client.cs",
+        "Sources/Client/Client.swift",
+        "src/lib.rs",
+    ] {
+        let cases = [
+            ("ViaMethod", "/api/orders", "API_URL"),
+            ("ViaFunction", "/v2/orders", "API_URL"),
+            ("ParamA", "/api/orders", "API_URL"),
+            ("ParamB", "/api/orders", "SECOND_URL"),
+            ("QueryAppend", "/api/orders", "API_URL"),
+            ("QueryRewrite", "/api/orders", "API_URL"),
+            ("QuerySuffix", "/api/orders", "API_URL"),
+            ("QueryConditional", "/api/orders", "API_URL"),
+        ];
+        for (name, route, variable) in cases {
+            if path == "client.go" && name == "QueryConditional" {
+                continue;
+            }
+            let matches: Vec<_> = consumers
+                .iter()
+                .filter(|c| {
+                    let site = c["site"].as_str().unwrap();
+                    site.contains(&format!("::{path}::")) && site.contains(name)
+                })
+                .collect();
+            let contract = format!("http::GET::{route}");
+            let via = format!("env:{variable}");
+            let found = match matches.as_slice() {
+                [row] if row["contract"] == contract && row["via"] == via => {
+                    let linked: Vec<_> = links
+                        .iter()
+                        .filter(|l| l["consumer"] == row["site"])
+                        .collect();
+                    matches!(linked.as_slice(), [link] if link["contract"] == contract
+                        && link["level"] == "inferred"
+                        && link["provider"].as_str().unwrap().starts_with("example.com/flow/api::openapi.yaml::"))
+                }
+                _ => false,
+            };
+            if !found {
+                differences.push(format!("{path} {name}: {matches:?}"));
+            }
+        }
+        let unknown: Vec<_> = consumers
+            .iter()
+            .filter(|c| {
+                let site = c["site"].as_str().unwrap();
+                site.contains(&format!("::{path}::")) && site.contains("ParamUnknown")
+            })
+            .collect();
+        if !matches!(unknown.as_slice(), [row] if row["contract"].is_null() && row["via"].is_null())
+        {
+            differences.push(format!("{path} ParamUnknown: {unknown:?}"));
+        }
+    }
+    assert!(differences.is_empty(), "{}", differences.join("\n"));
+}
+
+#[test]
+fn an_awaited_helper_and_discovery_arguments_keep_their_base() {
+    let export = http_value_flow("http_value_flow_async");
+    let consumers = export["consumers"].as_array().unwrap();
+    for (name, route, via) in [
+        ("ViaAwait", "http::GET::/v2/orders", "env:API_URL"),
+        (
+            "PluginMethod",
+            "http::GET::/api/orders/items",
+            "client:Backstage plugin orders at /api/orders",
+        ),
+        (
+            "PluginParameter",
+            "http::GET::/api/orders/items",
+            "client:Backstage plugin orders at /api/orders",
+        ),
+    ] {
+        let rows: Vec<_> = consumers
+            .iter()
+            .filter(|c| c["site"].as_str().unwrap().contains(name))
+            .collect();
+        assert!(
+            matches!(rows.as_slice(), [row] if row["contract"] == route && row["via"] == via),
+            "{name}: {rows:?}"
+        );
+    }
+}
+
+#[test]
+fn unknown_returns_and_path_changes_remain_unresolved() {
+    let export = http_value_flow("http_value_flow_unknown");
+    let consumers = export["consumers"].as_array().unwrap();
+    for name in [
+        "ViaPromise",
+        "ViaDispatch",
+        "ViaRecursive",
+        "ViaDivergent",
+        "unsafeDispatch",
+        "PathChanged",
+        "PathReplaced",
+        "MiddleQuery",
+    ] {
+        let rows: Vec<_> = consumers
+            .iter()
+            .filter(|c| c["site"].as_str().unwrap().contains(name))
+            .collect();
+        assert!(
+            matches!(rows.as_slice(), [row] if row["contract"].is_null()),
+            "{name}: {rows:?}"
+        );
+    }
+    let unknown: Vec<_> = consumers
+        .iter()
+        .filter(|c| c["site"].as_str().unwrap().contains("PathUnknown"))
+        .collect();
+    assert!(matches!(unknown.as_slice(), [row] if row["contract"] == "http::GET::/api/{}"));
+    assert!(!consumers.iter().any(|c| {
+        c["site"].as_str().unwrap().contains("ViaNameMatch") && !c["contract"].is_null()
+    }));
+}
+
+#[test]
+fn a_reassigned_parameter_does_not_take_the_callers_value() {
+    let export = http_value_flow("http_value_flow_reassigned");
+    for path in ["client.py", "client.ts"] {
+        let consumers: Vec<_> = export["consumers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| {
+                row["site"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("::{path}::"))
+            })
+            .collect();
+        for name in [
+            "mutated",
+            if path.ends_with(".ts") {
+                "possiblyMutated"
+            } else {
+                "possibly_mutated"
+            },
+        ] {
+            let rows: Vec<_> = consumers
+                .iter()
+                .filter(|c| c["site"].as_str().unwrap().contains(&format!("::{name}::")))
+                .collect();
+            assert!(
+                matches!(rows.as_slice(), [row] if row["contract"].is_null()),
+                "{path} {name}: {rows:?}"
+            );
+        }
+        let intact: Vec<_> = consumers
+            .iter()
+            .filter(|c| c["site"].as_str().unwrap().contains("::Intact::"))
+            .collect();
+        assert!(matches!(intact.as_slice(), [row] if row["contract"] == "http::GET::/api/orders"));
+        for name in ["::Reassigned::", "::Conditional::"] {
+            assert!(!consumers.iter().any(|c| c["site"].as_str().unwrap().contains(name) && !c["contract"].is_null()));
+        }
+    }
+    let writes: Vec<_> = export["providers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| {
+            row["site"]
+                .as_str()
+                .unwrap()
+                .contains("::mutation/store.go::")
+                && !row["contract"].is_null()
+        })
+        .map(|row| {
+            (
+                row["site"].as_str().unwrap(),
+                row["contract"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        writes,
+        [(
+            "example.com/flow/client::mutation/store.go::Current::writeIntact#0",
+            "resource::dynamodb::orders"
+        )]
+    );
+    let cycle: Vec<_> = export["consumers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["site"].as_str().unwrap().contains("::ViaCycle::"))
+        .collect();
+    assert!(
+        cycle
+            .iter()
+            .any(|r| r["contract"] == "http::GET::/api/orders")
+    );
+    assert!(
+        export["consumers"].as_array().unwrap().iter().any(|r| {
+            r["site"].as_str().unwrap().contains("::cycle::") && r["contract"].is_null()
+        })
+    );
+    assert!(
+        !cycle
+            .iter()
+            .any(|r| r["contract"] == "http::GET::/v2/orders")
+    );
+}
+
+#[test]
+fn a_rotating_go_wrapper_leaves_its_neighbors_readable() {
+    let since = std::time::Instant::now();
+    let export = http_value_flow("http_value_flow_cycle");
+    let consumers: Vec<_> = export["consumers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| {
+            row["site"]
+                .as_str()
+                .unwrap()
+                .contains("::recursive/recursive.go::")
+        })
+        .collect();
+    for (name, contract) in [
+        ("PlainA", "http::GET::/plain-a"),
+        ("PlainB", "http::GET::/plain-b"),
+        ("UseGet", "http::GET::/g0"),
+    ] {
+        assert!(
+            consumers
+                .iter()
+                .any(|row| row["site"].as_str().unwrap().contains(name)
+                    && row["contract"] == contract),
+            "{name}: {consumers:?}"
+        );
+    }
+    assert!(since.elapsed() < std::time::Duration::from_secs(20));
+}

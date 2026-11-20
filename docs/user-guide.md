@@ -1253,6 +1253,8 @@ Como saber se um elo que falta é bug:
 
 ### 8.1 Rotas HTTP
 
+Os clientes HTTP podem aproveitar a base retornada por uma função ou método chamado com resolução exata. Um wrapper pode passar a chave literal de uma variável de ambiente ou o identificador do plugin Backstage. A rota também é preservada quando as alternativas no fim da URL variam apenas na query string. Reatribuições de parâmetros e alternativas de despacho podem deixar a origem em aberto.
+
 Uma rota liga quem a **serve** (o provedor, o código que a trata) a quem a **chama** (o
 consumidor, uma chamada de cliente HTTP). Em todas as linguagens, o Meada normaliza o caminho:
 `/users/:id`, `/users/{id}` e `/users/<int:id>` viram o mesmo `/users/{}`, e o método fica

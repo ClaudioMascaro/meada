@@ -55,6 +55,7 @@ pub(crate) fn argument<'a>(
                     scope,
                     callee,
                     key,
+                    parameter: false,
                     then,
                 },
             ] if then.is_empty() => {
@@ -930,6 +931,7 @@ fn name<'a>(
                     scope,
                     callee,
                     key,
+                    parameter: false,
                     then,
                 } if then.is_empty() && csharp::environment(code, path, scope, callee, aliases) => {
                     Some(key.clone())

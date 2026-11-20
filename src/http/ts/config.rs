@@ -118,8 +118,14 @@ impl<'i> Config<'i> {
         let mut args = args.to_vec();
         if let Some(Value::Str(parts)) = args.first_mut() {
             for part in parts.iter_mut() {
-                if let Part::Read { key, then, .. } = part {
-                    *part = match then.is_empty().then(|| self.variable(key)).flatten() {
+                if let Part::Read {
+                    callee, key, then, ..
+                } = part
+                {
+                    *part = match (then.is_empty() && !callee.ends_with(".getBaseUrl"))
+                        .then(|| self.variable(key))
+                        .flatten()
+                    {
                         Some(var) => Part::Env(var),
                         None => Part::Hole,
                     };
