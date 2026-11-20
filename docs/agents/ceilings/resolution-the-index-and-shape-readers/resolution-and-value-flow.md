@@ -241,20 +241,22 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   constructor read as a value (`mk := New; mk(x)`) is not seen: its exact callers alone give the
   field.
 
-- `resolve.rs`, `lang/ts.rs` (#536): a call folds to the string its function returns
-  (`Code::built`, `Def::lone_string`) only for TypeScript and JavaScript (the other packs leave
-  `lone_string` empty), for a `function` declaration or an arrow or function expression with an
-  expression body or a body of one lone `return`, not `async` or a generator, whose value is a
-  string (a template, a literal or `+`), and for a call that resolves `exact` (a name match may
-  reach another function); the parameters bind to the call's arguments, so the fold costs the
-  `EVAL_DEPTH` and `EVAL_BUDGET` of the file it reads. Misses, the URL staying an unresolved
-  consumer: a `return` after other statements (a local, a guard, a `const`), a returned
-  value that is not a string (a call, a conditional, a member), a class method (`lone_string` reads
-  functions and arrow or function expressions, never a `method_definition`), and a string with a part that does not
-  fold, an environment read (`process.env.API_URL`) or a build-time global included: the builder
-  gives up as a whole where a template written in the `fetch` call keeps the environment read and
-  links by `base_url_env`, so a base that is a conditional over a build-time global, as
-  spring-petclinic-reactjs writes it, stays a separate gap.
+- `Code::built` folds strings returned by exact calls of repository functions and methods (#810).
+  Arguments bind by the usual wrapper rules. Async TypeScript and Python returns require an
+  awaited call. A call with possible repository dispatch alternatives, different returns,
+  an unread part, or a recursive return stays unknown. Return folding shares `EVAL_DEPTH`
+  and `EVAL_BUDGET` with other value flow and uses `WRAPPER_DEPTH` for nested returned calls.
+- A parameter the pack sees reassigned is unknown, including a write in a branch (#891). The
+  write is counted for its whole function. The reader does not compute the new value by
+  execution order. Parameterized environment reads in the eight HTTP client packs bind their
+  keys at exact callers (#811). Unknown keys keep the read open.
+- The HTTP reader drops terminal query suffixes (#812). A string local may retain its path
+  when every write appends text starting with literal `?`. A conditional or a repeatedly
+  assigned local can supply an optional query when its alternatives are empty or start with
+  `?`. A nested write not proven query-only or path text after an optional query leaves
+  the result open. These parts do not give literal names to other kinds.
+- Go's router reader skips proven net/http send functions before tracing router arguments
+  (#893). A recursive URL parameter on those calls does not spend the router walk's budget.
 
 - `resolve.rs` (`Code::origins` with `Follow::Constants`): only `const` bindings with a plain name are followed; a client
   held by `let`, a class field, `this.x`, a destructuring or a parameter, or chained without a

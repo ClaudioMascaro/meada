@@ -472,6 +472,7 @@ mod tests {
             scope: "s".into(),
             callee: "config.getString".into(),
             key: "a.b".into(),
+            parameter: false,
             then: vec![],
         };
         assert_eq!(lead(vec![read], "/orders").as_deref(), Some("/orders"));

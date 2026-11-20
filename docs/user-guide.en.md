@@ -1248,6 +1248,8 @@ How to tell whether a missing link is a bug:
 
 ### 8.1 HTTP routes
 
+HTTP clients can use a base returned by an exactly resolved function or method. A wrapper can pass a literal environment key or Backstage plugin ID. The route also survives terminal alternatives limited to the query string. Reassigned parameters and dispatch alternatives can leave the origin open.
+
 A route links whoever **serves** it (the provider, the code that handles it) to whoever **calls**
 it (the consumer, an HTTP client call). In every language, Meada normalizes the path:
 `/users/:id`, `/users/{id}` and `/users/<int:id>` become the same `/users/{}`, and the method is

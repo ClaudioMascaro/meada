@@ -461,7 +461,7 @@ fn walk(
     let mut budget = QUALIFICATION_BYTES;
     // The names assigned (`x = v`, `x += v`, `&x`), by the scope written in, which hold no one
     // value there, and the members assigned through a name (`request.httpMethod = v`).
-    let mut assigned: Vec<(Rc<String>, String)> = Vec::new();
+    let mut assigned: Vec<(Rc<String>, String, super::QueryWrite)> = Vec::new();
     // The properties assigned as `self.name = v`: they hold no one value to a receiver alone.
     let mut self_assigned: Vec<(Rc<String>, String)> = Vec::new();
     let mut members: Vec<Member> = Vec::new();
@@ -856,7 +856,19 @@ fn walk(
                     let plain = children(node).any(|c| c.kind() == "=");
                     let result = node.child_by_field_name("result");
                     match name.split_once('.') {
-                        None => assigned.push((scope.clone(), name)),
+                        None => {
+                            let operator = node
+                                .child_by_field_name("operator")
+                                .map_or("", |op| text(op, src));
+                            let change = result.map_or(super::QueryWrite::Other, |r| {
+                                super::QueryWrite::of(
+                                    &values::value(r, src, ctx(&scope, defining, &types)),
+                                    &name,
+                                    operator,
+                                )
+                            });
+                            assigned.push((scope.clone(), name, change));
+                        }
                         Some((head, rest)) if !name.contains('(') => {
                             if head == "self" && plain && !rest.contains('.') {
                                 self_assigned.push((scope.clone(), rest.to_string()));
@@ -883,7 +895,11 @@ fn walk(
             }
             "prefix_expression" if text(node, src).starts_with('&') => {
                 if let Some(target) = node.child_by_field_name("target") {
-                    assigned.push((scope.clone(), head(&callee(target, src)).to_string()));
+                    assigned.push((
+                        scope.clone(),
+                        head(&callee(target, src)).to_string(),
+                        super::QueryWrite::Other,
+                    ));
                 }
             }
             "call_expression" | "constructor_expression" => {
@@ -983,12 +999,31 @@ fn walk(
             .collect()
     };
     let (self_assigned, called) = (by_function(&self_assigned), by_function(&called));
-    let assigned = by_function(&assigned);
-    facts.bound.retain(|b| {
+    let mut reassignments = HashMap::new();
+    for (scope, name, change) in assigned {
+        let at = (function(&scope).to_string(), name);
+        reassignments
+            .entry(at)
+            .and_modify(|old: &mut super::QueryWrite| *old = old.merge(change))
+            .or_insert(change);
+    }
+    facts.bound.retain_mut(|b| {
         let at = (function(&b.scope).to_string(), b.name.clone());
-        !assigned.contains(&at)
-            && !(vars.contains(&b.name) && called.contains(&at) && mutable(&b.value))
+        !(vars.contains(&b.name) && called.contains(&at) && mutable(&b.value))
+            && reassignments
+                .get(&at)
+                .is_none_or(|change| change.keep(&mut b.value))
     });
+    for def in &mut facts.defs {
+        def.reassigned_params = def
+            .params
+            .iter()
+            .filter(|p| {
+                reassignments.contains_key(&(function(&def.name).to_string(), p.name.clone()))
+            })
+            .map(|p| p.name.clone())
+            .collect();
+    }
     assign_members(&mut facts.bound, members);
     // A name another binding of the scope also declares (a loop variable, a `guard let`, a
     // `var`) holds no one value: its `let` bounds are dropped (Kotlin's rule). Two `let`s keep
@@ -1018,7 +1053,7 @@ fn walk(
         .retain(|b| !shared.contains(&qualify(&b.scope, &b.name)));
     // A `var` read from outside and assigned again holds no one value: its calls keep the name
     // match (the assignment may be in a function of the type, for a property).
-    let reassigned: HashSet<(&str, &str)> = (assigned.iter().chain(&self_assigned))
+    let reassigned: HashSet<(&str, &str)> = (reassignments.keys().chain(&self_assigned))
         .flat_map(|(f, n)| enclosing(f).map(move |s| (s, n.as_str())))
         .collect();
     for receiver in &mut facts.receivers {

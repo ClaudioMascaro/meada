@@ -89,6 +89,8 @@ Names resolve within the file's module first, then within the modules it imports
 
 ## HTTP and contract documents
 
+HTTP clients can use a base returned by an exactly resolved function or method. A wrapper can pass a literal environment key or Backstage plugin ID. The route also survives terminal alternatives limited to the query string. Reassigned parameters and dispatch alternatives can leave the origin open.
+
 IaC declarations also provide HTTP routes: API Gateway HTTP and REST in Terraform/OpenTofu (HCL and JSON), SAM `Api`/`HttpApi` events, and Serverless `http`/`httpApi` events. Literal methods and paths use the same parameter normalization as code routes. The provider points to the local handler symbol when it resolves with certainty, or to the whole repository. Consumers in other repositories use ordinary host and peer rules. Unknown references, methods or paths never invent routes; non-Lambda integrations and catch-all routes without a finite path stay out of the map (#666).
 
 Base URLs from configuration or a workload environment can name a Kubernetes Service

@@ -19,6 +19,15 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- Rebuild indexes written before the Go literal-key extraction fix on the next local index
+  open or on `meada index --workspace` (#946).
+- Check linked decisions before reading their target in saving modes and identify the repository
+  on a failed read in `status --workspace` (#932, #934).
+- Keep neighboring Go HTTP consumers when a recursive wrapper rotates its parameters. A
+  reassigned parameter no longer supplies its caller's original value (#891, #893).
+- Resolve returned string bases, environment keys passed through wrappers and optional query
+  suffixes in HTTP clients (#810, #811, #812).
+
 - `meada status` no longer drops the stale and waiting decisions, and the other lines under each
   repository, without a word. When a repository of the workspace is not indexed, is indexed by
   another version or is locked, a line in their place says they were not evaluated and to run
