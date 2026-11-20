@@ -17,7 +17,7 @@ These tools, always with these names. None of them writes. A minor version may a
 | `search` | `query` | string, required | | Name to look for, case-insensitive. |
 | `search` | `kind` | string, optional | all | Restricts to one kind (list below). |
 | `search` | `budget` | unsigned 32-bit integer, optional | 2,000 | Token budget of the answer. |
-| `context` | `symbol` | string, required | | Symbol name, `<path>::<name>` or full identity; a resource (`resource::<kind>::<id>`) or a channel (`channel::<broker>::<name>`). |
+| `context` | `symbol` | string, required | | Symbol name, `<path>::<name>` or full identity; a resource (`resource::<kind>::<id>`), a channel (`channel::<broker>::<name>`), or a route (`http::GET::/orders`). |
 | `context` | `budget` | unsigned 32-bit integer, optional | 2,000 | Token budget of the answer. |
 | `trace` | `from` | string, optional | | Start: a symbol, a route (`GET /users/{}` or its contract), a call site or a process (`process::<entry point identity>`, `down` only). |
 | `trace` | `changes` | string, optional | | `uncommitted`: start from the symbols the working-tree diff touches. It is the only accepted value today. |
@@ -136,7 +136,8 @@ A repository's export is indented JSON ending in a newline, with every list sort
 | `communities` | `name`, `members`. |
 | `links` | `consumer`, `provider`, `contract`, `level`, `reason`, `by`, `p`, `drift` (`missing`, `unchecked`). |
 | `processes` | `entry_point`, `kind` (`route`, `export`, `channel` or `program`), `label`, `steps`. |
-| `stale_decisions` | `call`, `target`, `cause`. |
+| `open_items` | Open items in the repository: `call`, `kind` (`ambiguous-link` or `dynamic-url`), `candidates` (all targets, sorted and unique), and `limit` when present. |
+| `stale_decisions` | Decisions that do not apply: `call`, `target`, `cause` and `expected_kind` for `wrong-kind`. |
 | `uses` | `contract`, `site`, `at`, `level` (`exact` or `inferred`). |
 | `policy_grants` | `contract`, `site`, `at`. |
 
@@ -148,7 +149,12 @@ The fields of `shape` (`source`, `fields`, `open`, `scalars`, `declared`, `optio
 - `imports[].how`: `exports`, `types`, `module`, `main`, `path`, `outDir`, `moduleName`, `topLevel`, `crateName`, `modulePath`, `package` and `namespace`;
 - `steps[].via`: `entry`, `call` and `link`;
 - `steps[].mark`: `cycle`, `seen`, `ambiguous`, `unresolved`, `no-provider`, `produces`, `consumes` and `depth-limit`;
-- `stale_decisions[].cause`: `call-gone`, `item-not-open`, `target-gone` and `not-candidate`.
+- The values of `stale_decisions[].cause` are `call-gone`, `item-not-open`, `wrong-kind`, `unknown-repository`, `target-gone`, `no-candidates`, `not-candidate`.
+
+The new `meada_core::export::Cause` variants require a major version of the public crate. Rust
+clients with exhaustive matches need arms for the new variants. JSON readers that ignore unknown
+fields accept `open_items` in format 1. Readers that validate the previous set of causes need to
+accept the new values.
 
 ## What counts as breaking
 

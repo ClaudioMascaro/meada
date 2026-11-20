@@ -18682,5 +18682,202 @@
         }
       ]
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#1",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/derived.rs::shadowed::reqwest.get#2",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/dynamic.rs::looped::reqwest.get#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/alias/renamed-any",
+        "example.com/acme/conformance::http::ANY::/echo",
+        "example.com/acme/conformance::http::GET::/",
+        "example.com/acme/conformance::http::GET::/about",
+        "example.com/acme/conformance::http::GET::/accounts",
+        "example.com/acme/conformance::http::GET::/admin/dashboard",
+        "example.com/acme/conformance::http::GET::/admin/stats",
+        "example.com/acme/conformance::http::GET::/alias/renamed",
+        "example.com/acme/conformance::http::GET::/api/files/{}",
+        "example.com/acme/conformance::http::GET::/api/ping",
+        "example.com/acme/conformance::http::GET::/api/v1/items",
+        "example.com/acme/conformance::http::GET::/api/v1/items/{}",
+        "example.com/acme/conformance::http::GET::/api/v2/items",
+        "example.com/acme/conformance::http::GET::/api/v2/items/{}",
+        "example.com/acme/conformance::http::GET::/blobs/{}",
+        "example.com/acme/conformance::http::GET::/bound",
+        "example.com/acme/conformance::http::GET::/files/{}",
+        "example.com/acme/conformance::http::GET::/flat/page",
+        "example.com/acme/conformance::http::GET::/health",
+        "example.com/acme/conformance::http::GET::/hello",
+        "example.com/acme/conformance::http::GET::/hello/{}",
+        "example.com/acme/conformance::http::GET::/legacy/old",
+        "example.com/acme/conformance::http::GET::/legacy/old/{}",
+        "example.com/acme/conformance::http::GET::/more/extras",
+        "example.com/acme/conformance::http::GET::/orders",
+        "example.com/acme/conformance::http::GET::/ping",
+        "example.com/acme/conformance::http::GET::/posts",
+        "example.com/acme/conformance::http::GET::/posts/files/{}",
+        "example.com/acme/conformance::http::GET::/posts/search",
+        "example.com/acme/conformance::http::GET::/posts/{}",
+        "example.com/acme/conformance::http::GET::/shadowed",
+        "example.com/acme/conformance::http::GET::/status",
+        "example.com/acme/conformance::http::GET::/stray",
+        "example.com/acme/conformance::http::GET::/stray/{}",
+        "example.com/acme/conformance::http::GET::/tools/audit",
+        "example.com/acme/conformance::http::GET::/v1/admin/accounts/{}",
+        "example.com/acme/conformance::http::GET::/{raw}"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/dynamic.rs::unresolved::reqwest.get#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/alias/renamed-any",
+        "example.com/acme/conformance::http::ANY::/echo",
+        "example.com/acme/conformance::http::GET::/",
+        "example.com/acme/conformance::http::GET::/about",
+        "example.com/acme/conformance::http::GET::/accounts",
+        "example.com/acme/conformance::http::GET::/admin/dashboard",
+        "example.com/acme/conformance::http::GET::/admin/stats",
+        "example.com/acme/conformance::http::GET::/alias/renamed",
+        "example.com/acme/conformance::http::GET::/api/files/{}",
+        "example.com/acme/conformance::http::GET::/api/ping",
+        "example.com/acme/conformance::http::GET::/api/v1/items",
+        "example.com/acme/conformance::http::GET::/api/v1/items/{}",
+        "example.com/acme/conformance::http::GET::/api/v2/items",
+        "example.com/acme/conformance::http::GET::/api/v2/items/{}",
+        "example.com/acme/conformance::http::GET::/blobs/{}",
+        "example.com/acme/conformance::http::GET::/bound",
+        "example.com/acme/conformance::http::GET::/files/{}",
+        "example.com/acme/conformance::http::GET::/flat/page",
+        "example.com/acme/conformance::http::GET::/health",
+        "example.com/acme/conformance::http::GET::/hello",
+        "example.com/acme/conformance::http::GET::/hello/{}",
+        "example.com/acme/conformance::http::GET::/legacy/old",
+        "example.com/acme/conformance::http::GET::/legacy/old/{}",
+        "example.com/acme/conformance::http::GET::/more/extras",
+        "example.com/acme/conformance::http::GET::/orders",
+        "example.com/acme/conformance::http::GET::/ping",
+        "example.com/acme/conformance::http::GET::/posts",
+        "example.com/acme/conformance::http::GET::/posts/files/{}",
+        "example.com/acme/conformance::http::GET::/posts/search",
+        "example.com/acme/conformance::http::GET::/posts/{}",
+        "example.com/acme/conformance::http::GET::/shadowed",
+        "example.com/acme/conformance::http::GET::/status",
+        "example.com/acme/conformance::http::GET::/stray",
+        "example.com/acme/conformance::http::GET::/stray/{}",
+        "example.com/acme/conformance::http::GET::/tools/audit",
+        "example.com/acme/conformance::http::GET::/v1/admin/accounts/{}",
+        "example.com/acme/conformance::http::GET::/{raw}"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/env.rs::optional::reqwest.get#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/env.rs::two_reads::reqwest.get#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/env.rs::two_reads::reqwest.get#1",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::reqwest.get#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base from the return value of var"
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::reqwest.get#1",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/not_env.rs::foreign.read::reqwest.get#2",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/conformance::http::ANY::/alias/renamed-any",
+        "example.com/acme/conformance::http::ANY::/echo",
+        "example.com/acme/conformance::http::GET::/",
+        "example.com/acme/conformance::http::GET::/about",
+        "example.com/acme/conformance::http::GET::/accounts",
+        "example.com/acme/conformance::http::GET::/admin/dashboard",
+        "example.com/acme/conformance::http::GET::/admin/stats",
+        "example.com/acme/conformance::http::GET::/alias/renamed",
+        "example.com/acme/conformance::http::GET::/api/files/{}",
+        "example.com/acme/conformance::http::GET::/api/ping",
+        "example.com/acme/conformance::http::GET::/api/v1/items",
+        "example.com/acme/conformance::http::GET::/api/v1/items/{}",
+        "example.com/acme/conformance::http::GET::/api/v2/items",
+        "example.com/acme/conformance::http::GET::/api/v2/items/{}",
+        "example.com/acme/conformance::http::GET::/blobs/{}",
+        "example.com/acme/conformance::http::GET::/bound",
+        "example.com/acme/conformance::http::GET::/files/{}",
+        "example.com/acme/conformance::http::GET::/flat/page",
+        "example.com/acme/conformance::http::GET::/health",
+        "example.com/acme/conformance::http::GET::/hello",
+        "example.com/acme/conformance::http::GET::/hello/{}",
+        "example.com/acme/conformance::http::GET::/legacy/old",
+        "example.com/acme/conformance::http::GET::/legacy/old/{}",
+        "example.com/acme/conformance::http::GET::/more/extras",
+        "example.com/acme/conformance::http::GET::/orders",
+        "example.com/acme/conformance::http::GET::/ping",
+        "example.com/acme/conformance::http::GET::/posts",
+        "example.com/acme/conformance::http::GET::/posts/files/{}",
+        "example.com/acme/conformance::http::GET::/posts/search",
+        "example.com/acme/conformance::http::GET::/posts/{}",
+        "example.com/acme/conformance::http::GET::/shadowed",
+        "example.com/acme/conformance::http::GET::/status",
+        "example.com/acme/conformance::http::GET::/stray",
+        "example.com/acme/conformance::http::GET::/stray/{}",
+        "example.com/acme/conformance::http::GET::/tools/audit",
+        "example.com/acme/conformance::http::GET::/v1/admin/accounts/{}",
+        "example.com/acme/conformance::http::GET::/{raw}"
+      ]
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.closure::reqwest.get#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base from the return value of var"
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/not_env.rs::hidden.parameter::reqwest.get#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base from the return value of var"
+    },
+    {
+      "call": "example.com/acme/conformance::crates/worker/src/not_env.rs::other.bare::reqwest.get#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    }
   ]
 }

@@ -724,6 +724,7 @@ pub(crate) fn items(
                     enclosing: None,
                     candidates: choices.candidates.get(id).cloned().unwrap_or_default(),
                     cause: None,
+                    literal_coverage: None,
                     limit: None,
                 },
                 decided.contains(id.as_str()),

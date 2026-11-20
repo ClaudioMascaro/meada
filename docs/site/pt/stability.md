@@ -17,7 +17,7 @@ Estas ferramentas, sempre com estes nomes. Nenhuma escreve. Uma versão menor po
 | `search` | `query` | texto, obrigatório | | Nome a procurar, sem distinguir maiúsculas. |
 | `search` | `kind` | texto, opcional | todos | Restringe a um tipo (lista abaixo). |
 | `search` | `budget` | inteiro sem sinal de 32 bits, opcional | 2.000 | Orçamento de tokens da resposta. |
-| `context` | `symbol` | texto, obrigatório | | Nome do símbolo, `<caminho>::<nome>` ou identidade completa; um recurso (`resource::<tipo>::<id>`) ou um canal (`channel::<broker>::<nome>`). |
+| `context` | `symbol` | texto, obrigatório | | Nome do símbolo, `<caminho>::<nome>` ou identidade completa; um recurso (`resource::<tipo>::<id>`), um canal (`channel::<broker>::<nome>`) ou uma rota (`http::GET::/orders`). |
 | `context` | `budget` | inteiro sem sinal de 32 bits, opcional | 2.000 | Orçamento de tokens da resposta. |
 | `trace` | `from` | texto, opcional | | Início: um símbolo, uma rota (`GET /users/{}` ou seu contrato), um call site ou um processo (`process::<identidade do ponto de entrada>`, só `down`). |
 | `trace` | `changes` | texto, opcional | | `uncommitted`: parte dos símbolos que o diff da árvore de trabalho toca. Hoje é o único valor aceito. |
@@ -136,7 +136,8 @@ O export de um repositório é JSON indentado e terminado por uma quebra de linh
 | `communities` | `name`, `members`. |
 | `links` | `consumer`, `provider`, `contract`, `level`, `reason`, `by`, `p`, `drift` (`missing`, `unchecked`). |
 | `processes` | `entry_point`, `kind` (`route`, `export`, `channel` ou `program`), `label`, `steps`. |
-| `stale_decisions` | `call`, `target`, `cause`. |
+| `open_items` | Os itens abertos do repositório: `call`, `kind` (`ambiguous-link` ou `dynamic-url`), `candidates` (targets completos, únicos e ordenados), e `limit` quando presente. |
+| `stale_decisions` | As decisões que não se aplicam: `call`, `target`, `cause` e `expected_kind` para `wrong-kind`. |
 | `uses` | `contract`, `site`, `at`, `level` (`exact` ou `inferred`). |
 | `policy_grants` | `contract`, `site`, `at`. |
 
@@ -148,7 +149,12 @@ Os campos de `shape` (`source`, `fields`, `open`, `scalars`, `declared`, `option
 - `imports[].how`: `exports`, `types`, `module`, `main`, `path`, `outDir`, `moduleName`, `topLevel`, `crateName`, `modulePath`, `package` e `namespace`;
 - `steps[].via`: `entry`, `call` e `link`;
 - `steps[].mark`: `cycle`, `seen`, `ambiguous`, `unresolved`, `no-provider`, `produces`, `consumes` e `depth-limit`;
-- `stale_decisions[].cause`: `call-gone`, `item-not-open`, `target-gone` e `not-candidate`.
+- Os valores de `stale_decisions[].cause` são `call-gone`, `item-not-open`, `wrong-kind`, `unknown-repository`, `target-gone`, `no-candidates`, `not-candidate`.
+
+As novas variantes de `meada_core::export::Cause` exigem uma versão principal da crate pública.
+Clientes Rust que fazem `match` exaustivo precisam tratar as novas variantes. Leitores JSON
+tolerantes a campos desconhecidos aceitam `open_items` no formato 1. Um leitor que valida o conjunto
+antigo de causas precisa aceitar as novas.
 
 ## O que é uma quebra
 

@@ -237,6 +237,7 @@ fn a_base_a_call_returns_makes_an_open_item_that_names_the_callee() {
     assert!(
         listed.contains(
             "client.go:16  http.Get(c.baseV2() + \"/orders\")\n  \
+             kind = \"dynamic-url\"\n  \
              limit: base from the return value of c.baseV2\n  1) "
         ),
         "{listed}"
@@ -314,7 +315,8 @@ fn an_ambiguous_link_decision_for_an_unread_base_goes_stale() {
     assert!(
         listed.contains(
             "stale decision: example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0 \
-             -> example.com/acme/api::http::GET::/v2/orders (item no longer open)"
+             -> example.com/acme/api::http::GET::/v2/orders (kind `ambiguous-link` needs to be \
+             `dynamic-url`. Use kind = \"dynamic-url\")"
         ),
         "{listed}"
     );
@@ -760,4 +762,140 @@ fn a_rotating_go_wrapper_leaves_its_neighbors_readable() {
         );
     }
     assert!(since.elapsed() < std::time::Duration::from_secs(20));
+}
+
+#[test]
+fn exported_open_items_supply_canonical_decisions_and_keep_the_full_candidate_set() {
+    let (web, _, _) = chain("items_export_contract");
+    let read = || Engine::open(&web).unwrap().export().unwrap();
+    let first = read();
+    assert_eq!(read(), first);
+    let parsed = meada_core::export::parse(&first).unwrap();
+    assert_eq!(parsed.open_items.len(), 2);
+    let decoded: serde_json::Value = serde_json::from_str(&first).unwrap();
+    let data = decoded["open_items"].as_array().unwrap();
+    assert_eq!(data.len(), 2, "{data:?}");
+    assert_eq!(data[0]["kind"], "ambiguous-link");
+    assert_eq!(data[1]["kind"], "dynamic-url");
+    assert!(data[0]["call"].as_str() < data[1]["call"].as_str());
+    let mut decisions = Vec::new();
+    for item in data {
+        let candidates = item["candidates"].as_array().unwrap();
+        let targets = candidates
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert!(!targets.is_empty() && targets.windows(2).all(|pair| pair[0] < pair[1]));
+        let pick = targets[0];
+        let (repo, contract) = pick.split_once("::").unwrap();
+        decisions.push((
+            item["call"].as_str().unwrap(),
+            item["kind"].as_str().unwrap(),
+            repo,
+            contract,
+            pick,
+        ));
+    }
+    let text = decisions.iter().map(|(call, kind, _, _, pick)| {
+        format!("[[decision]]\ncall = {call:?}\nkind = {kind:?}\ntarget = {pick:?}\nby = \"human\"\n\n")
+    }).collect::<String>();
+    fs::write(web.join("meada.decisions.toml"), text).unwrap();
+    let applied: serde_json::Value = serde_json::from_str(&read()).unwrap();
+    assert!(applied.get("open_items").is_none(), "{applied}");
+    for (call, _, repo, contract, _) in decisions {
+        let links: Vec<_> = applied["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|l| l["consumer"] == call)
+            .collect();
+        assert!(matches!(links.as_slice(), [l] if l["level"] == "decided"
+            && l["contract"] == contract && l["provider"].as_str().unwrap().starts_with(&format!("{repo}::"))));
+    }
+    let generated: serde_json::Value =
+        serde_json::from_str(&generated("items_export_many").export().unwrap()).unwrap();
+    assert_eq!(
+        generated["open_items"][0]["candidates"]
+            .as_array()
+            .unwrap()
+            .len(),
+        55
+    );
+}
+
+#[test]
+fn a_dynamic_url_without_candidates_explains_method_path_and_missing_peers() {
+    use common::fixture_repo;
+    let peer = "example.com/open/api";
+    let src = r#"
+export function WithPath(base: string) { return fetch(`${base}/v1/orders`); }
+export function WithMethod(input: { url: string }) { return fetch(input.url, { method: 'PATCH' }); }
+export function WithCandidate(base: string) { return fetch(`${base}/orders`); }
+"#;
+    for (case, present, named) in [
+        ("items_url_cause", true, true),
+        ("items_url_missing_peer", false, true),
+        ("items_url_own_scope", false, false),
+    ] {
+        let repo = fixture_repo(
+            case,
+            "open-few",
+            Some("https://example.com/open/client.git"),
+        );
+        fs::remove_dir_all(repo.join("app")).unwrap();
+        fs::remove_dir_all(repo.join("src")).unwrap();
+        fs::write(repo.join("client.ts"), src).unwrap();
+        if named {
+            fs::write(
+                repo.join("meada.toml"),
+                format!("[[peer]]\nrepo = {peer:?}\npath = \"../http-value-flow-api\"\n"),
+            )
+            .unwrap();
+        }
+        if present {
+            let api = fixture_repo(
+                case,
+                "http-value-flow-api",
+                Some("https://example.com/open/api.git"),
+            );
+            let openapi = api.join("openapi.yaml");
+            let content = fs::read_to_string(&openapi)
+                .unwrap()
+                .replace("/api/orders:", "/orders:");
+            fs::write(openapi, content).unwrap();
+        }
+        let engine = Engine::open(&repo).unwrap();
+        let items = engine.local_items().unwrap();
+        assert_eq!(items.len(), 3);
+        let cause = |name| {
+            items
+                .iter()
+                .find(|i| i.id.contains(name))
+                .unwrap()
+                .cause
+                .as_deref()
+        };
+        if present {
+            assert!(cause("WithPath").unwrap().contains("[serve] prefix"));
+            assert!(cause("WithMethod").unwrap().contains("method PATCH"));
+            assert_eq!(cause("WithCandidate"), None);
+        } else {
+            assert!(items.iter().all(|i| i.candidates.is_empty()));
+            assert!(items.iter().all(|i| {
+                i.cause
+                    .as_deref()
+                    .unwrap()
+                    .contains("no repository in the workspace serves a route")
+            }));
+            assert!(
+                items
+                    .iter()
+                    .all(|i| i.cause.as_deref().unwrap().contains(peer) == named)
+            );
+        }
+        let search = engine.search("WithPath", Some("unresolved"), None).unwrap();
+        assert!(search.contains(cause("WithPath").unwrap()), "{search}");
+        let (list, _, ok) = meada(&repo, &["decide", "--list"], "", |_| {});
+        assert!(ok && list.contains(cause("WithPath").unwrap()), "{list}");
+    }
 }

@@ -8,6 +8,13 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Changed
 
+- `meada decide --list` prints the decision kind and summarizes candidates. To see the full
+  list, use `--list --item <id>`. Numbers at the prompt can differ from 1.3 when a dynamic URL's
+  literal fragments fit shorter paths (#803, #804).
+- Exports list open items with their full decision targets. New stale causes distinguish a wrong
+  kind, an unknown repository and an item with no candidates. Rust crates that match every
+  `meada_core::export::Cause` variant must handle the new variants (#802, #805, #939).
+
 - Every orphan line of `meada status` names the scope its absence holds in, as the mark does:
   `orphan resource::s3::unused: no use in the workspace; main.tf:4 ...`, or the repository of a
   workspace of one (`no use in example.com/acme/infra`). It holds for `no use`, `no provisioner`,
@@ -27,6 +34,10 @@ All notable changes to Meada are recorded here. The format follows
   reassigned parameter no longer supplies its caller's original value (#891, #893).
 - Resolve returned string bases, environment keys passed through wrappers and optional query
   suffixes in HTTP clients (#810, #811, #812).
+- Explain why dynamic URLs have no candidates in `meada decide` and MCP `search` (#938).
+- Count linked consumers omitted from HTTP route `context` and point to upward `trace` (#935).
+- Save accepted model decisions before sending the next request, so an interrupted run
+  can resume with the still-open items (#937).
 
 - `meada status` no longer drops the stale and waiting decisions, and the other lines under each
   repository, without a word. When a repository of the workspace is not indexed, is indexed by

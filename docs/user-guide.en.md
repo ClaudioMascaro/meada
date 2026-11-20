@@ -886,6 +886,19 @@ To see the open items:
   of candidates;
 - on the CLI, `meada decide --list` lists the items with numbered candidates.
 
+The `meada decide --list` overview shows the `kind = "..."` that the TOML takes and up to five
+candidates. For a dynamic URL, paths with the fewest characters left uncovered by its literal
+fragments come first. When the call has no literal fragment, the overview shows only the count.
+`meada decide --list --item <id>` prints the full list with the same numbering as the prompt. An
+item with no candidates gives the reason, for example a method with no route or a path that needs a
+provider's `[serve] prefix`.
+
+The optional `open_items` array in the export holds `call`, `kind`, the full sorted list of
+`candidates` to use as `target`, and `limit` when extraction hit a limit.
+
+`--prune` keeps `wrong-kind`, `unknown-repository` and `no-candidates`, along with decisions waiting
+for a missing peer.
+
 ### Deciding as a person
 
 `meada decide`, in the repository's root, shows each open item with numbered candidates. Pick a
@@ -895,6 +908,7 @@ you chose nothing, it writes nothing.
 ```text
 example.com/acme/web::src/status.ts::health::fetch#0
 src/status.ts:3  fetch("/api/health")
+  kind = "ambiguous-link"
   1) example.com/acme/api GET /api/health
   2) example.com/acme/worker GET /api/health
 ```
@@ -905,10 +919,11 @@ An item whose URL starts with a base Meada could not read names that limit on a 
 ```text
 example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0
 client.go:16  http.Get(c.baseV2() + "/orders")
+  kind = "dynamic-url"
   limit: base from the return value of c.baseV2
-  1) example.com/acme/api GET /api/orders
-  2) example.com/acme/api GET /orders
-  3) example.com/acme/api GET /v2/orders
+  1) example.com/acme/api GET /orders
+  2) example.com/acme/api GET /v2/orders
+  3) example.com/acme/api GET /api/orders
 ```
 
 ### The `meada.decisions.toml` file
@@ -944,7 +959,7 @@ link gets level `decided`, and the reason shows who decided.
 
 When the code changes and a decision no longer fits (the call is gone, the item is no longer open,
 the provider is gone or is no longer a candidate), `meada status` shows it as **stale** under the
-repository, and `meada decide --prune` removes it. A decision waiting on a peer not yet found
+repository. A decision waiting on a peer not yet found
 appears separately (`decision waiting on missing peer ...`) and is kept.
 The target must be one of the item's candidates, the ones `meada decide` lists, for a dynamic
 URL too: a target its repository serves but the call cannot reach (another method, or a path the
@@ -1107,7 +1122,7 @@ meada decide [--item <id>] [--dry-run] [--list] [--prune]
 | `--item <id>` | Handles only that item (the id `--list` or `search` prints), even if already decided, to redo it |
 | `--dry-run` | Prints the file that would be written and writes nothing |
 | `--list` | Prints the open items, the stale decisions and those waiting on a missing peer; neither asks nor writes |
-| `--prune` | Removes the stale decisions; keeps those waiting on a missing peer. Does not combine with `--item`, `--dry-run` or `--list` |
+| `--prune` | Prunes stale decisions, keeping those waiting on a missing peer and decisions with `wrong-kind`, `unknown-repository` or `no-candidates`. Does not combine with `--item`, `--dry-run` or `--list` |
 | `--decider` | Asks the model configured by the `MEADA_DECIDER_*` variables instead of a person |
 | `--show-request` | Only with `--decider`: prints each request that would be sent and sends none |
 | `--min-p <p>` | Only with `--decider`: the minimum probability, from 0 to 1, to write (default 0.5) |
@@ -1175,7 +1190,8 @@ which always appear (like `repository`, which is text).
 | `imports` | The imports resolved to a workspace package: `site`, `specifier`, `name`, `level`, `how` and `target` |
 | `communities` | The communities: `name` and `members` (sorted) |
 | `processes` | One process per entry point: `entry_point`, `kind` (`route`, `export`, `channel` or `program`), `label` and `steps` |
-| `stale_decisions` | The decisions that no longer apply: `call`, `target` and `cause` (`call-gone`, `item-not-open`, `target-gone` or `not-candidate`) |
+| `open_items` | Open items in the repository: `call`, `kind` (`ambiguous-link` or `dynamic-url`), `candidates` (all targets, sorted and unique), and `limit` when present. |
+| `stale_decisions` | Decisions that do not apply: `call`, `target`, `cause` and `expected_kind` for `wrong-kind`. `call-gone`, `item-not-open`, `wrong-kind`, `unknown-repository`, `target-gone`, `no-candidates`, `not-candidate`. |
 
 ### Recurring values
 

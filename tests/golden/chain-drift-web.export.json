@@ -3952,5 +3952,68 @@
         }
       }
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/chain/web::src/open.ts::ping::fetch#0",
+      "kind": "ambiguous-link",
+      "candidates": [
+        "example.com/chain/catalog::http::GET::/api/ping",
+        "example.com/chain/gateway::http::GET::/api/ping"
+      ]
+    },
+    {
+      "call": "example.com/chain/web::src/open.ts::rate::fetch#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/chain/catalog::http::GET::/api/batches",
+        "example.com/chain/catalog::http::GET::/api/cached",
+        "example.com/chain/catalog::http::GET::/api/comments",
+        "example.com/chain/catalog::http::GET::/api/comments/summary",
+        "example.com/chain/catalog::http::GET::/api/health",
+        "example.com/chain/catalog::http::GET::/api/labels",
+        "example.com/chain/catalog::http::GET::/api/offers",
+        "example.com/chain/catalog::http::GET::/api/ping",
+        "example.com/chain/catalog::http::GET::/api/products/{}",
+        "example.com/chain/catalog::http::GET::/api/profiles",
+        "example.com/chain/catalog::http::GET::/api/quotes",
+        "example.com/chain/catalog::http::GET::/api/receipts",
+        "example.com/chain/catalog::http::GET::/api/reviews",
+        "example.com/chain/catalog::http::GET::/api/stock",
+        "example.com/chain/catalog::http::GET::/api/stock/{}",
+        "example.com/chain/catalog::http::GET::/api/tags",
+        "example.com/chain/catalog::http::GET::/api/tickets",
+        "example.com/chain/gateway::http::GET::/api/carriers",
+        "example.com/chain/gateway::http::GET::/api/generated",
+        "example.com/chain/gateway::http::GET::/api/health",
+        "example.com/chain/gateway::http::GET::/api/inventory/{}",
+        "example.com/chain/gateway::http::GET::/api/inventory/{}/image",
+        "example.com/chain/gateway::http::GET::/api/inventory/{}/price",
+        "example.com/chain/gateway::http::GET::/api/orders",
+        "example.com/chain/gateway::http::GET::/api/ping",
+        "example.com/chain/gateway::http::GET::/api/shelves",
+        "example.com/chain/gateway::http::GET::/api/shelves/{}",
+        "example.com/chain/gateway::http::GET::/api/shipments/{}"
+      ]
+    },
+    {
+      "call": "example.com/chain/web::src/status.ts::health::fetch#0",
+      "kind": "ambiguous-link",
+      "candidates": [
+        "example.com/chain/catalog::http::GET::/api/health",
+        "example.com/chain/gateway::http::GET::/api/health"
+      ]
+    },
+    {
+      "call": "example.com/chain/web::src/status.ts::track::fetch#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/chain/catalog::http::POST::/api/comments",
+        "example.com/chain/catalog::http::POST::/api/events",
+        "example.com/chain/catalog::http::POST::/api/stock",
+        "example.com/chain/gateway::http::POST::/api/events",
+        "example.com/chain/gateway::http::POST::/api/inventory"
+      ]
+    }
   ]
 }

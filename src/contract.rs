@@ -653,6 +653,16 @@ pub trait ContractKind {
         HashMap::new()
     }
 
+    /// A diagnostic for an unowned item with zero candidates. This is presentation only.
+    fn no_candidates(
+        &self,
+        _consumer: &Consumer,
+        _providers: &mut dyn Iterator<Item = &Provider>,
+        _missing: &str,
+    ) -> Option<String> {
+        None
+    }
+
     /// Whether `provider` is a candidate for `consumer`, which has no contract.
     fn candidate(&self, _consumer: &Consumer, _provider: &Provider) -> bool {
         false
