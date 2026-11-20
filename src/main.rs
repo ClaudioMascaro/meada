@@ -1168,7 +1168,7 @@ fn main() -> ExitCode {
             decider,
             show_request,
             min_p,
-        } => Engine::open(here).and_then(|engine| {
+        } => (|| {
             let options = decide::Options {
                 item,
                 dry_run,
@@ -1178,13 +1178,14 @@ fn main() -> ExitCode {
                 show_request,
                 min_p,
             };
+            let engine = decide::open(here, &options)?;
             decide::run(
                 &engine,
                 &options,
                 &mut std::io::stdin().lock(),
                 &mut std::io::stdout(),
             )
-        }),
+        })(),
         command => Engine::open(here).and_then(|engine| match command {
             Command::Export { .. } => engine.export().map(out),
             _ => engine.refresh(),
