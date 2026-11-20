@@ -3,6 +3,11 @@ info:
   title: Value flow API
   version: 1.0.0
 paths:
+  /:
+    get:
+      responses:
+        '200':
+          description: OK
   /api/orders:
     get:
       responses:

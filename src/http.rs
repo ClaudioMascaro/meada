@@ -348,7 +348,7 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead
         !matches!(p, Part::QuerySuffix) && !matches!(p, Part::Text(t) if t.is_empty())
     });
     let path_parts = end.map_or(&[][..], |end| &parts[..=end]);
-    if path_parts.iter().any(|p| matches!(p, Part::QuerySuffix)) {
+    if path_parts.is_empty() || path_parts.iter().any(|p| matches!(p, Part::QuerySuffix)) {
         return Some((None, None, None));
     }
     let (via, path, lead) = match path_parts.split_first() {
@@ -538,7 +538,7 @@ fn render(parts: &[Part]) -> String {
             | Part::EnvOr(..)
             | Part::Read { .. }
             | Part::Invoke { .. }
-            | Part::EnvKey(_)
+            | Part::EnvKey { .. }
             | Part::QuerySuffix
             | Part::Ref(_)
             | Part::Limit(_)
@@ -761,32 +761,34 @@ impl ContractKind for Http {
     }
 
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
-        let mut found = Vec::new();
-        // One reader of each shape source for the whole extraction: each budget per file once.
-        let mut literals = Literals::default();
-        // One reader of Backstage's `app-config*.yaml` for the extraction (`ts::Config`).
-        let config = ts::Config::new(indexed);
-        let mut consumers = ts::consumers(code, &config, &mut literals);
-        let (providers, mounted) = ts::providers(code, &mut literals);
-        ts::name(&mut consumers, &mounted);
-        found.extend(consumers);
-        found.extend(providers);
-        found.extend(ts::unfollowed(code, &config));
-        found.extend(python::consumers(code));
-        found.extend(rust::providers(code));
-        found.extend(go::providers(code));
-        found.extend(go::consumers(code));
-        found.extend(python::providers(code));
-        found.extend(java::providers(code));
-        found.extend(csharp::providers(code));
-        found.extend(csharp::minimal_providers(code));
-        found.extend(kotlin::providers(code));
-        found.extend(swift::providers(code));
-        found.extend(kotlin::consumers(code, indexed));
-        found.extend(java::consumers(code, indexed));
-        found.extend(csharp::consumers(code, indexed));
-        found.extend(swift::consumers(code));
-        found
+        code.with_returned_strings(|| {
+            let mut found = Vec::new();
+            // One reader of each shape source for the whole extraction: each budget per file once.
+            let mut literals = Literals::default();
+            // One reader of Backstage's `app-config*.yaml` for the extraction (`ts::Config`).
+            let config = ts::Config::new(indexed);
+            let mut consumers = ts::consumers(code, &config, &mut literals);
+            let (providers, mounted) = ts::providers(code, &mut literals);
+            ts::name(&mut consumers, &mounted);
+            found.extend(consumers);
+            found.extend(providers);
+            found.extend(ts::unfollowed(code, &config));
+            found.extend(python::consumers(code));
+            found.extend(rust::providers(code));
+            found.extend(go::providers(code));
+            found.extend(go::consumers(code));
+            found.extend(python::providers(code));
+            found.extend(java::providers(code));
+            found.extend(csharp::providers(code));
+            found.extend(csharp::minimal_providers(code));
+            found.extend(kotlin::providers(code));
+            found.extend(swift::providers(code));
+            found.extend(kotlin::consumers(code, indexed));
+            found.extend(java::consumers(code, indexed));
+            found.extend(csharp::consumers(code, indexed));
+            found.extend(swift::consumers(code));
+            found
+        })
     }
 
     /// Keeps, of the two readings of a `${X:default}` base, the one that applies

@@ -10061,9 +10061,9 @@
       "via": "host:api.example.com"
     },
     {
-      "contract": null,
+      "contract": "http::POST::/built",
       "site": "example.com/acme/conformance::clients/dynamic.py::computed::requests.post#0",
-      "via": null
+      "via": "host:api.example.com"
     },
     {
       "contract": null,
@@ -11894,7 +11894,8 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::clients/dynamic.py::computed::requests.post#0",
-          "mark": "unresolved"
+          "mark": "no-provider",
+          "contract": "http::POST::/built"
         },
         {
           "depth": 1,

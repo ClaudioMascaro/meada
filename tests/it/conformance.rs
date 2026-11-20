@@ -4922,7 +4922,7 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
         ),
         (
             "http::GET::/rooted",
-            "",
+            "host:config.example.com",
             &at("Reads.Run(int)", "unknown.GetAsync#0"),
         ),
         // Reassigned.Inner.Run()
@@ -4982,7 +4982,11 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
             &at("Settings.Run()", "http.GetAsync#1"),
         ),
         // Unread.Run()
-        ("unresolved", "", &at("Unread.Run()", "http.GetAsync#0")),
+        (
+            "http::GET::/x",
+            "host:lookup.example.com",
+            &at("Unread.Run()", "http.GetAsync#0"),
+        ),
         // Verbs.Run(int)
         (
             "http::DELETE::/orders/3",
@@ -9439,7 +9443,7 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
         ("http::GET::/wrapped", api, &wrap("Wrapped", "get#0")),
         ("http::GET::/users/42", api, &wrap("Wrapped", "getUser#0")),
         ("http::PUT::/wrapped/put", api, &wrap("Wrapped", "send#0")),
-        ("unresolved", "", &wrap("Wrapped", "get#1")),
+        ("http::GET::/", api, &wrap("Wrapped", "get#1")),
         ("http::GET::/cycle", api, &wrap("Cycle", "ping#0")),
         ("http::GET::/", api, &wrap("pong", "ping#0")),
         // resty: the base URL of the client that issued the request.
@@ -10234,9 +10238,13 @@ fn rust_calls_spelled_like_an_environment_read_but_not_one_are_not_read() {
     };
     let site = |function: &str| site2(function, 0);
     let expected = triples(&[
-        // An `env` the file defines, and `env::var` with no `use std::env` in scope: the base is a
-        // hole, not a variable.
-        ("unresolved", "", &site("own_module")),
+        // The local `env::var` gives the URL its body returns. A bare `env::var` with
+        // no definition or import has no proven value.
+        (
+            "http::GET::/OWN_URL/own",
+            "host:api.example.com",
+            &site("own_module"),
+        ),
         ("unresolved", "", &site("other.bare")),
         // A parameter or a closure named `var` hides `use std::env::var`.
         ("unresolved", "", &site("hidden.parameter")),
@@ -10994,10 +11002,14 @@ fn python_wrapper_defaults_fill_the_arguments_a_caller_leaves_out() {
 fn python_calls_whose_path_cannot_be_evaluated_are_unresolved_consumers() {
     let site = |function: &str, call: &str| format!("clients/dynamic.py::{function}::{call}");
     let expected = triples(&[
-        // `str.format`, `%` and a function's result are not folded.
+        // `str.format` and `%` stay unread. The function returns a constant plus text.
         ("unresolved", "", &site("formatted", "requests.get#0")),
         ("unresolved", "", &site("percent", "requests.delete#0")),
-        ("unresolved", "", &site("computed", "requests.post#0")),
+        (
+            "http::POST::/built",
+            "host:api.example.com",
+            &site("computed", "requests.post#0"),
+        ),
         // A method no caller gives: the host is still known.
         (
             "unresolved",
@@ -13436,8 +13448,12 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
             api,
             &at("guarded(session:)", "session.data#0"),
         ),
+        (
+            "http::GET::/lookup",
+            api,
+            &unresolved("URLSession.shared.data#0"),
+        ),
         // A URL or a method Meada cannot evaluate.
-        ("unresolved", "", &unresolved("URLSession.shared.data#0")),
         ("unresolved", "", &unresolved("URLSession.shared.data#1")),
         ("unresolved", "", &unresolved("URLSession.shared.data#2")),
         ("unresolved", api, &unresolved("URLSession.shared.data#3")),

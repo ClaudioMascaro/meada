@@ -8239,7 +8239,7 @@
     {
       "contract": "http::GET::/rooted",
       "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Reads.Run(int)::unknown.GetAsync#0",
-      "via": null
+      "via": "host:config.example.com"
     },
     {
       "contract": "http::GET::/inner",
@@ -8292,9 +8292,9 @@
       "via": "env:Services__Stock"
     },
     {
-      "contract": null,
+      "contract": "http::GET::/x",
       "site": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Run()::http.GetAsync#0",
-      "via": null
+      "via": "host:lookup.example.com"
     },
     {
       "contract": "http::DELETE::/orders/3",
@@ -10388,7 +10388,8 @@
           "level": null,
           "via": "call",
           "node": "example.com/acme/conformance::src/Acme.Api/Clients.cs::Acme.Api.Clients.Unread.Run()::http.GetAsync#0",
-          "mark": "unresolved"
+          "mark": "no-provider",
+          "contract": "http::GET::/x"
         },
         {
           "depth": 1,

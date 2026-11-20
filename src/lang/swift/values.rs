@@ -264,7 +264,7 @@ pub(super) fn read(value: &Value) -> Option<&[Part]> {
         Value::Str(p)
             if matches!(
                 p[..],
-                [Part::Env(_) | Part::EnvKey(_) | Part::Hole | Part::Limit(_)]
+                [Part::Env(_) | Part::EnvKey { .. } | Part::Hole | Part::Limit(_)]
             ) =>
         {
             Some(p)

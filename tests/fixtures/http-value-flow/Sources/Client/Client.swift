@@ -9,10 +9,20 @@ struct Client {
     func ViaMethod() async throws {
         _ = try await URLSession.shared.data(from: URL(string: methodBase() + "/api/orders")!)
     }
+    func methodPrefix() -> String { ProcessInfo.processInfo.environment["API_URL"]! + "/v2" }
+    func MethodWithPrefix() async throws {
+        _ = try await URLSession.shared.data(from: URL(string: methodPrefix() + "/orders")!)
+    }
 }
 
 func ViaFunction() async throws {
     _ = try await URLSession.shared.data(from: URL(string: functionBase() + "/orders")!)
+}
+
+func plainBase() -> String { ProcessInfo.processInfo.environment["API_URL"]! }
+
+func FunctionWithoutPrefix() async throws {
+    _ = try await URLSession.shared.data(from: URL(string: plainBase() + "/api/orders")!)
 }
 
 func envGet(_ key: String, _ path: String) async throws {

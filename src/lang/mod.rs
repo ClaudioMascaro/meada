@@ -1569,7 +1569,11 @@ pub enum Part {
     /// fallbacks and string method calls. Its value is never known.
     Env(String),
     /// The key of a recognized environment read is a name to bind at the call site.
-    EnvKey(String),
+    EnvKey {
+        name: String,
+        /// When the parser only knows the spelling of the reader, the binding to verify.
+        reader: Option<String>,
+    },
     /// A call embedded in a string, identified by the same span as the pack's call fact.
     Invoke {
         callee: String,
@@ -1621,14 +1625,17 @@ impl Part {
             Value::Str(parts) => literal(parts)
                 .filter(|name| !name.is_empty())
                 .map(Self::Env),
-            Value::Ref(name) => Some(Self::EnvKey(name.clone())),
+            Value::Ref(name) => Some(Self::EnvKey {
+                name: name.clone(),
+                reader: None,
+            }),
             _ => None,
         }
     }
 
     pub(crate) fn parameter(&self) -> Option<&str> {
         match self {
-            Self::Ref(name) | Self::EnvKey(name) => Some(name),
+            Self::Ref(name) | Self::EnvKey { name, .. } => Some(name),
             Self::Read {
                 key,
                 parameter: true,
