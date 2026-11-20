@@ -393,7 +393,7 @@ def main():
     try:
         return probe.cross_kind_only() if args.cross_kind_only else probe.run_checks()
     except Exception as e:
-        write(probe.run, 'blocked.txt', f'{type(e).__name__}: {e}\n')
+        write(probe.run, 'execution-error.txt', f'{type(e).__name__}: {e}\n')
         raise
 
 

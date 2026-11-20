@@ -2,6 +2,7 @@
 
 import difflib
 import json
+import subprocess
 import sys
 import traceback
 
@@ -9,6 +10,15 @@ import traceback
 BLOCKED = 2
 ORACLE_FAILED = 3
 DIFFERENCE = 4
+TIMEOUT = 124
+
+
+def execution_exit(error):
+    if isinstance(error, (TimeoutError, subprocess.TimeoutExpired)):
+        return TIMEOUT
+    if isinstance(error, (FileNotFoundError, PermissionError, ModuleNotFoundError)):
+        return BLOCKED
+    return 1
 
 
 class Comparisons:
@@ -48,10 +58,12 @@ def run_driver(main, *, legacy=False):
     """Preserve the meaning of existing assertions and Boolean oracle results."""
     try:
         result = main()
+        if legacy and result == 1:
+            result = ORACLE_FAILED
     except AssertionError:
         traceback.print_exc()
         result = ORACLE_FAILED
-    except Exception:
+    except Exception as error:
         traceback.print_exc()
-        result = BLOCKED
-    sys.exit(ORACLE_FAILED if legacy and result == 1 else result)
+        result = execution_exit(error)
+    sys.exit(result)

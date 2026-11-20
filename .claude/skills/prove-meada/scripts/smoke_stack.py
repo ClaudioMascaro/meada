@@ -10,7 +10,7 @@ import subprocess
 import sys
 import traceback
 
-from proof_result import BLOCKED, ORACLE_FAILED, run_driver
+from proof_result import BLOCKED, ORACLE_FAILED, TIMEOUT, execution_exit, run_driver
 from prove import ROOT, git, mcp_answers
 
 NAMES = tuple(f'meada-smoke-{name}' for name in ('app', 'lib', 'shared'))
@@ -88,10 +88,11 @@ class Smoke:
     def phase(self, name, action, *args):
         try:
             action(self, *args)
-        except Exception:
-            evidence = f'{name}.blocked.txt'
+        except Exception as error:
+            status = {BLOCKED: 'blocked', TIMEOUT: 'timeout'}.get(execution_exit(error), 'error')
+            evidence = f'{name}.{status}.txt'
             (self.run / evidence).write_text(traceback.format_exc())
-            self.record({'name': name, 'result': 'blocked', 'evidence': evidence})
+            self.record({'name': name, 'result': status, 'evidence': evidence})
 
     def clone(self, label, kind):
         pins = PINS[kind]
@@ -593,10 +594,14 @@ def main():
     else:
         from smoke_lifecycle import lifecycle
         lifecycle(rig)
-    counts = {status: sum(row['result'] == status for row in rig.checks) for status in ('pass', 'fail', 'blocked')}
+    counts = {status: sum(row['result'] == status for row in rig.checks)
+              for status in ('pass', 'fail', 'blocked', 'timeout', 'error')}
     save(rig.run / 'result.json', {'counts': counts, 'verdict': 'UNPROVEN'})
     print(f'capture finished: {counts}. Judge against answer-key.md.')
-    return BLOCKED if counts['blocked'] else ORACLE_FAILED if counts['fail'] else 0
+    for status, code in (('timeout', TIMEOUT), ('blocked', BLOCKED), ('error', 1), ('fail', ORACLE_FAILED)):
+        if counts[status]:
+            return code
+    return 0
 
 
 if __name__ == '__main__':

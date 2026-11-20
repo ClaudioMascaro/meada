@@ -274,10 +274,4 @@ if __name__ == '__main__':
     parser.add_argument('--head-bin', required=True)
     parser.add_argument('--run', required=True, help='new evidence directory; never overwrite an earlier run')
     args = parser.parse_args()
-    try:
-        run_driver(lambda: main(args))
-    except Exception as exc:
-        if OUT is not None:
-            write(OUT/'blocked.txt', repr(exc))
-        print(f'BLOCKED: {exc}; raw evidence in {OUT}')
-        raise SystemExit(2)
+    run_driver(lambda: main(args))

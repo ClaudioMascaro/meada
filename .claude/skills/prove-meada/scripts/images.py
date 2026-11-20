@@ -770,9 +770,8 @@ def main():
     try:
         probe.execute()
     except Exception as exc:
-        write(probe.run, 'blocked.txt', repr(exc))
-        print(f'BLOCKED: {exc}; raw evidence in {probe.run}')
-        return 2
+        write(probe.run, 'execution-error.txt', repr(exc))
+        raise
     failures = [s['check'] for s in probe.steps if not s['pass']]
     report = '# Image contract proof\n\n' + '\n'.join(f"- [{'PASS' if s['pass'] else 'FAIL'}] {s['check']}: {s['detail']}" for s in probe.steps)
     write(probe.run, 'images.md', report+'\n')

@@ -432,9 +432,8 @@ def main():
         dump(run, 'result.json', {'result': 'checks passed' if not failed else 'BROKEN', 'failed': len(failed), 'checks': len(probe.checks)})
         return comparisons.exit_code(failed)
     except Exception:
-        write(run, 'blocked.txt', traceback.format_exc())
-        print(traceback.format_exc(), flush=True)
-        return 2
+        write(run, 'execution-error.txt', traceback.format_exc())
+        raise
 
 
 def console(probe, args, run, manifest, queries, texts):

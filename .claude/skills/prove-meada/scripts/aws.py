@@ -601,10 +601,9 @@ def main():
               + '\n'.join('- ' + c['check'] + ': ' + c['detail'] for c in failed) + '\n')
         return comparisons.exit_code(failed)
     except Exception:
-        write(run, 'blocked.txt', traceback.format_exc())
-        write(run, 'receipt.md', '# AWS #658 proof\n\nBLOCKED: verifier or surface failed; see blocked.txt and raw evidence.\n')
-        print(traceback.format_exc(), flush=True)
-        return 2
+        write(run, 'execution-error.txt', traceback.format_exc())
+        write(run, 'receipt.md', '# AWS #658 proof\n\nExecution stopped; see execution-error.txt and raw evidence.\n')
+        raise
 
 
 if __name__ == '__main__':

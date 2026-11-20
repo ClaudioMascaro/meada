@@ -622,8 +622,9 @@ def main():
     try:
         result=proof.run_checks();proof.receipt();return result
     except Exception:
-        error=traceback.format_exc();write(proof.run,'blocked.txt',error)
-        proof.receipt(error);print(error,flush=True);return 2
+        error=traceback.format_exc();write(proof.run,'execution-error.txt',error)
+        proof.receipt(error)
+        raise
 
 
 if __name__=='__main__':

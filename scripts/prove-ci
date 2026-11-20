@@ -392,9 +392,9 @@ def selftest():
             assert f'- Steps: {steps}; exit 0: {steps - (code != 0)}' in summary, summary
             lists = {'Differences': 1, 'Failed': 3, 'BLOCKED': 2}
             assert all((f'- {label}: cli-mcp\n' in summary) == (lists[label] == code) for label in lists), summary
-    # A parity failure, oracle failure, crash and timeout keep distinct receipts and the next
+    # A comparison, oracle failure, missing input, crash and timeout keep distinct receipts and the next
     # driver's evidence. This exercises the drivers' protocol independently of prove.py's exit 1.
-    for code, outcome in ((4, 'difference'), (3, 'oracle-failed'), (2, 'blocked'), (124, 'timeout')):
+    for code, outcome in ((4, 'difference'), (3, 'oracle-failed'), (2, 'blocked'), (1, 'failed'), (124, 'timeout')):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
             def fake_driver(args, **kwargs):
                 if str(SCRIPTS / 'http-iac.py') in args:
@@ -407,6 +407,14 @@ def selftest():
             steps = {step['name']: step for step in json.loads((run / 'receipt.json').read_text())['steps']}
             assert steps['http-iac']['outcome'] == outcome and steps['iac-http-routes']['exit_code'] == 0
             assert bool(result) == (code != 4) and (run / 'logs/http-iac.log').read_text() == 'driver evidence\n'
+    # The driver adapter must return the same codes for real Python exceptions. In particular,
+    # a broken legacy driver must never inherit the status of a Boolean oracle returning 1.
+    for exception, code in (('AssertionError', 3), ('FileNotFoundError', 2), ('RuntimeError', 1), ('TimeoutError', 124)):
+        probe = ('from proof_result import run_driver\n'
+                 f'def broken(): raise {exception}("probe evidence")\n'
+                 'run_driver(broken, legacy=True)')
+        result = subprocess.run([sys.executable, '-B', '-c', probe], cwd=SCRIPTS, capture_output=True, text=True)
+        assert result.returncode == code and f'{exception}: probe evidence' in result.stderr, result
     # `rebless` reports no difference by its exit: its exit 1 is a crash, a failed capture.
     goldens = dict.fromkeys(SURFACES, False)
     goldens['goldens'] = True

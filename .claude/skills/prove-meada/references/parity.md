@@ -25,8 +25,9 @@ The source and answer key for a step are in its Scope row and its own evidence d
 | `smoke_stack.py` | PR merge-base for resolution and lifecycle, plus named reference revisions for upgrade and SQS | The public corpus pins are in the receipt. Scope follows the source, running-probe transport records and complete per-site expected answers. #941 and #943 supply the historical upgrade pair. 68f1c0b supplies the SQS extraction control. |
 | `release-diff.py` | Previous release tag, Release diff workflow | Exports and orphan policy deltas are retained for the release reviewer. It exits 0 with a diff and 2 on a capture failure. |
 
-The PR comparison drivers use exit 4 for a comparison delta, 3 for a rejected oracle and 2
-when execution was blocked. The runner separately records timeout 124 and its job deadline.
+The PR comparison drivers use exit 4 for a comparison delta, 3 for a rejected oracle, 2 for
+a missing input or unavailable dependency and 1 for a crash. `prove.py run`, `values` and
+`iac` retain their documented exit codes above. The runner records timeout 124 and its job deadline.
 `comparisons.jsonl` identifies each comparison and its expected, actual and unified diff
 files when they differ. The A8 shell driver keeps its own `peers.md` and full export diffs.
 Some older drivers use their own checks JSON. An oracle failure still fails capture when
