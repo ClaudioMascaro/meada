@@ -49,6 +49,10 @@ fresh, and how things in it are named.
   the files that changed.
 - It then reindexes those files and their dependents, which are the importers of their exports
   and the contract links that touch them, before it answers.
+- The index compatibility golden includes the extraction revision. When a fix changes the rows
+  that unchanged files should produce without changing their stored shape, bump the revision.
+  Local index opens rebuild older indexes atomically. In server mode `meada index --workspace`
+  performs the rebuild.
 - Refreshing is a write inside Meada's own index. It is the only write an MCP call makes
   (ADR 0002, invariants 3 and 4).
 - (Amended 2026-10-21; in server mode, ADR 0011, freshness is by command: the server stats
