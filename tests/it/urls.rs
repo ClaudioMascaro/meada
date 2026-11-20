@@ -736,6 +736,10 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
     );
     assert_eq!(linked("src/local.ts"), ["http::GET::/api/vets"]);
     assert_eq!(linked("src/plain.js"), ["http::GET::/api/vets"]);
+    assert_eq!(
+        linked("src/env.ts"),
+        ["http::GET::/api/owners", "http::GET::/api/vets"]
+    );
     // An arrow function with a block body folds when the block is one `return` and not otherwise.
     assert_eq!(linked("src/block.ts"), ["http::GET::/api/vets"]);
     // `new URL(x)` of one argument is `x` (WHATWG URL Standard), through `toString()`, `href`,
@@ -790,12 +794,10 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
         expected.map(|(k, v)| (k.to_string(), v)).into();
     assert_eq!(consumers, expected);
     assert_eq!(linked("src/join.ts").len(), 11);
-    // A base read from the environment, a body of two statements, a name match and a name a
-    // parameter, a `catch` binding or a local hides fold nothing; neither does a `new URL`
-    // written through its path or host, nor a `URL` the file declares or imports from the
-    // repository.
+    // An unknown return, a name match and a name a parameter, a `catch` binding or a local
+    // hides fold nothing; neither does a `new URL` written through its path or host, nor a `URL`
+    // the file declares or imports from the repository.
     for file in [
-        "src/env.ts",
         "src/statements.ts",
         "src/names.ts",
         "src/hidden.ts",

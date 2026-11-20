@@ -138,5 +138,41 @@
       "level": "ambiguous",
       "reason": "2 providers fit; host unresolved; served by example.com/acme/backend"
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/acme/client::src/client.ts::dynamic::fetch#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/api::http::GET::/api/health",
+        "example.com/acme/api::http::GET::/api/reports/{}",
+        "example.com/acme/api::http::GET::/api/users",
+        "example.com/acme/api::http::GET::/api/users/{}",
+        "example.com/acme/backend::http::GET::/api/users",
+        "example.com/acme/backend::http::GET::/api/users/{}",
+        "example.com/acme/backend::http::GET::/guarded",
+        "example.com/acme/backend::http::GET::/health",
+        "example.com/acme/backend::http::GET::/orders/{}",
+        "example.com/acme/backend::http::GET::/v1/old"
+      ],
+      "limit": "base from the parameter endpoint"
+    },
+    {
+      "call": "example.com/acme/client::src/client.ts::origin::fetch#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/api::http::GET::/api/health",
+        "example.com/acme/backend::http::GET::/health"
+      ],
+      "limit": "base Meada could not read"
+    },
+    {
+      "call": "example.com/acme/client::src/client.ts::users::fetch#0",
+      "kind": "ambiguous-link",
+      "candidates": [
+        "example.com/acme/api::http::GET::/api/users",
+        "example.com/acme/backend::http::GET::/api/users"
+      ]
+    }
   ]
 }

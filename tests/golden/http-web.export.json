@@ -458,5 +458,27 @@
       "level": "inferred",
       "reason": "base URL from API_URL, a base_url_env of peer example.com/acme/api"
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/acme/web::src/unlinked.ts::anyMethod::fetch#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/api::http::DELETE::/api/users/{}",
+        "example.com/acme/api::http::GET::/api/users",
+        "example.com/acme/api::http::GET::/api/users/{}",
+        "example.com/acme/api::http::POST::/api/users"
+      ]
+    },
+    {
+      "call": "example.com/acme/web::src/unlinked.ts::dynamic::fetch#0",
+      "kind": "dynamic-url",
+      "candidates": [
+        "example.com/acme/api::http::GET::/api/health",
+        "example.com/acme/api::http::GET::/api/reports/{}",
+        "example.com/acme/api::http::GET::/api/users",
+        "example.com/acme/api::http::GET::/api/users/{}"
+      ]
+    }
   ]
 }
