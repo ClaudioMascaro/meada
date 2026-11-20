@@ -1104,6 +1104,10 @@ pub struct Def {
     /// this evidence, a Python or JS/TS function can also return implicitly.
     #[serde(default, skip_serializing_if = "lean")]
     pub terminal_return: bool,
+    /// A synchronous JS/TS function whose entire body is one return expression.
+    /// Contract kinds outside HTTP only fold a string written in this form.
+    #[serde(default, skip_serializing_if = "lean")]
+    pub single_return: bool,
     /// A function's declared return type, inside the `Promise` and `NextResponse` it is wrapped
     /// in (`Promise<z.infer<typeof S>>` gives that schema), when it lists any fields. Not kept in
     /// the index (see `Call::args`).
@@ -1150,6 +1154,7 @@ impl Def {
             return_values: Vec::new(),
             reassigned_params: Vec::new(),
             terminal_return: false,
+            single_return: false,
             returns: None,
             type_params: Vec::new(),
             result: None,
