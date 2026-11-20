@@ -17,6 +17,7 @@ NAMES = tuple(f'meada-smoke-{name}' for name in ('app', 'lib', 'shared'))
 ORIGINS = {name: f'https://github.com/ClaudioMascaro/{name}.git' for name in NAMES}
 APP, LIB, SHARED = (f'github.com/claudiomascaro/{name}' for name in NAMES)
 ROUTE = 'http::POST::/orders'
+SHARED_HOST = 'host:shared.smoke.example'
 ORDERS = {repo: f'{repo}::openapi.yaml::POST /orders' for repo in (LIB, SHARED)}
 QUEUE = 'channel::sqs::smoke-orders'
 QUEUE_NODE = f'{LIB}::queues.tf::aws_sqs_queue.orders'
@@ -173,11 +174,21 @@ def configured_order(links, repo=LIB):
             and 'SMOKE_ORDERS_URL' in links[0]['reason'] and repo in links[0]['reason'])
 
 
-def overridden_order(links):
+def overridden_order(observation):
+    consumers, links = observation['consumers'], observation['links']
+    if len(consumers) != 1:
+        return False
+    consumer = consumers[0]
+    if consumer['contract'] not in (None, ROUTE) or consumer['via'] not in (None, SHARED_HOST):
+        return False
     if not links:
-        return True  # The issues permit no established host.
-    return (len(links) == 1 and links[0]['provider'] == ORDERS[SHARED]
-            and links[0]['contract'] == ROUTE and links[0]['level'] in ('exact', 'inferred'))
+        return True
+    if len(links) == 1:
+        return (consumer['via'] == SHARED_HOST and links[0]['provider'] == ORDERS[SHARED]
+                and links[0]['contract'] == ROUTE and links[0]['level'] in ('exact', 'inferred'))
+    return (consumer['via'] is None and len(links) == 2
+            and {row['provider'] for row in links} == set(ORDERS.values())
+            and all(row['contract'] == ROUTE and row['level'] == 'ambiguous' for row in links))
 
 
 HTTP = (
@@ -261,9 +272,9 @@ def http_cases(rig, binary, app, data):
         expected = {'contract': ROUTE, 'provider': ORDERS[LIB],
                     'level': 'inferred', 'reason': 'via SMOKE_ORDERS_URL; lib is the declaring peer'}
         if issue in ('#948', '#949'):
-            expected = {'correct provider': ORDERS[SHARED], 'otherwise': 'unresolved; must not select lib'}
-        links = evidence['links']
-        matches = overridden_order(links) if issue in ('#948', '#949') else configured_order(links)
+            expected = {'correct provider': ORDERS[SHARED], 'via': SHARED_HOST,
+                        'otherwise': 'keep one open consumer with no selected peer'}
+        matches = overridden_order(evidence) if issue in ('#948', '#949') else configured_order(evidence['links'])
         rig.score(binary, f'HTTP {path} {name}' + (f' {issue}' if issue else ''), expected, evidence, matches)
     jvm(rig, data, binary, 'combined', 'java/OrdersClient.java', 'OrdersClient', 'ordersBase')
     jvm(rig, data, binary, 'combined', 'kotlin/Orders.kt', 'KotlinOrders', 'ordersBase')
@@ -444,6 +455,13 @@ def configuration_matrix(rig):
     save(rig.run / 'matrix.json', {'configurations': matrix, 'routes': 96, 'callers': 192})
 
 
+def shadowed_request(observation):
+    consumers = observation['consumers']
+    resolved = [row for row in consumers if (row['contract'], row['via'])
+                == ('http::GET::/persons/hidden', 'host:typed.example.com')]
+    return (not consumers and not observation['links']) or len(resolved) == len(consumers) == 1
+
+
 def kotlin_shadow(rig):
     path = 'src/main/kotlin/example/jvm/Typed.kt'
     fixture = ROOT / 'tests/fixtures/conformance-kotlin'
@@ -462,10 +480,9 @@ def kotlin_shadow(rig):
             witness = endpoint_observation(data, path, 'Typed.typed')
             controls[binary] = witness
             save(rig.run / f'kotlin-shadow-{binary}.json', {'shadowed': got, 'other_class': witness})
-            resolved = [row for row in got['consumers'] if row['contract'] == 'http::GET::/persons/hidden']
             rig.check(f'#952 {binary} Kotlin shadowing, behavior pending maintainer decision',
-                      'retain the documented receiver ceiling or recover the literal GET /persons/hidden',
-                      got, matches=not got['consumers'] or len(resolved) == len(got['consumers']) == 1)
+                      'retain the documented receiver ceiling or recover GET https://typed.example.com/persons/hidden',
+                      got, matches=shadowed_request(got))
     if 'base' in controls:
         rig.check('#952 neighboring Typed.typed control is stable', controls['base'], controls['head'])
 
@@ -522,11 +539,22 @@ def selftest():
              'reason': f'base URL from SMOKE_ORDERS_URL is provided by {LIB}'}
     assert configured_order([right])
     assert not configured_order([dict(right, provider=ORDERS[SHARED])])
-    assert not overridden_order([right]) and overridden_order([])
+    open_order = {'consumers': [{'contract': ROUTE, 'via': None}], 'links': []}
+    assert overridden_order(open_order)
+    assert not overridden_order(dict(open_order, consumers=[]))
+    assert not overridden_order(dict(open_order, links=[right]))
+    ambiguous = [dict(right, provider=provider, level='ambiguous') for provider in ORDERS.values()]
+    assert overridden_order(dict(open_order, links=ambiguous))
+    assert overridden_order({'consumers': [{'contract': ROUTE, 'via': SHARED_HOST}],
+                             'links': [dict(right, provider=ORDERS[SHARED])]})
+    path_only = {'consumers': [{'contract': 'http::GET::/persons/hidden', 'via': None}], 'links': []}
+    assert not shadowed_request(path_only)
+    assert shadowed_request(dict(path_only, consumers=[]))
+    assert shadowed_request(dict(path_only, consumers=[dict(path_only['consumers'][0], via='host:typed.example.com')]))
     assert provision_ok([{'level': 'exact', 'contract': QUEUE, 'provisioner': QUEUE_NODE}], True)
     assert not provision_ok([{'level': 'exact', 'contract': QUEUE, 'provisioner': QUEUE_NODE}], False)
     assert len(HTTP) == 10 and len({(path, name) for path, name, _ in HTTP}) == 10
-    print('smoke-stack selftest: swapped peer and runtime false exact rejected')
+    print('smoke-stack selftest: swapped peer, missing caller, hostless Kotlin path and runtime false exact rejected')
 
 
 def main():

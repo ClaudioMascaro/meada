@@ -38,6 +38,9 @@ local. These cases have no cloud credentials, live service or network.
 The variadic declaration itself has a resource-typed argument without a
 table, separate from the unresolved writer at the SDK call.
 
-All source is indexed alone via the public CLI. MCP queries target the
-transaction sides and the Java and Go controls. Comparing the base on
+All source is indexed alone via the public CLI. MCP search returns the source
+file and contract for each named table. Context on `TransactionExamples.immutableList()`
+shows a writer of `immutable`, and `TransactionExamples.getList()` shows a reader
+of `lookup`. Context on `deferredWrite` shows the unnamed DynamoDB writer, and
+`deferredControl` shows the writer of `defer-control`. Comparing the base on
 this new flow is a separate maintainer decision in #894.

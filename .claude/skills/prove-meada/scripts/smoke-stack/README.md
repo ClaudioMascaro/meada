@@ -18,13 +18,17 @@ The Go and Python recording transports run the pinned sources with
 SMOKE_ORDERS_URL=https://lib.smoke.example. The ordinary clients send POST to
 lib, and the Go deferred result and Python decorator replacement send POST to
 shared. No HTTP request leaves the process. #948 and #949 permit leaving the
-overridden caller open if the host cannot be established. Selecting lib is a
-wrong link. A uniquely selected peer must have the same method and route.
+overridden caller open if the host cannot be established. The consumer still
+appears at the source site, with no selected peer. A link to shared keeps the
+host, method and route from the recording. Selecting lib is a wrong link.
 
 For #810, the same spelling of a private method in unrelated Java and Kotlin
 classes leaves a unique exact code target in each class. The reachability of
 that code hop and the HTTP link are separate checks. Each isolated client,
 and each one-helper rename, keeps its own configured request and lib provider.
+The separate #952 fixture checks the documented receiver limit and the literal
+GET URL `https://typed.example.com/persons/hidden`. The maintainer decides which
+behavior to commit to for the shared-name receiver.
 
 In the SQS probe, publishLiteral and publishOrder write smoke-orders and
 provision at exact to lib's queues.tf::aws_sqs_queue.orders. publishSelected

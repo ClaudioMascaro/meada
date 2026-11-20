@@ -4,6 +4,7 @@ import argparse
 import collections
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 
@@ -12,6 +13,14 @@ from prove import fetch, git, infra, mcp_answers, ROOT
 
 HERE = Path(__file__).resolve().parent
 DYNAMODB = 'resource::dynamodb'
+MCP_SIDE = re.compile(r'(\S+) ([^:]+):[0-9]+ (?:(produces|consumes) )?(resource::dynamodb(?:::\S+)?)(?: |$)')
+CONTEXT = {
+    'immutableList': 'TransactionExamples.immutableList()',
+    'getList': 'TransactionExamples.getList()',
+    'deferredWrite': 'deferredWrite',
+    'deferredControl': 'deferredControl',
+}
+CONTEXT_ROLES = {'writer': 'produces', 'reader': 'consumes'}
 
 
 def key(source):
@@ -35,6 +44,10 @@ def sides(data):
     return sorted(result)
 
 
+def mcp_sides(answer):
+    return [match.groups() for line in answer.splitlines() if (match := MCP_SIDE.match(line))]
+
+
 def selftest():
     source = HERE / 'dynamodb-transactions'
     oracle = key(source)
@@ -48,7 +61,12 @@ def selftest():
         assert sides(doc) == [(file, name, role, contract)]
         doc[field][0]['contract'] = DYNAMODB + '::wrong-table'
         assert sides(doc) != [(file, name, role, contract)]
-    print('DynamoDB transaction selftest: 21 source-keyed sides and wrong-table mutation')
+    expected = [('example.com/transactions', 'Transactions.java', 'consumes', DYNAMODB + '::lookup')]
+    reply = 'example.com/transactions Transactions.java:43 consumes resource::dynamodb::lookup (unresolved)'
+    assert mcp_sides(reply) == expected
+    assert mcp_sides('no symbol matches getList') != expected
+    assert mcp_sides(reply.replace('::lookup', '::wrong-table')) != expected
+    print('DynamoDB transaction selftest: 21 source-keyed sides, wrong table and missing context rejected')
 
 
 def main():
@@ -90,14 +108,23 @@ def main():
             name_at = f'{row[0]} {row[1]} {row[2]} {row[3]}'
             comparisons.compare(name_at, expected_counts[row], actual_counts[row], oracle=True)
         (run / f'{name}-sides.json').write_text(json.dumps({'expected': expected, 'actual': actual}, indent=2))
-        queries = [
-            {'tool': 'search', 'arguments': {'query': table, 'kind': 'resource', 'budget': 6000}}
-            for _, _, _, table in expected if table != DYNAMODB
-        ]
-        queries += [{'tool': 'context', 'arguments': {'symbol': name, 'budget': 6000}}
-                    for name in ('immutableList', 'getList', 'deferredWrite', 'deferredControl')]
+        repository = f'github.com/zz-prove/{name}'
+        queries, reply_key = [], []
+        for file, function, role, contract in expected:
+            if contract != DYNAMODB:
+                queries.append({'tool': 'search', 'arguments': {'query': contract, 'kind': 'resource', 'budget': 6000}})
+                reply_key.append((repository, file, None, contract))
+            if function in CONTEXT:
+                symbol = f'{repository}::{file}::{CONTEXT[function]}'
+                queries.append({'tool': 'context', 'arguments': {'symbol': symbol, 'budget': 6000}})
+                reply_key.append((repository, file, CONTEXT_ROLES[role], contract))
         tools, answers, _ = mcp_answers(binary, source, queries, run / f'{name}-stdio.err')
-        (run / f'{name}-mcp.json').write_text(json.dumps({'queries': queries, 'catalog': tools, 'answers': answers}, indent=2))
+        (run / f'{name}-mcp.json').write_text(json.dumps({
+            'queries': queries, 'catalog': tools, 'answers': answers, 'expected_sides': reply_key,
+        }, indent=2))
+        for query, wanted, answer in zip(queries, reply_key, answers, strict=True):
+            target = query['arguments'].get('query') or query['arguments']['symbol']
+            comparisons.compare(f'MCP {query["tool"]} {target}', [wanted], mcp_sides(answer), oracle=True)
     return comparisons.exit_code()
 
 
