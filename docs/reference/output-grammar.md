@@ -295,7 +295,9 @@ the processes lines go last, only under a budget too small for them.
 symbol, its name as `<path>::<name>` (or its identity when another repository has the same).
 
 **A contract.** Its identifier, then one line per side across the workspace, providers first,
-each followed by the shape the side carries and, for a route's consumers, its drift.
+each followed by the shape the side carries. An HTTP route shows consumers that read fields of
+the response, followed by their drift. When the route has other linked consumers, a line counts
+their distinct sites and names the `trace` query that lists them.
 
 **A declared resource key.** Its repository and canonical key locator, then `provides` and
 `consumes` lines for its directed sides. Each side lists linked `reader:` or `writer:`
@@ -375,6 +377,7 @@ words:
 | side | `  <repository> <role> <side><mark?><orphan-note?>` | A side of the contract; a side linked through another name carries its mark. |
 | drift | `    drift: missing <missing>` | Under a consumer: the field paths it reads that the provider lacks, each with its level. |
 | not checked | `    not checked: <unchecked>` | Under a consumer: the field paths it reads under an open part of the shape. |
+| linked consumers omitted | `  <n> linked <consumer-noun> omitted. See trace with direction "up".` | On an HTTP route with linked consumer sites omitted from the answer. |
 | no contract | `` no <contract-kind> matches `<query>` `` | No side of the contract is in the workspace. |
 | provisioner | `<repository> <place> <address> (root <iac-root>)<mark?>` | A provisioner with its level and reason. |
 | iac type | `type: <iac-type>` | The IaC node's type. |
@@ -404,6 +407,8 @@ words:
 | Field | Form | Meaning |
 | --- | --- | --- |
 | `<last>` | `<number>` | The last line of the span. |
+| `<consumer-noun>` | `consumer` | One omitted consumer. |
+| `<consumer-noun>` | `consumers` | More than one omitted consumer. |
 | `<runner-root>` | ` (root <iac-root>)` | The root module or overlay the runner's evaluation starts from. |
 | `<physical-name>` | `<text>` | The node's `name` argument as static evaluation resolves it, quoted as JSON, or `none`. |
 | `<container>` | `<word>` | The name of a Kubernetes container or Compose service. |
