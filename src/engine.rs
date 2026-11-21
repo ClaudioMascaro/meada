@@ -289,21 +289,29 @@ impl Engine {
         repo::changed(&self.root).ok().map(|dirty| (before, dirty))
     }
 
+    /// Read each repository's index in workspace order and retain its identity on failure.
+    fn each_index<T>(
+        &self,
+        read: impl Fn(&Connection, &Repository) -> Result<T>,
+    ) -> Result<Vec<T>> {
+        (self.dbs.iter().zip(&self.workspace.repos))
+            .map(|(db, m)| read(db, m).map_err(|e| format!("{}: {e}", m.identity).into()))
+            .collect()
+    }
+
     /// The index content of every repository of the workspace, with the contracts its
     /// `meada.toml` declares, in workspace order.
     fn exports(&self) -> Result<Vec<Export>> {
-        let mut exports = (self.dbs.iter().zip(&self.workspace.repos))
-            .map(|(db, m)| {
-                let mut export = index::export(db, &m.identity)?;
-                export.root = m.root.clone();
-                export.decisions = m.decisions.clone();
-                for kind in contract::KINDS {
-                    kind.read_declarations(m, db, &mut export)?;
-                    kind.declare(m, &mut export);
-                }
-                Ok(export)
-            })
-            .collect::<Result<Vec<_>>>()?;
+        let mut exports = self.each_index(|db, m| {
+            let mut export = index::export(db, &m.identity)?;
+            export.root = m.root.clone();
+            export.decisions = m.decisions.clone();
+            for kind in contract::KINDS {
+                kind.read_declarations(m, db, &mut export)?;
+                kind.declare(m, &mut export);
+            }
+            Ok(export)
+        })?;
         // Each kind's step over the whole workspace, once every repository has declared.
         contract::workspace_steps(&mut exports, &self.workspace.repos);
         self.commits(&mut exports);
@@ -452,11 +460,8 @@ impl Engine {
         let repos = &self.workspace.repos;
         let entries = drift_view::entries(repos, &exports, &links);
         let drift = drift_view::counts(repos.len(), &entries);
-        let configs: Vec<Vec<String>> = (self.dbs.iter())
-            .map(config_values::status)
-            .collect::<Result<_>>()?;
-        let kubes: Vec<Option<String>> =
-            (self.dbs.iter()).map(kube::status).collect::<Result<_>>()?;
+        let configs = self.each_index(|db, _| config_values::status(db))?;
+        let kubes = self.each_index(|db, _| kube::status(db))?;
         let orphans = iac::orphans::Scope::new(&exports).reports();
         let mut prepared_status = contract::KINDS
             .iter()
