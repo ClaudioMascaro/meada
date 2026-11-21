@@ -443,6 +443,8 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     .filter(|c| matches!(c, Class::Type(_)));
                 facts.defs.push(Def {
                     result,
+                    non_overridable: kind == Kind::Method
+                        && own_access(node, src) == Access::Private,
                     return_values: function_returns(node, src),
                     ..definition(&inner, kind, node.byte_range(), params)
                 });

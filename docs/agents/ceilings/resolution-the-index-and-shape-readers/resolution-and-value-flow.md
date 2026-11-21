@@ -244,8 +244,12 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
 - The HTTP reader uses `Code::built` to fold strings returned by exact calls of repository
   functions and methods (#810).
   Arguments bind by the usual wrapper rules. Async TypeScript and Python returns require an
-  awaited call. A call with possible repository dispatch alternatives, different returns,
-  an unread part, or a recursive return stays unknown. Return folding shares `EVAL_DEPTH`
+  awaited call. Decorated Python definitions stay unknown because decoration can replace the
+  callable (#949). A Go function with named results and a defer stays unknown unless every
+  deferred call is an empty literal invoked with no arguments (#948). An explicitly private
+  Java or Kotlin method has no override, so an exact call can fold even when an unrelated
+  definition spells its name. A call with possible repository dispatch alternatives, different
+  returns, an unread part, or a recursive return stays unknown. Return folding shares `EVAL_DEPTH`
   and `EVAL_BUDGET` with other value flow and uses `WRAPPER_DEPTH` for nested returned calls.
 - `decide.rs`: `LIST_CANDIDATE_LIMIT` (5) is the number of candidates the unfiltered CLI overview
   shows per item. The focused list, prompt, MCP counts and export use the complete candidate set.

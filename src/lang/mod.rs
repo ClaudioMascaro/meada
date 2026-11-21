@@ -397,6 +397,10 @@ fn lean<T>(_: &T) -> bool {
     !VALUES.get()
 }
 
+fn lean_or_false(value: &bool) -> bool {
+    !*value || lean(value)
+}
+
 /// Runs `f` with `Facts` serializing their values too, for the values cache (ADR 0027): what
 /// `LanguagePack::parse_with` gives, whole. What `LanguagePack::join` sets stays out.
 pub fn with_values<T>(f: impl FnOnce() -> T) -> T {
@@ -1096,6 +1100,13 @@ pub struct Def {
     /// `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub return_values: Vec<Value>,
+    /// Whether the written return expression can be changed by an effect the pack does not
+    /// evaluate, such as a Go defer or a Python decorator.
+    #[serde(default, skip_serializing_if = "lean_or_false")]
+    pub return_effects: bool,
+    /// A method the pack proves cannot dispatch to another implementation.
+    #[serde(default, skip_serializing_if = "lean_or_false")]
+    pub non_overridable: bool,
     /// Parameter names written again in this function. The argument alone no longer gives
     /// their value. Only the full facts used in extraction retain them.
     #[serde(default, skip_serializing_if = "lean")]
@@ -1152,6 +1163,8 @@ impl Def {
             bases: Vec::new(),
             decorators: Vec::new(),
             return_values: Vec::new(),
+            return_effects: false,
+            non_overridable: false,
             reassigned_params: Vec::new(),
             terminal_return: false,
             single_return: false,
