@@ -78,6 +78,12 @@ def records(a,b):
     assert r['binaries']['meada-before-class-authority']['from']==f'commit {OLD}, features: default'
     print('Receipt',r['capture'],r['verdict'],r['run_url'],BASE,HEAD,r['surfaces'],len(r['steps']),sum(s.get('seconds',0) for s in r['steps']),Counter(s['exit_code'] for s in r['steps']),[(s['name'],s['exit_code']) for s in r['steps'] if s['exit_code']])
     print('Binary identities',json.dumps(r['binaries'],sort_keys=True))
+    marks=a.get(F,'checks.json')
+    print('Rejected candidate or shared keys',[(c['revision'],c['key'] or c['name'],c['result']) for c in marks if c['revision'] in ('head','shared') and c['result']!='pass'])
+    print('Auxiliary denominators',json.dumps(a.get(F,'auxiliary-denominators.json')))
+    for member in sorted(a.members):
+        if member.endswith('/rebless.md') or member=='rebless.md':
+            print('Golden deltas',member,[line for line in a.z.read(member).decode().splitlines() if line.startswith(('## ', '+extraction revision','-extraction revision'))])
     n=0
     for member in sorted(a.members):
         m=re.fullmatch(r'flows/(smoke-[^/]+)/sources/([^/]+)/(meada-smoke-[^/]+).tar',member)
@@ -136,7 +142,7 @@ def mcp(a):
         n,=matches
         return f'{APP} {path}:{n} {ROUTE}'
     root='orders/clients/'
-    probes=[('go/client.go','http.Post(configuredBase()'),('python/client.py','post(configured_base()'),('csharp/OrdersClient.cs','http.PostAsync('),('rust/src/lib.rs','.post(orders_base()'),('swift/Orders.swift','URLSession.shared.data('),('typescript/client.ts','return fetch(ordersBase()')]
+    probes=[('go/client.go','http.Post(configuredBase()'),('python/client.py','post(configured_base()'),('csharp/OrdersClient.cs','http.PostAsync('),('rust/src/lib.rs','reqwest::Client::new()'),('swift/Orders.swift','URLSession.shared.data('),('typescript/client.ts','return fetch(ordersBase()')]
     stable=[where(root+p,m) for p,m in probes]
     stable += [where('orders/evidence/client.go',m) for m in ('http.Post(c.ordersBase()', 'func ViaParameter()', 'func Relative()', 'os.Getenv("SMOKE_ORDERS_URL")+"/orders"+query,')]
     stable += [where('orders/evidence/client.go','os.Getenv("SMOKE_ORDERS_URL")+path,','func QueryAppend(')]
@@ -148,7 +154,7 @@ def mcp(a):
         assert [q['tool'] for q in pack['queries']]==['search','context','trace']
         search,context,trace=pack['answers']
         trim=lambda s:[x.strip() for x in s.splitlines() if x.strip()]
-        assert Counter(trim(search))==Counter(expected)
+        assert Counter(trim(search))==Counter(expected),(slot,Counter(trim(search))-Counter(expected),Counter(expected)-Counter(trim(search)))
         assert Counter(trim(context))==Counter([ROUTE,*[f'{peer} provider openapi.yaml (documented only)' for peer in PEERS],'16 linked consumers omitted. See trace with direction "up".'])
         edges_=[x for x in trim(trace) if x.startswith('→')]
         assert len(edges_)==2 and APP in trim(trace)[0] and 'jobs["through-lib"]' in trim(trace)[0]
@@ -296,6 +302,13 @@ def upgrades(a):
         for t in (first,refresh): assert all(obs(t,sid)[k]==obs(cold,sid)[k] for k in ('providers','provisions'))
     assert a.get(f,'result.json')['counts']=={'pass':7,'fail':0,'blocked':0,'timeout':0,'error':0}
     print('Historical upgrade 12/12, SQS 7/7 by source call and provision identity')
+    for flow,cold,stages in [('smoke-upgrade','head/cold-export',['head/first-export','head/refresh-export','head/second-refresh-export']),
+                             ('smoke-sqs','sdk/cold-export',['sdk/first-export','sdk/refresh'])]:
+        wr=a.cmd(flow,cold)
+        for stage in stages:
+            actual=a.cmd(flow,stage)
+            print('Whole historic',flow,stage,'delta fields',
+                  sorted(key for key in set(wr)|set(actual) if key not in wr or key not in actual or wr[key]!=actual[key]))
 
 def dynamo(a,b):
     f='dynamodb-transactions'; prefix='input/dynamodb-transactions/'; stem='dynamodb-transactions'; base='resource::dynamodb'

@@ -22,3 +22,7 @@ jobs:
       - name: Verify raw proof against independent source keys
         run: |
           python3 -u .github/verify-proof-960.py "$RUNNER_TEMP/proof-final.zip" "$RUNNER_TEMP/proof-historical.zip" sha256:071609ff150a8543ab949611cdb762841f5d266a4614530502054ab91b102c55
+      - name: Replay the smoke scorer on the retained candidate
+        run: |
+          python3 .claude/skills/prove-meada/scripts/smoke_stack.py --selftest --oracle-archive "$RUNNER_TEMP/proof-final.zip" > "$RUNNER_TEMP/smoke-replay.log"
+          grep -E '^(archived-|fetch missing|cache missing|cache checkout|smoke-stack selftest)' "$RUNNER_TEMP/smoke-replay.log"
