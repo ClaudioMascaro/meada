@@ -89,7 +89,7 @@ Os nomes resolvem primeiro no módulo do arquivo e depois nos módulos que ele i
 
 ## HTTP e documentos de contrato
 
-Os clientes HTTP podem aproveitar a base retornada por uma função ou método chamado com resolução exata. Um wrapper pode passar a chave literal de uma variável de ambiente ou o identificador do plugin Backstage. A rota também é preservada quando as alternativas no fim da URL variam apenas na query string. Reatribuições de parâmetros e alternativas de despacho podem deixar a origem em aberto.
+Os clientes HTTP podem aproveitar a base retornada por uma função ou método chamado com resolução exata. Um wrapper pode passar a chave literal de uma variável de ambiente ou o identificador do plugin Backstage. A rota também é preservada quando as alternativas no fim da URL variam apenas na query string. Reatribuições de parâmetros e alternativas de despacho podem deixar a origem em aberto. Um decorador de classe Python pode substituir o método que fornece a base. O Meada conserva o pedido em aberto com os candidatos compatíveis com o caminho conhecido.
 
 Rotas declaradas em IaC também são providers HTTP: API Gateway HTTP e REST no Terraform/OpenTofu (HCL e JSON), eventos SAM `Api`/`HttpApi` e Serverless `http`/`httpApi`. Métodos e caminhos literais usam a mesma normalização de parâmetros das rotas em código. O provider aponta para o símbolo do handler local quando ele resolve com certeza, ou para o repositório inteiro. Consumidores de outros repositórios usam as regras comuns de host e peers. Referências, métodos ou caminhos desconhecidos não inventam rotas; integrações que não sejam Lambda e rotas catch-all sem caminho finito não entram no mapa (#666).
 

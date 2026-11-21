@@ -423,6 +423,9 @@
   the consumer is an open item that names the client's base, and so does a relative path on an
   aiohttp session, whose `URL.join` (RFC 3986) makes a path from the root the path alone
   (`rooted_over_unread`, #801); over a base it read, a path from the root is still appended.
+  HTTP return folding leaves the result of a method defined in a decorated Python class
+  unknown (#962). The language pack marks the written method's return as opaque without
+  evaluating the decorator. The rule applies to the method's declaring class.
 - `http/ts/clients.rs` (`joined`, #686): a first argument `new URL(reference, base)` of the
   global `URL` (`Value::New` of `GLOBAL_URL`, so a file's own `URL` is left alone) is replaced
   by the join of the two before the `fetch` is read, in the argument, through a constant and in

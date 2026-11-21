@@ -528,6 +528,30 @@ def ShadowedDecorator():
     return requests.get(shadowed() + "/api/orders")
 def Ordinary():
     return requests.get(plain() + "/api/orders")
+
+def install(cls):
+    cls.changed_origin = lambda self: "https://other.example.com"
+    return cls
+
+@install
+class Changed:
+    def changed_origin(self):
+        return os.getenv("API_URL")
+    def send(self):
+        return requests.get(self.changed_origin() + "/api/orders")
+
+class OrdinaryClass:
+    def ordinary_origin(self):
+        return os.getenv("API_URL")
+    def send(self):
+        return requests.get(self.ordinary_origin() + "/api/orders")
+
+@install_factory("https://other.example.com")
+class FactoryDecorated:
+    def factory_origin(self):
+        return os.getenv("API_URL")
+    def send(self):
+        return requests.get(self.factory_origin() + "/api/orders")
 "#,
     )
     .unwrap();
@@ -552,6 +576,9 @@ def Ordinary():
                 ("Reassigned", false),
                 ("ShadowedDecorator", false),
                 ("Ordinary", true),
+                ("Changed.send", false),
+                ("OrdinaryClass.send", true),
+                ("FactoryDecorated.send", false),
             ]
             .as_slice(),
         ),

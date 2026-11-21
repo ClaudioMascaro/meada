@@ -28,7 +28,8 @@ HISTORICAL = {'pre_image': 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62',
               'pre_private_fields': 'b73e1e5318508d69a8e98e1081e2e9fb3c61076e',
               'before_go_keys': 'e4058ebc17f97f0ae08adfd89374be159fe11040',
               'before_invalidation': 'e0925fe4463ea44b6d1a928509fc68c0d8c14b81',
-              'before_sqs_restore': '68f1c0ba675f951a191c4fc7a87f75d77de02bef'}
+              'before_sqs_restore': '68f1c0ba675f951a191c4fc7a87f75d77de02bef',
+              'before_class_authority': '674b7ee52939ed58dccc43935b12322a56496696'}
 # A flow's ceiling, the audit's: one hung driver must not spend the job's 90 minutes. Every step but
 # the cleanups runs under timeout(1) with what is left of CAPTURE_END, and one with under a minute
 # left is BLOCKED unrun: with the setup before and the upload after, the receipt fits the job's 90.
@@ -50,7 +51,8 @@ A8 = r'src/(lang/(ts|go|mod)|http\.rs|http/(ts|go|join)|resolve\.rs|index\.rs)'
 SOURCE_KEY = '{scripts}/a7-source-keys/native-hcl-values/'
 # The Scope table's shared core: every answer goes through it, the A7/A8 flows' too.
 SHARED = (r'src/(lang/mod\.rs|resolve\.rs|index\.rs|engine\.rs|trace\.rs|partial\.rs|contract\.rs|community\.rs|entry\.rs'
-          r'|items\.rs|drift_view\.rs|render\.rs)|meada-core/src/(render|search|context|trace|shape|drift|export)\.rs')
+          r'|items\.rs|drift_view\.rs|render\.rs)|meada-core/src/(render|search|context|trace|shape|drift|export)\.rs'
+          r'|tests/golden/schema\.txt$')
 # The drivers the skill's Scope table names (`SCOPE`), each with the paths its row names (None: on
 # every run of its surface; a change to the verifier or to shared core runs them all). `{head}`, `{base}` and `{ui}` are this run's builds: a flow with `{ui}` runs
 # in a console run after the console's API checks, the others after `cli-mcp`. A `HISTORICAL` base is
@@ -97,7 +99,7 @@ FLOWS = (
     ('a8-peers', A8, 'a8-peers.sh check {base} {head} {out}'),
     ('a8-mcp', A8, 'a8-mcp.py --head-bin {head} --base-bin {base}'),
     ('smoke-resolution', r'src/(http|lang|resolve|index|contract/sdk|ci|iac/actions)(\.rs|/)|src/(config|workspace)\.rs$|tests/fixtures/conformance-kotlin/',
-     'smoke_stack.py --slice resolution --head-bin {head} --base-bin {base}'),
+     'smoke_stack.py --slice resolution --head-bin {head} --base-bin {base} --old-bin {before_class_authority}'),
     ('smoke-lifecycle', r'src/(decid|status|iac/orphans|workspace|index|engine|main)|meada-core/src/export\.rs',
      'smoke_stack.py --slice lifecycle --head-bin {head} --base-bin {base}'),
     ('smoke-upgrade', r'src/(index(\.rs|/)|lang/go(\.rs|/)|http/go(\.rs|/))',
@@ -473,7 +475,7 @@ def selftest():
     assert {'aws-sdk-jvm-go-dotnet', 'gcp-sdk'} <= sdk and 'images' not in sdk
     assert {'patterns', 'images'} <= set(chosen(['src/decisions.rs']))  # the patterns row names images.py
     assert chosen(['scripts/prove-ci']) == chosen([f'{SCRIPTS}/http-iac.py']) == chosen(['src/partial.rs']) \
-        == chosen(['.github/workflows/proof.yml']) == [flow[0] for flow in FLOWS]
+        == chosen(['.github/workflows/proof.yml']) == chosen(['tests/golden/schema.txt']) == [flow[0] for flow in FLOWS]
     # Each driver a Scope row names runs here as a flow that row's first path selects, so a flow
     # dropped from a script with several (`prove.py values`, `aws.py`) fails too; each flow has a row.
     rows = scope_table()[2:]
@@ -513,6 +515,8 @@ def selftest():
     for path, smoke in [('src/config.rs', {'smoke-resolution'}),
                         ('src/workspace.rs', {'smoke-resolution', 'smoke-lifecycle'}),
                         ('src/iac/provision.rs', {'smoke-sqs'}),
+                        ('src/lang/python.rs', {'smoke-resolution'}),
+                        ('src/index.rs', {'smoke-resolution', 'smoke-lifecycle', 'smoke-upgrade', 'smoke-sqs'}),
                         ('src/alert/incident.rs', set())]:
         assert {flow for flow in chosen([path]) if flow.startswith('smoke-')} == smoke, path
         assert all(any(f'--slice {flow.removeprefix("smoke-")}' in row for row in rows_for([path]))
@@ -531,6 +535,8 @@ def selftest():
     assert rows_for(['docs/a.md']) == [] and len(rows) > 30
     a8 = flow_command(Path('/r'), next(flow for flow in FLOWS if flow[0] == 'a8-peers'))
     assert [str(arg) for arg in a8] == ['sh', f'{SCRIPTS}/a8-peers.sh', 'check', '/r/bin/meada-base', '/r/bin/meada-head', '/r/flows/a8-peers']
+    smoke = flow_command(Path('/r'), next(flow for flow in FLOWS if flow[0] == 'smoke-resolution'))
+    assert smoke[8:10] == ['--old-bin', '/r/bin/meada-before-class-authority'], smoke
     # The CLI flows follow `cli-mcp` and the console's its API checks, with this run's builds; images
     # builds its own base and is BLOCKED without it.
     scope = dict.fromkeys(SURFACES, False)

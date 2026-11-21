@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """Drive the pinned public smoke workspaces through Meada's CLI and MCP."""
 import argparse
+from contextlib import closing
 import hashlib
 import itertools
 import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 import traceback
 
 from proof_result import BLOCKED, TIMEOUT, Comparisons, execution_exit, run_driver
-from prove import ROOT, git, mcp_answers
+from prove import ROOT, export_diff, git, mcp_answers
 
 NAMES = tuple(f'meada-smoke-{name}' for name in ('app', 'lib', 'shared'))
 ORIGINS = {name: f'https://github.com/ClaudioMascaro/{name}.git' for name in NAMES}
@@ -31,6 +33,7 @@ EXPANDED = ('3d5c209a84d71c609f3495fd68a163100ca01fb7',
 PINS = {
     'original': ORIGINAL,
     'expanded': EXPANDED,
+    'class-authority': ('ed13044ebad552f4dc8dd8ac4ab8fb35bbab8f3a', *EXPANDED[1:]),
     'published': ('fffac4a975ccb37b72abadb01a82159e3b6374f1', *EXPANDED[1:]),
     'linked': ('d4d76058f3dbe777854d05e8e0d781a37bee6cd1', *ORIGINAL[1:]),
     'malformed': ('ad48b4c17536a2c35102ae87c34fca85807eb700', *ORIGINAL[1:]),
@@ -41,16 +44,6 @@ KEY = Path(__file__).with_name('smoke-stack')
 def save(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2) + '\n')
-
-
-def checkout(source, destination, revision, name):
-    shutil.copytree(source, destination, symlinks=True, ignore=shutil.ignore_patterns('.meada'))
-    git('checkout', '-q', '--detach', revision, cwd=destination)
-    origin = git('remote', 'get-url', 'origin', cwd=destination).strip()
-    head = git('rev-parse', 'HEAD', cwd=destination).strip()
-    if (origin, head) != (ORIGINS[name], revision) or git('status', '--porcelain', cwd=destination):
-        raise ValueError(f'unexpected source at {destination}: {origin}, {head}')
-    return {'origin': origin, 'head': head, 'tree': git('rev-parse', 'HEAD^{tree}', cwd=destination).strip()}
 
 
 class Smoke:
@@ -119,11 +112,18 @@ class Smoke:
                     source.mkdir(parents=True)
                     git('init', '-q', cwd=source)
                     git('remote', 'add', 'origin', ORIGINS[name], cwd=source)
-                self.command(f'fetch/{name}-{sha}', source,
-                             ['git', 'fetch', '-q', '--no-tags', '--depth=1', 'origin', sha], timeout=90)
+                result = self.command(f'fetch/{name}-{sha}', source,
+                                      ['git', 'fetch', '-q', '--no-tags', '--depth=1', 'origin', sha],
+                                      timeout=90, check=False)
+                if result.returncode:
+                    missing = (f'upload-pack: not our ref {sha}', f"couldn't find remote ref {sha}")
+                    if any(line.startswith('fatal: ') and line.endswith(missing)
+                           for line in result.stderr.splitlines()):
+                        raise FileNotFoundError(f'{ORIGINS[name]} at {sha}: {result.stderr.strip()}')
+                    result.check_returncode()
                 self.fetched.add((name, sha))
             target = self.work / label / name
-            checkouts[name] = checkout(source, target, sha, name)
+            checkouts[name] = self.checkout(label, source, target, sha, name)
             evidence = self.run / 'sources' / kind / f'{name}.tar'
             if not evidence.exists():
                 evidence.parent.mkdir(parents=True, exist_ok=True)
@@ -132,6 +132,24 @@ class Smoke:
         self.checkouts[label] = checkouts
         save(self.run / 'checkouts.json', self.checkouts)
         return tuple(self.work / label / name for name in NAMES)
+
+    def checkout(self, label, source, target, sha, name):
+        shutil.copytree(source, target, symlinks=True, ignore=shutil.ignore_patterns('.meada'))
+        origin = git('config', '--get', 'remote.origin.url', cwd=target).strip()
+        if origin != ORIGINS[name]:
+            raise ValueError(f'unexpected origin at {target}: {origin}, need {ORIGINS[name]} at {sha}')
+        step = f'checkout/{label}/{name}-{sha}'
+        result = self.command(step, target, ['git', 'checkout', '-q', '--detach', sha], check=False)
+        if result.returncode:
+            # A checkout can fail with the object present (e.g. a worktree lock).
+            probe = self.command(step + '-object', target, ['git', 'cat-file', '--batch-check'], stdin=sha + '\n')
+            if probe.stdout == f'{sha} missing\n':
+                raise FileNotFoundError(f'{origin} at {sha}: {result.stderr.strip()}')
+            result.check_returncode()
+        head = git('rev-parse', 'HEAD', cwd=target).strip()
+        if head != sha or git('status', '--porcelain', cwd=target):
+            raise ValueError(f'unexpected source at {target}: {origin}, {head}, need {sha}')
+        return {'origin': origin, 'head': head, 'tree': git('rev-parse', 'HEAD^{tree}', cwd=target).strip()}
 
     def command(self, label, cwd, argv, *, check=True, stdin='', env=None, timeout=45):
         location = self.run / 'commands' / label
@@ -191,6 +209,16 @@ class Smoke:
                 pair['transition'] = transitions[pair['base']['result'], pair['head']['result']]
                 self.parity.compare(key, pair['base']['actual'], pair['head']['actual'])
         save(self.run / 'transitions.json', paired)
+        auxiliary = {}
+        for prefix, group, expected in (('MCP ', 'http-mcp', 3), ('#962 ', 'python-class', 6)):
+            for slot in ('base', 'head', 'old'):
+                rows = [row for row in self.checks if row['revision'] == slot and
+                        (row.get('key') or '').startswith(prefix)]
+                if rows:
+                    auxiliary.setdefault(group, {})[slot] = {'passed': counts(rows)['pass'],
+                                                             'checked': len(rows), 'expected': expected}
+        if auxiliary:
+            save(self.run / 'auxiliary-denominators.json', auxiliary)
         combined = counts(self.checks)
         for status, code in (('timeout', TIMEOUT), ('blocked', BLOCKED), ('error', 1)):
             if combined[status]:
@@ -215,6 +243,11 @@ def endpoint_observation(data, site):
             'items': [row for row in data.get('open_items', []) if row['call'] == site]}
 
 
+def compare_export(rig, name, expected, actual):
+    changed, _ = export_diff(expected, actual)
+    rig.check(name, [], changed)
+
+
 def configured_links(links, repo=LIB):
     return (len(links) == 1 and links[0]['provider'] == ORDERS[repo]
             and links[0]['contract'] == ROUTE and links[0]['level'] == 'inferred'
@@ -234,7 +267,7 @@ def configured_order(observation, repo=LIB):
 
 def decision_is(observation, kind, candidates):
     items = observation['items']
-    return len(items) == 1 and (items[0]['kind'], items[0]['candidates']) == (kind, candidates)
+    return len(items) == 1 and (items[0].get('kind'), items[0].get('candidates')) == (kind, candidates)
 
 
 ORDER_CANDIDATES = [f'{repo}::{ROUTE}' for repo in ORDERS]
@@ -248,12 +281,12 @@ def ambiguous_order(observation):
             and decision_is(observation, 'ambiguous-link', ORDER_CANDIDATES))
 
 
-def overridden_order(observation):
+def overridden_order(observation, helper, candidates=ORDER_CANDIDATES):
     links = observation['links']
     if not links:
         return (consumer_is(observation, None, None)
-                and any(decision_is(observation, 'dynamic-url', candidates)
-                        for candidates in ([], ORDER_CANDIDATES)))
+                and decision_is(observation, 'dynamic-url', candidates)
+                and observation['items'][0].get('limit') == f'base from the return value of {helper}')
     if len(links) == 1:
         link = links[0]
         return (consumer_is(observation, ROUTE, SHARED_HOST) and not observation['items']
@@ -274,6 +307,18 @@ HTTP = (
     ('swift/Orders.swift', 'sendOrder()', 'URLSession.shared.data#0', None),
     ('typescript/client.ts', 'sendOrder', 'fetch#0', None),
 )
+OVERRIDDEN = {'#948': 'sharedBase', '#949': 'shared_base'}
+
+
+def client_site(path, symbol, call):
+    return f'{APP}::orders/clients/{path}::{symbol}::{call}'
+
+
+# The pinned sources' search locations, including clients added before the eight-pack
+# corpus. The four version-sensitive requests have independent export source keys.
+SEARCH_LINES = (20, 24, 30, 26, 11, 7, 11, 8, 13, 6)
+STABLE_ORDERS = tuple(f'orders/evidence/client.go:{line}' for line in (13, 20, 24, 31, 39)) + tuple(
+    f'orders/{name}/client.go:17' for name in ('httpkey', 'neutral', 'oskey'))
 
 
 def provision_ok(rows, known):
@@ -383,7 +428,7 @@ def override_controls(rig):
         point, control = (endpoint_observation(data, name) for name in (site, ordinary))
         rig.check(f'#949 {variant} original helper binding',
                   'no selected lib peer' if open_site else ORDERS[LIB], point,
-                  matches=overridden_order(point) if open_site else configured_order(point))
+                  matches=overridden_order(point, 'shared_base') if open_site else configured_order(point))
         rig.check(f'#949 {variant} configured control', ORDERS[LIB], control, matches=configured_order(control))
         if variant == 'plain':
             expected = [point, control]
@@ -393,14 +438,49 @@ def override_controls(rig):
 
 def score_http(rig, binary, data):
     for path, symbol, call, issue in HTTP:
-        evidence = endpoint_observation(data, f'{APP}::orders/clients/{path}::{symbol}::{call}')
+        evidence = endpoint_observation(data, client_site(path, symbol, call))
         expected = {'contract': ROUTE, 'provider': ORDERS[LIB],
                     'level': 'inferred', 'reason': 'via SMOKE_ORDERS_URL; lib is the declaring peer'}
-        if issue in ('#948', '#949'):
+        if issue in OVERRIDDEN:
             expected = {'correct provider': ORDERS[SHARED], 'via': SHARED_HOST,
-                        'otherwise': 'keep one open consumer with no selected peer'}
-        matches = overridden_order(evidence) if issue in ('#948', '#949') else configured_order(evidence)
+                        'otherwise': {'candidates': ORDER_CANDIDATES,
+                                      'limit': f'base from the return value of {OVERRIDDEN[issue]}'}}
+        matches = overridden_order(evidence, OVERRIDDEN[issue]) if issue in OVERRIDDEN else configured_order(evidence)
         rig.score(binary, f'HTTP {path} {symbol}' + (f' {issue}' if issue else ''), expected, evidence, matches)
+
+
+def score_http_mcp(rig, binary, data, texts):
+    known = {row['site'] for row in data['consumers'] if row['contract'] == ROUTE}
+    # Check by location. The two overridden calls and two JVM calls can legitimately
+    # differ between slots. Their own export oracles decide those four rows.
+    callers = list(STABLE_ORDERS)
+    for (path, symbol, call, issue), line in zip(HTTP, SEARCH_LINES, strict=True):
+        if not issue or client_site(path, symbol, call) in known:
+            callers.append(f'orders/clients/{path}:{line}')
+    search = sorted([f'{APP} {caller} {ROUTE}' for caller in callers]
+                    + [f'{repo} openapi.yaml (documented only) {ROUTE}' for repo in ORDERS])
+    context = [
+        ROUTE, *(f'{repo} provider openapi.yaml (documented only)' for repo in ORDERS),
+        f'{len(callers)} linked consumers omitted. See trace with direction "up".',
+    ]
+    trace = {
+        'start': f'{APP} .github/workflows/ci.yml:32 jobs["through-lib"]',
+        'hops': [
+            f'→[exact: @main (indexed {EXPANDED[1][:7]})] {LIB} .github/workflows/check.yml:1 .',
+            f'→[exact: @main (indexed {EXPANDED[2][:7]})] {SHARED} .github/workflows/build.yml:1 .',
+        ],
+        'chain': ['chain: exact · 2 hops · 3 repos'],
+    }
+    searched, contextual, traced = ([line.strip() for line in text.splitlines() if line.strip()] for text in texts)
+    spans = {'start': traced[0] if traced else None,
+             'hops': [line for line in traced if line.startswith('→[')],
+             'chain': [line.rsplit(' · ', 1)[0] for line in traced if line.startswith('chain: ')]}
+    for key, expected, actual in [
+        ('MCP POST /orders search', search, sorted(searched)),
+        ('MCP POST /orders context', context, contextual),
+        ('MCP CI two-hop trace', trace, spans),
+    ]:
+        rig.check(f'{binary} {key}', expected, actual, revision=binary, key=key)
 
 
 def http_cases(rig, binary, app, data):
@@ -415,10 +495,7 @@ def http_cases(rig, binary, app, data):
         {'tool': 'trace', 'arguments': {'from': f'{APP}::.github/workflows/ci.yml::jobs["through-lib"]',
                                         'direction': 'down', 'budget': 8000}},
     ]
-    texts = rig.mcp(binary, app, binary, mcp)
-    hops = [line for line in texts[2].splitlines() if '→[exact' in line and ('check.yml' in line or 'build.yml' in line)]
-    rig.check(f'{binary} app to lib to shared two exact CI hops', [LIB, SHARED], hops,
-              matches=len(hops) == 2 and LIB in hops[0] and SHARED in hops[1] and '2 hops · 3 repos' in texts[2])
+    score_http_mcp(rig, binary, data, rig.mcp(binary, app, binary, mcp))
 
 
 def jvm_controls(rig):
@@ -537,8 +614,88 @@ def expanded_upgrade(rig):
                   [endpoint_observation(data, site) for site in sites])
         rig.check(f'expanded binary swap {stage} preserves cold SQS provisions',
                   expected['provisions'], data['provisions'])
+        compare_export(rig, f'expanded binary swap {stage} whole export matches cold', expected, data)
     rig.check('expanded binary swap leaves input checkouts clean', ['', '', '', ''],
               [before, *(git('status', '--porcelain', cwd=app.parent / name) for name in NAMES)])
+
+
+CLASS_PATH = 'python/class_probe.py'
+CLASS_CALLERS = ('Changed.send', 'Ordinary.send')
+
+
+def class_authority(rig, binary):
+    app, _, _ = rig.clone(f'class-{binary}', 'class-authority')
+    source = app / 'orders/clients' / CLASS_PATH
+    decorated = source.read_bytes()
+    original = decorated.replace(b'@install\n', b'')
+    if decorated.count(b'@install\n') != 1:
+        raise ValueError('the class fixture needs one @install decorator')
+    rig.cli(f'class/{binary}/index', app, binary, 'index')
+    cold = None
+    for state, content, host in [('decorated', decorated, 'shared'), ('removed', original, 'lib'),
+                                 ('restored', decorated, 'shared')]:
+        if state != 'decorated':
+            source.write_bytes(content)
+        label = f'class/{binary}/{state}'
+        variant = rig.run / 'class-sources' / f'{state}.py'
+        variant.parent.mkdir(exist_ok=True)
+        variant.write_bytes(content)
+        records = json.loads(rig.command(label + '/runtime', app,
+                                        [sys.executable, 'scripts/record-class-authority.py'],
+                                        env={'SMOKE_ORDERS_URL': 'https://lib.smoke.example'}).stdout)
+        data = rig.export(label + '/export', app, binary)
+        runtime = [{'caller': caller, 'method': 'POST', 'url': f'https://{peer}.smoke.example/orders'}
+                   for caller, peer in zip(CLASS_CALLERS, (host, 'lib'), strict=True)]
+        rig.check(f'{binary} #962 {state}: recorder', runtime, records)
+        for request, peer in zip(runtime, (host, 'lib'), strict=True):
+            caller = request['caller']
+            site = client_site(CLASS_PATH, caller, 'requests.post#0')
+            evidence = endpoint_observation(data, site)
+            key = f'#962 {state} {caller}'
+            expected = {'runtime': request, 'provider': ORDERS[LIB], 'via': 'env:SMOKE_ORDERS_URL'}
+            matches = configured_order(evidence)
+            if peer == 'shared':
+                helper = 'self.changed_origin'
+                expected.update(provider=ORDERS[SHARED], via=SHARED_HOST,
+                                otherwise={'candidates': ORDER_CANDIDATES,
+                                           'limit': f'base from the return value of {helper}'})
+                matches = overridden_order(evidence, helper)
+            rig.check(f'{binary} {key}', expected, evidence, key=key, matches=matches and request in records)
+        if state == 'decorated':
+            cold = data
+        if state == 'restored':
+            compare_export(rig, f'{binary} #962 restoring the source restores the whole cold export', cold, data)
+
+
+def class_index_version(app):
+    with closing(sqlite3.connect((app / '.meada/index.db').as_uri() + '?mode=ro', uri=True)) as db:
+        return db.execute('PRAGMA user_version').fetchone()[0]
+
+
+def class_upgrade(rig):
+    app, lib, shared = rig.clone('class-upgrade', 'class-authority')
+    source = app / 'orders/clients' / CLASS_PATH
+    old = 'old' if 'old' in rig.bins else 'base'
+    rig.cli('class/upgrade/old-index', app, old, 'index')
+    before = rig.export('class/upgrade/old-export', app, old)
+    old_cold = json.loads((rig.run / f'commands/class/{old}/decorated/export.out').read_text())
+    compare_export(rig, '#962 old index matches old cold export', old_cold, before)
+    expected = json.loads((rig.run / 'commands/class/head/decorated/export.out').read_text())
+    fingerprints = {'old': class_index_version(app)}
+    source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    for stage in ('first-export', 'after-index', 'reopened'):
+        if stage == 'after-index':
+            rig.cli('class/upgrade/index', app, 'head', 'index')
+        data = rig.export('class/upgrade/' + stage, app, 'head')
+        compare_export(rig, f'#962 binary swap {stage} whole export matches cold', expected, data)
+        fingerprints[stage] = class_index_version(app)
+    fingerprints['cold'] = class_index_version(rig.work / 'class-head' / NAMES[0])
+    rig.check('#962 first export refreshes the extraction fingerprint', fingerprints['cold'], fingerprints,
+              matches=fingerprints['old'] != fingerprints['first-export'] and
+              all(fingerprints[key] == fingerprints['cold'] for key in ('first-export', 'after-index', 'reopened')))
+    rig.check('#962 binary swap preserves pinned source bytes', [source_hash, '', '', ''],
+              [hashlib.sha256(source.read_bytes()).hexdigest(),
+               *(git('status', '--porcelain', cwd=repo) for repo in (app, lib, shared))])
 
 
 def published_controls(rig):
@@ -695,7 +852,7 @@ def sdk_transition(rig):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--selftest', action='store_true')
-    parser.add_argument('--oracle-archive', type=Path, help='replay the scorer on the original #953 proof ZIP')
+    parser.add_argument('--oracle-archive', type=Path, help='replay the scorer on a #953 or #960 proof ZIP')
     parser.add_argument('--slice', choices=('resolution', 'lifecycle', 'upgrade', 'sqs'), default='resolution')
     parser.add_argument('--run')
     parser.add_argument('--base-bin')
@@ -721,6 +878,11 @@ def main():
                 rig.phase(f'kotlin-shadow-{binary}', kotlin_shadow, binary, revision=binary)
         if 'base' in rig.bins:
             rig.phase('expanded-upgrade', expanded_upgrade)
+        for binary in ('old', 'base', 'head'):
+            if binary in rig.bins:
+                rig.phase(f'class-{binary}', class_authority, binary, revision=binary)
+        if {'old', 'base'} & rig.bins.keys():
+            rig.phase('class-upgrade', class_upgrade)
         rig.phase('private-methods', jvm_controls)
         rig.phase('override-controls', override_controls)
         rig.phase('peer-controls', published_controls)
