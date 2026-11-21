@@ -131,9 +131,8 @@ on it (ADR 0002).
 
 ## Agent skills
 
-For a builder delivery or a stack of PRs, use
-[review-meada-stack](.agents/skills/review-meada-stack/SKILL.md) to verify the cross-repository
-smokes, triage findings and prepare the next builder handoff.
+Review a builder delivery, a PR stack or all open PRs with
+[review-meada-stack](.agents/skills/review-meada-stack/SKILL.md).
 
 ### Issue tracker
 
