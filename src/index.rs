@@ -477,7 +477,8 @@ pub fn open_read(index: &Path, repo: &str, fix: Fix) -> Result<Connection> {
     // One read transaction, held until the connection closes (and then rolled back, nothing
     // being written): its first read takes the lock a commit waits on, so every answer read
     // through it sees the index as one commit left it (ADR 0011).
-    db.execute_batch("BEGIN DEFERRED")?;
+    db.execute_batch("BEGIN DEFERRED")
+        .map_err(|e| unreadable(e, index, repo, fix))?;
     check_read(&db, index, repo, fix)?;
     Ok(db)
 }
@@ -510,7 +511,7 @@ fn unreadable(
             timeout: BUSY.get(),
         }
         .text(),
-        _ => return e.into(),
+        _ => format!("{repo}: {e}"),
     };
     text.into()
 }
