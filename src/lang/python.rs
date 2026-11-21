@@ -154,6 +154,10 @@ impl LanguagePack for Python {
                                 decorators: bare_names.remove(&inner).unwrap_or_default(),
                                 asynchronous: !is_class
                                     && children(node).any(|n| n.kind() == "async"),
+                                return_effects: !is_class
+                                    && node
+                                        .parent()
+                                        .is_some_and(|n| n.kind() == "decorated_definition"),
                                 return_values: if !is_class
                                     && !node
                                         .child_by_field_name("body")
