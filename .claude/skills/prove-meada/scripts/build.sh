@@ -5,7 +5,8 @@
 # detached worktree under <run>. Build the head first: the base build reuses the same target
 # directory, so the crates.io dependencies compile once. A base build in its worktree leaves
 # meada-core artifacts that cargo can mistake for the head's, so the head build touches the
-# local crates' sources first: they rebuild, the dependency cache stays. PROVE_CARGO overrides `cargo` (a build
+# local crates' sources, build.rs and the vendored Kotlin grammar first: they rebuild, while the
+# dependency cache stays. PROVE_CARGO overrides `cargo` (a build
 # queue wrapper, for example).
 set -euo pipefail
 label=$1 rev=$2 run=$3 features=${4:-}
@@ -20,10 +21,15 @@ args=(build --locked --target-dir "$target")
 [ -n "$features" ] && args+=(--features "$features")
 if [ "$rev" = . ]; then
   find "$root/src" "$root/meada-core/src" -name '*.rs' -exec touch {} +
+  touch "$root/build.rs"
+  find "$root/vendor/tree-sitter-kotlin-ng/src" -exec touch {} +
   (cd "$root" && "${cargo[@]}" "${args[@]}")
   from="working tree at $(git -C "$root" rev-parse HEAD), uncommitted: $(git -C "$root" status --porcelain | grep -c . || true) path(s)"
 else
   src="$run/src-$label"
+  if ! git -C "$root" cat-file -e "$rev^{commit}"; then
+    git -C "$root" fetch --no-tags origin "$rev"
+  fi
   git -C "$root" worktree add -q --detach "$src" "$rev"
   trap 'git -C "$root" worktree remove --force "$src"' EXIT
   (cd "$src" && "${cargo[@]}" "${args[@]}")
