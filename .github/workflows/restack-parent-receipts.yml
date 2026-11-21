@@ -1,0 +1,39 @@
+name: Inspect formal Proof receipts on the lower PRs
+on:
+  push:
+    branches: [verify/restack-parent-receipts-20261121]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  raw:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Inspect exact archives and their red steps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/judge" b9d4c2315354fc348a77a3b12647fd78d92753aa
+          python3 -m venv "$RUNNER_TEMP/venv"
+          P="$RUNNER_TEMP/venv/bin/python"
+          "$RUNNER_TEMP/venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3 python-hcl2==8.1.4
+          archives=()
+          for entry in 941:44935033274:e27664e23d5da1ea5dffcdb91ae49915d501b95a 943:44935203293:7dee48a7b7fec9695c5e1c4a4d80208bbe827671 944:44935211599:d7fbc5b74363500b375718fdff0135b606e971d9; do
+            IFS=: read -r pr run head <<< "$entry"
+            id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts" --jq ".artifacts[] | select(.name == \"prove-meada-$pr-$head\") | .id")
+            if [ -z "$id" ]; then
+              echo "No main archive for PR $pr yet"
+              continue
+            fi
+            file="$RUNNER_TEMP/$pr.zip"
+            curl -fsSL --retry 2 -H "Authorization: Bearer $GH_TOKEN" -o "$file" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip"
+            sha256sum "$file"
+            archives+=("$file")
+          done
+          PYTHONPATH="$RUNNER_TEMP/judge/.claude/skills/prove-meada/scripts" "$P" .github/inspect-parent-proofs.py "${archives[@]}"
