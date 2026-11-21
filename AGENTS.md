@@ -131,6 +131,9 @@ on it (ADR 0002).
 
 ## Agent skills
 
+Review a builder delivery, a PR stack or all open PRs with
+[review-meada-stack](.agents/skills/review-meada-stack/SKILL.md).
+
 ### Issue tracker
 
 Issues and specs live in GitHub Issues on `ClaudioMascaro/meada`. See `docs/agents/issue-tracker.md`.
