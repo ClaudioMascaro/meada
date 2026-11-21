@@ -45,13 +45,15 @@ def block(typ, label, body):
 
 
 def orphan_set_matches(text, expected):
-    """#657 format, exact set AND row count; reject the superseded reporter too."""
+    """#657 format with its scope (#849), exact set AND row count; reject the superseded
+    reporter too, whose lines say `no provisioner in the workspace` without `orphan `."""
     lines = [line for line in text.splitlines() if line.strip().startswith('orphan ')]
     got = {(m.group(1), m.group(2)) for line in lines
-           if (m := re.search(r'^\s*orphan (\S+): (no use|no provisioner);', line))}
+           if (m := re.search(r'^\s*orphan (\S+): (no use|no provisioner) in [^;]+;', line))}
+    others = [line for line in text.splitlines() if not line.strip().startswith('orphan ')]
     return (got == set(expected.items()) and len(lines) == len(expected)
             and ': provisioned without use' not in text
-            and ': no provisioner in the workspace' not in text)
+            and not any(': no provisioner in the workspace' in line for line in others))
 
 
 def expected_orphans(provisioners, config_uses):

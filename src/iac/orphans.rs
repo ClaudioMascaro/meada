@@ -2,7 +2,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{contract, index::Export, msg::Msg};
+use crate::{
+    contract,
+    index::Export,
+    msg::{self, Absent, Msg},
+};
 
 use super::{provision, types};
 
@@ -90,6 +94,7 @@ impl<'e> Scope<'e> {
                 .and_then(|key| self.groups.get(&key))
                 .is_some_and(|g| g.provisioned && g.opens_scope)
         };
+        let scope = msg::Scope::of(self.exports);
         self.exports
             .iter()
             .map(|export| {
@@ -106,8 +111,10 @@ impl<'e> Scope<'e> {
                             .unwrap_or(&place);
                         rows.insert((
                             p.contract.as_str(),
-                            Msg::OrphanProvisioner {
+                            Msg::Orphan {
                                 contract: &p.contract,
+                                absent: Absent::Use,
+                                scope,
                                 place,
                             }
                             .text(),
@@ -126,10 +133,12 @@ impl<'e> Scope<'e> {
                             site.strip_prefix(&format!("{}::", export.repository))
                                 .unwrap_or(site)
                         };
-                        let line = Msg::OrphanUse {
+                        let place = format!("{place} [{}]", level.name());
+                        let line = Msg::Orphan {
                             contract,
-                            place,
-                            level,
+                            absent: Absent::Provisioner,
+                            scope,
+                            place: &place,
                         };
                         rows.insert((contract, line.text()));
                     }

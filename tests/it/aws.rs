@@ -240,7 +240,7 @@ fn aws_orphans_are_reported_per_kind_only_when_the_workspace_has_both_sides() {
         "resource::secretsmanager::unused/token",
     ] {
         assert!(
-            text.contains(&format!("orphan {name}: no use;")),
+            text.contains(&format!("orphan {name}: no use in the workspace;")),
             "{name}: {text}"
         );
     }

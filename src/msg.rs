@@ -24,23 +24,102 @@ pub enum Fix<'a> {
     Generation { id: &'a str, dir: &'a str },
 }
 
+/// The side an orphan line says is missing (ADR 0026, "Orphans").
+#[derive(Clone, Copy)]
+pub enum Absent {
+    Use,
+    Provisioner,
+    Consumer,
+    Builder,
+    Runner,
+    Emitter,
+    Matcher,
+}
+
+impl Absent {
+    /// Every side, so a test reads every orphan line.
+    #[cfg(test)]
+    const ALL: [Absent; 7] = [
+        Absent::Use,
+        Absent::Provisioner,
+        Absent::Consumer,
+        Absent::Builder,
+        Absent::Runner,
+        Absent::Emitter,
+        Absent::Matcher,
+    ];
+
+    /// The side in English, pt-BR and Spanish.
+    fn words(self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            Absent::Use => ("use", "uso", "uso"),
+            Absent::Provisioner => ("provisioner", "provisionador", "provisionador"),
+            Absent::Consumer => ("consumer", "consumidor", "consumidor"),
+            Absent::Builder => ("builder", "construtor", "constructor"),
+            Absent::Runner => ("runner", "executor", "ejecutor"),
+            Absent::Emitter => ("emitter", "emissor", "emisor"),
+            Absent::Matcher => ("matcher", "matcher", "matcher"),
+        }
+    }
+}
+
+/// Where an orphan line's absence holds: an absence in the workspace asked, never in the
+/// deployment (ADR 0020, "The bound of an answer").
+#[derive(Clone, Copy)]
+pub enum Scope<'a> {
+    Workspace,
+    /// A workspace of one repository: its identity.
+    Repository(&'a str),
+}
+
+impl<'a> Scope<'a> {
+    /// The scope of the orphan lines of a workspace whose index contents are `exports`.
+    pub(crate) fn of(exports: &'a [crate::index::Export]) -> Self {
+        match exports {
+            [one] => Scope::Repository(&one.repository),
+            _ => Scope::Workspace,
+        }
+    }
+}
+
+/// An orphan line in English, pt-BR and Spanish: the one place every orphan line names its scope.
+fn orphan(contract: &str, absent: Absent, scope: Scope, place: &str) -> (String, String, String) {
+    let (en, pt, es) = absent.words();
+    let (en_in, pt_in, es_in) = match scope {
+        Scope::Workspace => (
+            "in the workspace".into(),
+            "no workspace".into(),
+            "en el workspace".into(),
+        ),
+        Scope::Repository(identity) => (
+            format!("in {identity}"),
+            format!("em {identity}"),
+            format!("en {identity}"),
+        ),
+    };
+    (
+        format!("orphan {contract}: no {en} {en_in}; {place}"),
+        format!("órfão {contract}: nenhum {pt} {pt_in}; {place}"),
+        format!("huérfano {contract}: ningún {es} {es_in}; {place}"),
+    )
+}
+
 const REPORT_URL: &str =
     "https://github.com/ClaudioMascaro/meada/issues/new?template=inference.yml";
 
 pub enum Msg<'a> {
-    OrphanAlert {
+    /// A side whose counterpart the scope does not hold; `place` locates it (ADR 0026).
+    Orphan {
         contract: &'a str,
+        absent: Absent,
+        scope: Scope<'a>,
         place: &'a str,
-        emitter: bool,
     },
+    /// The head of `meada status`: how many repositories its workspace holds.
+    Repositories(usize),
     AlertSummaryLimit(&'a str),
     AlertLinkLimit,
     AlertMatchLimit,
-    OrphanCounterpart {
-        contract: &'a str,
-        place: &'a str,
-        builder: bool,
-    },
     NotIndexed,
     OtherVersion,
     Indexed(i64),
@@ -128,20 +207,6 @@ pub enum Msg<'a> {
     },
     ViaFallback(&'a str),
     UnlinkedResource(&'a str),
-    OrphanProvisioner {
-        contract: &'a str,
-        place: &'a str,
-    },
-    OrphanUse {
-        contract: &'a str,
-        place: &'a str,
-        level: meada_core::export::Level,
-    },
-    /// A reusable pipeline or an action nothing in the scope calls (#827).
-    OrphanCi {
-        contract: &'a str,
-        place: &'a str,
-    },
     /// The missing reads of the repository's consumers against the routes they call (spec #23).
     Drift(usize),
     /// The config files of a repository (#639): read, skipped as lockfiles, as unreadable or
@@ -1829,28 +1894,25 @@ impl Msg<'_> {
                 format!("{contract} sem ligação: nenhum escritor e leitor em repositórios diferentes"),
                 format!("{contract} sin vínculo: ningún escritor y lector en repositorios diferentes"),
             ),
-            Msg::OrphanProvisioner { contract, place } => pick(
-                format!("orphan {contract}: no use; {place}"),
-                format!("órfão {contract}: nenhum uso; {place}"),
-                format!("huérfano {contract}: ningún uso; {place}"),
-            ),
-            Msg::OrphanUse { contract, place, level } => {
-                let level = level.name();
-                pick(
-                    format!("orphan {contract}: no provisioner; {place} [{level}]"),
-                    format!("órfão {contract}: nenhum provisionador; {place} [{level}]"),
-                    format!("huérfano {contract}: ningún provisionador; {place} [{level}]"),
-                )
+            Msg::Orphan {
+                contract,
+                absent,
+                scope,
+                place,
+            } => {
+                let (en, pt_br, es) = orphan(contract, *absent, *scope, place);
+                pick(en, pt_br, es)
             }
-            Msg::OrphanCi { contract, place } => pick(
-                format!("orphan {contract}: no consumer; {place}"),
-                format!("órfão {contract}: nenhum consumidor; {place}"),
-                format!("huérfano {contract}: ningún consumidor; {place}"),
+            Msg::Repositories(1) => pick(
+                "workspace: 1 repository".into(),
+                "workspace: 1 repositório".into(),
+                "workspace: 1 repositorio".into(),
             ),
-            Msg::OrphanAlert { contract, place, emitter } => {
-                let (en, pt, es) = if *emitter { ("emitter", "emissor", "emisor") } else { ("matcher", "matcher", "matcher") };
-                pick(format!("orphan {contract}: no {en}; {place}"), format!("órfão {contract}: nenhum {pt}; {place}"), format!("huérfano {contract}: ningún {es}; {place}"))
-            },
+            Msg::Repositories(n) => pick(
+                format!("workspace: {n} repositories"),
+                format!("workspace: {n} repositórios"),
+                format!("workspace: {n} repositorios"),
+            ),
             Msg::AlertMatchLimit => pick(
                 "alert routing skipped: evaluation limit".into(),
                 "roteamento de alertas ignorado: limite de avaliação".into(),
@@ -1866,10 +1928,6 @@ impl Msg<'_> {
                 format!("arquivo de alertas ignorado: {path} (limite do resumo)"),
                 format!("archivo de alertas omitido: {path} (límite del resumen)"),
             ),
-            Msg::OrphanCounterpart { contract, place, builder } => {
-                let (en, pt, es) = if *builder { ("builder", "construtor", "constructor") } else { ("runner", "executor", "ejecutor") };
-                pick(format!("orphan {contract}: no {en}; {place}"), format!("órfão {contract}: nenhum {pt}; {place}"), format!("huérfano {contract}: ningún {es}; {place}"))
-            },
             Msg::Drift(n) => pick(
                 format!("shape drift, missing reads: {n}"),
                 format!("drift de formato, leituras ausentes: {n}"),
@@ -5749,5 +5807,43 @@ fn half_of(private: bool) -> (&'static str, &'static str, &'static str) {
     match private {
         true => ("private", "privada", "privada"),
         false => ("public", "pública", "pública"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Absent, Scope, orphan};
+
+    /// Every orphan line names the scope its absence holds in, in every language: the
+    /// workspace, or the repository of a workspace of one (ADR 0020, "The bound of an answer").
+    #[test]
+    fn every_orphan_line_names_its_scope_in_every_language() {
+        let place = "main.tf:4 aws_s3_bucket.unused (root .)";
+        for absent in Absent::ALL {
+            let (en, pt_br, es) = orphan("resource::s3::unused", absent, Scope::Workspace, place);
+            assert!(en.ends_with(&format!(" in the workspace; {place}")), "{en}");
+            assert!(
+                pt_br.ends_with(&format!(" no workspace; {place}")),
+                "{pt_br}"
+            );
+            assert!(es.ends_with(&format!(" en el workspace; {place}")), "{es}");
+            let one = Scope::Repository("example.com/acme/infra");
+            let (en, pt_br, es) = orphan("resource::s3::unused", absent, one, place);
+            assert!(
+                en.ends_with(&format!(" in example.com/acme/infra; {place}")),
+                "{en}"
+            );
+            assert!(
+                pt_br.ends_with(&format!(" em example.com/acme/infra; {place}")),
+                "{pt_br}"
+            );
+            assert!(
+                es.ends_with(&format!(" en example.com/acme/infra; {place}")),
+                "{es}"
+            );
+            for line in [en, pt_br, es] {
+                assert!(!line.contains("workspace"), "{line}");
+            }
+        }
     }
 }

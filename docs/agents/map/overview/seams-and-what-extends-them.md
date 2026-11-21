@@ -46,7 +46,7 @@ Each seam keeps its extension steps here, or their lead with a link to the whole
   | `calls_from_definition` | whether a consumer at a symbol (a Feign or Retrofit interface method) calls on its provider, so `trace` follows from the method to it (HTTP; a channel handler is where a link ends) |
   | `starts_at_provider` | whether a contract starts a `trace` at the node that provides it (CI: a contract names its one provider); any other contract is listed by its sides |
   | `flows_to_consumer` | whether data travels provider to consumer (resource writes to reads, channel producers to handlers), including consumers at call sites |
-  | `status`, `scope_status` | the lines `meada status` prints per repository, optionally considering the visible workspace |
+  | `status`, `scope_status` | the lines `meada status` prints per repository, optionally considering the visible workspace; an orphan line is a `msg::Msg::Orphan`, scoped by `msg::Scope::of` the exports (#849) |
   | `workspace_status` | optional per-query status rows in repository order, with `None` preserving the ordinary status hooks and call order |
   | `decidable`, `consumer_item`, `link_candidate`, `serves`, `candidate` | whether a consumer ambiguity remains an open item, whether a provider remains a current link candidate, alias matching and candidates for a consumer with no contract |
   | `unresolved_causes` | the kind's own consumers with no contract, by site, each with why it is unresolved: such a consumer holds no candidate and its open item says the cause (CI steps, package installs) |

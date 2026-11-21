@@ -121,7 +121,7 @@ fn a_peer_without_remote_is_found_by_its_path_hint() {
 
     assert_eq!(
         engine::status(&web).unwrap(),
-        "local/http-web (.) not indexed\nlocal/http-api (../../path_hint_api/http-api) not indexed\n"
+        "workspace: 2 repositories\nlocal/http-web (.) not indexed\nlocal/http-api (../../path_hint_api/http-api) not indexed\n"
     );
 }
 
@@ -138,7 +138,7 @@ fn a_peer_without_remote_is_not_found_among_siblings() {
 
     assert_eq!(
         engine::status(&web).unwrap(),
-        "local/http-web (.) not indexed\nmissing peer: local/http-api, named by local/http-web\n"
+        "workspace: 1 repository\nlocal/http-web (.) not indexed\nmissing peer: local/http-api, named by local/http-web\n"
     );
 }
 

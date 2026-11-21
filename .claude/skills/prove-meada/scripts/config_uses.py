@@ -193,7 +193,7 @@ def use_set(data):
 
 def orphan_set(text):
     rows = [l for l in text.splitlines() if l.strip().startswith('orphan ')]
-    got = [(m.group(1),m.group(2)) for l in rows if (m:=re.search(r'^\s*orphan (\S+): (no use|no provisioner);', l))]
+    got = [(m.group(1),m.group(2)) for l in rows if (m:=re.search(r'^\s*orphan (\S+): (no use|no provisioner) in [^;]+;', l))]
     return sorted(got), len(rows)
 
 
@@ -538,7 +538,7 @@ class Probe:
             d=copy.deepcopy(h['app']['export']);mutate(d)
             write(self.run,'negative-controls/'+label+'.json',dumps(d))
             self.check('negative control rejected '+label,sorted(use_set(d))!=exp)
-        text=h['app']['status']+'  orphan resource::s3::injected: no use; control\n'
+        text=h['app']['status']+'  orphan resource::s3::injected: no use in the workspace; control\n'
         write(self.run,'negative-controls/extra-orphan.out',text)
         expected=expected_orphan_rows(oracle)
         self.check('negative control rejected extra orphan',orphan_set(text)!=(expected,len(expected)))

@@ -205,7 +205,8 @@ fn status_reports_every_listed_repository_and_the_peers_the_manifest_leaves_out(
     assert!(!ok && stderr.is_empty(), "{stderr}");
     assert_eq!(
         unindexed,
-        "example.com/chain/gateway (../chain-gateway) not indexed\n\
+        "workspace: 2 repositories\n\
+         example.com/chain/gateway (../chain-gateway) not indexed\n\
          example.com/chain/web (../chain-web) not indexed\n\
          missing peer: example.com/chain/catalog, named by example.com/chain/gateway\n"
     );
@@ -294,7 +295,8 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
     assert!(!ok);
     assert!(
         status.starts_with(
-            "example.com/chain/web (../chain-web) indexed, 5 files\n\
+            "workspace: 12 repositories\n\
+             example.com/chain/web (../chain-web) indexed, 5 files\n\
              example.com/chain/../web (../chain-web) not a repository identity"
         ),
         "{status}"

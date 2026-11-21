@@ -2108,15 +2108,16 @@ fn state_text(state: State, other: Msg) -> String {
     }
 }
 
-/// `status`'s text: each repository's line, by identity in workspace order, followed by its
-/// decisions that are stale or waiting and its status lines (`Engine::status_report`, empty
-/// when it did not run), then the missing peers.
+/// `status`'s text: how many repositories the workspace holds, the scope of its orphan lines;
+/// each repository's line, by identity in workspace order, followed by its decisions that are
+/// stale or waiting and its status lines (`Engine::status_report`, empty when it did not run),
+/// then the missing peers.
 fn status_lines(
-    heads: impl Iterator<Item = (String, String)>,
+    heads: impl ExactSizeIterator<Item = (String, String)>,
     (evaluations, status_lines): (Vec<Evaluation>, Vec<Vec<String>>),
     missing: &[Missing],
 ) -> String {
-    let mut lines = Vec::new();
+    let mut lines = vec![Msg::Repositories(heads.len()).text()];
     for (n, (identity, head)) in heads.enumerate() {
         lines.push(head);
         for e in evaluations.iter().filter(|e| e.repository == identity) {

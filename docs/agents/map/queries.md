@@ -26,6 +26,10 @@ this file, and a change to these modules updates it.
   with its side's level. Search and context mark sides when their
   group's other role is absent. Unresolved sides have no group; existing resource diagnostics
   are unchanged. The scope is the engine's already filtered workspace, never another index.
+  Every orphan line, of every kind, is one `msg::Msg::Orphan` (#849): `msg::Absent` names the
+  missing side and `msg::Scope::of(exports)` the scope its absence holds in, `the workspace` or,
+  in a workspace of one, that repository's identity (ADR 0020, "The bound of an answer").
+  `engine::status_lines` heads `meada status` with `Msg::Repositories`, the workspace's count.
 
 - Provisioning (#656): `crate::iac::provision::context` lists a symbol's provisioners from its
   own sides and its calls. `crate::engine::Engine::context_fresh` hydrates every side of a

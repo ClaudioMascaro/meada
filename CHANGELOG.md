@@ -6,6 +6,17 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Every orphan line of `meada status` names the scope its absence holds in, as the mark does:
+  `orphan resource::s3::unused: no use in the workspace; main.tf:4 ...`, or the repository of a
+  workspace of one (`no use in example.com/acme/infra`). It holds for `no use`, `no provisioner`,
+  `no consumer`, `no builder`, `no runner`, `no emitter` and `no matcher`, in English, Portuguese
+  and Spanish. The first line of `meada status`, locally and with `--workspace`, gives the number
+  of repositories of the workspace (`workspace: 3 repositories`), and the skill and the user guide
+  say that an orphan line is a lead for review, never by itself a reason to delete a resource.
+  `search`, `context` and `trace` answer as before (ADR 0020) (#849).
+
 ## [1.5.0] - 2026-11-16
 
 A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md)

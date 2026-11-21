@@ -1,3 +1,4 @@
+workspace: 2 repositories
 example.com/orphan/app (.) indexed, 1 files
   resource::postgres::archive is unlinked: no writer and reader in different repositories
 example.com/orphan/infra (../orphan-infra) indexed, 0 files

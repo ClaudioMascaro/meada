@@ -1,3 +1,4 @@
+workspace: 1 repositório
 local/ts-basic (.) indexado, 9 arquivos
   Broad.cs: abrangente demais, seus nomes qualificados passaram do orçamento de 4194304 bytes: sem símbolos nem chamadas
   Broad.java: abrangente demais, seus nomes qualificados passaram do orçamento de 4194304 bytes: sem símbolos nem chamadas
