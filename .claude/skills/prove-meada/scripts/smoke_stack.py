@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Drive the pinned public smoke workspaces through Meada's CLI and MCP."""
 import argparse
+import hashlib
 import itertools
 import json
 import os
@@ -73,9 +74,15 @@ class Smoke:
         self.fetched = set()
         self.scored = {}
         shutil.copy(KEY / 'README.md', self.run / 'answer-key.md')
+        provenance = {}
+        for slot, path in self.bins.items():
+            with Path(path).open('rb') as binary:
+                sha256 = hashlib.file_digest(binary, 'sha256').hexdigest()
+            origin = Path(path + '.from')
+            provenance[slot] = {'sha256': sha256, 'from': origin.read_text().strip() if origin.is_file() else None}
         save(self.run / 'inputs.json', {'driver_revision': git('rev-parse', 'HEAD', cwd=ROOT).strip(),
                                        'corpora': {kind: dict(zip(NAMES, pins)) for kind, pins in PINS.items()},
-                                       'binaries': self.bins})
+                                       'binaries': self.bins, 'binary_provenance': provenance})
 
     def check(self, name, expected, actual, *, matches=None, revision=None, key=None):
         passed = expected == actual if matches is None else matches
@@ -271,17 +278,17 @@ HTTP = (
 
 def provision_ok(rows, known):
     if not known:
-        return not any(row['level'] == 'exact' for row in rows)
+        return not rows
     return (len(rows) == 1 and (rows[0]['contract'], rows[0]['provisioner'], rows[0]['level'])
             == (QUEUE, QUEUE_NODE, 'exact'))
 
 
 def sqs(rig, data, binary, *, historical=False):
     for name, known in (('publishOrder', True), ('publishLiteral', True), ('publishSelected', False)):
-        path = 'orders/events/publisher.ts'
-        rows = {'providers': rows_at(data, 'providers', 'site', path, name),
-                'provisions': rows_at(data, 'provisions', 'side', path, name)}
-        expected = [QUEUE, QUEUE_NODE, 'exact'] if known else 'no exact queue at runtime choice'
+        site = f'{APP}::orders/events/publisher.ts::{name}::SendMessageCommand#0'
+        rows = {'providers': [row for row in data['providers'] if row['site'] == site],
+                'provisions': [row for row in data['provisions'] if row['side'] == site]}
+        expected = [QUEUE, QUEUE_NODE, 'exact'] if known else 'no selected queue at runtime choice'
         if historical:
             # The inherited SDK regression drops the single-return helper at this tier.
             known = name == 'publishLiteral'
@@ -291,7 +298,7 @@ def sqs(rig, data, binary, *, historical=False):
                    and all(row['side'] == providers[0]['site'] for row in rows['provisions']))
         if historical:
             rig.check(f'68f1c0b {name} historical observation', [QUEUE, QUEUE_NODE, 'exact'] if known else
-                      'channel::sqs with no exact queue', rows, matches=matches)
+                      'channel::sqs with no selected queue', rows, matches=matches)
         else:
             rig.score(binary, f'SQS {name}', expected, rows, matches)
 
@@ -305,30 +312,83 @@ def jvm(rig, data, binary, variant, path, symbol, helper):
     rig.check(f'{binary} {variant} {owner}: private code hop', [{'target': target, 'level': 'exact', 'candidates': []}], actual)
 
 
-def transport(rig, language):
-    app, _, _ = rig.clone(f'transport-{language}', 'expanded')
-    root = rig.work / f'record-{language}'
+def transport(rig, language, app=None, variant='pinned', overridden='shared'):
+    if app is None:
+        app, _, _ = rig.clone(f'transport-{language}', 'expanded')
+    root = rig.work / f'record-{language}-{variant}'
     root.mkdir()
     url = 'https://lib.smoke.example'
+    step = f'transport/{language}' if variant == 'pinned' else f'transport/{variant}'
     if language == 'go':
         shutil.copy(app / 'orders/clients/go/client.go', root)
         shutil.copy(KEY / 'transport_test.go', root)
-        rig.command('transport/go-version', root, ['go', 'version'])
-        got = rig.command('transport/go', root, ['go', 'test', '-v', 'client.go', 'transport_test.go'],
+        rig.command(step + '-version', root, ['go', 'version'])
+        got = rig.command(step, root, ['go', 'test', '-v', 'client.go', 'transport_test.go'],
                           env={'GO111MODULE': 'off', 'GOTOOLCHAIN': 'local', 'GOCACHE': str(rig.work / 'go-cache'),
                                'SMOKE_ORDERS_URL': url}, timeout=150)
         records = [json.loads(line[len('PROBE '):]) for line in got.stdout.splitlines() if line.startswith('PROBE ')]
         callers = ('SendShared', 'SendConfigured')
     else:
         source = app / 'orders/clients/python/client.py'
-        got = rig.command('transport/python', root, [sys.executable, str(KEY / 'transport_record.py'), str(source)],
-                          env={'SMOKE_ORDERS_URL': url})
+        got = rig.command(step, root, [sys.executable, str(KEY / 'transport_record.py'), str(source)],
+                          env={'SMOKE_ORDERS_URL': url, 'SMOKE_OVERRIDE': '1'})
         records = json.loads(got.stdout)
         callers = ('send_shared', 'send_configured')
-    rig.check(f'{language} transport receives overridden and ordinary URL', [
-        {'caller': callers[0], 'method': 'POST', 'url': 'https://shared.smoke.example/orders'},
+    rig.check(f'{language} {variant} transport receives overridden and ordinary URL', [
+        {'caller': callers[0], 'method': 'POST', 'url': f'https://{overridden}.smoke.example/orders'},
         {'caller': callers[1], 'method': 'POST', 'url': url + '/orders'},
     ], records)
+
+
+def override_controls(rig):
+    app, _, _ = rig.clone('go-defer-controls', 'expanded')
+    source = app / 'orders/clients/go/client.go'
+    original = source.read_text()
+    benign = original.replace('\t\tbase = "https://shared.smoke.example"\n', '')
+    if benign == original:
+        raise ValueError('Go benign-defer overlay did not change the deferred write')
+    source.write_text(benign)
+    (rig.run / 'go-benign-defer.go').write_text(benign)
+    transport(rig, 'go', app, 'go-benign-defer', 'lib')
+    data = rig.export('go-benign-defer/export', app, 'head')
+    site = f'{APP}::orders/clients/go/client.go::SendShared::http.Post#0'
+    got = endpoint_observation(data, site)
+    rig.check('#948 benign defer retains configured peer', ORDERS[LIB], got, matches=configured_order(got))
+
+    app, _, _ = rig.clone('python-rebinding-controls', 'expanded')
+    source = app / 'orders/clients/python/client.py'
+    original = source.read_text()
+    plain = original.replace('@use_host("https://shared.smoke.example")\n', '')
+    marker = '\ndef send_shared():'
+    if plain == original or plain.count(marker) != 1:
+        raise ValueError('Python rebinding overlay could not locate the original helper')
+    replacement = 'replacement = use_host("https://shared.smoke.example")(shared_base)\n'
+    site = f'{APP}::orders/clients/python/client.py::send_shared::requests.post#0'
+    ordinary = f'{APP}::orders/clients/python/client.py::send_configured::requests.post#0'
+    expected = None
+    for variant, inserted, open_site in [
+        ('plain', '', False),
+        ('direct', replacement + 'shared_base = replacement\n', True),
+        ('alias', replacement + 'alias = replacement\nshared_base = alias\n', True),
+        ('conditional', replacement + 'if os.getenv("SMOKE_OVERRIDE"):\n    shared_base = replacement\n', True),
+        ('unrelated', 'other = 1\nother = 2\n', False),
+        ('restored', '', False),
+    ]:
+        changed = plain.replace(marker, f'\n{inserted}\n{marker}')
+        source.write_text(changed if inserted else plain)
+        label = f'python-{variant}'
+        shutil.copyfile(source, rig.run / f'{label}.py')
+        transport(rig, 'python', app, label, 'shared' if open_site else 'lib')
+        data = rig.export(f'{label}/export', app, 'head')
+        point, control = (endpoint_observation(data, name) for name in (site, ordinary))
+        rig.check(f'#949 {variant} original helper binding',
+                  'no selected lib peer' if open_site else ORDERS[LIB], point,
+                  matches=overridden_order(point) if open_site else configured_order(point))
+        rig.check(f'#949 {variant} configured control', ORDERS[LIB], control, matches=configured_order(control))
+        if variant == 'plain':
+            expected = [point, control]
+        if variant == 'restored':
+            rig.check('#949 restored source restores both site observations', expected, [point, control])
 
 
 def score_http(rig, binary, data):
@@ -463,6 +523,24 @@ def resolution(rig, binary):
     ci_keys(rig, lib_data)
 
 
+def expanded_upgrade(rig):
+    app = rig.work / 'base-expanded' / NAMES[0]
+    expected = json.loads((rig.run / 'commands/head/app.out').read_text())
+    sites = [f'{APP}::orders/clients/{path}::{symbol}::{call}' for path, symbol, call, _ in HTTP]
+    before = git('status', '--porcelain', cwd=app)
+    for stage in ('first-export', 'after-index', 'reopened'):
+        if stage == 'after-index':
+            rig.cli('expanded-upgrade/index', app, 'head', 'index')
+        data = rig.export(f'expanded-upgrade/{stage}', app, 'head')
+        rig.check(f'expanded binary swap {stage} preserves cold HTTP site evidence',
+                  [endpoint_observation(expected, site) for site in sites],
+                  [endpoint_observation(data, site) for site in sites])
+        rig.check(f'expanded binary swap {stage} preserves cold SQS provisions',
+                  expected['provisions'], data['provisions'])
+    rig.check('expanded binary swap leaves input checkouts clean', ['', '', '', ''],
+              [before, *(git('status', '--porcelain', cwd=app.parent / name) for name in NAMES)])
+
+
 def published_controls(rig):
     app, lib, _ = rig.clone('published-head', 'published')
     rig.cli('published/index', app, 'head', 'index')
@@ -532,16 +610,25 @@ def score_kotlin(rig, binary, data):
     observations = {}
     for label, (symbol, route) in KOTLIN_SHADOW.items():
         key = f'#952 {symbol}'
-        site = f'example.com/proof/kotlin-shadow::{TYPED_FIXTURE}::example.jvm.{symbol}::(call_expression).uri#0'
+        prefix = f'example.com/proof/kotlin-shadow::{TYPED_FIXTURE}::example.jvm.'
+        site = f'{prefix}{symbol}::(call_expression).uri#0'
         got = observations[label] = endpoint_observation(data, site)
+        got['code_calls'] = [row for row in data['calls']
+                             if row['id'] in (site, f'{prefix}{symbol}::make#0')]
+        uri = [row for row in got['code_calls'] if row['id'] == site]
+        factory = [row for row in got['code_calls'] if row['id'] != site]
+        source = (len(uri) == 1 and len(factory) == 1 and factory[0]['level'] == 'exact'
+                  and factory[0]['target'] == f'{prefix}make()')
         literal = consumer_is(got, f'http::GET::{route}', 'host:typed.example.com')
         absent = not got['consumers']
-        expected = {'url': f'GET https://typed.example.com{route}', 'links': [], 'items': []}
+        expected = {'url': f'GET https://typed.example.com{route}', 'links': [], 'items': [],
+                    'uri_call': site, 'factory': f'{prefix}make() (exact)'}
         if label == 'shadowed':
             expected['alternative'] = 'pre-#947 receiver ceiling, no HTTP consumer'
             expected['policy'] = 'pending maintainer decision #952'
         rig.check(f'{binary} {key}', expected, got, revision=binary, key=key,
-                  matches=not got['items'] and not got['links'] and (literal or label == 'shadowed' and absent))
+                  matches=source and not got['items'] and not got['links']
+                  and (literal or label == 'shadowed' and absent))
     return observations
 
 
@@ -632,7 +719,10 @@ def main():
             if binary in rig.bins:
                 rig.phase(f'resolution-{binary}', resolution, binary, revision=binary)
                 rig.phase(f'kotlin-shadow-{binary}', kotlin_shadow, binary, revision=binary)
+        if 'base' in rig.bins:
+            rig.phase('expanded-upgrade', expanded_upgrade)
         rig.phase('private-methods', jvm_controls)
+        rig.phase('override-controls', override_controls)
         rig.phase('peer-controls', published_controls)
         rig.phase('configuration-matrix', configuration_matrix)
     elif args.slice == 'upgrade':

@@ -42,12 +42,20 @@ separate Kotlin observations and raw candidate sets are in `checks.json` and
 `transitions.json`. Rejected answers from the base are historical observations. A
 rejected candidate fails the driver even when both binaries agree. To replay the
 same scorer on mutated and unchanged copies of the published #953 JSON, run
-`python3 smoke_stack.py --selftest --oracle-archive /path/to/proof-953.zip` from this
-script's directory or pass its repository-relative path.
+`python3 .claude/skills/prove-meada/scripts/smoke_stack.py --selftest --oracle-archive /path/to/proof-953.zip`.
+
+The expanded upgrade starts from the old binary's existing indexes and swaps only
+the executable. The first export, explicit index and reopened export compare the
+same ten HTTP site observations and SQS provisions with the candidate's cold index.
+The neighbor checks record transport and export after replacing the Go write with
+an empty deferred literal and after directly, indirectly and conditionally rebinding
+the Python helper. Changing an unrelated variable and restoring the undecorated
+file preserve both configured sites. These overlays live in disposable copies of
+the pinned app, and the changed sources accompany the raw answers.
 
 In the SQS probe, publishLiteral and publishOrder write smoke-orders and
 provision at exact to lib's queues.tf::aws_sqs_queue.orders. publishSelected
-cannot choose just that queue. The historical 68f1c0b drops the single-return helper, a regression relative
+has no selected provisioner. The historical 68f1c0b drops the single-return helper, a regression relative
 to the literal control. The current path restores that helper across an
 executable upgrade and keeps the runtime choice unresolved.
 

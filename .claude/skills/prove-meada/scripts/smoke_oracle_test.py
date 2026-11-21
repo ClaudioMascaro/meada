@@ -40,10 +40,14 @@ def set_configured(data, site):
 
 
 def resolved_kotlin():
-    return {'consumers': [
-        {'site': f'example.com/proof/kotlin-shadow::{TYPED_FIXTURE}::example.jvm.{symbol}::(call_expression).uri#0',
-         'contract': f'http::GET::{route}', 'via': 'host:typed.example.com'}
-        for symbol, route in KOTLIN_SHADOW.values()], 'links': []}
+    data = {'consumers': [], 'links': [], 'calls': []}
+    prefix = f'example.com/proof/kotlin-shadow::{TYPED_FIXTURE}::example.jvm.'
+    for symbol, route in KOTLIN_SHADOW.values():
+        uri = f'{prefix}{symbol}::(call_expression).uri#0'
+        data['consumers'].append({'site': uri, 'contract': f'http::GET::{route}', 'via': 'host:typed.example.com'})
+        data['calls'].extend([{'id': uri},
+                              {'id': f'{prefix}{symbol}::make#0', 'level': 'exact', 'target': f'{prefix}make()'}])
+    return data
 
 
 def unresolved_kotlin():
@@ -64,7 +68,7 @@ def synthetic():
             set_site(data, site_id(case), None, None, kind='dynamic-url', candidates=ORDER_CANDIDATES)
     data['providers'], data['provisions'] = [], []
     for name in ('publishOrder', 'publishLiteral', 'publishSelected'):
-        site = f'{APP}::orders/events/publisher.ts::{name}::send#0'
+        site = f'{APP}::orders/events/publisher.ts::{name}::SendMessageCommand#0'
         known = name != 'publishSelected'
         data['providers'].append({'site': site, 'contract': QUEUE if known else 'channel::sqs'})
         if known:
@@ -171,4 +175,21 @@ def selftest(archive=None):
         assert rig.finish() == ORACLE_FAILED
         exact = [{'level': 'exact', 'contract': QUEUE, 'provisioner': QUEUE_NODE}]
         assert provision_ok(exact, True) and not provision_ok(exact, False)
+        rig = rig_at(root / 'sqs-site-and-runtime')
+        sqs_data = synthetic()
+        for table, identity in [('providers', 'site'), ('provisions', 'side')]:
+            for row in sqs_data[table]:
+                row[identity] = row[identity].replace('::publishOrder::', '::publishOrderCopy::')
+        choice = next(row['site'] for row in sqs_data['providers'] if '::publishSelected::' in row['site'])
+        sqs_data['provisions'].append(dict(exact[0], side=choice, level='inferred'))
+        sqs(rig, sqs_data, 'head')
+        assert rig.scored['head'] == {'SQS publishOrder': False, 'SQS publishLiteral': True,
+                                      'SQS publishSelected': False}
+        rig = rig_at(root / 'kotlin-omission-must-keep-code-call')
+        kotlin = resolved_kotlin()
+        omitted = kotlin['consumers'].pop(0)
+        score_kotlin(rig, 'base', kotlin)
+        kotlin['calls'] = [row for row in kotlin['calls'] if row['id'] != omitted['site']]
+        score_kotlin(rig, 'head', kotlin)
+        assert [row['result'] for row in rig.checks] == ['pass', 'pass', 'fail', 'pass']
     print('smoke-stack selftest: revision outcomes, exact site joins, Kotlin keys and exit codes passed')
