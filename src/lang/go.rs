@@ -159,6 +159,9 @@ struct Walk<'s> {
     assigned: Vec<(String, String, Keep)>,
     /// The single value each `return` of a definition gives.
     returns: HashMap<String, Vec<Value>>,
+    /// Functions with named results, and those whose deferred calls can change them.
+    named_results: HashSet<String>,
+    deferred_results: HashSet<String>,
     /// The standard-library packages whose calls and constants the values fold.
     std: values::Std,
     /// The package-level `var`s, which hold their value only if nothing assigns them.
@@ -212,6 +215,18 @@ impl Walk<'_> {
                 self.bind_as(scope, text(name, self.src), class.clone(), local, None);
             }
         }
+    }
+
+    fn bind_results(&mut self, scope: &str, node: Node) {
+        let list = result_list(node);
+        if declarations(list)
+            .iter()
+            .flat_map(|(names, _)| names)
+            .any(|name| text(*name, self.src) != "_")
+        {
+            self.named_results.insert(scope.to_string());
+        }
+        self.typed_params(scope, list, true);
     }
 
     /// The names a `var` or `:=` binds, each with the class its type or its value writes: the
@@ -487,6 +502,7 @@ impl Walk<'_> {
         let mut returns = std::mem::take(&mut self.returns);
         for def in &mut self.facts.defs {
             def.return_values = returns.remove(&def.name).unwrap_or_default();
+            def.return_effects = self.deferred_results.contains(&def.name);
             def.reassigned_params = def
                 .params
                 .iter()
@@ -566,6 +582,9 @@ impl Walk<'_> {
                         let value = values::value(result, src, &self.std, scope, depth);
                         (self.returns.entry(scope.to_string()).or_default()).push(value);
                     }
+                }
+                "defer_statement" if self.named_results.contains(scope) && !empty_defer(node) => {
+                    self.deferred_results.insert(scope.to_string());
                 }
                 "short_var_declaration" => {
                     if let Some(left) = node.child_by_field_name("left") {
@@ -902,10 +921,26 @@ impl Walk<'_> {
         let params = params(list, self.src);
         (self.facts.defs).push(def(name.clone(), Kind::Inline, node.byte_range(), params));
         self.typed_params(&name, list, false);
-        self.typed_params(&name, result_list(node), true);
+        self.bind_results(&name, node);
         self.bind_type_params(&name, node);
         name
     }
+}
+
+/// An immediately deferred empty literal has no body or arguments that could alter the
+/// returned value. Any other defer is opaque to the return-value fold.
+fn empty_defer(node: Node) -> bool {
+    let Some(call) = named(node).find(|n| n.kind() != "comment") else {
+        return false;
+    };
+    call.kind() == "call_expression"
+        && !call.has_error()
+        && call
+            .child_by_field_name("function")
+            .filter(|n| n.kind() == "func_literal")
+            .and_then(|n| n.child_by_field_name("body"))
+            .is_some_and(|body| named(body).all(|n| n.kind() == "comment"))
+        && values::arguments(call).next().is_none()
 }
 
 /// Whether the declaration `node` is a statement of a function's own body, not of a block
@@ -1292,6 +1327,8 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         first_results: Vec::new(),
         assigned: Vec::new(),
         returns: HashMap::new(),
+        named_results: HashSet::new(),
+        deferred_results: HashSet::new(),
         std: values::Std::default(),
         vars: BTreeSet::new(),
         selected: BTreeSet::new(),
@@ -1347,7 +1384,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     walk.facts.programs.push(name.clone());
                 }
                 walk.typed_params(&name, list, false);
-                walk.typed_params(&name, result_list(node), true);
+                walk.bind_results(&name, node);
                 walk.bind_type_params(&name, node);
                 if let Some(body) = body {
                     walk.body(&name, body);
@@ -1372,7 +1409,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 walk.facts.defs.push(method);
                 walk.typed_params(&qualified, list, false);
                 walk.typed_params(&qualified, receiver, true);
-                walk.typed_params(&qualified, result_list(node), true);
+                walk.bind_results(&qualified, node);
                 for type_param in type_params {
                     walk.local(&qualified, type_param);
                 }
