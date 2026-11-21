@@ -34,6 +34,8 @@ All notable changes to Meada are recorded here. The format follows
   reassigned parameter no longer supplies its caller's original value (#891, #893).
 - Resolve returned string bases, environment keys passed through wrappers and optional query
   suffixes in HTTP clients (#810, #811, #812).
+- Keep HTTP requests open when a Python class decorator may replace the method that supplies
+  their base URL. Rebuild existing indexes to drop links inferred from the original body (#962).
 - Explain why dynamic URLs have no candidates in `meada decide` and MCP `search` (#938).
 - Count linked consumers omitted from HTTP route `context` and point to upward `trace` (#935).
 - Save accepted model decisions before sending the next request, so an interrupted run
