@@ -319,15 +319,17 @@ def selftest(archive=None):
             with ZipFile(archive) as zipfile:
                 flow = 'flows/smoke-resolution/'
                 captures = flow + 'commands/'
-                totals = json.loads(zipfile.read(flow + 'denominator.json'))['totals']
+                scores = json.loads(zipfile.read(flow + 'denominator.json'))['checks']
                 for slot in ('base', 'head'):
                     data = json.loads(zipfile.read(captures + slot + '/app.out'))
-                    if totals[slot]['passed'] == 13:
+                    assert len(scores[slot]) == 13
+                    passed = sum(scores[slot].values())
+                    if passed == 13:
                         replay_open_items(root, f'archived-{slot}', data)
                         mcp = json.loads(zipfile.read(flow + f'mcp/{slot}/answers.json'))
                         replay_mcp(root, f'archived-{slot}', data, mcp['answers'])
                     else:
-                        assert totals[slot]['passed'] == 9
+                        assert passed == 9
                         replay(root, f'archived-{slot}', data,
                                json.loads(zipfile.read(captures + 'kotlin-shadow/' + slot + '.out')))
         for error, code in [(FileNotFoundError(), BLOCKED), (RuntimeError(), 1),
