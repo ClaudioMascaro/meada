@@ -22,7 +22,7 @@ The source and answer key for a step are in its Scope row and its own evidence d
 | `config_uses.py` | `6a5eca5853193d205bcf756983b41e9cb16ffa9d` | The release before #661 is the source of the pre-feature parity keys. Keep the raw historical catalog, exports and status when #855 or later MCP wording changes them. |
 | `images.py` | `eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62` | The release before #662 is the source of existing non-image rows. The pinned Boutique input also has source-derived keys for the new image behavior. |
 | `custom-iac.py` | `e6d27d0` in the manual audit, no base in PR Proof | The historical oracle requires no provisioner. Current source-keyed package, channel and workload checks are independent. |
-| `smoke_stack.py` | PR merge-base for resolution and lifecycle, plus named reference revisions for upgrade and SQS | The public corpus pins are in the receipt. Scope follows the source, running-probe transport records and complete per-site expected answers. #941 and #943 supply the historical upgrade pair. 68f1c0b supplies the SQS extraction control. |
+| `smoke_stack.py` | PR merge-base for resolution and lifecycle, plus named reference revisions for Python class authority, upgrade and SQS | The public corpus pins are in the receipt. Scope follows the source, running-probe transport records and complete per-site expected answers. 674b7ee supplies the prior class index, #941 and #943 supply the historical Go upgrade pair, and 68f1c0b supplies the SQS extraction control. |
 | `release-diff.py` | Previous release tag, Release diff workflow | Exports and orphan policy deltas are retained for the release reviewer. It exits 0 with a diff and 2 on a capture failure. |
 
 The PR comparison drivers use exit 4 for a comparison delta, 3 for a rejected oracle, 2 for
@@ -35,7 +35,8 @@ the same driver also found comparison deltas. Later independently runnable drive
 execute. A delta can be a regression. Judge the complete recorded values against the source.
 
 Public smoke records source-key results per revision in `checks.json` and
-`denominator.json`. `transitions.json` keeps both observations and the outcome of each
+`denominator.json`. `auxiliary-denominators.json` counts the separate MCP and Python
+class probes. `transitions.json` keeps both observations and the outcome of each
 pair. Rejected historical results remain visible. Exit 3 rejects a candidate or shared
 control. Failures to exercise either binary (missing input, crash, timeout) still affect
 capture. The Kotlin receiver policy in #952 has its own per-site keys. Status presentation
