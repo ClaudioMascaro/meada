@@ -1269,7 +1269,7 @@ Como saber se um elo que falta é bug:
 
 ### 8.1 Rotas HTTP
 
-Os clientes HTTP podem aproveitar a base retornada por uma função ou método chamado com resolução exata. Um wrapper pode passar a chave literal de uma variável de ambiente ou o identificador do plugin Backstage. A rota também é preservada quando as alternativas no fim da URL variam apenas na query string. Reatribuições de parâmetros e alternativas de despacho podem deixar a origem em aberto.
+Os clientes HTTP podem aproveitar a base retornada por uma função ou método chamado com resolução exata. Um wrapper pode passar a chave literal de uma variável de ambiente ou o identificador do plugin Backstage. A rota também é preservada quando as alternativas no fim da URL variam apenas na query string. Reatribuições de parâmetros e alternativas de despacho podem deixar a origem em aberto. Um decorador de classe Python pode substituir o método que fornece a base. O Meada conserva o pedido em aberto com os candidatos compatíveis com o caminho conhecido.
 
 Uma rota liga quem a **serve** (o provedor, o código que a trata) a quem a **chama** (o
 consumidor, uma chamada de cliente HTTP). Em todas as linguagens, o Meada normaliza o caminho:
