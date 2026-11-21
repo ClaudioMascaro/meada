@@ -131,6 +131,10 @@ on it (ADR 0002).
 
 ## Agent skills
 
+For a builder delivery or a stack of PRs, use
+[review-meada-stack](.agents/skills/review-meada-stack/SKILL.md) to verify the cross-repository
+smokes, triage findings and prepare the next builder handoff.
+
 ### Issue tracker
 
 Issues and specs live in GitHub Issues on `ClaudioMascaro/meada`. See `docs/agents/issue-tracker.md`.
