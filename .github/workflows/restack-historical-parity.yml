@@ -1,0 +1,25 @@
+name: Compare exact historical parity deltas
+on:
+  push:
+    branches: [verify/restack-historical-parity-20261121]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Compare each raw expected, actual and unified diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 14721770457 14708103513; do
+            curl -fsSL --retry 2 -H "Authorization: Bearer $GH_TOKEN" -o "$RUNNER_TEMP/$id.zip" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip"
+          done
+          sha256sum "$RUNNER_TEMP/14721770457.zip" "$RUNNER_TEMP/14708103513.zip"
+          python3 .github/compare-historical-parity.py "$RUNNER_TEMP/14721770457.zip" "$RUNNER_TEMP/14708103513.zip"
