@@ -16,6 +16,7 @@ import socket
 import subprocess
 import time
 import traceback
+from proof_result import Comparisons, run_driver
 from prove import git, free_port, Http, answer, mcp_answers
 from console import http, query_equal
 
@@ -396,9 +397,12 @@ def main():
         new_tools, new_texts, _ = mcp_answers(binary, control, controls, run / 'head-control-stdio.err')
         dump(run, 'base-control-stdio.json', old_texts)
         dump(run, 'head-control-stdio.json', new_texts)
-        probe.check('existing code-only SQS export byte parity', old_bytes == new_bytes)
-        probe.check('existing code-only SQS status byte parity', old_status == new_status)
-        probe.check('existing SQS MCP answers and tool schemas byte parity', old_texts == new_texts and old_tools == new_tools == tools)
+        comparisons = Comparisons(run)
+        comparisons.compare('existing code-only SQS export bytes', old_bytes.decode(), new_bytes.decode())
+        comparisons.compare('existing code-only SQS status bytes', old_status.decode(), new_status.decode())
+        comparisons.compare('existing SQS MCP answers', old_texts, new_texts)
+        comparisons.compare('existing SQS MCP tool catalog', old_tools, new_tools)
+        probe.check('head SQS and AWS MCP tool catalogs agree', new_tools == tools)
         manifest = 'index_dir = "indexes"\n'
         for name, root in [('infra', infra), ('app', app), ('peer', peer)]:
             manifest += f'\n[[repository]]\nrepo = "{REMOTE}{name}"\npath = "{root}"\n'
@@ -426,11 +430,10 @@ def main():
             probe.check('console API and loaded graph supplied for A7 surface', False, 'requires --ui-bin and --ui-dir')
         failed = [check for check in probe.checks if not check['passed']]
         dump(run, 'result.json', {'result': 'checks passed' if not failed else 'BROKEN', 'failed': len(failed), 'checks': len(probe.checks)})
-        return 1 if failed else 0
+        return comparisons.exit_code(failed)
     except Exception:
-        write(run, 'blocked.txt', traceback.format_exc())
-        print(traceback.format_exc(), flush=True)
-        return 2
+        write(run, 'execution-error.txt', traceback.format_exc())
+        raise
 
 
 def console(probe, args, run, manifest, queries, texts):
@@ -477,4 +480,4 @@ def console(probe, args, run, manifest, queries, texts):
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    run_driver(main)

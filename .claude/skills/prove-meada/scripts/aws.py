@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import traceback
 import time
+from proof_result import Comparisons, run_driver
 from prove import git, free_port, Http, answer, mcp_answers
 
 REMOTE = 'example.com/zz-prove-aws/'
@@ -565,14 +566,15 @@ def main():
         old_status = probe.command(base, clean, 'base-plain-status', 'status')
         new = json.loads(probe.command(head, clean, 'head-plain', 'export'))
         new_status = probe.command(head, clean, 'head-plain-status', 'status')
-        probe.check('code-only export base parity', old == new)
-        probe.check('code-only status base parity', old_status == new_status)
+        comparisons = Comparisons(run)
+        comparisons.compare('code-only export', old, new)
+        comparisons.compare('code-only status', old_status, new_status)
         oq = [{'tool': 'context', 'arguments': {'symbol': 'independent_plain', 'budget': 8000}},
               {'tool': 'trace', 'arguments': {'from': 'independent_plain', 'direction': 'up', 'budget': 8000}}]
-        _, bt, _ = mcp_answers(base, clean, oq, run / 'base-plain-stdio.err')
-        _, ht, _ = mcp_answers(head, clean, oq, run / 'head-plain-stdio.err')
-        write(run, 'plain-stdio.json', json.dumps({'base': bt, 'head': ht}, indent=2))
-        probe.check('code-only MCP base parity', bt == ht)
+        base_tools, bt, _ = mcp_answers(base, clean, oq, run / 'base-plain-stdio.err')
+        head_tools, ht, _ = mcp_answers(head, clean, oq, run / 'head-plain-stdio.err')
+        write(run, 'plain-stdio.json', json.dumps({'queries': oq, 'base': bt, 'head': ht, 'base_tools': base_tools, 'head_tools': head_tools}, indent=2))
+        comparisons.compare('code-only MCP', (base_tools, bt), (head_tools, ht))
         failed = [c for c in probe.checks if not c['passed']]
         verdict = 'BROKEN' if failed else 'CHECKS PASSED; independent checker must judge PROVED'
         write(run, 'receipt.md', f'# AWS #658 proof\n\n{verdict}\n\nChecker: script only, not blind or independent.\n'
@@ -597,13 +599,12 @@ def main():
               'Not covered: cloud SDK additions (separate tickets), console rendering, grants; '
               'root checker runs full shared-code corpus parity and docs/release checks.\n\n'
               + '\n'.join('- ' + c['check'] + ': ' + c['detail'] for c in failed) + '\n')
-        return bool(failed)
+        return comparisons.exit_code(failed)
     except Exception:
-        write(run, 'blocked.txt', traceback.format_exc())
-        write(run, 'receipt.md', '# AWS #658 proof\n\nBLOCKED: verifier or surface failed; see blocked.txt and raw evidence.\n')
-        print(traceback.format_exc(), flush=True)
-        return 2
+        write(run, 'execution-error.txt', traceback.format_exc())
+        write(run, 'receipt.md', '# AWS #658 proof\n\nExecution stopped; see execution-error.txt and raw evidence.\n')
+        raise
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    run_driver(main, legacy=True)

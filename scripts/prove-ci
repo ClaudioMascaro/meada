@@ -4,11 +4,13 @@ prints the flows and Scope rows those paths reach."""
 
 import collections
 import fnmatch
+import hashlib
 import itertools
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,7 +24,12 @@ SURFACES = ('cli', 'console', 'accounts', 'deploy', 'container', 'goldens')
 # Bases from before a feature, as a7-a8-audit.py names them: `images.py` compares against one
 # before #662 (`PRE_IMAGE`), `config_uses.py` against one before #661 (`PRE_CONFIG`).
 HISTORICAL = {'pre_image': 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62',
-              'pre_config': '6a5eca5853193d205bcf756983b41e9cb16ffa9d'}
+              'pre_config': '6a5eca5853193d205bcf756983b41e9cb16ffa9d',
+              'pre_private_fields': 'b73e1e5318508d69a8e98e1081e2e9fb3c61076e',
+              'before_go_keys': 'e4058ebc17f97f0ae08adfd89374be159fe11040',
+              'before_invalidation': 'e0925fe4463ea44b6d1a928509fc68c0d8c14b81',
+              'before_sqs_restore': '68f1c0ba675f951a191c4fc7a87f75d77de02bef',
+              'before_class_authority': '674b7ee52939ed58dccc43935b12322a56496696'}
 # A flow's ceiling, the audit's: one hung driver must not spend the job's 90 minutes. Every step but
 # the cleanups runs under timeout(1) with what is left of CAPTURE_END, and one with under a minute
 # left is BLOCKED unrun: with the setup before and the upload after, the receipt fits the job's 90.
@@ -32,6 +39,7 @@ FLOW_CEILINGS = {'ci-corpus': 2400}
 CAPTURE_END = 75 * 60
 VALUES = r'src/(config_values|index\.rs|document/|msg\.rs)'
 IAC = r'src/(iac\.rs|iac/(functions|cloudformation|serverless)\.rs|document/events\.rs|index\.rs|engine\.rs)'
+AWS_WORKLOADS = r'src/(iac\.rs|iac/(cloudformation|serverless|json|types)\.rs|iac/types/|iac/types\.toml|iac/workload(\.rs|/)|image/code\.rs)'
 AWS = r'src/(iac/subscription\.rs|iac/types\.toml|config_values(\.rs|/hcl\.rs)|channel\.rs|document/asyncapi\.rs)'
 IMAGES = r'src/(image\.rs|image/|iac/types|index\.rs|engine\.rs|trace\.rs|items\.rs)|meada-core/src/export\.rs|ui/src/(graph|GraphPage)'
 PATTERNS = r'src/(iac/(pattern|provision)\.rs|image/patterns\.rs|decisions\.rs)'
@@ -43,7 +51,8 @@ A8 = r'src/(lang/(ts|go|mod)|http\.rs|http/(ts|go|join)|resolve\.rs|index\.rs)'
 SOURCE_KEY = '{scripts}/a7-source-keys/native-hcl-values/'
 # The Scope table's shared core: every answer goes through it, the A7/A8 flows' too.
 SHARED = (r'src/(lang/mod\.rs|resolve\.rs|index\.rs|engine\.rs|trace\.rs|partial\.rs|contract\.rs|community\.rs|entry\.rs'
-          r'|items\.rs|drift_view\.rs|render\.rs)|meada-core/src/(render|search|context|trace|shape|drift|export)\.rs')
+          r'|items\.rs|drift_view\.rs|render\.rs)|meada-core/src/(render|search|context|trace|shape|drift|export)\.rs'
+          r'|tests/golden/schema\.txt$')
 # The drivers the skill's Scope table names (`SCOPE`), each with the paths its row names (None: on
 # every run of its surface; a change to the verifier or to shared core runs them all). `{head}`, `{base}` and `{ui}` are this run's builds: a flow with `{ui}` runs
 # in a console run after the console's API checks, the others after `cli-mcp`. A `HISTORICAL` base is
@@ -59,7 +68,7 @@ FLOWS = (
     ('serverless-values', IAC, 'prove.py values --head-bin {head} --base-bin {base} --repos a7-sls --http'),
     ('terraform-json', r'src/(iac\.rs|iac/(json|functions|provision)\.rs)', 'terraform-json.py --head-bin {head} --http'),
     ('environment', r'src/(image|kube|iac)/environment\.rs', 'environment.py --head-bin {head}'),
-    ('aws-workloads', r'src/(iac/workload(\.rs|/)|image/code\.rs)', 'aws-workloads.py --head-bin {head}'),
+    ('aws-workloads', AWS_WORKLOADS, 'aws-workloads.py --head-bin {head}'),
     ('provisions', r'src/iac/(provision|types)|meada-core/src/export\.rs', 'provisions.py --head-bin {head}'),
     ('gcp', r'src/(contract|iac)/gcp\.rs', 'gcp.py --head-bin {head}'),
     ('gcp-sdk', r'src/contract/(gcp/)?sdk', 'gcp-sdk.py --head-bin {head} --http'),
@@ -67,7 +76,10 @@ FLOWS = (
     ('aws-json-values', AWS, 'aws.py --json-values --head-bin {head}'),
     ('aws-sdk-jvm-go-dotnet', r'src/(channel/(aws|java|go|csharp)\.rs|resource/aws\.rs|contract/sdk)|meada-core/src/export\.rs',
      'aws-sdk-jvm-go-dotnet.py --head-bin {head} --http'),
-    ('aws-java-private-fields', r'src/(contract/sdk/java\.rs|lang/java\.rs)', 'aws-java-private-fields.py --head-bin {head} --base-bin {base}'),
+    ('dynamodb-transactions', r'src/(contract/sdk|resource/aws\.rs|lang/(java|go)(\.rs|/))',
+     'dynamodb-transactions.py --head-bin {head} --repos dynamodb-transactions'),
+    ('aws-java-private-fields', r'src/(contract/sdk/java\.rs|lang/java\.rs)',
+     'aws-java-private-fields.py --head-bin {head} --base-bin {base} --historical-bin {pre_private_fields}'),
     ('orphans', r'src/(iac/orphans\.rs|engine\.rs|channel\.rs|resource\.rs|contract\.rs|msg\.rs)',
      'orphans.py --head-bin {head} --base-bin {base} --base-has-orphans --http'),
     ('images-mixed', IMAGES, 'images-mixed.py --head-bin {head} --base-bin {base}'),
@@ -86,12 +98,20 @@ FLOWS = (
     ('ci-permissions', CI, 'ci.py --slice f3 --head-bin {head} --base-bin {base} --http'),
     ('a8-peers', A8, 'a8-peers.sh check {base} {head} {out}'),
     ('a8-mcp', A8, 'a8-mcp.py --head-bin {head} --base-bin {base}'),
+    ('smoke-resolution', r'src/(http|lang|resolve|index|contract/sdk|ci|iac/actions)(\.rs|/)|src/(config|workspace)\.rs$|tests/fixtures/conformance-kotlin/',
+     'smoke_stack.py --slice resolution --head-bin {head} --base-bin {base} --old-bin {before_class_authority}'),
+    ('smoke-lifecycle', r'src/(decid|status|iac/orphans|workspace|index|engine|main)|meada-core/src/export\.rs',
+     'smoke_stack.py --slice lifecycle --head-bin {head} --base-bin {base}'),
+    ('smoke-upgrade', r'src/(index(\.rs|/)|lang/go(\.rs|/)|http/go(\.rs|/))',
+     'smoke_stack.py --slice upgrade --head-bin {head} --old-bin {before_go_keys} --middle-bin {before_invalidation}'),
+    ('smoke-sqs', r'src/(index(\.rs|/)|channel/aws\.rs|contract/sdk|iac/provision\.rs$)',
+     'smoke_stack.py --slice sqs --head-bin {head} --old-bin {before_sqs_restore}'),
     ('console-graph', None, 'console-graph.py --head-bin {ui} --ui-dir ui/dist'),
     ('aws-sdk', r'src/(channel|resource)/', 'aws-sdk.py --head-bin {head} --base-bin {base} --ui-bin {ui} --ui-dir ui/dist'),
     ('config-uses', r'src/(iac/config_uses\.rs|config_values\.rs|index\.rs|engine\.rs|trace\.rs|contract\.rs|iac/orphans\.rs)'
      r'|meada-core/src/(export|context|search|trace)\.rs|ui/src/(graph\.ts|GraphPage\.tsx)',
-     'config_uses.py --head-bin {ui} --base-bin {pre_config} --http --ui-dir ui/dist'),
-    ('images', f'{IMAGES}|{PATTERNS}', 'images.py --head-bin {head} --base-bin {pre_image} --http --public --ui-bin {ui} --ui-dir ui/dist'),
+     'config_uses.py --head-bin {ui} --historical-bin {pre_config} --http --ui-dir ui/dist'),
+    ('images', f'{IMAGES}|{PATTERNS}', 'images.py --head-bin {head} --historical-bin {pre_image} --http --public --ui-bin {ui} --ui-dir ui/dist'),
 )
 
 
@@ -109,17 +129,19 @@ def scope_table():
     return list(itertools.takewhile(lambda line: line.startswith('|'), lines[start:]))
 
 
+def row_patterns(row):
+    for token in re.findall(r'`([^`]+)`', row.split(' | ')[0]):
+        brace = re.fullmatch(r'([^{]*)\{([^}]*)\}(.*)', token)
+        yield from (brace[1] + choice + brace[3] for choice in brace[2].split(',')) if brace else (token,)
+
+
 def rows_for(paths):
     """The Scope rows whose first cell names one of the paths: a file, a directory, a glob or `{a,b}` choices."""
     # shortcut: a row's "but" exclusions are not read, so a path can also show a row that excludes it;
     # CI's selection is `selected()`, these rows are only the reviewer's map.
-    def patterns(cell):
-        for token in re.findall(r'`([^`]+)`', cell):
-            brace = re.fullmatch(r'([^{]*)\{([^}]*)\}(.*)', token)
-            yield from (brace[1] + choice + brace[3] for choice in brace[2].split(',')) if brace else (token,)
     names = lambda pattern, path: fnmatch.fnmatchcase(path, pattern + '*' if pattern.endswith('/') else pattern)
     return [row for row in scope_table()[2:]
-            if any(names(pattern, path) for pattern in patterns(row.split(' | ')[0]) for path in paths)]
+            if any(names(pattern, path) for pattern in row_patterns(row) for path in paths)]
 
 
 def flow_command(run, flow):
@@ -162,10 +184,10 @@ def capture(run, scope, base, head, repos, paths=()):
     ui_flows = [flow for flow in flows if '{ui}' in flow[2]]
     end = time.monotonic() + CAPTURE_END
 
-    def command(name, args, required=False, compares=False, ceiling=None, cleanup=False):
+    def command(name, args, required=False, compares=False, driver=False, ceiling=None, cleanup=False):
         left = int(end - time.monotonic())
         if left < 60 and not cleanup:
-            steps.append({'name': name, 'exit_code': 2, 'blocked': 'no time left in this job'})
+            steps.append({'name': name, 'exit_code': 2, 'outcome': 'not-run', 'blocked': 'no time left in this job'})
             print(f'{name}: no time left', flush=True)
             if required:
                 raise RuntimeError(f'{name}: no time left in this job')
@@ -178,30 +200,44 @@ def capture(run, scope, base, head, repos, paths=()):
             # outlives a timed-out driver, idle until the runner's cleanup; stop it here if one ever spins.
             args = ['timeout', '-k', '10', limit, *args]
         start = time.monotonic()
+        argv = [str(arg) for arg in args]
         with (run / 'logs' / (name + '.log')).open('w') as log:
-            code = subprocess.run([str(arg) for arg in args], stdout=log, stderr=subprocess.STDOUT).returncode
+            try:
+                code = subprocess.run(argv, stdout=log, stderr=subprocess.STDOUT).returncode
+            except OSError as error:
+                print(error, file=log)
+                code = 2
         seconds = time.monotonic() - start
         if code == -9 and limit and seconds >= limit:
             code = 124  # timeout's own KILL; a KILL before the limit (the OOM killer's) stays -9
-        steps.append({'name': name, 'exit_code': code, 'seconds': round(seconds)})
-        # A comparison's exit 1 is a difference from the base: evidence, not a failed capture.
-        if compares and code == 1:
+        difference = driver and code == 4 or compares and code == 1
+        outcome = ('difference' if difference else {0: 'completed', 2: 'blocked', 3: 'oracle-failed',
+                   124: 'timeout'}.get(code, 'failed'))
+        steps.append({'name': name, 'exit_code': code, 'seconds': round(seconds), 'outcome': outcome, 'argv': argv})
+        if difference:
             steps[-1]['differences'] = True
         print(f'{name}: exit {code}', flush=True)
         if required and code:
             raise RuntimeError(f'{name} failed; see logs/{name}.log')
 
     def drive(flow):
-        # A driver's exit 1 is its answer key disagreeing (or a crash): a failed step for the judge.
-        # `prove.py values` and `iac` exit 1 on a difference from the base, as `cli-mcp` does (and 3
-        # when their answer key rejects an answer).
+        # A missing historical binary blocks only the driver which needs it.
         failed = [step['name'] for step in steps if step['exit_code'] and step['name'] in
                   {'build-' + key.replace('_', '-') for key in HISTORICAL if f'{{{key}}}' in flow[2]}]
         if failed:
-            steps.append({'name': flow[0], 'exit_code': 2, 'blocked': f'{failed[0]} failed'})
+            steps.append({'name': flow[0], 'exit_code': 2, 'outcome': 'not-run', 'blocked': f'{failed[0]} failed'})
         else:
-            command(flow[0], flow_command(run, flow), compares=flow[2].startswith('prove.py'),
+            argv = flow_command(run, flow)
+            if flow[0] == 'aws-java-private-fields':
+                argv += ['--base-revision', base, '--head-revision', head]
+            command(flow[0], argv, compares=flow[2].startswith('prove.py'), driver=True,
                     ceiling=FLOW_CEILINGS.get(flow[0], FLOW_TIMEOUT))
+
+    def build_references(group):
+        for key, revision in HISTORICAL.items():
+            label = key.replace('_', '-')
+            if any(f'{{{key}}}' in flow[2] for flow in group):
+                command('build-' + label, ['env', 'PROVE_FIXED_REFERENCE=true', SCRIPTS / 'build.sh', label, revision, run])
 
     try:
         if scope['cli']:
@@ -210,9 +246,10 @@ def capture(run, scope, base, head, repos, paths=()):
             command('cli-mcp', [python, SCRIPTS / 'prove.py', 'run', '--base-bin', run / 'bin/meada-base',
                                '--head-bin', run / 'bin/meada-head', '--repos', repos, '--run', run, '--http'],
                     compares=True)
-            for flow in flows:
-                if flow not in ui_flows:
-                    drive(flow)
+            cli_flows = [flow for flow in flows if flow not in ui_flows]
+            build_references(cli_flows)
+            for flow in cli_flows:
+                drive(flow)
         if scope['console']:
             # The base can leave same-version core artifacts in the shared Cargo target.
             command('clean-console-core', ['cargo', 'clean', '-p', 'meada-core', '--target-dir',
@@ -240,10 +277,7 @@ def capture(run, scope, base, head, repos, paths=()):
                     finally:
                         (api_run / 'console/private.pem').unlink(missing_ok=True)
             # The old bases images and config-uses compare against, built only for them.
-            for key, revision in HISTORICAL.items():
-                if any(f'{{{key}}}' in flow[2] for flow in ui_flows):
-                    label = key.replace('_', '-')
-                    command('build-' + label, [SCRIPTS / 'build.sh', label, revision, run])
+            build_references(ui_flows)
             for flow in ui_flows:
                 drive(flow)
             command('console-start', [python, SCRIPTS / 'console.py', 'start', '--bin', run / 'bin/meada-head-ui',
@@ -258,7 +292,19 @@ def capture(run, scope, base, head, repos, paths=()):
             command('compose-contract', [python, 'scripts/compose-check'])
             command('helm-contract', [python, 'scripts/helm-check'])
         if scope['container']:
-            command('container-build', ['docker', 'build', '-t', 'meada:zz-prove', '.'], required=True)
+            cache = run.parent / 'meada-docker-cache'
+            if os.environ.get('PROVE_DOCKER_CACHE') == str(cache):
+                updated = run / 'docker-cache'
+                restore = ['--cache-from', f'type=local,src={cache}'] if (cache / 'index.json').is_file() else []
+                command('container-build', ['docker', 'buildx', 'build', '--load', *restore,
+                                            '--cache-to', f'type=local,dest={updated},mode=min',
+                                            '-t', 'meada:zz-prove', '.'], required=True)
+                if updated.is_dir():
+                    if cache.is_dir():
+                        shutil.rmtree(cache)
+                    updated.rename(cache)
+            else:
+                command('container-build', ['docker', 'build', '-t', 'meada:zz-prove', '.'], required=True)
             command('container-smoke', [python, 'scripts/container-smoke', 'meada:zz-prove'])
     except (OSError, RuntimeError) as error:
         blocked = str(error)
@@ -275,8 +321,17 @@ def capture(run, scope, base, head, repos, paths=()):
                                    f"{step['name']} {'timed out' if step['exit_code'] == 124 else 'reported BLOCKED'}"
                                    for step in steps if step['exit_code'] in (2, 124)), None)
         failed = blocked is not None or any(step['exit_code'] and not step.get('differences') for step in steps)
+        binaries = {}
+        for identity in sorted((run / 'bin').glob('*.from')):
+            binary = identity.with_suffix('')
+            if binary.is_file():
+                with binary.open('rb') as executable:
+                    binaries[binary.name] = {'from': identity.read_text().strip(),
+                                             'sha256': hashlib.file_digest(executable, 'sha256').hexdigest()}
         receipt = {
             'base': base, 'head': head, 'surfaces': [name for name in SURFACES if scope[name]],
+            'driver_revision': head, 'binaries': binaries,
+            'answer_keys': f'{head}:.claude/skills/prove-meada/references/scope.md',
             'repos': repos, 'run_url': os.environ.get('PROVE_RUN_URL'), 'steps': steps,
             'capture': 'BLOCKED' if blocked else 'FAILED' if failed else 'CAPTURED',
             'verdict': 'UNPROVEN', 'blocked': blocked,
@@ -339,6 +394,29 @@ def selftest():
             assert f'- Steps: {steps}; exit 0: {steps - (code != 0)}' in summary, summary
             lists = {'Differences': 1, 'Failed': 3, 'BLOCKED': 2}
             assert all((f'- {label}: cli-mcp\n' in summary) == (lists[label] == code) for label in lists), summary
+    # A comparison, oracle failure, missing input, crash and timeout keep distinct receipts and the next
+    # driver's evidence. This exercises the drivers' protocol independently of prove.py's exit 1.
+    for code, outcome in ((4, 'difference'), (3, 'oracle-failed'), (2, 'blocked'), (1, 'failed'), (124, 'timeout')):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
+            def fake_driver(args, **kwargs):
+                if str(SCRIPTS / 'http-iac.py') in args:
+                    kwargs['stdout'].write('driver evidence\n')
+                    return subprocess.CompletedProcess(args, code)
+                return subprocess.CompletedProcess(args, 0)
+            with patch('subprocess.run', side_effect=fake_driver):
+                run = Path(temp) / 'proof'
+                result = capture(run, scope, 'a' * 40, 'b' * 40, 'meada')
+            steps = {step['name']: step for step in json.loads((run / 'receipt.json').read_text())['steps']}
+            assert steps['http-iac']['outcome'] == outcome and steps['iac-http-routes']['exit_code'] == 0
+            assert bool(result) == (code != 4) and (run / 'logs/http-iac.log').read_text() == 'driver evidence\n'
+    # The driver adapter must return the same codes for real Python exceptions. In particular,
+    # a broken legacy driver must never inherit the status of a Boolean oracle returning 1.
+    for exception, code in (('AssertionError', 3), ('FileNotFoundError', 2), ('RuntimeError', 1), ('TimeoutError', 124)):
+        probe = ('from proof_result import run_driver\n'
+                 f'def broken(): raise {exception}("probe evidence")\n'
+                 'run_driver(broken, legacy=True)')
+        result = subprocess.run([sys.executable, '-B', '-c', probe], cwd=SCRIPTS, capture_output=True, text=True)
+        assert result.returncode == code and f'{exception}: probe evidence' in result.stderr, result
     # `rebless` reports no difference by its exit: its exit 1 is a crash, a failed capture.
     goldens = dict.fromkeys(SURFACES, False)
     goldens['goldens'] = True
@@ -397,11 +475,11 @@ def selftest():
     assert {'aws-sdk-jvm-go-dotnet', 'gcp-sdk'} <= sdk and 'images' not in sdk
     assert {'patterns', 'images'} <= set(chosen(['src/decisions.rs']))  # the patterns row names images.py
     assert chosen(['scripts/prove-ci']) == chosen([f'{SCRIPTS}/http-iac.py']) == chosen(['src/partial.rs']) \
-        == chosen(['.github/workflows/proof.yml']) == [flow[0] for flow in FLOWS]
+        == chosen(['.github/workflows/proof.yml']) == chosen(['tests/golden/schema.txt']) == [flow[0] for flow in FLOWS]
     # Each driver a Scope row names runs here as a flow that row's first path selects, so a flow
     # dropped from a script with several (`prove.py values`, `aws.py`) fails too; each flow has a row.
     rows = scope_table()[2:]
-    drivers = lambda text: [re.sub(r' --(head|base)-bin$', '', name) for name in
+    drivers = lambda text: [re.sub(r' --(head|base|historical)-bin$', '', name) for name in
                             re.findall(r'prove\.py [a-z]+|[\w-]+\.(?:py|sh)(?: --[a-z-]+)?', text) if name != 'prove.py']
     driver = {flow[0]: drivers(flow[2])[0] for flow in FLOWS}
     # `prove.py run`, `rebless` and `deploy` are the corpus, goldens and deploy steps; `console.py` the console's.
@@ -425,8 +503,27 @@ def selftest():
             mutation['check'], mutation['check'])
         assert check in chosen([mutation['file']]), mutation['id']
     audit = (SCRIPTS / 'a7-a8-audit.py').read_text()
-    assert all(f"{key.upper()} = '{revision}'" in audit for key, revision in HISTORICAL.items())
-    assert 'aws-workloads' in chosen(['src/iac/workload/ecs.rs'])  # the row's ECS readers
+    assert all(f"{key.upper()} = '{HISTORICAL[key]}'" in audit for key in ('pre_image', 'pre_config'))
+    workload_row, = (row for row in rows if '`aws-workloads.py ' in row)
+    workload_paths = [file.as_posix() for path in row_patterns(workload_row)
+                      for file in (sorted(Path(path).rglob('*')) if path.endswith('/') else [Path(path)])
+                      if file.is_file()]
+    assert {'src/iac.rs', 'src/iac/cloudformation.rs', 'src/iac/serverless.rs',
+            'src/iac/workload/ecs.rs'} <= set(workload_paths), workload_paths
+    for path in workload_paths:
+        assert 'aws-workloads' in chosen([path]), f'Scope only: aws-workloads ({path})'
+    for path, smoke in [('src/config.rs', {'smoke-resolution'}),
+                        ('src/workspace.rs', {'smoke-resolution', 'smoke-lifecycle'}),
+                        ('src/iac/provision.rs', {'smoke-sqs'}),
+                        ('src/lang/python.rs', {'smoke-resolution'}),
+                        ('src/index.rs', {'smoke-resolution', 'smoke-lifecycle', 'smoke-upgrade', 'smoke-sqs'}),
+                        ('src/alert/incident.rs', set())]:
+        assert {flow for flow in chosen([path]) if flow.startswith('smoke-')} == smoke, path
+        assert all(any(f'--slice {flow.removeprefix("smoke-")}' in row for row in rows_for([path]))
+                   for flow in smoke), path
+    # The address column is a required part of the input this verifier selects.
+    names = (SCRIPTS / 'a7-tf-set/terraform-names.tsv').read_text().splitlines()
+    assert all(len(row.split('\t')) == 4 for row in names if row and not row.startswith('#'))
     # `--rows` reads a row's first cell: a file, a directory, a glob, `{a,b}` choices.
     first = lambda path: [row.split(' | ')[0] for row in rows_for([path])]
     assert first('src/contract/gcp.rs')[0].startswith('| `src/contract/gcp.rs`')
@@ -438,6 +535,8 @@ def selftest():
     assert rows_for(['docs/a.md']) == [] and len(rows) > 30
     a8 = flow_command(Path('/r'), next(flow for flow in FLOWS if flow[0] == 'a8-peers'))
     assert [str(arg) for arg in a8] == ['sh', f'{SCRIPTS}/a8-peers.sh', 'check', '/r/bin/meada-base', '/r/bin/meada-head', '/r/flows/a8-peers']
+    smoke = flow_command(Path('/r'), next(flow for flow in FLOWS if flow[0] == 'smoke-resolution'))
+    assert smoke[8:10] == ['--old-bin', '/r/bin/meada-before-class-authority'], smoke
     # The CLI flows follow `cli-mcp` and the console's its API checks, with this run's builds; images
     # builds its own base and is BLOCKED without it.
     scope = dict.fromkeys(SURFACES, False)
@@ -476,11 +575,12 @@ def selftest():
         order = ('cli-mcp', 'images-mixed', 'build-console', 'console-meada-stop', 'build-pre-image', 'build-pre-config',
                  'console-graph', 'config-uses', 'images', 'console-start', 'console-pages')
         assert [names.index(name) for name in order] == sorted(names.index(name) for name in order), names
-        assert argv['config_uses.py'][4:6] == ['--base-bin', str(run / 'bin/meada-pre-config')], argv['config_uses.py']
+        assert argv['config_uses.py'][4:6] == ['--historical-bin', str(run / 'bin/meada-pre-config')], argv['config_uses.py']
         # `prove.py values`' exit 1 is a difference from the base; a hung driver times out, alone.
         assert [exits[name] for name in ('image-ko', 'orphans', 'native-hcl-values')] == [124, -9, 137], exits
         assert receipt['steps'][names.index('values')]['differences'] and receipt['blocked'] == 'image-ko timed out'
-        assert receipt['steps'][names.index('images')] == {'name': 'images', 'exit_code': 2, 'blocked': 'build-pre-image failed'}
+        assert receipt['steps'][names.index('images')] == {
+            'name': 'images', 'exit_code': 2, 'outcome': 'not-run', 'blocked': 'build-pre-image failed'}
         assert receipt['capture'] == 'BLOCKED' and 'images.py' not in argv and 'aws.py' not in argv
         summary = (run / 'summary.md').read_text()
         assert f'- Steps: {len(names)}; ' in summary and '- Timed out: image-ko\n' in summary, summary
@@ -514,6 +614,9 @@ def selftest():
         assert calls[-1][0] != 'timeout' and receipt['steps'][-1]['name'] == 'clean', calls
         assert result == 2 and receipt['capture'] == 'BLOCKED' and receipt['blocked'] == f'{unrun[0]}: no time left in this job'
     assert f'Selected flows that did not run: {", ".join(cli_flows)}.' in receipt['not_covered'], receipt['not_covered']
+    smoke = subprocess.run([sys.executable, str(SCRIPTS / 'smoke_stack.py'), '--selftest'],
+                           text=True, capture_output=True, timeout=30)
+    assert smoke.returncode == 0, smoke.stdout + smoke.stderr
     print('prove-ci selftest: local guard, capture status, failure retention, cleanup and flow selection passed')
 
 

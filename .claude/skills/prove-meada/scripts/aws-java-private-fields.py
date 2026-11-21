@@ -1,31 +1,25 @@
 #!/usr/bin/env python3
-"""#775, slice 1: a Java builder held in a `private final` field, and the reflection guard, through both
-binaries. The probe `aws-java-private-fields/` holds three repositories (README.md: the cases and their
-key); `oracle/java-run.txt` is what each case sends when compiled and run on a JDK with a stub SDK.
-
-The key, per DynamoDB side (`Class.method`): the contract the base binary gives and the one the head
-gives. A case the change does not touch keeps the base's answer; where they differ, the head's is the
-one the Java run allows (a name only where every run sends it, else none). A script pass is evidence,
-not a PROVED verdict.
-"""
+"""Check both PR binaries against the Java oracle and optionally replay the #775 transition."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 
 from prove import git
+from proof_result import Comparisons, run_driver
 
 HERE = Path(__file__).resolve().parent
 PROBE = HERE / 'aws-java-private-fields'
 NONE = 'resource::dynamodb'  # the side with no table: unresolved
-KEY = {  # (case, side) -> {binary: contract}
-    ('a', 'Fields.keptField'): {'base': NONE, 'head': NONE + '::kept-private'},
-    ('a', 'Fields.ownField'): {'base': NONE, 'head': NONE + '::own-private'},
-    ('b', 'Fields.keptField'): {'base': NONE, 'head': NONE},
-    ('b', 'Fields.ownField'): {'base': NONE + '::own-private', 'head': NONE + '::own-private'},
-    ('c', 'Held.heldField'): {'base': NONE + '::held-old', 'head': NONE},
+PRE_PRIVATE_FIELDS = 'b73e1e5318508d69a8e98e1081e2e9fb3c61076e'  # parent of e78c38c in #885
+KEY = {  # (case, side) -> (historical, Java oracle)
+    ('a', 'Fields.keptField'): (NONE, NONE + '::kept-private'),
+    ('a', 'Fields.ownField'): (NONE, NONE + '::own-private'),
+    ('b', 'Fields.keptField'): (NONE, NONE),
+    ('b', 'Fields.ownField'): (NONE + '::own-private', NONE + '::own-private'),
+    ('c', 'Held.heldField'): (NONE + '::held-old', NONE),
 }
 CASES = sorted({case for case, _ in KEY})
 
@@ -39,8 +33,26 @@ def selftest():
     # unnamed sends two tables for it, or one the source never names as the field's own.
     assert 'putItem kept-private' in sent and 'putItem own-private' in sent and 'putItem kept-new' in sent
     assert 'putItem held-old' in sent and 'putItem held-new' in sent
-    assert all(want['head'] == NONE or want['head'].removeprefix(NONE + '::') in sent for want in KEY.values())
+    assert all(expected == NONE or expected.removeprefix(NONE + '::') in sent for _, expected in KEY.values())
+    for revision in (PRE_PRIVATE_FIELDS, 'ac905be259fd4abd77eee8788a9be62711f49a60'):
+        for case, side in KEY:
+            old, java = KEY[case, side]
+            rows = [{'site': f'input::{side}()::putItem', 'contract': old if revision == PRE_PRIVATE_FIELDS else java}]
+            assert contracts(rows, side) == [expected_contract(case, side, revision)]
+            assert contracts(rows, side) == [java] or old != java and revision == PRE_PRIVATE_FIELDS
+    wrong = [{'site': 'input::Fields.keptField()::putItem', 'contract': NONE + '::own-private'}]
+    assert contracts(wrong, 'Fields.keptField') != [expected_contract('a', 'Fields.keptField', None)]
     print(f'aws-java-private-fields self-test: {len(KEY)} sides in {len(CASES)} cases')
+
+
+def expected_contract(case, side, revision):
+    historical, java = KEY[case, side]
+    return historical if revision == PRE_PRIVATE_FIELDS else java
+
+
+def contracts(providers, side):
+    return [row['contract'] for row in providers
+            if f'::{side}()::' in row['site'] and row['contract'].split('::')[:2] == ['resource', 'dynamodb']]
 
 
 def main():
@@ -48,6 +60,9 @@ def main():
     parser.add_argument('--selftest', action='store_true')
     parser.add_argument('--head-bin')
     parser.add_argument('--base-bin')
+    parser.add_argument('--base-revision')
+    parser.add_argument('--head-revision')
+    parser.add_argument('--historical-bin', help=f'Binary built from {PRE_PRIVATE_FIELDS}')
     parser.add_argument('--run')
     args = parser.parse_args()
     if args.selftest:
@@ -66,8 +81,15 @@ def main():
         git('remote', 'add', 'origin', f'https://github.com/zz-prove/aws-java-private-fields-{case}.git', cwd=source)
         git('add', '-A', cwd=source)
         git('commit', '-q', '-m', 'probe', cwd=source)
-    checks = []
-    for binary, path in (('base', args.base_bin), ('head', args.head_bin)):
+    checks, observations, binaries = [], {}, {}
+    comparisons = Comparisons(out)
+    inputs = [('base', args.base_bin, args.base_revision), ('head', args.head_bin, args.head_revision)]
+    if args.historical_bin:
+        inputs.append(('historical', args.historical_bin, PRE_PRIVATE_FIELDS))
+    for binary, path, revision in inputs:
+        with Path(path).open('rb') as stream:
+            binaries[binary] = {'revision': revision, 'sha256': hashlib.file_digest(stream, 'sha256').hexdigest()}
+        observations[binary] = {}
         for case in CASES:
             work = out / binary / case
             shutil.copytree(out / 'input' / case, work, symlinks=True)
@@ -76,12 +98,17 @@ def main():
             (out / binary / f'{case}.export.err').write_text(result.stderr)
             result.check_returncode()
             providers = json.loads(result.stdout).get('providers', [])
-            for (key_case, side), want in KEY.items():
+            for key_case, side in KEY:
                 if key_case != case:
                     continue
-                found = [row for row in providers if f'::{side}()::' in row['site'] and row['contract'].startswith(NONE)]
-                checks.append({'name': f'{binary} {case} {side}: {want[binary]}', 'passed': [row['contract'] for row in found] == [want[binary]],
-                               'evidence': found})
+                want = [expected_contract(case, side, revision)]
+                found = contracts(providers, side)
+                observations[binary][f'{case} {side}'] = found
+                name = f'{binary} {case} {side}'
+                checks.append({'name': name, 'answer_key': revision if revision == PRE_PRIVATE_FIELDS else 'java-run.txt',
+                               'expected': want, 'actual': found, 'passed': comparisons.compare(name, want, found, oracle=True)})
+    comparisons.compare('PR base vs head decisions by case and site', observations['base'], observations['head'])
+    (out / 'binaries.json').write_text(json.dumps(binaries, indent=2) + '\n')
     (out / 'checks.json').write_text(json.dumps(checks, indent=2) + '\n')
     failed = [check['name'] for check in checks if not check['passed']]
     (out / 'receipt.md').write_text('# #775 slice 1: private final field builders and the reflection guard\n\n'
@@ -89,8 +116,8 @@ def main():
                                     + ('Checks passed; independent verdict pending.\n' if not failed else 'BROKEN checks:\n' + ''.join(f'- {name}\n' for name in failed)))
     for check in checks:
         print(('PASS ' if check['passed'] else 'FAIL ') + check['name'])
-    return int(bool(failed))
+    return comparisons.exit_code()
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    run_driver(main)

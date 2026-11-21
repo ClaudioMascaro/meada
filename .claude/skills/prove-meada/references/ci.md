@@ -254,9 +254,10 @@ checker reads `input/`, #820 and the captures and writes the verdict.
 - F2, rules of #820 with no case: an unresolved form in a builder's name or in
   `KO_DOCKER_REPO`, an `env` whose own value is unresolved, a `while` loop, `uv tool install` as
   the evidence of an install, and the weakest level in the footer of the chain's `trace`.
-- F2, the reason of a program link: since an install and `uvx` or `pipx run` give `inferred` as no
-  install does (ADR 0029), the cases of the level table differ by their reason alone, which
-  #820 does not word, so no case keys it; `tests/it/ci_program.rs` holds the reasons.
+- F2 checks the level and entry points with and without install evidence. Two distributions
+  offer `acme-dup`. The named install of `dup-a` selects its entry point at `inferred`;
+  the script alone keeps two `ambiguous` alternatives (#919). The documentation of reason
+  wording and measurement of package link cost remain on #919.
 - F3: effective permissions (the token's defaults, an organisation's policy), `read-all`,
   `write-all` and `{}` on the provider's side or as a pipeline's block, a provider with one CI
   job declared beside one that is not, both sides `not declared` at once, a local call, a

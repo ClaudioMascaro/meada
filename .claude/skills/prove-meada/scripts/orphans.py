@@ -16,6 +16,7 @@ import shutil
 import socket
 import subprocess
 import time
+from proof_result import Comparisons, run_driver
 from prove import Http, Stdio, answer, free_port, git
 
 
@@ -103,6 +104,7 @@ class Probe:
         self.run.mkdir(parents=True, exist_ok=False)
         self.base, self.head = map(lambda p: str(Path(p).resolve()), [args.base_bin, args.head_bin])
         self.failures, self.steps = [], []
+        self.comparisons = Comparisons(self.run)
         self.http = args.http
 
     def check(self, label, ok, detail=''):
@@ -229,13 +231,13 @@ class Probe:
                             'resource::s3::archive': 'no provisioner', 'resource::s3::a-live': 'no provisioner'}
             self.check(name + ' exact orphan set', orphan_set_matches(h, expected), repr(lines))
             without = ''.join(l + '\n' for l in h.splitlines() if not l.strip().startswith('orphan '))
-            self.check(name + ' whole status baseline parity',
-                       (h if self.base_has_orphans else without) == b,
-                       'The current tier already has #657: compare complete status.' if self.base_has_orphans else
-                       'Only the exact new orphan lines may differ; existing declared-resource diagnostics remain independent.')
+            self.comparisons.compare(name + ' whole status baseline parity', b, h if self.base_has_orphans else without)
             be = json.loads((self.run / f'base/{name}/export.out').read_text())
             he = json.loads((self.run / f'head/{name}/export.out').read_text())
-            self.check(name + ' export parity', be == he)
+            self.comparisons.compare(name + ' export parity', be, he)
+            before = json.loads((self.run / f'base/{name}/stdio.json').read_text())
+            after = json.loads((self.run / f'head/{name}/stdio.json').read_text())
+            self.comparisons.compare(name + ' stdio queries and catalog', before, after)
             qs = self.queries(name)
             texts = json.loads((self.run / f'head/{name}/stdio.json').read_text())['answers']
             if name == 'code-only':
@@ -301,7 +303,7 @@ class Probe:
         report += [f"- {'PASS' if s['pass'] else 'FAIL'} {s['check']}" for s in self.steps]
         write(self.run, 'orphans.md', '\n'.join(report) + '\n')
         print('\n'.join(report[:3]))
-        return int(bool(self.failures))
+        return self.comparisons.exit_code(self.failures)
 
     def cross_kind_only(self):
         """Focused addendum, without repeating the six completed scenarios."""
@@ -391,9 +393,9 @@ def main():
     try:
         return probe.cross_kind_only() if args.cross_kind_only else probe.run_checks()
     except Exception as e:
-        write(probe.run, 'blocked.txt', f'{type(e).__name__}: {e}\n')
+        write(probe.run, 'execution-error.txt', f'{type(e).__name__}: {e}\n')
         raise
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    run_driver(main, legacy=True)

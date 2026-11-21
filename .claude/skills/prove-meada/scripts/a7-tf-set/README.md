@@ -10,7 +10,7 @@ resource "aws_sqs_queue" "q" {
 }
 ```
 
-The answer key is `terraform-names.tsv`: per root, the names Terraform v1.17.1 creates, or
+The answer key is `terraform-names.tsv`: by root and resource address, the names Terraform v1.17.1 creates, or
 `rejected` where Terraform refuses the configuration. The maintainer's column was run in
 Terraform's `console` on `[for k, v in var.s : "${k}-${v}"]`, the same key and value this
 resource joins, so each name is `queue-` and the column's value. Nothing in it comes from Meada.
@@ -35,7 +35,7 @@ what #740 decides.
 
 `prove.py iac` cannot evaluate these names (`tf_names.py` reads no override file and no `for`),
 so every root is left out of its oracle comparison. It reads `terraform-names.tsv` instead and asks
-`search` kind `iac` for each type: an exact name (`name "..."`) must be Terraform's, and a root
+`search` kind `iac` for each type: an exact name (`name "..."`) must match its Terraform root and resource address, and a root
 Terraform rejects must have none. A root with no exact name is absent, not wrong (certain or
 absent); the report names those roots. Meada leaves a `for` key over a variable declared
 `type = set(...)` unresolved (`docs/agents/ceilings/`, Terraform and provisioning), so the

@@ -35,6 +35,7 @@ import threading
 import time
 import traceback
 import urllib.request
+from collections import Counter
 from pathlib import Path
 
 import yaml  # PyYAML: the A7 oracle's own YAML reader
@@ -58,10 +59,9 @@ KEYED = {
     "subscriptions": ("source", "target", "node", "root"),
     "providers": ("contract", "site", "at"),
     "consumers": ("contract", "site", "root"),
+    "open_items": ("kind", "call"),
 }
 WATCHED = {"calls": ("level", "target", "candidates"), "links": ("level",), "provisions": ("level", "reason"), "packages": ("version",), "consumers": ("via",)}
-OTHER = ("files", "imports", "documents", "bindings", "publishes", "dependencies", "communities", "processes",
-         "executions", "stale_decisions")
 FIXED_GIT = {
     "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
     "GIT_AUTHOR_NAME": "prove-meada", "GIT_AUTHOR_EMAIL": "prove@example.com", "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
@@ -435,25 +435,71 @@ def line_of(repo, path, offset):
     return n, data[start:end if end >= 0 else None].decode(errors="replace").strip()[:120]
 
 
+def json_value(value):
+    return json.dumps(value, sort_keys=True, ensure_ascii=False)
+
+
+def list_changes(before, after):
+    """Keep order in the raw values and multiplicity in the item delta."""
+    old, new = map(lambda rows: Counter(map(json_value, rows)), (before, after))
+    return list((old - new).elements()), list((new - old).elements())
+
+
+def field_changes(before, after):
+    for field in sorted(before.keys() | after.keys()):
+        if field not in before:
+            yield f"{field} added: {json_value(after[field])}"
+        elif field not in after:
+            yield f"{field} removed: {json_value(before[field])}"
+        elif json_value(before[field]) != json_value(after[field]):
+            old, new = before[field], after[field]
+            if field == "candidates" and isinstance(old, list) and isinstance(new, list):
+                removed, added = list_changes(old, new)
+                yield f"candidates: -[{', '.join(removed)}] +[{', '.join(added)}]; {json_value(old)} -> {json_value(new)}"
+            else:
+                yield f"{field}: {json_value(old)} -> {json_value(new)}"
+
+
 def export_diff(base, head, repo=None, cap=20):
-    """Per-section differences of two exports, golden_diff's keys; and the new or changed
-    resolutions worth confirming in the source."""
+    """Compare every JSON field. Known row identities give a more useful description of moves."""
     lines, sample = [], []
-    for field in ("format", "repository", "commit", "dirty"):
-        if base.get(field) != head.get(field):
-            lines.append(f"  {field}: {base.get(field)} -> {head.get(field)}")
-    symbols = {s["id"]: s for s in head.get("symbols", [])}
-    for section, _ in KEYED.items():
+    symbols = {s["id"]: s for s in head.get("symbols", []) if isinstance(s, dict) and "id" in s} if repo else {}
+    for section in sorted(base.keys() | head.keys()):
+        old, new = base.get(section), head.get(section)
+        if section not in base or section not in head:
+            side = new if section in head else old
+            size = f" ({len(side)} items)" if isinstance(side, list) else f": {json_value(side)}"
+            lines.append(f"  {section} {'added' if section in head else 'removed'}{size}")
+        elif json_value(old) == json_value(new):
+            continue
+        if section not in KEYED or not all(isinstance(values, list) and all(isinstance(row, dict) for row in values)
+                                          for values in (base.get(section, []), head.get(section, []))):
+            if isinstance(base.get(section, []), list) and isinstance(head.get(section, []), list):
+                removed, added = list_changes(base.get(section, []), head.get(section, []))
+                lines.append(f"  {section}: +{len(added)} -{len(removed)}"
+                             + (" (order changed)" if not added and not removed and section in base and section in head else ""))
+                lines.extend(f"    {sign} {row}" for sign, delta in (("-", removed), ("+", added)) for row in delta[:cap])
+            elif section in base and section in head:
+                lines.append(f"  {section}: {json_value(old)} -> {json_value(new)}")
+            continue
         bl, hl = base.get(section, []), head.get(section, [])
         b, h = rows(section, unpaired(bl, hl)), rows(section, unpaired(hl, bl))
         added = sorted(set(h) - set(b))
         removed = sorted(set(b) - set(h))
-        changed = sorted(k for k in set(b) & set(h) if b[k] != h[k])
+        changed = sorted(set(b) & set(h))
         if not (added or removed or changed):
+            if section in base and section in head:
+                lines.append(f"  {section}: order changed")
             continue
         lines.append(f"  {section}: +{len(added)} -{len(removed)} ~{len(changed)}")
-        lines += [f"    + {k}" for k in added[:cap]] + ([f"    ... {len(added) - cap} more added"] if len(added) > cap else [])
-        lines += [f"    - {k}" for k in removed[:cap]] + ([f"    ... {len(removed) - cap} more removed"] if len(removed) > cap else [])
+        if section == "open_items":
+            for sign, keys, values in (("+", added, h), ("-", removed, b)):
+                lines.extend(f"    {sign} {k}: {json_value(values[k])}" for k in keys[:cap])
+        else:
+            lines += [f"    + {k}" for k in added[:cap]] + [f"    - {k}" for k in removed[:cap]]
+        for label, keys in (("added", added), ("removed", removed), ("changed", changed)):
+            if len(keys) > cap:
+                lines.append(f"    ... {len(keys) - cap} more {label}")
         moves = {}
         for k in changed:
             for f in WATCHED.get(section, ()):
@@ -463,17 +509,15 @@ def export_diff(base, head, repo=None, cap=20):
         for label, keys in sorted(moves.items()):
             lines.append(f"    {label}: {len(keys)}")
             lines += [f"      {k}" for k in keys[:cap]]
+        for k in changed[:cap]:
+            lines.append(f"    ~ {k}")
+            lines.extend(f"      {change}" for change in field_changes(b[k], h[k]))
         for k in added + changed:
             v = h[k]
             if section == "calls" and v.get("target") and v.get("level") in ("exact", "inferred"):
                 sample.append((section, k, v, b.get(k)))
             if section == "links":
                 sample.append((section, k, v, b.get(k)))
-    for section in OTHER:
-        bs = {json.dumps(v, sort_keys=True) for v in base.get(section, [])}
-        hs = {json.dumps(v, sort_keys=True) for v in head.get(section, [])}
-        if bs != hs:
-            lines.append(f"  {section}: +{len(hs - bs)} -{len(bs - hs)}")
     rendered = []
     for section, k, v, old in sample:
         if section == "calls" and repo is not None:
@@ -514,7 +558,7 @@ def http_parity(bin, name, repo, run, rec):
     (d / "meada.workspace.toml").write_text(f'index_dir = "indexes"\n\n[[repository]]\nrepo = "{identity}"\npath = "{repo}"\n')
     idx = timed([bin, "index", "--workspace", "meada.workspace.toml"], d, d / "index.out", d / "index.err")
     if idx["exit"]:
-        return f"  {name}: BLOCKED, meada index --workspace exited {idx['exit']}, see {d}/index.err", True
+        return f"  {name}: BLOCKED, meada index --workspace exited {idx['exit']}, see {d}/index.err", 2
     port = free_port()
     server = subprocess.Popen([bin, "mcp", "--listen", f"127.0.0.1:{port}", "--workspace", "meada.workspace.toml"],
                               cwd=d, stdin=subprocess.DEVNULL,
@@ -528,15 +572,18 @@ def http_parity(bin, name, repo, run, rec):
             except OSError:
                 time.sleep(0.2)
         client = Http(f"http://127.0.0.1:{port}/{identity}")
-        tools = client.call("tools/list", {}).get("result", {}).get("tools")
+        tools = client.call("tools/list", {})["result"]["tools"]
+        if not tools:
+            raise ValueError("empty HTTP tool catalog")
+        (d / "tools.json").write_text(json.dumps(tools, indent=1))
         same_tools = json.dumps(tools, sort_keys=True) == json.dumps(rec.get("tools"), sort_keys=True)
         answers = [answer(client.call("tools/call", {"name": q["tool"], "arguments": q["arguments"]})) for q in rec["queries"]]
         (d / "answers.json").write_text(json.dumps(answers, indent=1))
         diffs = [i for i, a in enumerate(answers) if a != rec["answers"][i]]
         return (f"  {name}: tools {'same' if same_tools else 'DIFFER'}, {len(answers) - len(diffs)}/{len(answers)} answers "
-                f"byte-equal to stdio" + (f", differ at queries {diffs} ({d}/answers.json)" if diffs else "")), bool(diffs) or not same_tools
+                f"byte-equal to stdio" + (f", differ at queries {diffs} ({d}/answers.json)" if diffs else "")), 3 if diffs or not same_tools else 0
     except Exception as e:
-        return f"  {name}: BLOCKED, HTTP client: {e!r}, see {d}/server.err", True
+        return f"  {name}: BLOCKED, HTTP client: {e!r}, see {d}/server.err", 2
     finally:
         server.terminate()
         server.wait(timeout=30)
@@ -628,12 +675,17 @@ def cmd_run(a):
                 report.append(f"MCP {q['tool']} {json.dumps(q['arguments'])}: differs\n```\n" + "\n".join(diff[:60]) + "\n```")
         same = sum(b["answers"][i] == h["answers"][i] for i in range(len(h["queries"])))
         report.append(f"MCP stdio: {same}/{len(h['queries'])} answers byte-equal; queries in {run}/queries/{name}.jsonl\n")
-    if a.http and not blocked:
+    if a.http:
         lines = []
         for n in names:
-            line, failed = http_parity(Path(a.head_bin).resolve(), n, run / "work" / "head" / n, run, records["head"][n])
+            if records["head"][n].get("failed"):
+                lines.append(f"  {n}: BLOCKED, head's CLI/stdio capture failed")
+                continue
+            line, outcome = http_parity(Path(a.head_bin).resolve(), n, run / "work" / "head" / n, run, records["head"][n])
             lines.append(line)
-            differences += failed
+            blocked |= outcome == 2
+            hard += outcome == 3
+            differences += outcome != 0
         report.append("## MCP HTTP vs stdio (head)\n\n" + "\n".join(lines) + "\n")
     verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}")
     (run / "compare.md").write_text(f"# prove.py run\n\n{verdict}\n\n" + "\n".join(report) + "\n")
@@ -794,9 +846,24 @@ def cmd_selftest(_):
                     "node": "infra::main.tf::aws_sns_topic_subscription.jobs", "root": "dev"}
     subscription_key = "channel::sns::events | channel::sqs::jobs | infra::main.tf::aws_sns_topic_subscription.jobs | dev"
     assert export_diff({}, {"subscriptions": [subscription]}) == ([
-        "  subscriptions: +1 -0 ~0", f"    + {subscription_key}"], [])
+        "  subscriptions added (1 items)", "  subscriptions: +1 -0 ~0", f"    + {subscription_key}"], [])
     assert export_diff({"subscriptions": [subscription]}, {}) == ([
-        "  subscriptions: +0 -1 ~0", f"    - {subscription_key}"], [])
+        "  subscriptions removed (1 items)", "  subscriptions: +0 -1 ~0", f"    - {subscription_key}"], [])
+    assert export_diff(json.loads('{"x": [1,2]}'), json.loads('{ "x": [1, 2] }\n')) == ([], [])
+    assert export_diff({"open_items": []}, {})[0] == ["  open_items removed (0 items)"]
+    assert export_diff({}, {"future": None})[0] == ["  future added: null"]
+    assert export_diff({"future": None}, {})[0] == ["  future removed: null"]
+    assert export_diff({"future": [2, 1, 1]}, {"future": [1, 2, 1]})[0] == ["  future: +0 -0 (order changed)"]
+    assert export_diff({"future": [2, 1, 1]}, {"future": [1, 2]})[0] == ["  future: +0 -1", "    - 1"]
+    item = {"kind": "ambiguous-link", "call": "app::client.py::send", "candidates": ["lib", "other"]}
+    assert "open_items added" in "\n".join(export_diff({}, {"open_items": [item]})[0])
+    changed_item = dict(item, candidates=["lib", "shared"], future=True)
+    text = "\n".join(export_diff({"open_items": [item]}, {"open_items": [changed_item]})[0])
+    assert 'ambiguous-link | app::client.py::send' in text and 'candidates: -["other"] +["shared"]' in text, text
+    assert "future added: true" in text, text
+    assert export_diff({"open_items": [item, item]}, {"open_items": [item]})[0][0] == "  open_items: +0 -1 ~0"
+    assert export_diff({"open_items": [item, changed_item]}, {"open_items": [changed_item, item]})[0] == [
+        "  open_items: order changed"]
     # #661: repository-level sites need their at locator in both keys. Otherwise
     # two references to one contract silently collapse in the comparison dictionary.
     uses = [{"contract": "channel::sqs::parcel", "site": "app", "at": f"values.yaml#worker.{key}"}
@@ -961,11 +1028,15 @@ Resources:
     assert cfn.sam_code_fields('template.yaml', source, worker) == {'build': 'target/lambda/worker'}
     # A probe's Terraform key: an exact name must be Terraform's, an absent one is no failure.
     key = terraform_key(HERE / "a7-tf-set")["aws_sqs_queue"]
-    assert key["list"] == ["queue-0-a", "queue-1-b"] and key["tuple"] == [] and len(key) == 12, key
-    hit = lambda root, name: f'a7-tf-set {root}/main.tf:4 aws_sqs_queue.q["0"] (aws_sqs_queue, name "{name}", root {root})'
-    right = "\n".join([hit("list", "queue-1-b"), hit("list", "queue-0-a"), 'x any/main.tf:4 aws_sqs_queue.q (aws_sqs_queue, pattern "queue-*-*", root any)'])
+    assert key["list"] == {'aws_sqs_queue.q["0"]': "queue-0-a", 'aws_sqs_queue.q["1"]': "queue-1-b"}
+    assert key["tuple"] == {} and len(key) == 12, key
+    hit = lambda root, name, index="0": f'a7-tf-set {root}/main.tf:4 aws_sqs_queue.q["{index}"] (aws_sqs_queue, name "{name}", root {root})'
+    right = "\n".join([hit("list", "queue-1-b", "1"), hit("list", "queue-0-a"), 'x any/main.tf:4 aws_sqs_queue.q (aws_sqs_queue, pattern "queue-*-*", root any)'])
     assert key_problems(key, right) == ([], [r for r in key if r not in ("list", "tuple", "tuple-pair")])
     assert key_problems(key, hit("list", "queue-0-b") + "\n" + hit("list", "queue-1-a"))[0]  # #740's wrong names
+    swapped = hit("list", "queue-0-a", "1") + "\n" + hit("list", "queue-1-b")
+    problems, _ = key_problems(key, swapped)
+    assert len(problems) == 2 and all("Terraform" in problem for problem in problems), problems
     assert key_problems(key, hit("tuple", "queue-0-a"))[0] and key_problems(key, hit("zz", "queue-0-a"))[0]
     unused = lambda line: line + " (no use in the workspace)"  # a provisioner no code reads, as here
     assert key_problems(key, "\n".join(map(unused, right.splitlines())))[0] == []
@@ -1283,30 +1354,43 @@ def check_iac_context(identity, path, want, got, baseline):
 
 
 def terraform_key(src):
-    """A probe's own answer key (`terraform-names.tsv`, #740): type -> root -> the names Terraform
-    gives, empty where Terraform rejects the root. Written from the tool, never from Meada."""
+    """A probe's own answer key: kind -> root -> address -> Terraform name."""
     key = {}
     path = src / "terraform-names.tsv"
     for line in path.read_text().splitlines() if path.exists() else []:
         if line and not line.startswith("#"):
-            root, kind, names = line.split("\t")
-            key.setdefault(kind, {})[root] = [] if names == "rejected" else names.split()
+            root, kind, address, name = line.split("\t")
+            addresses = key.setdefault(kind, {}).setdefault(root, {})
+            if address != "rejected":
+                if address in addresses:
+                    raise ValueError(f"duplicate address in {path}: {root} {address}")
+                addresses[address] = name
     return key
 
 
 def key_problems(key, answer):
-    """An exact name must be the key's (a rejected root has none); a root without one is absent,
-    not wrong (certain or absent). Returns the problems and the absent roots."""
-    got = {}
+    """Check every exact hit, retaining the existing absent-root and partial-set semantics."""
+    got, problems = {}, []
     for line in answer.splitlines():
         m = re.search(r', name ("(?:[^"\\]|\\.)*"), root ([^)]*)\)', line)  # a note may follow
-        if m:
-            got.setdefault(m[2], []).append(json.loads(m[1]))
-    problems = [f"root {root}: exact {names}, a root the key does not list" for root, names in got.items() if root not in key]
-    for root, names in key.items():
-        if root in got and sorted(got[root]) != sorted(names):
-            problems.append(f"root {root}: exact {sorted(got[root])}, Terraform {sorted(names) or 'rejects it'}")
-    return problems, [root for root, names in key.items() if names and root not in got]
+        if not m:
+            continue
+        address = re.search(r':\d+(?:-\d+)? (.+) \([^,]+$', line[:m.start()])
+        if not address:
+            problems.append(f"cannot read the Terraform address: {line}")
+            continue
+        root, address, name = m[2], address[1], json.loads(m[1])
+        seen = got.setdefault(root, set())
+        expected = key.get(root, {}).get(address)
+        if address in seen:
+            problems.append(f"root {root}: duplicate exact address {address}")
+        if name != expected:
+            problems.append(f"root {root}, {address}: exact {name!r}, Terraform expects {expected!r}")
+        seen.add(address)
+    for root in got.keys() & key.keys():
+        if missing := key[root].keys() - got[root]:
+            problems.append(f"root {root}: missing exact addresses {sorted(missing)}")
+    return problems, [root for root, addresses in key.items() if addresses and root not in got]
 
 
 def iac_context_tail(identity, path, lines):
@@ -1598,9 +1682,10 @@ def cmd_values(a):
         report.append(f"Value queries over stdio: {len(queries) - fails}/{len(queries)} equal to the oracle; slowest "
                       f"{max(secs)} s (story 16 has no number: the checker judges)\n" + "\n".join(lines))
         if a.http:
-            line, failed = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
-            differences += failed
-            hard += failed
+            line, outcome = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
+            blocked |= outcome == 2
+            differences += outcome != 0
+            hard += outcome == 3
             report.append("MCP HTTP vs stdio (head):\n" + line)
         report.append("")
     verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}"
@@ -1799,9 +1884,10 @@ def cmd_iac(a):
         differences += fails
         report.append(f"IaC queries over stdio: {len(queries) - fails}/{len(queries)} equal to the oracle (or base); slowest {max(secs)} s\n" + "\n".join(lines))
         if a.http:
-            line, failed = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
-            differences += failed
-            hard += failed
+            line, outcome = http_parity(Path(a.head_bin).resolve(), name, run / "work" / "head" / name, run, h)
+            blocked |= outcome == 2
+            differences += outcome != 0
+            hard += outcome == 3
             report.append("MCP HTTP vs stdio (head):\n" + line)
         report.append("")
     verdict = "BLOCKED: a run failed" if blocked else ("checks passed" if not differences else f"differences found: {differences}"
