@@ -12,7 +12,7 @@
 # everything else of each export (the controls and pending cases included) with the base's, and
 # writes RUN/peers.md.
 # Needs only meada (the two binaries), git and jq; no network.
-# Exit 0: no difference, 1: differences, 2: a run failed (BLOCKED).
+# Exit 0: checks passed, 2: BLOCKED, 3: answer key failed, 4: parity delta for judgment.
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
@@ -339,7 +339,7 @@ field() { # <export> <fn> <field>
 # The links of the consumers of <fn>, one per line: provider repository, level, reason.
 links_of() { # <export> <fn>
   jq -r --arg f "$2" '[.links[] | select((.consumer | split("::")[2]) == $f)
-    | "\(.provider | split("::")[0]) \(.level) \(.reason // "")"] | unique[]' "$1"
+    | "\(.provider | split("::")[0]) \(.level) \(.reason // "")"] | sort[]' "$1"
 }
 
 expected_export() { # <base export> <workspace> <run>
@@ -366,7 +366,7 @@ check() { # <base bin> <head bin> <run>
 
 compare_exports() { # <run holding base/ and head/ exports>
   run=$1
-  out=$run/peers.md diffs=0 pending=0
+  out=$run/peers.md diffs=0 failures=0 pending=0
   {
     echo "# A8 peer workspaces"
     echo
@@ -405,7 +405,10 @@ compare_exports() { # <run holding base/ and head/ exports>
         else r=FAIL; fi ;;
       *) die "case $name: unknown state $state" ;;
     esac
-    case $r in FAIL|MEETS*) diffs=$((diffs + 1)) ;; esac
+    case $r in
+      FAIL) failures=$((failures + 1)) ;;
+      MEETS*) diffs=$((diffs + 1)) ;;
+    esac
     printf '| %s | %s | %s | `%s` | %s | `%s` | `%s` | `%s` | `%s` | %s (want: %s) |\n' \
       "$r" "$w" "$name" "$fn" "$k" "$want" "$b" "$h" "$v120" \
       "$(echo "$hl" | tr '\n' ';' | sed 's/;$//; s/|/\\|/g')" "$link" >> "$out"
@@ -428,14 +431,17 @@ compare_exports() { # <run holding base/ and head/ exports>
       echo "- $w: complete export matches base plus specified resolutions" >> "$out"
     else
       diffs=$((diffs + 1))
-      diff -u "$run/base/$w/expected.json" "$run/head/$w/actual.json" > "$run/$w-export.diff" || true
+      diff -u "$run/base/$w/expected.json" "$run/head/$w/actual.json" > "$run/$w-export.diff" \
+        || [ "$?" -eq 1 ] || die "could not compare exports for $w"
       { echo "- $w: DIFFERS from base plus specified resolutions"; echo; echo '```diff'
         head -60 "$run/$w-export.diff"
         echo '```'; } >> "$out"
     fi
   done
-  { echo; echo "pending (not counted): $pending; differences: $diffs"; } >> "$out"
-  if [ $diffs -eq 0 ]; then echo "checks passed ($pending pending, not counted): $out"; else echo "differences found ($diffs): $out"; exit 1; fi
+  { echo; echo "pending (not counted): $pending; oracle failures: $failures; parity differences: $diffs"; } >> "$out"
+  echo "oracle failures: $failures; parity differences: $diffs ($pending pending): $out"
+  [ "$failures" -eq 0 ] || return 3
+  [ "$diffs" -eq 0 ] || return 4
 }
 
 case ${1:-} in

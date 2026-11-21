@@ -89,3 +89,4 @@ ci-f-nox	ci-f	https://github.com/wntrblm/nox	6054d2ad1b0fb1e87f8922eb78abffd0ad8
 ci-distractor-hamilton	ci-distractor	https://github.com/apache/hamilton	e6bebcd1e3a27a84dd26f363f58aa092fb77f51f	Apache-2.0
 ci-distractor-burr	ci-distractor	https://github.com/apache/burr	36e3ff3048c8cabd7aac6d5c373307934bf3c2df	Apache-2.0
 ci-distractor-texera	ci-distractor	https://github.com/apache/texera	a915d6b7099a2dec7f37ffa3b91d22c77a00841b	Apache-2.0
+dynamodb-transactions	aws-dynamodb-transactions	probe:dynamodb-transactions	-	Apache-2.0

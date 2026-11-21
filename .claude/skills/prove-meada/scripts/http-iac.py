@@ -8,6 +8,7 @@ from pathlib import Path
 import socket
 import subprocess
 import time
+from proof_result import Comparisons, run_driver
 from prove import Http, answer, free_port, git, mcp_answers
 from provisions import export, write
 
@@ -21,6 +22,7 @@ def main():
     binary = str(Path(args.head_bin).resolve())
     run = Path(args.run).resolve()
     run.mkdir(parents=True, exist_ok=False)
+    comparisons = Comparisons(run)
     # The binaries this evidence came from, as iac-http-routes.py records them.
     identity = lambda path: {'path': path, 'sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest(),
                              'version': subprocess.check_output([path, '--version'], text=True).strip()}
@@ -150,12 +152,13 @@ spec:
         baseline = export(str(Path(args.base_bin).resolve()), app)
         (run / 'baseline.json').write_text(json.dumps(baseline, indent=2))
         direct = lambda value: [link for link in value['links'] if '::directCall::' in link['consumer']]
-        assert direct(data) == direct(baseline)
+        comparisons.compare('direct host links', direct(baseline), direct(data))
         # Processes walk links too: compare their direct-host control and check new hops
         # against the same complete source-derived link set, keeping every other field exact.
-        assert {k:v for k,v in data.items() if k not in {'links', 'processes'}} == {k:v for k,v in baseline.items() if k not in {'links', 'processes'}}
+        controls = lambda value: {k: v for k, v in value.items() if k not in {'links', 'processes'}}
+        comparisons.compare('whole export outside route links and processes', controls(baseline), controls(data))
         direct_process = lambda value: [p for p in value.get('processes', []) if p['entry_point'].endswith('::directCall')]
-        assert direct_process(data) == direct_process(baseline)
+        comparisons.compare('direct host processes', direct_process(baseline), direct_process(data))
     queries = [
         {'tool': 'context', 'arguments': {'symbol': 'fromWorkload', 'budget': 10000}},
         {'tool': 'context', 'arguments': {'symbol': 'publicCall', 'budget': 10000}},
@@ -196,8 +199,9 @@ spec:
         server_process.terminate()
         server_process.wait(timeout=30)
     (run / 'checks.json').write_text(json.dumps({'checks': 'passed', 'answer_key': '#665/#642; ADR 0026', 'all_links': len(links), 'http_links': len(http), 'process_hops': len(hops), 'base_parity': bool(args.base_bin), 'surfaces': ['CLI', 'MCP stdio', 'MCP HTTP with source facts deleted']}, indent=2))
-    print('checks passed; evidence:', run)
+    print('capture complete; evidence:', run)
+    return comparisons.exit_code()
 
 
 if __name__ == '__main__':
-    main()
+    run_driver(main)

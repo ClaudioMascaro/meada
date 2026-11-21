@@ -409,6 +409,10 @@ jobs:
     timeout-minutes: 90
     env:
       CARGO_BUILD_JOBS: '2'
+      # These binaries are exercised as a black box. Keep the shared target and the six
+      # immutable reference executables small, at the same optimization level as their controls.
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_INCREMENTAL: '0'
       RUST_TEST_THREADS: '2'
       PROVE_BASE: ${{ needs.e2e-scope.outputs.base }}
       PROVE_HEAD: ${{ needs.e2e-scope.outputs.head }}
@@ -428,10 +432,28 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          cache-on-failure: true
+          cache-directories: |
+            ${{ runner.temp }}/meada-reference-cache
+            ${{ runner.temp }}/meada-docker-cache
+          shared-key: proof-capture
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: env.PROVE_CONTAINER == 'true'
+        id: buildx
+        continue-on-error: true
       - name: Prepare proof readers
+        env:
+          PROVE_BUILDX: ${{ steps.buildx.outcome }}
         run: |
+          echo "Cargo jobs=$CARGO_BUILD_JOBS, runner CPUs=$(nproc)"
+          free -m
           echo "PROVE_RUN=$RUNNER_TEMP/prove-meada" >> "$GITHUB_ENV"
           echo "PROVE_NODE=$RUNNER_TEMP/prove-node" >> "$GITHUB_ENV"
+          echo "PROVE_REFERENCE_CACHE=$RUNNER_TEMP/meada-reference-cache" >> "$GITHUB_ENV"
+          if [ "$PROVE_BUILDX" = success ]; then
+            echo "PROVE_DOCKER_CACHE=$RUNNER_TEMP/meada-docker-cache" >> "$GITHUB_ENV"
+          fi
           python3 -m venv "$RUNNER_TEMP/prove-venv"
           "$RUNNER_TEMP/prove-venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3 python-hcl2==8.1.4
       - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
@@ -470,7 +492,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: prove-meada-${{ github.event.pull_request.number }}-${{ needs.e2e-scope.outputs.head }}
+          name: prove-meada-${{ github.event.pull_request.number }}-${{ needs.e2e-scope.outputs.head }}${{ github.run_attempt != '1' && format('-attempt-{0}', github.run_attempt) || '' }}
           path: |
             ${{ runner.temp }}/prove-meada/receipt.json
             ${{ runner.temp }}/prove-meada/*.md

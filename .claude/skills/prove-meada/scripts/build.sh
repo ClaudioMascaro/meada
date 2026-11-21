@@ -19,6 +19,25 @@ read -r -a cargo <<<"${PROVE_CARGO:-cargo}"
 export CARGO_PROFILE_DEV_OPT_LEVEL=1
 args=(build --locked --target-dir "$target")
 [ -n "$features" ] && args+=(--features "$features")
+cache=
+if [ "${PROVE_FIXED_REFERENCE:-}" = true ] && [ -n "${PROVE_REFERENCE_CACHE:-}" ]; then
+  [[ "$rev" =~ ^[0-9a-f]{40}$ ]]
+  # Include the build inputs that can change the executable of one revision/feature pair.
+  reference_key=$(printf '%s\n' "$rev" "${features:-default}" "$(uname -sm)" \
+    "${CARGO_PROFILE_DEV_DEBUG:-}" "${CARGO_INCREMENTAL:-}" "${RUSTFLAGS:-}" \
+    "${CARGO_ENCODED_RUSTFLAGS:-}" | sha256sum | cut -d' ' -f1)
+  cache="$PROVE_REFERENCE_CACHE/$reference_key"
+  expected_from="commit $rev, features: ${features:-default}"
+  if [ -x "$cache/meada" ] && [ -f "$cache/from" ] &&
+     [ "$(cat "$cache/from")" = "$expected_from" ] &&
+     (cd "$cache" && sha256sum -c --status sha256); then
+    cp "$cache/meada" "$run/bin/meada-$label"
+    cp "$cache/from" "$run/bin/meada-$label.from"
+    echo "reference cache hit: $expected_from, $reference_key"
+    exit 0
+  fi
+  echo "reference cache miss: $expected_from, $reference_key"
+fi
 if [ "$rev" = . ]; then
   find "$root/src" "$root/meada-core/src" -name '*.rs' -exec touch {} +
   touch "$root/build.rs"
@@ -38,3 +57,9 @@ fi
 cp "$target/debug/meada" "$run/bin/meada-$label"
 echo "$from, features: ${features:-default}" >"$run/bin/meada-$label.from"
 echo "$run/bin/meada-$label: $("$run/bin/meada-$label" --version), $from, features: ${features:-default}"
+if [ -n "$cache" ]; then
+  mkdir -p "$cache"
+  cp "$run/bin/meada-$label" "$cache/meada"
+  cp "$run/bin/meada-$label.from" "$cache/from"
+  (cd "$cache" && sha256sum meada >sha256)
+fi

@@ -16,6 +16,7 @@ import socket
 import subprocess
 import time
 import traceback
+from proof_result import Comparisons, run_driver
 from prove import Http, Stdio, answer, free_port, git
 
 # A queue no Terraform provisions, named by its URL: an `exact` use, so its orphan line prints.
@@ -336,7 +337,7 @@ class Probe:
         # Existing arrays retain every field and ordering; only the new arrays may differ.
         bd={k:v for k,v in b.items() if k not in ['uses','provisions']}
         hd={k:v for k,v in h.items() if k not in ['uses','provisions']}
-        self.check(name+' all existing export fields base parity',bd==hd)
+        self.comparisons.compare(name + ' all existing export fields', bd, hd)
         old=b.get('provisions',[])
         new=h.get('provisions',[])
         remaining=copy.deepcopy(new)
@@ -371,6 +372,7 @@ class Probe:
                    h['consumers']==b['consumers'] and h['links']==b['links'])
 
     def run_checks(self):
+        self.comparisons = Comparisons(self.run)
         _,oracle=seed(self.run/'input')
         write(self.run,'oracle.json',dumps(oracle))
         inventory={str(p.relative_to(self.run/'input')):hashlib.sha256(p.read_bytes()).hexdigest()
@@ -409,13 +411,13 @@ class Probe:
         for name in ['infra','app','plain']:
             self.check_exports(b[name]['export'],h[name]['export'],oracle,name)
             if name=='plain':
-                self.check('plain whole status base parity',b[name]['status']==h[name]['status'])
+                self.comparisons.compare('plain whole status', b[name]['status'], h[name]['status'])
             else:
                 expected=expected_orphan_rows(oracle)
                 self.check(name+' complete orphan set/count',orphan_set(h[name]['status'])==(expected,len(expected)),h[name]['status'])
-                self.check(name+' existing status lines base parity',strip_orphans(h[name]['status'])==strip_orphans(b[name]['status']))
-        self.check('whole tool catalog preserves base plus the alert (#672) and CI (#860) kinds of search',expected_tools(b['tools'])==h['tools'])
-        self.check('plain all query tools base parity',b['plain_texts']==h['plain_texts'])
+                self.comparisons.compare(name + ' existing status lines', strip_orphans(b[name]['status']), strip_orphans(h[name]['status']))
+        self.comparisons.compare('whole catalog, historical control plus #672 and #860', expected_tools(b['tools']), h['tools'])
+        self.comparisons.compare('plain all query tools', b['plain_texts'], h['plain_texts'])
         for i,(q,text) in enumerate(zip(queries,h['texts'])):
             args=q['arguments']
             contract=args.get('symbol',args.get('from',args.get('query','')))
@@ -429,13 +431,13 @@ class Probe:
                               other['arguments'].get('kind')=='contract' and other['arguments'].get('query')==contract)
                 self.check('default full contract search equals explicit contract '+contract,text==h['texts'][explicit],text)
             if q['tool']=='search' and args.get('query') in ['worker.numeric.queue','zz_config_use_no_match']:
-                self.check(f'existing default/failure search {i} base parity',text==b['texts'][i],text)
+                self.comparisons.compare(f'existing default/failure search {i}', b['texts'][i], text)
             if args.get('kind')=='value':
                 # Search remains an existing flow: exact whole base answer on same input.
-                self.check(f'existing value query {i} base parity',text==b['texts'][i],text)
+                self.comparisons.compare(f'existing value query {i}', b['texts'][i], text)
             if q['tool']=='trace' and rows and contract not in UNPROVISIONED:
-                self.check(f'existing contract trace advisory {args["direction"]} {contract} base parity',
-                           text==b['texts'][i],text)
+                self.comparisons.compare(f'existing contract trace advisory {args["direction"]} {contract}',
+                                         b['texts'][i], text)
             key_rows=[u for u in oracle['uses'] if contract in [u['at'],u['site']+'::'+u['at']]]
             if q['tool']=='context' and key_rows:
                 row=key_rows[0]
@@ -473,7 +475,7 @@ class Probe:
             self.console(h['repos'],queries,h['texts'])
         else:
             write(self.run,'console-pending.txt','Console graph and query require --ui-dir built/ui/dist with a ui-enabled --head-bin.\n')
-        return int(any(not s['passed'] for s in self.steps))
+        return self.comparisons.exit_code(any(not s['passed'] for s in self.steps))
 
     def refresh(self,repos,oracle,exported,status):
         path=repos['app']/'helm/values.yaml'
@@ -612,7 +614,7 @@ class Probe:
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--head-bin',required=True);p.add_argument('--base-bin',required=True)
+    p.add_argument('--head-bin',required=True);p.add_argument('--historical-bin', '--base-bin', dest='base_bin',required=True)
     p.add_argument('--run',required=True);p.add_argument('--http',action='store_true')
     p.add_argument('--ui-dir')
     args=p.parse_args();os.environ['LANG']='C.UTF-8'
@@ -620,9 +622,10 @@ def main():
     try:
         result=proof.run_checks();proof.receipt();return result
     except Exception:
-        error=traceback.format_exc();write(proof.run,'blocked.txt',error)
-        proof.receipt(error);print(error,flush=True);return 2
+        error=traceback.format_exc();write(proof.run,'execution-error.txt',error)
+        proof.receipt(error)
+        raise
 
 
 if __name__=='__main__':
-    raise SystemExit(main())
+    run_driver(main)

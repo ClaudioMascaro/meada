@@ -14,6 +14,7 @@ import socket
 import subprocess
 import time
 
+from proof_result import Comparisons, run_driver
 from prove import Stdio, Http, answer, free_port, git
 
 OUT = HEAD = BASE = None
@@ -71,6 +72,7 @@ def main(args):
     out = Path(args.run).resolve()
     out.mkdir(parents=True, exist_ok=False)
     OUT = out
+    comparisons = Comparisons(out)
     HEAD, BASE = Path(args.head_bin).resolve(), Path(args.base_bin).resolve()
     os.environ['LANG'] = 'C.UTF-8'
     # Everything expected below follows the literal source, before Meada is run.
@@ -140,11 +142,10 @@ def main(args):
     for name in ['app', 'infra']:
         old, new = exports['tier', name], exports['head', name]
         for field in ['providers', 'consumers', 'links']:
-            check(name + ' existing ' + field + ' whole-row tier parity',
-                  [r for r in new[field] if not str(r.get('contract') or '').startswith('image::')]
-                  == [r for r in old[field] if not str(r.get('contract') or '').startswith('image::')])
+            existing = lambda doc: [r for r in doc[field] if not str(r.get('contract') or '').startswith('image::')]
+            comparisons.compare(name + ' existing ' + field + ' whole-row tier parity', existing(old), existing(new))
         for field in ['files', 'symbols', 'calls', 'provisioners', 'provisions', 'subscriptions']:
-            check(name + ' ' + field + ' complete tier parity', new.get(field) == old.get(field))
+            comparisons.compare(name + ' ' + field + ' complete tier parity', old.get(field), new.get(field))
     app_data, infra_data = exports['head','app'], exports['head','infra']
     app_images=[r for r in app_data['links'] if r['contract'].startswith('image::')]
     infra_images=[r for r in infra_data['links'] if r['contract'].startswith('image::')]
@@ -264,7 +265,7 @@ def main(args):
         f"- [{'PASS' if r['pass'] else 'FAIL'}] {r['check']}" for r in rows) + '\n'
     write(OUT/'mixed.md', report)
     print(f"{'differences found' if failures else 'checks passed'}: {len(rows)-failures}/{len(rows)}; {OUT}/mixed.md")
-    return int(bool(failures))
+    return comparisons.exit_code(failures)
 
 
 if __name__ == '__main__':
@@ -273,10 +274,4 @@ if __name__ == '__main__':
     parser.add_argument('--head-bin', required=True)
     parser.add_argument('--run', required=True, help='new evidence directory; never overwrite an earlier run')
     args = parser.parse_args()
-    try:
-        raise SystemExit(main(args))
-    except Exception as exc:
-        if OUT is not None:
-            write(OUT/'blocked.txt', repr(exc))
-        print(f'BLOCKED: {exc}; raw evidence in {OUT}')
-        raise SystemExit(2)
+    run_driver(lambda: main(args))

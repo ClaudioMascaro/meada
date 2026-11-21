@@ -9,6 +9,7 @@ import shutil
 import socket
 import subprocess
 import time
+from proof_result import Comparisons, run_driver
 from prove import Stdio, Http, answer, free_port, mcp_answers
 
 HERE = Path(__file__).resolve().parent
@@ -34,7 +35,7 @@ def scope(source, dest, workspace):
     return dest / workspace
 
 
-def ordinary(head, base, source, folder):
+def ordinary(head, base, source, folder, comparisons):
     """The narrowed #683 context explanation must leave ordinary HTTP answers intact."""
     observations = []
     for side, binary in (('base', base), ('head', head)):
@@ -49,8 +50,8 @@ def ordinary(head, base, source, folder):
             {'tool': 'trace', 'arguments': {'from': symbol, 'direction': 'down', 'budget': 16000}})]
         tools, texts, _ = mcp_answers(binary, root, queries, folder / (side + '.stdio.err'))
         save(folder / (side + '.json'), {'queries': queries, 'tools': tools, 'answers': texts})
-        observations.append(texts)
-    assert observations[0] == observations[1], 'ordinary relative/host/template context or trace differs from base'
+        observations.append({"tools": tools, "answers": texts})
+    return comparisons.compare('ordinary relative/host/template context, trace and catalog', *observations)
 
 
 def proxy_control(base, source, folder):
@@ -225,14 +226,17 @@ def main():
         checks.append({'workspace': workspace, 'queries': len(queries), 'passed': True})
         save(run / 'checks.json', {'checks': checks, 'checker': 'script only, not independent or blind'})
     refresh(binary, run / 'source', run / 'include-refresh')
-    ordinary(binary, str(Path(args.base_bin).resolve()), run / 'source', run / 'ordinary')
+    comparisons = Comparisons(run)
+    unchanged = ordinary(binary, str(Path(args.base_bin).resolve()), run / 'source', run / 'ordinary', comparisons)
     with Path(binary).open('rb') as stream:
         binary_hash = hashlib.file_digest(stream, 'sha256').hexdigest()
-    save(run / 'checks.json', {'checks': checks, 'include_only_refresh': True, 'ordinary_base_answer_parity': True,
+    save(run / 'checks.json', {'checks': checks, 'include_only_refresh': True, 'ordinary_base_answer_parity': unchanged,
                               'proxy_context_trace_base_control': proxy_key is not None,
                               'binary_sha256': binary_hash, 'checker': 'script only, not independent or blind'})
     print('A8 query, HTTP and partial-only refresh checks passed for ' + ','.join(workspaces))
 
+    return comparisons.exit_code()
+
 
 if __name__ == '__main__':
-    main()
+    run_driver(main)
