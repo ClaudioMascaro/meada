@@ -414,6 +414,9 @@ fn parse(src: &[u8]) -> Result<Facts> {
             }
             facts.defs.push(Def {
                 params,
+                non_overridable: kind == Kind::Method
+                    && !constructor
+                    && modifiers.contains(&"private"),
                 bases: if kind == Kind::Class {
                     bases(node, src, &generics)
                 } else {
