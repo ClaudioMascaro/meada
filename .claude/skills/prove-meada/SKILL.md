@@ -29,11 +29,11 @@ Each group of flows has a sibling skill with what a judge needs for it: its answ
 | [prove-meada-console](../prove-meada-console/SKILL.md) | console pages, the query and export API, accounts, the infrastructure graph | `console-graph`; steps `console-start`, `console-pages`, `console-stop`, `console-<entry>-start`, `console-<entry>-api`, `console-<entry>-stop` |
 | [prove-meada-deploy](../prove-meada-deploy/SKILL.md) | `deploy/`, `Dockerfile` and the compose, helm and container checks | steps `deploy-diff`, `compose-contract`, `helm-contract`, `container-build`, `container-smoke` |
 | [prove-meada-a7-config](../prove-meada-a7-config/SKILL.md) | config values, IaC nodes and their evaluated names, Terraform JSON, custom IaC, provisioners, orphans, `via`, config uses | `values`, `native-hcl-values`, `iac`, `serverless-values`, `terraform-json`, `custom-iac`, `provisions`, `orphans`, `resource-via`, `config-uses` |
-| [prove-meada-a7-cloud](../prove-meada-a7-cloud/SKILL.md) | AWS, GCP and Azure provisioners, subscriptions and SDK use sides | `aws`, `aws-json-values`, `aws-sdk`, `aws-sdk-jvm-go-dotnet`, `aws-java-private-fields`, `gcp`, `gcp-sdk`, `azure`, `azure-sdk` |
+| [prove-meada-a7-cloud](../prove-meada-a7-cloud/SKILL.md) | AWS, GCP and Azure provisioners, subscriptions and SDK use sides | `aws`, `aws-json-values`, `aws-sdk`, `aws-sdk-jvm-go-dotnet`, `aws-java-private-fields`, `dynamodb-transactions`, `gcp`, `gcp-sdk`, `azure`, `azure-sdk` |
 | [prove-meada-a7-workloads](../prove-meada-a7-workloads/SKILL.md) | workload environments, AWS functions and tasks, image contracts, anchored names | `environment`, `aws-workloads`, `images`, `images-mixed`, `image-ko`, `patterns` |
 | [prove-meada-a7-alerts](../prove-meada-a7-alerts/SKILL.md) | alert labels and routes, incident fields and their guards | `alerts`, `incident-routing`, `incident-guards` |
 | [prove-meada-a7-http](../prove-meada-a7-http/SKILL.md) | HTTP through Service DNS, Compose names and Ingress prefixes; IaC-declared routes | `http-iac`, `iac-http-routes` |
-| [prove-meada-a8-peers](../prove-meada-a8-peers/SKILL.md) | base URLs resolved across peer workspaces | `a8-peers`, `a8-mcp` |
+| [prove-meada-a8-peers](../prove-meada-a8-peers/SKILL.md) | base URLs resolved across peer workspaces and pinned public smoke workspaces | `a8-peers`, `a8-mcp`, `smoke-resolution`, `smoke-lifecycle`, `smoke-upgrade`, `smoke-sqs` |
 | [prove-meada-a9-ci](../prove-meada-a9-ci/SKILL.md) | CI nodes, the CI contract, `run` scripts and declared permissions | `ci`, `ci-corpus`, `ci-run`, `ci-permissions` |
 
 The `build-*` and `clean*` steps of a receipt are the runner's own: [references/runner.md](references/runner.md) has their commands.
@@ -49,7 +49,8 @@ The `build-*` and `clean*` steps of a receipt are the runner's own: [references/
 3. Read workflow `Proof` (`.github/workflows/proof.yml`), job `prove-meada`, and artifact
    `prove-meada-<PR number>-<head SHA>` for the tested SHA (each Scope driver under
    `flows/<name>`, its exit in `receipt.json`). Confirm its base/head identity, scope, raw
-   captures and checker provenance before interpreting results.
+   captures and checker provenance before interpreting results. [Binary comparisons](references/parity.md)
+   names every base and the exit codes that distinguish a delta, an oracle failure and blocked execution.
 4. Give the evidence and answer keys to an independent judge using Check in a fresh agent.
    A missing or pending judgment stays pending.
 5. Report the tested SHA, run/artifact or CI receipt, verdict and limitations.
