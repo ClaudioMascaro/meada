@@ -1,0 +1,55 @@
+name: Judge lower Meada captures and replay smoke adversaries
+on:
+  push:
+    branches: [verify/restack-lower-audit-20261121]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  judge-lower:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Extract raw lower-PR commands and source keys
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 14716199709 14715674636 14717015297; do
+            curl -fsSL --retry 2 -H "Authorization: Bearer $GH_TOKEN" -o "$RUNNER_TEMP/$id.zip" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip"
+          done
+          python3 .github/judge-restack-lower.py "$RUNNER_TEMP/14716199709.zip" "$RUNNER_TEMP/14715674636.zip" "$RUNNER_TEMP/14717015297.zip"
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: b9d4c2315354fc348a77a3b12647fd78d92753aa
+          persist-credentials: false
+      - name: Replay archived exports, MCP and missing pinned objects
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          S=.claude/skills/prove-meada/scripts
+          python3 -m venv "$RUNNER_TEMP/venv"
+          P="$RUNNER_TEMP/venv/bin/python"
+          "$RUNNER_TEMP/venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3 python-hcl2==8.1.4
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 2 -H "Authorization: Bearer $GH_TOKEN" -o proof-960.zip "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/14708103513/zip"
+          curl -fsSL --retry 2 -H "Authorization: Bearer $GH_TOKEN" -o proof-953.zip "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/14708154572/zip"
+          sha256sum -c <<'DIGEST'
+          071609ff150a8543ab949611cdb762841f5d266a4614530502054ab91b102c55  proof-960.zip
+          ee7443880511916de88cb25eb5c8f4a8cd2e6008e0e5fb230873e5d55b1560e5  proof-953.zip
+          DIGEST
+          cd "$GITHUB_WORKSPACE"
+          for path in src/config.rs src/workspace.rs src/iac/provision.rs src/lang/python.rs src/index.rs tests/golden/schema.txt src/alert/incident.rs; do
+            printf '\nPath %s\n' "$path"
+            "$P" scripts/prove-ci --rows "$path"
+          done
+          "$P" "$S/smoke_stack.py" --oracle-archive "$RUNNER_TEMP/proof-960.zip"
+          "$P" "$S/smoke_stack.py" --oracle-archive "$RUNNER_TEMP/proof-953.zip"
