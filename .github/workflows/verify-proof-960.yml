@@ -1,0 +1,24 @@
+name: Audit retained Meada Proof
+on:
+  push:
+    branches: ['verify/proof-960-def34e4']
+permissions:
+  actions: read
+  contents: read
+jobs:
+  raw-receipt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Download the two pinned Proof ZIPs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method GET "repos/$GITHUB_REPOSITORY/actions/artifacts/14708103513/zip" > "$RUNNER_TEMP/proof-final.zip"
+          gh api --method GET "repos/$GITHUB_REPOSITORY/actions/artifacts/14693920787/zip" > "$RUNNER_TEMP/proof-historical.zip"
+      - name: Verify raw proof against independent source keys
+        run: |
+          python3 -u .github/verify-proof-960.py "$RUNNER_TEMP/proof-final.zip" "$RUNNER_TEMP/proof-historical.zip" sha256:071609ff150a8543ab949611cdb762841f5d266a4614530502054ab91b102c55
