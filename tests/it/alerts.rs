@@ -281,7 +281,9 @@ fn alert_orphans_require_both_roles_in_scope_and_follow_refresh() {
         .collect::<Vec<_>>();
     assert_eq!(
         orphans,
-        ["orphan alert::alertname::ApiDown: no matcher; rules.yaml::groups[0].rules[0]"],
+        [
+            "orphan alert::alertname::ApiDown: no matcher in example.com/acme/monitoring; rules.yaml::groups[0].rules[0]"
+        ],
         "{report}"
     );
     std::fs::remove_file(repo.join("rules.yaml")).unwrap();

@@ -329,6 +329,14 @@ IaC-only repository produces no such lines; `search` and `context` mark the side
 patterns and independent root modules, determine whether a counterpart exists. Existing
 warnings about declared resources without writers and readers remain separate.
 
+Each orphan line names the scope its absence holds in:
+`orphan resource::s3::unused: no use in the workspace; main.tf:4 aws_s3_bucket.unused (root .)`
+or, in a workspace of one repository, `no use in <repository>`. The `no provisioner` lines and the
+orphan lines of images, alerts and CI name it the same way, and the first line of `meada status`
+gives the number of repositories of the workspace (`workspace: 3 repositories`). The absence holds
+in the workspace asked: a use in a repository it does not select is not seen. An orphan line is a
+lead for review, never by itself a reason to delete a resource.
+
 Only a broker or resource kind that the type table provisions has an orphan group. A declared
 `[[resource]]` of kind `postgres` or a NATS subject, which no IaC type creates, carries no mark in
 `search` or `context` and is never an orphan line.

@@ -1,2 +1,3 @@
+workspace: 1 repository
 example.com/acme/web (.) not indexed
 missing peer: example.com/acme/api, named by example.com/acme/web

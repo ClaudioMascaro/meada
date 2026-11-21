@@ -1,3 +1,4 @@
+workspace: 4 repositorios
 example.com/chain/web (.) indexado, 5 archivos
   decisión obsoleta: example.com/chain/web::src/status.ts::gone::fetch#0 -> example.com/chain/catalog::http::POST::/api/events (llamada eliminada)
   decisión a la espera del par ausente example.com/chain/billing: example.com/chain/web::src/status.ts::health::fetch#0 -> example.com/chain/billing::http::GET::/api/health

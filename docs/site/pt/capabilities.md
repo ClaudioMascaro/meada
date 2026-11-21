@@ -329,6 +329,15 @@ código ou só de IaC não gera essas linhas; `search` e `context` marcam o pró
 inclusive padrões e módulos raiz independentes, determinam se há contraparte. Os avisos
 existentes de recursos declarados sem escritor e leitor continuam separados.
 
+Cada linha de órfão nomeia o escopo em que vale a sua ausência:
+`órfão resource::s3::unused: nenhum uso no workspace; main.tf:4 aws_s3_bucket.unused (root .)`
+ou, num workspace de um só repositório, `nenhum uso em <repositório>`. As linhas
+`nenhum provisionador` e as de órfãos de imagens, alertas e CI o nomeiam do mesmo jeito, e a
+primeira linha do `meada status` dá o número de repositórios do workspace
+(`workspace: 3 repositórios`). A ausência vale no workspace consultado: um uso num repositório que
+ele não seleciona não é visto. Uma linha de órfão é uma pista para revisão, nunca, por si só,
+motivo para apagar um recurso.
+
 Só tem grupo de órfãos um broker ou tipo de recurso que a tabela de tipos provisiona. Um
 `[[resource]]` declarado de tipo `postgres` ou um subject NATS, que nenhum tipo de IaC cria, não
 leva marca em `search` nem em `context` e nunca vira linha de órfão.

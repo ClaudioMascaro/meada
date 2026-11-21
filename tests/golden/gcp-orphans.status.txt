@@ -1,7 +1,7 @@
-orphan resource::cloudsql::audit-db: no use; main.tf:9 google_sql_database_instance.audit (root .)
-orphan resource::gcs::assets: no use; main.tf:7 google_storage_bucket.assets (root .)
+orphan resource::cloudsql::audit-db: no use in the workspace; main.tf:9 google_sql_database_instance.audit (root .)
+orphan resource::gcs::assets: no use in the workspace; main.tf:7 google_storage_bucket.assets (root .)
 config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 13, redacted: 0
 resource::cloudsql::orders-db/orders is unlinked: no writer and reader in different repositories
 resource::cloudsql::audit-db/orders is unlinked: no writer and reader in different repositories
-orphan resource::gcs::absent: no provisioner; settings.yaml#exact.bucket [exact]
+orphan resource::gcs::absent: no provisioner in the workspace; settings.yaml#exact.bucket [exact]
 config files: 3 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 25, redacted: 2

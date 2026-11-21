@@ -278,14 +278,15 @@ fn status_lists_orphans_only_where_both_sides_of_the_group_exist() {
     let status = meada::engine::status(&app).unwrap();
     assert_eq!(
         status,
-        "example.com/orphan/app (.) indexed, 1 files
+        "workspace: 2 repositories
+example.com/orphan/app (.) indexed, 1 files
   resource::s3::archive is unlinked: no writer and reader in different repositories
   resource::s3::unmanaged is unlinked: no writer and reader in different repositories
-  orphan channel::sqs::unmanaged: no provisioner; app.ts::sendUnmanaged::SendMessageCommand#0 [exact]
-  orphan resource::s3::unmanaged: no provisioner; (repository-level) [declared]
+  orphan channel::sqs::unmanaged: no provisioner in the workspace; app.ts::sendUnmanaged::SendMessageCommand#0 [exact]
+  orphan resource::s3::unmanaged: no provisioner in the workspace; (repository-level) [declared]
 example.com/orphan/infra (../orphan-infra) indexed, 0 files
-  orphan channel::sqs::unused: no use; main.tf:2 aws_sqs_queue.unused (root .)
-  orphan resource::s3::unused: no use; main.tf:4 aws_s3_bucket.unused (root .)
+  orphan channel::sqs::unused: no use in the workspace; main.tf:2 aws_sqs_queue.unused (root .)
+  orphan resource::s3::unused: no use in the workspace; main.tf:4 aws_s3_bucket.unused (root .)
   config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 4, redacted: 0
 "
     );
@@ -329,7 +330,7 @@ fn code_only_scope_marks_uses_in_search_and_context_without_orphan_status() {
     );
     assert_eq!(
         meada::engine::status(&app).unwrap(),
-        "example.com/orphan/app (.) indexed, 1 files\n  resource::s3::archive is unlinked: no writer and reader in different repositories\n  resource::s3::unmanaged is unlinked: no writer and reader in different repositories\n"
+        "workspace: 1 repository\nexample.com/orphan/app (.) indexed, 1 files\n  resource::s3::archive is unlinked: no writer and reader in different repositories\n  resource::s3::unmanaged is unlinked: no writer and reader in different repositories\n"
     );
     assert_golden("orphan-code.context.txt", &(context + "\n" + &symbol));
 }
@@ -394,7 +395,7 @@ fn iac_only_scope_marks_provisioners_without_orphan_status() {
     );
     assert_eq!(
         meada::engine::status(&infra).unwrap(),
-        "example.com/orphan/infra (.) indexed, 0 files\n  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 4, redacted: 0\n"
+        "workspace: 1 repository\nexample.com/orphan/infra (.) indexed, 0 files\n  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 4, redacted: 0\n"
     );
     assert_golden("orphan-iac.context.txt", &(context + "\n" + &node));
 }
@@ -430,7 +431,7 @@ export async function send() {
     let status = meada::engine::status(&app).unwrap();
     assert_eq!(
         status,
-        "example.com/orphan/app (.) indexed, 1 files\n  resource::postgres::archive is unlinked: no writer and reader in different repositories\nexample.com/orphan/infra (../orphan-infra) indexed, 0 files\n  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 4, redacted: 0\n"
+        "workspace: 2 repositories\nexample.com/orphan/app (.) indexed, 1 files\n  resource::postgres::archive is unlinked: no writer and reader in different repositories\nexample.com/orphan/infra (../orphan-infra) indexed, 0 files\n  config files: 1 read, 0 skipped (lockfiles: 0, unreadable: 0); values: 4, redacted: 0\n"
     );
     assert_eq!(
         engine.search("orders", Some("channel"), None).unwrap(),
@@ -589,8 +590,8 @@ fn a_use_inferred_from_a_key_name_opens_no_orphan_scope() {
     assert_eq!(
         orphans(),
         [
-            "orphan channel::sqs::acme-jobs: no use; infra/main.tf:1 aws_sqs_queue.jobs (root infra)",
-            "orphan channel::sqs::ghost: no provisioner; config/arn.yaml#target [exact]",
+            "orphan channel::sqs::acme-jobs: no use in example.com/acme/o2; infra/main.tf:1 aws_sqs_queue.jobs (root infra)",
+            "orphan channel::sqs::ghost: no provisioner in example.com/acme/o2; config/arn.yaml#target [exact]",
         ]
     );
     // A provisioned queue whose only use is an inferred one of its own name is not unused.
@@ -601,7 +602,9 @@ fn a_use_inferred_from_a_key_name_opens_no_orphan_scope() {
     .unwrap();
     assert_eq!(
         orphans(),
-        ["orphan channel::sqs::ghost: no provisioner; config/arn.yaml#target [exact]"]
+        [
+            "orphan channel::sqs::ghost: no provisioner in example.com/acme/o2; config/arn.yaml#target [exact]"
+        ]
     );
 }
 
@@ -704,8 +707,8 @@ fn a_policy_grant_and_a_schema_example_are_no_use_side() {
     assert_eq!(
         orphans(),
         [
-            "orphan resource::dynamodb::acme-carts: no provisioner; config/app.yaml#carts.tableArn [exact]",
-            "orphan resource::dynamodb::acme-sessions: no use; infra/main.tf:5 aws_dynamodb_table.sessions (root infra)",
+            "orphan resource::dynamodb::acme-carts: no provisioner in example.com/acme/o3; config/app.yaml#carts.tableArn [exact]",
+            "orphan resource::dynamodb::acme-sessions: no use in example.com/acme/o3; infra/main.tf:5 aws_dynamodb_table.sessions (root infra)",
         ]
     );
     // `examples` in a document with no `$schema` at its root is any key.

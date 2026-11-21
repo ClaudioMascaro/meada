@@ -1,3 +1,4 @@
+workspace: 4 repositorios
 example.com/chain/web (.) indexado, 17 archivos
   archivos de configuración: 2 leídos, 0 omitidos (lockfiles: 0, ilegibles: 0); valores: 6, ocultados: 0
   drift de formato, lecturas ausentes: 39

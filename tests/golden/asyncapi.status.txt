@@ -1,3 +1,4 @@
+workspace: 2 repositories
 example.com/asyncapi/services (.) indexed, 2 files
 example.com/asyncapi/events (../asyncapi-events) indexed, 1 files
   asyncapi.yaml: asyncapi 2.6.0, channels: 3

@@ -455,7 +455,8 @@ class Probe:
         for name in ['app', 'deploy']:
             status = (self.run/f'head/{name}/status.out').read_text()
             rows = [r.strip() for r in status.splitlines() if r.strip().startswith('orphan image::')]
-            got = {r.split(';')[0] for r in rows}
+            # The scope each line names (#849) is cut: a row without one keeps its `; place`.
+            got = {r.split(' in ', 1)[0] for r in rows}
             # CLI status reports every repository of the discovered workspace.
             expected_orphans = {'orphan image::ghcr.io/parcel/idle: no runner',
                                 'orphan image::ghcr.io/parcel/lost: no builder'}

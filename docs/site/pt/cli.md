@@ -3,8 +3,8 @@
 Na raiz do repositório:
 
 - `meada index` monta o índice, em `.meada/`, do repositório e dos pares;
-- `meada status` mostra o conjunto de repositórios, o estado de cada índice e os pares que não
-  foram encontrados; sob cada repositório, os recursos sem ligação e os `via` que não
+- `meada status` mostra quantos repositórios o workspace contém, cada um, o estado do seu índice
+  e os pares que não foram encontrados; sob cada repositório, os recursos sem ligação e os `via` que não
   correspondem a nenhum símbolo, e cada arquivo-fonte que um language pack descartou por passar de um
   limite (`abrangente demais`, para o orçamento de nomes qualificados, ou um projeto que dá usings demais
   aos seus arquivos);

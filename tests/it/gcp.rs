@@ -420,9 +420,9 @@ fn gcp_config_refresh_keeps_privacy_cut_values_and_complete_orphan_scope() {
     assert_eq!(
         orphans,
         std::collections::BTreeSet::from([
-            "orphan resource::cloudsql::audit-db: no use",
-            "orphan resource::gcs::absent: no provisioner",
-            "orphan resource::gcs::assets: no use",
+            "orphan resource::cloudsql::audit-db: no use in the workspace",
+            "orphan resource::gcs::absent: no provisioner in the workspace",
+            "orphan resource::gcs::assets: no use in the workspace",
         ]),
         "{reports}"
     );

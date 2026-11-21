@@ -1,3 +1,4 @@
+workspace: 1 repository
 local/ts-basic (.) indexed, 9 files
   Broad.cs: too broad, its qualified names passed the 4194304-byte budget: no symbols or calls
   Broad.java: too broad, its qualified names passed the 4194304-byte budget: no symbols or calls
