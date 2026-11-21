@@ -1,0 +1,29 @@
+name: Reproduce the test input scheduling race
+on:
+  push:
+    branches: [verify/restack-early-exit-20261121]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  witness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test early exit on the exact published binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/driver" b9d4c2315354fc348a77a3b12647fd78d92753aa
+          gh run download 44935027343 --repo "$GITHUB_REPOSITORY" --name meada-debug-e27664e23d5da1ea5dffcdb91ae49915d501b95a --dir "$RUNNER_TEMP/binary"
+          chmod +x "$RUNNER_TEMP/binary/meada"
+          python3 -m venv "$RUNNER_TEMP/venv"
+          P="$RUNNER_TEMP/venv/bin/python"
+          "$RUNNER_TEMP/venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3 python-hcl2==8.1.4
+          sha256sum "$RUNNER_TEMP/binary/meada"
+          PYTHONPATH="$RUNNER_TEMP/driver/.claude/skills/prove-meada/scripts" "$P" .github/witness-early-exit.py "$RUNNER_TEMP/witness" "$RUNNER_TEMP/binary/meada"
