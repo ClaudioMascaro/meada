@@ -1,0 +1,64 @@
+name: Independently judge the restacked integration ZIP
+on:
+  push:
+    branches: [verify/restack-final-audit-20261121]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  judge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Recalculate historical and current merge trees
+        run: |
+          set -euo pipefail
+          old_base=69f68791ede7dc14fc7167af109d6aabcfdebe25
+          old_product=d2bc5f745a6daee9b08efe84e4e453009a351de7
+          old_composition=def34e4f887e8d97ebe02d4cca2aee3cfc8474aa
+          base=b9d4c2315354fc348a77a3b12647fd78d92753aa
+          product=0bc184f4e59aa1040d84a5e1b697f36ecc753246
+          composition=d147178f8ac41743ebd4017a020a3c32b9b1b1fd
+          for rev in "$old_base" "$old_product" "$old_composition"; do
+            git cat-file -e "$rev^{commit}" || git fetch --no-tags origin "$rev"
+          done
+          historical=$(git merge-tree --write-tree "$old_base" "$old_product")
+          current=$(git merge-tree --write-tree "$base" "$product")
+          printf 'Historical merge tree %s\nCurrent merge tree %s\n' "$historical" "$current"
+          test "$historical" = "$(git rev-parse "$old_composition^{tree}")"
+          test "$current" = "$(git rev-parse "$composition^{tree}")"
+          git rev-list --parents -n 1 "$composition"
+          direct=$(git diff --name-only "$old_base" "$old_composition" | wc -l)
+          three=$(git diff --name-only "$old_base...$old_composition" | wc -l)
+          with_new_base=$(git diff --name-only "$base...$composition" | wc -l)
+          printf 'Historical direct/three-dot %s/%s; restacked three-dot %s\n' "$direct" "$three" "$with_new_base"
+          test "$direct/$three/$with_new_base" = "19/61/19"
+          git diff --exit-code "$product" "$composition"
+      - name: Compare immutable Proof receipts and raw evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run=44935478498
+          head=d147178f8ac41743ebd4017a020a3c32b9b1b1fd
+          artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts" --jq ".artifacts[] | select(.name == \"prove-meada-960-$head\")")
+          id=$(jq -er '.id' <<< "$artifact")
+          digest=$(jq -er '.digest' <<< "$artifact")
+          echo "Run $run, artifact $id, digest $digest"
+          curl -fsSL --retry 2 -H "Authorization: Bearer $GH_TOKEN" -o "$RUNNER_TEMP/latest.zip" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip"
+          curl -fsSL --retry 2 -H "Authorization: Bearer $GH_TOKEN" -o "$RUNNER_TEMP/historical.zip" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/14708103513/zip"
+          python3 .github/judge-restack-final.py "$RUNNER_TEMP/latest.zip" "$RUNNER_TEMP/historical.zip" "$digest"
+      - name: Attack the scorer on the final raw answers
+        if: always()
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/final-driver" d147178f8ac41743ebd4017a020a3c32b9b1b1fd
+          cd "$RUNNER_TEMP/final-driver"
+          python3 -m venv "$RUNNER_TEMP/venv"
+          P="$RUNNER_TEMP/venv/bin/python"
+          "$RUNNER_TEMP/venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3 python-hcl2==8.1.4
+          "$P" .claude/skills/prove-meada/scripts/smoke_stack.py --oracle-archive "$RUNNER_TEMP/latest.zip"
