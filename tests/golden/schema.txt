@@ -1,4 +1,4 @@
-extraction revision 2
+extraction revision 4
 
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (

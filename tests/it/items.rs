@@ -456,6 +456,277 @@ fn http_value_flow(case: &str) -> serde_json::Value {
 }
 
 #[test]
+fn runtime_replacements_do_not_name_a_peer_from_the_written_return() {
+    let case = "http_value_flow_runtime_replacements";
+    fixture_repo(
+        case,
+        "http-value-flow-api",
+        Some("https://example.com/flow/api.git"),
+    );
+    let root = fixture_repo(
+        case,
+        "http-value-flow",
+        Some("https://example.com/flow/client.git"),
+    );
+    fs::write(
+        root.join("client.go"),
+        r#"
+package client
+import ("net/http"; "os")
+func unsafeBase() (base string) {
+    defer func() { base = "https://other.example.com" }()
+    return os.Getenv("API_URL")
+}
+func indirectBase() (base string) {
+    defer change(&base)
+    return os.Getenv("API_URL")
+}
+func change(base *string) { *base = "https://other.example.com" }
+func safeBase() (base string) {
+    defer func() {}()
+    return os.Getenv("API_URL")
+}
+func Deferred() { http.Get(unsafeBase() + "/api/orders") }
+func DeferredPointer() { http.Get(indirectBase() + "/api/orders") }
+func Benign() { http.Get(safeBase() + "/api/orders") }
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("client.py"),
+        r#"
+import os
+import requests
+
+def replace(host):
+    def decorator(original):
+        return lambda: host
+    return decorator
+
+@replace("https://other.example.com")
+def decorated():
+    return os.getenv("API_URL")
+
+def reassigned():
+    return os.getenv("API_URL")
+alias = replace("https://other.example.com")
+reassigned = alias(reassigned)
+
+staticmethod = replace("https://other.example.com")
+@staticmethod
+def shadowed():
+    return os.getenv("API_URL")
+
+def plain():
+    return os.getenv("API_URL")
+
+def Decorated():
+    return requests.get(decorated() + "/api/orders")
+def Reassigned():
+    return requests.get(reassigned() + "/api/orders")
+def ShadowedDecorator():
+    return requests.get(shadowed() + "/api/orders")
+def Ordinary():
+    return requests.get(plain() + "/api/orders")
+
+def install(cls):
+    cls.changed_origin = lambda self: "https://other.example.com"
+    return cls
+
+@install
+class Changed:
+    def changed_origin(self):
+        return os.getenv("API_URL")
+    def send(self):
+        return requests.get(self.changed_origin() + "/api/orders")
+
+class OrdinaryClass:
+    def ordinary_origin(self):
+        return os.getenv("API_URL")
+    def send(self):
+        return requests.get(self.ordinary_origin() + "/api/orders")
+
+@install_factory("https://other.example.com")
+class FactoryDecorated:
+    def factory_origin(self):
+        return os.getenv("API_URL")
+    def send(self):
+        return requests.get(self.factory_origin() + "/api/orders")
+"#,
+    )
+    .unwrap();
+    let export: serde_json::Value =
+        serde_json::from_str(&Engine::open(&root).unwrap().export().unwrap()).unwrap();
+    for (path, call, sites) in [
+        (
+            "client.go",
+            "http.Get#0",
+            [
+                ("Deferred", false),
+                ("DeferredPointer", false),
+                ("Benign", true),
+            ]
+            .as_slice(),
+        ),
+        (
+            "client.py",
+            "requests.get#0",
+            [
+                ("Decorated", false),
+                ("Reassigned", false),
+                ("ShadowedDecorator", false),
+                ("Ordinary", true),
+                ("Changed.send", false),
+                ("OrdinaryClass.send", true),
+                ("FactoryDecorated.send", false),
+            ]
+            .as_slice(),
+        ),
+    ] {
+        for (name, known) in sites {
+            let site = format!("example.com/flow/client::{path}::{name}::{call}");
+            let select = |table: &str, field: &str| {
+                export[table]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|row| row[field] == site)
+                    .collect::<Vec<_>>()
+            };
+            let rows = select("consumers", "site");
+            let links = select("links", "consumer");
+            assert_eq!(rows.len(), 1, "{site}: {rows:?}");
+            if *known {
+                assert_eq!(rows[0]["contract"], "http::GET::/api/orders", "{site}");
+                assert_eq!(rows[0]["via"], "env:API_URL", "{site}");
+                assert!(
+                    matches!(links.as_slice(), [link] if link["level"] == "inferred"
+                    && link["provider"] == "example.com/flow/api::openapi.yaml::GET /api/orders"),
+                    "{site}: {links:?}"
+                );
+            } else {
+                assert!(
+                    rows[0]["contract"].is_null() && rows[0]["via"].is_null(),
+                    "{site}: {rows:?}"
+                );
+                assert!(links.is_empty(), "{site}: {links:?}");
+                let open = select("open_items", "call");
+                assert!(
+                    matches!(open.as_slice(), [item] if item["kind"] == "dynamic-url"),
+                    "{site}: {open:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn exact_jvm_private_methods_fold_despite_homonyms_but_overrides_do_not() {
+    let case = "http_value_flow_jvm_private_names";
+    fixture_repo(
+        case,
+        "http-value-flow-api",
+        Some("https://example.com/flow/api.git"),
+    );
+    let root = fixture_repo(
+        case,
+        "http-value-flow",
+        Some("https://example.com/flow/client.git"),
+    );
+    fs::write(
+        root.join("PrivateJava.java"),
+        r#"
+import org.springframework.web.client.RestTemplate;
+class PrivateJava {
+    RestTemplate rest;
+    private String ordersBase() { return System.getenv("API_URL"); }
+    void send() { rest.getForObject(ordersBase() + "/api/orders", String.class); }
+}
+class Parent {
+    RestTemplate rest;
+    String dispatchBase() { return System.getenv("API_URL"); }
+    void polymorphic() { rest.getForObject(dispatchBase() + "/api/orders", String.class); }
+}
+class Child extends Parent {
+    @Override String dispatchBase() { return System.getenv("SECOND_URL"); }
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("PrivateKotlin.kt"),
+        r#"
+import org.springframework.web.client.RestTemplate
+class PrivateKotlin(private val rest: RestTemplate) {
+    private fun ordersBase(): String = System.getenv("API_URL")
+    fun send() { rest.getForObject(ordersBase() + "/api/orders", String::class.java) }
+}
+"#,
+    )
+    .unwrap();
+    let export: serde_json::Value =
+        serde_json::from_str(&Engine::open(&root).unwrap().export().unwrap()).unwrap();
+    for (path, owner, caller, helper, known) in [
+        (
+            "PrivateJava.java",
+            "PrivateJava",
+            "send",
+            "ordersBase",
+            true,
+        ),
+        (
+            "PrivateKotlin.kt",
+            "PrivateKotlin",
+            "send",
+            "ordersBase",
+            true,
+        ),
+        (
+            "PrivateJava.java",
+            "Parent",
+            "polymorphic",
+            "dispatchBase",
+            false,
+        ),
+    ] {
+        let symbol = format!("example.com/flow/client::{path}::{owner}.{caller}()");
+        let hop = format!("{symbol}::{helper}#0");
+        let site = format!("{symbol}::rest.getForObject#0");
+        let target = format!("example.com/flow/client::{path}::{owner}.{helper}()");
+        let rows = |table: &str, field: &str, key: &str| {
+            export[table]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|row| row[field] == key)
+                .collect::<Vec<_>>()
+        };
+        assert!(
+            matches!(rows("calls", "id", &hop).as_slice(),
+            [call] if call["level"] == "exact" && call["target"] == target),
+            "{hop}"
+        );
+        let consumer = rows("consumers", "site", &site);
+        let link = rows("links", "consumer", &site);
+        assert_eq!(consumer.len(), 1, "{site}: {consumer:?}");
+        if known {
+            assert_eq!(consumer[0]["via"], "env:API_URL", "{site}");
+            assert!(
+                matches!(link.as_slice(), [link] if link["level"] == "inferred"
+                && link["provider"] == "example.com/flow/api::openapi.yaml::GET /api/orders"),
+                "{site}: {link:?}"
+            );
+        } else {
+            assert!(
+                consumer[0]["contract"].is_null() && consumer[0]["via"].is_null(),
+                "{site}: {consumer:?}"
+            );
+            assert!(link.is_empty(), "{site}: {link:?}");
+        }
+    }
+}
+
+#[test]
 fn exact_returns_keys_and_optional_queries_reach_http_consumers() {
     let export = http_value_flow("http_value_flow_folded");
     let consumers = export["consumers"].as_array().unwrap();
