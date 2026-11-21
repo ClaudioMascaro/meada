@@ -34,6 +34,14 @@ Some older drivers use their own checks JSON. An oracle failure still fails capt
 the same driver also found comparison deltas. Later independently runnable drivers still
 execute. A delta can be a regression. Judge the complete recorded values against the source.
 
+Public smoke records source-key results per revision in `checks.json` and
+`denominator.json`. `transitions.json` keeps both observations and the outcome of each
+pair. Rejected historical results remain visible. Exit 3 rejects a candidate or shared
+control. Failures to exercise either binary (missing input, crash, timeout) still affect
+capture. The Kotlin receiver policy in #952 has its own per-site keys. Status presentation
+and cross-version decider output and decision files are parity entries. Candidate resumption
+must agree byte-for-byte with a continuous run of the same binary.
+
 `prove.py run` and `rebless` use the same JSON reader. They keep new and unknown fields,
 including an empty array that was previously absent, and report new, removed or moved
 candidates by decision identity. Arrays keep their multiplicity and order. The reports

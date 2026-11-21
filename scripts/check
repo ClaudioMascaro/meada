@@ -22,6 +22,8 @@ PROVE_SKILL = ".claude/skills/prove-meada"
 PROVE_CI_INPUTS = {
     "scripts/prove-ci", f"{PROVE_SKILL}/SKILL.md", f"{PROVE_SKILL}/references/scope.md",
     f"{PROVE_SKILL}/scripts/proof_result.py",
+    f"{PROVE_SKILL}/scripts/smoke_stack.py", f"{PROVE_SKILL}/scripts/smoke_lifecycle.py",
+    f"{PROVE_SKILL}/scripts/smoke_oracle_test.py",
     f"{PROVE_SKILL}/scripts/a7-a8-audit.py", f"{PROVE_SKILL}/scripts/a7-a8-mutations.json",
     f"{PROVE_SKILL}/scripts/a7-tf-set/terraform-names.tsv",
 }

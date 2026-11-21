@@ -10,7 +10,7 @@ import subprocess
 import sys
 import traceback
 
-from proof_result import BLOCKED, ORACLE_FAILED, TIMEOUT, execution_exit, run_driver
+from proof_result import BLOCKED, TIMEOUT, Comparisons, execution_exit, run_driver
 from prove import ROOT, git, mcp_answers
 
 NAMES = tuple(f'meada-smoke-{name}' for name in ('app', 'lib', 'shared'))
@@ -54,11 +54,14 @@ def checkout(source, destination, revision, name):
 
 class Smoke:
     def __init__(self, args):
+        self.slice = args.slice
         self.run = Path(args.run).resolve()
         self.run.mkdir(parents=True)
         self.work = self.run / 'work'
         self.work.mkdir()
         self.checks, self.checkouts = [], {}
+        self.parity = Comparisons(self.run)
+        self.revision = 'shared'
         self.env = {key: value for key, value in os.environ.items()
                     if not key.startswith(('LC_', 'MEADA_DECIDER_'))}
         self.env.update(LANG='C.UTF-8', LC_ALL='C')
@@ -74,18 +77,21 @@ class Smoke:
                                        'corpora': {kind: dict(zip(NAMES, pins)) for kind, pins in PINS.items()},
                                        'binaries': self.bins})
 
-    def check(self, name, expected, actual, *, matches=None):
+    def check(self, name, expected, actual, *, matches=None, revision=None, key=None):
         passed = expected == actual if matches is None else matches
         self.record({'name': name, 'result': 'pass' if passed else 'fail',
+                     'revision': revision or self.revision, 'key': key,
                      'expected': expected, 'actual': actual})
         return passed
 
     def record(self, check):
+        check.setdefault('revision', self.revision)
         self.checks.append(check)
         save(self.run / 'checks.json', self.checks)
         print(f"{check['result'].upper()} {check['name']}", flush=True)
 
-    def phase(self, name, action, *args):
+    def phase(self, name, action, *args, revision='shared'):
+        self.revision = revision
         try:
             action(self, *args)
         except Exception as error:
@@ -93,6 +99,8 @@ class Smoke:
             evidence = f'{name}.{status}.txt'
             (self.run / evidence).write_text(traceback.format_exc())
             self.record({'name': name, 'result': status, 'evidence': evidence})
+        finally:
+            self.revision = 'shared'
 
     def clone(self, label, kind):
         pins = PINS[kind]
@@ -152,8 +160,40 @@ class Smoke:
         return texts
 
     def score(self, binary, name, expected, actual, matches=None):
-        self.scored.setdefault(binary, {})[name] = self.check(f'{binary} {name}', expected, actual, matches=matches)
-        save(self.run / 'denominator.json', {'corpus': 'expanded', 'checks': self.scored})
+        self.scored.setdefault(binary, {})[name] = self.check(
+            f'{binary} {name}', expected, actual, matches=matches, revision=binary, key=name)
+        save(self.run / 'denominator.json', {'corpus': 'expanded', 'checks': self.scored,
+                                           'totals': {revision: {'passed': sum(checks.values()),
+                                                                 'checked': len(checks),
+                                                                 'expected': 13 if self.slice == 'resolution' else 3}
+                                                      for revision, checks in self.scored.items()}})
+
+    def finish(self):
+        statuses = ('pass', 'fail', 'blocked', 'timeout', 'error')
+        counts = lambda rows: {status: sum(row['result'] == status for row in rows) for status in statuses}
+        revisions = {slot: counts([row for row in self.checks if row['revision'] == slot])
+                     for slot in ('base', 'head', 'shared')}
+        paired = {}
+        for row in self.checks:
+            if row.get('key'):
+                paired.setdefault(row['key'], {})[row['revision']] = row
+        transitions = {('pass', 'pass'): 'stable', ('fail', 'pass'): 'recovered',
+                       ('pass', 'fail'): 'regression', ('fail', 'fail'): 'still rejected'}
+        for key, pair in paired.items():
+            if 'base' in pair and 'head' in pair:
+                pair['transition'] = transitions[pair['base']['result'], pair['head']['result']]
+                self.parity.compare(key, pair['base']['actual'], pair['head']['actual'])
+        save(self.run / 'transitions.json', paired)
+        combined = counts(self.checks)
+        for status, code in (('timeout', TIMEOUT), ('blocked', BLOCKED), ('error', 1)):
+            if combined[status]:
+                break
+        else:
+            code = self.parity.exit_code(failed=bool(revisions['head']['fail'] or revisions['shared']['fail']))
+        save(self.run / 'result.json', {'counts': combined, 'revisions': revisions,
+                                       'differences': self.parity.differences, 'exit': code, 'verdict': 'UNPROVEN'})
+        print(f'capture finished: {revisions}. Judge against answer-key.md.')
+        return code
 
 
 def rows_at(data, section, field, path, name):
@@ -161,48 +201,71 @@ def rows_at(data, section, field, path, name):
             if f'::{path}::' in row[field] and name in row[field].split('::')[2]]
 
 
-def endpoint_observation(data, path, name):
-    consumers = rows_at(data, 'consumers', 'site', path, name)
-    links = rows_at(data, 'links', 'consumer', path, name)
-    sites = {row['site'] for row in consumers}
-    return {'consumers': consumers, 'links': links,
-            'items': [row for row in data.get('open_items', []) if row['call'] in sites]}
+def endpoint_observation(data, site):
+    return {'site': site,
+            'consumers': [row for row in data['consumers'] if row['site'] == site],
+            'links': [row for row in data['links'] if row['consumer'] == site],
+            'items': [row for row in data.get('open_items', []) if row['call'] == site]}
 
 
-def configured_order(links, repo=LIB):
+def configured_links(links, repo=LIB):
     return (len(links) == 1 and links[0]['provider'] == ORDERS[repo]
             and links[0]['contract'] == ROUTE and links[0]['level'] == 'inferred'
-            and 'SMOKE_ORDERS_URL' in links[0]['reason'] and repo in links[0]['reason'])
+            and all(part in links[0]['reason'] for part in ('SMOKE_ORDERS_URL', 'base_url_env', repo)))
+
+
+def consumer_is(observation, contract, via):
+    return len(observation['consumers']) == 1 and all(
+        field in row and row[field] == value
+        for row in observation['consumers'] for field, value in [('contract', contract), ('via', via)])
+
+
+def configured_order(observation, repo=LIB):
+    return (consumer_is(observation, ROUTE, 'env:SMOKE_ORDERS_URL') and not observation['items']
+            and configured_links(observation['links'], repo))
+
+
+def decision_is(observation, kind, candidates):
+    items = observation['items']
+    return len(items) == 1 and (items[0]['kind'], items[0]['candidates']) == (kind, candidates)
+
+
+ORDER_CANDIDATES = [f'{repo}::{ROUTE}' for repo in ORDERS]
+
+
+def ambiguous_order(observation):
+    links = observation['links']
+    return (consumer_is(observation, ROUTE, None)
+            and len(links) == 2 and {row['provider'] for row in links} == set(ORDERS.values())
+            and all(row['contract'] == ROUTE and row['level'] == 'ambiguous' and row['reason'] for row in links)
+            and decision_is(observation, 'ambiguous-link', ORDER_CANDIDATES))
 
 
 def overridden_order(observation):
-    consumers, links = observation['consumers'], observation['links']
-    if len(consumers) != 1:
-        return False
-    consumer = consumers[0]
-    if consumer['contract'] not in (None, ROUTE) or consumer['via'] not in (None, SHARED_HOST):
-        return False
+    links = observation['links']
     if not links:
-        return True
+        return (consumer_is(observation, None, None)
+                and any(decision_is(observation, 'dynamic-url', candidates)
+                        for candidates in ([], ORDER_CANDIDATES)))
     if len(links) == 1:
-        return (consumer['via'] == SHARED_HOST and links[0]['provider'] == ORDERS[SHARED]
-                and links[0]['contract'] == ROUTE and links[0]['level'] in ('exact', 'inferred'))
-    return (consumer['via'] is None and len(links) == 2
-            and {row['provider'] for row in links} == set(ORDERS.values())
-            and all(row['contract'] == ROUTE and row['level'] == 'ambiguous' for row in links))
+        link = links[0]
+        return (consumer_is(observation, ROUTE, SHARED_HOST) and not observation['items']
+                and link['provider'] == ORDERS[SHARED] and link['contract'] == ROUTE
+                and link['level'] in ('exact', 'inferred') and 'shared.smoke.example' in link['reason'])
+    return ambiguous_order(observation)
 
 
 HTTP = (
-    ('go/client.go', 'SendConfigured', None),
-    ('go/client.go', 'SendShared', '#948'),
-    ('python/client.py', 'send_configured', None),
-    ('python/client.py', 'send_shared', '#949'),
-    ('java/OrdersClient.java', 'sendOrder', '#810'),
-    ('kotlin/Orders.kt', 'sendOrder', '#810'),
-    ('csharp/OrdersClient.cs', 'SendOrder', None),
-    ('rust/src/lib.rs', 'send_order', None),
-    ('swift/Orders.swift', 'sendOrder', None),
-    ('typescript/client.ts', 'sendOrder', None),
+    ('go/client.go', 'SendConfigured', 'http.Post#0', None),
+    ('go/client.go', 'SendShared', 'http.Post#0', '#948'),
+    ('python/client.py', 'send_configured', 'requests.post#0', None),
+    ('python/client.py', 'send_shared', 'requests.post#0', '#949'),
+    ('java/OrdersClient.java', 'OrdersClient.sendOrder()', 'http.postForObject#0', '#810'),
+    ('kotlin/Orders.kt', 'KotlinOrders.sendOrder()', 'http.postForObject#0', '#810'),
+    ('csharp/OrdersClient.cs', 'OrdersClient.SendOrder()', 'http.PostAsync#0', None),
+    ('rust/src/lib.rs', 'send_order', '(call_expression).post#0', None),
+    ('swift/Orders.swift', 'sendOrder()', 'URLSession.shared.data#0', None),
+    ('typescript/client.ts', 'sendOrder', 'fetch#0', None),
 )
 
 
@@ -233,9 +296,10 @@ def sqs(rig, data, binary, *, historical=False):
             rig.score(binary, f'SQS {name}', expected, rows, matches)
 
 
-def jvm(rig, data, binary, variant, path, owner, helper):
-    calls = [row for row in rows_at(data, 'calls', 'id', f'orders/clients/{path}', 'sendOrder')
-             if row['id'].split('::')[-1] == f'{helper}#0']
+def jvm(rig, data, binary, variant, path, symbol, helper):
+    site = f'{APP}::orders/clients/{path}::{symbol}::{helper}#0'
+    calls = [row for row in data['calls'] if row['id'] == site]
+    owner = symbol.rsplit('.', 1)[0]
     target = f'{APP}::orders/clients/{path}::{owner}.{helper}()'
     actual = [{'target': row['target'], 'level': row['level'], 'candidates': row.get('candidates', [])} for row in calls]
     rig.check(f'{binary} {variant} {owner}: private code hop', [{'target': target, 'level': 'exact', 'candidates': []}], actual)
@@ -267,18 +331,23 @@ def transport(rig, language):
     ], records)
 
 
-def http_cases(rig, binary, app, data):
-    for path, name, issue in HTTP:
-        evidence = endpoint_observation(data, f'orders/clients/{path}', name)
+def score_http(rig, binary, data):
+    for path, symbol, call, issue in HTTP:
+        evidence = endpoint_observation(data, f'{APP}::orders/clients/{path}::{symbol}::{call}')
         expected = {'contract': ROUTE, 'provider': ORDERS[LIB],
                     'level': 'inferred', 'reason': 'via SMOKE_ORDERS_URL; lib is the declaring peer'}
         if issue in ('#948', '#949'):
             expected = {'correct provider': ORDERS[SHARED], 'via': SHARED_HOST,
                         'otherwise': 'keep one open consumer with no selected peer'}
-        matches = overridden_order(evidence) if issue in ('#948', '#949') else configured_order(evidence['links'])
-        rig.score(binary, f'HTTP {path} {name}' + (f' {issue}' if issue else ''), expected, evidence, matches)
-    jvm(rig, data, binary, 'combined', 'java/OrdersClient.java', 'OrdersClient', 'ordersBase')
-    jvm(rig, data, binary, 'combined', 'kotlin/Orders.kt', 'KotlinOrders', 'ordersBase')
+        matches = overridden_order(evidence) if issue in ('#948', '#949') else configured_order(evidence)
+        rig.score(binary, f'HTTP {path} {symbol}' + (f' {issue}' if issue else ''), expected, evidence, matches)
+
+
+def http_cases(rig, binary, app, data):
+    score_http(rig, binary, data)
+    for path, symbol, _, issue in HTTP:
+        if issue == '#810':
+            jvm(rig, data, binary, 'combined', path, symbol, 'ordersBase')
     sqs(rig, data, binary)
     mcp = [
         {'tool': 'search', 'arguments': {'query': '/orders', 'kind': 'route', 'budget': 4000}},
@@ -308,22 +377,18 @@ def jvm_controls(rig):
             source.write_text(source.read_text().replace('ordersBase', 'ordersBasePrivateProbe'))
         rig.cli(variant + '/index', app, 'head', 'index')
         data = rig.export(variant + '/export', app, 'head')
-        for path, owner in [('java/OrdersClient.java', 'OrdersClient'), ('kotlin/Orders.kt', 'KotlinOrders')]:
-            if path == drop:
+        for path, symbol, call, issue in HTTP:
+            if issue != '#810' or path == drop:
                 continue
-            jvm(rig, data, 'head', variant, path, owner, 'ordersBasePrivateProbe' if path == rename else 'ordersBase')
-            got = endpoint_observation(data, f'orders/clients/{path}', 'sendOrder')
-            rig.check(f'#810 {variant} {owner} HTTP provider', ORDERS[LIB], got, matches=configured_order(got['links']))
+            jvm(rig, data, 'head', variant, path, symbol, 'ordersBasePrivateProbe' if path == rename else 'ordersBase')
+            got = endpoint_observation(data, f'{APP}::orders/clients/{path}::{symbol}::{call}')
+            rig.check(f'#810 {variant} {symbol} HTTP provider', ORDERS[LIB], got, matches=configured_order(got))
 
 
 def peer_controls(rig, app, lib, baseline):
     wanted = [(ORDERS[LIB], 'ambiguous'), (ORDERS[SHARED], 'ambiguous')]
-    relative = endpoint_observation(baseline, 'orders/evidence/client.go', 'Relative')
-    links = relative['links']
-    rig.check('authority-free /orders has two alternatives', wanted, relative,
-              matches=sorted((row['provider'], row['level']) for row in links) == wanted
-              and len(relative['items']) == 1 and relative['items'][0]['kind'] == 'ambiguous-link'
-              and relative['items'][0]['candidates'] == [f'{LIB}::{ROUTE}', f'{SHARED}::{ROUTE}'])
+    relative = endpoint_observation(baseline, f'{APP}::orders/evidence/client.go::Relative::http.Post#0')
+    rig.check('authority-free /orders has two alternatives', wanted, relative, matches=ambiguous_order(relative))
     for name, symbol in [('Archive', 'write'), ('Choose', 'writeConditional'), ('Current', 'Current')]:
         file = 'orders/mutation/store.go'
         rows = [row for row in rows_at(baseline, 'providers', 'site', file, symbol)
@@ -348,9 +413,9 @@ def peer_controls(rig, app, lib, baseline):
                     f'path = "../meada-smoke-shared"\n{declaration}')
     config.write_text(reassigned)
     other = rig.export('peers/reassigned', app, 'head')
-    outcome = endpoint_observation(other, 'orders/evidence/client.go', 'ViaMethod')
+    outcome = endpoint_observation(other, f'{APP}::orders/evidence/client.go::Client.ViaMethod::http.Post#0')
     rig.check('provider changes with the declared authority', ORDERS[SHARED], outcome,
-              matches=configured_order(outcome['links'], SHARED))
+              matches=configured_order(outcome, SHARED))
     config.write_text(original)
     route = lib / 'openapi.yaml'
     saved = route.read_bytes()
@@ -441,51 +506,56 @@ def configuration_matrix(rig):
             level = 'ambiguous' if dual else 'inferred'
             for name, expected_peers in ((f'Configured{index}', [owner]),
                                          (f'Relative{index}', sorted(peers) if dual else [owner])):
-                got = endpoint_observation(data, 'matrix.go', name)
+                got = endpoint_observation(data, f'{APP}::matrix.go::{name}::http.Post#0')
                 expected_level = 'inferred' if name.startswith('Configured') else level
                 expected = [(contract, f'{peer}::openapi.yaml::POST {path}', expected_level)
                             for peer in expected_peers]
                 links = got['links']
                 candidates = [f'{peer}::{contract}' for peer in expected_peers] if expected_level == 'ambiguous' else []
                 rig.check(f'{label} {name} {path}', {'links': expected, 'candidates': candidates}, got,
-                          matches=len(got['consumers']) == 1
+                          matches=consumer_is(got, contract, 'env:SMOKE_ORDERS_URL' if name.startswith('Configured') else None)
                           and sorted((row['contract'], row['provider'], row['level']) for row in links) == expected
-                          and [item['candidates'] for item in got['items']] == ([candidates] if candidates else [])
+                          and (decision_is(got, 'ambiguous-link', candidates) if candidates else not got['items'])
                           and all(row.get('reason') for row in links)
                           and (not name.startswith('Configured') or all('SMOKE_ORDERS_URL' in row['reason'] for row in links)))
     save(rig.run / 'matrix.json', {'configurations': matrix, 'routes': 96, 'callers': 192})
 
 
-def shadowed_request(observation):
-    consumers = observation['consumers']
-    resolved = [row for row in consumers if (row['contract'], row['via'])
-                == ('http::GET::/persons/hidden', 'host:typed.example.com')]
-    return (not consumers and not observation['links']) or len(resolved) == len(consumers) == 1
+KOTLIN_SHADOW = {
+    'shadowed': ('Shadowing.hidden()', '/persons/hidden'),
+    'other_class': ('Typed.typed()', '/persons/typed'),
+}
+TYPED_FIXTURE = 'src/main/kotlin/example/jvm/Typed.kt'
 
 
-def kotlin_shadow(rig):
-    path = 'src/main/kotlin/example/jvm/Typed.kt'
+def score_kotlin(rig, binary, data):
+    observations = {}
+    for label, (symbol, route) in KOTLIN_SHADOW.items():
+        key = f'#952 {symbol}'
+        site = f'example.com/proof/kotlin-shadow::{TYPED_FIXTURE}::example.jvm.{symbol}::(call_expression).uri#0'
+        got = observations[label] = endpoint_observation(data, site)
+        literal = consumer_is(got, f'http::GET::{route}', 'host:typed.example.com')
+        absent = not got['consumers']
+        expected = {'url': f'GET https://typed.example.com{route}', 'links': [], 'items': []}
+        if label == 'shadowed':
+            expected['alternative'] = 'pre-#947 receiver ceiling, no HTTP consumer'
+            expected['policy'] = 'pending maintainer decision #952'
+        rig.check(f'{binary} {key}', expected, got, revision=binary, key=key,
+                  matches=not got['items'] and not got['links'] and (literal or label == 'shadowed' and absent))
+    return observations
+
+
+def kotlin_shadow(rig, binary):
     fixture = ROOT / 'tests/fixtures/conformance-kotlin'
-    (rig.run / 'kotlin-shadow-typed.kt').write_bytes((fixture / path).read_bytes())
-    controls = {}
-    for binary in ('base', 'head'):
-        if binary in rig.bins:
-            root = rig.work / f'kotlin-shadow-{binary}'
-            shutil.copytree(fixture, root)
-            git('init', '-q', cwd=root)
-            git('remote', 'add', 'origin', 'https://example.com/proof/kotlin-shadow.git', cwd=root)
-            git('add', '.', cwd=root)
-            git('commit', '-qm', 'Kotlin shadowing fixture', cwd=root)
-            data = rig.export(f'kotlin-shadow/{binary}', root, binary)
-            got = endpoint_observation(data, path, 'Shadowing.hidden')
-            witness = endpoint_observation(data, path, 'Typed.typed')
-            controls[binary] = witness
-            save(rig.run / f'kotlin-shadow-{binary}.json', {'shadowed': got, 'other_class': witness})
-            rig.check(f'#952 {binary} Kotlin shadowing, behavior pending maintainer decision',
-                      'retain the documented receiver ceiling or recover GET https://typed.example.com/persons/hidden',
-                      got, matches=shadowed_request(got))
-    if 'base' in controls:
-        rig.check('#952 neighboring Typed.typed control is stable', controls['base'], controls['head'])
+    (rig.run / 'kotlin-shadow-typed.kt').write_bytes((fixture / TYPED_FIXTURE).read_bytes())
+    root = rig.work / f'kotlin-shadow-{binary}'
+    shutil.copytree(fixture, root)
+    git('init', '-q', cwd=root)
+    git('remote', 'add', 'origin', 'https://example.com/proof/kotlin-shadow.git', cwd=root)
+    git('add', '.', cwd=root)
+    git('commit', '-qm', 'Kotlin shadowing fixture', cwd=root)
+    data = rig.export(f'kotlin-shadow/{binary}', root, binary)
+    save(rig.run / f'kotlin-shadow-{binary}.json', score_kotlin(rig, binary, data))
 
 
 def order_rows(data):
@@ -510,7 +580,7 @@ def upgrade(rig, outcome_bin):
     rig.check(f'{outcome_bin} cold index has three source-proven Go links',
               ['httpkey', 'neutral', 'oskey'], parts(order_rows(separate)))
     rig.check(f'{outcome_bin} cold providers, level and reason from the declared peer', 'three lib links',
-              order_rows(separate), matches=all(configured_order([row]) for row in order_rows(separate)))
+              order_rows(separate), matches=all(configured_links([row]) for row in order_rows(separate)))
     if outcome_bin == 'middle':
         rig.check('#943 historical stale warm index retains only neutral', list(expected), parts(order_rows(reopened)))
     else:
@@ -535,32 +605,10 @@ def sdk_transition(rig):
               [warm['provisions'], refreshed['provisions']])
 
 
-def selftest():
-    right = {'provider': ORDERS[LIB], 'contract': ROUTE, 'level': 'inferred',
-             'reason': f'base URL from SMOKE_ORDERS_URL is provided by {LIB}'}
-    assert configured_order([right])
-    assert not configured_order([dict(right, provider=ORDERS[SHARED])])
-    open_order = {'consumers': [{'contract': ROUTE, 'via': None}], 'links': []}
-    assert overridden_order(open_order)
-    assert not overridden_order(dict(open_order, consumers=[]))
-    assert not overridden_order(dict(open_order, links=[right]))
-    ambiguous = [dict(right, provider=provider, level='ambiguous') for provider in ORDERS.values()]
-    assert overridden_order(dict(open_order, links=ambiguous))
-    assert overridden_order({'consumers': [{'contract': ROUTE, 'via': SHARED_HOST}],
-                             'links': [dict(right, provider=ORDERS[SHARED])]})
-    path_only = {'consumers': [{'contract': 'http::GET::/persons/hidden', 'via': None}], 'links': []}
-    assert not shadowed_request(path_only)
-    assert shadowed_request(dict(path_only, consumers=[]))
-    assert shadowed_request(dict(path_only, consumers=[dict(path_only['consumers'][0], via='host:typed.example.com')]))
-    assert provision_ok([{'level': 'exact', 'contract': QUEUE, 'provisioner': QUEUE_NODE}], True)
-    assert not provision_ok([{'level': 'exact', 'contract': QUEUE, 'provisioner': QUEUE_NODE}], False)
-    assert len(HTTP) == 10 and len({(path, name) for path, name, _ in HTTP}) == 10
-    print('smoke-stack selftest: swapped peer, missing caller, hostless Kotlin path and runtime false exact rejected')
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--selftest', action='store_true')
+    parser.add_argument('--oracle-archive', type=Path, help='replay the scorer on the original #953 proof ZIP')
     parser.add_argument('--slice', choices=('resolution', 'lifecycle', 'upgrade', 'sqs'), default='resolution')
     parser.add_argument('--run')
     parser.add_argument('--base-bin')
@@ -569,20 +617,22 @@ def main():
     parser.add_argument('--middle-bin')
     parser.add_argument('--source-dir', help='optional verified fetch cache containing the pinned revisions')
     args = parser.parse_args()
-    if args.selftest:
-        selftest()
+    if args.selftest or args.oracle_archive:
+        from smoke_oracle_test import selftest
+        selftest(args.oracle_archive)
         return
     if not args.run or not args.head_bin or args.slice in ('upgrade', 'sqs') and not args.old_bin:
-        parser.error('run directory, head binary and any historical binaries for the slice are required')
+        print('run directory, head binary and any historical binaries for the slice are required', file=sys.stderr)
+        return BLOCKED
     rig = Smoke(args)
     if args.slice == 'resolution':
         for language in ('go', 'python'):
             rig.phase(f'runtime-{language}', transport, language)
         for binary in ('base', 'head'):
             if binary in rig.bins:
-                rig.phase(f'resolution-{binary}', resolution, binary)
+                rig.phase(f'resolution-{binary}', resolution, binary, revision=binary)
+                rig.phase(f'kotlin-shadow-{binary}', kotlin_shadow, binary, revision=binary)
         rig.phase('private-methods', jvm_controls)
-        rig.phase('kotlin-shadow', kotlin_shadow)
         rig.phase('peer-controls', published_controls)
         rig.phase('configuration-matrix', configuration_matrix)
     elif args.slice == 'upgrade':
@@ -594,14 +644,7 @@ def main():
     else:
         from smoke_lifecycle import lifecycle
         lifecycle(rig)
-    counts = {status: sum(row['result'] == status for row in rig.checks)
-              for status in ('pass', 'fail', 'blocked', 'timeout', 'error')}
-    save(rig.run / 'result.json', {'counts': counts, 'verdict': 'UNPROVEN'})
-    print(f'capture finished: {counts}. Judge against answer-key.md.')
-    for status, code in (('timeout', TIMEOUT), ('blocked', BLOCKED), ('error', 1), ('fail', ORACLE_FAILED)):
-        if counts[status]:
-            return code
-    return 0
+    return rig.finish()
 
 
 if __name__ == '__main__':

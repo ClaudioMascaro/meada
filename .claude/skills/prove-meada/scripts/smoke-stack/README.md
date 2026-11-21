@@ -21,14 +21,29 @@ shared. No HTTP request leaves the process. #948 and #949 permit leaving the
 overridden caller open if the host cannot be established. The consumer still
 appears at the source site, with no selected peer. A link to shared keeps the
 host, method and route from the recording. Selecting lib is a wrong link.
+The HTTP checks join consumers, links and decision items by the full repository, path,
+qualified definition (with its signature), and call identity. An unknown URL needs a
+matching dynamic-url item. A relative route with two ambiguous links needs an
+ambiguous-link item listing both canonical targets. A configured or literal-host link
+requires the consumer's matching route and provenance and no item at that site.
 
 For #810, the same spelling of a private method in unrelated Java and Kotlin
 classes leaves a unique exact code target in each class. The reachability of
 that code hop and the HTTP link are separate checks. Each isolated client,
 and each one-helper rename, keeps its own configured request and lib provider.
-The separate #952 fixture checks the documented receiver limit and the literal
-GET URL `https://typed.example.com/persons/hidden`. The maintainer decides which
-behavior to commit to for the shared-name receiver.
+The separate #952 fixture gives `Shadowing.hidden()` and `Typed.typed()` independent
+keys. Both call the literal factory for `https://typed.example.com`. The first
+requests `/persons/hidden` and the second requests `/persons/typed`. An absent
+shadowed consumer also fits the historical receiver ceiling. The pending #952 decision
+is recorded even when a candidate matches an admissible outcome.
+
+`denominator.json` counts the 13 expanded cases independently per executable. The
+separate Kotlin observations and raw candidate sets are in `checks.json` and
+`transitions.json`. Rejected answers from the base are historical observations. A
+rejected candidate fails the driver even when both binaries agree. To replay the
+same scorer on mutated and unchanged copies of the published #953 JSON, run
+`python3 smoke_stack.py --selftest --oracle-archive /path/to/proof-953.zip` from this
+script's directory or pass its repository-relative path.
 
 In the SQS probe, publishLiteral and publishOrder write smoke-orders and
 provision at exact to lib's queues.tf::aws_sqs_queue.orders. publishSelected

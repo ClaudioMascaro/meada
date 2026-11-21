@@ -96,13 +96,13 @@ FLOWS = (
     ('ci-permissions', CI, 'ci.py --slice f3 --head-bin {head} --base-bin {base} --http'),
     ('a8-peers', A8, 'a8-peers.sh check {base} {head} {out}'),
     ('a8-mcp', A8, 'a8-mcp.py --head-bin {head} --base-bin {base}'),
-    ('smoke-resolution', r'src/(http|lang|resolve|index|contract/sdk|ci|iac/actions)(\.rs|/)|tests/fixtures/conformance-kotlin/',
+    ('smoke-resolution', r'src/(http|lang|resolve|index|contract/sdk|ci|iac/actions)(\.rs|/)|src/(config|workspace)\.rs$|tests/fixtures/conformance-kotlin/',
      'smoke_stack.py --slice resolution --head-bin {head} --base-bin {base}'),
     ('smoke-lifecycle', r'src/(decid|status|iac/orphans|workspace|index|engine|main)|meada-core/src/export\.rs',
      'smoke_stack.py --slice lifecycle --head-bin {head} --base-bin {base}'),
     ('smoke-upgrade', r'src/(index(\.rs|/)|lang/go(\.rs|/)|http/go(\.rs|/))',
      'smoke_stack.py --slice upgrade --head-bin {head} --old-bin {before_go_keys} --middle-bin {before_invalidation}'),
-    ('smoke-sqs', r'src/(index(\.rs|/)|channel/aws\.rs|contract/sdk)',
+    ('smoke-sqs', r'src/(index(\.rs|/)|channel/aws\.rs|contract/sdk|iac/provision\.rs$)',
      'smoke_stack.py --slice sqs --head-bin {head} --old-bin {before_sqs_restore}'),
     ('console-graph', None, 'console-graph.py --head-bin {ui} --ui-dir ui/dist'),
     ('aws-sdk', r'src/(channel|resource)/', 'aws-sdk.py --head-bin {head} --base-bin {base} --ui-bin {ui} --ui-dir ui/dist'),
@@ -510,6 +510,13 @@ def selftest():
             'src/iac/workload/ecs.rs'} <= set(workload_paths), workload_paths
     for path in workload_paths:
         assert 'aws-workloads' in chosen([path]), f'Scope only: aws-workloads ({path})'
+    for path, smoke in [('src/config.rs', {'smoke-resolution'}),
+                        ('src/workspace.rs', {'smoke-resolution', 'smoke-lifecycle'}),
+                        ('src/iac/provision.rs', {'smoke-sqs'}),
+                        ('src/alert/incident.rs', set())]:
+        assert {flow for flow in chosen([path]) if flow.startswith('smoke-')} == smoke, path
+        assert all(any(f'--slice {flow.removeprefix("smoke-")}' in row for row in rows_for([path]))
+                   for flow in smoke), path
     # The address column is a required part of the input this verifier selects.
     names = (SCRIPTS / 'a7-tf-set/terraform-names.tsv').read_text().splitlines()
     assert all(len(row.split('\t')) == 4 for row in names if row and not row.startswith('#'))
@@ -601,6 +608,9 @@ def selftest():
         assert calls[-1][0] != 'timeout' and receipt['steps'][-1]['name'] == 'clean', calls
         assert result == 2 and receipt['capture'] == 'BLOCKED' and receipt['blocked'] == f'{unrun[0]}: no time left in this job'
     assert f'Selected flows that did not run: {", ".join(cli_flows)}.' in receipt['not_covered'], receipt['not_covered']
+    smoke = subprocess.run([sys.executable, str(SCRIPTS / 'smoke_stack.py'), '--selftest'],
+                           text=True, capture_output=True, timeout=30)
+    assert smoke.returncode == 0, smoke.stdout + smoke.stderr
     print('prove-ci selftest: local guard, capture status, failure retention, cleanup and flow selection passed')
 
 

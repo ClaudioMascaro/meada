@@ -205,7 +205,7 @@ def manifest_status(rig):
         old, _, _ = rig.clone('status-manifest-base', 'original')
         rig.cli('status/base-index', old, 'base', 'index', *argv)
         before = rig.cli('status/base-healthy', old, 'base', 'status', *argv)
-        rig.check('#934 healthy PR base and head bytes', before.stdout, healthy.stdout)
+        rig.parity.compare('#934 healthy status stdout', before.stdout, healthy.stdout)
     lib_db, = [path for path in indexes.rglob('index.db') if NAMES[1] in path.parts]
     with sqlite3.connect(lib_db) as db:
         version, = db.execute('PRAGMA user_version').fetchone()
@@ -289,8 +289,9 @@ def interruption(rig):
         other = decision_fixture(rig, 'decider-base')
         with decider(rig, other, 'base') as (env, _, _):
             prior = rig.cli('decider/base', other, 'base', 'decide', '--decider', env=env)
-        rig.check('#937 PR base and head continuous bytes/output',
-                  [file_bytes(other / path.name).decode(), prior.stdout], [canonical.decode(), current.stdout])
+        rig.parity.compare('#937 continuous decider stdout', prior.stdout, current.stdout)
+        rig.parity.compare('#937 continuous decisions TOML', file_bytes(other / path.name).decode(),
+                           canonical.decode())
 
     for label, failure in [('failed-response', {'fail': 3}), ('failed-write', {'refuse': 2})]:
         if label == 'failed-write' and os.geteuid() == 0:
