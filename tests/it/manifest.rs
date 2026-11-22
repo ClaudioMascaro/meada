@@ -208,6 +208,8 @@ fn status_reports_every_listed_repository_and_the_peers_the_manifest_leaves_out(
         "workspace: 2 repositories\n\
          example.com/chain/gateway (../chain-gateway) not indexed\n\
          example.com/chain/web (../chain-web) not indexed\n\
+         decisions and other workspace lines not evaluated: not every repository is indexed at \
+         this version; run meada index --workspace\n\
          missing peer: example.com/chain/catalog, named by example.com/chain/gateway\n"
     );
     assert!(run(&dir, "index").2);
@@ -1621,6 +1623,39 @@ fn each_mirrors_decisions_are_replayed_and_the_stale_ones_reported() {
     decisions(&web, "chain-web-unfit");
     let (status, _, _) = run(&dir, "status");
     assert!(status.contains("\n  stale decision: "), "{status}");
+}
+
+/// An index that fails to read is named in place of the decisions and the lines under each
+/// repository, and the probe still answers from readiness alone; a manifest that lists nothing
+/// has nothing to evaluate and says nothing more (#934).
+#[test]
+fn status_says_why_it_did_not_evaluate_the_decisions() {
+    let dir = chain_manifest("manifest_status_unevaluated");
+    assert!(run(&dir, "index").2);
+    let (healthy, stderr, ok) = run(&dir, "status");
+    assert!(ok && stderr.is_empty(), "{stderr}");
+    assert!(!healthy.contains("not evaluated"), "{healthy}");
+
+    let path = dir.join("indexes/example.com/chain/gateway/index.db");
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute_batch("DROP TABLE symbols")
+        .unwrap();
+    let before = fs::read(&path).unwrap();
+
+    let (status, stderr, ok) = run(&dir, "status");
+
+    assert!(ok && stderr.is_empty(), "{stderr}");
+    assert!(
+        status.ends_with(
+            " indexed, 3 files\n\
+             decisions and other workspace lines not evaluated: example.com/chain/gateway: no such table: symbols\n"
+        ),
+        "{status}"
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+    write_manifest(&dir, "index_dir = \"../indexes\"\n");
+    assert_eq!(run(&dir, "status").0, "workspace: 0 repositories\n");
 }
 
 /// `status --workspace` as a readiness probe: 0 when every repository is servable, 1 when one

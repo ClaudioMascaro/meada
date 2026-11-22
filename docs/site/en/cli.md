@@ -6,7 +6,10 @@ At the root of the repository:
 - `meada status` shows how many repositories the workspace holds, each one, the state of its
   index and any peer that was not found; under each repository, the unlinked resources and each `via` that matches no
   symbol, and each source file a pack dropped for passing a limit (`too broad` for a qualified-name budget, or a project
-  that gives its files too many usings);
+  that gives its files too many usings). It creates no index: it evaluates the decisions and the lines under each
+  repository only when every repository of the workspace is indexed at this version, and then refreshes the indexes
+  as a query does. Otherwise, or when an index fails to open or refresh, one line says it did not evaluate them and
+  why (`run meada index`, or the repository and the error), and the exit code does not change;
 - `meada export` prints the whole index as sorted JSON, good for diffing two runs;
 - `meada decide` resolves ambiguous links and dynamic URLs, see Decisions;
 - `meada mcp` serves the [MCP tools](mcp.md).
