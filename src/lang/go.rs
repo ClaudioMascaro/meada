@@ -362,6 +362,7 @@ impl Walk<'_> {
         // The fallbacks of names bound to a read: the binding, the name, the scope, the default
         // and its guard.
         let mut defaults = Vec::new();
+        let mut query_writes = HashMap::new();
         for (scope, name, keeps) in std::mem::take(&mut self.assigned) {
             let found = binder(&scope, &name).map(|at| qualify(&at, &name));
             // The address of a topic: a write only when the scope writes through a pointer.
@@ -373,7 +374,17 @@ impl Walk<'_> {
                 (Some(found), Keep::Default(value, guard)) if env.contains(&found) => {
                     defaults.push((found, name, scope, value, guard));
                 }
-                (Some(found), _) => _ = assigned.insert(found),
+                (Some(found), keep) => {
+                    let change = match keep {
+                        Keep::Query(change) => change,
+                        _ => super::QueryWrite::Other,
+                    };
+                    query_writes
+                        .entry(found.clone())
+                        .and_modify(|old: &mut super::QueryWrite| *old = old.merge(change))
+                        .or_insert(change);
+                    assigned.insert(found);
+                }
                 (None, _) if name != "_" => _ = elsewhere.insert(name),
                 (None, _) => {}
             }
@@ -431,10 +442,11 @@ impl Walk<'_> {
             });
         }
         let mut constants = HashSet::new();
-        for (scope, name, value) in std::mem::take(&mut self.held) {
+        for (scope, name, mut value) in std::mem::take(&mut self.held) {
             let local = qualify(&scope, &name);
             if self.bound.get(&(scope.clone(), name.clone())).map(Vec::len) == Some(1)
-                && !assigned.contains(&local)
+                && (!assigned.contains(&local)
+                    || query_writes.get(&local).is_some_and(|q| q.keep(&mut value)))
             {
                 constants.insert(local.clone());
                 self.facts.consts.push(Const {
@@ -475,6 +487,18 @@ impl Walk<'_> {
         let mut returns = std::mem::take(&mut self.returns);
         for def in &mut self.facts.defs {
             def.return_values = returns.remove(&def.name).unwrap_or_default();
+            def.reassigned_params = def
+                .params
+                .iter()
+                .filter(|p| {
+                    assigned.contains(&qualify(&def.name, &p.name))
+                        || self
+                            .bound
+                            .get(&(def.name.clone(), p.name.clone()))
+                            .is_some_and(|b| b.len() > 1)
+                })
+                .map(|p| p.name.clone())
+                .collect();
         }
     }
 

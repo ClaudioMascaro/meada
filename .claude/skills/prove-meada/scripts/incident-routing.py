@@ -8,6 +8,7 @@ import socket
 import subprocess
 import time
 from alerts import command, write
+from proof_result import Comparisons, run_driver
 from prove import git, free_port, Http, answer, mcp_answers
 
 
@@ -167,6 +168,7 @@ resource "pagerduty_event_orchestration_service" "checkout" {
     (roots['monitors'] / '.meadaignore').unlink()
     restored = json.loads(command(binary, roots['routing'], run, 'restored-monitor', 'export'))
     assert link_rows(restored) == expected, restored
+    comparisons = Comparisons(run)
     if args.base_bin:
         existing = run / 'existing'
         existing.mkdir()
@@ -178,7 +180,7 @@ resource "pagerduty_event_orchestration_service" "checkout" {
         git('commit', '-qm', 'existing alert parity', cwd=existing)
         before = command(str(Path(args.base_bin).resolve()), existing, run, 'existing-base', 'export')
         after = command(binary, existing, run, 'existing-head', 'export')
-        assert before == after, 'Existing alert export bytes changed'
+        comparisons.compare('existing alert export bytes', before, after)
     if args.http:
         manifest = 'index_dir = "indexes"\n' + ''.join(f'[[repository]]\nrepo = "{identities[name]}"\npath = "{root}"\n' for name, root in roots.items())
         write(run, 'workspace.toml', manifest)
@@ -203,9 +205,11 @@ resource "pagerduty_event_orchestration_service" "checkout" {
                 server.terminate()
                 server.wait(timeout=30)
                 write(run, 'http.cleanup.json', json.dumps({'pid': server.pid, 'exit': server.returncode}))
-    write(run, 'checks.txt', 'CLI provider/consumer/link sets, explicit receiver transformations, native levels, tag trace starts, source/receiver filtering and restoration passed.\n' + ('Base alert export parity passed.\n' if args.base_bin else 'Base parity not requested.\n') + ('HTTP parity and server cleanup passed.\n' if args.http else 'HTTP not requested.\n'))
+    write(run, 'checks.txt', 'CLI provider/consumer/link sets, explicit receiver transformations, native levels, tag trace starts, source/receiver filtering and restoration passed.\n' + ('Base alert comparison: comparisons.jsonl.\n' if args.base_bin else 'Base parity not requested.\n') + ('HTTP parity and server cleanup passed.\n' if args.http else 'HTTP not requested.\n'))
     print(run / 'checks.txt')
+
+    return comparisons.exit_code()
 
 
 if __name__ == '__main__':
-    main()
+    run_driver(main)

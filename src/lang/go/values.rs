@@ -434,7 +434,10 @@ fn env_value(
     let (package, member) = name.split_once('.')?;
     let args: Vec<Node> = arguments(node).collect();
     if std.os.as_deref() == Some(package) && member == "Getenv" {
-        let read = env_name(&args, again).map(|env| Value::Str(vec![env]));
+        let read = match &args[..] {
+            [key] => Part::env_key(&again(*key)).map(|env| Value::Str(vec![env])),
+            _ => None,
+        };
         return Some(read.unwrap_or(Value::Unknown));
     }
     if std.strings.as_deref() != Some(package) {
@@ -501,6 +504,7 @@ pub(super) enum Keep {
     /// The address of a name is taken as the `Topic` of a `TopicPartition` literal: the name
     /// stays a constant unless the scope writes through a dereference.
     Pointer,
+    Query(super::super::QueryWrite),
 }
 
 /// What a fallback tests beyond an empty read (`v == ""`): `ok`, a name that must be the second
@@ -524,14 +528,23 @@ pub(super) fn keeps_env(node: Node, src: &[u8], std: &Std, scope: &str, depth: u
     let (Some(target), Some(right)) = (only(left), only(right)) else {
         return Keep::No;
     };
-    if text(operator, src) != "=" || target.kind() != "identifier" {
+    if target.kind() != "identifier" {
         return Keep::No;
     }
     let name = text(target, src);
+    let operator = text(operator, src);
+    let right_value = value(right, src, std, scope, depth);
+    let query = super::super::QueryWrite::of(&right_value, name, operator);
+    if query != super::super::QueryWrite::Other {
+        return Keep::Query(query);
+    }
+    if operator != "=" {
+        return Keep::No;
+    }
     if trims_itself(right, src, std, name) {
         Keep::Trim
     } else if let Some(guard) = empties_to(node, src, name) {
-        Keep::Default(value(right, src, std, scope, depth), guard)
+        Keep::Default(right_value, guard)
     } else {
         Keep::No
     }
@@ -563,6 +576,9 @@ pub(super) fn plain(value: &Value, scope: &str, consts: &HashMap<&str, &Value>) 
                 | Part::EnvOr(..)
                 | Part::Read { .. }
                 | Part::Limit(_)
+                | Part::EnvKey { .. }
+                | Part::Invoke { .. }
+                | Part::QuerySuffix
                 | Part::Hole => false,
             }),
             Value::Ref(n) => name(n),
@@ -1021,6 +1037,9 @@ mod tests {
                     | Part::EnvOr(..)
                     | Part::Read { .. }
                     | Part::Limit(_)
+                    | Part::EnvKey { .. }
+                    | Part::Invoke { .. }
+                    | Part::QuerySuffix
                     | Part::Hole => "{}".into(),
                 })
                 .collect(),

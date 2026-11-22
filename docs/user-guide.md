@@ -889,6 +889,19 @@ Ver os itens abertos:
   candidatos;
 - na CLI, `meada decide --list` lista os itens com os candidatos numerados.
 
+A visão geral de `meada decide --list` mostra o `kind = "..."` aceito pelo TOML e até cinco
+candidatos. Para uma URL dinâmica, aparecem primeiro as rotas com a menor parte do caminho sem
+cobertura pelos fragmentos literais. Quando a chamada não tem fragmento literal, aparece só a
+contagem. `meada decide --list --item <id>` mostra a lista completa com a mesma numeração do modo
+interativo. Um item sem candidatos informa a causa, por exemplo um método sem rota ou um caminho que
+precisa de `[serve] prefix` no provedor.
+
+O array opcional `open_items` do export contém `call`, `kind`, a lista completa e ordenada de
+`candidates` para usar em `target` e `limit` quando houver um limite de extração.
+
+O `--prune` preserva `wrong-kind`, `unknown-repository` e `no-candidates`, além das decisões que
+esperam um par ausente.
+
 ### Decidir como pessoa
 
 `meada decide`, na raiz do repositório, mostra cada item aberto com os candidatos numerados.
@@ -898,6 +911,7 @@ Escolha um número, ou `s` para pular. Ao fim, o comando grava as escolhas em
 ```text
 example.com/acme/web::src/status.ts::health::fetch#0
 src/status.ts:3  fetch("/api/health")
+  kind = "ambiguous-link"
   1) example.com/acme/api GET /api/health
   2) example.com/acme/worker GET /api/health
 ```
@@ -908,10 +922,11 @@ própria (seção 8.1):
 ```text
 example.com/acme/go::client.go::Client.ViaMethodPrefix::http.Get#0
 client.go:16  http.Get(c.baseV2() + "/orders")
+  kind = "dynamic-url"
   limite: base vinda do retorno de c.baseV2
-  1) example.com/acme/api GET /api/orders
-  2) example.com/acme/api GET /orders
-  3) example.com/acme/api GET /v2/orders
+  1) example.com/acme/api GET /orders
+  2) example.com/acme/api GET /v2/orders
+  3) example.com/acme/api GET /api/orders
 ```
 
 ### O arquivo `meada.decisions.toml`
@@ -947,7 +962,7 @@ decidida ganha o nível `decided`, e o motivo mostra quem decidiu.
 
 Quando o código muda e uma decisão deixa de caber (a chamada sumiu, o item não está mais aberto,
 o provedor sumiu ou não é mais candidato), o `meada status` a mostra como **obsoleta** sob o
-repositório, e `meada decide --prune` a remove. Uma decisão que espera um par ainda não
+repositório. Uma decisão que espera um par ainda não
 encontrado aparece à parte (`decision waiting on missing peer ...`) e é mantida.
 O alvo precisa ser um dos candidatos do item, os que o `meada decide` lista, também para uma URL
 dinâmica: um alvo que o repositório serve mas que a chamada não alcança (outro método, ou um
@@ -1110,7 +1125,7 @@ meada decide [--item <id>] [--dry-run] [--list] [--prune]
 | `--item <id>` | Trata só esse item (o id que `--list` ou o `search` imprime), mesmo que já decidido, para refazê-lo |
 | `--dry-run` | Imprime o arquivo que seria gravado e não escreve |
 | `--list` | Imprime os itens abertos, as decisões obsoletas e as que esperam um par ausente; não pergunta nem grava |
-| `--prune` | Remove as decisões obsoletas; mantém as que esperam um par ausente. Não combina com `--item`, `--dry-run` nem `--list` |
+| `--prune` | Remove as decisões obsoletas com causas compatíveis com a poda. Preserva `wrong-kind`, `unknown-repository`, `no-candidates` e as que esperam um par ausente. Não combina com `--item`, `--dry-run` nem `--list` |
 | `--decider` | Pergunta ao modelo configurado pelas variáveis `MEADA_DECIDER_*`, em vez de a uma pessoa |
 | `--show-request` | Só com `--decider`: imprime cada requisição que seria enviada e não envia nenhuma |
 | `--min-p <p>` | Só com `--decider`: a probabilidade mínima, de 0 a 1, para gravar (padrão 0,5) |
@@ -1179,7 +1194,8 @@ As listas vazias são omitidas, menos `files`, `symbols`, `calls`, `providers`, 
 | `imports` | Os imports resolvidos para um pacote do workspace: `site`, `specifier`, `name`, `level`, `how` e `target` |
 | `communities` | As comunidades: `name` e `members` (ordenados) |
 | `processes` | Um processo por ponto de entrada: `entry_point`, `kind` (`route`, `export`, `channel` ou `program`), `label` e `steps` |
-| `stale_decisions` | As decisões que não se aplicam mais: `call`, `target` e `cause` (`call-gone`, `item-not-open`, `target-gone` ou `not-candidate`) |
+| `open_items` | Os itens abertos do repositório: `call`, `kind` (`ambiguous-link` ou `dynamic-url`), `candidates` (targets completos, únicos e ordenados), e `limit` quando presente. |
+| `stale_decisions` | As decisões que não se aplicam: `call`, `target`, `cause` e `expected_kind` para `wrong-kind`. `call-gone`, `item-not-open`, `wrong-kind`, `unknown-repository`, `target-gone`, `no-candidates`, `not-candidate`. |
 
 ### Valores que se repetem
 
@@ -1252,6 +1268,8 @@ Como saber se um elo que falta é bug:
   (seção 8.4).
 
 ### 8.1 Rotas HTTP
+
+Os clientes HTTP podem aproveitar a base retornada por uma função ou método chamado com resolução exata. Um wrapper pode passar a chave literal de uma variável de ambiente ou o identificador do plugin Backstage. A rota também é preservada quando as alternativas no fim da URL variam apenas na query string. Reatribuições de parâmetros e alternativas de despacho podem deixar a origem em aberto.
 
 Uma rota liga quem a **serve** (o provedor, o código que a trata) a quem a **chama** (o
 consumidor, uma chamada de cliente HTTP). Em todas as linguagens, o Meada normaliza o caminho:

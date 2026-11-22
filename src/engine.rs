@@ -240,6 +240,19 @@ impl Engine {
         let processes = (exports[0].entry_points.iter())
             .map(|e| graph.export_process(e))
             .collect();
+        let items = items::list(
+            &self.workspace.repos,
+            &exports,
+            &all,
+            &self.workspace.missing,
+        );
+        let open_items = self
+            .items_from(&exports, items, &all)
+            .into_iter()
+            .filter_map(|(item, decided)| {
+                (!decided && item.repository == self.identity).then(|| item.written())
+            })
+            .collect();
         let links = all.into_iter();
         let links = links.filter(|l| contract::link_in_repository(l, &self.identity));
         // A use read from a pipeline or an action sits on the CI node that holds its key.
@@ -266,6 +279,7 @@ impl Engine {
         export.links = links.collect();
         export.stale_decisions = evaluations.swap_remove(0).stale;
         let mut written = export.written();
+        written.open_items = open_items;
         if let Some((commit, dirty)) = commit {
             (written.commit, written.dirty) = (Some(commit), Some(dirty));
         }
@@ -575,11 +589,25 @@ impl Engine {
         sites.extend(iac::provision::item_sites(&partial.exports));
         partial.sites(sites)?;
         let exports = partial.exports;
-        let items = items::list(&self.workspace.repos, &exports, &core);
+        let items = items::list(
+            &self.workspace.repos,
+            &exports,
+            &core,
+            &self.workspace.missing,
+        );
         let (links, _) = decisions::replay(core, &self.workspace, &exports, |d| {
             !iac::provision::handles(d) && !KINDS.iter().any(|k| k.owns_decision(d))
         });
-        let decided: HashSet<String> = (links.iter())
+        Ok(self.items_from(&exports, items, &links))
+    }
+
+    fn items_from(
+        &self,
+        exports: &[Export],
+        items: Vec<OpenItem>,
+        replayed: &[Link],
+    ) -> Vec<(OpenItem, bool)> {
+        let decided: HashSet<String> = (replayed.iter())
             .filter(|l| l.level == Level::Decided)
             .map(|l| l.item_site().into_owned())
             .collect();
@@ -589,12 +617,12 @@ impl Engine {
                 (item, applied)
             })
             .collect();
-        items.extend(iac::provision::items(&self.workspace, &exports));
+        items.extend(iac::provision::items(&self.workspace, exports));
         for kind in KINDS {
-            items.extend(kind.decision_items(&exports));
+            items.extend(kind.decision_items(exports));
         }
         items.sort_by(|a, b| a.0.id.cmp(&b.0.id));
-        Ok(items)
+        items
     }
 
     /// The chain from `start`, followed `direction` through calls inside repositories and
@@ -1094,7 +1122,7 @@ impl Engine {
                 continue;
             };
             // An item no decision closes says why, where another names the command.
-            let close = match item.cause {
+            let close = match &item.cause {
                 Some(cause) => format!("{cause} (`{}`)", item.id),
                 None => format!("run `meada decide --item {}`", item.id),
             };
@@ -1307,6 +1335,24 @@ impl Engine {
             if view.follows_drift() {
                 let entries = drift_view::entries(repos, &exports, &links);
                 lines.extend(drift_view::consumers(&entries, contract));
+                let listed: HashSet<_> = entries
+                    .iter()
+                    .filter(|e| e.link.contract == contract)
+                    .map(|e| e.link.item_site())
+                    .collect();
+                let omitted: HashSet<_> = links
+                    .iter()
+                    .filter(|link| link.contract == contract)
+                    .map(|link| link.item_site())
+                    .filter(|site| !listed.contains(site))
+                    .collect();
+                let count = omitted.len();
+                if count != 0 {
+                    let noun = if count == 1 { "consumer" } else { "consumers" };
+                    lines.push(format!(
+                        r#"  {count} linked {noun} omitted. See trace with direction "up"."#
+                    ));
+                }
             }
             return Ok(render::budgeted(&lines, budget));
         }

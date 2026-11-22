@@ -251,5 +251,22 @@
       "level": "exact",
       "reason": "own repository"
     }
+  ],
+  "open_items": [
+    {
+      "call": "github.com/acme/app-a::.github/workflows/forms.yml::jobs.elsewhere.steps[1]",
+      "kind": "dynamic-url",
+      "candidates": []
+    },
+    {
+      "call": "github.com/acme/app-a::.github/workflows/forms.yml::jobs[\"at-a-path\"].steps[2]",
+      "kind": "dynamic-url",
+      "candidates": []
+    },
+    {
+      "call": "github.com/acme/app-a::.github/workflows/forms.yml::jobs[\"no-checkout\"].steps[0]",
+      "kind": "dynamic-url",
+      "candidates": []
+    }
   ]
 }

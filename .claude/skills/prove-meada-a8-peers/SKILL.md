@@ -24,3 +24,8 @@ Read `.claude/skills/prove-meada/SKILL.md` first: it owns Scope, Sort, the answe
 **Done looks like**: `peers.md` with every control and landed case `PASS`, every `pending` case `PENDING (as 1.2.0, not counted)` and named so on the receipt, and every workspace "equal to base".
 
 **Could fool you**: a `pending` case passes on 1.2.0's value, so it proves only that nothing moved it; the script reads the export, not the MCP answers. The full list: the reference's "Could fool you".
+
+The public smoke flows take the source keys and pinned revisions from
+[the smoke answer key](../prove-meada/scripts/smoke-stack/README.md). They keep
+each workspace and each binary upgrade independent. Run and judge the exact
+HTTP/SQS cases, lifecycle, warm/cold upgrade and authored controls separately.

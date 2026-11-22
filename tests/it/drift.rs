@@ -246,3 +246,83 @@ fn a_document_wins_over_a_zod_schema() {
     let coded = Engine::open(&gateway).unwrap().export().unwrap();
     assert!(coded.contains(&format!("{route}          \"zod\": \"src/orders.ts\"")));
 }
+
+#[test]
+fn route_context_counts_linked_consumers_it_leaves_to_trace() {
+    use std::fs;
+    let repo = common::fixture_repo(
+        "drift_other_consumers",
+        "open-few",
+        Some("https://example.com/open/few.git"),
+    );
+    fs::write(
+        repo.join("meada.toml"),
+        "[serve]\nhosts = [\"service.example.com\"]\n",
+    )
+    .unwrap();
+    for path in ["orders", "invoices", "response", "unused"] {
+        let dir = repo.join("app").join(path);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("route.ts"),
+            "export function GET() { return Response.json({ total: 1 }); }",
+        )
+        .unwrap();
+    }
+    fs::write(
+        repo.join("src/consumers.ts"),
+        r#"
+export function noBody() { return fetch("https://service.example.com/orders"); }
+export function fire() { void fetch("https://service.example.com/orders"); }
+export function invoices(input: { url: string }) { return fetch(input.url); }
+export async function read() {
+    const res = await fetch("https://service.example.com/response");
+    const body = await res.json();
+    return body.total;
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        repo.join("meada.decisions.toml"),
+        r#"
+[[decision]]
+kind = "dynamic-url"
+call = "example.com/open/few::src/consumers.ts::invoices::fetch#0"
+target = "example.com/open/few::http::GET::/invoices"
+by = "human"
+"#,
+    )
+    .unwrap();
+    let engine = Engine::open(&repo).unwrap();
+    for (route, count, calls) in [
+        ("orders", 2, &["noBody", "fire"][..]),
+        ("invoices", 1, &["invoices"][..]),
+    ] {
+        let contract = format!("http::GET::/{route}");
+        let answer = engine.context(&contract, None).unwrap();
+        let noun = if count == 1 { "consumer" } else { "consumers" };
+        assert!(
+            answer.ends_with(&format!(
+                "  {count} linked {noun} omitted. See trace with direction \"up\".\n"
+            )),
+            "{answer}"
+        );
+        let trace = engine
+            .trace(Start::From(&contract), Direction::Up, None)
+            .unwrap();
+        for call in calls {
+            assert!(trace.contains(&format!(" {call}\n")), "{trace}");
+        }
+    }
+    let reads = engine.context("http::GET::/response", None).unwrap();
+    assert!(
+        reads.contains(" consumer src/consumers.ts:") && !reads.contains("omitted"),
+        "{reads}"
+    );
+    let unused = engine.context("http::GET::/unused", None).unwrap();
+    assert!(
+        !unused.contains("consumer") && !unused.contains("omitted"),
+        "{unused}"
+    );
+}

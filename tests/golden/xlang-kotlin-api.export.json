@@ -923,5 +923,13 @@
       "level": "inferred",
       "reason": "base URL from API_URL, a base_url_env of peer example.com/xlang-kotlin/api"
     }
+  ],
+  "open_items": [
+    {
+      "call": "example.com/xlang-kotlin/api::src/main/kotlin/com/example/api/MirrorClient.kt::com.example.api.MirrorClient.mirror()::client.get#0",
+      "kind": "dynamic-url",
+      "candidates": [],
+      "limit": "base Meada could not read"
+    }
   ]
 }

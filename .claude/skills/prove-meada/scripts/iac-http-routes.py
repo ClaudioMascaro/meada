@@ -5,11 +5,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import time
 
 from prove import Http, answer, free_port, git, mcp_answers
+from proof_result import Comparisons, run_driver
 from provisions import export, write
 
 
@@ -80,16 +82,17 @@ def provider(contract, site):
     return {'contract': contract, 'site': PREFIX + site}
 
 
-def code_source_display_control(head, base, control, run):
+def code_source_display_control(binaries, controls, run, comparisons):
     """The old binary supplies missing-code display policy, independently of IaC providers."""
-    path = control / 'app/ready/route.ts'
-    source = path.read_bytes()
     queries = [
         {'tool': 'trace', 'arguments': {'from': 'checkReady', 'direction': 'down', 'budget': 10000}},
         {'tool': 'context', 'arguments': {'symbol': 'http::GET::/ready', 'budget': 10000}},
     ]
     records = {}
-    for label, binary in [('head', head), ('base', base)]:
+    for label, binary in binaries.items():
+        control = controls[label]
+        path = control / 'app/ready/route.ts'
+        source = path.read_bytes()
         manifest = f'control-{label}.toml'
         write(run, manifest, f'index_dir = "control-{label}-indexes"\n[[repository]]\nrepo = "{PREFIX}control"\npath = "{control}"\n')
         subprocess.run([binary, 'index', '--workspace', manifest], cwd=run, check=True,
@@ -108,18 +111,22 @@ def code_source_display_control(head, base, control, run):
                     time.sleep(.1)
             client = Http(f'http://127.0.0.1:{port}/{PREFIX}control')
             ask = lambda: [answer(client.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})) for q in queries]
+            tools = client.call('tools/list', {})['result']['tools']
             before = ask()
             path.unlink()
             after = ask()
-            assert after == [text.replace('app/ready/route.ts:1', 'app/ready/route.ts') for text in before]
             data = json.loads(subprocess.check_output([binary, 'export', '--workspace', manifest, '--repo', PREFIX + 'control'], cwd=run, text=True))
-            records[label] = {'before': before, 'after': after, 'providers': data['providers'], 'links': data['links']}
+            records[label] = {'queries': queries, 'tools': tools, 'before': before, 'after': after,
+                              'providers': data['providers'], 'links': data['links']}
             dump(run, f'{label}-code-source-deleted.json', records[label])
+            comparisons.compare(f'{label} control: remove only the line hint after source deletion',
+                                [text.replace('app/ready/route.ts:1', 'app/ready/route.ts') for text in before],
+                                after, oracle=True)
         finally:
             server.terminate()
             server.wait(timeout=30)
             path.write_bytes(source)
-    assert records['head'] == records['base']
+    comparisons.compare('existing code HTTP display with and without source', records['base'], records['head'])
 
 
 def main():
@@ -131,6 +138,7 @@ def main():
     binary = str(Path(args.head_bin).resolve())
     run = Path(args.run).resolve()
     run.mkdir(parents=True, exist_ok=False)
+    comparisons = Comparisons(run)
     os.environ['LANG'] = 'C.UTF-8'
     dump(run, 'binary.json', {'path': binary, 'sha256': hashlib.sha256(Path(binary).read_bytes()).hexdigest(),
                               'version': subprocess.check_output([binary, '--version'], text=True).strip()})
@@ -199,8 +207,8 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
     results = {name: export(binary, root) for name, root in repos.items()}
     for name, data in results.items():
         dump(run, f'{name}.json', data)
-        assert data['providers'] == expected_providers[name], (name, data['providers'])
-    assert links(results['consumer']) == expected_links, results['consumer']['links']
+        comparisons.compare(f'{name} providers', expected_providers[name], data['providers'], oracle=True)
+    comparisons.compare('consumer links', sorted(expected_links), sorted(links(results['consumer'])), oracle=True)
 
     # An unread conditional with two possible Lambda targets cannot select either one.
     ambiguous = TF.replace('integration_uri = aws_lambda_function.arc.invoke_arn',
@@ -208,9 +216,12 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
     ambiguous += '\nresource "aws_lambda_function" "other" { function_name = "other" }\n'
     write(repos['terraform'], 'main.tf', ambiguous)
     changed = export(binary, repos['consumer'])
-    assert links(changed) == {row for row in expected_links if row[0] != 'readArc'}, changed['links']
-    assert export(binary, repos['terraform'])['providers'] == []
     dump(run, 'ambiguous-target.json', changed)
+    ambiguous_provider = export(binary, repos['terraform'])
+    dump(run, 'ambiguous-provider.json', ambiguous_provider)
+    comparisons.compare('ambiguous target consumer links', sorted(row for row in expected_links if row[0] != 'readArc'),
+                        sorted(links(changed)), oracle=True)
+    comparisons.compare('ambiguous target providers', [], ambiguous_provider['providers'], oracle=True)
     write(repos['terraform'], 'main.tf', TF)
 
     # Safe route facts survive an opaque code input, with repository fallback on both sides.
@@ -219,17 +230,20 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
     fallback = export(binary, repos['consumer'])
     wanted = {(caller, contract, PREFIX + 'sam' if caller in {'readGarden', 'createGarden'} else site, level)
               for caller, contract, site, level in expected_links}
-    assert links(fallback) == wanted, fallback['links']
     incoming = export(binary, repos['sam'])
-    assert len(incoming['links']) == 2 and all(row['provider'] == PREFIX + 'sam' for row in incoming['links'])
     dump(run, 'repository-fallback.json', fallback)
+    dump(run, 'repository-fallback-provider.json', incoming)
+    comparisons.compare('repository fallback outgoing links', sorted(wanted), sorted(links(fallback)), oracle=True)
+    comparisons.compare('repository fallback incoming links', [PREFIX + 'sam'] * 2,
+                        [row['provider'] for row in incoming['links']], oracle=True)
     write(repos['sam'], 'template.yaml', SAM)
-    assert links(export(binary, repos['consumer'])) == expected_links
+    comparisons.compare('restored consumer links', sorted(expected_links),
+                        sorted(links(export(binary, repos['consumer']))), oracle=True)
 
     if args.base_bin:
         # A standalone code HTTP flow must retain every existing export field and query byte.
-        control = run / 'control'
-        control.mkdir()
+        control = run / 'work' / 'existing-head' / 'control'
+        control.mkdir(parents=True)
         git('init', '-q', cwd=control)
         git('remote', 'add', 'origin', f'https://{PREFIX}control.git', cwd=control)
         write(control, 'meada.toml', '[serve]\nhosts = ["control.example.test"]\n')
@@ -237,15 +251,21 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
         write(control, 'client.ts', "export function checkReady() { return fetch('https://control.example.test/ready'); }\n")
         git('add', '.', cwd=control)
         git('commit', '-qm', 'existing code HTTP control', cwd=control)
-        head, base = export(binary, control), export(str(Path(args.base_bin).resolve()), control)
-        dump(run, 'control-head.json', head)
-        dump(run, 'control-base.json', base)
-        assert head == base
+        controls = {'base': run / 'work' / 'existing-base' / 'control', 'head': control}
+        shutil.copytree(control, controls['base'])
+        binaries = {'base': str(Path(args.base_bin).resolve()), 'head': binary}
+        exports = {label: export(exe, controls[label]) for label, exe in binaries.items()}
+        for label, data in exports.items():
+            dump(run, f'control-{label}.json', data)
+        comparisons.compare('whole existing code HTTP export', exports['base'], exports['head'])
         query = [{'tool': 'context', 'arguments': {'symbol': 'checkReady', 'budget': 10000}}]
-        _, head_text, _ = mcp_answers(binary, control, query, run / 'control-head.err')
-        _, base_text, _ = mcp_answers(str(Path(args.base_bin).resolve()), control, query, run / 'control-base.err')
-        assert head_text == base_text
-        code_source_display_control(binary, str(Path(args.base_bin).resolve()), control, run)
+        observations = {}
+        for name, exe in binaries.items():
+            tools, texts, _ = mcp_answers(exe, controls[name], query, run / f'control-{name}.err')
+            observations[name] = {'queries': query, 'tools': tools, 'answers': texts}
+            dump(run, f'control-{name}-stdio.json', observations[name])
+        comparisons.compare('existing code HTTP context and catalog', observations['base'], observations['head'])
+        code_source_display_control(binaries, controls, run, comparisons)
 
     queries = [
         {'tool': 'context', 'arguments': {'symbol': 'readGarden', 'budget': 10000}},
@@ -254,8 +274,10 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
         {'tool': 'context', 'arguments': {'symbol': 'http::GET::/gardens/{}', 'budget': 10000}},
     ]
     tools, texts, _ = mcp_answers(binary, repos['consumer'], queries, run / 'stdio.err')
+    dump(run, 'queries.json', queries)
+    dump(run, 'stdio-tools.json', tools)
     dump(run, 'stdio-answers.json', texts)
-    assert 'serveGarden' in texts[1], texts
+    comparisons.compare('stdio trace reaches serveGarden', True, 'serveGarden' in texts[1], oracle=True)
     manifest = 'index_dir = "indexes"\n' + ''.join(
         f'\n[[repository]]\nrepo = "{PREFIX}{name}"\npath = "{root}"\n' for name, root in repos.items())
     write(run, 'workspace.toml', manifest)
@@ -272,15 +294,17 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
             except OSError:
                 time.sleep(.1)
         client = Http(f'http://127.0.0.1:{port}/{PREFIX}consumer')
-        assert client.call('tools/list', {})['result']['tools'] == tools
+        http_tools = client.call('tools/list', {})['result']['tools']
+        dump(run, 'http-tools.json', http_tools)
+        comparisons.compare('same-binary HTTP/stdin catalog parity', tools, http_tools, oracle=True)
         replies = [answer(client.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})) for q in queries]
         dump(run, 'http-answers.json', replies)
-        assert replies == texts
+        comparisons.compare('same-binary HTTP/stdin answers', texts, replies, oracle=True)
         for name, path in [('sam', 'template.yaml'), ('serverless', 'serverless.yml'), ('terraform', 'main.tf')]:
             (repos[name] / path).unlink()
         deleted = [answer(client.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})) for q in queries]
         dump(run, 'source-deleted-http.json', deleted)
-        assert deleted == texts
+        comparisons.compare('IaC source deleted HTTP answers', texts, deleted, oracle=True)
         for name, path in [('sam', 'runtime/handler.ts'), ('sam', 'decoy.ts'),
                            ('serverless', 'worker.ts'), ('terraform', 'runtime/index.ts')]:
             (repos[name] / path).unlink()
@@ -289,21 +313,22 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
         expected_display = [text.replace('runtime/handler.ts:1', 'runtime/handler.ts')
                             .replace('worker.ts:1', 'worker.ts')
                             .replace('runtime/index.ts:1', 'runtime/index.ts') for text in texts]
-        assert handlers_deleted == expected_display
+        comparisons.compare('handler source deleted HTTP answers', expected_display, handlers_deleted, oracle=True)
         for name in names:
             readonly = json.loads(subprocess.check_output([binary, 'export', '--workspace', 'workspace.toml', '--repo', PREFIX + name], cwd=run, text=True))
             dump(run, f'source-deleted-{name}.json', readonly)
-            assert readonly['providers'] == expected_providers[name]
-            assert readonly['links'] == results[name]['links']
+            comparisons.compare(f'{name} stored providers', expected_providers[name], readonly['providers'], oracle=True)
+            comparisons.compare(f'{name} stored links', results[name]['links'], readonly['links'], oracle=True)
     finally:
         server.terminate()
         server.wait(timeout=30)
-    dump(run, 'checks.json', {'script_result': 'CHECKS_PASSED', 'verdict': 'UNPROVEN',
+    dump(run, 'checks.json', {'script_exit': comparisons.exit_code(), 'verdict': 'UNPROVEN',
                              'answer_key': '#666/#642; ADR 0005/0025/0026',
                              'providers': 5, 'links': 5, 'base_parity': bool(args.base_bin),
                              'surfaces': ['CLI export', 'MCP stdio', 'MCP HTTP', 'IaC-source-deleted byte parity', 'handler-source-deleted graph and baseline display parity']})
-    print('checks passed; evidence:', run)
+    print('capture complete; evidence:', run)
+    return comparisons.exit_code()
 
 
 if __name__ == '__main__':
-    main()
+    run_driver(main)

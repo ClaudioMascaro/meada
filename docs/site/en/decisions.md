@@ -18,14 +18,25 @@ a model does if you ask.
   `--decider`) prints every request that would be sent and sends none; `--min-p <p>` (only with
   `--decider`, from 0 to 1) is the least probability for the model to write a decision.
 
+The `meada decide --list` overview shows the `kind = "..."` that the TOML takes and up to five
+candidates. For a dynamic URL, paths with the fewest characters left uncovered by its literal
+fragments come first. When the call has no literal fragment, the overview shows only the count.
+`meada decide --list --item <id>` prints the full list with the same numbering as the prompt. An
+item with no candidates gives the reason, for example a method with no route or a path that needs a
+provider's `[serve] prefix`.
+
+The optional `open_items` array in the export holds `call`, `kind`, the full sorted list of
+`candidates` to use as `target`, and `limit` when extraction hit a limit.
+
 `meada.decisions.toml` is a file versioned in git, like a lockfile: its diff is what you
 review. Each `[[decision]]` holds the call (`call`), the chosen provider (`target`), who decided
 (`by`: `human` or the model id) and, for a model, the probability (`p`). Indexing only reads
 the file back: the decided link gets the level `decided` and its reason says who decided. When
 the code changes and a decision no longer fits (the call is gone, the item is no longer open,
 the provider is gone or is no longer a candidate), `meada status` reports it as stale, under
-its repository, and `meada decide --prune` removes it. A decision waiting for a peer that has
-not been found yet is shown apart and kept. `meada status` evaluates the decisions only when
+its repository, and `meada decide --prune` removes decisions with `call-gone`, `item-not-open`, `target-gone` or `not-candidate`. The command keeps decisions waiting for a missing peer or with the cause `wrong-kind`,
+`unknown-repository` or `no-candidates`. These causes give the kind to use, say that the identity
+needs the form `meada status` prints, or say that the item has no targets to choose. `meada status` evaluates the decisions only when
 every repository of the workspace is indexed at this version and each one's index opens and
 refreshes; otherwise one line in their place says they were not evaluated and why.
 The target must be one of the item's candidates, the ones `meada decide` lists, for a dynamic
@@ -71,6 +82,9 @@ the list of candidates (repository, method and path), plus the id of the reposit
 the call. No provider code, no other file. `--show-request` shows all of it first, with the key
 replaced by `<hidden>`. Each answer is validated per item; an invalid one, or a request that
 failed, is reported without writing that item, and the command exits with an error.
+
+The decider saves each accepted answer before it sends the next request. After an interruption,
+rerun the command with the same files to send the items that are still open.
 
 Fixed constants:
 

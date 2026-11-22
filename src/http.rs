@@ -337,17 +337,26 @@ fn tail_fits(contract: &str, method: Option<&str>, known: &str) -> bool {
 fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead>)> {
     let method = method(args.get(1)).ok()?;
     let parts = match args.first() {
-        Some(Value::Str(parts)) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => return None,
+        Some(Value::Str(parts)) if parts.iter().any(|p| p.parameter().is_some()) => return None,
         Some(Value::Str(parts)) => parts,
         Some(Value::Ref(_)) => return None,
         _ => return Some((None, None, None)),
     };
-    let (via, path, lead) = match parts.split_first() {
+    // Only a terminal optional query is irrelevant. If path text follows it, that text
+    // can be either part of the path or part of the query.
+    let end = parts.iter().rposition(|p| {
+        !matches!(p, Part::QuerySuffix) && !matches!(p, Part::Text(t) if t.is_empty())
+    });
+    let path_parts = end.map_or(&[][..], |end| &parts[..=end]);
+    if path_parts.is_empty() || path_parts.iter().any(|p| matches!(p, Part::QuerySuffix)) {
+        return Some((None, None, None));
+    }
+    let (via, path, lead) = match path_parts.split_first() {
         Some((Part::Env(var) | Part::EnvOr(var, _), rest)) => {
             (Some(format!("env:{var}")), Some(render(rest)), None)
         }
         _ => {
-            let url = render(parts);
+            let url = render(path_parts);
             match url.split_once("://") {
                 Some((_, rest)) => {
                     let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
@@ -364,10 +373,11 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead
                 // `${base}/users`: the rest is appended to a base Meada could not read, which may
                 // hold a path of its own, so only the end of the path is known.
                 None => {
-                    let rest = render(&parts[parts.iter().take_while(|p| unknown(p)).count()..]);
+                    let rest =
+                        render(&path_parts[path_parts.iter().take_while(|p| unknown(p)).count()..]);
                     let lead = rest.is_empty() || rest.starts_with(['/', '?', '#']);
                     let lead = lead.then(|| Lead {
-                        limit: match &parts[0] {
+                        limit: match &path_parts[0] {
                             Part::Limit(limit) => limit.clone(),
                             _ => Limit::Other,
                         },
@@ -388,7 +398,10 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead
 
 /// A part of a URL Meada could not read, which a base may hold (#801).
 fn unknown(part: &Part) -> bool {
-    matches!(part, Part::Hole | Part::Read { .. } | Part::Limit(_))
+    matches!(
+        part,
+        Part::Hole | Part::Read { .. } | Part::Invoke { .. } | Part::Limit(_)
+    )
 }
 
 /// The base of a client Meada did not read (#801): a path appended to it leaves the consumer an
@@ -423,7 +436,7 @@ fn method(init: Option<&Value>) -> Result<Option<String>, Depends> {
         value => value,
     };
     match value {
-        Value::Str(parts) if parts.iter().any(|p| matches!(p, Part::Ref(_))) => Err(Depends),
+        Value::Str(parts) if parts.iter().any(|p| p.parameter().is_some()) => Err(Depends),
         Value::Str(parts) => Ok(literal(parts)),
         Value::Ref(_) => Err(Depends),
         Value::Undefined => Ok(Some("GET".into())),
@@ -524,6 +537,9 @@ fn render(parts: &[Part]) -> String {
             Part::Env(_)
             | Part::EnvOr(..)
             | Part::Read { .. }
+            | Part::Invoke { .. }
+            | Part::EnvKey { .. }
+            | Part::QuerySuffix
             | Part::Ref(_)
             | Part::Limit(_)
             | Part::Hole => PARAM,
@@ -745,32 +761,34 @@ impl ContractKind for Http {
     }
 
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
-        let mut found = Vec::new();
-        // One reader of each shape source for the whole extraction: each budget per file once.
-        let mut literals = Literals::default();
-        // One reader of Backstage's `app-config*.yaml` for the extraction (`ts::Config`).
-        let config = ts::Config::new(indexed);
-        let mut consumers = ts::consumers(code, &config, &mut literals);
-        let (providers, mounted) = ts::providers(code, &mut literals);
-        ts::name(&mut consumers, &mounted);
-        found.extend(consumers);
-        found.extend(providers);
-        found.extend(ts::unfollowed(code, &config));
-        found.extend(python::consumers(code));
-        found.extend(rust::providers(code));
-        found.extend(go::providers(code));
-        found.extend(go::consumers(code));
-        found.extend(python::providers(code));
-        found.extend(java::providers(code));
-        found.extend(csharp::providers(code));
-        found.extend(csharp::minimal_providers(code));
-        found.extend(kotlin::providers(code));
-        found.extend(swift::providers(code));
-        found.extend(kotlin::consumers(code, indexed));
-        found.extend(java::consumers(code, indexed));
-        found.extend(csharp::consumers(code, indexed));
-        found.extend(swift::consumers(code));
-        found
+        code.with_returned_strings(|| {
+            let mut found = Vec::new();
+            // One reader of each shape source for the whole extraction: each budget per file once.
+            let mut literals = Literals::default();
+            // One reader of Backstage's `app-config*.yaml` for the extraction (`ts::Config`).
+            let config = ts::Config::new(indexed);
+            let mut consumers = ts::consumers(code, &config, &mut literals);
+            let (providers, mounted) = ts::providers(code, &mut literals);
+            ts::name(&mut consumers, &mounted);
+            found.extend(consumers);
+            found.extend(providers);
+            found.extend(ts::unfollowed(code, &config));
+            found.extend(python::consumers(code));
+            found.extend(rust::providers(code));
+            found.extend(go::providers(code));
+            found.extend(go::consumers(code));
+            found.extend(python::providers(code));
+            found.extend(java::providers(code));
+            found.extend(csharp::providers(code));
+            found.extend(csharp::minimal_providers(code));
+            found.extend(kotlin::providers(code));
+            found.extend(swift::providers(code));
+            found.extend(kotlin::consumers(code, indexed));
+            found.extend(java::consumers(code, indexed));
+            found.extend(csharp::consumers(code, indexed));
+            found.extend(swift::consumers(code));
+            found
+        })
     }
 
     /// Keeps, of the two readings of a `${X:default}` base, the one that applies
@@ -1064,6 +1082,38 @@ impl ContractKind for Http {
         serves(provider, contract)
     }
 
+    fn no_candidates(
+        &self,
+        consumer: &Consumer,
+        providers: &mut dyn Iterator<Item = &Provider>,
+        missing: &str,
+    ) -> Option<String> {
+        let routes: Vec<_> = providers.filter_map(|p| route(&p.contract)).collect();
+        if routes.is_empty() {
+            return Some(crate::msg::Msg::UrlNoRoutes(missing).text());
+        }
+        let method = consumer.method.as_deref();
+        let mut paths = (routes.iter())
+            .filter(|(served, _)| method.is_none_or(|m| m == *served || *served == ANY))
+            .map(|(_, path)| *path)
+            .peekable();
+        if paths.peek().is_none() {
+            return Some(crate::msg::Msg::UrlNoMethod(method.unwrap_or_default()).text());
+        }
+        // Suggest a prefix only when the whole server path is an exact suffix at a
+        // segment boundary. A fragment in the middle of a path proves less.
+        let written = consumer.lead.as_ref().map(|l| l.path.as_str()).or(
+            match consumer.fragments.as_slice() {
+                [one] => Some(one.as_str()),
+                _ => None,
+            },
+        );
+        let prefix = written.is_some_and(|written| {
+            paths.any(|path| path != "/" && written.len() > path.len() && written.ends_with(path))
+        });
+        Some(crate::msg::Msg::UrlNoPath { prefix }.text())
+    }
+
     /// A route fits a dynamic URL by its code path or by a gateway path: by the literal fragments
     /// of the URL, or, after a base Meada could not read, by the end of the path (#801).
     fn candidate(&self, consumer: &Consumer, provider: &Provider) -> bool {
@@ -1124,6 +1174,7 @@ mod tests {
             scope: "".into(),
             callee: "c[]".into(),
             key: "K".into(),
+            parameter: false,
             then: Vec::new(),
         };
         let text = |t: &str| Value::Str(vec![Part::Text(t.into())]);

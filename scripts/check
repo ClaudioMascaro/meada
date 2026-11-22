@@ -21,6 +21,9 @@ HARNESS_SCRIPTS = (".claude/skills/verify-blackbox/scripts/", ".claude/skills/me
 PROVE_SKILL = ".claude/skills/prove-meada"
 PROVE_CI_INPUTS = {
     "scripts/prove-ci", f"{PROVE_SKILL}/SKILL.md", f"{PROVE_SKILL}/references/scope.md",
+    f"{PROVE_SKILL}/scripts/proof_result.py",
+    f"{PROVE_SKILL}/scripts/smoke_stack.py", f"{PROVE_SKILL}/scripts/smoke_lifecycle.py",
+    f"{PROVE_SKILL}/scripts/smoke_oracle_test.py",
     f"{PROVE_SKILL}/scripts/a7-a8-audit.py", f"{PROVE_SKILL}/scripts/a7-a8-mutations.json",
     f"{PROVE_SKILL}/scripts/a7-tf-set/terraform-names.tsv",
 }
@@ -539,7 +542,7 @@ def selftest():
                 raise AssertionError("unsafe input was accepted")
             # Each data-only input, on its own, takes the actual static route to the selftest.
             write("scripts/prove-ci", 'from pathlib import Path\nPath("ran").touch()\n')
-            for input_path in ("SKILL.md", "references/scope.md", "scripts/a7-a8-mutations.json",
+            for input_path in ("SKILL.md", "references/scope.md", "scripts/proof_result.py", "scripts/a7-a8-mutations.json",
                                "scripts/a7-tf-set/terraform-names.tsv"):
                 static([], [f"{PROVE_SKILL}/{input_path}"], None)
                 assert Path("ran").is_file(), input_path

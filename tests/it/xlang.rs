@@ -812,6 +812,7 @@ fn a_swift_base_url_is_the_variable_of_exactly_one_process_environment_read() {
         ("guardLet", "GUARD_URL"),
         ("guardWithCondition", "COND_URL"),
         ("guardFallback", "GUARD_FALLBACK_URL"),
+        ("nameFromAVariable", "KEY_URL"),
     ];
     for (function, variable) in read {
         let expected = format!("env:{variable}");
@@ -828,7 +829,6 @@ fn a_swift_base_url_is_the_variable_of_exactly_one_process_environment_read() {
         "fallbackInterpolated",
         "trimmedByARead",
         "replacedByALocal",
-        "nameFromAVariable",
         "methodOfAnotherKind",
         "assignedAgain",
         "vaporEnvironment",
@@ -995,7 +995,7 @@ fn a_declarative_client_method_is_an_open_item_at_its_definition() {
         c.env("LANG", "en_US.UTF-8");
     });
     assert!(ok, "{stderr}");
-    assert!(list.contains(&format!("{catalog}\nsrc/main/java/com/example/api/CatalogClient.java:10  @GetMapping(\"/api/catalog\") String all();\n  1) ")), "{list}");
+    assert!(list.contains(&format!("{catalog}\nsrc/main/java/com/example/api/CatalogClient.java:10  @GetMapping(\"/api/catalog\") String all();\n  kind = \"ambiguous-link\"\n  1) ")), "{list}");
     assert!(list.contains(fetch), "{list}");
 }
 

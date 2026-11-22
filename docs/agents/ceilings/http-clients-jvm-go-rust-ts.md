@@ -370,9 +370,9 @@
   others of the trunk packs' lists pass an environment read through, beyond `trimEnd` and
   `removeSuffix`. A fallback that reads the environment through a name of another file, a
   function or a local is not seen (`ENV_NAMES` is the file's properties). An environment read
-  kept in a local `val` (`val raw = System.getenv(..) ?: ..; raw.trimEnd('/')`) or in a
-  function stays open: the consumer is open, never a wrong link. Parity with Java, not
-  regressions: a constructor parameter without `val` used in an initializer stays open; a
+  kept in a local `val` and passed through a string method stays open when the base cannot
+  be read. An exact call of a function or method can fold its returned environment read.
+  A constructor parameter without `val` used in an initializer stays open; a
   call that constructs the class in the source (`ExplicitClient("http://localhost:1")`) does not
   stop injection into the constructor's property; `@Value` on a plain function's parameter is
   injected as if the function were a bean's. A secondary constructor's `@Value` parameters are
@@ -397,11 +397,10 @@
   renamed destructured `httpRouter` (`{ httpRouter: r }`) are not followed, and such a plugin,
   like one whose `register` is not a function written in place, is neither mounted nor named by
   `meada status`. On the consumer side only
-  a URL whose first part is `<x>.getBaseUrl('<literal>')`, held by a constant or written in
-  place as the first call of the `fetch`, folds to `/api/<literal>`, and only when the receiver's
-  last name holds `discovery` (`discovery`, `this.discovery`, `discoveryApi`; by name, not by
-  type): another receiver, a base passed as a parameter and a non-literal id leave the base
-  unknown. A
+  a URL whose first part is `<x>.getBaseUrl(id)` folds to the mount when the receiver's
+  last name holds `discovery` (`discovery`, `this.discovery`, `discoveryApi`). An exact helper
+  return and a wrapper parameter that binds the id to a literal are followed. An unknown id
+  or a receiver with another name leaves the base unknown. A
   hostless call names a plugin in its reason only for a route that plugin's mount serves in the
   consumer's own repository (`backstage::name`); in another repository it links as any hostless
   URL does. `http/python.rs`: a FastAPI

@@ -428,7 +428,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
     // What a name written in a definition is bound to (`Facts::bound`), and the names assigned
     // in their binding's scope (`=`, `+=`, `++`, `out`, `ref`), which hold no one value.
     let mut bound: Vec<Bound> = Vec::new();
-    let mut assigned: Vec<(String, String, bool)> = Vec::new();
+    let mut assigned: Vec<(String, String, bool, super::QueryWrite)> = Vec::new();
     // The assignments through a name (`c.BaseAddress = v`, `_c = v`): the scope written in, the
     // path without a leading `this.`, whether it began with one, and the value.
     let mut members: Vec<(String, String, bool, Value)> = Vec::new();
@@ -877,7 +877,24 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         }
                         _ => continue,
                     };
-                    assigned.push((scope.as_ref().clone(), text(name, src).to_string(), this));
+                    let operator = node
+                        .child_by_field_name("operator")
+                        .map_or("", |op| text(op, src));
+                    let change = if this || left.is_none_or(|l| l.kind() != "identifier") {
+                        super::QueryWrite::Other
+                    } else if let Some(given) = &given {
+                        super::QueryWrite::of(given, text(name, src), operator)
+                    } else {
+                        right.map_or(super::QueryWrite::Other, |r| {
+                            super::QueryWrite::of(&value(r, src, 0), text(name, src), operator)
+                        })
+                    };
+                    assigned.push((
+                        scope.as_ref().clone(),
+                        text(name, src).to_string(),
+                        this,
+                        change,
+                    ));
                     let at = (scope.as_ref().clone(), this, given.clone());
                     writes
                         .entry(text(name, src).to_string())
@@ -953,7 +970,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 if children(node).any(|c| matches!(c.kind(), "++" | "--")) =>
             {
                 for target in named(node).filter(|t| t.kind() == "identifier") {
-                    assigned.push((scope.as_ref().clone(), text(target, src).to_string(), false));
+                    assigned.push((
+                        scope.as_ref().clone(),
+                        text(target, src).to_string(),
+                        false,
+                        super::QueryWrite::Other,
+                    ));
                     let at = (scope.as_ref().clone(), false, None);
                     writes
                         .entry(text(target, src).to_string())
@@ -978,7 +1000,12 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     _ => None,
                 });
                 for (target, this) in targets {
-                    assigned.push((scope.as_ref().clone(), text(target, src).to_string(), this));
+                    assigned.push((
+                        scope.as_ref().clone(),
+                        text(target, src).to_string(),
+                        this,
+                        super::QueryWrite::Other,
+                    ));
                     let at = (scope.as_ref().clone(), this, None);
                     writes
                         .entry(text(target, src).to_string())
@@ -1302,21 +1329,21 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 .flat_map(|d| d.params.iter().map(|p| (d.name.as_str(), p.name.as_str()))),
         )
         .collect();
-    let assigned: BTreeSet<(String, String)> = assigned
-        .into_iter()
-        .map(|(scope, name, this)| {
-            let mut at = scope.as_str();
-            while !at.is_empty() {
-                if (this && classes.contains(at))
-                    || (!this && bindings.contains(&(at, name.as_str())))
-                {
-                    break;
-                }
-                at = crate::parent(at);
+    let mut reassignments = BTreeMap::new();
+    for (scope, name, this, change) in assigned {
+        let mut at = scope.as_str();
+        while !at.is_empty() {
+            if (this && classes.contains(at)) || (!this && bindings.contains(&(at, name.as_str())))
+            {
+                break;
             }
-            (at.to_string(), name)
-        })
-        .collect();
+            at = crate::parent(at);
+        }
+        reassignments
+            .entry((at.to_owned(), name))
+            .and_modify(|old: &mut super::QueryWrite| *old = old.merge(change))
+            .or_insert(change);
+    }
     let mut through: Vec<Bound> = Vec::new();
     let mut member_at: HashMap<(String, String), usize> = HashMap::new();
     for (scope, path, this, value) in members {
@@ -1367,10 +1394,35 @@ fn parse(src: &[u8]) -> Result<Facts> {
     }
     // A binding assigned anywhere holds no one value, and its initializer is one more write of it
     // (`name=`, the first): the kinds that read a name's only write count them.
-    let (kept, initial): (Vec<Bound>, Vec<Bound>) = bound
-        .into_iter()
-        .partition(|b| !assigned.contains(&(b.scope.clone(), b.name.clone())));
+    let (mut kept, mut initial) = (Vec::new(), Vec::new());
+    for binding in bound {
+        let at = (binding.scope.clone(), binding.name.clone());
+        if let Some(change) = reassignments.get(&at) {
+            if !fields.contains(&binding.name) && !classes.contains(&binding.scope) {
+                let mut value = binding.value.clone();
+                if change.keep(&mut value) {
+                    kept.push(Bound {
+                        scope: binding.scope.clone(),
+                        within: binding.within.clone(),
+                        name: binding.name.clone(),
+                        value,
+                    });
+                }
+            }
+            initial.push(binding);
+        } else {
+            kept.push(binding);
+        }
+    }
     let bound = kept;
+    for def in &mut facts.defs {
+        def.reassigned_params = def
+            .params
+            .iter()
+            .filter(|p| reassignments.contains_key(&(def.name.clone(), p.name.clone())))
+            .map(|p| p.name.clone())
+            .collect();
+    }
     let mut all: Vec<Bound> = (initial.into_iter())
         .map(|b| Bound {
             name: format!("{}=", b.name),
@@ -1873,7 +1925,7 @@ const ENVIRONMENT_READ: &str = "GetEnvironmentVariable";
 const TRIMS: &[&str] = &["Trim", "TrimEnd", "TrimStart"];
 
 /// `callee` and `key` as a read in the scope `parse` is reading.
-fn read(callee: String, key: String) -> Part {
+fn read(callee: String, key: String, parameter: bool) -> Part {
     let scope = SCOPE.with_borrow_mut(|(scope, shared)| {
         (shared.get_or_insert_with(|| Arc::from(scope.as_str()))).clone()
     });
@@ -1881,6 +1933,7 @@ fn read(callee: String, key: String) -> Part {
         scope,
         callee,
         key,
+        parameter,
         then: Vec::new(),
     }
 }
@@ -1928,6 +1981,13 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         return Value::Unknown;
     }
     match node.kind() {
+        "conditional_expression" => {
+            let side = |field| {
+                node.child_by_field_name(field)
+                    .map_or(Value::Unknown, |n| value(n, src, depth + 1))
+            };
+            crate::lang::query_alternative(side("consequence"), side("alternative"))
+        }
         "string_literal" => {
             string(node, src).map_or(Value::Unknown, |s| Value::Str(vec![Part::Text(s)]))
         }
@@ -1970,7 +2030,8 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                         numbers += 1;
                         parts.push(Part::Hole);
                     }
-                    _ => parts.push(Part::Hole),
+                    Some(value) => parts.push(Part::unread(&value)),
+                    None => parts.push(Part::Hole),
                 }
             }
             // `1 + 2` adds numbers.
@@ -2015,7 +2076,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 (Some(receiver), Some([Value::Str(key)])) if !receiver.contains('(') => {
                     match &key[..] {
                         [Part::Text(key)] => {
-                            Value::Str(vec![read(format!("{receiver}[]"), key.clone())])
+                            Value::Str(vec![read(format!("{receiver}[]"), key.clone(), false)])
                         }
                         _ => Value::Unknown,
                     }
@@ -2056,6 +2117,7 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                     scope,
                     callee,
                     key,
+                    parameter,
                 }),
             ) = (member, receiver.as_ref().and_then(read_of))
             {
@@ -2067,17 +2129,23 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                     scope,
                     callee,
                     key,
+                    parameter,
                     then,
                 }]);
             }
             let callee = function.map_or_else(String::new, |f| callee(f, src));
             let args = arguments(node.child_by_field_name("arguments"), src, depth).0;
-            if let ([Value::Str(key)], Some(member)) = (&args[..], member)
-                && let [Part::Text(key)] = &key[..]
+            if let ([key], Some(member)) = (&args[..], member)
                 && text(member, src) == ENVIRONMENT_READ
                 && !callee.contains('(')
             {
-                return Value::Str(vec![read(callee, key.clone())]);
+                match key {
+                    Value::Str(parts) if let [Part::Text(text)] = parts.as_slice() => {
+                        return Value::Str(vec![read(callee, text.clone(), false)]);
+                    }
+                    Value::Ref(name) => return Value::Str(vec![read(callee, name.clone(), true)]),
+                    _ => {}
+                }
             }
             Value::Call(Invocation {
                 callee,
@@ -2415,7 +2483,7 @@ mod tests {
     }
 
     /// A read under a long `Trim` chain or a long `??` chain stays linear: past `VALUE_DEPTH` it
-    /// is an unknown part, never a read.
+    /// is opaque to the string reader.
     #[test]
     fn a_long_trim_or_fallback_chain_around_a_read_is_read_in_linear_time() {
         let get = "Environment.GetEnvironmentVariable(\"X\")";
@@ -2428,7 +2496,10 @@ mod tests {
         let found = strings(&source, "H.Get");
         // 1.0 s measured in a local debug build; the bound is over twenty times that.
         assert!(start.elapsed().as_secs() < 25, "{:?}", start.elapsed());
-        assert_eq!(found[0], [Part::Hole, Part::Text("/a".into())]);
+        assert!(
+            matches!(&found[0][..], [Part::Invoke { callee, .. }, Part::Text(path)]
+            if callee == "(invocation_expression).Trim" && path == "/a")
+        );
         assert_eq!(found[1], [Part::Hole, Part::Text("/b".into())]);
         // Within the depth, the chain is one read.
         let short = format!(

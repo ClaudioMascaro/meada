@@ -42,3 +42,8 @@ For #668 GCP SDK sides, run `python3 $S/gcp-sdk.py --head-bin "$RUN/bin/meada-he
 For #660's Java, Go and C# AWS SDK use sides, run `python3 $S/aws-sdk-jvm-go-dotnet.py --head-bin "$RUN/bin/meada-head" --run "$RUN/aws-sdk" --http`; inspect whole side/provision sets, controls, environment provenance and every raw transport answer. [references/aws-sdk-jvm-go-dotnet.md](../prove-meada/references/aws-sdk-jvm-go-dotnet.md) fixes the neutral input inventory and limits; all-corpus base parity and console viewer checks also apply to the Cargo version bump.
 
 For #775's field builders, run `python3 $S/aws-java-private-fields.py --head-bin "$RUN/bin/meada-head" --base-bin "$RUN/bin/meada-base" --run "$RUN/aws-java-private-fields"`. Each case is its own repository, and `checks.json` compares each DynamoDB side of both binaries with the key in `README.md`: case a, the change (base unnamed, head names `kept-private` and `own-private`); case b, its guard (a reflective read elsewhere in the repository keeps `keptField` unnamed on both, `ownField` named on both as a control); case c, the tighter guard (a reflective method reference in the file: the base names `held-old`, the head none). Read `java-run.txt` against the key: a name is right only where every run of the case sends it.
+
+The `dynamodb-transactions` flow covers #894 with the Java and Go sources and
+21 expected sides in [the neutral answer key](../prove-meada/scripts/dynamodb-transactions/README.md).
+The older SDK fixture is unchanged. The new flow runs on the head; the base
+comparison remains a maintainer decision.

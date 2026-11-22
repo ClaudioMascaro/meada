@@ -13,3 +13,4 @@ http::GET::/api/orders
   example.com/chain/web consumer src/drift.ts:59 page
   example.com/chain/web consumer src/drift.ts:73 pair
     drift: missing [].customer (inferred), [].total (inferred)
+  2 linked consumers omitted. See trace with direction "up".

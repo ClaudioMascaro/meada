@@ -12,7 +12,7 @@ export async function viaUrl(base: string) {
 
 export class OrdersClient {
   private base(): string {
-    return process.env.API_URL + '/v2';
+    return window.location.origin + '/v2';
   }
 
   async list() {

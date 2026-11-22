@@ -336,7 +336,7 @@ mod tests {
     #[test]
     fn a_path_after_a_base_meada_did_not_read_is_an_open_item_that_names_it() {
         let body = "import io.ktor.client.plugins.defaultRequest\n\
-            fun base(): String = System.getenv(\"API_URL\") + \"/v2/\"\n\
+            fun base(): String = runtimeBase()\n\
             val client = HttpClient(CIO) { defaultRequest { url(base()) } }\n\
             suspend fun f(typed: HttpClient) {\n    client.get(\"orders\")\n    \
             client.get(\"/health\")\n    typed.get(\"v1/items\")\n    typed.get(\"/ping\")\n    \
