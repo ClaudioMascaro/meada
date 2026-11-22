@@ -15,7 +15,7 @@ import shutil
 import subprocess
 import traceback
 import time
-from prove import git, free_port, Http, answer, mcp_answers
+from prove import git, free_port, Http, answer, mcp_answers, status_before_855
 
 REMOTE = 'example.com/zz-prove-aws/'
 SECRET = 'zz-prove-secure-must-never-appear'
@@ -566,7 +566,7 @@ def main():
         new = json.loads(probe.command(head, clean, 'head-plain', 'export'))
         new_status = probe.command(head, clean, 'head-plain-status', 'status')
         probe.check('code-only export base parity', old == new)
-        probe.check('code-only status base parity', old_status == new_status)
+        probe.check('code-only status base parity', status_before_855(old_status) == status_before_855(new_status))
         oq = [{'tool': 'context', 'arguments': {'symbol': 'independent_plain', 'budget': 8000}},
               {'tool': 'trace', 'arguments': {'from': 'independent_plain', 'direction': 'up', 'budget': 8000}}]
         _, bt, _ = mcp_answers(base, clean, oq, run / 'base-plain-stdio.err')

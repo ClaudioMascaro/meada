@@ -16,7 +16,7 @@ import socket
 import subprocess
 import time
 import traceback
-from prove import Http, Stdio, answer, free_port, git
+from prove import Http, Stdio, answer, free_port, git, status_before_855
 
 # A queue no Terraform provisions, named by its URL: an `exact` use, so its orphan line prints.
 LOST = 'https://sqs.eu-west-2.amazonaws.com/123456789012/lost'
@@ -409,11 +409,11 @@ class Probe:
         for name in ['infra','app','plain']:
             self.check_exports(b[name]['export'],h[name]['export'],oracle,name)
             if name=='plain':
-                self.check('plain whole status base parity',b[name]['status']==h[name]['status'])
+                self.check('plain whole status base parity',status_before_855(b[name]['status'])==status_before_855(h[name]['status']))
             else:
                 expected=expected_orphan_rows(oracle)
                 self.check(name+' complete orphan set/count',orphan_set(h[name]['status'])==(expected,len(expected)),h[name]['status'])
-                self.check(name+' existing status lines base parity',strip_orphans(h[name]['status'])==strip_orphans(b[name]['status']))
+                self.check(name+' existing status lines base parity',strip_orphans(status_before_855(h[name]['status']))==strip_orphans(status_before_855(b[name]['status'])))
         self.check('whole tool catalog preserves base plus the alert (#672) and CI (#860) kinds of search',expected_tools(b['tools'])==h['tools'])
         self.check('plain all query tools base parity',b['plain_texts']==h['plain_texts'])
         for i,(q,text) in enumerate(zip(queries,h['texts'])):

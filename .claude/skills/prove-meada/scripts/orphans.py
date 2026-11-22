@@ -16,7 +16,7 @@ import shutil
 import socket
 import subprocess
 import time
-from prove import Http, Stdio, answer, free_port, git
+from prove import Http, Stdio, answer, free_port, git, status_before_855
 
 
 NO_PROVIDER = 'no provisioner in the workspace'
@@ -230,7 +230,7 @@ class Probe:
             self.check(name + ' exact orphan set', orphan_set_matches(h, expected), repr(lines))
             without = ''.join(l + '\n' for l in h.splitlines() if not l.strip().startswith('orphan '))
             self.check(name + ' whole status baseline parity',
-                       (h if self.base_has_orphans else without) == b,
+                       status_before_855(h if self.base_has_orphans else without) == status_before_855(b),
                        'The current tier already has #657: compare complete status.' if self.base_has_orphans else
                        'Only the exact new orphan lines may differ; existing declared-resource diagnostics remain independent.')
             be = json.loads((self.run / f'base/{name}/export.out').read_text())
@@ -331,7 +331,7 @@ class Probe:
             if side == 'head' and self.http:
                 self.parity({'isolation': repo}, 'isolation', queries, texts, tools, 'http-isolation')
         self.check('cross-kind export parity', captures['base'][0] == captures['head'][0])
-        self.check('cross-kind whole status parity', captures['base'][1] == captures['head'][1])
+        self.check('cross-kind whole status parity', status_before_855(captures['base'][1]) == status_before_855(captures['head'][1]))
         self.check('cross-kind no orphan status lines', orphan_set_matches(captures['head'][1], {}))
         for i, text in enumerate(captures['head'][2]):
             # `channel::sqs` has a provisioner and no use; `resource::sqs` no group at all.

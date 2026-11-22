@@ -16,7 +16,7 @@ import socket
 import subprocess
 import time
 import traceback
-from prove import git, free_port, Http, answer, mcp_answers
+from prove import git, free_port, Http, answer, mcp_answers, status_before_855
 from console import http, query_equal
 
 REMOTE = 'example.com/neutral-sdk/'
@@ -397,7 +397,7 @@ def main():
         dump(run, 'base-control-stdio.json', old_texts)
         dump(run, 'head-control-stdio.json', new_texts)
         probe.check('existing code-only SQS export byte parity', old_bytes == new_bytes)
-        probe.check('existing code-only SQS status byte parity', old_status == new_status)
+        probe.check('existing code-only SQS status byte parity', status_before_855(old_status) == status_before_855(new_status))
         probe.check('existing SQS MCP answers and tool schemas byte parity', old_texts == new_texts and old_tools == new_tools == tools)
         manifest = 'index_dir = "indexes"\n'
         for name, root in [('infra', infra), ('app', app), ('peer', peer)]:
