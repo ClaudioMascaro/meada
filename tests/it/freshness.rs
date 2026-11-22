@@ -2732,3 +2732,65 @@ fn a_changed_dockerfile_summarizes_its_compose_file_again_and_matches_a_cold_exp
         assert_eq!(refreshed, cold, "{name}");
     }
 }
+
+#[test]
+fn an_upgrade_reextracts_unchanged_sources_and_matches_a_cold_index() {
+    let fixture = |case| {
+        fixture_repo(
+            case,
+            "go-literal-key-api",
+            Some("https://example.com/acme/api.git"),
+        );
+        let cli = fixture_repo(
+            case,
+            "go-literal-key-cli",
+            Some("https://example.com/acme/cli.git"),
+        );
+        age(&cli);
+        cli
+    };
+    let run = |root: &std::path::Path, cmd| {
+        let (stdout, stderr, ok) = common::meada(root, &[cmd], "", |_| {});
+        assert!(ok && stderr.is_empty(), "{cmd}: {stderr}");
+        stdout
+    };
+    let links = |json: &str| {
+        let export: serde_json::Value = serde_json::from_str(json).unwrap();
+        export["links"].clone()
+    };
+
+    let warm = fixture("items_upgrade_go_warm");
+    run(&warm, "index");
+    let index = warm.join(".meada/index.db");
+    // The version and the two missing contracts as recorded by e4058ebc. The test leaves all
+    // source bytes and their timestamps alone, so ordinary freshness cannot fix these rows.
+    rusqlite::Connection::open(index)
+        .unwrap()
+        .execute_batch(
+            "PRAGMA user_version = 1407674307;
+             UPDATE contracts SET contract = NULL
+             WHERE role = 'consumer' AND path IN ('bad/x.go', 'osk/x.go');",
+        )
+        .unwrap();
+
+    let first = links(&run(&warm, "export"));
+    run(&warm, "index");
+    let reopened = links(&run(&warm, "export"));
+    run(&warm, "index");
+    let repeated = links(&run(&warm, "export"));
+
+    let cold = fixture("items_upgrade_go_cold");
+    run(&cold, "index");
+    let expected = links(&run(&cold, "export"));
+    assert_eq!(expected.as_array().unwrap().len(), 4);
+    for link in expected.as_array().unwrap() {
+        assert_eq!(
+            link["provider"],
+            "example.com/acme/api::app/orders/route.ts::POST"
+        );
+        assert_eq!(link["level"], "inferred");
+    }
+    assert_eq!(first, expected);
+    assert_eq!(reopened, expected);
+    assert_eq!(repeated, expected);
+}

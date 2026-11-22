@@ -37,10 +37,15 @@ pub(crate) use meada_core::export::{Binding, CallSite, File, Process, Publish, S
 
 mod values;
 
+/// Bump when extraction or resolution changes the rows an unchanged checkout should produce
+/// without changing their stored shape. The schema golden pins the revision alongside the shape.
+#[cfg(test)]
+const EXTRACTION_REVISION: u32 = 1;
+
 /// The stored format's version, derived from its golden (`tests/golden/schema.txt`, kept by the
 /// unit test `the_stored_format_matches_its_golden`): re-blessing it after a change to `SCHEMA`,
-/// to the facts a pack stores or to a document's or a manifest's stored `summary` changes the
-/// version, and an index with another version is rebuilt beside it and renamed over it.
+/// the extraction revision or the shape of stored facts changes the version. An index with
+/// another version is rebuilt beside it and renamed over it.
 pub(crate) fn schema_version() -> i32 {
     let hash = blake3::hash(include_bytes!("../tests/golden/schema.txt"));
     let [a, b, c, d, ..] = *hash.as_bytes();
@@ -4768,7 +4773,11 @@ mod tests {
     #[test]
     fn the_stored_format_matches_its_golden() {
         let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
-        let mut actual = SCHEMA.trim_start().to_string();
+        let mut actual = format!(
+            "extraction revision {}\n\n{}",
+            super::EXTRACTION_REVISION,
+            SCHEMA.trim_start()
+        );
         let identity = [
             crate::contract::ReceiverIdentity {
                 kind: "subscription".into(),

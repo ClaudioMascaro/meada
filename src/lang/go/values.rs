@@ -195,8 +195,9 @@ pub(super) fn is_env(value: &Value) -> bool {
     matches!(value, Value::Str(parts) if matches!(parts[..], [Part::Env(_)]))
 }
 
-/// Which of `names` the file spells other than as the package of a selector (`fmt.Sprintf`): a
-/// parameter, a variable, a function. Any of them may hide the import.
+/// Which of `names` the file spells other than as the package of a selector (`fmt.Sprintf`) or
+/// as the whole key of a literal's element (`&C{http: ..}`): a parameter, a variable, a
+/// function. Any of them may hide the import.
 // ponytail: every such spelling counts as a binding, whatever its scope; it errs toward leaving
 // the call a plain call.
 fn hidden(root: Node, src: &[u8], names: &[&str]) -> BTreeSet<String> {
@@ -205,10 +206,16 @@ fn hidden(root: Node, src: &[u8], names: &[&str]) -> BTreeSet<String> {
     loop {
         let node = cursor.node();
         if node.kind() == "identifier" && names.contains(&text(node, src)) {
-            let package = node.parent().is_some_and(|p| {
+            let parent = node.parent();
+            let package = parent.is_some_and(|p| {
                 p.kind() == "selector_expression" && p.child_by_field_name("operand") == Some(node)
             });
-            if !package {
+            // A key alone is a struct's field, or a variable this file declares (Go refuses a
+            // package-level name beside a file's import of it): the declaration is the use.
+            let key = parent.and_then(|p| p.parent()).is_some_and(|e| {
+                e.kind() == "keyed_element" && e.child_by_field_name("key") == parent
+            });
+            if !package && !key {
                 out.insert(text(node, src).to_string());
             }
         }
@@ -864,6 +871,8 @@ mod tests {
         assert_eq!(tag(r#"default:"x env:B""#), None);
         assert_eq!(tag(r#"env:"-""#), None);
         assert_eq!(tag(r#"json:"b""#), None);
+        // An escaped quote is part of the value, not its end.
+        assert_eq!(tag(r#"json:"a\"b" env:"D""#).as_deref(), Some("D"));
     }
 
     /// How many calls deep the argument of the call `f` is read.
@@ -937,6 +946,26 @@ mod tests {
         ));
         let shadow = "package x\nimport \"net/http\"\nfunc f(http T){ g(http.MethodGet) }\n";
         assert!(!matches!(first_arg(shadow), Value::Str(_)));
+    }
+
+    #[test]
+    fn a_literal_key_named_like_an_import_leaves_it_read() {
+        let imports = "import (\"net/http\"\n\"os\")\n";
+        let folded = |file: &str| first_arg(&format!("package x\n{imports}{file}\n"));
+        // A struct literal's key is a field name, not the package.
+        let http =
+            "func n() *C { return &C{http: http.DefaultClient} }\nfunc f(){ g(http.MethodPost) }";
+        assert!(matches!(folded(http), Value::Str(_)));
+        let os = "func n() *C { return &C{os: \"linux\"} }\nfunc f(){ g(os.Getenv(\"X\")) }";
+        assert!(is_env(&folded(os)));
+        // The name as an element's value is a use, wherever it is bound.
+        let value = "func n() *C { return &C{os: os} }\nfunc f(){ g(os.Getenv(\"X\")) }";
+        assert!(!is_env(&folded(value)));
+        // A local or a parameter of the name still hides the package beside a key.
+        let local = "func n() *C { os := mk(); return &C{os: 1} }\nfunc f(){ g(os.Getenv(\"X\")) }";
+        assert!(!is_env(&folded(local)));
+        let param = "func f(os T){ _ = C{os: 1}; g(os.Getenv(\"X\")) }";
+        assert!(!is_env(&folded(param)));
     }
 
     #[test]
@@ -1033,5 +1062,196 @@ mod tests {
                 "{format} {given}"
             );
         }
+    }
+
+    #[test]
+    fn literals_read_as_the_values_they_write() {
+        let arg = |expr: &str| first_arg(&format!("package x\nfunc f(xs []T){{ g({expr}) }}\n"));
+        let text = |v: Value, want: &str| matches!(&v, Value::Str(p) if matches!(&p[..], [Part::Text(t)] if t == want));
+        assert!(text(arg("`/raw`"), "/raw"));
+        assert!(text(arg("(\"/x\")"), "/x"));
+        assert!(matches!(arg("xs..."), Value::Ref(n) if n == "xs"));
+        assert!(matches!(arg("func() {}"), Value::Function(_)));
+        // A slice is its elements, keyed or not; one written without its type is the object of
+        // its fields, or the list of its elements.
+        let items = arg("[]T{0: \"a\", {A: \"b\"}, {\"c\"}}");
+        assert!(matches!(&items, Value::List(items) if matches!(
+            &items[..],
+            [Value::Str(_), Value::Object(f), Value::List(l)] if f[0].0 == "A" && l.len() == 1
+        )));
+        // A map is the object of its entries, each under `[]` as its key and its value.
+        let entries = arg("map[string]string{\"k\": \"v\"}");
+        assert!(matches!(&entries, Value::Object(entries) if matches!(
+            &entries[..],
+            [(k, Value::List(kv))] if k == "[]" && kv.len() == 2
+        )));
+        // An anonymous struct names no type, and a sum of numbers is no string.
+        assert!(matches!(
+            arg("struct{ A string }{A: \"a\"}"),
+            Value::Unknown
+        ));
+        assert!(matches!(arg("1 + 2"), Value::Unknown));
+    }
+
+    #[test]
+    fn literals_without_their_type_nested_past_the_limit_are_unknown() {
+        // How many lists deep the first argument of `g` is read.
+        let depth = |nesting: usize| {
+            let ty = format!("{}int", "[]".repeat(nesting + 1));
+            let body = format!("{}1{}", "{".repeat(nesting + 1), "}".repeat(nesting + 1));
+            let mut value = first_arg(&format!("package x\nfunc f(){{ g({ty}{body}) }}\n"));
+            let mut depth = 0;
+            while let Value::List(mut items) = value {
+                depth += 1;
+                value = items.remove(0);
+            }
+            depth
+        };
+        assert_eq!(depth(10), 11);
+        // The typed list, then `VALUE_DEPTH` lists written without their type.
+        assert_eq!(depth(VALUE_DEPTH + 10), VALUE_DEPTH + 1);
+    }
+
+    #[test]
+    fn a_read_names_one_literal_and_a_trim_keeps_only_a_read() {
+        let imports = "import (\"os\"\n\"strings\")\n";
+        let folded = |body: &str| first_arg(&format!("package x\n{imports}func f(){{ {body} }}\n"));
+        assert!(is_env(&folded("g(os.Getenv(\"X\"))")));
+        // An empty name or two names, a trim of the wrong arity or by a read: no value.
+        for body in [
+            "g(os.Getenv(\"\"))",
+            "g(os.Getenv(\"X\", \"Y\"))",
+            "g(strings.TrimSpace(os.Getenv(\"X\"), \"/\"))",
+            "g(strings.TrimSuffix(os.Getenv(\"X\"), os.Getenv(\"Y\")))",
+        ] {
+            assert!(matches!(folded(body), Value::Unknown), "{body}");
+        }
+        // A trim of a name keeps it when the nearest binding noted for it is a read.
+        let held = folded("base := os.Getenv(\"X\"); g(strings.TrimSuffix(base, \"/\"))");
+        assert!(matches!(held, Value::Ref(n) if n == "base"));
+        for body in [
+            "base := \"x\"; g(strings.TrimSpace(base))",
+            "g(strings.TrimSpace(base))",
+        ] {
+            assert!(matches!(folded(body), Value::Unknown), "{body}");
+        }
+        // Another function of `strings` is a call.
+        assert!(matches!(
+            folded("g(strings.ToUpper(\"x\"))"),
+            Value::Call(_)
+        ));
+    }
+
+    #[test]
+    fn sprintf_of_an_unread_format_or_a_spread_is_unknown() {
+        let imports = "import \"fmt\"\n";
+        let folded = |body: &str| first_arg(&format!("package x\n{imports}func f(){{ {body} }}\n"));
+        let named = folded("g(fmt.Sprintf(\"/u/%s\", id))");
+        assert!(matches!(
+            &named,
+            Value::Str(p) if matches!(&p[..], [Part::Text(t), Part::Ref(r)] if t == "/u/" && r == "id")
+        ));
+        for body in [
+            "g(fmt.Sprintf(\"/u/%s\", xs...))",
+            "g(fmt.Sprintf(format, 1))",
+            "g(fmt.Sprintf(\"/u/\" + p + \"%d\", 1))",
+        ] {
+            assert!(matches!(folded(body), Value::Unknown), "{body}");
+        }
+    }
+
+    #[test]
+    fn a_tagged_field_is_read_by_its_path_from_its_type_to_the_limit() {
+        let file = |ty: &str, path: &str| {
+            first_arg(&format!(
+                "package x\ntype C struct {{\n{ty}\n}}\ntype D struct {{\nTwice string `env:\"B\"`\n}}\nfunc f(c C){{ g(c.{path}) }}\n"
+            ))
+        };
+        let read = file("API struct {\nURL string `env:\"API_URL\"`\n}", "API.URL");
+        assert!(
+            matches!(&read, Value::Str(p) if matches!(&p[..], [Part::Env(e)] if e == "API_URL"))
+        );
+        // A path two tags read differently is no read.
+        let twice = file("Twice string `env:\"A\"`", "Twice");
+        assert!(matches!(twice, Value::Ref(_)));
+        let nested = |n: usize| {
+            let ty = format!(
+                "{}URL string `env:\"X\"`{}",
+                "A struct {\n".repeat(n),
+                "\n}".repeat(n)
+            );
+            file(&ty, &format!("{}URL", "A.".repeat(n)))
+        };
+        assert!(is_env(&nested(10)));
+        assert!(!is_env(&nested(VALUE_DEPTH + 10)));
+    }
+
+    /// Whether `v`, bound to a read in `f`, is still a constant holding it after `body`, in a file
+    /// with `imports` and the constant `d`.
+    fn keeps_read(imports: &str, body: &str) -> bool {
+        let src = format!("package x\n{imports}const d = \"http://d\"\nfunc f() {{ {body} }}\n");
+        let facts = crate::lang::go::Go.parse("x.go", src.as_bytes()).unwrap();
+        (facts.consts.iter()).any(|c| c.name == "f.v" && is_env(&c.value))
+    }
+
+    #[test]
+    fn a_read_stays_through_a_trim_of_itself_or_a_plain_fallback_behind_an_empty_test() {
+        let imports = "import (\"os\"\n\"strings\")\n";
+        let read = "v := os.Getenv(\"X\"); ";
+        let lookup = "v, ok := os.LookupEnv(\"X\"); ";
+        for body in [
+            String::new(),
+            "v = strings.TrimSuffix(v, \"/\")".to_string(),
+            "v = strings.TrimRight(v, `/`)".to_string(),
+            "v = strings.TrimSpace(v)".to_string(),
+            "if v == \"\" { v = \"http://x\" }".to_string(),
+            "if \"\" == v { v = d }".to_string(),
+            "if len(v) == 0 { v = d + \"/x\" }".to_string(),
+            "if 0 == len(v) { v = \"x\" }".to_string(),
+        ] {
+            assert!(keeps_read(imports, &format!("{read}{body}")), "{body}");
+        }
+        for body in [
+            "if !ok { v = \"x\" }",
+            "if !ok || v == \"\" { v = \"x\" }",
+            "if v == `` || !ok { v = \"x\" }",
+        ] {
+            assert!(keeps_read(imports, &format!("{lookup}{body}")), "{body}");
+        }
+        // Replaced, assigned otherwise, trimmed of a name or by another function.
+        let replaced = [
+            "v = mk()",
+            "v = \"x\"",
+            "v += \"/x\"",
+            "v, w = a, b",
+            "v = strings.TrimSuffix(v, cut)",
+            "v = strings.TrimPrefix(v, \"/\")",
+        ];
+        // A fallback that is not plain: a call, another read, a name the file does not hold.
+        let unplain = [
+            "if v == \"\" { v = mk() }",
+            "if v == \"\" { v = os.Getenv(\"Y\") }",
+            "if v == \"\" { v = other }",
+        ];
+        // A test of something else than an empty read, or a branch that does more.
+        let untested = [
+            "if v != \"\" { v = \"x\" }",
+            "if v == \"a\" { v = \"x\" }",
+            "if cap(v) == 0 { v = \"x\" }",
+            "if ok { v = \"x\" }",
+            "if !mk() { v = \"x\" }",
+            "if v == \"\" || w == \"\" { v = \"x\" }",
+            "if v == \"\" { v = \"x\" } else { mk() }",
+            "if w := 1; v == \"\" { v = \"x\" }",
+            "if v == \"\" { v = \"x\"; mk() }",
+        ];
+        for body in replaced.iter().chain(&unplain).chain(&untested) {
+            assert!(!keeps_read(imports, &format!("{read}{body}")), "{body}");
+        }
+        let unpaired = "if !ok || v != \"\" { v = \"x\" }";
+        assert!(!keeps_read(imports, &format!("{lookup}{unpaired}")));
+        // Without the `strings` import a trim is a call like any other.
+        let trim = format!("{read}v = strings.TrimSpace(v)");
+        assert!(!keeps_read("import \"os\"\n", &trim));
     }
 }
