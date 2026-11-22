@@ -415,6 +415,53 @@ fn list_prune_and_human_mode_read_no_decider_variable_and_send_nothing() {
     assert!(stub.requests().is_empty());
 }
 
+/// A linked `meada.decisions.toml` is refused before the first request; what sends nothing
+/// and saves nothing still reads through it.
+#[cfg(unix)]
+#[test]
+fn a_linked_decisions_file_is_refused_before_any_request() {
+    let (web, _, _) = chain("decider_linked");
+    let link = web.join("meada.decisions.toml");
+    let target = web.with_file_name("shared.decisions.toml");
+    fs::write(&target, "").unwrap();
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+    let stub = Stub::start(vec![
+        Reply::chat("local/test-model", answer("2", 0.9)),
+        Reply::chat("local/test-model", answer("1", 0.9)),
+    ]);
+
+    let (stdout, stderr, ok) = meada(
+        &web,
+        &["decide", "--decider"],
+        &chat(&stub),
+        "",
+        Some(&stub),
+    );
+
+    assert!(!ok);
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "meada: <repo>/meada.decisions.toml: a symbolic link; Meada writes this file in the \
+         repository root only\n"
+    );
+    assert!(stub.requests().is_empty());
+    assert!(
+        fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(fs::read(&target).unwrap(), b"");
+    assert!(!web.join("meada.decisions.toml.tmp").exists());
+
+    let show = ["decide", "--decider", "--show-request"];
+    let (stdout, stderr, ok) = meada(&web, &show, &chat(&stub), "", Some(&stub));
+    assert!(ok, "{stderr}");
+    assert_golden("chain-web.decide.show-request.chat.txt", &stdout);
+    assert!(stub.requests().is_empty());
+}
+
 #[test]
 fn no_other_command_reaches_the_decider() {
     let (web, _, _) = chain("decider_boundary");

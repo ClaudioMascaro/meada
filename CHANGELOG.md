@@ -17,6 +17,16 @@ All notable changes to Meada are recorded here. The format follows
   say that an orphan line is a lead for review, never by itself a reason to delete a resource.
   `search`, `context` and `trace` answer as before (ADR 0020) (#849).
 
+### Fixed
+
+- `meada decide` no longer replaces a `meada.decisions.toml` that is a symbolic link with a
+  regular file, leaving the link's target as it was: every mode that can write (interactive,
+  `--item`, `--decider`, `--prune`) refuses the link, a dangling one too, before it asks a
+  question or sends a request, with `<path>: a symbolic link; Meada writes this file in the
+  repository root only` and a non-zero exit, writing nothing. `--list`, `--dry-run`,
+  `--show-request`, `meada index`, `meada status`, `meada export` and the MCP server still read
+  the file through the link. What counts as a link is the test a mirror's files use (#506, #547).
+
 ## [1.5.0] - 2026-11-16
 
 A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md)

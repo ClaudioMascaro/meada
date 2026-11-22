@@ -4,6 +4,7 @@
 //! Decider mode (`--decider`, `crate::decider`) asks a model instead.
 
 use std::io::{BufRead, Write};
+use std::path::Path;
 
 use crate::Result;
 use crate::decider;
@@ -28,6 +29,20 @@ pub struct Options {
     pub show_request: bool,
     /// Decider mode: write a model decision only from this probability up; `MIN_P` when unset.
     pub min_p: Option<f64>,
+}
+
+impl Options {
+    fn can_save(&self) -> bool {
+        self.prune || !(self.list || self.dry_run || self.show_request)
+    }
+}
+
+/// Opens the workspace for decide, checking the local decisions file before discovery reads it.
+pub fn open(dir: &Path, options: &Options) -> Result<Engine> {
+    if options.can_save() {
+        decisions::writable(&crate::repo::root(dir)?)?;
+    }
+    Engine::open(dir)
 }
 
 /// The open items of this repository to work on, in id order; with `only`, that one item,
@@ -102,8 +117,9 @@ pub(crate) fn ask(
 
 /// Runs the command: `--list` shows the items; otherwise it asks a person, or the decider with
 /// `--decider`, then writes the file once, at the end (or prints it for `--dry-run`). Nothing
-/// is written when nothing was picked. Only decider mode reads the decider variables, and
-/// `--list` reads none.
+/// is written when nothing was picked. A run that can write refuses a decisions file that is a
+/// symbolic link before it asks or sends anything (`decisions::writable`). Only decider mode
+/// reads the decider variables, and `--list` reads none.
 pub fn run(
     engine: &Engine,
     options: &Options,
@@ -112,6 +128,10 @@ pub fn run(
 ) -> Result<()> {
     // Checked whenever it is given, whatever else the run does.
     let min_p = options.min_p.map_or(Ok(decider::MIN_P), decider::min_p)?;
+    // Before any question, request or write, whether or not the run ends up saving.
+    if options.can_save() {
+        decisions::writable(engine.root())?;
+    }
     if options.prune {
         return prune(engine, out);
     }

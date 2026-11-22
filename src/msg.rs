@@ -1416,6 +1416,9 @@ pub enum Msg<'a> {
     DecidePruneHelp,
     DecidePruned(usize),
     CallRepeated(&'a str),
+    /// After the path of a `meada.decisions.toml` that is a symbolic link, which a run that
+    /// saves refuses (`decisions::writable`).
+    DecisionsLinked,
     DecideNothingToPrune,
     DecideNoItems,
     DecideUnknownItem(&'a str),
@@ -5204,6 +5207,12 @@ impl Msg<'_> {
                 format!("`call`: `{call}` is decided twice, one entry per call"),
                 format!("`call`: `{call}` aparece duas vezes, uma entrada por chamada"),
                 format!("`call`: `{call}` aparece dos veces, una entrada por llamada"),
+            ),
+            Msg::DecisionsLinked => pick(
+                "a symbolic link; Meada writes this file in the repository root only".into(),
+                "um link simbólico; o Meada grava este arquivo só na raiz do repositório".into(),
+                "un enlace simbólico; Meada escribe este archivo solo en la raíz del repositorio"
+                    .into(),
             ),
             Msg::DecideNothingToPrune => {
                 pick("nothing to prune".into(), "nada a remover".into(), "nada que eliminar".into())

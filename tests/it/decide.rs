@@ -5,6 +5,8 @@ use crate::common;
 
 use std::fs;
 use std::path::Path;
+#[cfg(unix)]
+use std::path::PathBuf;
 
 use common::{HEALTH, TRACK, assert_golden, chain, without_processes, written as file};
 use meada::engine::Engine;
@@ -350,4 +352,158 @@ fn prune_does_not_combine_with_the_other_flags() {
         let (_, stderr, ok) = decide(&web, "en_US.UTF-8", &["--prune", other], "");
         assert!(!ok && stderr.contains("cannot be used"), "{stderr}");
     }
+}
+
+/// What a run that can save prints, after `meada: `, for a linked decisions file.
+#[cfg(unix)]
+const LINKED: &str = "<repo>/meada.decisions.toml: a symbolic link; \
+    Meada writes this file in the repository root only";
+
+/// Moves `web`'s `meada.decisions.toml` out of the repository, beside it, and makes the name a
+/// symbolic link to it. Returns the link and its target.
+#[cfg(unix)]
+fn link_out(web: &Path) -> (PathBuf, PathBuf) {
+    let link = web.join("meada.decisions.toml");
+    let target = web.with_file_name("shared.decisions.toml");
+    fs::rename(&link, &target).unwrap();
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+    (link, target)
+}
+
+/// The link is still a link, its target holds `before` (`None`: there is none), and no
+/// temporary file was left beside the name.
+#[cfg(unix)]
+fn untouched(web: &Path, (link, target): &(PathBuf, PathBuf), before: Option<&[u8]>) {
+    let meta = fs::symlink_metadata(link).unwrap();
+    assert!(meta.file_type().is_symlink(), "{}", link.display());
+    assert_eq!(fs::read(target).ok().as_deref(), before);
+    assert!(!web.join("meada.decisions.toml.tmp").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn every_mode_that_can_save_refuses_a_linked_decisions_file_and_leaves_it_alone() {
+    let (web, _, _) = chain("decide_linked");
+    // A stale and a waiting entry: each mode below has something to save.
+    common::decisions(&web, "chain-web-stale-and-waiting");
+    add_missing_peer(&web);
+    let linked = link_out(&web);
+    let before = fs::read(&linked.1).unwrap();
+
+    for (args, stdin) in [
+        (&[][..], "1\n1\n"),
+        (&["--item", HEALTH], "1\n"),
+        (&["--prune"], ""),
+    ] {
+        let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", args, stdin);
+        // Refused before the first question.
+        assert!(!ok, "{args:?}");
+        assert_eq!(
+            (stdout.as_str(), stderr),
+            ("", format!("meada: {LINKED}\n"))
+        );
+        untouched(&web, &linked, Some(&before));
+    }
+
+    let (_, stderr, ok) = decide(&web, "pt_BR.UTF-8", &[], "1\n1\n");
+    assert!(!ok);
+    assert_eq!(
+        stderr,
+        "meada: <repo>/meada.decisions.toml: um link simbólico; o Meada grava este arquivo só \
+         na raiz do repositório\n"
+    );
+    untouched(&web, &linked, Some(&before));
+}
+
+#[cfg(unix)]
+#[test]
+fn the_refusal_of_a_linked_decisions_file_does_not_depend_on_what_the_run_would_save() {
+    let (web, _, _) = chain("decide_linked_nothing");
+    // Every item decided and none stale: neither run would write.
+    common::decisions(&web, "chain-web");
+    let linked = link_out(&web);
+    let before = fs::read(&linked.1).unwrap();
+    let refused = (String::new(), format!("meada: {LINKED}\n"), false);
+
+    for args in [&[][..], &["--prune"]] {
+        assert_eq!(
+            decide(&web, "en_US.UTF-8", args, "1\n"),
+            refused,
+            "{args:?}"
+        );
+        untouched(&web, &linked, Some(&before));
+    }
+
+    // A dangling link reads as no file, so both items are open again: still refused.
+    fs::remove_file(&linked.1).unwrap();
+    for args in [&[][..], &["--prune"]] {
+        assert_eq!(
+            decide(&web, "en_US.UTF-8", args, "1\n1\n"),
+            refused,
+            "{args:?}"
+        );
+        untouched(&web, &linked, None);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn saving_modes_check_the_link_before_loading_its_malformed_target() {
+    let (web, _, _) = chain("decide_linked_malformed");
+    let bytes = b"decision = [\n";
+    fs::write(web.join("meada.decisions.toml"), bytes).unwrap();
+    let linked = link_out(&web);
+    let destination = fs::read_link(&linked.0).unwrap();
+    for args in [&[][..], &["--item", HEALTH], &["--prune"], &["--decider"]] {
+        assert_eq!(
+            decide(&web, "en_US.UTF-8", args, "1\n"),
+            (String::new(), format!("meada: {LINKED}\n"), false),
+            "{args:?}"
+        );
+        untouched(&web, &linked, Some(bytes));
+        assert_eq!(fs::read_link(&linked.0).unwrap(), destination);
+    }
+    for args in [
+        &["--list"][..],
+        &["--dry-run"],
+        &["--decider", "--show-request"],
+    ] {
+        let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", args, "");
+        assert!(!ok && stdout.is_empty(), "{args:?}: {stdout}");
+        assert!(stderr.contains("unclosed array"), "{args:?}: {stderr}");
+        untouched(&web, &linked, Some(bytes));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn what_never_saves_reads_a_linked_decisions_file_as_a_regular_one() {
+    let (web, _, _) = chain("decide_linked_reads");
+    common::decisions(&web, "chain-web-stale-and-waiting");
+    add_missing_peer(&web);
+    let runs: [(&[&str], &str); 4] = [
+        (&["decide", "--list"], ""),
+        (&["decide", "--dry-run"], "1\n"),
+        (&["index"], ""),
+        (&["status"], ""),
+    ];
+    let outputs = || {
+        runs.map(|(args, stdin)| {
+            let lang = |c: &mut std::process::Command| {
+                c.env("LANG", "en_US.UTF-8");
+            };
+            let (stdout, stderr, ok) = common::meada(&web, args, stdin, lang);
+            assert!(ok, "{args:?}: {stderr}");
+            (stdout, stderr)
+        })
+    };
+
+    let regular = outputs();
+    let linked = link_out(&web);
+    let before = fs::read(&linked.1).unwrap();
+    let through = outputs();
+
+    assert_golden("chain-web.decide.list-stale.en.txt", &through[0].0);
+    assert_eq!(through, regular);
+    untouched(&web, &linked, Some(&before));
 }

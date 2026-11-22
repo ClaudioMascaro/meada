@@ -150,10 +150,9 @@ pub(crate) fn read_bounded(path: &Path, max: u64) -> std::result::Result<Vec<u8>
 /// refused too.
 fn read_unlinked(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> {
     let problem = io_problem(path);
-    let checked = fs::symlink_metadata(path).map_err(problem)?;
-    if checked.file_type().is_symlink() {
+    let Some(checked) = unlinked(path).map_err(problem)? else {
         return Err(format!("{}: a symbolic link", path.display()));
-    }
+    };
     if !checked.is_file() {
         return Err(format!("{}: not a regular file", path.display()));
     }
@@ -162,6 +161,14 @@ fn read_unlinked(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> 
         return Err(format!("{}: replaced while read", path.display()));
     }
     read_up_to(path, file, max)
+}
+
+/// The metadata of `path` itself, or `None` when `path` is a symbolic link, a dangling one
+/// included: the one test of a link for a file the repository holds, which a mirror's read
+/// (`read_unlinked`) and the save of `meada.decisions.toml` (`decisions::writable`) refuse.
+pub(crate) fn unlinked(path: &Path) -> std::io::Result<Option<fs::Metadata>> {
+    let meta = fs::symlink_metadata(path)?;
+    Ok((!meta.file_type().is_symlink()).then_some(meta))
 }
 
 /// Whether `a` and `b` are the metadata of the same file: its device and inode on Unix.
