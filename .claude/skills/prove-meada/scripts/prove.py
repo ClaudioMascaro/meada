@@ -74,6 +74,17 @@ def git(*args, cwd, **kw):
                           capture_output=True, text=True, **kw).stdout
 
 
+def status_before_855(text):
+    """`meada status` (English) without what #855 adds on purpose: the first line `workspace: N
+    repositories` and the scope (` in the workspace`, ` in <repository>`) that ends an orphan line's
+    reason. A base-parity check of `status` compares both sides through it (SKILL.md, Known and
+    deliberate); a side from before #855 passes through unchanged."""
+    lines = text.splitlines(keepends=True)
+    if lines and re.fullmatch(r"workspace: \d+ repositor(?:y|ies)\n?", lines[0]):
+        lines = lines[1:]
+    return "".join(re.sub(r"^(\s*orphan \S+: no [a-z]+) in [^;]+;", r"\1;", line) for line in lines)
+
+
 def corpus(table="corpus.tsv"):
     """name -> (packs or A7 flows, url, sha); `infra.tsv` adds a license column, kept for people."""
     rows = {}

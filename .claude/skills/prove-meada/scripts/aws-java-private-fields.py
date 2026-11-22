@@ -5,8 +5,8 @@ key); `oracle/java-run.txt` is what each case sends when compiled and run on a J
 
 The key, per DynamoDB side (`Class.method`): the contract the base binary gives and the one the head
 gives. A case the change does not touch keeps the base's answer; where they differ, the head's is the
-one the Java run allows (a name only where every run sends it, else none). A script pass is evidence,
-not a PROVED verdict.
+one the Java run allows (a name only where every run sends it, else none). A base at or after 1.5.0
+holds #775 (#885), so its column is the head's. A script pass is evidence, not a PROVED verdict.
 """
 import argparse
 import json
@@ -21,11 +21,11 @@ HERE = Path(__file__).resolve().parent
 PROBE = HERE / 'aws-java-private-fields'
 NONE = 'resource::dynamodb'  # the side with no table: unresolved
 KEY = {  # (case, side) -> {binary: contract}
-    ('a', 'Fields.keptField'): {'base': NONE, 'head': NONE + '::kept-private'},
-    ('a', 'Fields.ownField'): {'base': NONE, 'head': NONE + '::own-private'},
+    ('a', 'Fields.keptField'): {'base': NONE + '::kept-private', 'head': NONE + '::kept-private'},
+    ('a', 'Fields.ownField'): {'base': NONE + '::own-private', 'head': NONE + '::own-private'},
     ('b', 'Fields.keptField'): {'base': NONE, 'head': NONE},
     ('b', 'Fields.ownField'): {'base': NONE + '::own-private', 'head': NONE + '::own-private'},
-    ('c', 'Held.heldField'): {'base': NONE + '::held-old', 'head': NONE},
+    ('c', 'Held.heldField'): {'base': NONE, 'head': NONE},
 }
 CASES = sorted({case for case, _ in KEY})
 
